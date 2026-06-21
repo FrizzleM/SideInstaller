@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SideInstaller — Install</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0a0f">
+<style>
+  :root{
+    --bg:#0a0a0f; --bg2:#12121c; --card:rgba(255,255,255,.04); --card-hover:rgba(255,255,255,.07);
+    --stroke:rgba(255,255,255,.09); --stroke-strong:rgba(255,255,255,.16);
+    --text:#f4f5fb; --muted:#9aa0b4; --faint:#6b7180;
+    --accent:#6d8bff; --accent2:#a06bff;
+    --good:#34d399; --warn:#fbbf24; --crit:#fb923c; --bad:#f87171;
+    --radius:18px; --radius-sm:12px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; min-height:100vh; color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    line-height:1.55;
+    background:
+      radial-gradient(1100px 620px at 18% -8%, rgba(109,139,255,.18), transparent 60%),
+      radial-gradient(900px 560px at 88% 4%, rgba(160,107,255,.16), transparent 58%),
+      var(--bg);
+    background-attachment:fixed;
+    padding:max(20px,env(safe-area-inset-top)) 18px 64px;
+  }
+  .wrap{max-width:920px; margin:0 auto}
+
+  /* ---- hero ---- */
+  .hero{text-align:center; padding:18px 8px 8px}
+  .logo{
+    width:96px; height:96px; margin:0 auto 18px; display:grid; place-items:center;
+    border-radius:24px; background:linear-gradient(150deg,#1b1d2c,#101019);
+    border:1px solid var(--stroke-strong);
+    box-shadow:0 18px 50px rgba(109,139,255,.28), inset 0 1px 0 rgba(255,255,255,.06);
+    overflow:hidden;
+  }
+  .logo img{width:100%; height:100%; object-fit:cover}
+  .logo svg{width:54px; height:54px}
+  h1{
+    margin:0; font-size:clamp(28px,6vw,40px); font-weight:800; letter-spacing:-.02em;
+    background:linear-gradient(120deg,#fff,#c7cdf2 60%,#a9b2ff);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .tagline{margin:8px auto 0; max-width:540px; color:var(--muted); font-size:16px}
+  .badges{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
+  .badge{
+    font-size:13px; font-weight:600; color:var(--muted);
+    padding:7px 14px; border-radius:999px; background:var(--card); border:1px solid var(--stroke);
+  }
+  .badge b{color:var(--text)}
+
+  /* ---- controls ---- */
+  .controls{
+    display:flex; gap:10px; margin:30px 0 18px; flex-wrap:wrap; align-items:center;
+  }
+  .search{position:relative; flex:1 1 240px}
+  .search svg{position:absolute; left:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--faint)}
+  .search input{
+    width:100%; padding:13px 14px 13px 42px; font-size:15px; color:var(--text);
+    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius-sm);
+    outline:none; transition:border-color .15s, background .15s;
+  }
+  .search input:focus{border-color:var(--accent); background:var(--card-hover)}
+  .search input::placeholder{color:var(--faint)}
+  .sort{
+    padding:13px 38px 13px 14px; font-size:14px; font-weight:600; color:var(--text);
+    background:var(--card) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa0b4' stroke-width='2.5' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>") no-repeat right 14px center;
+    border:1px solid var(--stroke); border-radius:var(--radius-sm); outline:none;
+    appearance:none; -webkit-appearance:none; cursor:pointer;
+  }
+
+  /* ---- cert grid ---- */
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(248px,1fr)); gap:14px}
+  .cert-card{
+    display:flex; flex-direction:column; gap:12px; padding:18px;
+    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius);
+    transition:transform .16s ease, border-color .16s, background .16s;
+  }
+  .cert-card:hover{transform:translateY(-3px); background:var(--card-hover); border-color:var(--stroke-strong)}
+  .cert-head{display:flex; align-items:flex-start; justify-content:space-between; gap:10px}
+  .cert-name{margin:0; font-size:17px; font-weight:700; word-break:break-word}
+  .cert-meta{margin:0; font-size:12.5px; color:var(--faint)}
+  .pill{
+    flex:none; font-size:11.5px; font-weight:700; letter-spacing:.01em;
+    padding:5px 10px; border-radius:999px; white-space:nowrap;
+    border:1px solid transparent;
+  }
+  .pill.good{color:var(--good); background:rgba(52,211,153,.12); border-color:rgba(52,211,153,.25)}
+  .pill.warn{color:var(--warn); background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.25)}
+  .pill.crit{color:var(--crit); background:rgba(251,146,60,.13); border-color:rgba(251,146,60,.28)}
+  .pill.bad{color:var(--bad); background:rgba(248,113,113,.13); border-color:rgba(248,113,113,.3)}
+  .pill.unknown{color:var(--muted); background:rgba(255,255,255,.05); border-color:var(--stroke)}
+  .install-btn{
+    margin-top:auto; display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:12px 16px; font-size:15px; font-weight:700; text-decoration:none; color:#fff;
+    border-radius:var(--radius-sm);
+    background:linear-gradient(120deg,var(--accent),var(--accent2));
+    box-shadow:0 8px 22px rgba(109,139,255,.3);
+    transition:transform .14s, box-shadow .14s, filter .14s;
+  }
+  .install-btn svg{width:17px; height:17px}
+  .install-btn:hover{filter:brightness(1.07); box-shadow:0 12px 30px rgba(160,107,255,.4)}
+  .install-btn:active{transform:scale(.97)}
+  .cert-card[data-days^="-"] .install-btn{filter:saturate(.5) brightness(.85)}
+
+  .empty{display:none; text-align:center; color:var(--muted); padding:50px 0; font-size:15px}
+  .empty.show{display:block}
+
+  /* ---- how-to ---- */
+  details.howto{
+    margin-top:32px; background:var(--card); border:1px solid var(--stroke);
+    border-radius:var(--radius); overflow:hidden;
+  }
+  details.howto summary{
+    list-style:none; cursor:pointer; padding:16px 20px; font-weight:700; font-size:15px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+  }
+  details.howto summary::-webkit-details-marker{display:none}
+  details.howto summary::after{content:"+"; color:var(--muted); font-size:20px; font-weight:400; transition:transform .2s}
+  details.howto[open] summary::after{transform:rotate(45deg)}
+  .howto-body{padding:0 20px 20px; color:var(--muted); font-size:14.5px}
+  .howto-body ol{margin:0; padding-left:20px}
+  .howto-body li{margin:8px 0}
+  .howto-body code{
+    background:rgba(255,255,255,.07); padding:1px 6px; border-radius:6px;
+    font-size:13px; color:var(--text);
+  }
+
+  .footer{margin-top:40px; text-align:center; color:var(--faint); font-size:13px}
+  .footer a{color:var(--muted); text-decoration:none}
+  .footer a:hover{color:var(--text)}
+
+  @media (max-width:520px){
+    .grid{grid-template-columns:1fr}
+    .controls{flex-direction:column; align-items:stretch}
+    .sort{width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop offset="0" stop-color="#6d8bff"/><stop offset="1" stop-color="#a06bff"/></linearGradient></defs><rect x="4" y="2.5" width="16" height="19" rx="3.5"/><path d="M12 7v8"/><path d="M8.5 11.5L12 15l3.5-3.5"/></svg></div>
+    <h1>SideInstaller</h1>
+    <p class="tagline">On-device sideloader. Pick a certificate and tap install.</p>
+    <div class="badges">
+      <span class="badge">Version <b>0.1.0</b></span>
+      <span class="badge"><b>14</b> certificates</span>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="q" type="search" placeholder="Search certificates…" autocomplete="off" spellcheck="false">
+    </div>
+    <select id="sort" class="sort" aria-label="Sort certificates">
+      <option value="days">Most days left</option>
+      <option value="days-asc">Soonest to expire</option>
+      <option value="name">Name (A–Z)</option>
+    </select>
+  </div>
+
+  <main id="grid" class="grid">
+    <article class="cert-card" data-name="XL" data-days="973">
+      <div class="cert-head">
+        <h3 class="cert-name">XL</h3>
+        <span class="pill good">973 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2029-02-17</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-XL.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="National" data-days="949">
+      <div class="cert-head">
+        <h3 class="cert-name">National</h3>
+        <span class="pill good">949 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2029-01-25</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-National.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Rural" data-days="877">
+      <div class="cert-head">
+        <h3 class="cert-name">Rural</h3>
+        <span class="pill good">877 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-11-14</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Rural.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="ChinaAcademy" data-days="859">
+      <div class="cert-head">
+        <h3 class="cert-name">ChinaAcademy</h3>
+        <span class="pill good">859 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-10-27</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-ChinaAcademy.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="ChinaPower" data-days="853">
+      <div class="cert-head">
+        <h3 class="cert-name">ChinaPower</h3>
+        <span class="pill good">853 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-10-21</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-ChinaPower.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Postal" data-days="780">
+      <div class="cert-head">
+        <h3 class="cert-name">Postal</h3>
+        <span class="pill good">780 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-08-09</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Postal.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Takeoff" data-days="714">
+      <div class="cert-head">
+        <h3 class="cert-name">Takeoff</h3>
+        <span class="pill good">714 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-06-04</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Takeoff.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Election" data-days="676">
+      <div class="cert-head">
+        <h3 class="cert-name">Election</h3>
+        <span class="pill good">676 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-04-27</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Election.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Vietnam" data-days="670">
+      <div class="cert-head">
+        <h3 class="cert-name">Vietnam</h3>
+        <span class="pill good">670 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-04-21</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Vietnam.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Wuling" data-days="343">
+      <div class="cert-head">
+        <h3 class="cert-name">Wuling</h3>
+        <span class="pill good">343 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2027-05-30</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Wuling.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Forever" data-days="229">
+      <div class="cert-head">
+        <h3 class="cert-name">Forever</h3>
+        <span class="pill good">229 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2027-02-05</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Forever.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="BOC" data-days="138">
+      <div class="cert-head">
+        <h3 class="cert-name">BOC</h3>
+        <span class="pill good">138 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2026-11-06</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-BOC.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Aramco" data-days="95">
+      <div class="cert-head">
+        <h3 class="cert-name">Aramco</h3>
+        <span class="pill good">95 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2026-09-24</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Aramco.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Beijing" data-days="62">
+      <div class="cert-head">
+        <h3 class="cert-name">Beijing</h3>
+        <span class="pill good">62 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2026-08-22</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Beijing.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+  </main>
+  <p id="empty" class="empty">No certificates match your search.</p>
+
+  <details class="howto">
+    <summary>How to install</summary>
+    <div class="howto-body">
+      <ol>
+        <li>Open this page <b>on your iPhone or iPad in Safari</b>.</li>
+        <li>Pick any certificate below and tap <b>Install</b>, then confirm the prompt.</li>
+        <li>Wait for the app to finish installing on your Home Screen.</li>
+        <li>Go to <code>Settings → General → VPN &amp; Device Management</code>, tap the developer profile, and <b>Trust</b> it.</li>
+        <li>Launch the app. If one certificate is revoked or won't open, just install with another.</li>
+      </ol>
+    </div>
+  </details>
+
+  <footer class="footer">
+    Built automatically &middot; signed with 14 certificate(s)
+    <br>Last updated: 21 Jun 2026, 22:51 CET
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  var grid=document.getElementById('grid');
+  var q=document.getElementById('q');
+  var sortSel=document.getElementById('sort');
+  var empty=document.getElementById('empty');
+  var cards=[].slice.call(grid.querySelectorAll('.cert-card'));
+  function days(c){ var d=parseInt(c.getAttribute('data-days'),10); return isNaN(d)?-1e9:d; }
+  function name(c){ return (c.getAttribute('data-name')||'').toLowerCase(); }
+  function apply(){
+    var term=(q.value||'').trim().toLowerCase();
+    var mode=sortSel.value;
+    var sorted=cards.slice().sort(function(a,b){
+      if(mode==='name') return name(a).localeCompare(name(b));
+      if(mode==='days-asc') return days(a)-days(b);
+      return days(b)-days(a);
+    });
+    var visible=0;
+    sorted.forEach(function(c){
+      var show=!term || name(c).indexOf(term)>-1;
+      c.style.display=show?'':'none';
+      if(show) visible++;
+      grid.appendChild(c);
+    });
+    empty.classList.toggle('show', visible===0);
+  }
+  q.addEventListener('input',apply);
+  sortSel.addEventListener('change',apply);
+  apply();
+})();
+</script>
+</body>
+</html>
