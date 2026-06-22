@@ -14,7 +14,6 @@ struct CertsView: View {
         ScrollView {
             VStack(spacing: 16) {
                 header
-                explainer
                 credentials
                 actionButton
                 if let error = manager.lastError {
@@ -62,25 +61,6 @@ struct CertsView: View {
         .padding(.top, 8)
     }
 
-    // MARK: Explainer
-
-    private var explainer: some View {
-        card(tint: .accentColor) {
-            VStack(alignment: .leading, spacing: 6) {
-                Label("Free up a signing slot", systemImage: "info.circle")
-                    .font(.headline)
-                Text("Apple allows only 3 signing certificates per Apple ID. If installing fails with “too many certificates”, revoke an old one here to free a slot.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("Revoking stops apps already signed with that certificate from launching — re-sign them afterwards.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
     // MARK: Credentials (shared with the Install tab)
 
     private var credentials: some View {
@@ -95,9 +75,6 @@ struct CertsView: View {
                     .textFieldStyle(.roundedBorder)
                 SecureField("Apple ID password", text: $engine.applePassword)
                     .textFieldStyle(.roundedBorder)
-                Text("Shared with the Install tab. The same account whose certificates you want to manage.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
             }
         }
         .disabled(manager.isWorking || manager.revokingID != nil)
