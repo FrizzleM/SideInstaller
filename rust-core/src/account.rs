@@ -40,7 +40,10 @@ pub struct SignSession {
 // calls to it on one queue. Raw-pointer 2FA ctx is handled inside login only.
 unsafe impl Send for SignSession {}
 
-struct TwoFaCtx(*mut c_void);
+/// Wraps the opaque 2FA callback context so it can cross thread boundaries.
+/// Shared with the certificate-management module, which drives the same Swift
+/// 2FA prompt.
+pub(crate) struct TwoFaCtx(pub(crate) *mut c_void);
 unsafe impl Send for TwoFaCtx {}
 unsafe impl Sync for TwoFaCtx {}
 
@@ -51,8 +54,9 @@ unsafe fn opt(p: *const c_char, default: &str) -> String {
     CStr::from_ptr(p).to_str().unwrap_or(default).to_string()
 }
 
-/// Build the `Fn() -> Option<String>` 2FA closure that bridges to Swift.
-fn make_2fa(cb: TwoFactorCb, ctx: TwoFaCtx) -> impl Fn() -> Option<String> {
+/// Build the `Fn() -> Option<String>` 2FA closure that bridges to Swift. Shared
+/// with `certs.rs` so login and certificate management drive the same prompt.
+pub(crate) fn make_2fa(cb: TwoFactorCb, ctx: TwoFaCtx) -> impl Fn() -> Option<String> {
     move || {
         let cb = cb?;
         let mut buf = vec![0u8; 128];

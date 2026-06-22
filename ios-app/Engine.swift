@@ -82,7 +82,11 @@ final class Engine: ObservableObject {
 
     @Published var appleID: String = ""
     @Published var applePassword: String = ""
-    @Published var anisetteURL: String = "https://ani.sidestore.io"
+    @Published var anisetteURL: String = AnisetteServer.fallback.address
+    /// Servers the user can pick from. Seeded with a bundled snapshot so the
+    /// picker is populated instantly, then refreshed from the live list on
+    /// launch (see `loadAnisetteServers`).
+    @Published private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
     // LocalDevVPN's default device (target) IP; configurable in Advanced.
     @Published var deviceIP: String = "10.7.0.1"
     // Which build to install (plain SideStore vs LiveContainer + SideStore).
@@ -90,6 +94,9 @@ final class Engine: ObservableObject {
 
     // MARK: Plain-text status readouts
 
+    /// Live LocalDevVPN loopback state, polled (see `startStatusMonitor`) so the
+    /// UI banner + the Install gate always reflect the current tunnel.
+    @Published var vpnConnected: Bool = false
     @Published var vpnStatus: String = "unknown"
     @Published var wifiStatus: String = "unknown"
     @Published var pairingStatus: String = "not paired"
@@ -127,6 +134,18 @@ final class Engine: ObservableObject {
     @Published var finished: Bool = false
 
     private var pipelineTask: Task<Void, Never>?
+    /// Repeating poll that keeps `vpnConnected` live for the UI banner. A timer
+    /// (not NWPathMonitor) because LocalDevVPN is a local-only tunnel with no
+    /// default route, so a path monitor never fires when it comes up or down.
+    private var statusTimer: Timer?
+
+    /// True when the build that was actually installed is the LiveContainer +
+    /// SideStore bundle (falls back to the current selection before any
+    /// download). Drives the post-install "import the certificate into
+    /// LiveContainer" card, which only applies to that build.
+    var installedIsLiveContainer: Bool {
+        (downloadedSource ?? installSource) == .liveContainer
+    }
 
     /// Overall fraction across all steps (0…1). Computed from the published
     /// step states + install sub-progress, so the bar updates automatically.
@@ -157,6 +176,10 @@ final class Engine: ObservableObject {
     @Published var pendingTwoFactor = false
     private let twoFactorSem = DispatchSemaphore(value: 0)
     private var twoFactorResult: String?
+    /// Set when the user taps Cancel on the 2FA prompt. Lets the sign-in loop
+    /// stop instead of re-prompting for every remaining anisette server. Shared
+    /// with `CertManager`, which drives the same 2FA prompt.
+    var twoFactorWasCancelled = false
 
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -171,8 +194,29 @@ final class Engine: ObservableObject {
         // proving the full Rust-tracing -> FFI callback -> console path at start.
         ping()
         // Show the loopback/Wi-Fi status on launch so the user knows whether to
-        // start LocalDevVPN before running.
+        // start LocalDevVPN before running, then keep it live for the banner.
         checkVPNAndWifi()
+        startStatusMonitor()
+        // Refresh the anisette server picker from the live community list.
+        loadAnisetteServers()
+    }
+
+    // MARK: - Anisette servers
+
+    /// Pull the live anisette server list (the one SideStore/iLoader share) and
+    /// swap it in for the bundled snapshot. Silently keeps the snapshot on any
+    /// failure — the picker stays usable offline.
+    func loadAnisetteServers() {
+        Task { @MainActor in
+            do {
+                let servers = try await AnisetteServer.fetchList()
+                guard !servers.isEmpty else { return }
+                self.anisetteServers = servers
+                log("Loaded \(servers.count) anisette servers.")
+            } catch {
+                log("Couldn't refresh anisette servers (\(short(error))); using \(self.anisetteServers.count) bundled.")
+            }
+        }
     }
 
     // MARK: - Logging
@@ -259,6 +303,16 @@ final class Engine: ObservableObject {
             log("Enter your Apple ID email + password first.")
             return
         }
+        // Pre-flight gate: the entire install runs over LocalDevVPN's loopback
+        // tunnel, so don't even begin until it's connected — show how instead.
+        // (ensureNetwork() below still waits too, as a mid-run safety net in case
+        // the tunnel drops after this check passes.)
+        refreshNetworkStatus()
+        guard vpnConnected else {
+            setGuide(Guides.vpn)
+            log("⛔️ LocalDevVPN isn't connected. Turn it on, then tap Install again.")
+            return
+        }
         resetRun()
         isRunning = true
         log("=== Starting one-click install ===")
@@ -303,7 +357,8 @@ final class Engine: ObservableObject {
         var announced = false
         while true {
             try Task.checkCancellation()
-            let (vpn, wifi, detail) = NetworkStatus.summarize()
+            let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceIP)
+            vpnConnected = vpn
             vpnStatus = vpn ? "tunnel up" : "no tunnel"
             wifiStatus = wifi ? "on" : "off"
             if vpn {
@@ -409,13 +464,66 @@ final class Engine: ObservableObject {
             throw EngineError.message("Enter your Apple ID email + password.")
         }
         setStep(.signIn, .active)
-        signInStatus = "signing in…"
-        let id = appleID, pw = applePassword, ani = anisetteURL, dir = storageDir
-        let summary = try await onSignQueue { try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir) }
-        signInStatus = "signed in (\(summary))"
-        setStep(.signIn, .done)
+
+        // Anisette servers are flaky and go down often, so don't fail on the
+        // first one — try the user's pick, then every other known server, and
+        // only give up once they've all failed. (Apple ID errors that no server
+        // could fix, like a wrong password or a cancelled 2FA prompt, stop the
+        // loop early — see below.)
+        let servers = anisetteCandidates()
+        let id = appleID, pw = applePassword, dir = storageDir
+        twoFactorWasCancelled = false
+        var lastError = "no anisette servers configured"
+
+        for (idx, ani) in servers.enumerated() {
+            try Task.checkCancellation()
+            let name = anisetteName(for: ani)
+            signInStatus = servers.count > 1
+                ? "signing in via \(name) (\(idx + 1)/\(servers.count))…"
+                : "signing in…"
+            if servers.count > 1 {
+                log("Sign-in attempt \(idx + 1)/\(servers.count) — anisette \(name).")
+            }
+            do {
+                let summary = try await onSignQueue {
+                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir)
+                }
+                // Worked — remember the server that succeeded so the rest of the
+                // app (and any re-run) sticks with it.
+                anisetteURL = ani
+                signInStatus = "signed in (\(summary))"
+                setStep(.signIn, .done)
+                return
+            } catch let error as EngineError {
+                lastError = error.errorDescription ?? "sign-in failed"
+
+                // A cancelled 2FA prompt isn't the server's fault — bail now
+                // rather than re-prompting for every remaining server.
+                if twoFactorWasCancelled {
+                    log("Two-factor verification cancelled — stopping.")
+                    signInStatus = "signed out"
+                    throw EngineError.message("Two-factor verification was cancelled.")
+                }
+                // A bad Apple ID / password fails the same way on every server,
+                // and hammering Apple with repeated bad logins risks locking the
+                // account — so stop instead of cycling through the whole list.
+                if Self.isCredentialError(lastError) {
+                    signInStatus = "sign-in failed"
+                    throw EngineError.message("Apple ID sign-in failed: \(lastError)")
+                }
+                log("Anisette \(name) failed: \(lastError)")
+                if idx < servers.count - 1 { log("Trying the next anisette server…") }
+            }
+        }
+
+        signInStatus = "sign-in failed"
+        let tried = servers.count == 1 ? "the anisette server" : "all \(servers.count) anisette servers"
+        throw EngineError.message("Apple ID sign-in failed on \(tried). Last error: \(lastError)")
     }
 
+    /// One sign-in attempt against a specific anisette server. Returns the
+    /// account summary on success; throws `EngineError.message` with the raw
+    /// failure text (so the caller can classify it) otherwise.
     private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {
         log("Apple ID sign-in for \(id) via anisette \(ani) …")
         var session: OpaquePointer?
@@ -434,9 +542,37 @@ final class Engine: ObservableObject {
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            setMain { self.signInStatus = "sign-in failed" }
-            throw EngineError.message("Apple ID sign-in failed: \(msg)")
+            throw EngineError.message(msg)
         }
+    }
+
+    /// Anisette servers to try, in order: the user's current pick first, then
+    /// every other known server. De-duplicated; addresses only.
+    private func anisetteCandidates() -> [String] {
+        var seen = Set<String>()
+        var out: [String] = []
+        for addr in [anisetteURL] + anisetteServers.map(\.address) {
+            let a = addr.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !a.isEmpty, seen.insert(a).inserted { out.append(a) }
+        }
+        return out
+    }
+
+    /// Friendly name for an anisette address (falls back to the address itself).
+    private func anisetteName(for address: String) -> String {
+        anisetteServers.first { $0.address == address }?.name ?? address
+    }
+
+    /// Detect a definitive Apple ID credential failure (vs. a flaky anisette
+    /// server). Switching anisette servers can't fix these, so the sign-in loop
+    /// stops on them instead of trying every server.
+    static func isCredentialError(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("apple id or password")
+            || m.contains("password was incorrect")
+            || m.contains("incorrect apple id")
+            || m.contains("-20101")          // GSA: invalid username/password
+            || (m.contains("password") && m.contains("incorrect"))
     }
 
     // MARK: Step 5 — download SideStore
@@ -529,32 +665,44 @@ final class Engine: ObservableObject {
     private func writePairing() async throws {
         setStep(.writePairing, .active)
         let path = pairingFilePath ?? PairingController.pairingFilePath()
-        try await onDeviceQueue { try self.performWritePairing(path: path) }
+        // Use the build that was actually installed (falls back to the current
+        // selection) — it decides the host app and the path the file lands at.
+        let source = downloadedSource ?? installSource
+        try await onDeviceQueue { try self.performWritePairing(path: path, source: source) }
         setStep(.writePairing, .done)
     }
 
-    private func performWritePairing(path: String) throws {
+    private func performWritePairing(path: String, source: InstallSource) throws {
         guard connection.isConnected else { throw EngineError.message("Device link dropped — reconnect.") }
         let size = fileSize(path)
         guard FileManager.default.fileExists(atPath: path), size > 0 else {
             throw EngineError.message("Pairing file missing — pairing must run first.")
         }
-        // Resolve the *installed* SideStore bundle id (isideload rewrites it to
-        // com.SideStore.SideStore.<teamID>). installation_proxy is the source of
-        // truth; fall back to the signed bundle's id only if the lookup is empty.
+        // Resolve the *installed* host app's bundle id. installation_proxy is the
+        // source of truth — match by display name (survives the bundle id rewrite
+        // isideload performs), then by base bundle id; fall back to the signed
+        // bundle's id only if the lookup is empty. For LiveContainer the host app
+        // is LiveContainer (com.kdt.livecontainer.<teamID>), not SideStore.
+        let appName = source.pairingAppDisplayName
         let bundleID: String
-        if let found = try connection.findInstalledBundleID(base: "com.SideStore.SideStore") {
+        if let found = try connection.resolveInstalledBundleID(
+            displayName: appName, bundleIDBase: source.pairingBundleIDBase) {
             bundleID = found
         } else if let signed = signedAppBundleID() {
             bundleID = signed
-            log("SideStore not found via installation_proxy; using signed bundle id \(signed).")
+            log("\(appName) not found via installation_proxy; using signed bundle id \(signed).")
         } else {
-            throw EngineError.message("SideStore isn't installed yet — install must run first.")
+            throw EngineError.message("\(source.displayName) isn't installed yet — install must run first.")
         }
-        log("Resolved SideStore bundle id: \(bundleID)")
-        log("Writing pairing file into \(bundleID) /Documents/ALTPairingFile.mobiledevicepairing …")
-        let written = try connection.writePairingFile(intoBundleID: bundleID, pairingFilePath: path)
-        log("Pairing file written into SideStore and read-back VERIFIED (\(written) bytes).")
+        // Plain SideStore reads the file at its Documents root; the LiveContainer
+        // guest reads it from a nested folder. The source picks the right path.
+        let remoteRel = source.pairingRemoteRelativePath
+        log("Resolved \(appName) bundle id: \(bundleID)")
+        log("Writing pairing file into \(bundleID) /Documents/\(remoteRel) …")
+        let written = try connection.writePairingFile(intoBundleID: bundleID,
+                                                       remoteRelativePath: remoteRel,
+                                                       pairingFilePath: path)
+        log("Pairing file written into \(appName) and read-back VERIFIED (\(written) bytes).")
     }
 
     // MARK: Success
@@ -587,12 +735,34 @@ final class Engine: ObservableObject {
     // orchestrator instead surfaces failures as a stopped step + guide).
 
     func checkVPNAndWifi() {
-        let (vpn, wifi, detail) = NetworkStatus.summarize()
+        let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceIP)
+        vpnConnected = vpn
         vpnStatus = vpn ? "tunnel up" : "no tunnel (start LocalDevVPN)"
         wifiStatus = wifi ? "on" : "off"
         log("Network: \(detail)")
         log("VPN(loopback)=\(vpnStatus), Wi-Fi=\(wifiStatus). RSD target \(deviceIP):\(DeviceConnection.rsdPort).")
-        if !vpn { log("⚠️ No tunnel interface found — open LocalDevVPN and connect.") }
+        if !vpn { log("⚠️ No LocalDevVPN tunnel on \(deviceIP)'s subnet — open LocalDevVPN and tap Connect.") }
+    }
+
+    /// Poll the interface list so `vpnConnected` (and the plain-text readouts)
+    /// track LocalDevVPN coming up / dropping while the app is open. Added to the
+    /// run loop in `.common` mode so it keeps firing during scrolling.
+    private func startStatusMonitor() {
+        statusTimer?.invalidate()
+        let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.refreshNetworkStatus()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        statusTimer = timer
+    }
+
+    /// One quiet (non-logging) re-scan of the LocalDevVPN/Wi-Fi state. Used by the
+    /// poll above and as the authoritative check inside the Install gate.
+    func refreshNetworkStatus() {
+        let (vpn, wifi, _) = NetworkStatus.summarize(deviceIP: deviceIP)
+        vpnConnected = vpn
+        vpnStatus = vpn ? "tunnel up" : "no tunnel (start LocalDevVPN)"
+        wifiStatus = wifi ? "on" : "off"
     }
 
     /// RPPairing host (fire-and-forget; reports back through the shared engine).
@@ -689,11 +859,13 @@ final class Engine: ObservableObject {
     }
 
     func submitTwoFactor(_ code: String) {
+        twoFactorWasCancelled = false
         twoFactorResult = code
         twoFactorSem.signal()
     }
 
     func cancelTwoFactor() {
+        twoFactorWasCancelled = true
         twoFactorResult = nil
         twoFactorSem.signal()
     }
@@ -805,6 +977,18 @@ enum Guides {
             "Open Settings › General › VPN & Device Management.",
             "Tap your Apple ID under “Developer App”, then tap Trust.",
             "Open SideStore from your Home Screen — you're done.",
+        ],
+        actionLabel: nil, actionURLString: nil)
+
+    /// Shown only after a LiveContainer + SideStore install: LiveContainer needs
+    /// SideStore's signing certificate, which you pull in from its settings.
+    static let liveContainerImport = Guide(
+        title: "Import the certificate into LiveContainer",
+        systemImage: "arrow.down.doc",
+        steps: [
+            "Open LiveContainer from your Home Screen.",
+            "Tap the Settings tab.",
+            "Tap “Import Certificate From SideStore”.",
         ],
         actionLabel: nil, actionURLString: nil)
 }

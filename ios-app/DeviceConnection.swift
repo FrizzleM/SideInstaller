@@ -174,9 +174,12 @@ final class DeviceConnection {
         return out
     }
 
-    /// Resolve an installed app's *exact* bundle id by base id — exact match, or
-    /// the "<base>.<teamID>" variant isideload produces. Returns nil if absent.
-    func findInstalledBundleID(base: String) throws -> String? {
+    /// Resolve the installed host app's exact bundle id for the pairing write.
+    /// Prefers an exact CFBundleDisplayName match (how iLoader locates SideStore
+    /// / LiveContainer — robust to the bundle id rewrite isideload performs),
+    /// then falls back to the "<base>" / "<base>.<teamID>" bundle id forms.
+    /// Returns nil if no matching app is installed.
+    func resolveInstalledBundleID(displayName: String, bundleIDBase: String) throws -> String? {
         guard let adapter, let handshake else { throw fail("not connected") }
         var client: OpaquePointer?
         try check(installation_proxy_connect_rsd(adapter, handshake, &client),
@@ -191,17 +194,21 @@ final class DeviceConnection {
         guard let result, count > 0 else { return nil }
 
         let apps = result.assumingMemoryBound(to: plist_t?.self)
+        var byName: String?
         var exact: String?
         var suffixed: String?
         for i in 0..<count {
             let appPlist = apps[i]
             if let bid = plistString(appPlist, "CFBundleIdentifier") {
-                if bid == base { exact = bid }
-                else if bid.hasPrefix(base + ".") { suffixed = bid }
+                if byName == nil, plistString(appPlist, "CFBundleDisplayName") == displayName {
+                    byName = bid
+                }
+                if bid == bundleIDBase { exact = bid }
+                else if bid.hasPrefix(bundleIDBase + ".") { suffixed = bid }
             }
             if let appPlist { plist_free(appPlist) }
         }
-        return exact ?? suffixed
+        return byName ?? exact ?? suffixed
     }
 
     // MARK: Install (AFC upload to /PublicStaging + installation_proxy)
@@ -272,9 +279,12 @@ final class DeviceConnection {
 
     // MARK: Write pairing file into another app's container (house_arrest)
 
-    /// Write `pairingFilePath` into `bundleID`'s Documents as the SideStore
-    /// pairing file (`ALTPairingFile.mobiledevicepairing`), then read it back to
-    /// prove the write committed. Returns the verified byte count.
+    /// Write `pairingFilePath` into `bundleID`'s Documents at
+    /// `remoteRelativePath` (relative to Documents, e.g.
+    /// `ALTPairingFile.mobiledevicepairing` for SideStore or
+    /// `SideStore/Documents/ALTPairingFile.mobiledevicepairing` for the
+    /// LiveContainer guest), then read it back to prove the write committed.
+    /// Returns the verified byte count.
     ///
     /// Ownership (confirmed against idevice-ffi source):
     ///  - `house_arrest_vend_documents` CONSUMES the HouseArrestClient
@@ -284,7 +294,9 @@ final class DeviceConnection {
     ///  - `afc_file_close` and `afc_client_free` each consume their handle:
     ///    close/free each exactly once. AFC commits the write only on close.
     @discardableResult
-    func writePairingFile(intoBundleID bundleID: String, pairingFilePath: String) throws -> Int {
+    func writePairingFile(intoBundleID bundleID: String,
+                          remoteRelativePath: String,
+                          pairingFilePath: String) throws -> Int {
         guard let adapter, let handshake else { throw fail("not connected") }
 
         let data = try Data(contentsOf: URL(fileURLWithPath: pairingFilePath))
@@ -305,9 +317,10 @@ final class DeviceConnection {
         // idevice's vend_documents roots AFC at the app CONTAINER, not at the
         // Documents dir — so the path must include "/Documents/" (matches
         // iLoader's place_file). Writing to the container root is denied
-        // (Afc PermDenied). mk_dir the parent first (no-op if it exists).
-        let remotePath = "/Documents/ALTPairingFile.mobiledevicepairing"
-        _ = "/Documents".withCString { afc_make_directory(afc, $0) }
+        // (Afc PermDenied). Create the full parent chain first (no-op for dirs
+        // that already exist) — the LiveContainer guest path is nested.
+        let remotePath = "/Documents/\(remoteRelativePath)"
+        makeRemoteDirectories(afc, forFileAt: remotePath)
 
         // --- Write: open (create+truncate), write whole buffer, CLOSE (commits).
         var wfile: OpaquePointer?
@@ -341,6 +354,18 @@ final class DeviceConnection {
             throw fail("read-back size mismatch: wrote \(data.count) bytes but device has \(rlen)")
         }
         return rlen
+    }
+
+    /// Create every parent directory of `remoteFilePath` on the AFC volume,
+    /// one level at a time (each `afc_make_directory` is a no-op if the dir
+    /// already exists). Needed for the nested LiveContainer guest path.
+    private func makeRemoteDirectories(_ afc: OpaquePointer, forFileAt remoteFilePath: String) {
+        let components = remoteFilePath.split(separator: "/").dropLast()  // drop the file name
+        var path = ""
+        for component in components {
+            path += "/\(component)"
+            _ = path.withCString { afc_make_directory(afc, $0) }
+        }
     }
 
     // MARK: plist helpers

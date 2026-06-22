@@ -20,6 +20,7 @@
 extern crate idevice_ffi as _;
 
 mod account;
+mod certs;
 mod ffi_util;
 mod logging;
 mod pairing;
@@ -30,6 +31,7 @@ use ffi_util::cstr;
 
 // Re-export FFI types so the generated header / Swift see them.
 pub use account::{SignSession, TwoFactorCb};
+pub use certs::CertSession;
 pub use pairing::{PairResult, PinCb, ReadyCb};
 
 /// Initialise the logging spine. `cb` receives every formatted log line
@@ -158,4 +160,70 @@ pub unsafe extern "C" fn si_sign_ipa(
 #[no_mangle]
 pub unsafe extern "C" fn si_sign_session_free(session: *mut SignSession) {
     account::sign_session_free(session)
+}
+
+// ---------------------------------------------------------------------------
+// Certificate management — list + revoke iOS development certificates
+// ---------------------------------------------------------------------------
+
+/// Log in + open a developer session + select the first team for certificate
+/// management. Blocks — run off the main thread. `twofa_cb` is invoked when a
+/// 2FA code is needed. Independent of the install pipeline (no device needed).
+///
+/// # Safety
+/// See `certs::cert_signin`.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn si_cert_signin(
+    apple_id: *const c_char,
+    password: *const c_char,
+    anisette_url: *const c_char,
+    machine_name: *const c_char,
+    storage_dir: *const c_char,
+    twofa_cb: TwoFactorCb,
+    ctx: *mut c_void,
+    out_session: *mut *mut CertSession,
+    out_summary: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    certs::cert_signin(
+        apple_id, password, anisette_url, machine_name, storage_dir, twofa_cb, ctx,
+        out_session, out_summary, out_error,
+    )
+}
+
+/// List the team's iOS development certificates as a JSON array. Blocks.
+/// On success `*out_json` is a heap JSON string (free with `si_string_free`).
+///
+/// # Safety
+/// See `certs::cert_list`.
+#[no_mangle]
+pub unsafe extern "C" fn si_cert_list(
+    session: *mut CertSession,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    certs::cert_list(session, out_json, out_error)
+}
+
+/// Revoke the development certificate with `serial_number`. Blocks.
+///
+/// # Safety
+/// See `certs::cert_revoke`.
+#[no_mangle]
+pub unsafe extern "C" fn si_cert_revoke(
+    session: *mut CertSession,
+    serial_number: *const c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    certs::cert_revoke(session, serial_number, out_error)
+}
+
+/// Free a certificate session.
+///
+/// # Safety
+/// `session` must be null or a pointer from `si_cert_signin`.
+#[no_mangle]
+pub unsafe extern "C" fn si_cert_session_free(session: *mut CertSession) {
+    certs::cert_session_free(session)
 }

@@ -56,6 +56,45 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
+    // MARK: Pairing-file placement
+    //
+    // After install, the device pairing file is written into the *installed*
+    // host app's container so SideStore can find it. The host app and the path
+    // it reads differ between the two builds — mirrored from iLoader's
+    // PAIRING_APPS table (src-tauri/src/pairing.rs).
+
+    /// CFBundleDisplayName of the installed host app that receives the pairing
+    /// file. installation_proxy reports this; matching on the display name
+    /// (rather than a bundle id, which isideload rewrites) is how iLoader
+    /// locates the target app.
+    var pairingAppDisplayName: String {
+        switch self {
+        case .sideStore:     return "SideStore"
+        case .liveContainer: return "LiveContainer"
+        }
+    }
+
+    /// Base bundle id of the installed host app — fallback for resolving the
+    /// install when the display-name lookup misses. isideload appends
+    /// ".<teamID>" to this.
+    var pairingBundleIDBase: String {
+        switch self {
+        case .sideStore:     return "com.SideStore.SideStore"
+        case .liveContainer: return "com.kdt.livecontainer"
+        }
+    }
+
+    /// Where the pairing file must land, relative to the host app's Documents
+    /// directory. Plain SideStore reads it at the Documents root. Under
+    /// LiveContainer, SideStore runs as a guest whose Documents live in a
+    /// nested folder, so the file goes there instead.
+    var pairingRemoteRelativePath: String {
+        switch self {
+        case .sideStore:     return "ALTPairingFile.mobiledevicepairing"
+        case .liveContainer: return "SideStore/Documents/ALTPairingFile.mobiledevicepairing"
+        }
+    }
+
     /// Pick the right `.ipa` asset out of a release's assets.
     func selectAsset(from assets: [SideStoreDownloader.GHAsset]) -> SideStoreDownloader.GHAsset? {
         switch self {

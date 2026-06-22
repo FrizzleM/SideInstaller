@@ -114,6 +114,45 @@ int32_t si_sign_ipa(SignSession *session,
 // Free a sign session.
 void si_sign_session_free(SignSession *session);
 
+// ---------------------------------------------------------------------------
+// Certificate management — list + revoke iOS development certificates
+// ---------------------------------------------------------------------------
+
+// Opaque certificate-session handle.
+typedef struct CertSession CertSession;
+
+// Log in + open developer session + select the first team, for certificate
+// management. BLOCKS — call off the main thread. Independent of the install
+// pipeline (no device/pairing/VPN needed). Returns 0 on success (*out_session +
+// *out_summary set), non-zero on error (*out_error set). Free strings with
+// si_string_free, the session with si_cert_session_free.
+int32_t si_cert_signin(const char *apple_id,
+                       const char *password,
+                       const char *anisette_url,
+                       const char *machine_name,
+                       const char *storage_dir,
+                       SITwoFactorCb twofa_cb,
+                       void *ctx,
+                       CertSession **out_session,
+                       char **out_summary,
+                       char **out_error);
+
+// List the team's iOS development certificates. BLOCKS. On success *out_json is
+// a heap JSON array of objects: {name, serial_number, machine_name, machine_id,
+// certificate_id, platform, status, expiration}. Free with si_string_free.
+int32_t si_cert_list(CertSession *session,
+                     char **out_json,
+                     char **out_error);
+
+// Revoke the development certificate with the given serial number. BLOCKS.
+// Returns 0 on success, non-zero on error (*out_error set).
+int32_t si_cert_revoke(CertSession *session,
+                       const char *serial_number,
+                       char **out_error);
+
+// Free a certificate session.
+void si_cert_session_free(CertSession *session);
+
 #ifdef __cplusplus
 }
 #endif

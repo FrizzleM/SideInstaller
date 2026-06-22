@@ -4068,6 +4068,8 @@ dependencies = [
  "idevice 0.1.63 (git+https://github.com/jkcoxson/idevice.git?rev=7bd551c16c6dd2e058740d85a2d9399a51a776e9)",
  "idevice-ffi",
  "isideload",
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",

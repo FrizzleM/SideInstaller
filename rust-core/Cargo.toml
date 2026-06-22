@@ -80,6 +80,11 @@ isideload = { git = "https://github.com/nab138/isideload.git", package = "isidel
 
 tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "fs"] }
 
+# Serialize the certificate list across the FFI boundary as JSON (decoded by
+# Swift). Both are already in the tree via isideload, so this adds no new deps.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
 # Logging spine: forward idevice's `tracing` events (and any `log` records via
 # the tracing-log compat layer, enabled by default) through the FFI callback.
 tracing = "0.1"
