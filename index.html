@@ -3,8 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>SideInstaller — Install</title>
-<link rel="icon" href="https://files.catbox.moe/gi0g5w.png">
-<link rel="apple-touch-icon" href="https://files.catbox.moe/gi0g5w.png">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0a0a0f">
@@ -133,6 +131,19 @@
     font-size:13px; color:var(--text);
   }
 
+  /* ---- download unsigned ipa ---- */
+  .ipa-dl{margin-top:18px; text-align:center}
+  .ipa-btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:9px;
+    padding:13px 22px; font-size:15px; font-weight:700; text-decoration:none; color:var(--text);
+    border-radius:var(--radius-sm); background:var(--card); border:1px solid var(--stroke-strong);
+    transition:background .15s, border-color .15s, transform .14s;
+  }
+  .ipa-btn svg{width:18px; height:18px; color:var(--muted)}
+  .ipa-btn:hover{background:var(--card-hover); border-color:var(--accent)}
+  .ipa-btn:active{transform:scale(.98)}
+  .ipa-note{margin:10px auto 0; max-width:420px; color:var(--faint); font-size:12.5px}
+
   .footer{margin-top:40px; text-align:center; color:var(--faint); font-size:13px}
   .footer a{color:var(--muted); text-decoration:none}
   .footer a:hover{color:var(--text)}
@@ -148,7 +159,7 @@
 <div class="wrap">
 
   <header class="hero">
-    <div class="logo"><img src="https://files.catbox.moe/gi0g5w.png" alt="SideInstaller"></div>
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop offset="0" stop-color="#6d8bff"/><stop offset="1" stop-color="#a06bff"/></linearGradient></defs><rect x="4" y="2.5" width="16" height="19" rx="3.5"/><path d="M12 7v8"/><path d="M8.5 11.5L12 15l3.5-3.5"/></svg></div>
     <h1>SideInstaller</h1>
     <p class="tagline">On-device sideloader. Pick a certificate and tap install.</p>
     <div class="badges">
@@ -176,7 +187,7 @@
         <span class="pill good">973 days left</span>
       </div>
       <p class="cert-meta">Expires 2029-02-17</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-XL.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-XL.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="National" data-days="949">
       <div class="cert-head">
@@ -184,7 +195,7 @@
         <span class="pill good">949 days left</span>
       </div>
       <p class="cert-meta">Expires 2029-01-25</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-National.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-National.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Rural" data-days="877">
       <div class="cert-head">
@@ -192,7 +203,7 @@
         <span class="pill good">877 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-11-14</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Rural.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-Rural.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="ChinaAcademy" data-days="859">
       <div class="cert-head">
@@ -200,7 +211,7 @@
         <span class="pill good">859 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-10-27</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-ChinaAcademy.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-ChinaAcademy.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="ChinaPower" data-days="853">
       <div class="cert-head">
@@ -208,7 +219,7 @@
         <span class="pill good">853 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-10-21</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-ChinaPower.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-ChinaPower.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Postal" data-days="780">
       <div class="cert-head">
@@ -216,7 +227,7 @@
         <span class="pill good">780 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-08-09</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Postal.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-Postal.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Takeoff" data-days="714">
       <div class="cert-head">
@@ -224,7 +235,7 @@
         <span class="pill good">714 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-06-04</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Takeoff.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-Takeoff.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Election" data-days="676">
       <div class="cert-head">
@@ -232,7 +243,7 @@
         <span class="pill good">676 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-04-27</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Election.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-Election.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Vietnam" data-days="670">
       <div class="cert-head">
@@ -240,7 +251,7 @@
         <span class="pill good">670 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-04-21</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Vietnam.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-Vietnam.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Wuling" data-days="343">
       <div class="cert-head">
@@ -248,7 +259,7 @@
         <span class="pill good">343 days left</span>
       </div>
       <p class="cert-meta">Expires 2027-05-30</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Wuling.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-Wuling.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Forever" data-days="229">
       <div class="cert-head">
@@ -256,7 +267,7 @@
         <span class="pill good">229 days left</span>
       </div>
       <p class="cert-meta">Expires 2027-02-05</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Forever.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-Forever.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="BOC" data-days="138">
       <div class="cert-head">
@@ -264,7 +275,7 @@
         <span class="pill good">138 days left</span>
       </div>
       <p class="cert-meta">Expires 2026-11-06</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-BOC.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-BOC.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Aramco" data-days="95">
       <div class="cert-head">
@@ -272,7 +283,7 @@
         <span class="pill good">95 days left</span>
       </div>
       <p class="cert-meta">Expires 2026-09-24</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Aramco.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-Aramco.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Beijing" data-days="62">
       <div class="cert-head">
@@ -280,7 +291,7 @@
         <span class="pill good">62 days left</span>
       </div>
       <p class="cert-meta">Expires 2026-08-22</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Beijing.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-Beijing.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
   </main>
   <p id="empty" class="empty">No certificates match your search.</p>
@@ -298,9 +309,11 @@
     </div>
   </details>
 
+  <div class="ipa-dl"><a class="ipa-btn" href="https://files.catbox.moe/skjbs8.ipa" download><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Download unsigned .ipa</a><p class="ipa-note">The raw, unsigned build — for signing it yourself or sideloading with your own tool.</p></div>
+
   <footer class="footer">
     Built automatically &middot; signed with 14 certificate(s)
-    <br>Last updated: 21 Jun 2026, 22:51 CET
+    <br>Last updated: 23 Jun 2026, 13:48 CET
   </footer>
 
 </div>

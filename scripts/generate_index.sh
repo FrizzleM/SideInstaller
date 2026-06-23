@@ -13,6 +13,7 @@ PAGE_TITLE="${PAGE_TITLE:-$APP_NAME — Install}"
 LOGO_URL="${LOGO_URL:-}"
 OUTPUT_HTML="${OUTPUT_HTML:-index.html}"
 TEMPLATE="${TEMPLATE:-$SCRIPT_DIR/template.html}"
+IPA_URL_FILE="${IPA_URL_FILE:-$ROOT_DIR/ipa-url.txt}"
 
 if [[ -n "${GITHUB_REPOSITORY:-}" && "$GITHUB_REPOSITORY" == */* ]]; then
   GITHUB_USER="${GITHUB_USER:-${GITHUB_REPOSITORY%/*}}"
@@ -51,6 +52,24 @@ fi
 
 html_escape() { sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
 
+# First non-blank, non-comment line of a file, CR-stripped and trimmed.
+first_config_line() {
+  [[ -f "$1" ]] || return 0
+  awk '
+    {
+      sub(/\r$/, "")
+      sub(/^[[:space:]]+/, "")
+      if ($0 ~ /^#/ || $0 !~ /[^[:space:]]/) next
+      sub(/[[:space:]]+$/, "")
+      print
+      exit
+    }
+  ' "$1"
+}
+
+# --- unsigned IPA URL: explicit override, else first line of ipa-url.txt ---
+UNSIGNED_IPA_URL="${UNSIGNED_IPA_URL:-$(first_config_line "$IPA_URL_FILE")}"
+
 certificate_days_left() {
   local name="$1" cert_name cert_expires_at cert_days_left
   if [[ ! -f "$CERT_METADATA_FILE" ]]; then printf '%s\n' "-999999"; return 0; fi
@@ -83,6 +102,13 @@ pill_for() {  # days -> "class<TAB>label"
 }
 
 INSTALL_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>'
+
+# --- "Download unsigned .ipa" button (omitted entirely if no URL is configured) ---
+IPA_DOWNLOAD_HTML=""
+if [[ -n "$UNSIGNED_IPA_URL" ]]; then
+  ipa_url_esc="$(printf '%s' "$UNSIGNED_IPA_URL" | html_escape)"
+  IPA_DOWNLOAD_HTML="<div class=\"ipa-dl\"><a class=\"ipa-btn\" href=\"$ipa_url_esc\" download>$INSTALL_ICON Download unsigned .ipa</a><p class=\"ipa-note\">The raw, unsigned build — for signing it yourself or sideloading with your own tool.</p></div>"
+fi
 
 shopt -s nullglob
 PLISTS=("$OUTPUT_DIR"/"$OUTPUT_PREFIX"-*.plist)
@@ -144,7 +170,8 @@ awk \
   -v cert_count="$CERT_COUNT" \
   -v logo="$LOGO_HTML" \
   -v last_updated="$LAST_UPDATED" \
-  -v repo_note="$REPO_NOTE" '
+  -v repo_note="$REPO_NOTE" \
+  -v ipa_download="$IPA_DOWNLOAD_HTML" '
   # Literal find/replace — avoids gsub treating & or \ in the value specially,
   # which matters because names/notes can contain & (escaped to &amp;).
   function rep(s, tok, val,   out, p){
@@ -164,6 +191,7 @@ awk \
     s = rep(s, "{{LOGO}}", logo)
     s = rep(s, "{{LAST_UPDATED}}", last_updated)
     s = rep(s, "{{REPO_NOTE}}", repo_note)
+    s = rep(s, "{{IPA_DOWNLOAD}}", ipa_download)
     return s
   }
   {
