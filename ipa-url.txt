@@ -1,1 +1,1 @@
-https://github.com/FrizzleM/SideInstaller/releases/latest
+https://github.com/FrizzleM/SideInstaller/releases/latest/download/SideInstaller.ipa
