@@ -1,15 +1,1 @@
-# SideInstaller — certificate pool
-#
-# Put the direct download URL of a .zip of signing certificates on the first
-# non-comment line below. The "sign-sideinstaller" workflow downloads it and
-# signs the IPA once per certificate it contains.
-#
-# Expected layout inside the zip (one folder per certificate):
-#   <Name>/<Name>.p12
-#   <Name>/<Name>.mobileprovision
-#   <Name>/password.txt        (optional — p12 password; falls back to P12_PASSWORD)
-#
-# Change this URL any time by editing this line, or override with the
-# CERT_ZIP_URL env var in the workflow. Lines starting with '#' are ignored.
-
 https://github.com/WSF-Team/WSF/raw/refs/heads/main/portal/resources/certificates.zip
