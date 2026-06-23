@@ -12,8 +12,20 @@ if [[ -n "${GITHUB_REPOSITORY:-}" && "$GITHUB_REPOSITORY" == */* ]]; then
   GITHUB_USER="${GITHUB_USER:-${GITHUB_REPOSITORY%/*}}"
   GITHUB_REPO="${GITHUB_REPO:-${GITHUB_REPOSITORY#*/}}"
 else
-  GITHUB_USER="${GITHUB_USER:-SideInstaller}"
-  GITHUB_REPO="${GITHUB_REPO:-SideInstaller}"
+  # Outside CI, derive owner/repo from the git "origin" remote so locally
+  # generated URLs match wherever this repo actually lives. Keeps the script
+  # owner-neutral while stopping a stale placeholder slug (which 404s) from
+  # being baked into committed artifacts. Falls back to the placeholder only
+  # when there is no usable GitHub remote (e.g. a git-archive export).
+  origin_slug="$(git -C "$ROOT_DIR" remote get-url origin 2>/dev/null \
+    | sed -E 's#(\.git)?/?$##; s#^.*github\.com[:/]+##' || true)"
+  if [[ "$origin_slug" =~ ^[^/]+/[^/]+$ ]]; then
+    GITHUB_USER="${GITHUB_USER:-${origin_slug%/*}}"
+    GITHUB_REPO="${GITHUB_REPO:-${origin_slug#*/}}"
+  else
+    GITHUB_USER="${GITHUB_USER:-SideInstaller}"
+    GITHUB_REPO="${GITHUB_REPO:-SideInstaller}"
+  fi
 fi
 GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
 OUTPUT_BASE_URL="${OUTPUT_BASE_URL:-https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/$GITHUB_BRANCH/output}"
