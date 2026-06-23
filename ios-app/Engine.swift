@@ -124,6 +124,14 @@ final class Engine: ObservableObject {
     /// Short human summary of the connected device, e.g. "iPhone · iOS 17.5".
     @Published var deviceSummary: String?
 
+    /// The connected device's UDID + name, read from lockdownd during connect.
+    /// Fed into signing so the device is registered with the developer portal
+    /// before the provisioning profile is fetched — otherwise the profile won't
+    /// list this device and installd fails with 0xe8008015 ("a valid
+    /// provisioning profile for this executable was not found").
+    private(set) var deviceUDID: String?
+    private(set) var deviceName: String?
+
     /// The current contextual instruction card (nil = none).
     @Published var guide: Guide?
 
@@ -285,6 +293,8 @@ final class Engine: ObservableObject {
             self.pairingPIN = nil
             self.guide = nil
             self.deviceSummary = nil
+            self.deviceUDID = nil
+            self.deviceName = nil
             self.lastError = nil
             self.finished = false
         }
@@ -430,13 +440,23 @@ final class Engine: ObservableObject {
         setGuide(nil)
         let ip = deviceIP
         let path = pairingFilePath ?? PairingController.pairingFilePath()
-        let summary = try await onDeviceQueue { try self.performConnect(ip: ip, pairingPath: path) }
-        deviceSummary = summary
+        let result = try await onDeviceQueue { try self.performConnect(ip: ip, pairingPath: path) }
+        deviceSummary = result.summary
+        deviceUDID = result.udid
+        deviceName = result.name
         pairingStatus = "connected"
         setStep(.connect, .done)
     }
 
-    private func performConnect(ip: String, pairingPath path: String) throws -> String {
+    /// Result of a successful connect: the human summary plus the identifiers
+    /// (UDID + name) needed to register the device with the developer portal.
+    private struct ConnectedDevice {
+        let summary: String
+        let udid: String?
+        let name: String?
+    }
+
+    private func performConnect(ip: String, pairingPath path: String) throws -> ConnectedDevice {
         // Gate: never attempt a connect with a missing/zero-byte pairing file —
         // idevice maps the file-read error to a confusing Socket(ENOENT).
         let size = fileSize(path)
@@ -456,8 +476,14 @@ final class Engine: ObservableObject {
             for (k, v) in info { dict[k] = v; log("  \(k) = \(v)") }
         }
         let name = dict["DeviceName"] ?? "device"
-        if let version = dict["ProductVersion"] { return "\(name) · iOS \(version)" }
-        return name
+        let udid = dict["UniqueDeviceID"]
+        let summary: String
+        if let version = dict["ProductVersion"] {
+            summary = "\(name) · iOS \(version)"
+        } else {
+            summary = name
+        }
+        return ConnectedDevice(summary: summary, udid: udid, name: dict["DeviceName"])
     }
 
     // MARK: Step 4 — Apple ID sign-in
@@ -609,9 +635,16 @@ final class Engine: ObservableObject {
     private func signApp() async throws {
         guard let session = signSession else { throw EngineError.message("Not signed in.") }
         guard let ipa = downloadedIPAPath else { throw EngineError.message("No SideStore IPA downloaded.") }
+        // Captured during connect — registered with the developer portal inside
+        // the signer so the provisioning profile covers this device (see
+        // `deviceUDID`). Connect runs before sign, so these are populated.
+        let udid = deviceUDID
+        let name = deviceName
         setStep(.sign, .active)
         do {
-            let path = try await onSignQueue { try self.performSign(session: session, ipa: ipa) }
+            let path = try await onSignQueue {
+                try self.performSign(session: session, ipa: ipa, deviceUDID: udid, deviceName: name)
+            }
             signedAppPath = path
             setStep(.sign, .done)
         } catch {
@@ -622,11 +655,21 @@ final class Engine: ObservableObject {
         }
     }
 
-    private func performSign(session: OpaquePointer, ipa: String) throws -> String {
+    private func performSign(session: OpaquePointer, ipa: String,
+                             deviceUDID: String?, deviceName: String?) throws -> String {
         log("Signing \(ipa) …")
+        // Empty string (not nil) when unknown — the Rust core treats an empty
+        // UDID as "skip device registration".
+        let udid = deviceUDID ?? ""
+        let name = deviceName ?? ""
+        if udid.isEmpty {
+            log("⚠️ No device UDID captured — skipping device registration. Install may fail (0xe8008015) if this device isn't already registered with the Apple ID.")
+        } else {
+            log("Registering this device with the developer portal so the provisioning profile covers it (\(name.isEmpty ? udid : name)).")
+        }
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        let rc = si_sign_ipa(session, ipa, &signed, &error)
+        let rc = si_sign_ipa(session, ipa, name, udid, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
             signed.map { si_string_free($0) }
