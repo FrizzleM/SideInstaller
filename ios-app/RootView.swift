@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// Top-level tab container. Hosts the install flow (`ContentView`) and the
+/// Top-level tab container hosting the install flow (`ContentView`) and the
 /// certificate manager (`CertsView`).
 ///
-/// The two-factor prompt lives here, not inside a tab: both the install flow and
-/// the cert flow drive the same shared `Engine` 2FA bridge, and an `.alert`
-/// attached at the tab root presents regardless of which tab is active.
+/// The two-factor prompt lives here, not inside a tab: both flows drive the same
+/// shared `Engine` 2FA bridge, and an `.alert` attached at the tab root presents
+/// regardless of which tab is active.
 struct RootView: View {
     @EnvironmentObject private var engine: Engine
     /// Owned here so it survives tab switches and shares the one `Engine`.
@@ -22,7 +22,8 @@ struct RootView: View {
                 .tabItem { Label("Certificates", systemImage: "checkmark.seal") }
                 .tag(1)
         }
-        .alert("Two-factor code", isPresented: $engine.pendingTwoFactor) {
+        .tint(Theme.accent)
+        .alert("Two-Factor Code", isPresented: $engine.pendingTwoFactor) {
             TextField("6-digit code", text: $twoFactorCode)
                 .keyboardType(.numberPad)
             Button("Submit") { engine.submitTwoFactor(twoFactorCode); twoFactorCode = "" }
