@@ -8,15 +8,18 @@ enum Step: Int, CaseIterable, Identifiable {
 
     var id: Int { rawValue }
 
-    var title: String {
+    /// The checklist label. The download/install rows name the chosen build so
+    /// the timeline matches what the user picked (e.g. "SS + LiveContainer")
+    /// rather than always saying "SideStore".
+    func title(for source: InstallSource) -> String {
         switch self {
         case .network:      return "Connect the VPN"
         case .pair:         return "Pair with this iPhone"
         case .connect:      return "Open the device link"
         case .signIn:       return "Sign in to Apple ID"
-        case .download:     return "Download SideStore"
+        case .download:     return "Download \(source.shortName)"
         case .sign:         return "Sign the app"
-        case .install:      return "Install SideStore"
+        case .install:      return "Install \(source.shortName)"
         case .writePairing: return "Finish setup"
         }
     }
@@ -145,6 +148,12 @@ final class Engine: ObservableObject {
     /// LiveContainer" card, which only applies to that build.
     var installedIsLiveContainer: Bool {
         (downloadedSource ?? installSource) == .liveContainer
+    }
+
+    /// Name of the build that was installed (or is selected, before any
+    /// download) — used so post-install copy names the right app.
+    var installedSourceName: String {
+        (downloadedSource ?? installSource).displayName
     }
 
     /// Overall fraction across all steps (0…1). Computed from the published
@@ -711,7 +720,7 @@ final class Engine: ObservableObject {
     private func finishSuccess() {
         finished = true
         setGuide(Guides.trust)
-        log("✅ Done — SideStore is installed. One trust step left (see the card).")
+        log("✅ Done — \(installedSourceName) is installed. One trust step left (see the card).")
     }
 
     // MARK: - STEP 1: liveness
@@ -934,7 +943,7 @@ enum Guides {
         steps: [
             "Type your Apple ID email and password in the fields above.",
             "A spare / secondary Apple ID is best — a free signing certificate is created on it.",
-            "Then tap “Install SideStore”.",
+            "Then tap the Install button.",
         ],
         actionLabel: nil, actionURLString: nil)
 
@@ -965,7 +974,7 @@ enum Guides {
         systemImage: "exclamationmark.shield",
         steps: [
             "Apple allows only 3 signing certificates per Apple ID, and this one already has 3 — usually from setting up AltStore / SideStore on other devices.",
-            "Easiest fix: change the Apple ID email above to a different (or spare) account, then tap Install SideStore again.",
+            "Easiest fix: change the Apple ID email above to a different (or spare) account, then tap Install again.",
             "Or revoke an old certificate from another device that has AltStore / SideStore (use its reset / revoke option), then retry here. Revoking stops apps signed with that certificate from launching on those devices.",
         ],
         actionLabel: nil, actionURLString: nil)

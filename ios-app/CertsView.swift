@@ -15,9 +15,9 @@ struct CertsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
-                    header
-                    appleIDCard
-                    loadButton
+                    header.cascadeItem(0)
+                    appleIDCard.cascadeItem(1)
+                    loadButton.cascadeItem(2)
                     if let error = manager.lastError {
                         errorCallout(error).transition(.cardAppear)
                     }
@@ -52,7 +52,7 @@ struct CertsView: View {
     // MARK: Header
 
     private var header: some View {
-        BrandHeader(icon: "checkmark.seal.fill", title: "Certificates") {
+        BrandHeader(icon: "checkmark.seal.fill", image: "CertsLogo", title: "Certificates") {
             if let team = manager.teamSummary {
                 StatusPill(text: team, systemImage: "person.2.fill", color: .green)
                     .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
@@ -117,8 +117,9 @@ struct CertsView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
-                ForEach(manager.certs) { cert in
-                    certRow(cert)
+                .cascadeItem(3)
+                ForEach(Array(manager.certs.enumerated()), id: \.element.id) { idx, cert in
+                    certRow(cert).cascadeItem(4 + idx)
                 }
             }
         }
