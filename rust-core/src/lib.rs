@@ -141,16 +141,29 @@ pub unsafe extern "C" fn si_apple_signin(
 /// Sign the IPA at `ipa_path` using a session from `si_apple_signin`. Blocks.
 /// On success `*out_signed_path` is the signed `.app` bundle path.
 ///
+/// `device_udid` (and cosmetic `device_name`) identify the device the build will
+/// be installed onto; the device is registered with the developer portal before
+/// signing so the provisioning profile covers it. Pass null/empty to skip.
+///
 /// # Safety
 /// See `account::sign_ipa`.
 #[no_mangle]
 pub unsafe extern "C" fn si_sign_ipa(
     session: *mut SignSession,
     ipa_path: *const c_char,
+    device_name: *const c_char,
+    device_udid: *const c_char,
     out_signed_path: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
-    account::sign_ipa(session, ipa_path, out_signed_path, out_error)
+    account::sign_ipa(
+        session,
+        ipa_path,
+        device_name,
+        device_udid,
+        out_signed_path,
+        out_error,
+    )
 }
 
 /// Free a sign session.

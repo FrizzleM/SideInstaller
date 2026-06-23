@@ -106,8 +106,17 @@ int32_t si_apple_signin(const char *apple_id,
 // Sign the IPA at ipa_path. BLOCKS. On success *out_signed_path is the signed
 // .app bundle path (in a temp dir). Registers App ID + provisioning profile and
 // retrieves/creates the dev certificate internally.
+//
+// device_udid (and the cosmetic device_name) identify the device this build is
+// being installed onto. When a UDID is given, the device is registered with the
+// developer portal BEFORE signing so the provisioning profile lists it —
+// without this, installd rejects the install with 0xe8008015 ("a valid
+// provisioning profile for this executable was not found"). Pass NULL/empty to
+// skip registration.
 int32_t si_sign_ipa(SignSession *session,
                     const char *ipa_path,
+                    const char *device_name,
+                    const char *device_udid,
                     char **out_signed_path,
                     char **out_error);
 

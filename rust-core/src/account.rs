@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use isideload::{
     anisette::remote_v3::RemoteV3AnisetteProvider,
     auth::apple_account::AppleAccount,
-    dev::developer_session::DeveloperSession,
+    dev::{developer_session::DeveloperSession, devices::DevicesApi},
     sideload::{builder::MaxCertsBehavior, sideloader::Sideloader, SideloaderBuilder, TeamSelection},
     util::fs_storage::FsStorage,
 };
@@ -176,11 +176,22 @@ pub unsafe fn apple_signin(
 /// Sign the IPA at `ipa_path` with the session. Returns 0 on success
 /// (`*out_signed_path` set to the signed `.app` bundle path), non-zero on error.
 ///
+/// `device_udid` (and the cosmetic `device_name`) name the device this build is
+/// being installed onto. When a UDID is given we register it with the developer
+/// portal BEFORE signing, so the team provisioning profile that `sign_app`
+/// downloads lists this device in its `ProvisionedDevices`. Without this,
+/// installd rejects the install with `0xe8008015` ("a valid provisioning
+/// profile for this executable was not found") — the sign-only `sign_app` path
+/// skips `install_app`'s own device registration, so we must do it here. Pass an
+/// empty/null UDID to skip registration (e.g. when the device link isn't up).
+///
 /// # Safety
 /// `session` must be a valid pointer from `apple_signin`; out pointers valid.
 pub unsafe fn sign_ipa(
     session: *mut SignSession,
     ipa_path: *const c_char,
+    device_name: *const c_char,
+    device_udid: *const c_char,
     out_signed_path: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
@@ -190,9 +201,41 @@ pub unsafe fn sign_ipa(
     }
     let session = &mut *session;
     let ipa_path = opt(ipa_path, "");
+    let device_udid = opt(device_udid, "");
+    let device_name = opt(device_name, "");
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         session.rt.block_on(async {
+            // Register the device so the provisioning profile sign_app fetches
+            // includes its UDID (see the doc comment above). Must run before
+            // sign_app's download_team_provisioning_profile, and needs the
+            // authenticated developer session this SignSession already holds.
+            if device_udid.is_empty() {
+                tracing::warn!(
+                    "No device UDID provided — skipping device registration; \
+                     install may fail with 0xe8008015 if this device isn't already registered"
+                );
+            } else {
+                let team = session
+                    .sideloader
+                    .get_team()
+                    .await
+                    .map_err(|e| format!("get_team for device registration: {e}"))?;
+                let name = if device_name.is_empty() {
+                    "SideInstaller device"
+                } else {
+                    device_name.as_str()
+                };
+                tracing::info!("Ensuring device {device_udid} is registered with the developer portal");
+                session
+                    .sideloader
+                    .get_dev_session()
+                    .ensure_device_registered(&team, name, &device_udid, None)
+                    .await
+                    .map_err(|e| format!("device registration failed: {e}"))?;
+                tracing::info!("Device registered (or already present) on the team");
+            }
+
             tracing::info!("Signing IPA at {ipa_path}");
             let (signed, _special) = session
                 .sideloader
