@@ -13,13 +13,13 @@ struct ContentView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
-                    header
-                    appleIDCard
-                    buildCard
+                    header.cascadeItem(0)
+                    appleIDCard.cascadeItem(1)
+                    buildCard.cascadeItem(2)
                     if !engine.vpnConnected && !engine.isRunning {
-                        vpnRequirement.transition(.cardAppear)
+                        vpnRequirement.cascadeItem(3)
                     }
-                    installButton
+                    installButton.cascadeItem(4)
                     if showProgress {
                         progressCard.transition(.cardAppear)
                     }
@@ -73,11 +73,16 @@ struct ContentView: View {
     // MARK: Header
 
     private var header: some View {
-        BrandHeader(icon: "arrow.down.app.fill", title: "SideStore",
+        BrandHeader(icon: "arrow.down.app.fill", image: "AppLogo", title: "SideInstaller",
                     animateIcon: engine.isRunning) {
-            statusPill
-                .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
-                .id(statusPillID)
+            VStack(spacing: 12) {
+                Text("an app by Frizzle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                statusPill
+                    .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
+                    .id(statusPillID)
+            }
         }
     }
 
@@ -93,7 +98,7 @@ struct ContentView: View {
         } else if engine.vpnConnected {
             StatusPill(text: "Tunnel connected", systemImage: "checkmark.shield.fill", color: .green)
         } else {
-            StatusPill(text: "Tunnel off", systemImage: "shield.slash.fill", color: .orange)
+            StatusPill(text: "Tunnel off", systemImage: "shield.slash.fill", color: .red)
         }
     }
 
@@ -167,11 +172,11 @@ struct ContentView: View {
     /// Shown above the Install button while the LocalDevVPN tunnel is off — the
     /// whole install runs over it, so it must be on before tapping Install.
     private var vpnRequirement: some View {
-        CalloutCard(tint: .orange) {
+        CalloutCard(tint: .red) {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: "shield.lefthalf.filled")
                     .font(.title2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.red)
                     .symbolEffect(.pulse)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("LocalDevVPN required")
@@ -187,7 +192,7 @@ struct ContentView: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        .tint(.orange)
+                        .tint(.red)
                         .padding(.top, 2)
                     }
                 }
@@ -217,6 +222,7 @@ struct ContentView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(Step.allCases.enumerated()), id: \.element) { idx, step in
                         StepRow(step: step,
+                                source: engine.installSource,
                                 state: engine.stepStates[step] ?? .pending,
                                 installProgress: engine.installProgress,
                                 isLast: idx == Step.allCases.count - 1)
@@ -325,7 +331,7 @@ struct ContentView: View {
                     .font(.title)
                     .foregroundStyle(.green)
                     .symbolEffect(.bounce, options: .nonRepeating, value: engine.finished)
-                Text("SideStore is installed. Finish the trust step above to open it.")
+                Text("\(engine.installedSourceName) is installed. Finish the trust step above to open it.")
                     .font(.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -366,6 +372,7 @@ extension View {
 /// while installing, or an "Action needed" cue when blocked on the user).
 private struct StepRow: View {
     let step: Step
+    let source: InstallSource
     let state: StepState
     let installProgress: Double
     let isLast: Bool
@@ -375,7 +382,7 @@ private struct StepRow: View {
             timelineColumn
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Text(step.title)
+                    Text(step.title(for: source))
                         .font(.subheadline.weight(state == .pending ? .regular : .medium))
                         .foregroundStyle(state == .pending ? .secondary : .primary)
                     Spacer()

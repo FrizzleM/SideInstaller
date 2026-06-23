@@ -8,8 +8,9 @@ import SwiftUI
 /// regardless of which tab is active.
 struct RootView: View {
     @EnvironmentObject private var engine: Engine
-    /// Owned here so it survives tab switches and shares the one `Engine`.
+    /// Owned here so they survive tab switches and share the one `Engine`.
     @StateObject private var certManager = CertManager()
+    @StateObject private var downloadsManager = DownloadsManager()
     @State private var twoFactorCode = ""
     @State private var selectedTab = 0
 
@@ -21,8 +22,12 @@ struct RootView: View {
             CertsView(manager: certManager)
                 .tabItem { Label("Certificates", systemImage: "checkmark.seal") }
                 .tag(1)
+            DownloadsView(manager: downloadsManager)
+                .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
+                .tag(2)
         }
         .tint(Theme.accent)
+        .preferredColorScheme(.dark)
         .alert("Two-Factor Code", isPresented: $engine.pendingTwoFactor) {
             TextField("6-digit code", text: $twoFactorCode)
                 .keyboardType(.numberPad)
