@@ -113,11 +113,11 @@ certificate_revocation() {
   printf 'unknown\n'
 }
 
-rev_badge_for() {  # status -> HTML badge
+rev_label_for() {  # status -> display text (shown like the "Expires" line)
   case "$1" in
-    revoked) printf '<span class="rev rev-bad">Revoked</span>' ;;
-    valid)   printf '<span class="rev rev-ok">Not revoked</span>' ;;
-    *)       printf '<span class="rev rev-unknown">Status unknown</span>' ;;
+    revoked) printf 'Revoked' ;;
+    valid)   printf 'Not revoked' ;;
+    *)       printf 'Status unknown' ;;
   esac
 }
 
@@ -153,7 +153,7 @@ if [[ ${#PLISTS[@]} -gt 0 ]]; then
     filename="$(basename "$plist")"
     expires_at="$(certificate_expires_at "$name")"
     revocation="$(certificate_revocation "$name")"
-    rev_badge="$(rev_badge_for "$revocation")"
+    rev_line="<p class=\"cert-meta\">$(rev_label_for "$revocation")</p>"
     IFS=$'\t' read -r pill_class pill_label <<< "$(pill_for "$days_left")"
 
     name_esc="$(printf '%s' "$name" | html_escape)"
@@ -169,8 +169,8 @@ if [[ ${#PLISTS[@]} -gt 0 ]]; then
         <h3 class="cert-name">$name_esc</h3>
         <span class="pill $pill_class">$pill_label</span>
       </div>
+      $rev_line
       $expires_line
-      <div class="cert-status">$rev_badge</div>
       <a class="install-btn" href="$install_url">$INSTALL_ICON Install</a>
     </article>
 EOF

@@ -47,6 +47,7 @@
     -webkit-background-clip:text; background-clip:text; color:transparent;
   }
   .tagline{margin:8px auto 0; max-width:540px; color:var(--muted); font-size:16px}
+  .note{margin:10px auto 0; max-width:540px; color:var(--faint); font-size:13.5px}
   .badges{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
   .badge{
     font-size:13px; font-weight:600; color:var(--muted);
@@ -108,20 +109,6 @@
   .install-btn:active{transform:scale(.97)}
   .cert-card[data-days^="-"] .install-btn{filter:saturate(.5) brightness(.85)}
 
-  /* ---- revocation status ---- */
-  .cert-status{display:flex}
-  .rev{
-    display:inline-flex; align-items:center; gap:6px;
-    font-size:11.5px; font-weight:700; letter-spacing:.01em;
-    padding:5px 10px; border-radius:999px; white-space:nowrap; border:1px solid transparent;
-  }
-  .rev::before{content:""; width:7px; height:7px; border-radius:50%; background:currentColor; flex:none}
-  .rev-ok{color:var(--good); background:rgba(52,211,153,.12); border-color:rgba(52,211,153,.25)}
-  .rev-bad{color:var(--bad); background:rgba(248,113,113,.13); border-color:rgba(248,113,113,.3)}
-  .rev-unknown{color:var(--muted); background:rgba(255,255,255,.05); border-color:var(--stroke)}
-  /* Revoked builds won't launch, so de-emphasize their install button. */
-  .cert-card[data-revoked="revoked"] .install-btn{filter:saturate(.5) brightness(.85)}
-
   .empty{display:none; text-align:center; color:var(--muted); padding:50px 0; font-size:15px}
   .empty.show{display:block}
 
@@ -175,6 +162,7 @@
     <div class="logo">{{LOGO}}</div>
     <h1>{{APP_NAME}}</h1>
     <p class="tagline">{{APP_TAGLINE}}</p>
+    <p class="note">Note: revoked certificates can still be used</p>
     <div class="badges">
       <span class="badge">Version <b>{{APP_VERSION}}</b></span>
       <span class="badge"><b>{{CERT_COUNT}}</b> certificates</span>

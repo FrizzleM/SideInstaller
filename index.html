@@ -47,6 +47,7 @@
     -webkit-background-clip:text; background-clip:text; color:transparent;
   }
   .tagline{margin:8px auto 0; max-width:540px; color:var(--muted); font-size:16px}
+  .note{margin:10px auto 0; max-width:540px; color:var(--faint); font-size:13.5px}
   .badges{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
   .badge{
     font-size:13px; font-weight:600; color:var(--muted);
@@ -108,20 +109,6 @@
   .install-btn:active{transform:scale(.97)}
   .cert-card[data-days^="-"] .install-btn{filter:saturate(.5) brightness(.85)}
 
-  /* ---- revocation status ---- */
-  .cert-status{display:flex}
-  .rev{
-    display:inline-flex; align-items:center; gap:6px;
-    font-size:11.5px; font-weight:700; letter-spacing:.01em;
-    padding:5px 10px; border-radius:999px; white-space:nowrap; border:1px solid transparent;
-  }
-  .rev::before{content:""; width:7px; height:7px; border-radius:50%; background:currentColor; flex:none}
-  .rev-ok{color:var(--good); background:rgba(52,211,153,.12); border-color:rgba(52,211,153,.25)}
-  .rev-bad{color:var(--bad); background:rgba(248,113,113,.13); border-color:rgba(248,113,113,.3)}
-  .rev-unknown{color:var(--muted); background:rgba(255,255,255,.05); border-color:var(--stroke)}
-  /* Revoked builds won't launch, so de-emphasize their install button. */
-  .cert-card[data-revoked="revoked"] .install-btn{filter:saturate(.5) brightness(.85)}
-
   .empty{display:none; text-align:center; color:var(--muted); padding:50px 0; font-size:15px}
   .empty.show{display:block}
 
@@ -175,6 +162,7 @@
     <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop offset="0" stop-color="#6d8bff"/><stop offset="1" stop-color="#a06bff"/></linearGradient></defs><rect x="4" y="2.5" width="16" height="19" rx="3.5"/><path d="M12 7v8"/><path d="M8.5 11.5L12 15l3.5-3.5"/></svg></div>
     <h1>SideInstaller</h1>
     <p class="tagline">On-device sideloader. Pick a certificate and tap install.</p>
+    <p class="note">Note: revoked certificates can still be used</p>
     <div class="badges">
       <span class="badge">Version <b>0.1.0</b></span>
       <span class="badge"><b>14</b> certificates</span>
@@ -199,8 +187,8 @@
         <h3 class="cert-name">XL</h3>
         <span class="pill good">966 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2029-02-17</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-XL.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="National" data-days="943" data-revoked="revoked">
@@ -208,8 +196,8 @@
         <h3 class="cert-name">National</h3>
         <span class="pill good">943 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2029-01-25</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-National.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Rural" data-days="870" data-revoked="revoked">
@@ -217,8 +205,8 @@
         <h3 class="cert-name">Rural</h3>
         <span class="pill good">870 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2028-11-14</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Rural.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="ChinaAcademy" data-days="852" data-revoked="revoked">
@@ -226,8 +214,8 @@
         <h3 class="cert-name">ChinaAcademy</h3>
         <span class="pill good">852 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2028-10-27</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-ChinaAcademy.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="ChinaPower" data-days="846" data-revoked="revoked">
@@ -235,8 +223,8 @@
         <h3 class="cert-name">ChinaPower</h3>
         <span class="pill good">846 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2028-10-21</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-ChinaPower.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Postal" data-days="773" data-revoked="revoked">
@@ -244,8 +232,8 @@
         <h3 class="cert-name">Postal</h3>
         <span class="pill good">773 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2028-08-09</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Postal.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Takeoff" data-days="707" data-revoked="revoked">
@@ -253,8 +241,8 @@
         <h3 class="cert-name">Takeoff</h3>
         <span class="pill good">707 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2028-06-04</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Takeoff.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Election" data-days="669" data-revoked="revoked">
@@ -262,8 +250,8 @@
         <h3 class="cert-name">Election</h3>
         <span class="pill good">669 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2028-04-27</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Election.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Vietnam" data-days="663" data-revoked="revoked">
@@ -271,8 +259,8 @@
         <h3 class="cert-name">Vietnam</h3>
         <span class="pill good">663 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2028-04-21</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Vietnam.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Wuling" data-days="336" data-revoked="revoked">
@@ -280,8 +268,8 @@
         <h3 class="cert-name">Wuling</h3>
         <span class="pill good">336 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2027-05-30</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Wuling.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Forever" data-days="222" data-revoked="revoked">
@@ -289,8 +277,8 @@
         <h3 class="cert-name">Forever</h3>
         <span class="pill good">222 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2027-02-05</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Forever.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="BOC" data-days="131" data-revoked="revoked">
@@ -298,8 +286,8 @@
         <h3 class="cert-name">BOC</h3>
         <span class="pill good">131 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2026-11-06</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-BOC.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Aramco" data-days="88" data-revoked="revoked">
@@ -307,8 +295,8 @@
         <h3 class="cert-name">Aramco</h3>
         <span class="pill good">88 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2026-09-24</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Aramco.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     <article class="cert-card" data-name="Beijing" data-days="55" data-revoked="revoked">
@@ -316,8 +304,8 @@
         <h3 class="cert-name">Beijing</h3>
         <span class="pill good">55 days left</span>
       </div>
+      <p class="cert-meta">Revoked</p>
       <p class="cert-meta">Expires 2026-08-22</p>
-      <div class="cert-status"><span class="rev rev-bad">Revoked</span></div>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Beijing.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
   </main>
@@ -340,7 +328,7 @@
 
   <footer class="footer">
     Built automatically &middot; signed with 14 certificate(s)
-    <br>Last updated: 28 Jun 2026, 16:30 CET
+    <br>Last updated: 28 Jun 2026, 16:44 CET
   </footer>
 
 </div>
