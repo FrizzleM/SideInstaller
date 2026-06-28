@@ -32,13 +32,15 @@ struct ContentView: View {
                     if showError, let error = engine.lastError {
                         errorCallout(error).transition(.cardAppear)
                     }
-                    if engine.finished {
-                        successCallout.transition(.cardAppear)
-                    }
                     // After a LiveContainer + SideStore install, the user still
                     // needs to import SideStore's certificate into LiveContainer.
+                    // Show that step *above* the success note so the remaining
+                    // manual action is the first thing they see.
                     if engine.finished, engine.installedIsLiveContainer {
                         guideCallout(Guides.liveContainerImport).transition(.cardAppear)
+                    }
+                    if engine.finished {
+                        successCallout.transition(.cardAppear)
                     }
                 }
                 .padding(20)
