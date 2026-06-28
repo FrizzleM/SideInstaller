@@ -35,6 +35,7 @@ CERT_ARCHIVE="$TMP_DIR/certificates.zip"
 UNSIGNED_IPA="$TMP_DIR/unsigned.ipa"
 APPLE_CERTS_DIR="$TMP_DIR/apple-certs"
 INTERMEDIATES_KC="$TMP_DIR/intermediates.keychain-db"
+OCSP_CA_BUNDLE="$APPLE_CERTS_DIR/ocsp-ca-bundle.pem"
 
 ORIGINAL_KEYCHAINS=()
 OPENSSL_LEGACY_FLAG=""
@@ -260,10 +261,78 @@ download_apple_intermediates() {
     "$ca/AppleWWDRCAG2.cer" "$ca/AppleWWDRCAG3.cer" "$ca/AppleWWDRCAG4.cer" \
     "$ca/AppleWWDRCAG5.cer" "$ca/AppleWWDRCAG6.cer" \
     "https://developer.apple.com/certificationauthority/AppleWWDRCA.cer" \
+    "$ca/AppleRootCA-G3.cer" \
     "https://www.apple.com/appleca/AppleIncRootCertificate.cer"; do
     curl -fsSL "$u" -o "$APPLE_CERTS_DIR/$(basename "$u")" 2>/dev/null || true
   done
   return 0
+}
+
+# Convert the downloaded Apple CA .cer files (DER) to PEM and assemble a single
+# CA bundle. Used by the OCSP revocation check to (a) match each leaf's issuer
+# and (b) verify the OCSP responder's signature ("Response verify OK").
+prepare_ocsp_truststore() {
+  local c pem
+  : > "$OCSP_CA_BUNDLE"
+  shopt -s nullglob
+  for c in "$APPLE_CERTS_DIR"/*.cer; do
+    pem="${c%.cer}.pem"
+    if openssl x509 -inform DER -in "$c" -out "$pem" 2>/dev/null \
+       || openssl x509 -inform PEM -in "$c" -out "$pem" 2>/dev/null; then
+      cat "$pem" >> "$OCSP_CA_BUNDLE"
+    fi
+  done
+  shopt -u nullglob
+}
+
+# OCSP revocation status of a signing certificate -> prints "revoked", "valid",
+# or "unknown". Asks the cert's own OCSP responder (from its AIA extension),
+# using the matching Apple WWDR intermediate as issuer. Any failure — no
+# network, missing issuer, unreadable cert — degrades to "unknown" so it can
+# never block signing. Works on both OpenSSL 3.x and the macOS LibreSSL.
+certificate_revocation_status() {
+  local p12_file="$1" password="$2"
+  command -v openssl >/dev/null 2>&1 || { echo "unknown"; return 0; }
+  local leaf="$TMP_DIR/ocsp-leaf-$(basename "$p12_file" .p12).pem"
+  openssl pkcs12 $OPENSSL_LEGACY_FLAG -in "$p12_file" -passin "pass:$password" \
+    -nokeys -clcerts -out "$leaf" >/dev/null 2>&1 || { echo "unknown"; return 0; }
+  [[ -s "$leaf" ]] || { echo "unknown"; return 0; }
+
+  local uri issuer_dn
+  uri="$(openssl x509 -in "$leaf" -noout -ocsp_uri 2>/dev/null)"
+  # Fallback for openssl builds without -ocsp_uri: read the AIA extension text.
+  [[ -n "$uri" ]] || uri="$(openssl x509 -in "$leaf" -noout -text 2>/dev/null \
+    | sed -n 's/.*OCSP - URI:\(.*\)/\1/p' | head -n1)"
+  [[ -n "$uri" ]] || { echo "unknown"; return 0; }
+
+  issuer_dn="$(openssl x509 -in "$leaf" -noout -issuer -nameopt RFC2253 2>/dev/null | sed 's/^issuer=//')"
+  local cand subj issuer_pem=""
+  shopt -s nullglob
+  for cand in "$APPLE_CERTS_DIR"/*.pem; do
+    subj="$(openssl x509 -in "$cand" -noout -subject -nameopt RFC2253 2>/dev/null | sed 's/^subject=//')"
+    [[ "$subj" == "$issuer_dn" ]] && { issuer_pem="$cand"; break; }
+  done
+  shopt -u nullglob
+  [[ -n "$issuer_pem" ]] || { echo "unknown"; return 0; }
+
+  # Always pass a non-empty verify option (avoids set -u empty-array issues on
+  # bash 3.2): a CA bundle when we have one, else skip responder verification.
+  local -a verify_opt
+  if [[ -s "$OCSP_CA_BUNDLE" ]]; then verify_opt=(-CAfile "$OCSP_CA_BUNDLE"); else verify_opt=(-no_cert_verify); fi
+
+  local out status_line attempt
+  for attempt in 1 2 3; do
+    out="$(openssl ocsp -issuer "$issuer_pem" -cert "$leaf" -url "$uri" \
+      "${verify_opt[@]}" -no_nonce -timeout 25 2>/dev/null)"
+    status_line="$(printf '%s\n' "$out" | sed -n "s#^$leaf: ##p" | head -n1)"
+    case "$status_line" in
+      good)    echo "valid";   return 0 ;;
+      revoked) echo "revoked"; return 0 ;;
+      unknown) echo "unknown"; return 0 ;;
+    esac
+    sleep 2
+  done
+  echo "unknown"
 }
 
 # Import Apple intermediates ONCE into a dedicated keychain that stays in the
@@ -296,7 +365,7 @@ if [[ "$OPENSSL_PKCS12_HELP" == *"-legacy"* ]]; then OPENSSL_LEGACY_FLAG="-legac
 
 mkdir -p "$OUTPUT_DIR"
 clean_generated_artifacts "$OUTPUT_PREFIX-*.ipa"
-printf 'name\tcertificate_expires_at\tdays_left\n' > "$CERT_METADATA_FILE"
+printf 'name\tcertificate_expires_at\tdays_left\trevoked\n' > "$CERT_METADATA_FILE"
 if [[ -n "$CERT_NAME_LIST_FILE" ]]; then : > "$CERT_NAME_LIST_FILE"; fi
 
 CERT_ZIP_URL="$(resolve_cert_zip_url)"
@@ -326,6 +395,7 @@ record_app_info "$UNSIGNED_IPA" || warn "Could not read app info from the unsign
 echo "[*] Fetching Apple WWDR intermediates"
 download_apple_intermediates
 setup_intermediates_keychain
+prepare_ocsp_truststore
 unzip -q "$CERT_ARCHIVE" -d "$TMP_DIR"
 
 SUCCESS=0
@@ -365,6 +435,7 @@ while IFS= read -r P12_FILE; do
   else
     warn "Unable to read certificate expiry for $CERT_GROUP_NAME"
   fi
+  CERT_REVOCATION="$(certificate_revocation_status "$P12_FILE" "$P12_PASSWORD_FOR_CERT")"
 
   echo
   echo "=============================================="
@@ -386,6 +457,7 @@ while IFS= read -r P12_FILE; do
   log "Profile App ID: ${PROFILE_APP_ID:-unknown}"
   log "Profile Expiry: $EXPIRY"
   log "Certificate Expiry: $CERT_EXPIRES_AT ($CERT_DAYS_LEFT days left)"
+  log "Certificate Revocation: $CERT_REVOCATION"
 
   if [[ -z "$TEAM_ID" || -z "$PROFILE_APP_ID" ]]; then
     fail "Provisioning profile is missing TeamIdentifier or application-identifier"
@@ -489,7 +561,7 @@ while IFS= read -r P12_FILE; do
   popd >/dev/null
 
   log "Signed IPA created: $OUTPUT_PREFIX-$OUTPUT_NAME.ipa"
-  printf '%s\t%s\t%s\n' "$OUTPUT_NAME" "$CERT_EXPIRES_AT" "$CERT_DAYS_LEFT" >> "$CERT_METADATA_FILE"
+  printf '%s\t%s\t%s\t%s\n' "$OUTPUT_NAME" "$CERT_EXPIRES_AT" "$CERT_DAYS_LEFT" "$CERT_REVOCATION" >> "$CERT_METADATA_FILE"
   if [[ -n "$CERT_NAME_LIST_FILE" ]]; then printf '%s\n' "$OUTPUT_NAME" >> "$CERT_NAME_LIST_FILE"; fi
 
   restore_keychains

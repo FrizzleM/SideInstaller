@@ -83,9 +83,9 @@ first_config_line() {
 UNSIGNED_IPA_URL="${UNSIGNED_IPA_URL:-$(first_config_line "$IPA_URL_FILE")}"
 
 certificate_days_left() {
-  local name="$1" cert_name cert_expires_at cert_days_left
+  local name="$1" cert_name cert_expires_at cert_days_left cert_revoked
   if [[ ! -f "$CERT_METADATA_FILE" ]]; then printf '%s\n' "-999999"; return 0; fi
-  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left; do
+  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left cert_revoked; do
     if [[ "$cert_name" == "$name" && "$cert_days_left" =~ ^-?[0-9]+$ ]]; then
       printf '%s\n' "$cert_days_left"; return 0
     fi
@@ -94,12 +94,31 @@ certificate_days_left() {
 }
 
 certificate_expires_at() {
-  local name="$1" cert_name cert_expires_at cert_days_left
+  local name="$1" cert_name cert_expires_at cert_days_left cert_revoked
   [[ -f "$CERT_METADATA_FILE" ]] || { printf '\n'; return 0; }
-  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left; do
+  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left cert_revoked; do
     if [[ "$cert_name" == "$name" ]]; then printf '%s\n' "$cert_expires_at"; return 0; fi
   done < "$CERT_METADATA_FILE"
   printf '\n'
+}
+
+# Revocation status recorded at signing time (4th column). Older metadata files
+# without the column degrade to "unknown".
+certificate_revocation() {
+  local name="$1" cert_name cert_expires_at cert_days_left cert_revoked
+  [[ -f "$CERT_METADATA_FILE" ]] || { printf 'unknown\n'; return 0; }
+  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left cert_revoked; do
+    if [[ "$cert_name" == "$name" ]]; then printf '%s\n' "${cert_revoked:-unknown}"; return 0; fi
+  done < "$CERT_METADATA_FILE"
+  printf 'unknown\n'
+}
+
+rev_badge_for() {  # status -> HTML badge
+  case "$1" in
+    revoked) printf '<span class="rev rev-bad">Revoked</span>' ;;
+    valid)   printf '<span class="rev rev-ok">Not revoked</span>' ;;
+    *)       printf '<span class="rev rev-unknown">Status unknown</span>' ;;
+  esac
 }
 
 pill_for() {  # days -> "class<TAB>label"
@@ -119,7 +138,7 @@ INSTALL_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 IPA_DOWNLOAD_HTML=""
 if [[ -n "$UNSIGNED_IPA_URL" ]]; then
   ipa_url_esc="$(printf '%s' "$UNSIGNED_IPA_URL" | html_escape)"
-  IPA_DOWNLOAD_HTML="<div class=\"ipa-dl\"><a class=\"ipa-btn\" href=\"$ipa_url_esc\" download>$INSTALL_ICON Download unsigned .ipa</a><p class=\"ipa-note\">The raw, unsigned build — for signing it yourself or sideloading with your own tool.</p></div>"
+  IPA_DOWNLOAD_HTML="<div class=\"ipa-dl\"><a class=\"ipa-btn\" href=\"$ipa_url_esc\" download>$INSTALL_ICON Download unsigned .ipa</a></div>"
 fi
 
 shopt -s nullglob
@@ -133,6 +152,8 @@ if [[ ${#PLISTS[@]} -gt 0 ]]; then
   while IFS=$'\t' read -r days_left name plist; do
     filename="$(basename "$plist")"
     expires_at="$(certificate_expires_at "$name")"
+    revocation="$(certificate_revocation "$name")"
+    rev_badge="$(rev_badge_for "$revocation")"
     IFS=$'\t' read -r pill_class pill_label <<< "$(pill_for "$days_left")"
 
     name_esc="$(printf '%s' "$name" | html_escape)"
@@ -143,12 +164,13 @@ if [[ ${#PLISTS[@]} -gt 0 ]]; then
     install_url="itms-services://?action=download-manifest&amp;url=$OUTPUT_BASE_URL/$filename"
 
     cat >> "$CARDS_FILE" <<EOF
-    <article class="cert-card" data-name="$name_esc" data-days="$days_left">
+    <article class="cert-card" data-name="$name_esc" data-days="$days_left" data-revoked="$revocation">
       <div class="cert-head">
         <h3 class="cert-name">$name_esc</h3>
         <span class="pill $pill_class">$pill_label</span>
       </div>
       $expires_line
+      <div class="cert-status">$rev_badge</div>
       <a class="install-btn" href="$install_url">$INSTALL_ICON Install</a>
     </article>
 EOF
