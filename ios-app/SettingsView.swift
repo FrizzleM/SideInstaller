@@ -7,6 +7,7 @@ import UIKit
 struct SettingsView: View {
     @EnvironmentObject private var engine: Engine
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     /// `true` once the user picks "Custom…", revealing the free-form URL field.
     @State private var anisetteIsCustom = false
@@ -14,6 +15,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                linksSection
                 anisetteSection
                 advancedSection
                 logSection
@@ -29,6 +31,55 @@ struct SettingsView: View {
         .onAppear {
             anisetteIsCustom = !engine.anisetteServers.contains { $0.address == engine.anisetteURL }
         }
+    }
+
+    // MARK: Links
+
+    /// Project links — source, support, and community — kept at the very top so
+    /// they're the first thing the user sees in Settings.
+    private var linksSection: some View {
+        Section {
+            HStack(spacing: 10) {
+                linkButton("GitHub",
+                           systemImage: "chevron.left.forwardslash.chevron.right",
+                           tint: .primary,
+                           url: "https://github.com/FrizzleM/SideInstaller")
+                linkButton("Ko-fi",
+                           systemImage: "cup.and.saucer.fill",
+                           tint: Color(red: 1.0, green: 0.37, blue: 0.36),
+                           url: "https://ko-fi.com/frizzlem")
+                linkButton("Discord",
+                           systemImage: "bubble.left.and.bubble.right.fill",
+                           tint: Color(red: 0.35, green: 0.40, blue: 0.95),
+                           url: "https://discord.gg/sQ5Y8vbYJS")
+            }
+            .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+            .listRowBackground(Color.clear)
+        }
+    }
+
+    /// One pill in the links row: a tinted tile with a glyph over its label that
+    /// opens `url` in the browser.
+    private func linkButton(_ title: String, systemImage: String,
+                            tint: Color, url: String) -> some View {
+        Button {
+            if let url = URL(string: url) { openURL(url) }
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.title3)
+                Text(title)
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(tint)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(tint.opacity(0.14))
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Anisette server
