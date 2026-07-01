@@ -145,9 +145,18 @@ Fixes applied (connect path + pairing gate only):
   `SideloaderBuilder` (team `First`, `FsStorage`, machine name) → opaque
   `SignSession`. 2FA is bridged to a Swift prompt via a blocking semaphore
   callback (`SITwoFactorCb`).
-- `si_sign_ipa` — `Sideloader::sign_app(ipa, None, false)` → signed `.app`
-  bundle path. sign_app internally registers the App ID + provisioning profile
-  and retrieves/creates the dev certificate, then signs with `apple-codesign`.
+- `si_sign_ipa(session, ipa, udid, device_name, …)` — first calls
+  `DeveloperSession::ensure_device_registered(team, name, udid)` so the team has
+  the connected device, then `Sideloader::sign_app(ipa, None, false)` → signed
+  `.app` bundle path. sign_app internally registers the App ID + provisioning
+  profile and retrieves/creates the dev certificate, then signs with
+  `apple-codesign`. **Device registration is mandatory here:** we use the
+  sign-only path (not isideload's `install_app`, which is the only place
+  isideload registers the device), so without this step a fresh/free team has no
+  devices and the profile download fails with developer error **8220** ("Your
+  team has no devices …"). The UDID comes from the lockdown handshake, captured
+  by Swift during Connect and passed down; a registration failure is prefixed
+  `device registration failed for UDID <udid>:` so Swift can surface the UDID.
 
 **idevice version coexistence:** isideload pulls idevice **0.1.61** (crates.io,
 behind its `install` feature, which is required because its feature-gating is

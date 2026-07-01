@@ -51,13 +51,21 @@ enum EngineError: LocalizedError {
     case message(String)
     /// Apple's free-account cap of 3 signing certificates is already used up.
     case certLimit
+    /// The connected device's UDID couldn't be registered with the developer
+    /// team, so the provisioning profile can't be issued (Apple error 8220).
+    /// Carries the UDID and the raw error so both the message and the guide can
+    /// show the UDID for manual entry.
+    case deviceRegistration(udid: String, raw: String)
 
     var errorDescription: String? {
         switch self {
         case let .message(m):
             return m
         case .certLimit:
-            return "Apple allows only 3 signing certificates per Apple ID and this one already has 3, so a new one can't be made. Sign in with a different Apple ID, or revoke an old certificate — see the steps above."
+            return "Apple allows only 3 signing certificates per Apple ID and this one already has 3, so a new one can't be made. Open the Certificates tab, tap “Load certificates”, and revoke an old or expired one to free a slot — then tap Install again. See the steps above."
+        case let .deviceRegistration(udid, raw):
+            let tail = udid.isEmpty ? "" : " (UDID \(udid))"
+            return "Couldn't register this iPhone\(tail) with your Apple ID's developer team, so Apple won't issue a provisioning profile. \(raw) — see the steps above."
         }
     }
 }
@@ -124,6 +132,13 @@ final class Engine: ObservableObject {
     /// Short human summary of the connected device, e.g. "iPhone · iOS 17.5".
     @Published var deviceSummary: String?
 
+    /// The connected iPhone's UDID + name, captured from the lockdown handshake
+    /// during `connect`. The UDID is registered with the developer team before
+    /// signing (Apple rejects the provisioning profile with error 8220 if the
+    /// team has no devices), and is shown to the user if registration fails.
+    private(set) var deviceUDID: String?
+    private(set) var deviceName: String?
+
     /// The current contextual instruction card (nil = none).
     @Published var guide: Guide?
 
@@ -154,6 +169,13 @@ final class Engine: ObservableObject {
     /// download) — used so post-install copy names the right app.
     var installedSourceName: String {
         (downloadedSource ?? installSource).displayName
+    }
+
+    /// Home-screen app name of what actually landed on the device — the app the
+    /// user taps to open (LiveContainer, not "LiveContainer + SideStore"). Used
+    /// for the trust card so it names the right icon to open.
+    var installedAppName: String {
+        (downloadedSource ?? installSource).pairingAppDisplayName
     }
 
     /// Overall fraction across all steps (0…1). Computed from the published
@@ -285,6 +307,8 @@ final class Engine: ObservableObject {
             self.pairingPIN = nil
             self.guide = nil
             self.deviceSummary = nil
+            self.deviceUDID = nil
+            self.deviceName = nil
             self.lastError = nil
             self.finished = false
         }
@@ -308,7 +332,6 @@ final class Engine: ObservableObject {
     func runOneClick() {
         guard !isRunning else { return }
         guard !appleID.isEmpty, !applePassword.isEmpty else {
-            setGuide(Guides.credentials)
             log("Enter your Apple ID email + password first.")
             return
         }
@@ -430,13 +453,23 @@ final class Engine: ObservableObject {
         setGuide(nil)
         let ip = deviceIP
         let path = pairingFilePath ?? PairingController.pairingFilePath()
-        let summary = try await onDeviceQueue { try self.performConnect(ip: ip, pairingPath: path) }
-        deviceSummary = summary
+        let device = try await onDeviceQueue { try self.performConnect(ip: ip, pairingPath: path) }
+        deviceSummary = device.summary
+        deviceUDID = device.udid
+        deviceName = device.name
         pairingStatus = "connected"
         setStep(.connect, .done)
     }
 
-    private func performConnect(ip: String, pairingPath path: String) throws -> String {
+    /// The connected device's summary line plus the identifiers needed to
+    /// register it with the developer team before signing.
+    private struct ConnectedDevice {
+        let summary: String
+        let udid: String?
+        let name: String?
+    }
+
+    private func performConnect(ip: String, pairingPath path: String) throws -> ConnectedDevice {
         // Gate: never attempt a connect with a missing/zero-byte pairing file —
         // idevice maps the file-read error to a confusing Socket(ENOENT).
         let size = fileSize(path)
@@ -456,8 +489,15 @@ final class Engine: ObservableObject {
             for (k, v) in info { dict[k] = v; log("  \(k) = \(v)") }
         }
         let name = dict["DeviceName"] ?? "device"
-        if let version = dict["ProductVersion"] { return "\(name) · iOS \(version)" }
-        return name
+        let summary: String
+        if let version = dict["ProductVersion"] {
+            summary = "\(name) · iOS \(version)"
+        } else {
+            summary = name
+        }
+        return ConnectedDevice(summary: summary,
+                               udid: dict["UniqueDeviceID"],
+                               name: dict["DeviceName"])
     }
 
     // MARK: Step 4 — Apple ID sign-in
@@ -609,24 +649,38 @@ final class Engine: ObservableObject {
     private func signApp() async throws {
         guard let session = signSession else { throw EngineError.message("Not signed in.") }
         guard let ipa = downloadedIPAPath else { throw EngineError.message("No SideStore IPA downloaded.") }
+        // The signer registers this UDID with the developer team before asking
+        // Apple for a provisioning profile — a fresh/free team has no devices, so
+        // the profile download fails with error 8220 unless the device is added
+        // first (the step Sideloadly/AltStore do transparently).
+        let udid = deviceUDID ?? ""
+        let name = deviceName ?? ""
+        if udid.isEmpty {
+            log("⚠️ No device UDID captured — run the Connect step first, or signing may fail with error 8220.")
+        }
         setStep(.sign, .active)
         do {
-            let path = try await onSignQueue { try self.performSign(session: session, ipa: ipa) }
+            let path = try await onSignQueue {
+                try self.performSign(session: session, ipa: ipa, udid: udid, deviceName: name)
+            }
             signedAppPath = path
             setStep(.sign, .done)
         } catch {
-            // The "max certificates" failure has a concrete, user-fixable cause —
-            // show the explanatory card alongside the stopped step.
+            // Failures with a concrete, user-fixable cause get an explanatory
+            // card alongside the stopped step.
             if case EngineError.certLimit = error { setGuide(Guides.certLimit) }
+            if case let EngineError.deviceRegistration(udid, raw) = error {
+                setGuide(Guides.deviceRegistration(udid: udid, raw: raw))
+            }
             throw error
         }
     }
 
-    private func performSign(session: OpaquePointer, ipa: String) throws -> String {
+    private func performSign(session: OpaquePointer, ipa: String, udid: String, deviceName: String) throws -> String {
         log("Signing \(ipa) …")
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        let rc = si_sign_ipa(session, ipa, &signed, &error)
+        let rc = si_sign_ipa(session, ipa, udid, deviceName, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
             signed.map { si_string_free($0) }
@@ -637,6 +691,11 @@ final class Engine: ObservableObject {
             error.map { si_string_free($0) }
             log("Sign FAILED: \(msg)")
             if Self.isCertLimitError(msg) { throw EngineError.certLimit }
+            // Device-registration / "team has no devices" (8220) failures: carry
+            // the UDID so the error and its guide can show it for manual entry.
+            if Self.isDeviceRegistrationError(msg) {
+                throw EngineError.deviceRegistration(udid: udid, raw: msg)
+            }
             throw EngineError.message("Signing failed: \(msg)")
         }
     }
@@ -649,6 +708,28 @@ final class Engine: ObservableObject {
         return m.contains("7460")
             || m.contains("maximum number of certificates")
             || (m.contains("certificate") && (m.contains("maximum") || m.contains("limit")))
+    }
+
+    /// Detect a device-registration failure: either our pre-sign registration
+    /// step failed (Rust prefixes "device registration failed for UDID …"), or
+    /// the profile download itself hit Apple error 8220 ("Your team has no
+    /// devices …") because no device was registered.
+    static func isDeviceRegistrationError(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("device registration failed")
+            || m.contains("8220")
+            || m.contains("no devices")
+            || m.contains("has no devices")
+    }
+
+    /// Distinguish a device *limit* rejection (free accounts can only register a
+    /// limited number of devices per year, and can't remove old ones) from other
+    /// registration failures — so the guide can give the right advice.
+    static func isDeviceLimitError(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("maximum number of devices")
+            || (m.contains("device") && (m.contains("maximum") || m.contains("too many")
+                || (m.contains("limit") && !m.contains("no devices"))))
     }
 
     // MARK: Step 7 — install over AFC + installation_proxy
@@ -687,6 +768,28 @@ final class Engine: ObservableObject {
         guard FileManager.default.fileExists(atPath: path), size > 0 else {
             throw EngineError.message("Pairing file missing — pairing must run first.")
         }
+
+        // StikDebug: resolve and write exactly the way the Pairing tab does — that
+        // path is known to work. Unlike SideStore/LiveContainer (matched by display
+        // name), StikDebug ships an App Store build and a sideloaded build that share
+        // the display name "StikDebug" but read the pairing file from different paths.
+        // `PairingTargets.match` distinguishes them by bundle id (the sideloaded build,
+        // `com.stik.stikdebug.<teamID>`, reads `rp_pairing_file.plist`), so we pick the
+        // sideloaded target we just installed and hand it to the shared write helper.
+        if source == .stikDebug {
+            let stikTargets = try PairingTargets.match(installed: connection.installedApps())
+                .filter { $0.bundleID.contains(source.pairingBundleIDBase) }
+            guard let target = stikTargets.first(where: { $0.app.bundleIDContains != nil })
+                ?? stikTargets.first else {
+                throw EngineError.message("\(source.displayName) isn't installed yet — install must run first.")
+            }
+            log("Resolved \(target.name) bundle id: \(target.bundleID)")
+            try performInstallPairing(bundleID: target.bundleID,
+                                      remoteRelativePath: target.remoteRelativePath,
+                                      path: path)
+            return
+        }
+
         // Resolve the *installed* host app's bundle id. installation_proxy is the
         // source of truth — match by display name (survives the bundle id rewrite
         // isideload performs), then by base bundle id; fall back to the signed
@@ -719,7 +822,7 @@ final class Engine: ObservableObject {
     @MainActor
     private func finishSuccess() {
         finished = true
-        setGuide(Guides.trust)
+        setGuide(Guides.trust(appName: installedAppName))
         log("✅ Done — \(installedSourceName) is installed. One trust step left (see the card).")
     }
 
@@ -846,6 +949,76 @@ final class Engine: ObservableObject {
         return plist["CFBundleIdentifier"] as? String
     }
 
+    // MARK: - Pairing tab
+    //
+    // Standalone pairing-file management (the "Pairing" tab), independent of the
+    // one-click install. Mirrors iLoader's "Manage Pairing files": the file is
+    // produced by the same RPPairing host the install uses (PairingController),
+    // then written into a chosen installed app the same way SideStore receives
+    // it — over LocalDevVPN via house_arrest/AFC.
+
+    /// List the supported pairing-target apps actually installed on the device.
+    /// Brings the device link up first (using the saved pairing file) if needed.
+    @MainActor
+    func installedPairingTargets() async throws -> [InstalledPairingTarget] {
+        try await ensurePairingConnection()
+        let apps = try await onDeviceQueue { try self.connection.installedApps() }
+        let targets = PairingTargets.match(installed: apps)
+        log("Pairing: \(targets.count) supported app(s) installed\(targets.isEmpty ? "." : ": \(targets.map(\.name).joined(separator: ", "))")")
+        return targets
+    }
+
+    /// Write the current pairing file into one installed target app's container.
+    @MainActor
+    func installPairing(into target: InstalledPairingTarget) async throws {
+        try await ensurePairingConnection()
+        let path = pairingFilePath ?? PairingController.pairingFilePath()
+        let bundleID = target.bundleID
+        let rel = target.remoteRelativePath
+        try await onDeviceQueue {
+            try self.performInstallPairing(bundleID: bundleID, remoteRelativePath: rel, path: path)
+        }
+    }
+
+    /// Bring up the device link for a standalone pairing operation: reuse an
+    /// existing connection, else connect with the saved pairing file. Unlike the
+    /// install pipeline's `connect()`, this touches no step states.
+    @MainActor
+    private func ensurePairingConnection() async throws {
+        if connection.isConnected { return }
+        refreshNetworkStatus()
+        guard vpnConnected else {
+            throw EngineError.message("LocalDevVPN isn't connected. Turn it on, then try again.")
+        }
+        let path = pairingFilePath ?? PairingController.pairingFilePath()
+        guard fileExistsNonEmpty(path) else {
+            throw EngineError.message("No pairing file yet — tap “Generate pairing file” first.")
+        }
+        pairingFilePath = path
+        let ip = deviceIP
+        let device = try await onDeviceQueue { try self.performConnect(ip: ip, pairingPath: path) }
+        deviceSummary = device.summary
+        deviceUDID = device.udid
+        deviceName = device.name
+        pairingStatus = "connected"
+    }
+
+    /// Write `path` into `bundleID`'s Documents at `remoteRelativePath`, verifying
+    /// the read-back (the bundle-id-based sibling of `performWritePairing`, which
+    /// resolves the id from an `InstallSource`).
+    private func performInstallPairing(bundleID: String, remoteRelativePath: String, path: String) throws {
+        guard connection.isConnected else { throw EngineError.message("Device link dropped — reconnect.") }
+        let size = fileSize(path)
+        guard FileManager.default.fileExists(atPath: path), size > 0 else {
+            throw EngineError.message("Pairing file missing — generate it first.")
+        }
+        log("Writing pairing file into \(bundleID) /Documents/\(remoteRelativePath) …")
+        let written = try connection.writePairingFile(intoBundleID: bundleID,
+                                                       remoteRelativePath: remoteRelativePath,
+                                                       pairingFilePath: path)
+        log("Pairing file written into \(bundleID) and read-back VERIFIED (\(written) bytes).")
+    }
+
     // MARK: 2FA bridge
 
     /// Called from a Rust worker thread; blocks until the UI submits/cancels.
@@ -937,16 +1110,6 @@ final class Engine: ObservableObject {
 // MARK: - Predefined instruction cards
 
 enum Guides {
-    static let credentials = Guide(
-        title: "Enter your Apple ID",
-        systemImage: "person.crop.circle",
-        steps: [
-            "Type your Apple ID email and password in the fields above.",
-            "A spare / secondary Apple ID is best — a free signing certificate is created on it.",
-            "Then tap the Install button.",
-        ],
-        actionLabel: nil, actionURLString: nil)
-
     static let vpn = Guide(
         title: "Turn on LocalDevVPN",
         systemImage: "network",
@@ -973,21 +1136,51 @@ enum Guides {
         title: "Too many signing certificates",
         systemImage: "exclamationmark.shield",
         steps: [
-            "Apple allows only 3 signing certificates per Apple ID, and this one already has 3 — usually from setting up AltStore / SideStore on other devices.",
-            "Easiest fix: change the Apple ID email above to a different (or spare) account, then tap Install again.",
-            "Or revoke an old certificate from another device that has AltStore / SideStore (use its reset / revoke option), then retry here. Revoking stops apps signed with that certificate from launching on those devices.",
+            "Apple allows only 3 signing certificates per Apple ID, and this one already has 3 — usually left over from setting up AltStore / SideStore on other devices.",
+            "Open the Certificates tab at the bottom of the screen, make sure your Apple ID is filled in, and tap “Load certificates”.",
+            "Tap “Revoke” on an old or expired certificate to free up a slot. Revoking stops apps already signed with that certificate from launching on other devices, so pick one you no longer use.",
+            "Come back to the Install tab and tap Install again.",
+            "Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again.",
         ],
         actionLabel: nil, actionURLString: nil)
 
-    static let trust = Guide(
-        title: "Last step: trust SideStore",
-        systemImage: "checkmark.seal",
-        steps: [
-            "Open Settings › General › VPN & Device Management.",
-            "Tap your Apple ID under “Developer App”, then tap Trust.",
-            "Open SideStore from your Home Screen — you're done.",
-        ],
-        actionLabel: nil, actionURLString: nil)
+    /// Shown when the device UDID couldn't be registered with the developer
+    /// team before signing (Apple error 8220 / a registration rejection). The
+    /// UDID is included as its own step so it's easy to copy. The advice adapts
+    /// to a device-*limit* rejection, which a free account can't clear by
+    /// deleting devices (they don't reset until the membership year rolls over).
+    static func deviceRegistration(udid: String, raw: String) -> Guide {
+        var steps: [String] = []
+        if Engine.isDeviceLimitError(raw) {
+            steps.append("Your Apple ID has hit its limit of registered devices. Free accounts can only register a handful of devices per year and can't remove old ones until the year resets.")
+            steps.append("Easiest fix: put a different (or spare) Apple ID in the fields above, then tap Install again.")
+        } else {
+            steps.append("SideInstaller couldn't add this iPhone to your Apple ID's developer team automatically. Tapping Install again often works — Apple's developer service is sometimes briefly unavailable.")
+        }
+        if !udid.isEmpty {
+            steps.append("If it keeps failing, add the device by hand. Its UDID is:")
+            steps.append(udid)
+            steps.append("Paste that into the “Register a Device” form in the Apple Developer portal (this requires a paid Apple Developer account), then tap Install again.")
+        }
+        return Guide(
+            title: "Couldn't register this device",
+            systemImage: "iphone.badge.exclamationmark",
+            steps: steps,
+            actionLabel: udid.isEmpty ? nil : "Open device list",
+            actionURLString: udid.isEmpty ? nil : "https://developer.apple.com/account/resources/devices/list")
+    }
+
+    static func trust(appName: String) -> Guide {
+        Guide(
+            title: "Last step: trust \(appName)",
+            systemImage: "checkmark.seal",
+            steps: [
+                "Open Settings › General › VPN & Device Management.",
+                "Tap your Apple ID under “Developer App”, then tap Trust.",
+                "Open \(appName) from your Home Screen — you're done.",
+            ],
+            actionLabel: nil, actionURLString: nil)
+    }
 
     /// Shown only after a LiveContainer + SideStore install: LiveContainer needs
     /// SideStore's signing certificate, which you pull in from its settings.

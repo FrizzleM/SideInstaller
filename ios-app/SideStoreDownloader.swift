@@ -1,14 +1,19 @@
 import Foundation
 
-/// What to install. Both are SideStore builds — the difference is which
-/// GitHub release the IPA is fetched from (LiveContainer + SideStore is
-/// SideStore with LiveContainer integrated). SideStore pulls its latest stable
-/// release; LiveContainer pulls its rolling `nightly` pre-release, which is
-/// where the freshest LiveContainer + SideStore IPA is published. The rest of
-/// the pipeline (sign, install, write pairing) is identical.
+/// What to install. `sideStore` and `liveContainer` are both SideStore builds —
+/// the difference is which GitHub release the IPA is fetched from (LiveContainer
+/// + SideStore is SideStore with LiveContainer integrated). SideStore pulls its
+/// latest stable release; LiveContainer pulls its rolling `nightly` pre-release,
+/// which is where the freshest LiveContainer + SideStore IPA is published.
+/// `stikDebug` is a different app entirely — StephenDev0's on-device
+/// debugger/JIT enabler — but the pipeline (sign, install, write pairing) is
+/// identical; only the pairing-file target changes (see below). Because
+/// StikDebug is itself powered by idevice/RPPairing, the `rp_pairing_file.plist`
+/// SideInstaller generates is exactly the record it wants.
 enum InstallSource: String, CaseIterable, Identifiable {
     case sideStore
     case liveContainer
+    case stikDebug
 
     var id: String { rawValue }
 
@@ -17,6 +22,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "LiveContainer + SideStore"
+        case .stikDebug:     return "StikDebug"
         }
     }
 
@@ -25,6 +31,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "SS + LiveContainer"
+        case .stikDebug:     return "StikDebug"
         }
     }
 
@@ -33,18 +40,19 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore/SideStore"
         case .liveContainer: return "LiveContainer/LiveContainer"
+        case .stikDebug:     return "StephenDev0/StikDebug"
         }
     }
 
-    /// GitHub releases API endpoint to read the IPA from. SideStore uses the
-    /// latest stable release; LiveContainer uses its rolling `nightly`
+    /// GitHub releases API endpoint to read the IPA from. SideStore and StikDebug
+    /// use their latest stable release; LiveContainer uses its rolling `nightly`
     /// pre-release (the `/releases/latest` endpoint skips pre-releases, so we
     /// fetch the `nightly` tag directly).
     var releaseAPI: URL {
         let base = "https://api.github.com/repos/\(repo)/releases"
         switch self {
-        case .sideStore:     return URL(string: "\(base)/latest")!
-        case .liveContainer: return URL(string: "\(base)/tags/nightly")!
+        case .sideStore, .stikDebug: return URL(string: "\(base)/latest")!
+        case .liveContainer:         return URL(string: "\(base)/tags/nightly")!
         }
     }
 
@@ -53,6 +61,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore.ipa"
         case .liveContainer: return "LiveContainer+SideStore.ipa"
+        case .stikDebug:     return "StikDebug.ipa"
         }
     }
 
@@ -71,6 +80,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "LiveContainer"
+        case .stikDebug:     return "StikDebug"
         }
     }
 
@@ -81,24 +91,34 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "com.SideStore.SideStore"
         case .liveContainer: return "com.kdt.livecontainer"
+        case .stikDebug:     return "com.stik.stikdebug"
         }
     }
 
     /// Where the pairing file must land, relative to the host app's Documents
     /// directory. Plain SideStore reads it at the Documents root. Under
     /// LiveContainer, SideStore runs as a guest whose Documents live in a
-    /// nested folder, so the file goes there instead.
+    /// nested folder, so the file goes there instead. A *sideloaded* StikDebug
+    /// (which is what we install — bundle id `com.stik.stikdebug.<teamID>`)
+    /// reads `rp_pairing_file.plist`; StikDebug now keeps that file in
+    /// Application Support but still migrates a legacy copy from its Documents
+    /// root on launch, so seeding it there via house_arrest is picked up. This
+    /// matches the `StikDebug (Sideloaded)` entry on the Pairing tab
+    /// (`PairingTargets`).
     var pairingRemoteRelativePath: String {
         switch self {
         case .sideStore:     return "ALTPairingFile.mobiledevicepairing"
         case .liveContainer: return "SideStore/Documents/ALTPairingFile.mobiledevicepairing"
+        case .stikDebug:     return "rp_pairing_file.plist"
         }
     }
 
     /// Pick the right `.ipa` asset out of a release's assets.
     func selectAsset(from assets: [SideStoreDownloader.GHAsset]) -> SideStoreDownloader.GHAsset? {
         switch self {
-        case .sideStore:
+        case .sideStore, .stikDebug:
+            // Both publish a single `.ipa` per release (StikDebug's is
+            // version-stamped, e.g. `StikDebug-3.1.6.ipa`).
             return assets.first { $0.name.hasSuffix(".ipa") }
         case .liveContainer:
             // Prefer the exact published bundle; fall back to any SideStore-

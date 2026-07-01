@@ -1,30 +1,40 @@
 import SwiftUI
 
-/// Top-level tab container hosting the install flow (`ContentView`) and the
-/// certificate manager (`CertsView`).
+/// Top-level tab container hosting the app's four screens — Install, Pairing,
+/// Certificates and Downloads.
 ///
-/// The two-factor prompt lives here, not inside a tab: both flows drive the same
-/// shared `Engine` 2FA bridge, and an `.alert` attached at the tab root presents
+/// Each page paints the shared animated `AppBackground` behind its own content.
+/// (`TabView` hosts each tab in an opaque container, so a single backdrop *behind*
+/// the `TabView` would be hidden — the background has to live inside each page.)
+/// Because that gradient is driven off the wall clock rather than an elapsed
+/// timer, every page renders the identical frame, so it stays perfectly in sync
+/// and reads as one continuous surface even across tab switches.
+///
+/// The two-factor prompt lives here, not inside a tab: every flow drives the same
+/// shared `Engine` 2FA bridge, and an `.alert` attached at the root presents
 /// regardless of which tab is active.
 struct RootView: View {
     @EnvironmentObject private var engine: Engine
     /// Owned here so they survive tab switches and share the one `Engine`.
     @StateObject private var certManager = CertManager()
     @StateObject private var downloadsManager = DownloadsManager()
+    @StateObject private var pairingManager = PairingManager()
     @State private var twoFactorCode = ""
-    @State private var selectedTab = 0
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            ContentView()
-                .tabItem { Label("Install", systemImage: "square.and.arrow.down") }
-                .tag(0)
-            CertsView(manager: certManager)
-                .tabItem { Label("Certificates", systemImage: "checkmark.seal") }
-                .tag(1)
-            DownloadsView(manager: downloadsManager)
-                .tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
-                .tag(2)
+        TabView {
+            Tab("Install", systemImage: "square.and.arrow.down") {
+                ContentView()
+            }
+            Tab("Pairing", systemImage: "lock.iphone") {
+                PairingView(manager: pairingManager)
+            }
+            Tab("Certificates", systemImage: "checkmark.seal") {
+                CertsView(manager: certManager)
+            }
+            Tab("Downloads", systemImage: "arrow.down.circle") {
+                DownloadsView(manager: downloadsManager)
+            }
         }
         .tint(Theme.accent)
         .preferredColorScheme(.dark)

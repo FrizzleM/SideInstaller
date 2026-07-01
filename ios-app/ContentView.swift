@@ -6,6 +6,7 @@ import UIKit
 /// callouts guide the user through anything they need to do by hand.
 struct ContentView: View {
     @EnvironmentObject private var engine: Engine
+    @EnvironmentObject private var updateChecker: UpdateChecker
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
 
@@ -14,8 +15,11 @@ struct ContentView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     header.cascadeItem(0)
+                    if updateChecker.showBanner {
+                        updateBanner.transition(.cardAppear)
+                    }
                     appleIDCard.cascadeItem(1)
-                    buildCard.cascadeItem(2)
+                    appCard.cascadeItem(2)
                     if !engine.vpnConnected && !engine.isRunning {
                         vpnRequirement.cascadeItem(3)
                     }
@@ -40,10 +44,12 @@ struct ContentView: View {
                     if engine.finished, engine.installedIsLiveContainer {
                         guideCallout(Guides.liveContainerImport).transition(.cardAppear)
                     }
+                    footer.cascadeItem(5)
                 }
                 .padding(20)
                 // Each modifier watches one piece of state so a change animates
                 // only its own card swap rather than the whole screen.
+                .animation(.smooth(duration: 0.35), value: updateChecker.showBanner)
                 .animation(.smooth(duration: 0.35), value: engine.vpnConnected)
                 .animation(.smooth(duration: 0.35), value: showProgress)
                 .animation(.smooth(duration: 0.35), value: engine.pairingPIN)
@@ -75,14 +81,9 @@ struct ContentView: View {
     private var header: some View {
         BrandHeader(icon: "arrow.down.app.fill", image: "AppLogo", title: "SideInstaller",
                     animateIcon: engine.isRunning) {
-            VStack(spacing: 12) {
-                Text("an app by Frizzle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                statusPill
-                    .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
-                    .id(statusPillID)
-            }
+            statusPill
+                .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
+                .id(statusPillID)
         }
     }
 
@@ -100,6 +101,18 @@ struct ContentView: View {
         } else {
             StatusPill(text: "Tunnel off", systemImage: "shield.slash.fill", color: .red)
         }
+    }
+
+    // MARK: Footer
+
+    /// A quiet brand credit at the foot of the screen, tucked below the flow so it
+    /// stays visible without crowding the header.
+    private var footer: some View {
+        Text("an app by Frizzle")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 10)
     }
 
     // MARK: Apple ID
@@ -124,18 +137,77 @@ struct ContentView: View {
         .disabled(engine.isRunning)
     }
 
-    // MARK: Build picker
+    // MARK: Update banner
 
-    private var buildCard: some View {
+    /// Closable notice shown when GitHub advertises a newer version than this
+    /// build (see `UpdateChecker`). Tapping the body opens the releases page; the
+    /// ✕ dismisses it for this launch.
+    private var updateBanner: some View {
+        CalloutCard(tint: Theme.accent) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(Theme.brand)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Update available")
+                            .font(.subheadline.weight(.semibold))
+                        Text("SideInstaller \(updateChecker.latestVersion ?? "") is available — you're on \(updateChecker.currentVersion).")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 4)
+                    Button {
+                        updateChecker.dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .padding(6)
+                            .background(Circle().fill(.white.opacity(0.08)))
+                    }
+                    .buttonStyle(.plain)
+                }
+                Button {
+                    if let url = URL(string: UpdateChecker.releasesURL) { openURL(url) }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Get the latest version")
+                        Image(systemName: "arrow.up.right")
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.accent2)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: App picker
+
+    private var appCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle("Build", systemImage: "square.stack.3d.up.fill")
-                Picker("Build", selection: $engine.installSource) {
-                    ForEach(InstallSource.allCases) { src in
-                        Text(src.shortName).tag(src)
+                sectionTitle("Install", systemImage: "square.and.arrow.down.fill")
+                Menu {
+                    Picker("Install", selection: $engine.installSource) {
+                        ForEach(InstallSource.allCases) { src in
+                            Text(src.displayName).tag(src)
+                        }
                     }
+                } label: {
+                    HStack {
+                        Text(engine.installSource.displayName)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .fieldBackground()
+                    .contentShape(Rectangle())
                 }
-                .pickerStyle(.segmented)
             }
         }
         .disabled(engine.isRunning)

@@ -27,10 +27,54 @@ enum Theme {
 
 // MARK: - Background
 
-/// Pure OLED-black app background.
+/// The app's backdrop: OLED black with a slow, low-opacity blue **mesh gradient**
+/// drifting behind everything. Its control points sway on gentle sine waves so the
+/// blue blooms breathe and flow, while the dark corners and low overall opacity
+/// over pure black keep the app firmly dark-themed.
 struct AppBackground: View {
     var body: some View {
-        Color.black.ignoresSafeArea()
+        // `TimelineView(.animation)` ticks every frame; the mesh points are derived
+        // from the clock so the motion is smooth and continuous (no keyframe reset).
+        TimelineView(.animation) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            ZStack {
+                Color.black
+                MeshGradient(width: 3, height: 3, points: meshPoints(at: t), colors: meshColors)
+                    .blur(radius: 24)
+                    // Low opacity so it reads as a deep tint, not a light — the
+                    // UI stays dark-themed.
+                    .opacity(0.2)
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    /// Deep-navy corners with brighter blue blooms through the middle, so the
+    /// whole field reads as blue while the dark corners keep it grounded.
+    private let meshColors: [Color] = [
+        Theme.glow,    Theme.accent,   Theme.glow,
+        Theme.accent2, Theme.accent,   Theme.accent2,
+        Theme.glow,    Theme.accent2,  Theme.glow,
+    ]
+
+    /// A 3×3 grid of control points. The four corners stay pinned so the gradient
+    /// always fills the screen; the edge midpoints and centre sway on slow,
+    /// out-of-phase sine waves for an organic, flowing motion.
+    private func meshPoints(at t: TimeInterval) -> [SIMD2<Float>] {
+        func osc(_ base: Double, _ amp: Double, _ speed: Double, _ phase: Double) -> Float {
+            Float(base + amp * sin(t * speed + phase))
+        }
+        return [
+            SIMD2<Float>(0, 0),
+            SIMD2<Float>(osc(0.5, 0.18, 0.625, 0.0), 0),
+            SIMD2<Float>(1, 0),
+            SIMD2<Float>(0, osc(0.5, 0.18, 0.55, 1.0)),
+            SIMD2<Float>(osc(0.5, 0.12, 0.75, 2.0), osc(0.5, 0.12, 0.675, 3.0)),
+            SIMD2<Float>(1, osc(0.5, 0.18, 0.60, 4.0)),
+            SIMD2<Float>(0, 1),
+            SIMD2<Float>(osc(0.5, 0.18, 0.65, 5.0), 1),
+            SIMD2<Float>(1, 1),
+        ]
     }
 }
 
@@ -207,31 +251,31 @@ extension AnyTransition {
     }
 }
 
-// MARK: - Tab entrance
+// MARK: - Page entrance
 
-/// One card's part in the tab's entrance cascade: it "materializes" into place —
-/// fading up from slightly low and small with a quick focus-pull (blur clearing)
-/// and a gentle spring — staggered by `index` so the cards reveal top-to-bottom.
+/// One object's part in a page's entrance cascade: it fades up into place from
+/// slightly low and small, staggered by `index` so the objects settle one after
+/// another. The whole-page left/right slide is handled by `RootView`; this is the
+/// slight per-object delay layered on top as the incoming page's contents land.
 ///
-/// Driven by `onAppear`/`onDisappear`, which fire on *every* tab switch, so the
-/// cascade replays each time the user opens the tab (not just on first launch).
-/// A view only animates when it first appears, so rows added later (e.g. a freshly
-/// loaded list) cascade in on arrival without re-animating the ones already shown.
+/// Driven by `onAppear`/`onDisappear`, which fire on *every* page switch, so the
+/// cascade replays each time the page is opened (not just on first launch). A view
+/// only animates when it first appears, so rows added later (e.g. a freshly loaded
+/// list) settle in on arrival without re-animating the ones already shown.
 private struct CascadeItem: ViewModifier {
     let index: Int
     @State private var shown = false
 
-    /// 60 ms between cards — enough to read as a cascade, quick enough not to drag.
-    private var delay: Double { Double(index) * 0.06 }
+    /// 55 ms between objects — enough to read as a cascade, quick enough not to drag.
+    private var delay: Double { Double(index) * 0.055 }
 
     func body(content: Content) -> some View {
         content
             .opacity(shown ? 1 : 0)
-            .scaleEffect(shown ? 1 : 0.96, anchor: .top)
-            .offset(y: shown ? 0 : 18)
-            .blur(radius: shown ? 0 : 6)
+            .scaleEffect(shown ? 1 : 0.98, anchor: .top)
+            .offset(y: shown ? 0 : 16)
             .onAppear {
-                withAnimation(.smooth(duration: 0.45, extraBounce: 0.12).delay(delay)) {
+                withAnimation(.smooth(duration: 0.4, extraBounce: 0.1).delay(delay)) {
                     shown = true
                 }
             }
@@ -240,7 +284,7 @@ private struct CascadeItem: ViewModifier {
 }
 
 extension View {
-    /// Give a card its place in the tab's entrance cascade (0 = first to appear).
-    /// Replays each time the tab is opened.
+    /// Give an object its place in a page's entrance cascade (0 = first to appear).
+    /// Replays each time the page is opened.
     func cascadeItem(_ index: Int) -> some View { modifier(CascadeItem(index: index)) }
 }

@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use isideload::{
     anisette::remote_v3::RemoteV3AnisetteProvider,
     auth::apple_account::AppleAccount,
-    dev::developer_session::DeveloperSession,
+    dev::{developer_session::DeveloperSession, devices::DevicesApi},
     sideload::{builder::MaxCertsBehavior, sideloader::Sideloader, SideloaderBuilder, TeamSelection},
     util::fs_storage::FsStorage,
 };
@@ -176,11 +176,22 @@ pub unsafe fn apple_signin(
 /// Sign the IPA at `ipa_path` with the session. Returns 0 on success
 /// (`*out_signed_path` set to the signed `.app` bundle path), non-zero on error.
 ///
+/// `udid` (and the human-readable `device_name`) is the connected iPhone's
+/// UDID, taken from the lockdown handshake. It is registered with the developer
+/// team *before* the provisioning profile is requested — a fresh/free team has
+/// no devices, so `sign_app` would otherwise fail with developer error 8220
+/// ("Your team has no devices …"). This mirrors what Sideloadly/AltStore do
+/// transparently. A registration failure is reported with a `device
+/// registration failed for UDID <udid>:` prefix so the caller can show the UDID
+/// and an actionable message. Pass an empty `udid` to skip registration.
+///
 /// # Safety
 /// `session` must be a valid pointer from `apple_signin`; out pointers valid.
 pub unsafe fn sign_ipa(
     session: *mut SignSession,
     ipa_path: *const c_char,
+    udid: *const c_char,
+    device_name: *const c_char,
     out_signed_path: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
@@ -190,9 +201,41 @@ pub unsafe fn sign_ipa(
     }
     let session = &mut *session;
     let ipa_path = opt(ipa_path, "");
+    let udid = opt(udid, "");
+    let device_name = opt(device_name, "");
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         session.rt.block_on(async {
+            // Register the connected device with the team before signing, so the
+            // provisioning-profile download has a device to bind to. `sign_app`
+            // itself never does this (only isideload's `install_app` does, and we
+            // don't use that path — we install over our own RSD tunnel).
+            if udid.is_empty() {
+                tracing::warn!(
+                    "No device UDID provided; skipping registration — provisioning \
+                     profile download may fail with developer error 8220."
+                );
+            } else {
+                let team = session
+                    .sideloader
+                    .get_team()
+                    .await
+                    .map_err(|e| format!("device registration failed for UDID {udid}: {e}"))?;
+                let name = if device_name.is_empty() {
+                    "iPhone"
+                } else {
+                    device_name.as_str()
+                };
+                tracing::info!("Ensuring device {udid} ({name}) is registered on team {}", team.team_id);
+                session
+                    .sideloader
+                    .get_dev_session()
+                    .ensure_device_registered(&team, name, &udid, None)
+                    .await
+                    .map_err(|e| format!("device registration failed for UDID {udid}: {e}"))?;
+                tracing::info!("Device {udid} is registered on the team");
+            }
+
             tracing::info!("Signing IPA at {ipa_path}");
             let (signed, _special) = session
                 .sideloader

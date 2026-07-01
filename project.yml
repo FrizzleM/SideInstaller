@@ -1,16 +1,16 @@
 name: SideInstaller
 options:
-  # Neutral reverse-DNS prefix — no personal handle. Change to your own domain
-  # if you publish; do NOT use a prefix tied to a specific developer account.
-  bundleIdPrefix: com.example
+  # Brand reverse-DNS prefix. NOTE: this is a chosen handle only — it is NOT
+  # tied to an Apple Developer account (DEVELOPMENT_TEAM stays empty below).
+  bundleIdPrefix: com.frizzle
   deploymentTarget:
-    iOS: "17.4"
+    iOS: "27.0"
   createIntermediateGroups: true
 
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "0.5.0"
     CURRENT_PROJECT_VERSION: "1"
     TARGETED_DEVICE_FAMILY: "1,2"
     # aws-lc-rs / idevice are arm64-only here; drop x86_64 sim slice.
@@ -32,7 +32,7 @@ targets:
         embed: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.sideinstaller
+        PRODUCT_BUNDLE_IDENTIFIER: com.frizzle.sideinstaller
         INFOPLIST_FILE: ios-app/Info.plist
         # idevice's static lib pulls in C++ symbols (aws-lc); link libc++.
         OTHER_LDFLAGS: "-lc++"

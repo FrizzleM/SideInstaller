@@ -174,6 +174,45 @@ final class DeviceConnection {
         return out
     }
 
+    /// One installed app as installation_proxy reports it — the bundle id (used
+    /// to vend house_arrest for the pairing write) plus its display name (used to
+    /// match against the supported pairing-target table).
+    struct InstalledApp: Equatable {
+        let bundleID: String
+        let displayName: String?
+    }
+
+    /// Structured list of every installed app (bundle id + display name), for
+    /// matching against `PairingTargets`. Mirrors `listApps` but returns data
+    /// instead of pre-formatted log lines.
+    func installedApps() throws -> [InstalledApp] {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var client: OpaquePointer?
+        try check(installation_proxy_connect_rsd(adapter, handshake, &client),
+                  "installation_proxy_connect_rsd failed")
+        guard let client else { throw fail("installation_proxy client was null") }
+        defer { installation_proxy_client_free(client) }
+
+        var result: UnsafeMutableRawPointer?
+        var count = 0
+        try check(installation_proxy_get_apps(client, nil, nil, 0, &result, &count),
+                  "installation_proxy_get_apps failed")
+        guard let result, count > 0 else { return [] }
+
+        let apps = result.assumingMemoryBound(to: plist_t?.self)
+        var out: [InstalledApp] = []
+        out.reserveCapacity(count)
+        for i in 0..<count {
+            let appPlist = apps[i]
+            if let bid = plistString(appPlist, "CFBundleIdentifier") {
+                out.append(InstalledApp(bundleID: bid,
+                                        displayName: plistString(appPlist, "CFBundleDisplayName")))
+            }
+            if let appPlist { plist_free(appPlist) }
+        }
+        return out
+    }
+
     /// Resolve the installed host app's exact bundle id for the pairing write.
     /// Prefers an exact CFBundleDisplayName match (how iLoader locates SideStore
     /// / LiveContainer — robust to the bundle id rewrite isideload performs),

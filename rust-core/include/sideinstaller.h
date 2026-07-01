@@ -105,9 +105,16 @@ int32_t si_apple_signin(const char *apple_id,
 
 // Sign the IPA at ipa_path. BLOCKS. On success *out_signed_path is the signed
 // .app bundle path (in a temp dir). Registers App ID + provisioning profile and
-// retrieves/creates the dev certificate internally.
+// retrieves/creates the dev certificate internally. `udid` (with the friendly
+// `device_name`) is registered with the developer team BEFORE the provisioning
+// profile is requested — without it a fresh/free team fails with developer
+// error 8220 ("Your team has no devices …"). A registration failure is reported
+// with a "device registration failed for UDID <udid>:" prefix. Pass NULL/empty
+// `udid` to skip registration.
 int32_t si_sign_ipa(SignSession *session,
                     const char *ipa_path,
+                    const char *udid,
+                    const char *device_name,
                     char **out_signed_path,
                     char **out_error);
 

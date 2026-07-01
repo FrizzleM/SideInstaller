@@ -139,7 +139,9 @@ pub unsafe extern "C" fn si_apple_signin(
 }
 
 /// Sign the IPA at `ipa_path` using a session from `si_apple_signin`. Blocks.
-/// On success `*out_signed_path` is the signed `.app` bundle path.
+/// On success `*out_signed_path` is the signed `.app` bundle path. `udid` (with
+/// the friendly `device_name`) is registered with the developer team before the
+/// provisioning profile is requested; pass an empty/NULL `udid` to skip it.
 ///
 /// # Safety
 /// See `account::sign_ipa`.
@@ -147,10 +149,12 @@ pub unsafe extern "C" fn si_apple_signin(
 pub unsafe extern "C" fn si_sign_ipa(
     session: *mut SignSession,
     ipa_path: *const c_char,
+    udid: *const c_char,
+    device_name: *const c_char,
     out_signed_path: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
-    account::sign_ipa(session, ipa_path, out_signed_path, out_error)
+    account::sign_ipa(session, ipa_path, udid, device_name, out_signed_path, out_error)
 }
 
 /// Free a sign session.
