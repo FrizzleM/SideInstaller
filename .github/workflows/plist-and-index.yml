@@ -57,7 +57,7 @@ jobs:
               echo "OUTPUT_DIR=output-beta"
               echo "OUTPUT_BASE_URL=$base/output-beta"
               echo "PAGE_TITLE=SideInstaller — Beta"
-              echo "APP_TAGLINE=Beta test build — not the public release. Pick a certificate and tap install."
+              echo "APP_TAGLINE=Beta test build — not the public release. Follow the three steps below to get set up."
             else
               echo "OUTPUT_HTML=index.html"
               echo "OUTPUT_DIR=output"
@@ -156,6 +156,8 @@ jobs:
           # raw-githubusercontent manifests, so the pages work standalone.
           if [[ -f index.html ]]; then cp index.html _site/index.html; fi
           if [[ -f beta.html ]]; then cp beta.html _site/beta.html; fi
+          # DNS profile linked from the page's Setup step — must ship with the site.
+          if [[ -f SideInstallerDNS.mobileconfig ]]; then cp SideInstallerDNS.mobileconfig _site/SideInstallerDNS.mobileconfig; fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

@@ -74,9 +74,39 @@
   .link-btn.ipa svg{width:15px; height:15px}
   .link-btn.ipa:hover{color:var(--text)}
 
+  /* ---- steps ---- */
+  .step{margin-top:34px}
+  .step-head{display:flex; align-items:center; gap:14px; margin-bottom:14px}
+  .step-num{
+    flex:none; width:34px; height:34px; display:grid; place-items:center;
+    font-size:16px; font-weight:800; color:#fff; border-radius:12px;
+    background:linear-gradient(120deg,var(--accent),var(--accent2));
+    box-shadow:0 8px 22px rgba(109,139,255,.3);
+  }
+  .step-title{margin:0; font-size:20px; font-weight:800; letter-spacing:-.01em}
+  .step-sub{margin:2px 0 0; color:var(--muted); font-size:13.5px}
+  .step-card{
+    padding:18px 20px; color:var(--muted); font-size:14.5px;
+    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius);
+  }
+  .step-card p{margin:0}
+  .step-card b{color:var(--text)}
+  .step-card ol{margin:14px 0 0; padding-left:20px}
+  .step-card li{margin:8px 0}
+  .step-card code{
+    background:rgba(255,255,255,.07); padding:1px 6px; border-radius:6px;
+    font-size:13px; color:var(--text);
+  }
+  .step-card .install-btn{width:100%; margin-top:16px}
+  .callout{
+    margin-top:16px; padding:13px 16px; border-radius:var(--radius-sm);
+    background:rgba(52,211,153,.08); border:1px solid rgba(52,211,153,.25);
+  }
+  .callout b{color:var(--good)}
+
   /* ---- controls ---- */
   .controls{
-    display:flex; gap:10px; margin:30px 0 18px; flex-wrap:wrap; align-items:center;
+    display:flex; gap:10px; margin:0 0 14px; flex-wrap:wrap; align-items:center;
   }
   .search{position:relative; flex:1 1 240px}
   .search svg{position:absolute; left:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--faint)}
@@ -133,7 +163,7 @@
 
   /* ---- how-to ---- */
   details.howto{
-    margin-top:32px; background:var(--card); border:1px solid var(--stroke);
+    margin-top:14px; background:var(--card); border:1px solid var(--stroke);
     border-radius:var(--radius); overflow:hidden;
   }
   details.howto summary{
@@ -158,6 +188,7 @@
   @media (max-width:520px){
     .grid{grid-template-columns:1fr}
     .controls{flex-direction:column; align-items:stretch}
+    .search{flex:0 0 auto} /* in column direction the 240px basis becomes height */
     .sort{width:100%}
   }
 </style>
@@ -168,7 +199,7 @@
   <header class="hero">
     <div class="logo"><img src="https://files.catbox.moe/6mf2vz.png" alt="SideInstaller"></div>
     <h1>SideInstaller</h1>
-    <p class="tagline">On-device sideloader. Pick a certificate and tap install.</p>
+    <p class="tagline">On-device sideloader. Follow the three steps below to get set up.</p>
     <div class="badges">
       <span class="badge">Version <b>0.1.0</b></span>
       <span class="badge"><b>14</b> certificates</span>
@@ -193,19 +224,50 @@
     </div>
   </header>
 
-  <div class="controls">
-    <div class="search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input id="q" type="search" placeholder="Search certificates…" autocomplete="off" spellcheck="false">
+  <section class="step" id="setup">
+    <div class="step-head">
+      <span class="step-num">1</span>
+      <div>
+        <h2 class="step-title">Setup</h2>
+        <p class="step-sub">Install the SideInstaller DNS profile before anything else.</p>
+      </div>
     </div>
-    <select id="sort" class="sort" aria-label="Sort certificates">
-      <option value="days">Most days left</option>
-      <option value="days-asc">Soonest to expire</option>
-      <option value="name">Name (A–Z)</option>
-    </select>
-  </div>
+    <div class="step-card">
+      <p>SideInstaller needs its DNS active on your device during setup. Tap the button, then follow the steps to apply it:</p>
+      <a class="install-btn" href="SideInstallerDNS.mobileconfig">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M12 3a15.3 15.3 0 0 1 0 18"/><path d="M12 3a15.3 15.3 0 0 0 0 18"/></svg>
+        Install DNS Profile
+      </a>
+      <ol>
+        <li>Tap <b>Install DNS Profile</b> above and tap <b>Allow</b> when Safari asks to download the configuration profile. If it gets saved as a regular file instead, open it from <code>Files → Downloads</code>.</li>
+        <li>Open <code>Settings</code> and tap <b>Profile Downloaded</b> (or go to <code>Settings → General → VPN &amp; Device Management</code>), then tap <b>Install</b>.</li>
+        <li>Apply the DNS: in <code>Settings → General → VPN &amp; Device Management</code>, open <b>DNS</b> and make sure <b>SideInstaller</b> is selected. Keep it enabled until setup is complete.</li>
+      </ol>
+    </div>
+  </section>
 
-  <main id="grid" class="grid">
+  <section class="step" id="installation">
+    <div class="step-head">
+      <span class="step-num">2</span>
+      <div>
+        <h2 class="step-title">Installation</h2>
+        <p class="step-sub">Pick a certificate and install the SideInstaller app.</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="q" type="search" placeholder="Search certificates…" autocomplete="off" spellcheck="false">
+      </div>
+      <select id="sort" class="sort" aria-label="Sort certificates">
+        <option value="days">Most days left</option>
+        <option value="days-asc">Soonest to expire</option>
+        <option value="name">Name (A–Z)</option>
+      </select>
+    </div>
+
+    <main id="grid" class="grid">
     <article class="cert-card" data-name="XL" data-days="973">
       <div class="cert-head">
         <h3 class="cert-name">XL</h3>
@@ -318,25 +380,42 @@
       <p class="cert-meta">Expires 2026-08-22</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/SideInstaller/SideInstaller/main/output/sideinstaller-Beijing.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-  </main>
-  <p id="empty" class="empty">No certificates match your search.</p>
+    </main>
+    <p id="empty" class="empty">No certificates match your search.</p>
 
-  <details class="howto">
-    <summary>How to install</summary>
-    <div class="howto-body">
-      <ol>
-        <li>Open this page <b>on your iPhone or iPad in Safari</b>.</li>
-        <li>Pick any certificate below and tap <b>Install</b>, then confirm the prompt.</li>
-        <li>Wait for the app to finish installing on your Home Screen.</li>
-        <li>Go to <code>Settings → General → VPN &amp; Device Management</code>, tap the developer profile, and <b>Trust</b> it.</li>
-        <li>Launch the app. If one certificate is revoked or won't open, just install with another.</li>
-      </ol>
+    <details class="howto">
+      <summary>How to install</summary>
+      <div class="howto-body">
+        <ol>
+          <li>Open this page <b>on your iPhone or iPad in Safari</b>.</li>
+          <li>Pick any certificate above and tap <b>Install</b>, then confirm the prompt.</li>
+          <li>Wait for the app to finish installing on your Home Screen.</li>
+          <li>Go to <code>Settings → General → VPN &amp; Device Management</code>, tap the developer profile, and <b>Trust</b> it.</li>
+          <li>Launch the app. If one certificate is revoked or won't open, just install with another.</li>
+        </ol>
+      </div>
+    </details>
+  </section>
+
+  <section class="step" id="completion">
+    <div class="step-head">
+      <span class="step-num">3</span>
+      <div>
+        <h2 class="step-title">Completion</h2>
+        <p class="step-sub">You're all set.</p>
+      </div>
     </div>
-  </details>
+    <div class="step-card">
+      <p>That's it — open <b>SideInstaller</b> from your Home Screen and use it to install <b>SideStore</b> (or SideStore + LiveContainer), straight from your device. No PC needed.</p>
+      <div class="callout">
+        <b>Once SideStore is installed, the DNS profile is no longer needed.</b> Remove it in <code>Settings → General → VPN &amp; Device Management</code> → <b>SideInstaller</b> → <b>Remove Profile</b> — or keep it and just stop using its DNS by switching <code>DNS</code> back to <b>Automatic</b> in the same menu.
+      </div>
+    </div>
+  </section>
 
   <footer class="footer">
     Built automatically &middot; signed with 14 certificate(s)
-    <br>Last updated: 02 Jul 2026, 20:35 CET
+    <br>Last updated: 02 Jul 2026, 22:16 CET
   </footer>
 
 </div>
