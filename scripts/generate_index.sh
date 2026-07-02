@@ -10,7 +10,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/output}"
 APP_NAME="${APP_NAME:-SideInstaller}"
 APP_TAGLINE="${APP_TAGLINE:-On-device sideloader. Pick a certificate and tap install.}"
 PAGE_TITLE="${PAGE_TITLE:-$APP_NAME — Install}"
-LOGO_URL="${LOGO_URL:-}"
+LOGO_URL="${LOGO_URL:-https://files.catbox.moe/6mf2vz.png}"
 OUTPUT_HTML="${OUTPUT_HTML:-index.html}"
 TEMPLATE="${TEMPLATE:-$SCRIPT_DIR/template.html}"
 

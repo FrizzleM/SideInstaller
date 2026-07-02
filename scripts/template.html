@@ -54,6 +54,26 @@
   }
   .badge b{color:var(--text)}
 
+  /* ---- hero links (community + downloads) ---- */
+  .links{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
+  .link-btn{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 16px; font-size:14px; font-weight:700; text-decoration:none;
+    color:var(--text); border-radius:999px;
+    background:var(--card); border:1px solid var(--stroke);
+    transition:transform .14s, background .14s, border-color .14s, filter .14s;
+  }
+  .link-btn svg{width:17px; height:17px; flex:none}
+  .link-btn:hover{background:var(--card-hover); border-color:var(--stroke-strong); transform:translateY(-2px)}
+  .link-btn:active{transform:scale(.97)}
+  .link-btn.discord{color:#fff; background:#5865f2; border-color:transparent}
+  .link-btn.discord:hover{background:#5865f2; filter:brightness(1.08)}
+  .link-btn.kofi{color:#fff; background:#ff5e5b; border-color:transparent}
+  .link-btn.kofi:hover{background:#ff5e5b; filter:brightness(1.08)}
+  .link-btn.ipa{padding:8px 13px; font-size:12.5px; font-weight:600; color:var(--muted)}
+  .link-btn.ipa svg{width:15px; height:15px}
+  .link-btn.ipa:hover{color:var(--text)}
+
   /* ---- controls ---- */
   .controls{
     display:flex; gap:10px; margin:30px 0 18px; flex-wrap:wrap; align-items:center;
@@ -152,6 +172,24 @@
     <div class="badges">
       <span class="badge">Version <b>{{APP_VERSION}}</b></span>
       <span class="badge"><b>{{CERT_COUNT}}</b> certificates</span>
+    </div>
+    <div class="links">
+      <a class="link-btn discord" href="https://discord.gg/sQ5Y8vbYJS" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.446.865-.61 1.249a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.1 14.1 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.009c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.893.077.077 0 0 0-.041.106c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.331c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+        Join the Discord
+      </a>
+      <a class="link-btn ipa" href="https://files.catbox.moe/skjbs8.ipa" download>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>
+        Download IPA
+      </a>
+      <a class="link-btn kofi" href="https://ko-fi.com/frizzlem" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        Ko-fi
+      </a>
+      <a class="link-btn github" href="https://github.com/FrizzleM/SideInstaller/tree/main" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23a11.5 11.5 0 0 1 3.003-.404c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </a>
     </div>
   </header>
 
