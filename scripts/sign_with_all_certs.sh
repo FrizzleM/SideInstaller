@@ -295,6 +295,9 @@ OPENSSL_PKCS12_HELP="$(openssl pkcs12 -help 2>&1 || true)"
 if [[ "$OPENSSL_PKCS12_HELP" == *"-legacy"* ]]; then OPENSSL_LEGACY_FLAG="-legacy"; fi
 
 mkdir -p "$OUTPUT_DIR"
+# Resolve to an absolute path so the zip write stays correct after `pushd`
+# into the per-cert IPA work dir (zip's output path is relative to the cwd).
+OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 clean_generated_artifacts "$OUTPUT_PREFIX-*.ipa"
 printf 'name\tcertificate_expires_at\tdays_left\n' > "$CERT_METADATA_FILE"
 if [[ -n "$CERT_NAME_LIST_FILE" ]]; then : > "$CERT_NAME_LIST_FILE"; fi
