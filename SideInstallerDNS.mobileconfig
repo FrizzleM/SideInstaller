@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ConsentText</key>
+	<dict>
+		<key>default</key>
+		<string>This is SideInstaller's official DNS. You can uninstall this as soon as you install Sidestore or SS + Livecontainer.</string>
+	</dict>
+	<key>PayloadContent</key>
+	<array>
+		<dict>
+			<key>DNSSettings</key>
+			<dict>
+				<key>DNSProtocol</key>
+				<string>HTTPS</string>
+				<key>ServerURL</key>
+				<string>https://apple.dns.nextdns.io/73f83a/SideInstaller</string>
+			</dict>
+			<key>OnDemandRules</key>
+			<array>
+				<dict>
+					<key>Action</key>
+					<string>EvaluateConnection</string>
+					<key>ActionParameters</key>
+					<array>
+						<dict>
+							<key>DomainAction</key>
+							<string>NeverConnect</string>
+							<key>Domains</key>
+							<array>
+								<string>captive.apple.com</string>
+								<string>3gppnetwork.org</string>
+								<string>dav.orange.fr</string>
+								<string>vvm.mobistar.be</string>
+								<string>vvm.mstore.msg.t-mobile.com</string>
+								<string>tma.vvm.mone.pan-net.eu</string>
+								<string>vvm.ee.co.uk</string>
+							</array>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>Action</key>
+					<string>Connect</string>
+				</dict>
+			</array>
+			<key>PayloadDisplayName</key>
+			<string>NextDNS (73f83a)</string>
+			<key>PayloadIdentifier</key>
+			<string>io.nextdns.73f83a.profile.dnsSettings.managed</string>
+			<key>PayloadOrganization</key>
+			<string>NextDNS</string>
+			<key>PayloadType</key>
+			<string>com.apple.dnsSettings.managed</string>
+			<key>PayloadUUID</key>
+			<string>A1E2F262-DB73-40F6-BD22-2E42A43A3C94.73f83a.dnsSettings.managed</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+		</dict>
+	</array>
+	<key>PayloadDescription</key>
+	<string>This is SideInstaller's official DNS. You can uninstall this as soon as you install Sidestore or SS + Livecontainer.</string>
+	<key>PayloadDisplayName</key>
+	<string>SideInstaller</string>
+	<key>PayloadIdentifier</key>
+	<string>io.nextdns.73f83a.profile</string>
+	<key>PayloadScope</key>
+	<string>System</string>
+	<key>PayloadType</key>
+	<string>Configuration</string>
+	<key>PayloadUUID</key>
+	<string>A1E2F262-DB73-40F6-BD22-2E42A43A3C94.73f83a</string>
+	<key>PayloadVersion</key>
+	<integer>1</integer>
+	<key>TargetDeviceType</key>
+	<integer>1</integer>
+</dict>
+</plist>
