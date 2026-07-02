@@ -7,6 +7,14 @@ name: sign-sideinstaller
 on:
   workflow_dispatch:
     inputs:
+      channel:
+        description: "Build channel: stable -> index.html (public), beta -> beta.html (test)"
+        required: true
+        type: choice
+        default: stable
+        options:
+          - stable
+          - beta
       ipa_url:
         description: "Override unsigned IPA URL (leave blank to use ipa-url.txt)"
         required: false
@@ -42,6 +50,33 @@ jobs:
       - name: Make scripts executable
         run: chmod +x scripts/sign_with_all_certs.sh scripts/generate_plist.sh scripts/generate_index.sh
 
+      # Resolve the channel once and export the paths every later step + script
+      # reads from env. Beta gets its own output dir and page so a test build is
+      # never mixed into the public index.html / output/ artifacts. Automatic
+      # triggers (push, schedule) have no channel input and fall back to stable.
+      - name: Resolve release channel
+        shell: bash
+        env:
+          CHANNEL_INPUT: ${{ github.event.inputs.channel }}
+        run: |
+          channel="${CHANNEL_INPUT:-stable}"
+          base="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}"
+          {
+            echo "CHANNEL=$channel"
+            if [[ "$channel" == "beta" ]]; then
+              echo "OUTPUT_HTML=beta.html"
+              echo "OUTPUT_DIR=output-beta"
+              echo "OUTPUT_BASE_URL=$base/output-beta"
+              echo "PAGE_TITLE=SideInstaller — Beta"
+              echo "APP_TAGLINE=Beta test build — not the public release. Pick a certificate and tap install."
+            else
+              echo "OUTPUT_HTML=index.html"
+              echo "OUTPUT_DIR=output"
+              echo "OUTPUT_BASE_URL=$base/output"
+            fi
+          } >> "$GITHUB_ENV"
+          echo "Resolved channel: $channel"
+
       - name: Sign IPA with all certificates
         env:
           # Dispatch overrides win; otherwise the scripts fall back to the
@@ -54,10 +89,10 @@ jobs:
         shell: bash
         run: |
           shopt -s nullglob
-          signed=(output/sideinstaller-*.ipa)
+          signed=("${OUTPUT_DIR}"/"${OUTPUT_PREFIX:-sideinstaller}"-*.ipa)
           shopt -u nullglob
           if [[ ${#signed[@]} -eq 0 ]]; then
-            echo "No signed IPAs were produced in output/." >&2
+            echo "No signed IPAs were produced in ${OUTPUT_DIR}/." >&2
             exit 1
           fi
           printf '%s\n' "${signed[@]}"
@@ -72,14 +107,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A output index.html
+          git add -A "$OUTPUT_DIR" "$OUTPUT_HTML"
 
           if git diff --cached --quiet; then
             echo "Nothing to commit"
             exit 0
           fi
 
-          git commit -m "sign-sideinstaller: refresh signed IPAs, manifests, and install page"
+          git commit -m "sign-sideinstaller ($CHANNEL): refresh signed IPAs, manifests, and install page"
 
           for attempt in 1 2 3; do
             git pull --rebase origin "${GITHUB_REF_NAME}" || true
@@ -95,9 +130,12 @@ jobs:
         run: |
           rm -rf _site
           mkdir -p _site
-          cp index.html _site/index.html
-          # Install links inside index.html point at the committed raw-githubusercontent
-          # manifests, so the page works standalone; Pages just needs the page itself.
+          # Publish whichever channel pages exist so a beta deploy never drops the
+          # public index.html (and vice versa). Install links inside each page point
+          # at committed raw-githubusercontent manifests, so the pages work
+          # standalone; Pages just needs the HTML itself.
+          if [[ -f index.html ]]; then cp index.html _site/index.html; fi
+          if [[ -f beta.html ]]; then cp beta.html _site/beta.html; fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
