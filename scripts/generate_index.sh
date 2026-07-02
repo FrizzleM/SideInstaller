@@ -10,7 +10,6 @@ OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/output}"
 APP_NAME="${APP_NAME:-SideInstaller}"
 APP_TAGLINE="${APP_TAGLINE:-On-device sideloader. Follow the three steps below to get set up.}"
 PAGE_TITLE="${PAGE_TITLE:-$APP_NAME — Install}"
-LOGO_URL="${LOGO_URL:-https://files.catbox.moe/6mf2vz.png}"
 OUTPUT_HTML="${OUTPUT_HTML:-index.html}"
 TEMPLATE="${TEMPLATE:-$SCRIPT_DIR/template.html}"
 
@@ -23,6 +22,9 @@ else
 fi
 GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
 OUTPUT_BASE_URL="${OUTPUT_BASE_URL:-https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/$GITHUB_BRANCH/output}"
+# Logo: the app's own icon, committed at the repo root so the standalone page
+# can load it by raw URL (Pages ships only the HTML).
+LOGO_URL="${LOGO_URL:-https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/$GITHUB_BRANCH/app-icon.png}"
 
 CERT_METADATA_FILE="$OUTPUT_DIR/certificate-validity.tsv"
 APP_INFO_FILE="$OUTPUT_DIR/app-info.tsv"
