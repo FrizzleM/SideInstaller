@@ -94,17 +94,6 @@ safe_name() {
   echo "$1" | tr ' ' '-' | sed 's/[^A-Za-z0-9._-]/-/g; s/--*/-/g; s/^-//; s/-$//'
 }
 
-clean_generated_artifacts() {
-  local pattern="$1"
-  local matches=()
-  shopt -s nullglob
-  matches=("$OUTPUT_DIR"/$pattern)
-  shopt -u nullglob
-  if [[ ${#matches[@]} -gt 0 ]]; then
-    rm -f "${matches[@]}"
-  fi
-}
-
 resolve_cert_zip_url() {
   if [[ -n "${CERT_ZIP_URL:-}" ]]; then
     echo "$CERT_ZIP_URL"; return 0
@@ -359,7 +348,9 @@ mkdir -p "$OUTPUT_DIR"
 # Resolve to an absolute path so the zip write stays correct after `pushd`
 # into the per-cert IPA work dir (zip's output path is relative to the cwd).
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
-clean_generated_artifacts "$OUTPUT_PREFIX-*.ipa"
+# NB: we intentionally do NOT wipe sideinstaller-*.ipa here. Each pool cert
+# clears and rewrites only its own file inside the loop below, so signed IPAs
+# from certs outside the current pool (hand-added, other-cert builds) survive.
 printf 'name\tcertificate_expires_at\tdays_left\n' > "$CERT_METADATA_FILE"
 if [[ -n "$CERT_NAME_LIST_FILE" ]]; then : > "$CERT_NAME_LIST_FILE"; fi
 
@@ -405,6 +396,13 @@ while IFS= read -r P12_FILE; do
   CERT_GROUP_NAME="$(basename "$CERT_PATH")"
   OUTPUT_NAME="$(safe_name "$CERT_GROUP_NAME")"
   PROFILE="$CERT_PATH/$RAW_NAME.mobileprovision"
+
+  # Refresh only THIS pool cert's own signed IPA. Because the whole output dir is
+  # never blanket-wiped, builds signed with certs outside the current pool (hand-
+  # added, other-cert IPAs) are left untouched. Clearing our own target here also
+  # drops a pool cert's stale build if it fails to sign this run, and lets the zip
+  # below start from a clean archive instead of updating a stale one.
+  rm -f "$OUTPUT_DIR/$OUTPUT_PREFIX-$OUTPUT_NAME.ipa"
 
   if [[ "$RAW_NAME" != "$CERT_GROUP_NAME" ]]; then
     warn "Certificate filename $RAW_NAME.p12 does not match directory $CERT_GROUP_NAME; using directory name for output"

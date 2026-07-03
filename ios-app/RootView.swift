@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Top-level tab container hosting the app's four screens — Install, Pairing,
-/// Certificates and Downloads.
+/// Top-level tab container hosting the app's three screens — Install, Pairing
+/// and Certificates. (Managing downloaded IPAs now lives in the Settings sheet.)
 ///
 /// Each page paints the shared animated `AppBackground` behind its own content.
 /// (`TabView` hosts each tab in an opaque container, so a single backdrop *behind*
@@ -17,7 +17,6 @@ struct RootView: View {
     @EnvironmentObject private var engine: Engine
     /// Owned here so they survive tab switches and share the one `Engine`.
     @StateObject private var certManager = CertManager()
-    @StateObject private var downloadsManager = DownloadsManager()
     @StateObject private var pairingManager = PairingManager()
     @State private var twoFactorCode = ""
 
@@ -31,9 +30,6 @@ struct RootView: View {
             }
             Tab("Certificates", systemImage: "checkmark.seal") {
                 CertsView(manager: certManager)
-            }
-            Tab("Downloads", systemImage: "arrow.down.circle") {
-                DownloadsView(manager: downloadsManager)
             }
         }
         .tint(Theme.accent)

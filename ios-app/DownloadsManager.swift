@@ -1,8 +1,8 @@
 import Foundation
 
 /// One IPA the app has downloaded into Documents, ready to be (re)deleted from
-/// the Downloads tab. Each maps 1:1 to an `InstallSource`, whose `fileName` is
-/// the on-disk name the downloader writes to.
+/// the download manager in Settings. Each maps 1:1 to an `InstallSource`, whose
+/// `fileName` is the on-disk name the downloader writes to.
 struct DownloadedIPA: Identifiable, Equatable {
     let source: InstallSource
     let url: URL
