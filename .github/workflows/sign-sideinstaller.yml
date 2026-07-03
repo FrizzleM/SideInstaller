@@ -97,9 +97,11 @@ jobs:
       - name: Sign IPA with all certificates
         env:
           # Dispatch overrides win; otherwise the scripts fall back to the
-          # ipa-url.txt / cert-url.txt files in the repo.
+          # ipa-url.txt / cert-url.txt files in the repo, then the latest release.
           UNSIGNED_IPA_URL: ${{ github.event.inputs.ipa_url }}
           CERT_ZIP_URL: ${{ github.event.inputs.cert_zip_url }}
+          # Authenticates the Releases API lookup for the unsigned IPA.
+          GITHUB_TOKEN: ${{ github.token }}
         run: ./scripts/sign_with_all_certs.sh
 
       - name: Ensure signed IPAs exist

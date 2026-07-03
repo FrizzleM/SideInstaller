@@ -144,7 +144,9 @@ resolve_release_ipa_url() {
     endpoint="$api/releases/latest"
   fi
 
-  curl -fsSL "${auth[@]}" -H "Accept: application/vnd.github+json" "$endpoint" -o "$json_file" 2>/dev/null || return 1
+  # ${auth[@]+"${auth[@]}"} expands to nothing when the array is empty, instead
+  # of tripping "unbound variable" under `set -u` on the runner's Bash 3.2.
+  curl -fsSL ${auth[@]+"${auth[@]}"} -H "Accept: application/vnd.github+json" "$endpoint" -o "$json_file" 2>/dev/null || return 1
   command -v python3 >/dev/null 2>&1 || return 1
   python3 - "$json_file" <<'PY'
 import json, sys
