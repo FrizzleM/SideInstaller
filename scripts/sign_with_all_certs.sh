@@ -3,7 +3,11 @@
 #
 # Config (all overridable by env; sensible defaults baked in):
 #   UNSIGNED_IPA_URL  direct URL of the unsigned IPA. If unset, the first
-#                     non-comment line of ipa-url.txt is used.
+#                     non-comment line of ipa-url.txt is used; if that is also
+#                     blank, the .ipa asset attached to the repo's latest
+#                     release is used (latest prerelease when CHANNEL=beta).
+#   RELEASE_REPO      owner/repo to pull the release IPA from (default:
+#                     $GITHUB_REPOSITORY, else the origin remote).
 #   CERT_ZIP_URL      direct URL of the certificate pool zip. If unset, the
 #                     first non-comment line of cert-url.txt is used.
 #   OUTPUT_DIR        where signed IPAs + metadata land (default: ./output)
@@ -112,6 +116,51 @@ resolve_cert_zip_url() {
   echo "$DEFAULT_CERT_ZIP_URL"
 }
 
+# owner/repo to query the GitHub Releases API against. Prefer the CI-provided
+# slug; otherwise parse it out of the origin remote (ssh or https form).
+resolve_repo_slug() {
+  if [[ -n "${RELEASE_REPO:-}" ]]; then echo "$RELEASE_REPO"; return 0; fi
+  if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then echo "$GITHUB_REPOSITORY"; return 0; fi
+  local url; url="$(git -C "$ROOT_DIR" config --get remote.origin.url 2>/dev/null || true)"
+  url="${url%.git}"
+  case "$url" in
+    *github.com[:/]*) echo "${url#*github.com[:/]}"; return 0 ;;
+  esac
+  return 1
+}
+
+# Browser download URL of the newest .ipa asset on the repo's latest release.
+# include_pre=1 considers prereleases (newest overall); otherwise only the
+# latest published stable release is used.
+resolve_release_ipa_url() {
+  local repo="$1" include_pre="${2:-0}"
+  local api="https://api.github.com/repos/$repo" endpoint json_file="$TMP_DIR/release.json"
+  local auth=()
+  [[ -n "${GITHUB_TOKEN:-}" ]] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
+
+  if [[ "$include_pre" == "1" ]]; then
+    endpoint="$api/releases?per_page=1"
+  else
+    endpoint="$api/releases/latest"
+  fi
+
+  curl -fsSL "${auth[@]}" -H "Accept: application/vnd.github+json" "$endpoint" -o "$json_file" 2>/dev/null || return 1
+  command -v python3 >/dev/null 2>&1 || return 1
+  python3 - "$json_file" <<'PY'
+import json, sys
+with open(sys.argv[1]) as fh:
+    data = json.load(fh)
+# /releases returns a list, /releases/latest a single object.
+rel = (data[0] if data else None) if isinstance(data, list) else data
+if not rel:
+    raise SystemExit(1)
+ipas = [a for a in rel.get("assets", []) if a.get("name", "").lower().endswith(".ipa")]
+if not ipas:
+    raise SystemExit(1)
+print(ipas[0]["browser_download_url"])
+PY
+}
+
 resolve_unsigned_ipa_url() {
   if [[ -n "${UNSIGNED_IPA_URL:-}" ]]; then
     echo "$UNSIGNED_IPA_URL"; return 0
@@ -119,6 +168,16 @@ resolve_unsigned_ipa_url() {
   if [[ -f "$IPA_URL_FILE" ]]; then
     local u; u="$(first_config_line "$IPA_URL_FILE")"
     [[ -n "$u" ]] && { echo "$u"; return 0; }
+  fi
+  # Default: the .ipa asset attached to the repo's latest release. Beta builds
+  # pull from the newest release including prereleases.
+  local repo include_pre=0
+  [[ "${CHANNEL:-stable}" == "beta" ]] && include_pre=1
+  if repo="$(resolve_repo_slug)"; then
+    local url
+    if url="$(resolve_release_ipa_url "$repo" "$include_pre")" && [[ -n "$url" ]]; then
+      echo "$url"; return 0
+    fi
   fi
   return 1
 }
@@ -304,7 +363,7 @@ if [[ -n "$CERT_NAME_LIST_FILE" ]]; then : > "$CERT_NAME_LIST_FILE"; fi
 
 CERT_ZIP_URL="$(resolve_cert_zip_url)"
 if ! UNSIGNED_IPA_RESOLVED_URL="$(resolve_unsigned_ipa_url)"; then
-  fail "No unsigned IPA URL. Set the first line of $IPA_URL_FILE, or pass UNSIGNED_IPA_URL."
+  fail "No unsigned IPA URL: the repo's latest release has no .ipa asset (and no override was given). Attach an IPA to the release, set the first line of $IPA_URL_FILE, or pass UNSIGNED_IPA_URL."
   exit 1
 fi
 
