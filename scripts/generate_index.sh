@@ -25,6 +25,9 @@ OUTPUT_BASE_URL="${OUTPUT_BASE_URL:-https://raw.githubusercontent.com/$GITHUB_US
 # Logo: the app's own icon, committed at the repo root so the standalone page
 # can load it by raw URL (Pages ships only the HTML).
 LOGO_URL="${LOGO_URL:-https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/$GITHUB_BRANCH/app-icon.png}"
+# "Download IPA" target: GitHub's /releases/latest always redirects to the
+# current latest release page, so it never needs updating per release.
+LATEST_RELEASE_URL="${LATEST_RELEASE_URL:-https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/latest}"
 
 CERT_METADATA_FILE="$OUTPUT_DIR/certificate-validity.tsv"
 APP_INFO_FILE="$OUTPUT_DIR/app-info.tsv"
@@ -146,6 +149,7 @@ awk \
   -v cert_count="$CERT_COUNT" \
   -v logo="$LOGO_HTML" \
   -v last_updated="$LAST_UPDATED" \
+  -v latest_release_url="$LATEST_RELEASE_URL" \
   -v repo_note="$REPO_NOTE" '
   # Literal find/replace — avoids gsub treating & or \ in the value specially,
   # which matters because names/notes can contain & (escaped to &amp;).
@@ -165,6 +169,7 @@ awk \
     s = rep(s, "{{CERT_COUNT}}", cert_count)
     s = rep(s, "{{LOGO}}", logo)
     s = rep(s, "{{LAST_UPDATED}}", last_updated)
+    s = rep(s, "{{LATEST_RELEASE_URL}}", latest_release_url)
     s = rep(s, "{{REPO_NOTE}}", repo_note)
     return s
   }
