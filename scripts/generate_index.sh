@@ -51,7 +51,7 @@ fi
 if [[ -n "$LOGO_URL" ]]; then
   LOGO_HTML="<img src=\"$LOGO_URL\" alt=\"$APP_NAME\">"
 else
-  LOGO_HTML='<svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop offset="0" stop-color="#6d8bff"/><stop offset="1" stop-color="#a06bff"/></linearGradient></defs><rect x="4" y="2.5" width="16" height="19" rx="3.5"/><path d="M12 7v8"/><path d="M8.5 11.5L12 15l3.5-3.5"/></svg>'
+  LOGO_HTML='<svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop offset="0" stop-color="#2170f5"/><stop offset="1" stop-color="#4dadff"/></linearGradient></defs><rect x="4" y="2.5" width="16" height="19" rx="3.5"/><path d="M12 7v8"/><path d="M8.5 11.5L12 15l3.5-3.5"/></svg>'
 fi
 
 html_escape() { sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }

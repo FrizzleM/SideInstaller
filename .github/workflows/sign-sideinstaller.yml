@@ -20,7 +20,7 @@ on:
         required: false
         default: ""
       cert_zip_url:
-        description: "Override certificate pool zip URL (leave blank to use cert-url.txt)"
+        description: "Override cert pool source(s): space-separated .zip and/or github.com/owner/repo URLs, merged and de-duped (blank = use cert-url.txt)"
         required: false
         default: ""
   push:
@@ -157,6 +157,8 @@ jobs:
           if [[ -f beta.html ]]; then cp beta.html _site/beta.html; fi
           # DNS profile linked from the page's Setup step — must ship with the site.
           if [[ -f SideInstallerDNS.mobileconfig ]]; then cp SideInstallerDNS.mobileconfig _site/SideInstallerDNS.mobileconfig; fi
+          # Terms of Service linked from the page footer.
+          if [[ -f terms.html ]]; then cp terms.html _site/terms.html; fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

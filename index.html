@@ -5,47 +5,80 @@
 <title>SideInstaller — Install</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#000000">
 <style>
+  /* Palette mirrors the app's Theme.swift: OLED black backdrop, brand blues
+     accent #2170F5 -> accent2 #4DADFF, deep-navy glow #011A5C. */
   :root{
-    --bg:#0a0a0f; --bg2:#12121c; --card:rgba(255,255,255,.04); --card-hover:rgba(255,255,255,.07);
-    --stroke:rgba(255,255,255,.09); --stroke-strong:rgba(255,255,255,.16);
-    --text:#f4f5fb; --muted:#9aa0b4; --faint:#6b7180;
-    --accent:#6d8bff; --accent2:#a06bff;
+    --card:rgba(23,28,42,.62); --card-hover:rgba(32,38,58,.72);
+    --stroke:rgba(255,255,255,.07); --stroke-strong:rgba(255,255,255,.14);
+    --text:#f4f6fb; --muted:#9ba3b8; --faint:#6c7386;
+    --accent:#2170f5; --accent2:#4dadff; --glow:#011a5c;
+    --brand:linear-gradient(135deg,var(--accent),var(--accent2));
     --good:#34d399; --warn:#fbbf24; --crit:#fb923c; --bad:#f87171;
-    --radius:18px; --radius-sm:12px;
+    --radius:22px; --radius-btn:18px; --radius-sm:14px;
   }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
   body{
     margin:0; min-height:100vh; color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
-    line-height:1.55;
-    background:
-      radial-gradient(1100px 620px at 18% -8%, rgba(1,26,92,.18), transparent 60%),
-      radial-gradient(900px 560px at 88% 4%, rgba(1,26,92,.16), transparent 58%),
-      var(--bg);
-    background-attachment:fixed;
+    line-height:1.55; background:#000;
     padding:max(20px,env(safe-area-inset-top)) 18px 64px;
   }
+
+  /* ---- animated backdrop ----
+     The app's background is black with a slow blue mesh gradient breathing
+     behind everything (Theme.swift AppBackground). Two heavily blurred,
+     overlapping gradient fields drift out of phase so the whole backdrop
+     reads as one continuous blue wash — no distinct blobs. */
+  .bg{position:fixed; inset:0; z-index:-1; overflow:hidden; pointer-events:none; background:#000}
+  .bg::before,.bg::after{
+    content:""; position:absolute; inset:-25%; will-change:transform; filter:blur(48px);
+  }
+  .bg::before{
+    background:
+      radial-gradient(46% 38% at 28% 22%, rgba(33,112,245,.15), transparent 70%),
+      radial-gradient(40% 34% at 74% 12%, rgba(77,173,255,.11), transparent 72%),
+      radial-gradient(64% 56% at 50% 28%, rgba(1,26,92,.42), transparent 78%);
+    animation:mesh-a 27s ease-in-out infinite alternate;
+  }
+  .bg::after{
+    background:
+      radial-gradient(44% 38% at 66% 64%, rgba(33,112,245,.10), transparent 72%),
+      radial-gradient(38% 32% at 22% 78%, rgba(77,173,255,.08), transparent 74%),
+      radial-gradient(60% 50% at 50% 86%, rgba(1,26,92,.36), transparent 80%);
+    animation:mesh-b 34s ease-in-out infinite alternate;
+  }
+  @keyframes mesh-a{to{transform:translate3d(4%,3%,0) scale(1.06)}}
+  @keyframes mesh-b{to{transform:translate3d(-4%,-3%,0) scale(1.08)}}
+
+  /* ---- entrance cascade, echoing the app's per-object settle-in ---- */
+  .hero,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
+  .step:nth-of-type(1){animation-delay:.06s}
+  .step:nth-of-type(2){animation-delay:.12s}
+  .step:nth-of-type(3){animation-delay:.18s}
+  .footer{animation-delay:.24s}
+  @keyframes rise{from{opacity:0; transform:translateY(16px) scale(.98)}}
+  @media (prefers-reduced-motion:reduce){
+    .bg::before,.bg::after{animation:none}
+    .hero,.step,.footer{animation:none}
+  }
+
   .wrap{max-width:920px; margin:0 auto}
 
   /* ---- hero ---- */
   .hero{text-align:center; padding:18px 8px 8px}
   .logo{
     width:96px; height:96px; margin:0 auto 18px; display:grid; place-items:center;
-    border-radius:24px; background:linear-gradient(150deg,#1b1d2c,#101019);
+    border-radius:23px; background:linear-gradient(150deg,#0d1530,#05070f);
     border:1px solid var(--stroke-strong);
-    box-shadow:0 18px 50px rgba(109,139,255,.28), inset 0 1px 0 rgba(255,255,255,.06);
+    box-shadow:0 12px 40px rgba(33,112,245,.32), 0 18px 60px rgba(1,26,92,.85), inset 0 1px 0 rgba(255,255,255,.06);
     overflow:hidden;
   }
   .logo img{width:100%; height:100%; object-fit:cover}
   .logo svg{width:54px; height:54px}
-  h1{
-    margin:0; font-size:clamp(28px,6vw,40px); font-weight:800; letter-spacing:-.02em;
-    background:linear-gradient(120deg,#fff,#c7cdf2 60%,#a9b2ff);
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-  }
+  h1{margin:0; color:#fff; font-size:clamp(28px,6vw,40px); font-weight:800; letter-spacing:-.02em}
   .tagline{margin:8px auto 0; max-width:540px; color:var(--muted); font-size:16px}
   .badges{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
   .badge{
@@ -54,8 +87,9 @@
   }
   .badge b{color:var(--text)}
 
-  /* ---- hero links (community + downloads) ---- */
+  /* ---- hero links: social row above, repo/download row below ---- */
   .links{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
+  .links.repo{margin-top:10px}
   .link-btn{
     display:inline-flex; align-items:center; gap:8px;
     padding:10px 16px; font-size:14px; font-weight:700; text-decoration:none;
@@ -82,14 +116,16 @@
   .step-num{
     flex:none; width:34px; height:34px; display:grid; place-items:center;
     font-size:16px; font-weight:800; color:#fff; border-radius:12px;
-    background:linear-gradient(120deg,var(--accent),var(--accent2));
-    box-shadow:0 8px 22px rgba(109,139,255,.3);
+    background:var(--brand);
+    box-shadow:0 8px 22px rgba(33,112,245,.35);
   }
   .step-title{margin:0; font-size:20px; font-weight:800; letter-spacing:-.01em}
   .step-sub{margin:2px 0 0; color:var(--muted); font-size:13.5px}
   .step-card{
     padding:18px 20px; color:var(--muted); font-size:14.5px;
     background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius);
+    -webkit-backdrop-filter:blur(20px) saturate(140%); backdrop-filter:blur(20px) saturate(140%);
+    box-shadow:0 7px 14px rgba(0,0,0,.07);
   }
   .step-card p{margin:0}
   .step-card b{color:var(--text)}
@@ -106,6 +142,31 @@
   }
   .callout b{color:var(--good)}
 
+  /* ---- TOS gate ----
+     Downloads stay dimmed and non-interactive until the box is ticked. */
+  .tos-gate{
+    display:flex; align-items:center; gap:12px; margin:0 0 14px; padding:15px 18px;
+    background:rgba(33,112,245,.08); border:1px solid rgba(33,112,245,.3);
+    border-radius:var(--radius-sm); cursor:pointer;
+    -webkit-user-select:none; user-select:none;
+  }
+  .tos-gate input{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
+  .tos-gate .box{
+    flex:none; width:22px; height:22px; border-radius:7px; display:grid; place-items:center;
+    background:rgba(255,255,255,.06); border:1px solid var(--stroke-strong);
+    transition:background .15s, border-color .15s, box-shadow .15s;
+  }
+  .tos-gate .box svg{width:13px; height:13px; color:#fff; opacity:0; transform:scale(.6); transition:opacity .15s, transform .15s}
+  .tos-gate input:checked ~ .box{background:var(--brand); border-color:transparent; box-shadow:0 4px 14px rgba(33,112,245,.4)}
+  .tos-gate input:checked ~ .box svg{opacity:1; transform:scale(1)}
+  .tos-gate input:focus-visible ~ .box{outline:2px solid var(--accent2); outline-offset:2px}
+  .tos-text{color:var(--muted); font-size:14.5px}
+  .tos-text b{color:var(--text)}
+  .tos-text a{color:var(--accent2); text-decoration:none; font-weight:600}
+  .tos-text a:hover{text-decoration:underline}
+  .grid{transition:opacity .25s, filter .25s}
+  .grid.locked{opacity:.4; filter:saturate(.6); pointer-events:none}
+
   /* ---- controls ---- */
   .controls{
     display:flex; gap:10px; margin:0 0 14px; flex-wrap:wrap; align-items:center;
@@ -121,7 +182,7 @@
   .search input::placeholder{color:var(--faint)}
   .sort{
     padding:13px 38px 13px 14px; font-size:14px; font-weight:600; color:var(--text);
-    background:var(--card) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa0b4' stroke-width='2.5' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>") no-repeat right 14px center;
+    background:var(--card) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ba3b8' stroke-width='2.5' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>") no-repeat right 14px center;
     border:1px solid var(--stroke); border-radius:var(--radius-sm); outline:none;
     appearance:none; -webkit-appearance:none; cursor:pointer;
   }
@@ -131,6 +192,8 @@
   .cert-card{
     display:flex; flex-direction:column; gap:12px; padding:18px;
     background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius);
+    -webkit-backdrop-filter:blur(20px) saturate(140%); backdrop-filter:blur(20px) saturate(140%);
+    box-shadow:0 7px 14px rgba(0,0,0,.07);
     transition:transform .16s ease, border-color .16s, background .16s;
   }
   .cert-card:hover{transform:translateY(-3px); background:var(--card-hover); border-color:var(--stroke-strong)}
@@ -149,14 +212,14 @@
   .pill.unknown{color:var(--muted); background:rgba(255,255,255,.05); border-color:var(--stroke)}
   .install-btn{
     margin-top:auto; display:inline-flex; align-items:center; justify-content:center; gap:8px;
-    padding:12px 16px; font-size:15px; font-weight:700; text-decoration:none; color:#fff;
-    border-radius:var(--radius-sm);
-    background:linear-gradient(120deg,var(--accent),var(--accent2));
-    box-shadow:0 8px 22px rgba(109,139,255,.3);
+    padding:13px 16px; font-size:15px; font-weight:700; text-decoration:none; color:#fff;
+    border-radius:var(--radius-btn);
+    background:var(--brand);
+    box-shadow:0 8px 24px rgba(33,112,245,.4);
     transition:transform .14s, box-shadow .14s, filter .14s;
   }
   .install-btn svg{width:17px; height:17px}
-  .install-btn:hover{filter:brightness(1.07); box-shadow:0 12px 30px rgba(160,107,255,.4)}
+  .install-btn:hover{filter:brightness(1.08); box-shadow:0 12px 30px rgba(77,173,255,.45)}
   .install-btn:active{transform:scale(.97)}
   .cert-card[data-days^="-"] .install-btn{filter:saturate(.5) brightness(.85)}
 
@@ -167,6 +230,7 @@
   details.howto{
     margin-top:14px; background:var(--card); border:1px solid var(--stroke);
     border-radius:var(--radius); overflow:hidden;
+    -webkit-backdrop-filter:blur(20px) saturate(140%); backdrop-filter:blur(20px) saturate(140%);
   }
   details.howto summary{
     list-style:none; cursor:pointer; padding:16px 20px; font-weight:700; font-size:15px;
@@ -196,6 +260,7 @@
 </style>
 </head>
 <body>
+<div class="bg" aria-hidden="true"></div>
 <div class="wrap">
 
   <header class="hero">
@@ -206,7 +271,7 @@
       <span class="badge">Version <b>0.5.0</b></span>
       <span class="badge"><b>14</b> certificates</span>
     </div>
-    <div class="links">
+    <div class="links social">
       <a class="link-btn youtube" href="https://youtu.be/OyeYTSEheQw?is=j6FyM9iURyrMwcXy" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
         Tutorial
@@ -215,13 +280,15 @@
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.446.865-.61 1.249a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.1 14.1 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.009c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.893.077.077 0 0 0-.041.106c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.331c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
         Join the Discord
       </a>
-      <a class="link-btn ipa" href="https://github.com/FrizzleM/SideInstaller/releases/latest" target="_blank" rel="noopener">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>
-        Download IPA
-      </a>
       <a class="link-btn kofi" href="https://ko-fi.com/frizzlem" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
         Ko-fi
+      </a>
+    </div>
+    <div class="links repo">
+      <a class="link-btn ipa" href="https://github.com/FrizzleM/SideInstaller/releases/latest" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>
+        Download IPA
       </a>
       <a class="link-btn github" href="https://github.com/FrizzleM/SideInstaller/tree/main" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23a11.5 11.5 0 0 1 3.003-.404c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12z"/></svg>
@@ -260,6 +327,12 @@
         <p class="step-sub">Pick a certificate and install the SideInstaller app.</p>
       </div>
     </div>
+
+    <label class="tos-gate">
+      <input type="checkbox" id="tosCheck">
+      <span class="box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span>
+      <span class="tos-text">I have read and accept the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a>.</span>
+    </label>
 
     <div class="controls">
       <div class="search">
@@ -421,7 +494,8 @@
 
   <footer class="footer">
     Built automatically &middot; signed with 14 certificate(s)
-    <br>Last updated: 08 Jul 2026, 13:02 CET
+    <br>Last updated: 08 Jul 2026, 13:24 CET
+    <br><a href="terms.html">Terms of Service</a>
   </footer>
 
 </div>
@@ -455,6 +529,29 @@
   q.addEventListener('input',apply);
   sortSel.addEventListener('change',apply);
   apply();
+
+  /* TOS gate: installs stay dimmed and inert until the box is ticked.
+     Acceptance is remembered per device. */
+  var tos=document.getElementById('tosCheck');
+  var TOS_KEY='si-tos-accepted';
+  function tosLocked(){ return !tos.checked; }
+  function applyTos(){
+    grid.classList.toggle('locked', tosLocked());
+    grid.setAttribute('aria-disabled', tosLocked()?'true':'false');
+    if('inert' in grid) grid.inert=tosLocked();
+    try{
+      if(tos.checked) localStorage.setItem(TOS_KEY,'1');
+      else localStorage.removeItem(TOS_KEY);
+    }catch(e){}
+  }
+  try{ if(localStorage.getItem(TOS_KEY)==='1') tos.checked=true; }catch(e){}
+  tos.addEventListener('change',applyTos);
+  /* Belt and braces for browsers without inert: swallow activations
+     (including keyboard Enter) while locked. */
+  grid.addEventListener('click',function(e){
+    if(tosLocked()){ e.preventDefault(); e.stopPropagation(); }
+  },true);
+  applyTos();
 })();
 </script>
 </body>

@@ -8,15 +8,22 @@
 #                     release is used (latest prerelease when CHANNEL=beta).
 #   RELEASE_REPO      owner/repo to pull the release IPA from (default:
 #                     $GITHUB_REPOSITORY, else the origin remote).
-#   CERT_ZIP_URL      direct URL of the certificate pool zip. If unset, the
-#                     first non-comment line of cert-url.txt is used.
+#   CERT_ZIP_URL      certificate pool source(s). Space/newline-separated list;
+#                     each entry is either a direct .zip URL or a GitHub repo
+#                     URL (https://github.com/<owner>/<repo>). If unset, every
+#                     non-comment line of cert-url.txt is used.
 #   OUTPUT_DIR        where signed IPAs + metadata land (default: ./output)
 #   OUTPUT_PREFIX     filename prefix for signed IPAs (default: sideinstaller)
 #   P12_PASSWORD      fallback p12 password when no sidecar file exists
 #   FORCED_BUNDLE_ID  override bundle id for wildcard profiles
 #
-# Cert pool layout (one folder per cert):
+# Cert pool layout (one folder per cert, per source):
 #   <Name>/<Name>.p12  +  <Name>/<Name>.mobileprovision  [+ <Name>/password.txt]
+# Sources are merged into one pool. The SAME signing certificate often shows up
+# in more than one source (or across profile variants within a source); each
+# unique leaf certificate is signed only ONCE, keyed by its SHA-1 fingerprint,
+# with the first source listed winning. .zip sources are downloaded+unzipped;
+# GitHub-repo sources are sparse-cloned so only the cert files are fetched.
 set -euo pipefail
 
 ROOT_DIR="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -28,14 +35,18 @@ CERT_METADATA_FILE="${CERT_METADATA_FILE:-$OUTPUT_DIR/certificate-validity.tsv}"
 APP_INFO_FILE="${APP_INFO_FILE:-$OUTPUT_DIR/app-info.tsv}"
 CERT_NAME_LIST_FILE="${CERT_NAME_LIST_FILE:-}"
 
-DEFAULT_CERT_ZIP_URL="https://github.com/WSF-Team/WSF/raw/refs/heads/main/portal/resources/certificates.zip"
+# Fallback source list when neither CERT_ZIP_URL nor cert-url.txt provides one.
+# One source per line; kept in sync with cert-url.txt.
+DEFAULT_CERT_SOURCES="https://github.com/WSF-Team/WSF/raw/refs/heads/main/portal/resources/certificates.zip
+https://github.com/NovaDev404/NexCerts"
 
 DEFAULT_P12_PASSWORD="${P12_PASSWORD:-WSF}"
 KC_PASSWORD="${KC_PASSWORD:-temp123}"
 FORCED_BUNDLE_ID="${FORCED_BUNDLE_ID:-}"
 
 TMP_DIR="$(mktemp -d)"
-CERT_ARCHIVE="$TMP_DIR/certificates.zip"
+POOL_DIR="$TMP_DIR/pool"                 # merged cert pool, one subdir per source
+SEEN_FP_FILE="$TMP_DIR/seen-fingerprints.tsv"  # fingerprint<TAB>kept-name, for dedup
 UNSIGNED_IPA="$TMP_DIR/unsigned.ipa"
 APPLE_CERTS_DIR="$TMP_DIR/apple-certs"
 INTERMEDIATES_KC="$TMP_DIR/intermediates.keychain-db"
@@ -74,6 +85,19 @@ first_config_line() {
   ' "$1"
 }
 
+# Every non-blank, non-comment line of a file, CR-stripped and trimmed.
+all_config_lines() {
+  awk '
+    {
+      sub(/\r$/, "")
+      sub(/^[[:space:]]+/, "")
+      if ($0 ~ /^#/ || $0 !~ /[^[:space:]]/) next
+      sub(/[[:space:]]+$/, "")
+      print
+    }
+  ' "$1"
+}
+
 password_from_file() {
   awk '
     {
@@ -94,16 +118,93 @@ safe_name() {
   echo "$1" | tr ' ' '-' | sed 's/[^A-Za-z0-9._-]/-/g; s/--*/-/g; s/^-//; s/-$//'
 }
 
-resolve_cert_zip_url() {
+# The certificate pool sources, one per line. Precedence: CERT_ZIP_URL env
+# (space/newline-separated list) > every non-comment line of cert-url.txt >
+# the built-in default list.
+resolve_cert_sources() {
   if [[ -n "${CERT_ZIP_URL:-}" ]]; then
-    echo "$CERT_ZIP_URL"; return 0
+    # Word-split on whitespace/newlines so a lone URL (back-compat) and a
+    # multi-URL override both normalise to one-per-line. URLs never contain
+    # spaces, so this is safe.
+    printf '%s\n' $CERT_ZIP_URL
+    return 0
   fi
   if [[ -f "$CERT_URL_FILE" ]]; then
-    local u; u="$(first_config_line "$CERT_URL_FILE")"
-    [[ -n "$u" ]] && { echo "$u"; return 0; }
+    local lines; lines="$(all_config_lines "$CERT_URL_FILE")"
+    [[ -n "$lines" ]] && { printf '%s\n' "$lines"; return 0; }
   fi
-  echo "$DEFAULT_CERT_ZIP_URL"
+  printf '%s\n' "$DEFAULT_CERT_SOURCES"
 }
+
+# True when $1 points at a GitHub repository ROOT (owner/repo) rather than a
+# direct file inside it. Repo roots are sparse-cloned; everything else (raw
+# links, /archive/ tarballs, any .zip) is downloaded as an archive.
+is_github_repo_url() {
+  local u="${1%/}"; u="${u%.git}"
+  case "$u" in
+    *.zip) return 1 ;;
+    https://github.com/*/* | http://github.com/*/* | git@github.com:*/*)
+      local rest="${u#*github.com[:/]}"       # owner/repo[/more…]
+      case "$rest" in
+        */*/*) return 1 ;;                     # 3+ segments => path into repo
+        */*)   return 0 ;;                     # exactly owner/repo => root
+        *)     return 1 ;;
+      esac ;;
+    *) return 1 ;;
+  esac
+}
+
+# Sparse, blob-filtered clone of a GitHub repo that checks out ONLY the cert
+# material (p12 / mobileprovision / password sidecars) at any depth — so large
+# unrelated assets (e.g. bundled .ipa files) are never fetched.
+clone_repo_certs() {   # $1 repo-url  $2 dest-dir
+  local url="${1%/}"; url="${url%.git}"
+  git clone --no-checkout --depth 1 --filter=blob:none "$url" "$2" >/dev/null 2>&1 || return 1
+  (
+    cd "$2" || exit 1
+    git sparse-checkout init --no-cone >/dev/null 2>&1 || exit 1
+    git sparse-checkout set --no-cone '*.p12' '*.mobileprovision' 'password.txt' '*.password' '*.pass' >/dev/null 2>&1 || exit 1
+    git checkout >/dev/null 2>&1 || exit 1
+  ) || return 1
+  rm -rf "$2/.git"
+}
+
+fetch_zip_certs() {   # $1 url  $2 dest-dir
+  local archive="$TMP_DIR/src-$(basename "$2").zip"
+  curl -fsSL "$1" -o "$archive" || return 1
+  unzip -q "$archive" -d "$2" || return 1
+  rm -f "$archive"
+}
+
+# Populate $POOL_DIR from a newline-separated source list. Each source lands in
+# its own zero-padded subdir (00-src, 01-src, …) so the p12 enumeration below
+# visits sources in list order — that ordering is what makes the first source
+# win when the same certificate appears in several of them.
+acquire_sources() {   # $1 = newline-separated source URLs
+  local idx=0 url dest
+  mkdir -p "$POOL_DIR"
+  while IFS= read -r url; do
+    [[ -n "$url" ]] || continue
+    dest="$POOL_DIR/$(printf '%02d' "$idx")-src"
+    mkdir -p "$dest"
+    if is_github_repo_url "$url"; then
+      echo "[*] Source $idx (GitHub repo, cert files only): $url"
+      clone_repo_certs "$url" "$dest" || warn "Failed to fetch certificates from repo: $url"
+    else
+      echo "[*] Source $idx (zip archive): $url"
+      fetch_zip_certs "$url" "$dest" || warn "Failed to download/extract cert zip: $url"
+    fi
+    idx=$((idx + 1))
+  done <<< "$1"
+}
+
+# Dedup bookkeeping: has this leaf-certificate fingerprint already been signed?
+# Prints the name it was first signed under and returns 0 when it has.
+dedup_lookup() {   # $1 = fingerprint
+  [[ -f "$SEEN_FP_FILE" ]] || return 1
+  awk -F'\t' -v fp="$1" '$1 == fp { print $2; found = 1; exit } END { exit(found ? 0 : 1) }' "$SEEN_FP_FILE"
+}
+dedup_record() { printf '%s\t%s\n' "$1" "$2" >> "$SEEN_FP_FILE"; }
 
 # owner/repo to query the GitHub Releases API against. Prefer the CI-provided
 # slug; otherwise parse it out of the origin remote (ssh or https form).
@@ -247,6 +348,18 @@ import_certificate() {
   security import "$repacked_p12" -f pkcs12 -k "$keychain" -P "$password" -A -T /usr/bin/codesign -T /usr/bin/security >/dev/null 2>&1
 }
 
+# SHA-1 fingerprint (uppercase hex, no colons) of the leaf certificate inside a
+# p12 — the dedup key. Same identity across pools/profiles => same fingerprint.
+certificate_fingerprint() {
+  local p12_file="$1" password="$2"
+  local cert_pem="$TMP_DIR/fp-$(basename "$p12_file" .p12).pem" fp=""
+  openssl pkcs12 $OPENSSL_LEGACY_FLAG -in "$p12_file" -passin "pass:$password" -nokeys -clcerts -out "$cert_pem" >/dev/null 2>&1 || return 1
+  fp="$(openssl x509 -in "$cert_pem" -noout -fingerprint -sha1 2>/dev/null | sed 's/.*=//; s/://g')"
+  rm -f "$cert_pem"
+  [[ -n "$fp" ]] || return 1
+  printf '%s\n' "$fp"
+}
+
 certificate_expiry_info() {
   local p12_file="$1" password="$2"
   local cert_pem="$TMP_DIR/cert-$(basename "$p12_file" .p12).pem" not_after=""
@@ -354,7 +467,7 @@ OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 printf 'name\tcertificate_expires_at\tdays_left\n' > "$CERT_METADATA_FILE"
 if [[ -n "$CERT_NAME_LIST_FILE" ]]; then : > "$CERT_NAME_LIST_FILE"; fi
 
-CERT_ZIP_URL="$(resolve_cert_zip_url)"
+CERT_SOURCES="$(resolve_cert_sources)"
 if ! UNSIGNED_IPA_RESOLVED_URL="$(resolve_unsigned_ipa_url)"; then
   fail "No unsigned IPA URL: the repo's latest release has no .ipa asset (and no override was given). Attach an IPA to the release, set the first line of $IPA_URL_FILE, or pass UNSIGNED_IPA_URL."
   exit 1
@@ -363,10 +476,13 @@ fi
 echo "[*] Root dir: $ROOT_DIR"
 echo "[*] Output dir: $OUTPUT_DIR"
 echo "[*] Unsigned IPA URL: $UNSIGNED_IPA_RESOLVED_URL"
-echo "[*] Certificate zip: $CERT_ZIP_URL"
-echo "[*] Expected cert layout: <Name>/<Name>.p12 + <Name>/<Name>.mobileprovision"
+echo "[*] Certificate sources (merged, de-duplicated by certificate fingerprint):"
+while IFS= read -r _src; do
+  [[ -n "$_src" ]] || continue
+  echo "      - $_src"
+done <<< "$CERT_SOURCES"
+echo "[*] Expected cert layout per source: <Name>/<Name>.p12 + <Name>/<Name>.mobileprovision [+ password]"
 
-curl -fsSL "$CERT_ZIP_URL" -o "$CERT_ARCHIVE"
 if ! curl -fSL "$UNSIGNED_IPA_RESOLVED_URL" -o "$UNSIGNED_IPA"; then
   fail "Could not download the unsigned IPA from: $UNSIGNED_IPA_RESOLVED_URL"
   exit 1
@@ -381,12 +497,18 @@ record_app_info "$UNSIGNED_IPA" || warn "Could not read app info from the unsign
 echo "[*] Fetching Apple WWDR intermediates"
 download_apple_intermediates
 setup_intermediates_keychain
-unzip -q "$CERT_ARCHIVE" -d "$TMP_DIR"
+echo "[*] Assembling certificate pool"
+acquire_sources "$CERT_SOURCES"
 
 SUCCESS=0
 FAILED=0
 FOUND_P12=0
+SKIPPED_DUP=0
+: > "$SEEN_FP_FILE"
 
+# Enumerate p12s across the whole merged pool. Sources sit in zero-padded
+# subdirs (00-src, 01-src, …) so this sorted walk hits them in list order,
+# which is what lets the first source keep a cert when it recurs later.
 while IFS= read -r P12_FILE; do
   [[ -n "$P12_FILE" ]] || continue
   FOUND_P12=1
@@ -421,6 +543,26 @@ while IFS= read -r P12_FILE; do
   fi
 
   P12_PASSWORD_FOR_CERT="$(resolve_p12_password "$CERT_PATH" "$RAW_NAME")"
+
+  # De-duplicate the merged pool: sign each unique signing certificate once.
+  # The same cert routinely appears in more than one source, and within a
+  # source across profile variants (e.g. one enterprise cert with many
+  # provisioning profiles). Key on the leaf cert's SHA-1 fingerprint; the first
+  # occurrence wins (see source ordering above), so the incumbent source keeps
+  # its existing card/filename and later copies are skipped. The stale IPA for a
+  # skipped copy, if any, was already cleared by the rm above. A cert we cannot
+  # fingerprint (bad password, etc.) is signed anyway rather than dropped.
+  CERT_FP="$(certificate_fingerprint "$P12_FILE" "$P12_PASSWORD_FOR_CERT" || true)"
+  if [[ -n "$CERT_FP" ]]; then
+    if PRIOR="$(dedup_lookup "$CERT_FP")"; then
+      warn "Skipping $CERT_GROUP_NAME — duplicate certificate (already signed as $PRIOR)"
+      SKIPPED_DUP=$((SKIPPED_DUP + 1)); continue
+    fi
+    dedup_record "$CERT_FP" "$OUTPUT_NAME"
+  else
+    warn "Could not fingerprint $CERT_GROUP_NAME; signing without a duplicate check"
+  fi
+
   CERT_EXPIRES_AT="unknown"; CERT_DAYS_LEFT="unknown"
   if CERT_EXPIRY_INFO="$(certificate_expiry_info "$P12_FILE" "$P12_PASSWORD_FOR_CERT")"; then
     IFS=$'\t' read -r CERT_EXPIRES_AT CERT_DAYS_LEFT <<< "$CERT_EXPIRY_INFO"
@@ -557,16 +699,17 @@ while IFS= read -r P12_FILE; do
   restore_keychains
   security delete-keychain "$KEYCHAIN" >/dev/null 2>&1 || true
   SUCCESS=$((SUCCESS + 1))
-done < <(find "$TMP_DIR" -type f -name '*.p12' | LC_ALL=C sort)
+done < <(find "$POOL_DIR" -type f -name '*.p12' | LC_ALL=C sort)
 
 if [[ $FOUND_P12 -eq 0 ]]; then
-  fail "No .p12 files were found in the certificate archive"; exit 1
+  fail "No .p12 files were found in any certificate source"; exit 1
 fi
 
 echo
 echo "[✓] Done"
 echo "[✓] Successful: $SUCCESS"
 echo "[!] Failed: $FAILED"
+echo "[=] Skipped (duplicate certificates): $SKIPPED_DUP"
 
 if [[ $SUCCESS -eq 0 ]]; then
   fail "No signed IPAs were created"; exit 1

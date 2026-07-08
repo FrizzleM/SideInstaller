@@ -1,15 +1,30 @@
-# SideInstaller — certificate pool
+# SideInstaller — certificate pool sources
 #
-# Put the direct download URL of a .zip of signing certificates on the first
-# non-comment line below. The "sign-sideinstaller" workflow downloads it and
-# signs the IPA once per certificate it contains.
+# The "sign-sideinstaller" workflow signs the IPA once per certificate found
+# across ALL of the sources listed below. List one source per line; blank lines
+# and lines starting with '#' are ignored. Add or remove a line to add/drop a
+# source. Override the whole list for a one-off run with the CERT_ZIP_URL env
+# var (space/newline-separated).
 #
-# Expected layout inside the zip (one folder per certificate):
-#   <Name>/<Name>.p12
-#   <Name>/<Name>.mobileprovision
-#   <Name>/password.txt        (optional — p12 password; falls back to P12_PASSWORD)
+# Two source kinds are supported (the two below have different layouts — the
+# workflow handles both):
 #
-# Change this URL any time by editing this line, or override with the
-# CERT_ZIP_URL env var in the workflow. Lines starting with '#' are ignored.
+#   1) A direct .zip URL. Expected layout inside the zip (one folder per cert):
+#        <Name>/<Name>.p12
+#        <Name>/<Name>.mobileprovision
+#        <Name>/password.txt        (optional — p12 password; falls back to P12_PASSWORD)
+#      (may be nested under an extra top-level folder, e.g. certificates/<Name>/…)
+#
+#   2) A GitHub repository URL (https://github.com/<owner>/<repo>). Only the
+#      certificate files are fetched (a sparse, blob-filtered clone), so large
+#      unrelated assets in the repo are never downloaded. Same per-folder
+#      layout as above; extra per-cert subfolders (e.g. NexStore/) are ignored.
+#
+# MERGE / DE-DUPLICATION: the same signing certificate often appears in more
+# than one source (and, within a source, across several provisioning-profile
+# variants). Each unique certificate is signed only ONCE — duplicates are
+# detected by the leaf certificate's SHA-1 fingerprint, and the first source
+# listed here wins. Order the lines to control which copy is kept.
 
 https://github.com/WSF-Team/WSF/raw/refs/heads/main/portal/resources/certificates.zip
+https://github.com/NovaDev404/NexCerts

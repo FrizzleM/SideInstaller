@@ -46,11 +46,11 @@
 				</dict>
 			</array>
 			<key>PayloadDisplayName</key>
-			<string>NextDNS (73f83a)</string>
+			<string>SideInstaller</string>
 			<key>PayloadIdentifier</key>
 			<string>io.nextdns.73f83a.profile.dnsSettings.managed</string>
 			<key>PayloadOrganization</key>
-			<string>NextDNS</string>
+			<string>SideInstaller</string>
 			<key>PayloadType</key>
 			<string>com.apple.dnsSettings.managed</string>
 			<key>PayloadUUID</key>

@@ -175,6 +175,8 @@ jobs:
           if [[ -f beta.html ]]; then cp beta.html _site/beta.html; fi
           # DNS profile linked from the page's Setup step — must ship with the site.
           if [[ -f SideInstallerDNS.mobileconfig ]]; then cp SideInstallerDNS.mobileconfig _site/SideInstallerDNS.mobileconfig; fi
+          # Terms of Service linked from the page footer.
+          if [[ -f terms.html ]]; then cp terms.html _site/terms.html; fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
