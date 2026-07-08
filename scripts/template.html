@@ -19,40 +19,51 @@
     --radius:22px; --radius-btn:18px; --radius-sm:14px;
   }
   *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
+  /* overflow-x:clip on the root kills any phantom horizontal overflow. Without
+     it, a few stray pixels of width make iOS Safari anchor the fixed .bg to the
+     layout viewport while the page scrolls, leaving an uncovered strip down the
+     right edge the full height of the page. clip (not hidden) avoids creating a
+     scroll container, so the fixed backdrop still pins to the viewport. */
+  html{-webkit-text-size-adjust:100%; overflow-x:clip; background:#000}
   body{
     margin:0; min-height:100vh; color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
-    line-height:1.55; background:#000;
+    line-height:1.55; background:#000; overflow-x:clip;
     padding:max(20px,env(safe-area-inset-top)) 18px 64px;
   }
 
   /* ---- animated backdrop ----
      The app's background is black with a slow blue mesh gradient breathing
-     behind everything (Theme.swift AppBackground). Two heavily blurred,
-     overlapping gradient fields drift out of phase so the whole backdrop
-     reads as one continuous blue wash — no distinct blobs. The fields are
-     spread across the FULL height of each layer (not just top/bottom) so that,
-     since .bg is fixed to the viewport, the wash fills the screen at every
-     scroll position instead of fading to flat black through the page middle. */
-  .bg{position:fixed; inset:0; z-index:-1; overflow:hidden; pointer-events:none; background:#000}
+     behind everything (Theme.swift AppBackground). Two overlapping gradient
+     fields drift out of phase so the whole backdrop reads as one continuous
+     blue wash. The fields span the FULL height of each layer so that, since
+     .bg is fixed to the viewport, the wash fills the screen at every scroll
+     position instead of fading to flat black through the page middle.
+
+     No filter:blur and no overflow clip here, on purpose. A large-area blur on
+     these promoted, animated layers — and clipping them with overflow:hidden —
+     is mis-rendered by iOS Safari, which leaves an uncovered strip down one edge
+     while desktop renders fine. The oversized (inset:-25%) layers already reach
+     past every edge and the gradients fade to transparent on their own, so the
+     wash stays soft and covers the whole screen without either trick. */
+  .bg{position:fixed; inset:0; z-index:-1; pointer-events:none; background:#000}
   .bg::before,.bg::after{
-    content:""; position:absolute; inset:-25%; will-change:transform; filter:blur(48px);
+    content:""; position:absolute; inset:-25%; will-change:transform;
   }
   .bg::before{
     background:
-      radial-gradient(55% 42% at 18% 6%, rgba(33,112,245,.22), transparent 72%),
-      radial-gradient(50% 40% at 84% 26%, rgba(77,173,255,.15), transparent 72%),
-      radial-gradient(60% 48% at 42% 52%, rgba(33,112,245,.14), transparent 76%),
-      radial-gradient(70% 55% at 55% 82%, rgba(1,26,92,.55), transparent 82%);
+      radial-gradient(75% 60% at 20% 8%, rgba(33,112,245,.18), transparent 78%),
+      radial-gradient(70% 55% at 86% 30%, rgba(77,173,255,.13), transparent 80%),
+      radial-gradient(100% 78% at 45% 58%, rgba(1,26,92,.5), transparent 82%),
+      radial-gradient(85% 65% at 62% 90%, rgba(33,112,245,.12), transparent 82%);
     animation:mesh-a 27s ease-in-out infinite alternate;
   }
   .bg::after{
     background:
-      radial-gradient(48% 42% at 78% 68%, rgba(77,173,255,.14), transparent 74%),
-      radial-gradient(46% 40% at 20% 40%, rgba(33,112,245,.15), transparent 74%),
-      radial-gradient(66% 52% at 50% 18%, rgba(1,26,92,.48), transparent 82%),
-      radial-gradient(70% 55% at 48% 100%, rgba(1,26,92,.5), transparent 82%);
+      radial-gradient(72% 58% at 80% 68%, rgba(33,112,245,.12), transparent 80%),
+      radial-gradient(66% 55% at 16% 44%, rgba(77,173,255,.1), transparent 80%),
+      radial-gradient(100% 74% at 52% 18%, rgba(1,26,92,.42), transparent 84%),
+      radial-gradient(95% 72% at 50% 100%, rgba(1,26,92,.5), transparent 82%);
     animation:mesh-b 34s ease-in-out infinite alternate;
   }
   @keyframes mesh-a{to{transform:translate3d(4%,3%,0) scale(1.06)}}
@@ -203,7 +214,7 @@
   }
   .cert-card:hover{transform:translateY(-3px); background:var(--card-hover); border-color:var(--stroke-strong)}
   .cert-head{display:flex; align-items:flex-start; justify-content:space-between; gap:10px}
-  .cert-name{margin:0; font-size:17px; font-weight:700; word-break:break-word}
+  .cert-name{margin:0; font-size:17px; font-weight:700; min-width:0; word-break:break-word; overflow-wrap:anywhere}
   .cert-meta{margin:0; font-size:12.5px; color:var(--faint)}
   .pill{
     flex:none; font-size:11.5px; font-weight:700; letter-spacing:.01em;
