@@ -108,6 +108,10 @@ final class Engine: ObservableObject {
     /// Live LocalDevVPN loopback state, polled (see `startStatusMonitor`) so the
     /// UI banner + the Install gate always reflect the current tunnel.
     @Published var vpnConnected: Bool = false
+    /// Live Wi-Fi (`en0`) state, polled alongside `vpnConnected`. The tunnel runs
+    /// over Wi-Fi, so Wi-Fi is the first precondition the Install gate checks —
+    /// without it, LocalDevVPN can't come up in the first place.
+    @Published var wifiConnected: Bool = false
     @Published var vpnStatus: String = "unknown"
     @Published var wifiStatus: String = "unknown"
     @Published var pairingStatus: String = "not paired"
@@ -336,10 +340,16 @@ final class Engine: ObservableObject {
             return
         }
         // Pre-flight gate: the entire install runs over LocalDevVPN's loopback
-        // tunnel, so don't even begin until it's connected — show how instead.
-        // (ensureNetwork() below still waits too, as a mid-run safety net in case
-        // the tunnel drops after this check passes.)
+        // tunnel, which itself rides on Wi-Fi — so require Wi-Fi first, then the
+        // tunnel, showing how instead of just failing. (ensureNetwork() below
+        // still waits too, as a mid-run safety net in case either drops after
+        // this check passes.)
         refreshNetworkStatus()
+        guard wifiConnected else {
+            setGuide(Guides.wifi)
+            log("⛔️ Wi-Fi is off. Connect to a Wi-Fi network, then tap Install again.")
+            return
+        }
         guard vpnConnected else {
             setGuide(Guides.vpn)
             log("⛔️ LocalDevVPN isn't connected. Turn it on, then tap Install again.")
@@ -386,25 +396,39 @@ final class Engine: ObservableObject {
     @MainActor
     private func ensureNetwork() async throws {
         setStep(.network, .active)
-        var announced = false
+        // Track which blocker we last logged so we announce each stage once, yet
+        // still re-announce when the user clears one (Wi-Fi → tunnel) and the
+        // next comes into view.
+        var announced: String?
         while true {
             try Task.checkCancellation()
             let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceIP)
             vpnConnected = vpn
+            wifiConnected = wifi
             vpnStatus = vpn ? "tunnel up" : "no tunnel"
             wifiStatus = wifi ? "on" : "off"
-            if vpn {
+            if wifi && vpn {
                 log("Network OK: \(detail)")
                 setStep(.network, .done)
                 setGuide(nil)
                 return
             }
-            if !announced {
-                log("Waiting for LocalDevVPN tunnel… open LocalDevVPN and tap Connect.")
-                announced = true
-            }
             setStep(.network, .waiting)
-            setGuide(Guides.vpn)
+            if !wifi {
+                // Wi-Fi is the prerequisite for the tunnel, so surface it first —
+                // even if a stale tunnel interface still reads as up.
+                if announced != "wifi" {
+                    log("Waiting for Wi-Fi… connect to a Wi-Fi network.")
+                    announced = "wifi"
+                }
+                setGuide(Guides.wifi)
+            } else {
+                if announced != "vpn" {
+                    log("Waiting for LocalDevVPN tunnel… open LocalDevVPN and tap Connect.")
+                    announced = "vpn"
+                }
+                setGuide(Guides.vpn)
+            }
             try await Task.sleep(nanoseconds: 1_500_000_000)
         }
     }
@@ -849,6 +873,7 @@ final class Engine: ObservableObject {
     func checkVPNAndWifi() {
         let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceIP)
         vpnConnected = vpn
+        wifiConnected = wifi
         vpnStatus = vpn ? "tunnel up" : "no tunnel (start LocalDevVPN)"
         wifiStatus = wifi ? "on" : "off"
         log("Network: \(detail)")
@@ -873,6 +898,7 @@ final class Engine: ObservableObject {
     func refreshNetworkStatus() {
         let (vpn, wifi, _) = NetworkStatus.summarize(deviceIP: deviceIP)
         vpnConnected = vpn
+        wifiConnected = wifi
         vpnStatus = vpn ? "tunnel up" : "no tunnel (start LocalDevVPN)"
         wifiStatus = wifi ? "on" : "off"
     }
@@ -987,6 +1013,9 @@ final class Engine: ObservableObject {
     private func ensurePairingConnection() async throws {
         if connection.isConnected { return }
         refreshNetworkStatus()
+        guard wifiConnected else {
+            throw EngineError.message("Wi-Fi is off. Connect to a Wi-Fi network, then try again.")
+        }
         guard vpnConnected else {
             throw EngineError.message("LocalDevVPN isn't connected. Turn it on, then try again.")
         }
@@ -1110,6 +1139,16 @@ final class Engine: ObservableObject {
 // MARK: - Predefined instruction cards
 
 enum Guides {
+    static let wifi = Guide(
+        title: "Connect to Wi-Fi",
+        systemImage: "wifi",
+        steps: [
+            "Open Settings › Wi-Fi and join a network.",
+            "LocalDevVPN's tunnel — and the whole install — run over Wi-Fi.",
+            "Then come back here — this continues automatically.",
+        ],
+        actionLabel: nil, actionURLString: nil)
+
     static let vpn = Guide(
         title: "Turn on LocalDevVPN",
         systemImage: "network",

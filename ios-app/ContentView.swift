@@ -20,8 +20,15 @@ struct ContentView: View {
                     }
                     appleIDCard.cascadeItem(1)
                     appCard.cascadeItem(2)
-                    if !engine.vpnConnected && !engine.isRunning {
-                        vpnRequirement.cascadeItem(3)
+                    // Wi-Fi is the prerequisite for the tunnel, so it takes
+                    // priority: no Wi-Fi → Wi-Fi callout; Wi-Fi but no tunnel →
+                    // LocalDevVPN callout; both up → neither.
+                    if !engine.isRunning {
+                        if !engine.wifiConnected {
+                            wifiRequirement.cascadeItem(3)
+                        } else if !engine.vpnConnected {
+                            vpnRequirement.cascadeItem(3)
+                        }
                     }
                     installButton.cascadeItem(4)
                     if showProgress {
@@ -51,6 +58,7 @@ struct ContentView: View {
                 // only its own card swap rather than the whole screen.
                 .animation(.smooth(duration: 0.35), value: updateChecker.showBanner)
                 .animation(.smooth(duration: 0.35), value: engine.vpnConnected)
+                .animation(.smooth(duration: 0.35), value: engine.wifiConnected)
                 .animation(.smooth(duration: 0.35), value: showProgress)
                 .animation(.smooth(duration: 0.35), value: engine.pairingPIN)
                 .animation(.smooth(duration: 0.35), value: engine.guide?.title)
@@ -237,6 +245,30 @@ struct ContentView: View {
                 : Theme.brand,
             glow: engine.isRunning ? .red : Theme.accent))
         .animation(.smooth(duration: 0.3), value: engine.isRunning)
+    }
+
+    // MARK: Wi-Fi requirement
+
+    /// Shown above the Install button while Wi-Fi is off. The tunnel — and so the
+    /// whole install — rides on Wi-Fi, so it's the first thing to fix; enabling
+    /// it reveals the LocalDevVPN callout next if the tunnel is still down.
+    private var wifiRequirement: some View {
+        CalloutCard(tint: .red) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "wifi.slash")
+                    .font(.title2)
+                    .foregroundStyle(.red)
+                    .symbolEffect(.pulse)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Wi-Fi required")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Connect to a Wi-Fi network. LocalDevVPN's tunnel and the install run over it.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
     }
 
     // MARK: LocalDevVPN requirement

@@ -41,6 +41,7 @@ struct PairingView: View {
                 .animation(.smooth(duration: 0.35), value: manager.targets)
                 .animation(.smooth(duration: 0.3), value: engine.deviceSummary)
                 .animation(.smooth(duration: 0.3), value: engine.vpnConnected)
+                .animation(.smooth(duration: 0.3), value: engine.wifiConnected)
             }
             .scrollDismissesKeyboard(.interactively)
             .background(AppBackground())
@@ -72,7 +73,7 @@ struct PairingView: View {
         } else if manager.pairingFileExists {
             StatusPill(text: "Pairing file ready", systemImage: "checkmark.seal.fill", color: .green)
         } else {
-            StatusPill(text: "No pairing file", systemImage: "lock.slash.fill", color: .orange)
+            StatusPill(text: "No pairing file", systemImage: "lock.slash.fill", color: .orange, glass: true)
         }
     }
 
@@ -161,7 +162,11 @@ struct PairingView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle("Install into an app", systemImage: "tray.and.arrow.down.fill")
 
-                if !engine.vpnConnected {
+                // Wi-Fi is the prerequisite for the tunnel, so it takes priority:
+                // no Wi-Fi → Wi-Fi note; Wi-Fi but no tunnel → LocalDevVPN note.
+                if !engine.wifiConnected {
+                    wifiNote
+                } else if !engine.vpnConnected {
                     vpnNote
                 }
 
@@ -178,23 +183,37 @@ struct PairingView: View {
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(manager.isBusy || !manager.pairingFileExists || !engine.vpnConnected || engine.isRunning)
+                .disabled(manager.isBusy || !manager.pairingFileExists || !engine.wifiConnected || !engine.vpnConnected || engine.isRunning)
             }
         }
     }
 
-    private var vpnNote: some View {
+    private var wifiNote: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "shield.lefthalf.filled")
-                .foregroundStyle(.orange)
-            Text("Turn on LocalDevVPN to scan and install — the write runs over its tunnel.")
+            Image(systemName: "wifi.slash")
+                .foregroundStyle(.red)
+            Text("Connect to Wi-Fi to scan and install. LocalDevVPN's tunnel runs over it.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.orange.opacity(0.12)))
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.red.opacity(0.12)))
+    }
+
+    private var vpnNote: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "shield.lefthalf.filled")
+                .foregroundStyle(.red)
+            Text("Turn on LocalDevVPN to scan and install. The write runs over its tunnel.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.red.opacity(0.12)))
     }
 
     // MARK: Scanned targets

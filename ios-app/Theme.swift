@@ -129,14 +129,22 @@ struct StatusPill: View {
     var text: String
     var systemImage: String
     var color: Color
+    /// When true, the pill wears a translucent Liquid Glass capsule instead of
+    /// the tinted fill — for a neutral/idle state that should read as clear glass
+    /// over the background rather than a solid status chip.
+    var glass: Bool = false
 
     var body: some View {
-        Label(text, systemImage: systemImage)
+        let label = Label(text, systemImage: systemImage)
             .font(.caption.weight(.semibold))
             .foregroundStyle(color)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(Capsule().fill(color.opacity(0.16)))
+        if glass {
+            label.glassEffect(.regular, in: Capsule())
+        } else {
+            label.background(Capsule().fill(color.opacity(0.16)))
+        }
     }
 }
 
