@@ -31,23 +31,28 @@
      The app's background is black with a slow blue mesh gradient breathing
      behind everything (Theme.swift AppBackground). Two heavily blurred,
      overlapping gradient fields drift out of phase so the whole backdrop
-     reads as one continuous blue wash — no distinct blobs. */
+     reads as one continuous blue wash — no distinct blobs. The fields are
+     spread across the FULL height of each layer (not just top/bottom) so that,
+     since .bg is fixed to the viewport, the wash fills the screen at every
+     scroll position instead of fading to flat black through the page middle. */
   .bg{position:fixed; inset:0; z-index:-1; overflow:hidden; pointer-events:none; background:#000}
   .bg::before,.bg::after{
     content:""; position:absolute; inset:-25%; will-change:transform; filter:blur(48px);
   }
   .bg::before{
     background:
-      radial-gradient(46% 38% at 28% 22%, rgba(33,112,245,.15), transparent 70%),
-      radial-gradient(40% 34% at 74% 12%, rgba(77,173,255,.11), transparent 72%),
-      radial-gradient(64% 56% at 50% 28%, rgba(1,26,92,.42), transparent 78%);
+      radial-gradient(55% 42% at 18% 6%, rgba(33,112,245,.22), transparent 72%),
+      radial-gradient(50% 40% at 84% 26%, rgba(77,173,255,.15), transparent 72%),
+      radial-gradient(60% 48% at 42% 52%, rgba(33,112,245,.14), transparent 76%),
+      radial-gradient(70% 55% at 55% 82%, rgba(1,26,92,.55), transparent 82%);
     animation:mesh-a 27s ease-in-out infinite alternate;
   }
   .bg::after{
     background:
-      radial-gradient(44% 38% at 66% 64%, rgba(33,112,245,.10), transparent 72%),
-      radial-gradient(38% 32% at 22% 78%, rgba(77,173,255,.08), transparent 74%),
-      radial-gradient(60% 50% at 50% 86%, rgba(1,26,92,.36), transparent 80%);
+      radial-gradient(48% 42% at 78% 68%, rgba(77,173,255,.14), transparent 74%),
+      radial-gradient(46% 40% at 20% 40%, rgba(33,112,245,.15), transparent 74%),
+      radial-gradient(66% 52% at 50% 18%, rgba(1,26,92,.48), transparent 82%),
+      radial-gradient(70% 55% at 48% 100%, rgba(1,26,92,.5), transparent 82%);
     animation:mesh-b 34s ease-in-out infinite alternate;
   }
   @keyframes mesh-a{to{transform:translate3d(4%,3%,0) scale(1.06)}}
