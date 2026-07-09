@@ -95,7 +95,7 @@
   .link-btn{
     display:inline-flex; align-items:center; gap:8px;
     padding:10px 16px; font-size:14px; font-weight:700; text-decoration:none;
-    color:var(--text); border-radius:999px;
+    color:var(--text); border-radius:999px; cursor:pointer; font-family:inherit;
     background:var(--card); border:1px solid var(--stroke);
     transition:transform .14s, background .14s, border-color .14s, filter .14s;
   }
@@ -111,6 +111,46 @@
   .link-btn.ipa{padding:8px 13px; font-size:12.5px; font-weight:600; color:var(--muted)}
   .link-btn.ipa svg{width:15px; height:15px}
   .link-btn.ipa:hover{color:var(--text)}
+
+  /* ---- tutorial popup ---- */
+  .modal{position:fixed; inset:0; z-index:50; display:grid; place-items:center; padding:20px}
+  .modal[hidden]{display:none}
+  .modal-backdrop{position:absolute; inset:0; background:rgba(0,0,0,.6)}
+  .modal-card{
+    position:relative; width:min(420px,100%); padding:20px;
+    background:rgba(17,22,36,.92); border:1px solid var(--stroke-strong); border-radius:var(--radius);
+    -webkit-backdrop-filter:blur(24px) saturate(140%); backdrop-filter:blur(24px) saturate(140%);
+    box-shadow:0 24px 70px rgba(0,0,0,.55);
+    animation:modal-pop .22s cubic-bezier(.22,.9,.35,1) both;
+  }
+  @keyframes modal-pop{from{opacity:0; transform:translateY(14px) scale(.96)}}
+  @media (prefers-reduced-motion:reduce){ .modal-card{animation:none} }
+  .modal-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px}
+  .modal-title{margin:0; font-size:18px; font-weight:800; letter-spacing:-.01em}
+  .modal-close{
+    display:grid; place-items:center; width:32px; height:32px; padding:0;
+    color:var(--muted); background:var(--card); border:1px solid var(--stroke); border-radius:999px;
+    cursor:pointer; transition:background .14s, color .14s;
+  }
+  .modal-close:hover{color:var(--text); background:var(--card-hover)}
+  .modal-close svg{width:15px; height:15px}
+  .modal-links{display:flex; flex-direction:column; gap:10px}
+  .modal-link{
+    display:flex; align-items:center; gap:13px; padding:14px 16px; text-decoration:none;
+    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius-sm);
+    transition:background .14s, border-color .14s, transform .14s;
+  }
+  .modal-link:hover{background:var(--card-hover); border-color:var(--stroke-strong); transform:translateY(-1px)}
+  .modal-link:active{transform:scale(.98)}
+  .modal-link-icon{
+    flex:none; width:38px; height:38px; display:grid; place-items:center;
+    color:#fff; background:#ff0000; border-radius:12px;
+  }
+  .modal-link-icon svg{width:18px; height:18px}
+  .modal-link-text{min-width:0}
+  .modal-link-text b{display:block; color:var(--text); font-size:15px; font-weight:700}
+  .modal-link-text small{display:block; color:var(--muted); font-size:12.5px; margin-top:1px}
+  .modal-link-arrow{margin-left:auto; flex:none; width:16px; height:16px; color:var(--faint)}
 
   /* ---- steps ---- */
   .step{margin-top:34px}
@@ -274,10 +314,10 @@
       <span class="badge"><b>{{CERT_COUNT}}</b> certificates</span>
     </div>
     <div class="links social">
-      <a class="link-btn youtube" href="https://youtu.be/OyeYTSEheQw?is=j6FyM9iURyrMwcXy" target="_blank" rel="noopener">
+      <button type="button" class="link-btn youtube" id="tutorialBtn" aria-haspopup="dialog" aria-controls="tutorialModal">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
         Tutorial
-      </a>
+      </button>
       <a class="link-btn discord" href="https://discord.gg/sQ5Y8vbYJS" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.446.865-.61 1.249a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.1 14.1 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.009c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.893.077.077 0 0 0-.041.106c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.331c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
         Join the Discord
@@ -391,6 +431,30 @@
 
 </div>
 
+<div class="modal" id="tutorialModal" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 class="modal-title" id="tutorialTitle">Tutorials</h3>
+      <button type="button" class="modal-close" data-close aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-links">
+      <a class="modal-link" href="https://youtu.be/OyeYTSEheQw?is=j6FyM9iURyrMwcXy" target="_blank" rel="noopener">
+        <span class="modal-link-icon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></span>
+        <span class="modal-link-text"><b>Install SideStore</b></span>
+        <svg class="modal-link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </a>
+      <a class="modal-link" href="https://youtu.be/WCYkxfRHapg" target="_blank" rel="noopener">
+        <span class="modal-link-icon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></span>
+        <span class="modal-link-text"><b>Enable JIT</b></span>
+        <svg class="modal-link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   var grid=document.getElementById('grid');
@@ -443,6 +507,28 @@
     if(tosLocked()){ e.preventDefault(); e.stopPropagation(); }
   },true);
   applyTos();
+
+  /* Tutorial popup */
+  var tutBtn=document.getElementById('tutorialBtn');
+  var tutModal=document.getElementById('tutorialModal');
+  function openTut(){
+    tutModal.hidden=false;
+    document.body.style.overflow='hidden';
+    var first=tutModal.querySelector('.modal-link');
+    if(first) first.focus();
+  }
+  function closeTut(){
+    tutModal.hidden=true;
+    document.body.style.overflow='';
+    tutBtn.focus();
+  }
+  tutBtn.addEventListener('click',openTut);
+  tutModal.addEventListener('click',function(e){
+    if(e.target.closest && e.target.closest('[data-close]')) closeTut();
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape' && !tutModal.hidden) closeTut();
+  });
 })();
 </script>
 </body>
