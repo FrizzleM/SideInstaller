@@ -28,46 +28,30 @@
   body{
     margin:0; min-height:100vh; color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
-    line-height:1.55; background:#000; overflow-x:clip;
+    line-height:1.55; background:transparent; overflow-x:clip; /* transparent so the fixed .bg canvas shows through; html keeps the #000 backstop */
     padding:max(20px,env(safe-area-inset-top)) 18px 64px;
   }
 
-  /* ---- animated backdrop ----
-     The app's background is black with a slow blue mesh gradient breathing
-     behind everything (Theme.swift AppBackground). Two overlapping gradient
-     fields drift out of phase so the whole backdrop reads as one continuous
-     blue wash. The fields span the FULL height of each layer so that, since
-     .bg is fixed to the viewport, the wash fills the screen at every scroll
-     position instead of fading to flat black through the page middle.
+  /* ---- backdrop: a faithful port of the app's AppBackground (ios-app/Theme.swift) ----
+     Pure black with the SAME 3x3 MeshGradient the app draws — identical
+     accent/accent2/glow colours, identical sine-wave control-point motion —
+     composited at 0.2 opacity and softened, so this page breathes the exact same
+     deep-blue mesh as the app rather than a hand-tuned approximation of it.
 
-     No filter:blur and no overflow clip here, on purpose. A large-area blur on
-     these promoted, animated layers — and clipping them with overflow:hidden —
-     is mis-rendered by iOS Safari, which leaves an uncovered strip down one edge
-     while desktop renders fine. The oversized (inset:-25%) layers already reach
-     past every edge and the gradients fade to transparent on their own, so the
-     wash stays soft and covers the whole screen without either trick. */
-  .bg{position:fixed; inset:0; z-index:-1; pointer-events:none; background:#000}
-  .bg::before,.bg::after{
-    content:""; position:absolute; inset:-25%; will-change:transform;
-  }
-  .bg::before{
+     It renders on a <canvas>, not CSS blur layers, on purpose: iOS Safari
+     mis-renders a large filter:blur on a promoted, fixed, animated layer (it
+     leaves an uncovered strip down one edge), but a plain fixed canvas bitmap is
+     immune. The softening is done inside the bitmap by down- then up-scaling, so
+     it needs no ctx.filter (which older Safari lacks). The gradient below is the
+     no-JS / pre-paint fallback and the still frame used for reduced motion. */
+  .bg{
+    position:fixed; inset:0; z-index:-1; pointer-events:none;
+    width:100%; height:100%; display:block;
     background:
-      radial-gradient(90% 70% at 25% 8%, rgba(33,112,245,.40), transparent 74%),
-      radial-gradient(80% 62% at 88% 26%, rgba(77,173,255,.28), transparent 78%),
-      radial-gradient(130% 95% at 48% 44%, rgba(1,26,92,.85), transparent 82%),
-      radial-gradient(95% 72% at 58% 96%, rgba(33,112,245,.24), transparent 80%);
-    animation:mesh-a 27s ease-in-out infinite alternate;
+      radial-gradient(120% 80% at 50% 62%, rgba(33,82,124,.5), transparent 72%),
+      radial-gradient(125% 100% at 50% 46%, rgba(10,50,118,.42), transparent 86%),
+      #000;
   }
-  .bg::after{
-    background:
-      radial-gradient(82% 64% at 82% 68%, rgba(33,112,245,.26), transparent 78%),
-      radial-gradient(76% 60% at 16% 48%, rgba(77,173,255,.22), transparent 80%),
-      radial-gradient(130% 88% at 50% 18%, rgba(1,26,92,.7), transparent 84%),
-      radial-gradient(105% 82% at 50% 100%, rgba(1,26,92,.72), transparent 82%);
-    animation:mesh-b 34s ease-in-out infinite alternate;
-  }
-  @keyframes mesh-a{to{transform:translate3d(4%,3%,0) scale(1.06)}}
-  @keyframes mesh-b{to{transform:translate3d(-4%,-3%,0) scale(1.08)}}
 
   /* ---- entrance cascade, echoing the app's per-object settle-in ---- */
   .hero,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
@@ -77,7 +61,6 @@
   .footer{animation-delay:.24s}
   @keyframes rise{from{opacity:0; transform:translateY(16px) scale(.98)}}
   @media (prefers-reduced-motion:reduce){
-    .bg::before,.bg::after{animation:none}
     .hero,.step,.footer{animation:none}
   }
 
@@ -276,7 +259,118 @@
 </style>
 </head>
 <body>
-<div class="bg" aria-hidden="true"></div>
+<canvas class="bg" id="bg" aria-hidden="true"></canvas>
+<script>
+/* Animated backdrop — an exact port of the app's AppBackground (ios-app/Theme.swift):
+   black + a 3x3 MeshGradient (same accent/accent2/glow colours, same sine-wave
+   control-point motion) composited at 0.2 opacity and softened. Runs the app's
+   own maths so the page shows the identical mesh, not an approximation. */
+(function(){
+  var cv=document.getElementById('bg');
+  if(!cv || !cv.getContext) return;              // no <canvas> -> CSS gradient fallback stays
+  var ctx=cv.getContext('2d');
+  if(!ctx) return;
+
+  // Theme.swift colours: accent rgb(33,112,245), accent2 rgb(77,173,255), glow rgb(1,26,92).
+  var accent=[33,112,245], accent2=[77,173,255], glow=[1,26,92];
+  // The app composites the mesh (.opacity(0.2) over black) and blurs it in LINEAR
+  // light — that is why the app reads as a clear deep-blue, not near-black. Bake the
+  // same 0.2-in-linear composite into each colour so the canvas draws it directly;
+  // a naive gamma-space 0.2 would give the near-black that has been mistaken for the
+  // app before (blue channel ~49 vs the ~118 linear actually produces).
+  function s2l(c){ c/=255; return c<=0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055,2.4); }
+  function l2s(l){ l=l<=0.0031308 ? l*12.92 : 1.055*Math.pow(l,1/2.4)-0.055; return Math.max(0,Math.min(255,Math.round(l*255))); }
+  var OPACITY=0.2;                                 // Theme.swift AppBackground .opacity(0.2)
+  function comp(rgb){ return [ l2s(OPACITY*s2l(rgb[0])), l2s(OPACITY*s2l(rgb[1])), l2s(OPACITY*s2l(rgb[2])) ]; }
+  var cGlow=comp(glow), cAccent=comp(accent), cAccent2=comp(accent2);
+  // Mesh colour grid (row-major), exactly as AppBackground.meshColors.
+  var COLORS=[ cGlow,cAccent,cGlow,  cAccent2,cAccent,cAccent2,  cGlow,cAccent2,cGlow ];
+  // The four 2x2 patches over the 3x3 point grid.
+  var CELLS=[[0,1,3,4],[1,2,4,5],[3,4,6,7],[4,5,7,8]];
+  var N=16;                                       // sub-divisions per patch
+
+  function osc(base,amp,speed,phase,t){ return base+amp*Math.sin(t*speed+phase); }
+  // Exact control-point layout / oscillators from AppBackground.meshPoints(at:).
+  function points(t){ return [
+    [0,0],                     [osc(.5,.18,.625,0,t),0],                    [1,0],
+    [0,osc(.5,.18,.55,1,t)],   [osc(.5,.12,.75,2,t),osc(.5,.12,.675,3,t)],  [1,osc(.5,.18,.60,4,t)],
+    [0,1],                     [osc(.5,.18,.65,5,t),1],                     [1,1]
+  ]; }
+  function lerp(a,b,u){ return a+(b-a)*u; }
+  function bPt(p0,p1,p2,p3,u,v){ return [
+    lerp(lerp(p0[0],p1[0],u),lerp(p2[0],p3[0],u),v),
+    lerp(lerp(p0[1],p1[1],u),lerp(p2[1],p3[1],u),v) ]; }
+  function bCol(c0,c1,c2,c3,u,v){ return [
+    lerp(lerp(c0[0],c1[0],u),lerp(c2[0],c3[0],u),v),
+    lerp(lerp(c0[1],c1[1],u),lerp(c2[1],c3[1],u),v),
+    lerp(lerp(c0[2],c1[2],u),lerp(c2[2],c3[2],u),v) ]; }
+
+  // Three buffers: mesh (moderate res) -> small (heavy downscale == the blur)
+  // -> main canvas (upscaled, drawn at 0.2 over black).
+  var mesh=document.createElement('canvas'), mctx=mesh.getContext('2d');
+  var small=document.createElement('canvas'), sctx=small.getContext('2d');
+  var Wc=1,Hc=1, mW=1,mH=1, sW=2,sH=2;
+
+  function resize(){
+    Wc=Math.max(1, cv.clientWidth||window.innerWidth);
+    Hc=Math.max(1, cv.clientHeight||window.innerHeight);
+    cv.width=Wc; cv.height=Hc;                    // CSS-res backing store: the field is smooth, so 1x is plenty
+    mW=Math.min(Wc,320); mH=Math.max(1,Math.round(mW*Hc/Wc));
+    mesh.width=mW; mesh.height=mH;
+    sW=Math.max(2,Math.round(mW/6)); sH=Math.max(2,Math.round(mH/6));
+    small.width=sW; small.height=sH;
+    sctx.imageSmoothingEnabled=true; ctx.imageSmoothingEnabled=true;
+  }
+
+  function draw(t){
+    var P=points(t);
+    mctx.fillStyle='#000'; mctx.fillRect(0,0,mW,mH);
+    for(var ci=0;ci<4;ci++){
+      var c=CELLS[ci];
+      var p0=P[c[0]],p1=P[c[1]],p2=P[c[2]],p3=P[c[3]];
+      var k0=COLORS[c[0]],k1=COLORS[c[1]],k2=COLORS[c[2]],k3=COLORS[c[3]];
+      for(var a=0;a<N;a++){ for(var b=0;b<N;b++){
+        var u0=a/N,u1=(a+1)/N,v0=b/N,v1=(b+1)/N,um=(u0+u1)/2,vm=(v0+v1)/2;
+        var col=bCol(k0,k1,k2,k3,um,vm);
+        var g0=bPt(p0,p1,p2,p3,u0,v0),g1=bPt(p0,p1,p2,p3,u1,v0),
+            g2=bPt(p0,p1,p2,p3,u1,v1),g3=bPt(p0,p1,p2,p3,u0,v1);
+        mctx.beginPath();
+        mctx.moveTo(g0[0]*mW,g0[1]*mH); mctx.lineTo(g1[0]*mW,g1[1]*mH);
+        mctx.lineTo(g2[0]*mW,g2[1]*mH); mctx.lineTo(g3[0]*mW,g3[1]*mH);
+        mctx.closePath();
+        mctx.fillStyle='rgb('+(col[0]|0)+','+(col[1]|0)+','+(col[2]|0)+')';
+        mctx.fill();
+      }}
+    }
+    // Blur = downscale then upscale (robust everywhere; needs no ctx.filter).
+    sctx.clearRect(0,0,sW,sH);
+    sctx.drawImage(mesh,0,0,mW,mH,0,0,sW,sH);
+    ctx.globalAlpha=1; ctx.fillStyle='#000'; ctx.fillRect(0,0,Wc,Hc);
+    ctx.drawImage(small,0,0,sW,sH,0,0,Wc,Hc);     // 0.2-over-black is baked into COLORS (linear light)
+  }
+
+  var reduce=!!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var raf=0, running=false, t0=0, lastDraw=0;
+  function loop(ts){
+    if(!running) return;
+    if(!t0) t0=ts;
+    if(ts-lastDraw >= 33){ lastDraw=ts; draw((ts-t0)/1000); }   // ~30fps is plenty for a slow drift
+    raf=requestAnimationFrame(loop);
+  }
+  function start(){ if(running||reduce) return; running=true; t0=0; lastDraw=0; raf=requestAnimationFrame(loop); }
+  function stop(){ running=false; if(raf) cancelAnimationFrame(raf); raf=0; }
+
+  resize();
+  draw(6.0);                                      // immediate first paint (also the reduced-motion still)
+  if(!reduce){
+    start();
+    document.addEventListener('visibilitychange', function(){ document.hidden ? stop() : start(); });
+  }
+  var relayout=function(){ resize(); draw(running ? (performance.now()-t0)/1000 : 6.0); };
+  if(window.ResizeObserver){ new ResizeObserver(relayout).observe(cv); }
+  else { window.addEventListener('resize', relayout); }
+})();
+</script>
 <div class="wrap">
 
   <header class="hero">
