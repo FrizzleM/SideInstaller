@@ -148,7 +148,7 @@ struct ContentView: View {
     // MARK: Update banner
 
     /// Closable notice shown when GitHub advertises a newer version than this
-    /// build (see `UpdateChecker`). Tapping the body opens the releases page; the
+    /// build (see `UpdateChecker`). Tapping the body opens the install page; the
     /// ✕ dismisses it for this launch.
     private var updateBanner: some View {
         CalloutCard(tint: Theme.accent) {
@@ -178,7 +178,7 @@ struct ContentView: View {
                     .buttonStyle(.plain)
                 }
                 Button {
-                    if let url = URL(string: UpdateChecker.releasesURL) { openURL(url) }
+                    if let url = URL(string: UpdateChecker.installPageURL) { openURL(url) }
                 } label: {
                     HStack(spacing: 4) {
                         Text("Get the latest version")

@@ -44,31 +44,41 @@ struct WelcomeView: View {
         .preferredColorScheme(.dark)
     }
 
-    /// The tickbox row. The whole row is one tap target.
+    /// The tickbox row. Tapping the box or the sentence toggles acceptance;
+    /// tapping "TOS" opens the terms page instead.
     private var checkboxRow: some View {
-        Button {
-            withAnimation(.snappy(duration: 0.25)) { accepted.toggle() }
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(accepted ? AnyShapeStyle(Theme.brand) : AnyShapeStyle(.white.opacity(0.06)))
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .strokeBorder(.white.opacity(accepted ? 0 : 0.25), lineWidth: 1)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                        .opacity(accepted ? 1 : 0)
-                        .scaleEffect(accepted ? 1 : 0.5)
+        HStack(spacing: 4) {
+            Button {
+                withAnimation(.snappy(duration: 0.25)) { accepted.toggle() }
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(accepted ? AnyShapeStyle(Theme.brand) : AnyShapeStyle(.white.opacity(0.06)))
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .strokeBorder(.white.opacity(accepted ? 0 : 0.25), lineWidth: 1)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .opacity(accepted ? 1 : 0)
+                            .scaleEffect(accepted ? 1 : 0.5)
+                    }
+                    .frame(width: 24, height: 24)
+                    Text("I have accepted the")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.9))
                 }
-                .frame(width: 24, height: 24)
-                Text("I have accepted the TOS")
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(accepted ? [.isSelected] : [])
+
+            Link(destination: URL(string: "https://frizzlem.github.io/SideInstaller/terms.html")!) {
+                Text("TOS")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(Theme.accent2)
+                    .underline()
             }
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(accepted ? [.isSelected] : [])
     }
 }
 
