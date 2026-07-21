@@ -13,7 +13,7 @@ let italianStrings: [String: String] = [
     "Email": "Email",
     "Password": "Password",
     "Install": "Installa",
-    "Installing": "Installazione",
+    "Installing": "Installazione in corso",
     "Installed": "Installato",
     "Something went wrong": "Qualcosa è andato storto",
     "an app by Frizzle": "un'app di Frizzle",
@@ -45,13 +45,13 @@ let italianStrings: [String: String] = [
     "Release": "Canale",
     "Reinstall": "Reinstalla",
     "Install %@": "Installa %@",
-    "iOS %@ required": "Richiede iOS %@",
+    "iOS %@ required": "Serve iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Questo iPhone ha iOS %@, su cui SideInstaller non può installare nulla. Aggiorna a iOS %@ in Impostazioni › Generali › Aggiornamento software.",
-    "Wi-Fi required": "Richiede il Wi-Fi",
+    "Wi-Fi required": "Serve il Wi-Fi",
     "Connect to a Wi-Fi network. LocalDevVPN's tunnel and the install run over it.":
         "Connettiti a una rete Wi-Fi. Il tunnel di LocalDevVPN e l'installazione ci passano sopra.",
-    "LocalDevVPN required": "Richiede LocalDevVPN",
+    "LocalDevVPN required": "Serve LocalDevVPN",
     "Open LocalDevVPN and tap Connect. The install runs over its tunnel.":
         "Apri LocalDevVPN e tocca Connect. L'installazione passa dal suo tunnel.",
     "Pairing code": "Codice di abbinamento",
@@ -60,7 +60,7 @@ let italianStrings: [String: String] = [
     "Install stopped": "Installazione interrotta",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ è installato. Completa il passaggio di autorizzazione qui sopra per aprirlo.",
-    "Action needed": "Richiede un'azione",
+    "Action needed": "Serve il tuo intervento",
 
     // MARK: - Install steps
 
@@ -83,7 +83,7 @@ let italianStrings: [String: String] = [
     "Export pairing file": "Esporta il file di abbinamento",
     "Pair in Settings": "Abbina in Impostazioni",
     "Install into an app": "Installa in un'app",
-    "Scanning": "Ricerca",
+    "Scanning": "Ricerca in corso",
     "Rescan apps": "Cerca di nuovo",
     "Scan installed apps": "Cerca le app installate",
     "Connect to Wi-Fi to scan and install. LocalDevVPN's tunnel runs over it.":
@@ -104,8 +104,8 @@ let italianStrings: [String: String] = [
 
     "not paired": "non abbinato",
     "connected": "connesso",
-    "requesting Local Network…": "richiesta rete locale…",
-    "Local Network denied": "rete locale negata",
+    "requesting Local Network…": "richiesta di accesso alla rete locale…",
+    "Local Network denied": "accesso alla rete locale negato",
     "waiting for device…": "in attesa del dispositivo…",
     "advertising — open Settings › Privacy & Security › Developer Mode":
         "in ascolto — apri Impostazioni › Privacy e sicurezza › Modalità sviluppatore",
@@ -126,7 +126,7 @@ let italianStrings: [String: String] = [
     "Revoking": "Revoca in corso",
     "“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.":
         "“%@” verrà revocato. Le app già firmate con questo certificato smetteranno di aprirsi su tutti i dispositivi. L'operazione non può essere annullata.",
-    "Refreshing": "Aggiornamento",
+    "Refreshing": "Aggiornamento in corso",
     "Signing in": "Accesso in corso",
     "Refresh": "Aggiorna",
     "Load certificates": "Carica i certificati",
@@ -182,7 +182,7 @@ let italianStrings: [String: String] = [
     "Enter your Apple ID email + password.":
         "Inserisci email e password del tuo Apple ID.",
     "Two-factor verification was cancelled.":
-        "La verifica in due passaggi è stata annullata.",
+        "La verifica a due fattori è stata annullata.",
     "Apple ID sign-in failed: %@": "Accesso con l'Apple ID non riuscito: %@",
     "Apple ID sign-in failed on %@. Last error: %@":
         "Accesso con l'Apple ID non riuscito su %@. Ultimo errore: %@",
@@ -244,7 +244,7 @@ let italianStrings: [String: String] = [
 
     "Too many signing certificates": "Troppi certificati di firma",
     "Apple allows only 3 signing certificates per Apple ID, and this one already has 3 — usually left over from setting up AltStore / SideStore on other devices.":
-        "Apple consente solo 3 certificati di firma per Apple ID e questo ne ha già 3 — di solito sono avanzi della configurazione di AltStore / SideStore su altri dispositivi.",
+        "Apple consente solo 3 certificati di firma per Apple ID e questo ne ha già 3 — di solito sono rimasti da vecchie configurazioni di AltStore / SideStore su altri dispositivi.",
     "Open the Certificates tab at the bottom of the screen, make sure your Apple ID is filled in, and tap “Load certificates”.":
         "Apri la scheda Certificati in fondo allo schermo, controlla di aver inserito il tuo Apple ID e tocca “Carica i certificati”.",
     "Tap “Revoke” on an old or expired certificate to free up a slot. Revoking stops apps already signed with that certificate from launching on other devices, so pick one you no longer use.":
@@ -271,7 +271,7 @@ let italianStrings: [String: String] = [
     "Open Settings › General › VPN & Device Management.":
         "Apri Impostazioni › Generali › VPN e gestione dispositivi.",
     "Tap your Apple ID under “Developer App”, then tap Trust.":
-        "Tocca il tuo Apple ID sotto “App sviluppatore”, poi tocca Autorizza.",
+        "Tocca il tuo Apple ID sotto “App dello sviluppatore”, poi tocca Autorizza.",
     "Open %@ from your Home Screen — you're done.":
         "Apri %@ dalla schermata Home: è tutto pronto.",
 

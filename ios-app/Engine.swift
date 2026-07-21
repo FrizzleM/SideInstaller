@@ -826,7 +826,23 @@ final class Engine: ObservableObject {
         guard let bundle = signedAppPath else { throw EngineError.message(L("No signed bundle to install.")) }
         setStep(.install, .active)
         installProgress = 0
+        let ip = deviceIP
+        let path = pairingFilePath ?? PairingController.pairingFilePath()
         try await onDeviceQueue {
+            // The RSD tunnel opened during Connect (step 3) has been held but
+            // sitting idle ever since — through sign-in (2FA), the IPA download,
+            // and signing, routinely 1–2 minutes. iOS tears down an idle tunnel,
+            // which kills the in-process software TCP adapter, so the next
+            // service connect fails "adapter closed" (NetworkUnreachable) even
+            // though our handles are still non-null (`isConnected` can't see it).
+            // Re-establish a fresh tunnel from the saved pairing file right
+            // before pushing bytes: it's a cheap pair-verify (no PIN), and
+            // DeviceConnection.connect() frees the stale adapter before swapping
+            // in the new one. The upload keeps the link busy from here, so
+            // install and the pairing-file write that follows stay on a live
+            // tunnel.
+            self.log("Refreshing device link before install (tunnel was idle during sign-in/download/sign) …")
+            try self.connection.connect(deviceIP: ip, pairingFilePath: path)
             guard self.connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
             self.log("Installing signed bundle via AFC + installation_proxy …")
             try self.connection.installSignedApp(bundlePath: bundle)

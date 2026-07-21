@@ -32,7 +32,7 @@ let vietnameseStrings: [String: String] = [
 
     "Pairing": "Ghép nối",
     "Certificates": "Chứng chỉ",
-    "Two-Factor Code": "Mã xác minh hai yếu tố",
+    "Two-Factor Code": "Mã xác minh",
     "6-digit code": "Mã gồm 6 chữ số",
     "Submit": "Gửi",
     "Enter the code Apple just sent to your trusted device.":
@@ -51,19 +51,19 @@ let vietnameseStrings: [String: String] = [
     "Install %@": "Cài đặt %@",
     "iOS %@ required": "Yêu cầu iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
-        "iPhone này đang chạy iOS %@, SideInstaller không thể cài đặt trên phiên bản đó. Hãy cập nhật lên iOS %@ trở lên trong Cài đặt › Cài đặt chung › Cập nhật phần mềm.",
+        "iPhone này đang chạy iOS %@, SideInstaller không thể cài đặt trên phiên bản đó. Cập nhật lên iOS %@ trở lên trong Cài đặt › Cài đặt chung › Cập nhật phần mềm.",
     "Wi-Fi required": "Yêu cầu Wi-Fi",
     "Connect to a Wi-Fi network. LocalDevVPN's tunnel and the install run over it.":
-        "Hãy kết nối vào một mạng Wi-Fi. Đường hầm của LocalDevVPN và quá trình cài đặt đều chạy qua đó.",
+        "Kết nối vào một mạng Wi-Fi. Đường hầm của LocalDevVPN và quá trình cài đặt đều chạy qua đó.",
     "LocalDevVPN required": "Yêu cầu LocalDevVPN",
     "Open LocalDevVPN and tap Connect. The install runs over its tunnel.":
-        "Hãy mở LocalDevVPN và chạm Connect. Quá trình cài đặt chạy qua đường hầm của ứng dụng đó.",
+        "Mở LocalDevVPN và chạm vào Connect. Quá trình cài đặt chạy qua đường hầm của LocalDevVPN.",
     "Pairing code": "Mã ghép nối",
     "Type this into the prompt in Settings.":
-        "Hãy nhập mã này vào hộp thoại trong Cài đặt.",
+        "Nhập mã này vào hộp thoại trong Cài đặt.",
     "Install stopped": "Đã dừng cài đặt",
     "%@ is installed. Finish the trust step above to open it.":
-        "%@ đã được cài đặt. Hãy hoàn tất bước tin cậy ở trên để mở ứng dụng.",
+        "%@ đã được cài đặt. Hoàn tất bước tin cậy ở trên để mở ứng dụng.",
     "Action needed": "Cần thao tác",
 
     // MARK: - Install steps
@@ -91,14 +91,14 @@ let vietnameseStrings: [String: String] = [
     "Rescan apps": "Quét lại ứng dụng",
     "Scan installed apps": "Quét ứng dụng đã cài",
     "Connect to Wi-Fi to scan and install. LocalDevVPN's tunnel runs over it.":
-        "Hãy kết nối Wi-Fi để quét và cài đặt. Đường hầm của LocalDevVPN chạy qua đó.",
+        "Kết nối Wi-Fi để quét và cài đặt. Đường hầm của LocalDevVPN chạy qua đó.",
     "Turn on LocalDevVPN to scan and install. The write runs over its tunnel.":
-        "Hãy bật LocalDevVPN để quét và cài đặt. Việc ghi tệp chạy qua đường hầm của nó.",
+        "Bật LocalDevVPN để quét và cài đặt. Việc ghi tệp chạy qua đường hầm này.",
     "%d supported app installed": "Đã cài %d ứng dụng được hỗ trợ",
     "%d supported apps installed": "Đã cài %d ứng dụng được hỗ trợ",
     "No supported apps found": "Không tìm thấy ứng dụng được hỗ trợ",
     "Install an app like SideStore, StikDebug, or Feather first, then rescan.":
-        "Hãy cài trước một ứng dụng như SideStore, StikDebug hoặc Feather, rồi quét lại.",
+        "Cài trước một ứng dụng như SideStore, StikDebug hoặc Feather, rồi quét lại.",
     "Install pairing": "Cài tệp ghép nối",
     "Pairing file ready. You can export it or install it into an app below.":
         "Tệp ghép nối đã sẵn sàng. Bạn có thể xuất tệp hoặc cài vào một ứng dụng bên dưới.",
@@ -112,16 +112,16 @@ let vietnameseStrings: [String: String] = [
     "Local Network denied": "quyền Mạng cục bộ bị từ chối",
     "waiting for device…": "đang chờ thiết bị…",
     "advertising — open Settings › Privacy & Security › Developer Mode":
-        "đang phát quảng bá — hãy mở Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển",
+        "đang phát tín hiệu — mở Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển",
     "enter PIN %@ in Settings": "nhập mã PIN %@ trong Cài đặt",
     "paired: %@ (%dB)": "đã ghép nối: %@ (%d B)",
     "failed: empty pairing file": "lỗi: tệp ghép nối rỗng",
     "failed: %@": "lỗi: %@",
-    "Pairing is already in progress.": "Đang có một phiên ghép nối chạy rồi.",
+    "Pairing is already in progress.": "Quá trình ghép nối đang diễn ra.",
     "Local Network permission is off. Enable it in Settings › SideInstaller › Local Network, then try again.":
-        "Quyền Mạng cục bộ đang tắt. Hãy bật quyền này trong Cài đặt › SideInstaller › Mạng cục bộ rồi thử lại.",
+        "Quyền Mạng cục bộ đang tắt. Bật quyền này trong Cài đặt › SideInstaller › Mạng cục bộ rồi thử lại.",
     "Pairing produced an empty file. Make sure you approved the pairing request, then try again.":
-        "Quá trình ghép nối tạo ra một tệp rỗng. Hãy chắc chắn bạn đã chấp nhận yêu cầu ghép nối rồi thử lại.",
+        "Quá trình ghép nối tạo ra một tệp rỗng. Kiểm tra xem bạn đã chấp nhận yêu cầu ghép nối chưa, rồi thử lại.",
 
     // MARK: - Certificates tab
 
@@ -142,7 +142,7 @@ let vietnameseStrings: [String: String] = [
     "Expires %@": "Hết hạn ngày %@",
     "Unnamed certificate": "Chứng chỉ không có tên",
     "Enter your Apple ID email and password first.":
-        "Hãy nhập email và mật khẩu Apple ID của bạn trước.",
+        "Nhập email và mật khẩu Apple ID của bạn trước.",
     "This certificate has no serial number, so it can't be revoked.":
         "Chứng chỉ này không có số sê-ri nên không thể thu hồi.",
 
@@ -157,7 +157,7 @@ let vietnameseStrings: [String: String] = [
     "%@ used": "Đã dùng %@",
     "No downloaded IPAs. Ones you install from the Install tab are cached here.":
         "Chưa có tệp IPA nào được tải. Những tệp bạn cài từ tab Cài ứng dụng sẽ được lưu ở đây.",
-    "Downloaded %@": "Đã tải lúc %@",
+    "Downloaded %@": "Đã tải vào %@",
     "Delete this download?": "Xóa bản tải này?",
     "Delete": "Xóa",
     "“%@” (%@) will be removed. You can download it again any time from the Install tab.":
@@ -184,7 +184,7 @@ let vietnameseStrings: [String: String] = [
     // MARK: - Engine failures
 
     "Enter your Apple ID email + password.":
-        "Hãy nhập email và mật khẩu Apple ID của bạn.",
+        "Nhập email và mật khẩu Apple ID của bạn.",
     "Two-factor verification was cancelled.": "Đã hủy xác minh hai yếu tố.",
     "Apple ID sign-in failed: %@": "Đăng nhập Apple ID thất bại: %@",
     "Apple ID sign-in failed on %@. Last error: %@":
@@ -204,15 +204,15 @@ let vietnameseStrings: [String: String] = [
     "Pairing file missing — generate it first.":
         "Thiếu tệp ghép nối — hãy tạo tệp trước.",
     "No pairing file yet — tap “Generate pairing file” first.":
-        "Vẫn chưa có tệp ghép nối — hãy chạm “Tạo tệp ghép nối” trước.",
+        "Vẫn chưa có tệp ghép nối — hãy chạm vào “Tạo tệp ghép nối” trước.",
     "%@ isn't installed yet — install must run first.":
         "%@ chưa được cài đặt — phải cài đặt trước.",
     "Wi-Fi is off. Connect to a Wi-Fi network, then try again.":
-        "Wi-Fi đang tắt. Hãy kết nối vào một mạng Wi-Fi rồi thử lại.",
+        "Wi-Fi đang tắt. Kết nối vào một mạng Wi-Fi rồi thử lại.",
     "LocalDevVPN isn't connected. Turn it on, then try again.":
-        "LocalDevVPN chưa kết nối. Hãy bật lên rồi thử lại.",
+        "LocalDevVPN chưa kết nối. Bật lên rồi thử lại.",
     "Apple allows only 3 signing certificates per Apple ID and this one already has 3, so a new one can't be made. Open the Certificates tab, tap “Load certificates”, and revoke an old or expired one to free a slot — then tap Install again. See the steps above.":
-        "Apple chỉ cho phép 3 chứng chỉ ký trên mỗi Apple ID và Apple ID này đã có đủ 3, nên không thể tạo thêm. Hãy mở tab Chứng chỉ, chạm “Tải danh sách chứng chỉ” và thu hồi một chứng chỉ cũ hoặc đã hết hạn để giải phóng chỗ — rồi chạm Cài đặt lần nữa. Xem các bước ở trên.",
+        "Apple chỉ cho phép 3 chứng chỉ ký trên mỗi Apple ID và Apple ID này đã có đủ 3, nên không thể tạo thêm. Mở tab Chứng chỉ, chạm vào “Tải danh sách chứng chỉ” và thu hồi một chứng chỉ cũ hoặc đã hết hạn để giải phóng chỗ — rồi chạm vào Cài đặt lần nữa. Xem các bước ở trên.",
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "Không thể đăng ký iPhone này%@ vào nhóm phát triển của Apple ID, nên Apple sẽ không cấp hồ sơ cấp phép. %@ — xem các bước ở trên.",
@@ -230,7 +230,7 @@ let vietnameseStrings: [String: String] = [
     "Turn on LocalDevVPN": "Bật LocalDevVPN",
     "Open the LocalDevVPN app (install it first if you haven't).":
         "Mở ứng dụng LocalDevVPN (nếu chưa có, hãy cài trước).",
-    "Tap Connect so the toggle turns on.": "Chạm Connect để công tắc bật lên.",
+    "Tap Connect so the toggle turns on.": "Chạm vào Connect để công tắc bật lên.",
     "Keep Wi-Fi on, then come back here — this continues automatically.":
         "Giữ Wi-Fi bật rồi quay lại đây: quá trình sẽ tự tiếp tục.",
     "Get LocalDevVPN": "Tải LocalDevVPN",
@@ -238,7 +238,7 @@ let vietnameseStrings: [String: String] = [
     "Pair this iPhone in Settings": "Ghép nối iPhone này trong Cài đặt",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "Mở ứng dụng Cài đặt, rồi vào Quyền riêng tư & Bảo mật › Chế độ nhà phát triển.",
-    "Tap “Pair with SideInstaller”.": "Chạm “Ghép nối với SideInstaller”.",
+    "Tap “Pair with SideInstaller”.": "Chạm vào “Ghép nối với SideInstaller”.",
     "Enter your iPhone’s passcode if it asks for it.":
         "Nhập mật mã iPhone của bạn nếu được hỏi.",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
@@ -248,38 +248,38 @@ let vietnameseStrings: [String: String] = [
     "Apple allows only 3 signing certificates per Apple ID, and this one already has 3 — usually left over from setting up AltStore / SideStore on other devices.":
         "Apple chỉ cho phép 3 chứng chỉ ký trên mỗi Apple ID và Apple ID này đã có đủ 3 — thường là còn sót lại từ việc thiết lập AltStore / SideStore trên các thiết bị khác.",
     "Open the Certificates tab at the bottom of the screen, make sure your Apple ID is filled in, and tap “Load certificates”.":
-        "Mở tab Chứng chỉ ở cuối màn hình, kiểm tra đã điền Apple ID của bạn, rồi chạm “Tải danh sách chứng chỉ”.",
+        "Mở tab Chứng chỉ ở cuối màn hình, kiểm tra đã điền Apple ID của bạn, rồi chạm vào “Tải danh sách chứng chỉ”.",
     "Tap “Revoke” on an old or expired certificate to free up a slot. Revoking stops apps already signed with that certificate from launching on other devices, so pick one you no longer use.":
-        "Chạm “Thu hồi” trên một chứng chỉ cũ hoặc đã hết hạn để giải phóng chỗ. Khi thu hồi, các ứng dụng đã ký bằng chứng chỉ đó sẽ không mở được trên các thiết bị khác, nên hãy chọn chứng chỉ bạn không còn dùng.",
+        "Chạm vào “Thu hồi” trên một chứng chỉ cũ hoặc đã hết hạn để giải phóng chỗ. Khi thu hồi, các ứng dụng đã ký bằng chứng chỉ đó sẽ không mở được trên các thiết bị khác, nên hãy chọn chứng chỉ bạn không còn dùng.",
     "Come back to the Install tab and tap Install again.":
-        "Quay lại tab Cài ứng dụng và chạm Cài đặt lần nữa.",
+        "Quay lại tab Cài ứng dụng và chạm vào Cài đặt lần nữa.",
     "Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again.":
-        "Hoặc đăng nhập bằng một Apple ID khác (hoặc tài khoản dự phòng) ở trên, rồi chạm Cài đặt lần nữa.",
+        "Hoặc đăng nhập bằng một Apple ID khác (hoặc tài khoản dự phòng) ở trên, rồi chạm vào Cài đặt lần nữa.",
 
     "Couldn't register this device": "Không thể đăng ký thiết bị này",
     "Your Apple ID has hit its limit of registered devices. Free accounts can only register a handful of devices per year and can't remove old ones until the year resets.":
         "Apple ID của bạn đã đạt giới hạn số thiết bị đăng ký. Tài khoản miễn phí chỉ đăng ký được một số ít thiết bị mỗi năm và không thể gỡ thiết bị cũ cho đến khi năm đăng ký được đặt lại.",
     "Easiest fix: put a different (or spare) Apple ID in the fields above, then tap Install again.":
-        "Cách đơn giản nhất: điền một Apple ID khác (hoặc tài khoản dự phòng) vào các ô ở trên, rồi chạm Cài đặt lần nữa.",
+        "Cách đơn giản nhất: điền một Apple ID khác (hoặc tài khoản dự phòng) vào các ô ở trên, rồi chạm vào Cài đặt lần nữa.",
     "SideInstaller couldn't add this iPhone to your Apple ID's developer team automatically. Tapping Install again often works — Apple's developer service is sometimes briefly unavailable.":
-        "SideInstaller không thể tự động thêm iPhone này vào nhóm phát triển của Apple ID. Chạm Cài đặt lần nữa thường sẽ được — dịch vụ nhà phát triển của Apple đôi khi tạm thời không hoạt động.",
+        "SideInstaller không thể tự động thêm iPhone này vào nhóm phát triển của Apple ID. Chạm vào Cài đặt lần nữa thường sẽ được — dịch vụ nhà phát triển của Apple đôi khi tạm thời không hoạt động.",
     "If it keeps failing, add the device by hand. Its UDID is:":
         "Nếu vẫn lỗi, hãy thêm thiết bị thủ công. UDID của thiết bị là:",
     "Paste that into the “Register a Device” form in the Apple Developer portal (this requires a paid Apple Developer account), then tap Install again.":
-        "Dán mã đó vào biểu mẫu “Register a Device” trên cổng Apple Developer (việc này cần tài khoản Apple Developer trả phí), rồi chạm Cài đặt lần nữa.",
+        "Dán mã đó vào biểu mẫu “Register a Device” trên cổng Apple Developer (việc này cần tài khoản Apple Developer trả phí), rồi chạm vào Cài đặt lần nữa.",
     "Open device list": "Mở danh sách thiết bị",
 
     "Last step: trust %@": "Bước cuối: tin cậy %@",
     "Open Settings › General › VPN & Device Management.":
         "Mở Cài đặt › Cài đặt chung › VPN & Quản lý thiết bị.",
     "Tap your Apple ID under “Developer App”, then tap Trust.":
-        "Chạm vào Apple ID của bạn trong mục “Ứng dụng nhà phát triển”, rồi chạm Tin cậy.",
+        "Chạm vào Apple ID của bạn trong mục “Ứng dụng nhà phát triển”, rồi chạm vào Tin cậy.",
     "Open %@ from your Home Screen — you're done.":
         "Mở %@ từ Màn hình chính — vậy là xong.",
 
     "Import the certificate into LiveContainer": "Nhập chứng chỉ vào LiveContainer",
     "Open LiveContainer from your Home Screen.": "Mở LiveContainer từ Màn hình chính.",
-    "Tap the Settings tab.": "Chạm tab Settings.",
+    "Tap the Settings tab.": "Chạm vào tab Settings.",
     "Tap “Import Certificate From SideStore”.":
-        "Chạm “Import Certificate From SideStore”.",
+        "Chạm vào “Import Certificate From SideStore”.",
 ]

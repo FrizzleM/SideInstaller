@@ -21,7 +21,7 @@ let spanishStrings: [String: String] = [
     "Install": "Instalar",
     "Installing": "Instalando",
     "Installed": "Instalado",
-    "Something went wrong": "Algo salió mal",
+    "Something went wrong": "Algo ha ido mal",
     "an app by Frizzle": "una app de Frizzle",
     "device": "dispositivo",
 
@@ -34,7 +34,7 @@ let spanishStrings: [String: String] = [
 
     "Pairing": "Emparejamiento",
     "Certificates": "Certificados",
-    "Two-Factor Code": "Código de doble factor",
+    "Two-Factor Code": "Código de verificación",
     "6-digit code": "Código de 6 dígitos",
     "Submit": "Enviar",
     "Enter the code Apple just sent to your trusted device.":
@@ -46,27 +46,27 @@ let spanishStrings: [String: String] = [
     "Tunnel off": "Túnel desactivado",
     "Update available": "Actualización disponible",
     "SideInstaller %@ is available — you're on %@.":
-        "SideInstaller %@ ya está disponible — tú tienes la %@.",
-    "Get the latest version": "Consigue la última versión",
+        "SideInstaller %@ ya está disponible — tienes instalada la %@.",
+    "Get the latest version": "Obtener la última versión",
     "Release": "Canal",
     "Reinstall": "Reinstalar",
     "Install %@": "Instalar %@",
     "iOS %@ required": "Se requiere iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
-        "Este iPhone tiene iOS %@, y SideInstaller no puede instalar nada ahí. Actualiza a iOS %@ o posterior en Ajustes › General › Actualización de software.",
+        "Este iPhone tiene iOS %@, y con esa versión SideInstaller no puede instalar nada. Actualiza a iOS %@ o posterior en Ajustes › General › Actualización de software.",
     "Wi-Fi required": "Se requiere Wi-Fi",
     "Connect to a Wi-Fi network. LocalDevVPN's tunnel and the install run over it.":
-        "Conéctate a una red Wi-Fi. El túnel de LocalDevVPN y la instalación funcionan sobre ella.",
+        "Conéctate a una red Wi-Fi. El túnel de LocalDevVPN y la instalación pasan por esa red.",
     "LocalDevVPN required": "Se requiere LocalDevVPN",
     "Open LocalDevVPN and tap Connect. The install runs over its tunnel.":
-        "Abre LocalDevVPN y toca Connect. La instalación funciona sobre su túnel.",
+        "Abre LocalDevVPN y toca Connect. La instalación pasa por su túnel.",
     "Pairing code": "Código de emparejamiento",
     "Type this into the prompt in Settings.":
         "Escribe este código en el mensaje que aparece en Ajustes.",
     "Install stopped": "Instalación detenida",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ ya está instalado. Completa el paso de confianza de arriba para abrirlo.",
-    "Action needed": "Requiere acción",
+    "Action needed": "Necesita tu atención",
 
     // MARK: - Install steps
 
@@ -93,12 +93,12 @@ let spanishStrings: [String: String] = [
     "Rescan apps": "Buscar apps otra vez",
     "Scan installed apps": "Buscar apps instaladas",
     "Connect to Wi-Fi to scan and install. LocalDevVPN's tunnel runs over it.":
-        "Conéctate al Wi-Fi para buscar e instalar. El túnel de LocalDevVPN funciona sobre él.",
+        "Conéctate al Wi-Fi para buscar e instalar. El túnel de LocalDevVPN pasa por esa red.",
     "Turn on LocalDevVPN to scan and install. The write runs over its tunnel.":
         "Activa LocalDevVPN para buscar e instalar. La escritura se hace por su túnel.",
     "%d supported app installed": "%d app compatible instalada",
     "%d supported apps installed": "%d apps compatibles instaladas",
-    "No supported apps found": "No se encontraron apps compatibles",
+    "No supported apps found": "No se han encontrado apps compatibles",
     "Install an app like SideStore, StikDebug, or Feather first, then rescan.":
         "Instala antes una app como SideStore, StikDebug o Feather y vuelve a buscar.",
     "Install pairing": "Instalar emparejamiento",
@@ -110,11 +110,11 @@ let spanishStrings: [String: String] = [
 
     "not paired": "sin emparejar",
     "connected": "conectado",
-    "requesting Local Network…": "solicitando red local…",
-    "Local Network denied": "red local denegada",
+    "requesting Local Network…": "solicitando acceso a la red local…",
+    "Local Network denied": "acceso a la red local denegado",
     "waiting for device…": "esperando al dispositivo…",
     "advertising — open Settings › Privacy & Security › Developer Mode":
-        "anunciando — abre Ajustes › Privacidad y seguridad › Modo desarrollador",
+        "visible en la red — abre Ajustes › Privacidad y seguridad › Modo desarrollador",
     "enter PIN %@ in Settings": "introduce el PIN %@ en Ajustes",
     "paired: %@ (%dB)": "emparejado: %@ (%d B)",
     "failed: empty pairing file": "error: archivo de emparejamiento vacío",
@@ -123,7 +123,7 @@ let spanishStrings: [String: String] = [
     "Local Network permission is off. Enable it in Settings › SideInstaller › Local Network, then try again.":
         "El permiso de red local está desactivado. Actívalo en Ajustes › SideInstaller › Red local e inténtalo de nuevo.",
     "Pairing produced an empty file. Make sure you approved the pairing request, then try again.":
-        "El emparejamiento generó un archivo vacío. Asegúrate de aceptar la solicitud de emparejamiento e inténtalo de nuevo.",
+        "El emparejamiento ha generado un archivo vacío. Asegúrate de aceptar la solicitud de emparejamiento e inténtalo de nuevo.",
 
     // MARK: - Certificates tab
 
@@ -144,7 +144,7 @@ let spanishStrings: [String: String] = [
     "Expires %@": "Caduca el %@",
     "Unnamed certificate": "Certificado sin nombre",
     "Enter your Apple ID email and password first.":
-        "Introduce antes el correo y la contraseña de tu Apple ID.",
+        "Introduce primero el correo y la contraseña de tu Apple ID.",
     "This certificate has no serial number, so it can't be revoked.":
         "Este certificado no tiene número de serie, así que no se puede revocar.",
 
@@ -156,7 +156,7 @@ let spanishStrings: [String: String] = [
     "App language": "Idioma de la app",
     "Auto": "Automático",
     "Downloaded IPAs": "IPA descargados",
-    "%@ used": "%@ en uso",
+    "%@ used": "%@ ocupados",
     "No downloaded IPAs. Ones you install from the Install tab are cached here.":
         "No hay IPA descargados. Los que instales desde la pestaña Instalar se guardan aquí.",
     "Downloaded %@": "Descargado el %@",
@@ -164,7 +164,7 @@ let spanishStrings: [String: String] = [
     "Delete": "Eliminar",
     "“%@” (%@) will be removed. You can download it again any time from the Install tab.":
         "Se eliminará “%@” (%@). Puedes volver a descargarlo cuando quieras desde la pestaña Instalar.",
-    "Couldn't delete %@: %@": "No se pudo eliminar %@: %@",
+    "Couldn't delete %@: %@": "No se ha podido eliminar %@: %@",
     "Server": "Servidor",
     "Custom…": "Personalizado…",
     "Server URL": "URL del servidor",
@@ -177,9 +177,9 @@ let spanishStrings: [String: String] = [
     // MARK: - Release channels & downloads
 
     "Stable": "Estable",
-    "Nightly": "Nocturna",
+    "Nightly": "Nightly",
     "couldn't find the IPA in the %@ %@ release":
-        "no se encontró el IPA en la versión %@ de %@",
+        "no se ha encontrado el IPA en la versión %@ de %@",
     "%@ has no %@ release right now": "%@ no tiene ninguna versión %@ ahora mismo",
     "bad asset URL": "URL del recurso incorrecta",
 
@@ -187,10 +187,10 @@ let spanishStrings: [String: String] = [
 
     "Enter your Apple ID email + password.":
         "Introduce el correo y la contraseña de tu Apple ID.",
-    "Two-factor verification was cancelled.": "Se canceló la verificación en dos pasos.",
-    "Apple ID sign-in failed: %@": "No se pudo iniciar sesión con el Apple ID: %@",
+    "Two-factor verification was cancelled.": "Se ha cancelado la verificación en dos pasos.",
+    "Apple ID sign-in failed: %@": "No se ha podido iniciar sesión con el Apple ID: %@",
     "Apple ID sign-in failed on %@. Last error: %@":
-        "No se pudo iniciar sesión con el Apple ID en %@. Último error: %@",
+        "No se ha podido iniciar sesión con el Apple ID en %@. Último error: %@",
     "the anisette server": "el servidor anisette",
     "all %d anisette servers": "los %d servidores anisette",
     "Not signed in.": "No has iniciado sesión.",
@@ -198,9 +198,9 @@ let spanishStrings: [String: String] = [
     "Signing failed: %@": "Falló la firma: %@",
     "No signed bundle to install.": "No hay ningún paquete firmado que instalar.",
     "Device link dropped — reconnect.":
-        "Se perdió el enlace con el dispositivo: vuelve a conectarlo.",
+        "Se ha perdido el enlace con el dispositivo: vuelve a conectarlo.",
     "Pairing didn't finish — no pairing file yet.":
-        "El emparejamiento no terminó: todavía no hay archivo de emparejamiento.",
+        "El emparejamiento no ha terminado: todavía no hay archivo de emparejamiento.",
     "Pairing file missing — pairing must run first.":
         "Falta el archivo de emparejamiento: primero hay que emparejar.",
     "Pairing file missing — generate it first.":
@@ -217,14 +217,14 @@ let spanishStrings: [String: String] = [
         "Apple solo permite 3 certificados de firma por Apple ID y este ya tiene 3, así que no se puede crear otro. Abre la pestaña Certificados, toca “Cargar certificados” y revoca uno antiguo o caducado para liberar un espacio; después toca Instalar otra vez. Consulta los pasos de arriba.",
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
-        "No se pudo registrar este iPhone%@ en el equipo de desarrollo de tu Apple ID, así que Apple no emitirá un perfil de aprovisionamiento. %@ — consulta los pasos de arriba.",
+        "No se ha podido registrar este iPhone%@ en el equipo de desarrollo de tu Apple ID, así que Apple no emitirá un perfil de aprovisionamiento. %@ — consulta los pasos de arriba.",
 
     // MARK: - Guide cards
 
     "Connect to Wi-Fi": "Conéctate al Wi-Fi",
     "Open Settings › Wi-Fi and join a network.": "Abre Ajustes › Wi-Fi y únete a una red.",
     "LocalDevVPN's tunnel — and the whole install — run over Wi-Fi.":
-        "El túnel de LocalDevVPN —y toda la instalación— funcionan sobre el Wi-Fi.",
+        "El túnel de LocalDevVPN —y toda la instalación— pasan por el Wi-Fi.",
     "Then come back here — this continues automatically.":
         "Después vuelve aquí: el proceso continúa solo.",
 
@@ -248,9 +248,9 @@ let spanishStrings: [String: String] = [
 
     "Too many signing certificates": "Demasiados certificados de firma",
     "Apple allows only 3 signing certificates per Apple ID, and this one already has 3 — usually left over from setting up AltStore / SideStore on other devices.":
-        "Apple solo permite 3 certificados de firma por Apple ID y este ya tiene 3 — normalmente sobran de configurar AltStore / SideStore en otros dispositivos.",
+        "Apple solo permite 3 certificados de firma por Apple ID y este ya tiene 3 — normalmente son restos de configurar AltStore / SideStore en otros dispositivos.",
     "Open the Certificates tab at the bottom of the screen, make sure your Apple ID is filled in, and tap “Load certificates”.":
-        "Abre la pestaña Certificados en la parte inferior de la pantalla, comprueba que tu Apple ID esté puesto y toca “Cargar certificados”.",
+        "Abre la pestaña Certificados en la parte inferior de la pantalla, comprueba que hayas introducido tu Apple ID y toca “Cargar certificados”.",
     "Tap “Revoke” on an old or expired certificate to free up a slot. Revoking stops apps already signed with that certificate from launching on other devices, so pick one you no longer use.":
         "Toca “Revocar” en un certificado antiguo o caducado para liberar un espacio. Al revocarlo, las apps ya firmadas con ese certificado dejarán de abrirse en otros dispositivos, así que elige uno que ya no uses.",
     "Come back to the Install tab and tap Install again.":
@@ -258,13 +258,13 @@ let spanishStrings: [String: String] = [
     "Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again.":
         "Otra opción: inicia sesión arriba con otro Apple ID (o uno de repuesto) y toca Instalar otra vez.",
 
-    "Couldn't register this device": "No se pudo registrar este dispositivo",
+    "Couldn't register this device": "No se ha podido registrar este dispositivo",
     "Your Apple ID has hit its limit of registered devices. Free accounts can only register a handful of devices per year and can't remove old ones until the year resets.":
         "Tu Apple ID ha alcanzado el límite de dispositivos registrados. Las cuentas gratuitas solo pueden registrar unos pocos dispositivos al año y no pueden quitar los antiguos hasta que el año se reinicia.",
     "Easiest fix: put a different (or spare) Apple ID in the fields above, then tap Install again.":
         "La solución más sencilla: pon otro Apple ID (o uno de repuesto) en los campos de arriba y toca Instalar otra vez.",
     "SideInstaller couldn't add this iPhone to your Apple ID's developer team automatically. Tapping Install again often works — Apple's developer service is sometimes briefly unavailable.":
-        "SideInstaller no pudo añadir este iPhone al equipo de desarrollo de tu Apple ID automáticamente. Volver a tocar Instalar suele funcionar: el servicio de desarrollo de Apple a veces deja de estar disponible un rato.",
+        "SideInstaller no ha podido añadir este iPhone al equipo de desarrollo de tu Apple ID automáticamente. Volver a tocar Instalar suele funcionar: el servicio de desarrollo de Apple a veces deja de estar disponible un rato.",
     "If it keeps failing, add the device by hand. Its UDID is:":
         "Si sigue fallando, añade el dispositivo a mano. Su UDID es:",
     "Paste that into the “Register a Device” form in the Apple Developer portal (this requires a paid Apple Developer account), then tap Install again.":

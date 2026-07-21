@@ -44,7 +44,7 @@ let frenchStrings: [String: String] = [
     "Tunnel off": "Tunnel désactivé",
     "Update available": "Mise à jour disponible",
     "SideInstaller %@ is available — you're on %@.":
-        "SideInstaller %@ est disponible — vous avez la %@.",
+        "SideInstaller %@ est disponible — vous utilisez la %@.",
     "Get the latest version": "Obtenir la dernière version",
     "Release": "Canal",
     "Reinstall": "Réinstaller",
@@ -54,7 +54,7 @@ let frenchStrings: [String: String] = [
         "Cet iPhone est sous iOS %@, sur lequel SideInstaller ne peut rien installer. Mettez à jour vers iOS %@ ou une version ultérieure dans Réglages › Général › Mise à jour logicielle.",
     "Wi-Fi required": "Wi-Fi requis",
     "Connect to a Wi-Fi network. LocalDevVPN's tunnel and the install run over it.":
-        "Connectez-vous à un réseau Wi-Fi. Le tunnel de LocalDevVPN et l'installation passent par lui.",
+        "Connectez-vous à un réseau Wi-Fi. Le tunnel de LocalDevVPN et l'installation passent par ce réseau.",
     "LocalDevVPN required": "LocalDevVPN requis",
     "Open LocalDevVPN and tap Connect. The install runs over its tunnel.":
         "Ouvrez LocalDevVPN et touchez Connect. L'installation passe par son tunnel.",
@@ -91,7 +91,7 @@ let frenchStrings: [String: String] = [
     "Rescan apps": "Rechercher à nouveau",
     "Scan installed apps": "Rechercher les apps installées",
     "Connect to Wi-Fi to scan and install. LocalDevVPN's tunnel runs over it.":
-        "Connectez-vous au Wi-Fi pour rechercher et installer. Le tunnel de LocalDevVPN passe par lui.",
+        "Connectez-vous au Wi-Fi pour rechercher et installer. Le tunnel de LocalDevVPN passe par ce réseau.",
     "Turn on LocalDevVPN to scan and install. The write runs over its tunnel.":
         "Activez LocalDevVPN pour rechercher et installer. L'écriture passe par son tunnel.",
     "%d supported app installed": "%d app compatible installée",
@@ -197,11 +197,11 @@ let frenchStrings: [String: String] = [
     "Signing failed: %@": "Échec de la signature : %@",
     "No signed bundle to install.": "Aucun paquet signé à installer.",
     "Device link dropped — reconnect.":
-        "Liaison avec l'appareil perdue — reconnectez-vous.",
+        "Liaison avec l'appareil perdue — relancez la connexion.",
     "Pairing didn't finish — no pairing file yet.":
         "Le jumelage ne s'est pas terminé — il n'y a pas encore de fichier de jumelage.",
     "Pairing file missing — pairing must run first.":
-        "Fichier de jumelage manquant — le jumelage doit être effectué d'abord.",
+        "Fichier de jumelage manquant — il faut d'abord effectuer le jumelage.",
     "Pairing file missing — generate it first.":
         "Fichier de jumelage manquant — générez-le d'abord.",
     "No pairing file yet — tap “Generate pairing file” first.":
