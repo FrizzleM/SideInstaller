@@ -30,7 +30,7 @@ struct DevCert: Identifiable, Decodable, Equatable {
     /// back to the certificate id if Apple didn't send one.
     var id: String { serialNumber.isEmpty ? certificateId : serialNumber }
 
-    var displayName: String { name.isEmpty ? "Unnamed certificate" : name }
+    var displayName: String { name.isEmpty ? L("Unnamed certificate") : name }
 
     /// "Created on <machine>" label, or nil when Apple didn't tag a machine.
     var machineLabel: String? {
@@ -94,7 +94,7 @@ final class CertManager: ObservableObject {
         guard !isWorking, revokingID == nil else { return }
         let id = engine.appleID, pw = engine.applePassword
         guard !id.isEmpty, !pw.isEmpty else {
-            lastError = "Enter your Apple ID email and password first."
+            lastError = L("Enter your Apple ID email and password first.")
             return
         }
         isWorking = true
@@ -123,7 +123,7 @@ final class CertManager: ObservableObject {
         guard session != nil, revokingID == nil, !isWorking else { return }
         let serial = cert.serialNumber
         guard !serial.isEmpty else {
-            lastError = "This certificate has no serial number, so it can't be revoked."
+            lastError = L("This certificate has no serial number, so it can't be revoked.")
             return
         }
         revokingID = cert.id
@@ -181,16 +181,18 @@ final class CertManager: ObservableObject {
                 lastError = error.errorDescription ?? "sign-in failed"
                 if engine.twoFactorWasCancelled {
                     engine.log("Two-factor verification cancelled — stopping.")
-                    throw EngineError.message("Two-factor verification was cancelled.")
+                    throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
                 if Engine.isCredentialError(lastError) {
-                    throw EngineError.message("Apple ID sign-in failed: \(lastError)")
+                    throw EngineError.message(L("Apple ID sign-in failed: %@", lastError))
                 }
                 engine.log("Certificates: anisette \(idx + 1)/\(servers.count) failed: \(lastError)")
             }
         }
-        let tried = servers.count == 1 ? "the anisette server" : "all \(servers.count) anisette servers"
-        throw EngineError.message("Apple ID sign-in failed on \(tried). Last error: \(lastError)")
+        let tried = servers.count == 1
+            ? L("the anisette server")
+            : L("all %d anisette servers", servers.count)
+        throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, lastError))
     }
 
     /// One sign-in attempt against a specific anisette server. Stores the session

@@ -1,19 +1,26 @@
 import Foundation
 
 /// One IPA the app has downloaded into Documents, ready to be (re)deleted from
-/// the download manager in Settings. Each maps 1:1 to an `InstallSource`, whose
-/// `fileName` is the on-disk name the downloader writes to.
+/// the download manager in Settings. Each maps 1:1 to an `InstallSource` +
+/// `ReleaseChannel` pair, whose `fileName` is the on-disk name the downloader
+/// writes to.
 struct DownloadedIPA: Identifiable, Equatable {
     let source: InstallSource
+    let channel: ReleaseChannel
     let url: URL
     let size: Int
     let modified: Date?
 
-    /// Stable identity for SwiftUI — the file path is unique per source.
+    /// Stable identity for SwiftUI — the file path is unique per source+channel.
     var id: String { url.path }
 
-    /// Full source name, e.g. "LiveContainer + SideStore".
-    var displayName: String { source.displayName }
+    /// Full source name, channel-qualified: "LiveContainer + SideStore (Nightly)".
+    var displayName: String {
+        switch channel {
+        case .stable:  return source.displayName
+        case .nightly: return "\(source.displayName) (\(channel.displayName))"
+        }
+    }
 
     /// The on-disk filename, e.g. "SideStore.ipa".
     var fileName: String { url.lastPathComponent }
@@ -62,11 +69,14 @@ final class DownloadsManager: ObservableObject {
         let fm = FileManager.default
         var found: [DownloadedIPA] = []
         for source in InstallSource.allCases {
-            let url = documentsDir.appendingPathComponent(source.fileName)
-            guard let attrs = try? fm.attributesOfItem(atPath: url.path) else { continue }
-            let size = (attrs[.size] as? Int) ?? 0
-            let modified = attrs[.modificationDate] as? Date
-            found.append(DownloadedIPA(source: source, url: url, size: size, modified: modified))
+            for channel in ReleaseChannel.allCases {
+                let url = documentsDir.appendingPathComponent(source.fileName(channel))
+                guard let attrs = try? fm.attributesOfItem(atPath: url.path) else { continue }
+                let size = (attrs[.size] as? Int) ?? 0
+                let modified = attrs[.modificationDate] as? Date
+                found.append(DownloadedIPA(source: source, channel: channel, url: url,
+                                           size: size, modified: modified))
+            }
         }
         downloads = found
         hasLoaded = true
@@ -87,7 +97,7 @@ final class DownloadsManager: ObservableObject {
             }
             engine.log("Downloads: deleted \(item.fileName) (\(item.sizeText)).")
         } catch {
-            lastError = "Couldn't delete \(item.fileName): \(error.localizedDescription)"
+            lastError = L("Couldn't delete %@: %@", item.fileName, error.localizedDescription)
             engine.log("⛔️ Downloads: \(lastError ?? "delete failed")")
         }
         deletingID = nil

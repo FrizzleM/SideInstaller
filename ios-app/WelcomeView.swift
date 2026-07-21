@@ -6,6 +6,8 @@ import SwiftUI
 /// persisted flag (`hasAcceptedTOS`) so the page never shows again.
 struct WelcomeView: View {
     @AppStorage("hasAcceptedTOS") private var hasAcceptedTOS = false
+    /// Declared so the page redraws if the language changes underneath it.
+    @EnvironmentObject private var loc: Localizer
     @State private var accepted = false
 
     var body: some View {
@@ -18,7 +20,7 @@ struct WelcomeView: View {
                         .font(.system(size: 40, weight: .bold))
                         .foregroundStyle(.white)
                         .welcomeItem(0)
-                    Text("an app by Frizzle")
+                    Text(L("an app by Frizzle"))
                         .font(.headline.weight(.medium))
                         .foregroundStyle(.secondary)
                         .welcomeItem(1)
@@ -30,7 +32,7 @@ struct WelcomeView: View {
                 VStack(spacing: 20) {
                     checkboxRow
                         .welcomeItem(2)
-                    Button("Start") { hasAcceptedTOS = true }
+                    Button(L("Start")) { hasAcceptedTOS = true }
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(!accepted)
                         .opacity(accepted ? 1 : 0.35)
@@ -64,7 +66,7 @@ struct WelcomeView: View {
                             .scaleEffect(accepted ? 1 : 0.5)
                     }
                     .frame(width: 24, height: 24)
-                    Text("I have accepted the")
+                    Text(L("I have accepted the"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.9))
                 }

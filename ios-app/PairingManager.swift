@@ -68,7 +68,7 @@ final class PairingManager: ObservableObject {
                 engine.connection.disconnect()
                 targets = []
                 hasScanned = false
-                lastSuccess = "Pairing file ready. You can export it or install it into an app below."
+                lastSuccess = L("Pairing file ready. You can export it or install it into an app below.")
             } catch is CancellationError {
                 // User backed out — no error banner.
             } catch {
@@ -104,7 +104,7 @@ final class PairingManager: ObservableObject {
         Task {
             do {
                 try await engine.installPairing(into: target)
-                lastSuccess = "Pairing file installed into \(target.name)."
+                lastSuccess = L("Pairing file installed into %@.", target.name)
             } catch {
                 lastError = message(error)
             }

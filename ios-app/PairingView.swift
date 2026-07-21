@@ -7,6 +7,8 @@ import UIKit
 /// on this iPhone (SideStore, StikDebug, Feather, …) over LocalDevVPN.
 struct PairingView: View {
     @EnvironmentObject private var engine: Engine
+    /// Declared so every label on this screen redraws when the language changes.
+    @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: PairingManager
 
     @State private var showSettings = false
@@ -54,7 +56,7 @@ struct PairingView: View {
     // MARK: Header
 
     private var header: some View {
-        BrandHeader(icon: "lock.doc.fill", image: "PairingLogo", title: "Pairing") {
+        BrandHeader(icon: "lock.doc.fill", image: "PairingLogo", title: L("Pairing")) {
             statusPill
                 .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
                 .id(statusID)
@@ -71,9 +73,9 @@ struct PairingView: View {
         if let summary = engine.deviceSummary {
             StatusPill(text: summary, systemImage: "iphone", color: .green)
         } else if manager.pairingFileExists {
-            StatusPill(text: "Pairing file ready", systemImage: "checkmark.seal.fill", color: .green)
+            StatusPill(text: L("Pairing file ready"), systemImage: "checkmark.seal.fill", color: .green)
         } else {
-            StatusPill(text: "No pairing file", systemImage: "lock.slash.fill", color: .orange, glass: true)
+            StatusPill(text: L("No pairing file"), systemImage: "lock.slash.fill", color: .orange, glass: true)
         }
     }
 
@@ -82,17 +84,17 @@ struct PairingView: View {
     private var pairingFileCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 14) {
-                sectionTitle("Pairing file", systemImage: "lock.doc.fill")
+                sectionTitle(L("Pairing file"), systemImage: "lock.doc.fill")
 
                 Button { manager.generate() } label: {
                     HStack(spacing: 10) {
                         if manager.isGenerating {
                             ProgressView().tint(.white)
-                            Text("Pairing…")
+                            Text(L("Pairing…"))
                         } else {
                             Image(systemName: manager.pairingFileExists ? "arrow.clockwise" : "lock.iphone")
                                 .contentTransition(.symbolEffect(.replace))
-                            Text(manager.pairingFileExists ? "Regenerate" : "Generate pairing file")
+                            Text(manager.pairingFileExists ? L("Regenerate") : L("Generate pairing file"))
                         }
                     }
                 }
@@ -101,7 +103,7 @@ struct PairingView: View {
 
                 if let url = manager.exportURL {
                     ShareLink(item: url) {
-                        Label("Export pairing file", systemImage: "square.and.arrow.up")
+                        Label(L("Export pairing file"), systemImage: "square.and.arrow.up")
                             .font(.subheadline.weight(.semibold))
                             .frame(maxWidth: .infinity)
                     }
@@ -119,19 +121,19 @@ struct PairingView: View {
     private func pinCard(_ pin: String) -> some View {
         CalloutCard(tint: .orange) {
             VStack(spacing: 12) {
-                sectionTitle("Pairing code", systemImage: "lock.iphone")
+                sectionTitle(L("Pairing code"), systemImage: "lock.iphone")
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text(pin)
                     .font(.system(size: 46, weight: .bold, design: .rounded))
                     .tracking(8)
                     .frame(maxWidth: .infinity)
-                Text("Type this into the prompt in Settings.")
+                Text(L("Type this into the prompt in Settings."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Button {
                     UIPasteboard.general.string = pin
                 } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
+                    Label(L("Copy"), systemImage: "doc.on.doc")
                         .font(.subheadline.weight(.semibold))
                 }
                 .buttonStyle(.bordered)
@@ -143,7 +145,7 @@ struct PairingView: View {
     private var generatingSteps: some View {
         CalloutCard(tint: Theme.accent) {
             VStack(alignment: .leading, spacing: 14) {
-                sectionTitle("Pair in Settings", systemImage: "gearshape")
+                sectionTitle(L("Pair in Settings"), systemImage: "gearshape")
                 stepsList(Guides.pairing.steps)
                 if !engine.pairingStatus.isEmpty {
                     Text(engine.pairingStatus)
@@ -160,7 +162,7 @@ struct PairingView: View {
     private var installCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 14) {
-                sectionTitle("Install into an app", systemImage: "tray.and.arrow.down.fill")
+                sectionTitle(L("Install into an app"), systemImage: "tray.and.arrow.down.fill")
 
                 // Wi-Fi is the prerequisite for the tunnel, so it takes priority:
                 // no Wi-Fi → Wi-Fi note; Wi-Fi but no tunnel → LocalDevVPN note.
@@ -174,11 +176,11 @@ struct PairingView: View {
                     HStack(spacing: 10) {
                         if manager.isScanning {
                             ProgressView().tint(.white)
-                            Text("Scanning")
+                            Text(L("Scanning"))
                         } else {
                             Image(systemName: manager.hasScanned ? "arrow.clockwise" : "magnifyingglass")
                                 .contentTransition(.symbolEffect(.replace))
-                            Text(manager.hasScanned ? "Rescan apps" : "Scan installed apps")
+                            Text(manager.hasScanned ? L("Rescan apps") : L("Scan installed apps"))
                         }
                     }
                 }
@@ -192,7 +194,7 @@ struct PairingView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "wifi.slash")
                 .foregroundStyle(.red)
-            Text("Connect to Wi-Fi to scan and install. LocalDevVPN's tunnel runs over it.")
+            Text(L("Connect to Wi-Fi to scan and install. LocalDevVPN's tunnel runs over it."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -206,7 +208,7 @@ struct PairingView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "shield.lefthalf.filled")
                 .foregroundStyle(.red)
-            Text("Turn on LocalDevVPN to scan and install. The write runs over its tunnel.")
+            Text(L("Turn on LocalDevVPN to scan and install. The write runs over its tunnel."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -225,7 +227,9 @@ struct PairingView: View {
         } else if !manager.targets.isEmpty {
             VStack(spacing: 14) {
                 HStack {
-                    Text("\(manager.targets.count) supported \(manager.targets.count == 1 ? "app" : "apps") installed")
+                    Text(manager.targets.count == 1
+                         ? L("%d supported app installed", manager.targets.count)
+                         : L("%d supported apps installed", manager.targets.count))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -244,9 +248,9 @@ struct PairingView: View {
                 Image(systemName: "questionmark.app.dashed")
                     .font(.largeTitle)
                     .foregroundStyle(Theme.brand)
-                Text("No supported apps found")
+                Text(L("No supported apps found"))
                     .font(.headline)
-                Text("Install an app like SideStore, StikDebug, or Feather first, then rescan.")
+                Text(L("Install an app like SideStore, StikDebug, or Feather first, then rescan."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -280,10 +284,10 @@ struct PairingView: View {
                     HStack(spacing: 6) {
                         if installing {
                             ProgressView().controlSize(.small)
-                            Text("Installing")
+                            Text(L("Installing"))
                         } else {
                             Image(systemName: "arrow.down.doc")
-                            Text("Install pairing")
+                            Text(L("Install pairing"))
                         }
                     }
                     .font(.subheadline.weight(.medium))
@@ -306,7 +310,7 @@ struct PairingView: View {
                     .font(.title2)
                     .foregroundStyle(.red)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Something went wrong")
+                    Text(L("Something went wrong"))
                         .font(.subheadline.weight(.semibold))
                     Text(message)
                         .font(.footnote)

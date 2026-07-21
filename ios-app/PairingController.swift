@@ -44,11 +44,11 @@ final class PairingController {
         var errorDescription: String? {
             switch self {
             case .busy:
-                return "Pairing is already in progress."
+                return L("Pairing is already in progress.")
             case .localNetworkDenied:
-                return "Local Network permission is off. Enable it in Settings › SideInstaller › Local Network, then try again."
+                return L("Local Network permission is off. Enable it in Settings › SideInstaller › Local Network, then try again.")
             case .zeroBytes:
-                return "Pairing produced an empty file. Make sure you approved the pairing request, then try again."
+                return L("Pairing produced an empty file. Make sure you approved the pairing request, then try again.")
             case let .failed(message):
                 return message
             }
@@ -90,20 +90,20 @@ final class PairingController {
             return
         }
         running = true
-        engine.pairingStatus = "requesting Local Network…"
+        engine.pairingStatus = L("requesting Local Network…")
         engine.log("RPPairing: requesting Local Network permission…")
 
         Task {
             guard await localNetwork.request() else {
                 engine.log("RPPairing: Local Network permission DENIED. Enable it in Settings › SideInstaller › Local Network, then retry.")
-                engine.pairingStatus = "Local Network denied"
+                engine.pairingStatus = L("Local Network denied")
                 running = false
                 resolve(.failure(PairingError.localNetworkDenied))
                 return
             }
             engine.log("RPPairing: Local Network granted. Starting keep-alive (silent audio).")
             keepAlive.startAudio()
-            engine.pairingStatus = "waiting for device…"
+            engine.pairingStatus = L("waiting for device…")
             runHost()
         }
     }
@@ -170,16 +170,16 @@ final class PairingController {
             engine.log("RPPairing: pairing file written to \(path) (\(size) bytes)")
             if size == 0 {
                 engine.log("⚠️ pairing file is zero bytes — Connect will refuse to use it.")
-                engine.pairingStatus = "failed: empty pairing file"
+                engine.pairingStatus = L("failed: empty pairing file")
                 resolve(.failure(PairingError.zeroBytes))
             } else {
                 engine.pairingFilePath = path
-                engine.pairingStatus = "paired: \(name) (\(size)B)"
+                engine.pairingStatus = L("paired: %@ (%dB)", name, size)
                 resolve(.success(path))
             }
         case let .failure(message):
             engine.log("RPPairing: FAILED — \(message)")
-            engine.pairingStatus = "failed: \(message)"
+            engine.pairingStatus = L("failed: %@", message)
             resolve(.failure(PairingError.failed(message)))
         }
     }
@@ -197,12 +197,12 @@ final class PairingController {
         service.setTXTRecord(NetService.data(fromTXTRecord: txt))
         service.publish()
         netService = service
-        engine.pairingStatus = "advertising — open Settings › Privacy & Security › Developer Mode"
+        engine.pairingStatus = L("advertising — open Settings › Privacy & Security › Developer Mode")
     }
 
     fileprivate func presentPin(_ pin: String) {
         engine.log("RPPairing: PIN = \(pin) — confirm it on this device (Settings → Developer Mode → Pair with SideInstaller).")
-        engine.pairingStatus = "enter PIN \(pin) in Settings"
+        engine.pairingStatus = L("enter PIN %@ in Settings", pin)
         // Surfaced as a prominent card in the one-click UI.
         engine.pairingPIN = pin
     }

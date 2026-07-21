@@ -6,6 +6,9 @@ import UIKit
 /// log for troubleshooting — kept out of the main flow so it stays uncluttered.
 struct SettingsView: View {
     @EnvironmentObject private var engine: Engine
+    /// The language setting lives here, so this sheet both drives it and
+    /// redraws itself the instant it changes.
+    @EnvironmentObject private var loc: Localizer
     @Environment(\.dismiss) private var dismiss
 
     /// Lists / deletes the IPAs the app has cached in Documents. Owned here (rather
@@ -21,16 +24,17 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                languageSection
                 downloadsSection
                 anisetteSection
                 advancedSection
                 logSection
             }
-            .navigationTitle("Settings")
+            .navigationTitle(L("Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button(L("Done")) { dismiss() }
                 }
             }
         }
@@ -38,18 +42,36 @@ struct SettingsView: View {
             anisetteIsCustom = !engine.anisetteServers.contains { $0.address == engine.anisetteURL }
             downloadsManager.refresh()
         }
-        .alert("Delete this download?",
+        .alert(L("Delete this download?"),
                isPresented: Binding(get: { pendingDelete != nil },
                                     set: { if !$0 { pendingDelete = nil } })) {
-            Button("Delete", role: .destructive) {
+            Button(L("Delete"), role: .destructive) {
                 if let item = pendingDelete { downloadsManager.delete(item) }
                 pendingDelete = nil
             }
-            Button("Cancel", role: .cancel) { pendingDelete = nil }
+            Button(L("Cancel"), role: .cancel) { pendingDelete = nil }
         } message: {
             if let item = pendingDelete {
-                Text("“\(item.fileName)” (\(item.sizeText)) will be removed. You can download it again any time from the Install tab.")
+                Text(L("“%@” (%@) will be removed. You can download it again any time from the Install tab.",
+                       item.fileName, item.sizeText))
             }
+        }
+    }
+
+    // MARK: Language
+
+    /// App-wide language. "Auto" tracks the iPhone's own language; picking a
+    /// language pins the app to it whatever the phone is set to. The change
+    /// lands immediately — every screen observes `Localizer`.
+    private var languageSection: some View {
+        Section {
+            Picker(L("App language"), selection: $loc.language) {
+                ForEach(AppLanguage.allCases) { language in
+                    Text(language.displayName).tag(language)
+                }
+            }
+        } header: {
+            Text(L("Language"))
         }
     }
 
@@ -66,7 +88,7 @@ struct SettingsView: View {
                     .foregroundStyle(.red)
             }
             if downloadsManager.hasLoaded && downloadsManager.downloads.isEmpty {
-                Text("No downloaded IPAs. Ones you install from the Install tab are cached here.")
+                Text(L("No downloaded IPAs. Ones you install from the Install tab are cached here."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
@@ -81,15 +103,13 @@ struct SettingsView: View {
             }
         } header: {
             HStack {
-                Text("Downloaded IPAs")
+                Text(L("Downloaded IPAs"))
                 Spacer()
                 if !downloadsManager.downloads.isEmpty {
-                    Text("\(downloadsManager.totalSizeText) used")
+                    Text(L("%@ used", downloadsManager.totalSizeText))
                         .foregroundStyle(.secondary)
                 }
             }
-        } footer: {
-            Text("IPAs are cached in the app's Documents so re-installs are instant. Swipe a row to delete it and free up space.")
         }
     }
 
@@ -102,7 +122,9 @@ struct SettingsView: View {
                 Text(item.displayName)
                     .font(.subheadline.weight(.medium))
                 if let modified = item.modified {
-                    Text("Downloaded \(modified.formatted(date: .abbreviated, time: .shortened))")
+                    Text(L("Downloaded %@", modified.formatted(
+                        Date.FormatStyle(date: .abbreviated, time: .shortened)
+                            .locale(Localizer.locale))))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -121,15 +143,15 @@ struct SettingsView: View {
 
     private var anisetteSection: some View {
         Section {
-            Picker("Server", selection: anisetteSelection) {
+            Picker(L("Server"), selection: anisetteSelection) {
                 ForEach(engine.anisetteServers) { server in
                     Text(server.name).tag(Optional(server.address))
                 }
                 Divider()
-                Text("Custom…").tag(String?.none)
+                Text(L("Custom…")).tag(String?.none)
             }
             if anisetteIsCustom {
-                TextField("Server URL", text: $engine.anisetteURL)
+                TextField(L("Server URL"), text: $engine.anisetteURL)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
@@ -141,9 +163,7 @@ struct SettingsView: View {
                     .truncationMode(.middle)
             }
         } header: {
-            Text("Anisette Server")
-        } footer: {
-            Text("Used to sign in to Apple. The app retries the others automatically if one is down.")
+            Text(L("Anisette Server"))
         }
     }
 
@@ -168,7 +188,7 @@ struct SettingsView: View {
     private var advancedSection: some View {
         Section {
             HStack {
-                Text("Device IP")
+                Text(L("Device IP"))
                 Spacer()
                 TextField("10.7.0.1", text: $engine.deviceIP)
                     .textInputAutocapitalization(.never)
@@ -178,9 +198,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("Advanced")
-        } footer: {
-            Text("The LocalDevVPN tunnel target. Leave the default unless you've changed it.")
+            Text(L("Advanced"))
         }
     }
 
@@ -210,18 +228,18 @@ struct SettingsView: View {
                 Button {
                     UIPasteboard.general.string = engine.logText()
                 } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
+                    Label(L("Copy"), systemImage: "doc.on.doc")
                 }
                 Spacer()
                 Button(role: .destructive) {
                     engine.clearLog()
                 } label: {
-                    Label("Clear", systemImage: "trash")
+                    Label(L("Clear"), systemImage: "trash")
                 }
             }
             .font(.subheadline)
         } header: {
-            Text("Activity Log (\(engine.lines.count))")
+            Text(L("Activity Log (%d)", engine.lines.count))
         }
     }
 }

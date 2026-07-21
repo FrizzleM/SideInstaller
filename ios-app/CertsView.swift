@@ -5,6 +5,8 @@ import SwiftUI
 /// revoking a stale one here frees a slot when "Install" hits that limit.
 struct CertsView: View {
     @EnvironmentObject private var engine: Engine
+    /// Declared so every label on this screen redraws when the language changes.
+    @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: CertManager
 
     @State private var showSettings = false
@@ -34,17 +36,18 @@ struct CertsView: View {
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
             .sheet(isPresented: $showSettings) { SettingsView() }
         }
-        .alert("Revoke this certificate?",
+        .alert(L("Revoke this certificate?"),
                isPresented: Binding(get: { pendingRevoke != nil },
                                     set: { if !$0 { pendingRevoke = nil } })) {
-            Button("Revoke", role: .destructive) {
+            Button(L("Revoke"), role: .destructive) {
                 if let cert = pendingRevoke { manager.revoke(cert) }
                 pendingRevoke = nil
             }
-            Button("Cancel", role: .cancel) { pendingRevoke = nil }
+            Button(L("Cancel"), role: .cancel) { pendingRevoke = nil }
         } message: {
             if let cert = pendingRevoke {
-                Text("“\(cert.displayName)” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.")
+                Text(L("“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.",
+                       cert.displayName))
             }
         }
     }
@@ -52,7 +55,7 @@ struct CertsView: View {
     // MARK: Header
 
     private var header: some View {
-        BrandHeader(icon: "checkmark.seal.fill", image: "CertsLogo", title: "Certificates") {
+        BrandHeader(icon: "checkmark.seal.fill", image: "CertsLogo", title: L("Certificates")) {
             if let team = manager.teamSummary {
                 StatusPill(text: team, systemImage: "person.2.fill", color: .green)
                     .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
@@ -66,14 +69,14 @@ struct CertsView: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 sectionTitle("Apple ID", systemImage: "person.crop.circle.fill")
-                TextField("Email", text: $engine.appleID)
+                TextField(L("Email"), text: $engine.appleID)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.emailAddress)
                     .textContentType(.username)
                     .textFieldStyle(.plain)
                     .fieldBackground()
-                SecureField("Password", text: $engine.applePassword)
+                SecureField(L("Password"), text: $engine.applePassword)
                     .textContentType(.password)
                     .textFieldStyle(.plain)
                     .fieldBackground()
@@ -91,11 +94,11 @@ struct CertsView: View {
             HStack(spacing: 10) {
                 if manager.isWorking {
                     ProgressView().tint(.white)
-                    Text(manager.isSignedIn ? "Refreshing" : "Signing in")
+                    Text(manager.isSignedIn ? L("Refreshing") : L("Signing in"))
                 } else {
                     Image(systemName: manager.hasLoaded ? "arrow.clockwise" : "list.bullet.rectangle.fill")
                         .contentTransition(.symbolEffect(.replace))
-                    Text(manager.hasLoaded ? "Refresh" : "Load certificates")
+                    Text(manager.hasLoaded ? L("Refresh") : L("Load certificates"))
                 }
             }
         }
@@ -112,7 +115,7 @@ struct CertsView: View {
         } else if !manager.certs.isEmpty {
             VStack(spacing: 14) {
                 HStack {
-                    Text("\(manager.certs.count) of 3 certificates")
+                    Text(L("%d of 3 certificates", manager.certs.count))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -131,9 +134,9 @@ struct CertsView: View {
                 Image(systemName: "checkmark.seal")
                     .font(.largeTitle)
                     .foregroundStyle(Theme.brand)
-                Text("No certificates")
+                Text(L("No certificates"))
                     .font(.headline)
-                Text("This Apple ID has no development certificates to revoke.")
+                Text(L("This Apple ID has no development certificates to revoke."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -162,7 +165,7 @@ struct CertsView: View {
                     }
                     Spacer()
                     if cert.isExpired {
-                        Text("Expired")
+                        Text(L("Expired"))
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(.orange)
                             .padding(.horizontal, 9)
@@ -174,7 +177,9 @@ struct CertsView: View {
                 if cert.expiresAt != nil || !cert.serialNumber.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         if let expiry = cert.expiresAt {
-                            Label("Expires \(expiry.formatted(date: .abbreviated, time: .omitted))",
+                            Label(L("Expires %@", expiry.formatted(
+                                       Date.FormatStyle(date: .abbreviated, time: .omitted)
+                                           .locale(Localizer.locale))),
                                   systemImage: "calendar")
                         }
                         if !cert.serialNumber.isEmpty {
@@ -193,10 +198,10 @@ struct CertsView: View {
                     HStack(spacing: 6) {
                         if revoking {
                             ProgressView().controlSize(.small)
-                            Text("Revoking")
+                            Text(L("Revoking"))
                         } else {
                             Image(systemName: "trash")
-                            Text("Revoke")
+                            Text(L("Revoke"))
                         }
                     }
                     .font(.subheadline.weight(.medium))
@@ -219,7 +224,7 @@ struct CertsView: View {
                     .font(.title2)
                     .foregroundStyle(.red)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Something went wrong")
+                    Text(L("Something went wrong"))
                         .font(.subheadline.weight(.semibold))
                     Text(message)
                         .font(.footnote)

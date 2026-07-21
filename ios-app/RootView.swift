@@ -15,6 +15,9 @@ import SwiftUI
 /// regardless of which tab is active.
 struct RootView: View {
     @EnvironmentObject private var engine: Engine
+    /// Declared so a language change invalidates this view and the tab bar
+    /// relabels itself.
+    @EnvironmentObject private var loc: Localizer
     /// Owned here so they survive tab switches and share the one `Engine`.
     @StateObject private var certManager = CertManager()
     @StateObject private var pairingManager = PairingManager()
@@ -22,25 +25,25 @@ struct RootView: View {
 
     var body: some View {
         TabView {
-            Tab("Install", systemImage: "square.and.arrow.down") {
+            Tab(L("Install"), systemImage: "square.and.arrow.down") {
                 ContentView()
             }
-            Tab("Pairing", systemImage: "lock.iphone") {
+            Tab(L("Pairing"), systemImage: "lock.iphone") {
                 PairingView(manager: pairingManager)
             }
-            Tab("Certificates", systemImage: "checkmark.seal") {
+            Tab(L("Certificates"), systemImage: "checkmark.seal") {
                 CertsView(manager: certManager)
             }
         }
         .tint(Theme.accent)
         .preferredColorScheme(.dark)
-        .alert("Two-Factor Code", isPresented: $engine.pendingTwoFactor) {
-            TextField("6-digit code", text: $twoFactorCode)
+        .alert(L("Two-Factor Code"), isPresented: $engine.pendingTwoFactor) {
+            TextField(L("6-digit code"), text: $twoFactorCode)
                 .keyboardType(.numberPad)
-            Button("Submit") { engine.submitTwoFactor(twoFactorCode); twoFactorCode = "" }
-            Button("Cancel", role: .cancel) { engine.cancelTwoFactor(); twoFactorCode = "" }
+            Button(L("Submit")) { engine.submitTwoFactor(twoFactorCode); twoFactorCode = "" }
+            Button(L("Cancel"), role: .cancel) { engine.cancelTwoFactor(); twoFactorCode = "" }
         } message: {
-            Text("Enter the code Apple just sent to your trusted device.")
+            Text(L("Enter the code Apple just sent to your trusted device."))
         }
     }
 }

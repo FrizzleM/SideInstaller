@@ -1,19 +1,39 @@
 import Foundation
 
+/// Which release track to pull the IPA from. Both supported repos publish a
+/// stable tagged release *and* a rolling `nightly` pre-release carrying the same
+/// asset names, so the choice is orthogonal to `InstallSource`.
+enum ReleaseChannel: String, CaseIterable, Identifiable {
+    case stable
+    case nightly
+
+    var id: String { rawValue }
+
+    /// Label for the picker.
+    var displayName: String {
+        switch self {
+        case .stable:  return L("Stable")
+        case .nightly: return L("Nightly")
+        }
+    }
+
+    /// Filename suffix, so a stable and a nightly download of the same app can
+    /// coexist in Documents instead of overwriting each other.
+    var fileSuffix: String {
+        switch self {
+        case .stable:  return ""
+        case .nightly: return "-nightly"
+        }
+    }
+}
+
 /// What to install. `sideStore` and `liveContainer` are both SideStore builds —
-/// the difference is which GitHub release the IPA is fetched from (LiveContainer
-/// + SideStore is SideStore with LiveContainer integrated). SideStore pulls its
-/// latest stable release; LiveContainer pulls its rolling `nightly` pre-release,
-/// which is where the freshest LiveContainer + SideStore IPA is published.
-/// `stikDebug` is a different app entirely — StephenDev0's on-device
-/// debugger/JIT enabler — but the pipeline (sign, install, write pairing) is
-/// identical; only the pairing-file target changes (see below). Because
-/// StikDebug is itself powered by idevice/RPPairing, the `rp_pairing_file.plist`
-/// SideInstaller generates is exactly the record it wants.
+/// the difference is which GitHub repo the IPA is fetched from (LiveContainer
+/// + SideStore is SideStore with LiveContainer integrated). Which *release* of
+/// that repo is picked comes from the `ReleaseChannel` the user selected.
 enum InstallSource: String, CaseIterable, Identifiable {
     case sideStore
     case liveContainer
-    case stikDebug
 
     var id: String { rawValue }
 
@@ -22,7 +42,6 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "LiveContainer + SideStore"
-        case .stikDebug:     return "StikDebug"
         }
     }
 
@@ -31,7 +50,6 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "SS + LiveContainer"
-        case .stikDebug:     return "StikDebug"
         }
     }
 
@@ -40,29 +58,27 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore/SideStore"
         case .liveContainer: return "LiveContainer/LiveContainer"
-        case .stikDebug:     return "StephenDev0/StikDebug"
         }
     }
 
-    /// GitHub releases API endpoint to read the IPA from. SideStore and StikDebug
-    /// use their latest stable release; LiveContainer uses its rolling `nightly`
-    /// pre-release (the `/releases/latest` endpoint skips pre-releases, so we
-    /// fetch the `nightly` tag directly).
-    var releaseAPI: URL {
+    /// GitHub releases API endpoint for a channel. `/releases/latest` skips
+    /// pre-releases, so the nightly build is fetched by its `nightly` tag.
+    func releaseAPI(_ channel: ReleaseChannel) -> URL {
         let base = "https://api.github.com/repos/\(repo)/releases"
-        switch self {
-        case .sideStore, .stikDebug: return URL(string: "\(base)/latest")!
-        case .liveContainer:         return URL(string: "\(base)/tags/nightly")!
+        switch channel {
+        case .stable:  return URL(string: "\(base)/latest")!
+        case .nightly: return URL(string: "\(base)/tags/nightly")!
         }
     }
 
-    /// Local filename for the downloaded IPA.
-    var fileName: String {
+    /// Local filename for the downloaded IPA, e.g. "SideStore-nightly.ipa".
+    func fileName(_ channel: ReleaseChannel) -> String {
+        let base: String
         switch self {
-        case .sideStore:     return "SideStore.ipa"
-        case .liveContainer: return "LiveContainer+SideStore.ipa"
-        case .stikDebug:     return "StikDebug.ipa"
+        case .sideStore:     base = "SideStore"
+        case .liveContainer: base = "LiveContainer+SideStore"
         }
+        return "\(base)\(channel.fileSuffix).ipa"
     }
 
     // MARK: Pairing-file placement
@@ -80,7 +96,6 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "LiveContainer"
-        case .stikDebug:     return "StikDebug"
         }
     }
 
@@ -91,34 +106,25 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "com.SideStore.SideStore"
         case .liveContainer: return "com.kdt.livecontainer"
-        case .stikDebug:     return "com.stik.stikdebug"
         }
     }
 
     /// Where the pairing file must land, relative to the host app's Documents
     /// directory. Plain SideStore reads it at the Documents root. Under
     /// LiveContainer, SideStore runs as a guest whose Documents live in a
-    /// nested folder, so the file goes there instead. A *sideloaded* StikDebug
-    /// (which is what we install — bundle id `com.stik.stikdebug.<teamID>`)
-    /// reads `rp_pairing_file.plist`; StikDebug now keeps that file in
-    /// Application Support but still migrates a legacy copy from its Documents
-    /// root on launch, so seeding it there via house_arrest is picked up. This
-    /// matches the `StikDebug (Sideloaded)` entry on the Pairing tab
-    /// (`PairingTargets`).
+    /// nested folder, so the file goes there instead.
     var pairingRemoteRelativePath: String {
         switch self {
         case .sideStore:     return "ALTPairingFile.mobiledevicepairing"
         case .liveContainer: return "SideStore/Documents/ALTPairingFile.mobiledevicepairing"
-        case .stikDebug:     return "rp_pairing_file.plist"
         }
     }
 
     /// Pick the right `.ipa` asset out of a release's assets.
     func selectAsset(from assets: [SideStoreDownloader.GHAsset]) -> SideStoreDownloader.GHAsset? {
         switch self {
-        case .sideStore, .stikDebug:
-            // Both publish a single `.ipa` per release (StikDebug's is
-            // version-stamped, e.g. `StikDebug-3.1.6.ipa`).
+        case .sideStore:
+            // Publishes a single `.ipa` per release.
             return assets.first { $0.name.hasSuffix(".ipa") }
         case .liveContainer:
             // Prefer the exact published bundle; fall back to any SideStore-
@@ -129,7 +135,8 @@ enum InstallSource: String, CaseIterable, Identifiable {
     }
 }
 
-/// Downloads the latest release IPA for the chosen `InstallSource` into Documents.
+/// Downloads the newest IPA on the chosen `InstallSource` + `ReleaseChannel`
+/// into Documents.
 enum SideStoreDownloader {
 
     struct GHAsset: Decodable {
@@ -143,29 +150,42 @@ enum SideStoreDownloader {
     }
 
     enum DownloadError: Error, CustomStringConvertible {
-        case noIPAAsset(String)
+        case noIPAAsset(String, ReleaseChannel)
+        case noRelease(String, ReleaseChannel)
         case badURL
         var description: String {
             switch self {
-            case let .noIPAAsset(source): return "couldn't find the IPA in the latest \(source) release"
-            case .badURL: return "bad asset URL"
+            case let .noIPAAsset(source, channel):
+                return L("couldn't find the IPA in the %@ %@ release",
+                         channel.displayName.lowercased(), source)
+            case let .noRelease(source, channel):
+                return L("%@ has no %@ release right now",
+                         source, channel.displayName.lowercased())
+            case .badURL:
+                return L("bad asset URL")
             }
         }
     }
 
     /// Returns the local path of the downloaded IPA. `log` receives progress.
     static func downloadLatest(source: InstallSource,
+                               channel: ReleaseChannel,
                                log: @escaping (String) -> Void) async throws -> String {
-        var req = URLRequest(url: source.releaseAPI)
+        var req = URLRequest(url: source.releaseAPI(channel))
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
 
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, releaseResponse) = try await URLSession.shared.data(for: req)
+        // A repo that has dropped (or never published) the `nightly` tag answers
+        // 404 — report that as a missing channel rather than a decode failure.
+        if let http = releaseResponse as? HTTPURLResponse, http.statusCode == 404 {
+            throw DownloadError.noRelease(source.displayName, channel)
+        }
         let release = try JSONDecoder().decode(GHRelease.self, from: data)
-        log("Latest \(source.displayName) release: \(release.tag_name) with \(release.assets.count) assets")
+        log("\(channel.displayName) \(source.displayName) release: \(release.tag_name) with \(release.assets.count) assets")
 
         guard let asset = source.selectAsset(from: release.assets) else {
-            throw DownloadError.noIPAAsset(source.displayName)
+            throw DownloadError.noIPAAsset(source.displayName, channel)
         }
         guard let assetURL = URL(string: asset.browser_download_url) else {
             throw DownloadError.badURL
@@ -178,7 +198,7 @@ enum SideStoreDownloader {
         }
 
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let dest = docs.appendingPathComponent(source.fileName)
+        let dest = docs.appendingPathComponent(source.fileName(channel))
         try? FileManager.default.removeItem(at: dest)
         try FileManager.default.moveItem(at: tmp, to: dest)
         return dest.path

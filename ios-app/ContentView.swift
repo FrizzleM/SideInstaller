@@ -7,6 +7,8 @@ import UIKit
 struct ContentView: View {
     @EnvironmentObject private var engine: Engine
     @EnvironmentObject private var updateChecker: UpdateChecker
+    /// Declared so every label on this screen redraws when the language changes.
+    @EnvironmentObject private var loc: Localizer
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
 
@@ -20,11 +22,15 @@ struct ContentView: View {
                     }
                     appleIDCard.cascadeItem(1)
                     appCard.cascadeItem(2)
-                    // Wi-Fi is the prerequisite for the tunnel, so it takes
-                    // priority: no Wi-Fi → Wi-Fi callout; Wi-Fi but no tunnel →
-                    // LocalDevVPN callout; both up → neither.
+                    // Most-blocking requirement first: an unsupported iOS can't
+                    // be worked around at all, so it pre-empts the other two.
+                    // Then Wi-Fi, the prerequisite for the tunnel: no Wi-Fi →
+                    // Wi-Fi callout; Wi-Fi but no tunnel → LocalDevVPN callout;
+                    // all three fine → none.
                     if !engine.isRunning {
-                        if !engine.wifiConnected {
+                        if !engine.osSupported {
+                            osRequirement.cascadeItem(3)
+                        } else if !engine.wifiConnected {
                             wifiRequirement.cascadeItem(3)
                         } else if !engine.vpnConnected {
                             vpnRequirement.cascadeItem(3)
@@ -105,9 +111,9 @@ struct ContentView: View {
         if let summary = engine.deviceSummary {
             StatusPill(text: summary, systemImage: "iphone", color: .green)
         } else if engine.vpnConnected {
-            StatusPill(text: "Tunnel connected", systemImage: "checkmark.shield.fill", color: .green)
+            StatusPill(text: L("Tunnel connected"), systemImage: "checkmark.shield.fill", color: .green)
         } else {
-            StatusPill(text: "Tunnel off", systemImage: "shield.slash.fill", color: .red)
+            StatusPill(text: L("Tunnel off"), systemImage: "shield.slash.fill", color: .red)
         }
     }
 
@@ -116,7 +122,7 @@ struct ContentView: View {
     /// A quiet brand credit at the foot of the screen, tucked below the flow so it
     /// stays visible without crowding the header.
     private var footer: some View {
-        Text("an app by Frizzle")
+        Text(L("an app by Frizzle"))
             .font(.caption)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity)
@@ -129,14 +135,14 @@ struct ContentView: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 sectionTitle("Apple ID", systemImage: "person.crop.circle.fill")
-                TextField("Email", text: $engine.appleID)
+                TextField(L("Email"), text: $engine.appleID)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.emailAddress)
                     .textContentType(.username)
                     .textFieldStyle(.plain)
                     .fieldBackground()
-                SecureField("Password", text: $engine.applePassword)
+                SecureField(L("Password"), text: $engine.applePassword)
                     .textContentType(.password)
                     .textFieldStyle(.plain)
                     .fieldBackground()
@@ -158,9 +164,10 @@ struct ContentView: View {
                         .font(.title2)
                         .foregroundStyle(Theme.brand)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Update available")
+                        Text(L("Update available"))
                             .font(.subheadline.weight(.semibold))
-                        Text("SideInstaller \(updateChecker.latestVersion ?? "") is available — you're on \(updateChecker.currentVersion).")
+                        Text(L("SideInstaller %@ is available — you're on %@.",
+                               updateChecker.latestVersion ?? "", updateChecker.currentVersion))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -181,7 +188,7 @@ struct ContentView: View {
                     if let url = URL(string: UpdateChecker.installPageURL) { openURL(url) }
                 } label: {
                     HStack(spacing: 4) {
-                        Text("Get the latest version")
+                        Text(L("Get the latest version"))
                         Image(systemName: "arrow.up.right")
                     }
                     .font(.footnote.weight(.semibold))
@@ -197,9 +204,9 @@ struct ContentView: View {
     private var appCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle("Install", systemImage: "square.and.arrow.down.fill")
+                sectionTitle(L("Install"), systemImage: "square.and.arrow.down.fill")
                 Menu {
-                    Picker("Install", selection: $engine.installSource) {
+                    Picker(L("Install"), selection: $engine.installSource) {
                         ForEach(InstallSource.allCases) { src in
                             Text(src.displayName).tag(src)
                         }
@@ -216,6 +223,13 @@ struct ContentView: View {
                     .fieldBackground()
                     .contentShape(Rectangle())
                 }
+
+                Picker(L("Release"), selection: $engine.releaseChannel) {
+                    ForEach(ReleaseChannel.allCases) { channel in
+                        Text(channel.displayName).tag(channel)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
         }
         .disabled(engine.isRunning)
@@ -230,11 +244,12 @@ struct ContentView: View {
             HStack(spacing: 10) {
                 if engine.isRunning {
                     ProgressView().tint(.white)
-                    Text("Cancel")
+                    Text(L("Cancel"))
                 } else {
                     Image(systemName: engine.finished ? "arrow.clockwise" : "square.and.arrow.down.fill")
                         .contentTransition(.symbolEffect(.replace))
-                    Text(engine.finished ? "Reinstall" : "Install \(engine.installSource.shortName)")
+                    Text(engine.finished ? L("Reinstall")
+                                         : L("Install %@", engine.installSource.shortName))
                 }
             }
         }
@@ -245,6 +260,31 @@ struct ContentView: View {
                 : Theme.brand,
             glow: engine.isRunning ? .red : Theme.accent))
         .animation(.smooth(duration: 0.3), value: engine.isRunning)
+    }
+
+    // MARK: iOS version requirement
+
+    /// Shown above the Install button on an iPhone older than the minimum iOS.
+    /// Unlike the Wi-Fi and LocalDevVPN callouts this one isn't a "do this and
+    /// carry on" — the install can't run here at all — so it replaces both.
+    private var osRequirement: some View {
+        CalloutCard(tint: .red) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "iphone.gen3.slash")
+                    .font(.title2)
+                    .foregroundStyle(.red)
+                    .symbolEffect(.pulse)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L("iOS %@ required", Engine.minimumOSText))
+                        .font(.subheadline.weight(.semibold))
+                    Text(L("This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.",
+                           engine.osVersionText, Engine.minimumOSText))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
     }
 
     // MARK: Wi-Fi requirement
@@ -260,9 +300,9 @@ struct ContentView: View {
                     .foregroundStyle(.red)
                     .symbolEffect(.pulse)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Wi-Fi required")
+                    Text(L("Wi-Fi required"))
                         .font(.subheadline.weight(.semibold))
-                    Text("Connect to a Wi-Fi network. LocalDevVPN's tunnel and the install run over it.")
+                    Text(L("Connect to a Wi-Fi network. LocalDevVPN's tunnel and the install run over it."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -283,9 +323,9 @@ struct ContentView: View {
                     .foregroundStyle(.red)
                     .symbolEffect(.pulse)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("LocalDevVPN required")
+                    Text(L("LocalDevVPN required"))
                         .font(.subheadline.weight(.semibold))
-                    Text("Open LocalDevVPN and tap Connect. The install runs over its tunnel.")
+                    Text(L("Open LocalDevVPN and tap Connect. The install runs over its tunnel."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -310,7 +350,7 @@ struct ContentView: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Text(engine.finished ? "Installed" : "Installing")
+                    Text(engine.finished ? L("Installed") : L("Installing"))
                         .font(.headline)
                         .contentTransition(.opacity)
                     Spacer()
@@ -325,8 +365,11 @@ struct ContentView: View {
 
                 VStack(spacing: 0) {
                     ForEach(Array(Step.allCases.enumerated()), id: \.element) { idx, step in
+                        // The title is resolved here, not inside the row: it's
+                        // the stored property whose change makes the row redraw
+                        // when the language switches.
                         StepRow(step: step,
-                                source: engine.installSource,
+                                title: step.title(for: engine.installSource),
                                 state: engine.stepStates[step] ?? .pending,
                                 installProgress: engine.installProgress,
                                 isLast: idx == Step.allCases.count - 1)
@@ -355,19 +398,19 @@ struct ContentView: View {
     private func pinCallout(_ pin: String) -> some View {
         CalloutCard(tint: .orange) {
             VStack(spacing: 12) {
-                sectionTitle("Pairing code", systemImage: "lock.iphone")
+                sectionTitle(L("Pairing code"), systemImage: "lock.iphone")
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text(pin)
                     .font(.system(size: 46, weight: .bold, design: .rounded))
                     .tracking(8)
                     .frame(maxWidth: .infinity)
-                Text("Type this into the prompt in Settings.")
+                Text(L("Type this into the prompt in Settings."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Button {
                     UIPasteboard.general.string = pin
                 } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
+                    Label(L("Copy"), systemImage: "doc.on.doc")
                         .font(.subheadline.weight(.semibold))
                 }
                 .buttonStyle(.bordered)
@@ -417,7 +460,7 @@ struct ContentView: View {
                     .font(.title2)
                     .foregroundStyle(.red)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Install stopped")
+                    Text(L("Install stopped"))
                         .font(.subheadline.weight(.semibold))
                     Text(message)
                         .font(.footnote)
@@ -435,7 +478,8 @@ struct ContentView: View {
                     .font(.title)
                     .foregroundStyle(.green)
                     .symbolEffect(.bounce, options: .nonRepeating, value: engine.finished)
-                Text("\(engine.installedSourceName) is installed. Finish the trust step above to open it.")
+                Text(L("%@ is installed. Finish the trust step above to open it.",
+                       engine.installedSourceName))
                     .font(.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -476,7 +520,7 @@ extension View {
 /// while installing, or an "Action needed" cue when blocked on the user).
 private struct StepRow: View {
     let step: Step
-    let source: InstallSource
+    let title: String
     let state: StepState
     let installProgress: Double
     let isLast: Bool
@@ -486,7 +530,7 @@ private struct StepRow: View {
             timelineColumn
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Text(step.title(for: source))
+                    Text(title)
                         .font(.subheadline.weight(state == .pending ? .regular : .medium))
                         .foregroundStyle(state == .pending ? .secondary : .primary)
                     Spacer()
@@ -527,7 +571,7 @@ private struct StepRow: View {
                 .animation(.smooth(duration: 0.3), value: installProgress)
                 .transition(.opacity)
         } else if state == .waiting {
-            Text("Action needed")
+            Text(L("Action needed"))
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(.orange)
                 .padding(.horizontal, 9)
