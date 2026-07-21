@@ -92,7 +92,7 @@ final class CertManager: ObservableObject {
     @MainActor
     func loadCerts() {
         guard !isWorking, revokingID == nil else { return }
-        let id = engine.appleID, pw = engine.applePassword
+        let id = engine.normalizedAppleID, pw = engine.applePassword
         guard !id.isEmpty, !pw.isEmpty else {
             lastError = L("Enter your Apple ID email and password first.")
             return

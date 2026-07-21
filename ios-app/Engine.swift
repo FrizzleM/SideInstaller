@@ -367,7 +367,7 @@ final class Engine: ObservableObject {
             log("⛔️ iOS \(osVersionText) isn't supported — SideInstaller needs iOS \(Engine.minimumOSText) or later.")
             return
         }
-        guard !appleID.isEmpty, !applePassword.isEmpty else {
+        guard !normalizedAppleID.isEmpty, !applePassword.isEmpty else {
             log("Enter your Apple ID email + password first.")
             return
         }
@@ -558,6 +558,15 @@ final class Engine: ObservableObject {
 
     // MARK: Step 4 — Apple ID sign-in
 
+    /// The Apple ID as it should be sent to Apple. iOS keyboards happily leave a
+    /// trailing space behind autocomplete or a paste, and the field gives no
+    /// visual hint that it's there — but the username is mixed into the SRP
+    /// proof, so that invisible space comes back as a wrong-password error.
+    /// (The password is deliberately *not* trimmed: spaces can be part of it.)
+    var normalizedAppleID: String {
+        appleID.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     @MainActor
     private func signIn() async throws {
         if signSession != nil {
@@ -565,7 +574,7 @@ final class Engine: ObservableObject {
             setStep(.signIn, .done)
             return
         }
-        guard !appleID.isEmpty, !applePassword.isEmpty else {
+        guard !normalizedAppleID.isEmpty, !applePassword.isEmpty else {
             throw EngineError.message(L("Enter your Apple ID email + password."))
         }
         setStep(.signIn, .active)
@@ -576,7 +585,7 @@ final class Engine: ObservableObject {
         // could fix, like a wrong password or a cancelled 2FA prompt, stop the
         // loop early — see below.)
         let servers = anisetteCandidates()
-        let id = appleID, pw = applePassword, dir = storageDir
+        let id = normalizedAppleID, pw = applePassword, dir = storageDir
         twoFactorWasCancelled = false
         var lastError = "no anisette servers configured"
 
@@ -670,15 +679,28 @@ final class Engine: ObservableObject {
         anisetteServers.first { $0.address == address }?.name ?? address
     }
 
+    /// GrandSlam status codes that mean the credentials themselves are the
+    /// problem. Apple localises the accompanying message, so the numeric code is
+    /// the only reliable signal — match on it first and treat the wording as a
+    /// fallback for servers that don't echo the code.
+    private static let credentialErrorCodes = [
+        "-20101",   // invalid username/password
+        "-22406",   // "Enter the correct password for this Apple Account."
+    ]
+
     /// Detect a definitive Apple ID credential failure (vs. a flaky anisette
     /// server). Switching anisette servers can't fix these, so the sign-in loop
     /// stops on them instead of trying every server.
     static func isCredentialError(_ raw: String) -> Bool {
         let m = raw.lowercased()
+        if credentialErrorCodes.contains(where: m.contains) { return true }
+        // Wording fallbacks. Apple now brands the account an "Apple Account"
+        // rather than an "Apple ID", so both spellings have to be covered.
         return m.contains("apple id or password")
+            || m.contains("apple account or password")
             || m.contains("password was incorrect")
             || m.contains("incorrect apple id")
-            || m.contains("-20101")          // GSA: invalid username/password
+            || m.contains("correct password")
             || (m.contains("password") && m.contains("incorrect"))
     }
 
