@@ -28,7 +28,7 @@
 > - **Repository:** https://github.com/FrizzleM/SideInstaller
 >
 > Do not install SideInstaller from any other site, AltStore source, Telegram channel, Discord server,
-> app repo, or mirror — no matter how official it looks. Redistributing our builds is also prohibited by
+> app repo, or mirror, no matter how official it looks. Redistributing my builds without explicit consent is also prohibited by
 > the [license](LICENSE.md).
 
 ---
@@ -54,11 +54,10 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 
 ## Requirements
 
-| | |
-| :-- | :-- |
-| 📱 **Device** | An iPhone or iPad on iOS 27 |
-| 📶 **Network** | A Wi-Fi router or a hotspot connection |
-| 🔑 **Account** | Your Apple account credentials (used on-device only) |
+- An iPhone or iPad on iOS 27
+- A Wi-Fi router or a hotspot connection
+- Your Apple account credentials (not collected)
+
 
 ## How to use it
 
@@ -69,17 +68,19 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 4. Log in with your Apple account credentials.
 5. Tap **Install SideStore** or **Install SideStore + LiveContainer**.
 6. Wait while your selection installs.
-7. That's it — no PC and no extra steps required.
+7. That's it. No PC and no extra steps required.
 
 ## Is SideInstaller safe?
 
 SideInstaller is built with safety and privacy in mind. The app is fully local and open source, which means
 anyone can inspect exactly what it does.
 
-- 🔒 **Your Apple credentials never leave your device.** They're used locally, only to sign and install your
+**Your Apple credentials never leave your device.** They're used locally, only to sign and install your
   apps, and are never transmitted, logged, or collected in any way.
-- 🚫 **No server, no analytics, no account.** Nothing is collected and there's nothing to sign up for.
-- 🔍 **Fully auditable.** Every line of it can be verified in the source code.
+
+**No server, no analytics, no account.** Nothing is collected and there's nothing to sign up for.
+
+**Fully auditable.** Every line of it can be verified in the source code.
 
 > [!WARNING]
 > All of the above is true of **this** repository and the builds published from it. It is **not** a guarantee
