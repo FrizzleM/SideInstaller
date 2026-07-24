@@ -11,7 +11,6 @@
 [![Platform](https://img.shields.io/badge/platform-iOS-lightgrey?style=for-the-badge&logo=apple)](#requirements)
 [![License](https://img.shields.io/badge/license-Custom-orange?style=for-the-badge)](LICENSE.md)
 
-<img width="330" alt="SideInstaller running on iPhone" src="https://github.com/user-attachments/assets/600987fd-e294-4e6f-86ee-59a181bd2010" />
 
 </div>
 
