@@ -186,6 +186,8 @@ let vietnameseStrings: [String: String] = [
     "Enter your Apple ID email + password.":
         "Nhập email và mật khẩu Apple ID của bạn.",
     "Two-factor verification was cancelled.": "Đã hủy xác minh hai yếu tố.",
+    "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
+        "Apple ID hoặc mật khẩu không đúng. Hãy kiểm tra lại email và mật khẩu Apple Account của bạn rồi thử lại.",
     "Apple ID sign-in failed: %@": "Đăng nhập Apple ID thất bại: %@",
     "Apple ID sign-in failed on %@. Last error: %@":
         "Đăng nhập Apple ID thất bại trên %@. Lỗi cuối cùng: %@",

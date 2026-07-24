@@ -184,7 +184,8 @@ final class CertManager: ObservableObject {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
                 if Engine.isCredentialError(lastError) {
-                    throw EngineError.message(L("Apple ID sign-in failed: %@", lastError))
+                    engine.log("Apple ID credentials rejected: \(lastError)")
+                    throw EngineError.message(Engine.credentialErrorMessage)
                 }
                 engine.log("Certificates: anisette \(idx + 1)/\(servers.count) failed: \(lastError)")
             }

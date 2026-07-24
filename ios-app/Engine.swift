@@ -623,7 +623,8 @@ final class Engine: ObservableObject {
                 // account — so stop instead of cycling through the whole list.
                 if Self.isCredentialError(lastError) {
                     signInStatus = "sign-in failed"
-                    throw EngineError.message(L("Apple ID sign-in failed: %@", lastError))
+                    log("Apple ID credentials rejected: \(lastError)")
+                    throw EngineError.message(Self.credentialErrorMessage)
                 }
                 log("Anisette \(name) failed: \(lastError)")
                 if idx < servers.count - 1 { log("Trying the next anisette server…") }
@@ -687,6 +688,14 @@ final class Engine: ObservableObject {
         "-20101",   // invalid username/password
         "-22406",   // "Enter the correct password for this Apple Account."
     ]
+
+    /// What the user sees when Apple rejects the credentials themselves. Apple's
+    /// own wording arrives localised by *its* servers (so it can land in a
+    /// language the user didn't pick) and is often just a bare GrandSlam code —
+    /// that raw text goes to the log, and this replaces it on screen.
+    static var credentialErrorMessage: String {
+        L("Incorrect Apple ID or password. Check your Apple Account email and password, then try again.")
+    }
 
     /// Detect a definitive Apple ID credential failure (vs. a flaky anisette
     /// server). Switching anisette servers can't fix these, so the sign-in loop

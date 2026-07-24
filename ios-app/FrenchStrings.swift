@@ -187,6 +187,8 @@ let frenchStrings: [String: String] = [
         "Saisissez l'e-mail et le mot de passe de votre Apple ID.",
     "Two-factor verification was cancelled.":
         "La validation en deux étapes a été annulée.",
+    "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
+        "Identifiant Apple ou mot de passe incorrect. Vérifiez l'e-mail et le mot de passe de votre compte Apple, puis réessayez.",
     "Apple ID sign-in failed: %@": "Échec de la connexion à l'Apple ID : %@",
     "Apple ID sign-in failed on %@. Last error: %@":
         "Échec de la connexion à l'Apple ID sur %@. Dernière erreur : %@",

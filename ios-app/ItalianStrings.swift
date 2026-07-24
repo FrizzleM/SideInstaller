@@ -183,6 +183,8 @@ let italianStrings: [String: String] = [
         "Inserisci email e password del tuo Apple ID.",
     "Two-factor verification was cancelled.":
         "La verifica a due fattori è stata annullata.",
+    "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
+        "Apple ID o password non corretti. Controlla l'email e la password del tuo Apple Account e riprova.",
     "Apple ID sign-in failed: %@": "Accesso con l'Apple ID non riuscito: %@",
     "Apple ID sign-in failed on %@. Last error: %@":
         "Accesso con l'Apple ID non riuscito su %@. Ultimo errore: %@",
