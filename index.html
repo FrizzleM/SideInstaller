@@ -122,79 +122,35 @@
     -webkit-backdrop-filter:blur(24px) saturate(140%); backdrop-filter:blur(24px) saturate(140%);
     box-shadow:0 24px 70px rgba(0,0,0,.55);
     animation:modal-pop .22s cubic-bezier(.22,.9,.35,1) both;
-    transition:width .34s cubic-bezier(.22,.9,.35,1);
   }
-  .modal-card.wide{width:min(760px,100%)}
   @keyframes modal-pop{from{opacity:0; transform:translateY(14px) scale(.96)}}
-  @media (prefers-reduced-motion:reduce){ .modal-card{animation:none; transition:none} }
-  .modal-head{display:flex; align-items:center; gap:10px; margin-bottom:14px}
-  .modal-title{margin:0 auto 0 0; font-size:18px; font-weight:800; letter-spacing:-.01em}
-  .modal-close,.modal-back{
-    display:grid; place-items:center; width:32px; height:32px; padding:0; flex:none;
+  @media (prefers-reduced-motion:reduce){ .modal-card{animation:none} }
+  .modal-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px}
+  .modal-title{margin:0; font-size:18px; font-weight:800; letter-spacing:-.01em}
+  .modal-close{
+    display:grid; place-items:center; width:32px; height:32px; padding:0;
     color:var(--muted); background:var(--card); border:1px solid var(--stroke); border-radius:999px;
     cursor:pointer; transition:background .14s, color .14s;
   }
-  .modal-close:hover,.modal-back:hover{color:var(--text); background:var(--card-hover)}
-  .modal-close svg,.modal-back svg{width:15px; height:15px}
-  .modal-back[hidden]{display:none}
-
-  /* ---- tutorial wizard: one question on screen at a time ----
-     The panes are stacked absolutely so the outgoing one can slide away while
-     the next slides in; the wrapper's height is set from JS so the card morphs
-     between steps instead of snapping. */
-  .wizard{position:relative; overflow:hidden; transition:height .34s cubic-bezier(.22,.9,.35,1)}
-  .wizard.no-anim{transition:none}
-  .pane{position:absolute; top:0; left:0; width:100%}
-  .pane[hidden]{display:none}
-  .pane-q{display:flex; flex-direction:column; gap:10px}
-  @keyframes pane-in{from{opacity:0; transform:translateX(26px)}}
-  @keyframes pane-out{to{opacity:0; transform:translateX(-26px)}}
-  @keyframes pane-in-rev{from{opacity:0; transform:translateX(-26px)}}
-  @keyframes pane-out-rev{to{opacity:0; transform:translateX(26px)}}
-  .pane.in{animation:pane-in .3s cubic-bezier(.22,.9,.35,1) both}
-  .pane.out{animation:pane-out .22s ease both; pointer-events:none}
-  .pane.in.rev{animation-name:pane-in-rev}
-  .pane.out.rev{animation-name:pane-out-rev}
-  @media (prefers-reduced-motion:reduce){
-    .wizard{transition:none}
-    .pane.in,.pane.out{animation:none}
-  }
-
-  .opt{
-    display:flex; align-items:center; gap:13px; width:100%; padding:14px 16px;
-    text-align:left; font-family:inherit; color:var(--text); cursor:pointer;
+  .modal-close:hover{color:var(--text); background:var(--card-hover)}
+  .modal-close svg{width:15px; height:15px}
+  .modal-links{display:flex; flex-direction:column; gap:10px}
+  .modal-link{
+    display:flex; align-items:center; gap:13px; padding:14px 16px; text-decoration:none;
     background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius-sm);
     transition:background .14s, border-color .14s, transform .14s;
   }
-  .opt:hover{background:var(--card-hover); border-color:var(--stroke-strong); transform:translateY(-1px)}
-  .opt:active{transform:scale(.98)}
-  .opt-icon{
+  .modal-link:hover{background:var(--card-hover); border-color:var(--stroke-strong); transform:translateY(-1px)}
+  .modal-link:active{transform:scale(.98)}
+  .modal-link-icon{
     flex:none; width:38px; height:38px; display:grid; place-items:center;
-    color:#fff; background:var(--brand); border-radius:12px;
-    font-size:13px; font-weight:800; letter-spacing:.02em;
+    color:#fff; background:#ff0000; border-radius:12px;
   }
-  .opt-icon svg{width:18px; height:18px}
-  .opt-text{min-width:0}
-  .opt-text b{display:block; color:var(--text); font-size:15px; font-weight:700}
-  .opt-text small{display:block; color:var(--muted); font-size:12.5px; margin-top:1px}
-  .opt-arrow{margin-left:auto; flex:none; width:16px; height:16px; color:var(--faint)}
-
-  /* ---- embedded tutorials ---- */
-  .videos{
-    display:flex; flex-direction:column; gap:16px;
-    max-height:min(64vh,560px); overflow-y:auto; -webkit-overflow-scrolling:touch;
-  }
-  .video-frame{
-    position:relative; aspect-ratio:16/9; background:#000; overflow:hidden;
-    border:1px solid var(--stroke); border-radius:var(--radius-sm);
-  }
-  .video-frame iframe{position:absolute; inset:0; width:100%; height:100%; border:0}
-  .video-cap{
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-    margin-top:8px; color:var(--muted); font-size:12.5px; font-weight:600;
-  }
-  .video-cap a{color:var(--accent2); text-decoration:none}
-  .video-cap a:hover{text-decoration:underline}
+  .modal-link-icon svg{width:18px; height:18px}
+  .modal-link-text{min-width:0}
+  .modal-link-text b{display:block; color:var(--text); font-size:15px; font-weight:700}
+  .modal-link-text small{display:block; color:var(--muted); font-size:12.5px; margin-top:1px}
+  .modal-link-arrow{margin-left:auto; flex:none; width:16px; height:16px; color:var(--faint)}
 
   /* ---- steps ---- */
   .step{margin-top:34px}
@@ -355,7 +311,7 @@
     <p class="tagline">On-device sideloader. Follow the three steps below to get set up.</p>
     <div class="badges">
       <span class="badge">Version <b>0.6.5</b></span>
-      <span class="badge"><b>23</b> certificates</span>
+      <span class="badge"><b>25</b> certificates</span>
     </div>
     <div class="links social">
       <button type="button" class="link-btn youtube" id="tutorialBtn" aria-haspopup="dialog" aria-controls="tutorialModal">
@@ -433,189 +389,205 @@
     </div>
 
     <main id="grid" class="grid">
-    <article class="cert-card" data-name="Moving-Increasingly-Interconnected-Technology-Co.-Ltd-com.oa11" data-days="1052">
+    <article class="cert-card" data-name="Moving-Increasingly-Interconnected-Technology-Co.-Ltd-com.oa11" data-days="1046">
       <div class="cert-head">
         <h3 class="cert-name">Moving-Increasingly-Interconnected-Technology-Co.-Ltd-com.oa11</h3>
-        <span class="pill good">1052 days left</span>
+        <span class="pill good">1046 days left</span>
       </div>
       <p class="cert-meta">Expires 2029-06-12</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Moving-Increasingly-Interconnected-Technology-Co.-Ltd-com.oa11.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="China-Telecom-Corporation-Limited" data-days="943">
-      <div class="cert-head">
-        <h3 class="cert-name">China-Telecom-Corporation-Limited</h3>
-        <span class="pill good">943 days left</span>
-      </div>
-      <p class="cert-meta">Expires 2029-02-23</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-China-Telecom-Corporation-Limited.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
-    </article>
-    <article class="cert-card" data-name="XL" data-days="937">
+    <article class="cert-card" data-name="XL" data-days="932">
       <div class="cert-head">
         <h3 class="cert-name">XL</h3>
-        <span class="pill good">937 days left</span>
+        <span class="pill good">932 days left</span>
       </div>
       <p class="cert-meta">Expires 2029-02-17</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-XL.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="National" data-days="914">
+    <article class="cert-card" data-name="National" data-days="909">
       <div class="cert-head">
         <h3 class="cert-name">National</h3>
-        <span class="pill good">914 days left</span>
+        <span class="pill good">909 days left</span>
       </div>
       <p class="cert-meta">Expires 2029-01-25</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-National.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Rural" data-days="842">
+    <article class="cert-card" data-name="Rural" data-days="836">
       <div class="cert-head">
         <h3 class="cert-name">Rural</h3>
-        <span class="pill good">842 days left</span>
+        <span class="pill good">836 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-11-14</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Rural.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="ChinaAcademy" data-days="824">
+    <article class="cert-card" data-name="ChinaAcademy" data-days="818">
       <div class="cert-head">
         <h3 class="cert-name">ChinaAcademy</h3>
-        <span class="pill good">824 days left</span>
+        <span class="pill good">818 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-10-27</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-ChinaAcademy.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="ChinaPower" data-days="818">
+    <article class="cert-card" data-name="ChinaPower" data-days="812">
       <div class="cert-head">
         <h3 class="cert-name">ChinaPower</h3>
-        <span class="pill good">818 days left</span>
+        <span class="pill good">812 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-10-21</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-ChinaPower.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Viet-Nam-Rubber-Group-Limited" data-days="811">
+    <article class="cert-card" data-name="Viet-Nam-Rubber-Group-Limited" data-days="805">
       <div class="cert-head">
         <h3 class="cert-name">Viet-Nam-Rubber-Group-Limited</h3>
-        <span class="pill good">811 days left</span>
+        <span class="pill good">805 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-10-14</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Viet-Nam-Rubber-Group-Limited.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Postal" data-days="745">
+    <article class="cert-card" data-name="Beijing-Xibei-Longzhimeng-Restaurant-Management-Co.-Ltd" data-days="742">
+      <div class="cert-head">
+        <h3 class="cert-name">Beijing-Xibei-Longzhimeng-Restaurant-Management-Co.-Ltd</h3>
+        <span class="pill good">742 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-08-12</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Beijing-Xibei-Longzhimeng-Restaurant-Management-Co.-Ltd.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Postal" data-days="739">
       <div class="cert-head">
         <h3 class="cert-name">Postal</h3>
-        <span class="pill good">745 days left</span>
+        <span class="pill good">739 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-08-09</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Postal.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="VIETNAM-AIRLINES-JSC-MOPLUS-LIDO-UAT" data-days="742">
+    <article class="cert-card" data-name="VIETNAM-AIRLINES-JSC-MOPLUS-LIDO-UAT" data-days="736">
       <div class="cert-head">
         <h3 class="cert-name">VIETNAM-AIRLINES-JSC-MOPLUS-LIDO-UAT</h3>
-        <span class="pill good">742 days left</span>
+        <span class="pill good">736 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-08-06</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-VIETNAM-AIRLINES-JSC-MOPLUS-LIDO-UAT.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Takeoff" data-days="679">
+    <article class="cert-card" data-name="Takeoff" data-days="673">
       <div class="cert-head">
         <h3 class="cert-name">Takeoff</h3>
-        <span class="pill good">679 days left</span>
+        <span class="pill good">673 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-06-04</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Takeoff.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Election" data-days="641">
+    <article class="cert-card" data-name="Election" data-days="635">
       <div class="cert-head">
         <h3 class="cert-name">Election</h3>
-        <span class="pill good">641 days left</span>
+        <span class="pill good">635 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-04-27</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Election.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Vietnam" data-days="635">
+    <article class="cert-card" data-name="Vietnam" data-days="629">
       <div class="cert-head">
         <h3 class="cert-name">Vietnam</h3>
-        <span class="pill good">635 days left</span>
+        <span class="pill good">629 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-04-21</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Vietnam.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-workone" data-days="589">
+    <article class="cert-card" data-name="Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-workone" data-days="583">
       <div class="cert-head">
         <h3 class="cert-name">Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-workone</h3>
-        <span class="pill good">589 days left</span>
+        <span class="pill good">583 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-03-06</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-workone.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Guangzhou-Huahan-Educational-Technology-Co.-Ltd." data-days="546">
+    <article class="cert-card" data-name="Guangzhou-Huahan-Educational-Technology-Co.-Ltd" data-days="540">
       <div class="cert-head">
-        <h3 class="cert-name">Guangzhou-Huahan-Educational-Technology-Co.-Ltd.</h3>
-        <span class="pill good">546 days left</span>
+        <h3 class="cert-name">Guangzhou-Huahan-Educational-Technology-Co.-Ltd</h3>
+        <span class="pill good">540 days left</span>
       </div>
       <p class="cert-meta">Expires 2028-01-23</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Guangzhou-Huahan-Educational-Technology-Co.-Ltd..plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Guangzhou-Huahan-Educational-Technology-Co.-Ltd.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="VIETNAM-JOINT-STOCK-COMMERCIAL-BANK-FOR-INDUSTRY-AND-TRADE" data-days="314">
+    <article class="cert-card" data-name="VIETNAM-JOINT-STOCK-COMMERCIAL-BANK-FOR-INDUSTRY-AND-TRADE" data-days="308">
       <div class="cert-head">
         <h3 class="cert-name">VIETNAM-JOINT-STOCK-COMMERCIAL-BANK-FOR-INDUSTRY-AND-TRADE</h3>
-        <span class="pill good">314 days left</span>
+        <span class="pill good">308 days left</span>
       </div>
       <p class="cert-meta">Expires 2027-06-05</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-VIETNAM-JOINT-STOCK-COMMERCIAL-BANK-FOR-INDUSTRY-AND-TRADE.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Wuling" data-days="308">
+    <article class="cert-card" data-name="Wuling" data-days="302">
       <div class="cert-head">
         <h3 class="cert-name">Wuling</h3>
-        <span class="pill good">308 days left</span>
+        <span class="pill good">302 days left</span>
       </div>
       <p class="cert-meta">Expires 2027-05-30</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Wuling.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Tianjin-University-of-Commerce" data-days="214">
+    <article class="cert-card" data-name="Tianjin-University-of-Commerce" data-days="208">
       <div class="cert-head">
         <h3 class="cert-name">Tianjin-University-of-Commerce</h3>
-        <span class="pill good">214 days left</span>
+        <span class="pill good">208 days left</span>
       </div>
       <p class="cert-meta">Expires 2027-02-25</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Tianjin-University-of-Commerce.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Forever" data-days="194">
+    <article class="cert-card" data-name="Forever" data-days="188">
       <div class="cert-head">
         <h3 class="cert-name">Forever</h3>
-        <span class="pill good">194 days left</span>
+        <span class="pill good">188 days left</span>
       </div>
       <p class="cert-meta">Expires 2027-02-05</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Forever.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="BOC" data-days="103">
+    <article class="cert-card" data-name="BOC" data-days="97">
       <div class="cert-head">
         <h3 class="cert-name">BOC</h3>
-        <span class="pill good">103 days left</span>
+        <span class="pill good">97 days left</span>
       </div>
       <p class="cert-meta">Expires 2026-11-06</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-BOC.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="China-National-Heavy-Duty-Truck-Group-Co.-Ltd." data-days="95">
+    <article class="cert-card" data-name="China-National-Heavy-Duty-Truck-Group-Co.-Ltd" data-days="89">
       <div class="cert-head">
-        <h3 class="cert-name">China-National-Heavy-Duty-Truck-Group-Co.-Ltd.</h3>
-        <span class="pill good">95 days left</span>
+        <h3 class="cert-name">China-National-Heavy-Duty-Truck-Group-Co.-Ltd</h3>
+        <span class="pill good">89 days left</span>
       </div>
       <p class="cert-meta">Expires 2026-10-29</p>
-      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-China-National-Heavy-Duty-Truck-Group-Co.-Ltd..plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-China-National-Heavy-Duty-Truck-Group-Co.-Ltd.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Aramco" data-days="60">
+    <article class="cert-card" data-name="Aramco" data-days="54">
       <div class="cert-head">
         <h3 class="cert-name">Aramco</h3>
-        <span class="pill good">60 days left</span>
+        <span class="pill good">54 days left</span>
       </div>
       <p class="cert-meta">Expires 2026-09-24</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Aramco.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
-    <article class="cert-card" data-name="Beijing" data-days="27">
+    <article class="cert-card" data-name="Beijing" data-days="21">
       <div class="cert-head">
         <h3 class="cert-name">Beijing</h3>
-        <span class="pill warn">27 days left</span>
+        <span class="pill warn">21 days left</span>
       </div>
       <p class="cert-meta">Expires 2026-08-22</p>
       <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Beijing.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="China-National-Heavy-Duty-Truck-Group-Co.-Ltd." data-days="-999999">
+      <div class="cert-head">
+        <h3 class="cert-name">China-National-Heavy-Duty-Truck-Group-Co.-Ltd.</h3>
+        <span class="pill unknown">Unknown</span>
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-China-National-Heavy-Duty-Truck-Group-Co.-Ltd..plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Guangzhou-Huahan-Educational-Technology-Co.-Ltd." data-days="-999999">
+      <div class="cert-head">
+        <h3 class="cert-name">Guangzhou-Huahan-Educational-Technology-Co.-Ltd.</h3>
+        <span class="pill unknown">Unknown</span>
+      </div>
+      
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output/sideinstaller-Guangzhou-Huahan-Educational-Technology-Co.-Ltd..plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
     </article>
     </main>
     <p id="empty" class="empty">No certificates match your search.</p>
@@ -651,8 +623,8 @@
   </section>
 
   <footer class="footer">
-    Built automatically &middot; signed with 23 certificate(s)
-    <br>Last updated: 27 Jul 2026, 02:04 CET
+    Built automatically &middot; signed with 25 certificate(s)
+    <br>Last updated: 01 Aug 2026, 16:17 CET
     <br><a href="terms.html">Terms of Service</a>
   </footer>
 
@@ -660,50 +632,24 @@
 
 <div class="modal" id="tutorialModal" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle" hidden>
   <div class="modal-backdrop" data-close></div>
-  <div class="modal-card" id="tutorialCard">
+  <div class="modal-card">
     <div class="modal-head">
-      <button type="button" class="modal-back" id="tutorialBack" aria-label="Back" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
-      </button>
-      <h3 class="modal-title" id="tutorialTitle">Language</h3>
+      <h3 class="modal-title" id="tutorialTitle">Tutorials</h3>
       <button type="button" class="modal-close" data-close aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-
-    <div class="wizard" id="tutorialWizard">
-      <!-- step 1 — language -->
-      <div class="pane pane-q" data-step="0">
-        <button type="button" class="opt" data-value="en">
-          <span class="opt-icon" aria-hidden="true">EN</span>
-          <span class="opt-text"><b>English</b></span>
-          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-        </button>
-        <button type="button" class="opt" data-value="es">
-          <span class="opt-icon" aria-hidden="true">ES</span>
-          <span class="opt-text"><b>Spanish</b><small>Español</small></span>
-          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-        </button>
-      </div>
-
-      <!-- step 2 — topic -->
-      <div class="pane pane-q" data-step="1" hidden>
-        <button type="button" class="opt" data-value="sidestore">
-          <span class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg></span>
-          <span class="opt-text"><b data-t="optSidestore">SideStore</b><small data-t="optSidestoreSub">Installing SideStore on your device</small></span>
-          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-        </button>
-        <button type="button" class="opt" data-value="jit">
-          <span class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></span>
-          <span class="opt-text"><b data-t="optJit">JIT</b><small data-t="optJitSub">Enabling JIT for your apps</small></span>
-          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-        </button>
-      </div>
-
-      <!-- step 3 — the tutorials themselves -->
-      <div class="pane" data-step="2" hidden>
-        <div class="videos" id="tutorialVideos"></div>
-      </div>
+    <div class="modal-links">
+      <a class="modal-link" href="https://youtu.be/OyeYTSEheQw?is=j6FyM9iURyrMwcXy" target="_blank" rel="noopener">
+        <span class="modal-link-icon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></span>
+        <span class="modal-link-text"><b>Install SideStore</b></span>
+        <svg class="modal-link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </a>
+      <a class="modal-link" href="https://youtu.be/WCYkxfRHapg" target="_blank" rel="noopener">
+        <span class="modal-link-icon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></span>
+        <span class="modal-link-text"><b>Enable JIT</b></span>
+        <svg class="modal-link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </a>
     </div>
   </div>
 </div>
@@ -761,161 +707,18 @@
   },true);
   applyTos();
 
-  /* Tutorial popup: ask for a language, then a topic, then play the matching
-     tutorials. One pane is on screen at a time — the answered one slides out as
-     the next slides in. */
+  /* Tutorial popup */
   var tutBtn=document.getElementById('tutorialBtn');
   var tutModal=document.getElementById('tutorialModal');
-  var tutCard=document.getElementById('tutorialCard');
-  var tutBack=document.getElementById('tutorialBack');
-  var tutTitle=document.getElementById('tutorialTitle');
-  var wizard=document.getElementById('tutorialWizard');
-  var videos=document.getElementById('tutorialVideos');
-  var panes=[].slice.call(wizard.querySelectorAll('.pane'));
-
-  var VIDEOS={
-    en:{sidestore:['4J4muoczR54','OyeYTSEheQw'], jit:['U90-4jA8Kj8','WCYkxfRHapg']},
-    es:{sidestore:['tXGihEkcg-4'], jit:['hEhkDEALNWo']}
-  };
-  var STRINGS={
-    en:{lang:'Language', topic:'Tutorial for', sidestore:'SideStore', jit:'JIT',
-        sidestoreSub:'Installing SideStore on your device', jitSub:'Enabling JIT for your apps',
-        tutorial:'Tutorial', watch:'Watch on YouTube'},
-    es:{lang:'Idioma', topic:'Tutorial para', sidestore:'SideStore', jit:'JIT',
-        sidestoreSub:'Instalar SideStore en tu dispositivo', jitSub:'Activar JIT en tus apps',
-        tutorial:'Tutorial', watch:'Ver en YouTube'}
-  };
-
-  var reduce=window.matchMedia?window.matchMedia('(prefers-reduced-motion:reduce)'):{matches:false};
-  var step=0, lang='en', topic='sidestore', outTimer=null;
-
-  function t(key){ return (STRINGS[lang]||STRINGS.en)[key]; }
-
-  /* The card also animates its width on the way to the videos, so a one-shot
-     measurement taken at swap time would be a frame too early and clip the
-     16:9 embeds. Track the live pane instead. */
-  function syncHeight(){
-    if(!tutModal.hidden) wizard.style.height=panes[step].offsetHeight+'px';
-  }
-  var ro=window.ResizeObserver?new ResizeObserver(syncHeight):null;
-  function watch(pane){ if(ro){ ro.disconnect(); ro.observe(pane); } }
-  tutCard.addEventListener('transitionend',function(e){
-    if(e.propertyName==='width') syncHeight();
-  });
-
-  /* Swap the visible pane. dir<0 reverses the slide for the back button. */
-  function showStep(next,dir){
-    if(next===step) return;
-    var cur=panes[step], nxt=panes[next];
-    if(next===2) buildVideos();
-    tutTitle.textContent = next===0 ? STRINGS.en.lang : next===1 ? t('topic') : t(topic);
-    tutBack.hidden = next===0;
-    tutCard.classList.toggle('wide', next===2);
-
-    clearTimeout(outTimer);
-    cur.classList.remove('in','out','rev');
-    nxt.classList.remove('in','out','rev');
-    nxt.hidden=false;
-    step=next;
-    watch(nxt);
-    syncHeight();
-
-    if(reduce.matches){
-      cur.hidden=true;
-    }else{
-      cur.classList.add('out'); nxt.classList.add('in');
-      if(dir<0){ cur.classList.add('rev'); nxt.classList.add('rev'); }
-      outTimer=setTimeout(function(){ cur.hidden=true; cur.classList.remove('out','rev'); },220);
-    }
-    focusPane(nxt);
-  }
-
-  function focusPane(pane){
-    var first=pane.querySelector('.opt');
-    if(first) first.focus();
-    else if(step===2) tutBack.focus();
-  }
-
-  function buildVideos(){
-    var ids=VIDEOS[lang][topic]||[];
-    var label=t(topic);
-    videos.textContent='';
-    ids.forEach(function(id,i){
-      var wrap=document.createElement('div');
-
-      var frame=document.createElement('div');
-      frame.className='video-frame';
-      var f=document.createElement('iframe');
-      f.src='https://www.youtube-nocookie.com/embed/'+id+'?rel=0';
-      f.title=label+' — '+t('tutorial')+' '+(i+1);
-      f.allow='accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
-      f.setAttribute('allowfullscreen','');
-      f.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
-      frame.appendChild(f);
-
-      var cap=document.createElement('div');
-      cap.className='video-cap';
-      var name=document.createElement('span');
-      name.textContent = ids.length>1 ? t('tutorial')+' '+(i+1) : label;
-      var link=document.createElement('a');
-      link.href='https://youtu.be/'+id;
-      link.target='_blank'; link.rel='noopener';
-      link.textContent=t('watch');
-      cap.appendChild(name); cap.appendChild(link);
-
-      wrap.appendChild(frame); wrap.appendChild(cap);
-      videos.appendChild(wrap);
-    });
-  }
-
-  /* Back out of the modal entirely to step 0, with no animation. */
-  function resetTut(){
-    clearTimeout(outTimer);
-    step=0; lang='en'; topic='sidestore';
-    panes.forEach(function(p,i){
-      p.classList.remove('in','out','rev');
-      p.hidden = i!==0;
-    });
-    videos.textContent='';   /* drops the iframes so playback stops */
-    tutCard.classList.remove('wide');
-    tutBack.hidden=true;
-    tutTitle.textContent=STRINGS.en.lang;
-    applyLang();
-    /* No height tween on the way in — the card should just appear at size. */
-    wizard.classList.add('no-anim');
-    watch(panes[0]);
-    syncHeight();
-    void wizard.offsetHeight;
-    wizard.classList.remove('no-anim');
-  }
-
-  /* Step 2 speaks the language picked in step 1. */
-  function applyLang(){
-    wizard.querySelector('[data-t="optSidestore"]').textContent=t('sidestore');
-    wizard.querySelector('[data-t="optSidestoreSub"]').textContent=t('sidestoreSub');
-    wizard.querySelector('[data-t="optJit"]').textContent=t('jit');
-    wizard.querySelector('[data-t="optJitSub"]').textContent=t('jitSub');
-  }
-
-  wizard.addEventListener('click',function(e){
-    var btn=e.target.closest && e.target.closest('.opt');
-    if(!btn) return;
-    if(step===0){ lang=btn.getAttribute('data-value'); applyLang(); showStep(1,1); }
-    else if(step===1){ topic=btn.getAttribute('data-value'); showStep(2,1); }
-  });
-  tutBack.addEventListener('click',function(){ if(step>0) showStep(step-1,-1); });
-
   function openTut(){
     tutModal.hidden=false;
     document.body.style.overflow='hidden';
-    resetTut();
-    var first=wizard.querySelector('.opt');
+    var first=tutModal.querySelector('.modal-link');
     if(first) first.focus();
   }
   function closeTut(){
     tutModal.hidden=true;
     document.body.style.overflow='';
-    videos.textContent='';   /* stop any playing video */
     tutBtn.focus();
   }
   tutBtn.addEventListener('click',openTut);
@@ -925,7 +728,6 @@
   document.addEventListener('keydown',function(e){
     if(e.key==='Escape' && !tutModal.hidden) closeTut();
   });
-  window.addEventListener('resize',syncHeight);
 })();
 </script>
 </body>
