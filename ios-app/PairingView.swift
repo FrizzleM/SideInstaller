@@ -4,7 +4,7 @@ import UIKit
 /// The "Pairing" tab — manage the device pairing file on its own, the way
 /// iLoader's "Manage Pairing files" does. Generate (extract) the pairing file,
 /// export it (share / Save to Files), and write it into a supported app installed
-/// on this iPhone (SideStore, StikDebug, Feather, …) over LocalDevVPN.
+/// on this iPhone (SideStore, StikDebug, Feather, …) over the loopback tunnel.
 struct PairingView: View {
     @EnvironmentObject private var engine: Engine
     /// Declared so every label on this screen redraws when the language changes.
@@ -165,7 +165,7 @@ struct PairingView: View {
                 sectionTitle(L("Install into an app"), systemImage: "tray.and.arrow.down.fill")
 
                 // Wi-Fi is the prerequisite for the tunnel, so it takes priority:
-                // no Wi-Fi → Wi-Fi note; Wi-Fi but no tunnel → LocalDevVPN note.
+                // no Wi-Fi → Wi-Fi note; Wi-Fi but no tunnel → loopback-VPN note.
                 if !engine.wifiConnected {
                     wifiNote
                 } else if !engine.vpnConnected {
@@ -194,7 +194,7 @@ struct PairingView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "wifi.slash")
                 .foregroundStyle(.red)
-            Text(L("Connect to Wi-Fi to scan and install. LocalDevVPN's tunnel runs over it."))
+            Text(L("Connect to Wi-Fi to scan and install. The loopback tunnel runs over it."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -208,7 +208,7 @@ struct PairingView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "shield.lefthalf.filled")
                 .foregroundStyle(.red)
-            Text(L("Turn on LocalDevVPN to scan and install. The write runs over its tunnel."))
+            Text(L("Turn on a loopback VPN to scan and install. The write runs over its tunnel."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

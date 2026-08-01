@@ -3,7 +3,8 @@ import SideInstallerFFI
 import Darwin
 
 /// Wraps idevice's C-FFI to open the loopback connection to the local device
-/// over LocalDevVPN and talk lockdown / installation_proxy over the RSD tunnel.
+/// over the loopback VPN and talk lockdown / installation_proxy over the RSD
+/// tunnel.
 ///
 /// The recipe mirrors StikDebug's working path:
 ///   rp_pairing_file_read  ->  tunnel_create_rppairing(deviceIP:49152, pairing)
@@ -20,7 +21,7 @@ final class DeviceConnection {
     private var adapter: OpaquePointer?
     private var handshake: OpaquePointer?
 
-    /// RemoteServiceDiscovery port reached over the LocalDevVPN loopback.
+    /// RemoteServiceDiscovery port reached over the VPN loopback.
     static let rsdPort: UInt16 = 49152
 
     var isConnected: Bool { adapter != nil && handshake != nil }
@@ -78,7 +79,7 @@ final class DeviceConnection {
                 }
             }
         }
-        try check(err, "tunnel_create_rppairing failed (is LocalDevVPN connected, Wi-Fi on, device IP \(deviceIP)?)")
+        try check(err, "tunnel_create_rppairing failed (is a loopback VPN connected, Wi-Fi on, device IP \(deviceIP)?)")
         guard newAdapter != nil, newHandshake != nil else {
             throw fail("tunnel created without valid handles")
         }
@@ -271,10 +272,36 @@ final class DeviceConnection {
         guard let ip else { throw fail("installation_proxy client was null") }
         defer { installation_proxy_client_free(ip) }
 
+        guard let options = developerInstallOptions() else {
+            throw fail("couldn't build install ClientOptions")
+        }
+        defer { plist_free(options) }
+
         try remoteRoot.withCString { p in
-            try check(installation_proxy_install_with_callback(ip, p, nil, installProgressCb, nil),
+            try check(installation_proxy_install_with_callback(ip, p, options, installProgressCb, nil),
                       "installation_proxy install failed")
         }
+    }
+
+    /// installation_proxy `ClientOptions` for a developer-signed bundle.
+    ///
+    /// What we upload is a signed `.app` *directory*, not a zipped IPA, and
+    /// installd only applies developer-signing rules to a package it's been
+    /// told is one. Without `PackageType: Developer` it stages, extracts and
+    /// inspects the bundle happily, then rejects it at VerifyingApplication
+    /// with `0xe8008015 (A valid provisioning profile for this executable was
+    /// not found.)` — it never consults the bundle's embedded.mobileprovision,
+    /// because a default-type package is expected to carry an App Store
+    /// signature and need no profile at all.
+    ///
+    /// ideviceinstaller sets this for directory installs, and so does
+    /// isideload's own `install_app_rsd`; we reimplement the install over our
+    /// own RSD tunnel (see Engine's step 7), so setting it is on us.
+    private func developerInstallOptions() -> plist_t? {
+        guard let options: plist_t = plist_new_dict() else { return nil }
+        // The dict takes ownership of the value node, so freeing it is enough.
+        plist_dict_set_item(options, "PackageType", plist_new_string("Developer"))
+        return options
     }
 
     /// Recursively upload a local directory tree to AFC.

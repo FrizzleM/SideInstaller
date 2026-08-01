@@ -51,15 +51,18 @@ let spanishStrings: [String: String] = [
     "Release": "Canal",
     "Reinstall": "Reinstalar",
     "Install %@": "Instalar %@",
+    "Custom .ipa": "IPA personalizado",
+    "Import .ipa": "Importar .ipa",
+    "Replace": "Sustituir",
     "iOS %@ required": "Se requiere iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Este iPhone tiene iOS %@, y con esa versión SideInstaller no puede instalar nada. Actualiza a iOS %@ o posterior en Ajustes › General › Actualización de software.",
     "Wi-Fi required": "Se requiere Wi-Fi",
-    "Connect to a Wi-Fi network. LocalDevVPN's tunnel and the install run over it.":
-        "Conéctate a una red Wi-Fi. El túnel de LocalDevVPN y la instalación pasan por esa red.",
-    "LocalDevVPN required": "Se requiere LocalDevVPN",
-    "Open LocalDevVPN and tap Connect. The install runs over its tunnel.":
-        "Abre LocalDevVPN y toca Connect. La instalación pasa por su túnel.",
+    "Connect to a Wi-Fi network. The loopback tunnel and the install run over it.":
+        "Conéctate a una red Wi-Fi. El túnel loopback y la instalación pasan por esa red.",
+    "Loopback VPN required": "Se requiere una VPN loopback",
+    "Turn on a loopback VPN — LocalDevVPN, ClashMi, or any app that tunnels to this iPhone. The install runs over it.":
+        "Activa una VPN loopback: LocalDevVPN, ClashMi o cualquier app que haga un túnel a este iPhone. La instalación pasa por ella.",
     "Pairing code": "Código de emparejamiento",
     "Type this into the prompt in Settings.":
         "Escribe este código en el mensaje que aparece en Ajustes.",
@@ -75,6 +78,7 @@ let spanishStrings: [String: String] = [
     "Open the device link": "Abrir el enlace con el dispositivo",
     "Sign in to Apple ID": "Iniciar sesión en el Apple ID",
     "Download %@": "Descargar %@",
+    "Use your imported IPA": "Usar tu IPA importado",
     "Sign the app": "Firmar la app",
     "Finish setup": "Finalizar la configuración",
 
@@ -92,10 +96,10 @@ let spanishStrings: [String: String] = [
     "Scanning": "Buscando",
     "Rescan apps": "Buscar apps otra vez",
     "Scan installed apps": "Buscar apps instaladas",
-    "Connect to Wi-Fi to scan and install. LocalDevVPN's tunnel runs over it.":
-        "Conéctate al Wi-Fi para buscar e instalar. El túnel de LocalDevVPN pasa por esa red.",
-    "Turn on LocalDevVPN to scan and install. The write runs over its tunnel.":
-        "Activa LocalDevVPN para buscar e instalar. La escritura se hace por su túnel.",
+    "Connect to Wi-Fi to scan and install. The loopback tunnel runs over it.":
+        "Conéctate al Wi-Fi para buscar e instalar. El túnel loopback pasa por esa red.",
+    "Turn on a loopback VPN to scan and install. The write runs over its tunnel.":
+        "Activa una VPN loopback para buscar e instalar. La escritura se hace por su túnel.",
     "%d supported app installed": "%d app compatible instalada",
     "%d supported apps installed": "%d apps compatibles instaladas",
     "No supported apps found": "No se han encontrado apps compatibles",
@@ -157,9 +161,11 @@ let spanishStrings: [String: String] = [
     "Auto": "Automático",
     "Downloaded IPAs": "IPA descargados",
     "%@ used": "%@ ocupados",
+    "imported": "importado",
     "No downloaded IPAs. Ones you install from the Install tab are cached here.":
         "No hay IPA descargados. Los que instales desde la pestaña Instalar se guardan aquí.",
     "Downloaded %@": "Descargado el %@",
+    "Added %@": "Añadido %@",
     "Delete this download?": "¿Eliminar esta descarga?",
     "Delete": "Eliminar",
     "“%@” (%@) will be removed. You can download it again any time from the Install tab.":
@@ -213,8 +219,18 @@ let spanishStrings: [String: String] = [
         "%@ todavía no está instalado: primero hay que instalarlo.",
     "Wi-Fi is off. Connect to a Wi-Fi network, then try again.":
         "El Wi-Fi está desactivado. Conéctate a una red Wi-Fi e inténtalo de nuevo.",
-    "LocalDevVPN isn't connected. Turn it on, then try again.":
-        "LocalDevVPN no está conectado. Actívalo e inténtalo de nuevo.",
+    "No loopback VPN is connected. Turn one on, then try again.":
+        "No hay ninguna VPN loopback conectada. Activa una e inténtalo de nuevo.",
+    "%@ isn't a valid IPA — the download it came from probably returned an error page, or the copy stopped partway. Replace it and tap Install again.":
+        "%@ no es un IPA válido: es probable que la descarga devolviera una página de error o que la copia se cortara a medias. Sustitúyelo y toca Instalar otra vez.",
+    "%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.":
+        "%@ no es un IPA. Elige el archivo .ipa en sí; si parece correcto, puede que la descarga guardara una página de error o se cortara a medias.",
+    "No IPA imported yet. Tap “Import .ipa” and pick one.":
+        "Aún no has importado ningún IPA. Toca “Importar .ipa” y elige uno.",
+    "Couldn't import %@: %@": "No se ha podido importar %@: %@",
+    "there's nothing to download for a custom IPA — import one first":
+        "no hay nada que descargar para un IPA personalizado: impórtalo primero",
+    "your app": "tu app",
     "Apple allows only 3 signing certificates per Apple ID and this one already has 3, so a new one can't be made. Open the Certificates tab, tap “Load certificates”, and revoke an old or expired one to free a slot — then tap Install again. See the steps above.":
         "Apple solo permite 3 certificados de firma por Apple ID y este ya tiene 3, así que no se puede crear otro. Abre la pestaña Certificados, toca “Cargar certificados” y revoca uno antiguo o caducado para liberar un espacio; después toca Instalar otra vez. Consulta los pasos de arriba.",
     " (UDID %@)": " (UDID %@)",
@@ -225,19 +241,28 @@ let spanishStrings: [String: String] = [
 
     "Connect to Wi-Fi": "Conéctate al Wi-Fi",
     "Open Settings › Wi-Fi and join a network.": "Abre Ajustes › Wi-Fi y únete a una red.",
-    "LocalDevVPN's tunnel — and the whole install — run over Wi-Fi.":
-        "El túnel de LocalDevVPN —y toda la instalación— pasan por el Wi-Fi.",
+    "The loopback tunnel — and the whole install — run over Wi-Fi.":
+        "El túnel loopback —y toda la instalación— pasan por el Wi-Fi.",
     "Then come back here — this continues automatically.":
         "Después vuelve aquí: el proceso continúa solo.",
 
-    "Turn on LocalDevVPN": "Activa LocalDevVPN",
-    "Open the LocalDevVPN app (install it first if you haven't).":
-        "Abre la app LocalDevVPN (instálala antes si aún no la tienes).",
+    "Turn on a loopback VPN": "Activa una VPN loopback",
+    "Open a VPN app that tunnels to this iPhone — LocalDevVPN, ClashMi, or another. Any of them works.":
+        "Abre una app de VPN que haga un túnel a este iPhone: LocalDevVPN, ClashMi u otra. Cualquiera sirve.",
+    "If GitHub is blocked where you are, pick one that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through.":
+        "Si GitHub está bloqueado donde estás, elige una que además pueda hacer de proxy: iOS solo permite una VPN a la vez, así que un túnel solo local no deja por dónde descargar SideStore.",
     "Tap Connect so the toggle turns on.":
         "Toca Connect para que el interruptor se active.",
     "Keep Wi-Fi on, then come back here — this continues automatically.":
         "Deja el Wi-Fi activado y vuelve aquí: el proceso continúa solo.",
     "Get LocalDevVPN": "Obtener LocalDevVPN",
+    "Import an .ipa first": "Importa un .ipa primero",
+    "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
+        "Toca “Importar .ipa” arriba y elige el archivo: puede estar en cualquier sitio al que llegue la app Archivos, incluidos iCloud Drive o una unidad USB.",
+    "Or copy it into Files › On My iPhone › SideInstaller, where SideInstaller also finds it.":
+        "O cópialo en Archivos › En mi iPhone › SideInstaller, donde SideInstaller también lo encuentra.",
+    "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
+        "Esta es la vía donde GitHub está bloqueado: consigue el IPA en cualquier dispositivo, tráelo e instálalo aquí.",
 
     "Pair this iPhone in Settings": "Empareja este iPhone en Ajustes",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":

@@ -17,7 +17,10 @@ enum Step: Int, CaseIterable, Identifiable {
         case .pair:         return L("Pair with this iPhone")
         case .connect:      return L("Open the device link")
         case .signIn:       return L("Sign in to Apple ID")
-        case .download:     return L("Download %@", source.shortName)
+        // Nothing is fetched for an imported IPA — the row still runs, it just
+        // reads the file off disk, so name it for what it actually does.
+        case .download:     return source == .custom ? L("Use your imported IPA")
+                                                     : L("Download %@", source.shortName)
         case .sign:         return L("Sign the app")
         case .install:      return L("Install %@", source.shortName)
         case .writePairing: return L("Finish setup")
@@ -99,7 +102,8 @@ final class Engine: ObservableObject {
     /// picker is populated instantly, then refreshed from the live list on
     /// launch (see `loadAnisetteServers`).
     @Published private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
-    // LocalDevVPN's default device (target) IP; configurable in Advanced.
+    // LocalDevVPN's default device (target) IP, and the one other loopback VPN
+    // apps follow; configurable in Advanced.
     @Published var deviceIP: String = "10.7.0.1"
     // Which build to install (plain SideStore vs LiveContainer + SideStore).
     @Published var installSource: InstallSource = .sideStore
@@ -109,12 +113,12 @@ final class Engine: ObservableObject {
 
     // MARK: Plain-text status readouts
 
-    /// Live LocalDevVPN loopback state, polled (see `startStatusMonitor`) so the
+    /// Live loopback-tunnel state, polled (see `startStatusMonitor`) so the
     /// UI banner + the Install gate always reflect the current tunnel.
     @Published var vpnConnected: Bool = false
     /// Live Wi-Fi (`en0`) state, polled alongside `vpnConnected`. The tunnel runs
     /// over Wi-Fi, so Wi-Fi is the first precondition the Install gate checks —
-    /// without it, LocalDevVPN can't come up in the first place.
+    /// without it, the tunnel can't come up in the first place.
     @Published var wifiConnected: Bool = false
     @Published var vpnStatus: String = "unknown"
     @Published var wifiStatus: String = "unknown"
@@ -182,7 +186,7 @@ final class Engine: ObservableObject {
 
     private var pipelineTask: Task<Void, Never>?
     /// Repeating poll that keeps `vpnConnected` live for the UI banner. A timer
-    /// (not NWPathMonitor) because LocalDevVPN is a local-only tunnel with no
+    /// (not NWPathMonitor) because the loopback tunnel is local-only with no
     /// default route, so a path monitor never fires when it comes up or down.
     private var statusTimer: Timer?
 
@@ -195,16 +199,22 @@ final class Engine: ObservableObject {
     }
 
     /// Name of the build that was installed (or is selected, before any
-    /// download) — used so post-install copy names the right app.
+    /// download) — used so post-install copy names the right app. An imported
+    /// IPA has no name but the one inside it, known once it's been signed.
     var installedSourceName: String {
-        (downloadedSource ?? installSource).displayName
+        let source = downloadedSource ?? installSource
+        if source == .custom, let signed = signedDisplayName { return signed }
+        return source.displayName
     }
 
     /// Home-screen app name of what actually landed on the device — the app the
     /// user taps to open (LiveContainer, not "LiveContainer + SideStore"). Used
-    /// for the trust card so it names the right icon to open.
+    /// for the trust card so it names the right icon to open. An imported IPA
+    /// only reveals its name once signed, hence the fallback chain.
     var installedAppName: String {
         (downloadedSource ?? installSource).pairingAppDisplayName
+            ?? signedDisplayName
+            ?? L("your app")
     }
 
     /// Overall fraction across all steps (0…1). Computed from the published
@@ -217,7 +227,7 @@ final class Engine: ObservableObject {
         return min(1, (done + frac) / total)
     }
 
-    // Loopback connection over LocalDevVPN (idevice FFI). Long-lived; reused
+    // Connection over the loopback tunnel (idevice FFI). Long-lived; reused
     // across device-info / list-apps / install. Serialized on deviceQueue.
     let connection = DeviceConnection()
     private let deviceQueue = DispatchQueue(label: "sideinstaller.device")
@@ -231,6 +241,13 @@ final class Engine: ObservableObject {
     private var downloadedSource: InstallSource?
     private var downloadedChannel: ReleaseChannel?
     @Published var signedAppPath: String?
+    /// CFBundleDisplayName read off the signed bundle. The only way to learn
+    /// what an imported IPA actually calls itself, so post-install copy and the
+    /// pairing-file write can name it.
+    @Published private(set) var signedDisplayName: String?
+    /// Filename of the IPA imported for `InstallSource.custom`, or nil if none.
+    /// Published so the import button can show what's loaded.
+    @Published private(set) var customIPAName: String?
 
     // 2FA bridge: the FFI 2FA callback (on a Rust worker thread) blocks on this
     // semaphore until the UI submits/cancels a code.
@@ -255,11 +272,13 @@ final class Engine: ObservableObject {
         // proving the full Rust-tracing -> FFI callback -> console path at start.
         ping()
         // Show the loopback/Wi-Fi status on launch so the user knows whether to
-        // start LocalDevVPN before running, then keep it live for the banner.
+        // start the loopback VPN before running, then keep it live for the banner.
         checkVPNAndWifi()
         startStatusMonitor()
         // Refresh the anisette server picker from the live community list.
         loadAnisetteServers()
+        // An import survives relaunches, so the button reflects it from the off.
+        customIPAName = IPALibrary.customImport()?.url.lastPathComponent
     }
 
     // MARK: - Anisette servers
@@ -371,7 +390,14 @@ final class Engine: ObservableObject {
             log("Enter your Apple ID email + password first.")
             return
         }
-        // Pre-flight gate: the entire install runs over LocalDevVPN's loopback
+        // Custom installs nothing until there's something to install. Catch it
+        // here rather than five steps in, after a sign-in the user can't undo.
+        if installSource == .custom, IPALibrary.customImport() == nil {
+            setGuide(Guides.customIPA)
+            log("⛔️ No IPA imported yet. Tap “Import .ipa” and pick one, then tap Install again.")
+            return
+        }
+        // Pre-flight gate: the entire install runs over the loopback
         // tunnel, which itself rides on Wi-Fi — so require Wi-Fi first, then the
         // tunnel, showing how instead of just failing. (ensureNetwork() below
         // still waits too, as a mid-run safety net in case either drops after
@@ -384,7 +410,7 @@ final class Engine: ObservableObject {
         }
         guard vpnConnected else {
             setGuide(Guides.vpn)
-            log("⛔️ LocalDevVPN isn't connected. Turn it on, then tap Install again.")
+            log("⛔️ No loopback VPN is connected. Turn one on, then tap Install again.")
             return
         }
         resetRun()
@@ -423,7 +449,7 @@ final class Engine: ObservableObject {
         PairingController.shared.softCancel()   // unblock a pending pairing wait
     }
 
-    // MARK: Step 1 — network (waits for LocalDevVPN)
+    // MARK: Step 1 — network (waits for the loopback tunnel)
 
     @MainActor
     private func ensureNetwork() async throws {
@@ -456,7 +482,7 @@ final class Engine: ObservableObject {
                 setGuide(Guides.wifi)
             } else {
                 if announced != "vpn" {
-                    log("Waiting for LocalDevVPN tunnel… open LocalDevVPN and tap Connect.")
+                    log("Waiting for the loopback tunnel… connect LocalDevVPN, ClashMi, or whichever VPN app you use.")
                     announced = "vpn"
                 }
                 setGuide(Guides.vpn)
@@ -728,15 +754,130 @@ final class Engine: ObservableObject {
             return
         }
         setStep(.download, .active)
-        log("Fetching \(channel.displayName.lowercased()) \(src.displayName) release…")
-        let path = try await SideStoreDownloader.downloadLatest(source: src, channel: channel) { line in
-            self.log(line)
+
+        let onDisk = IPALibrary.entry(source: src, channel: channel)
+
+        // Custom has nothing to fall back on: the imported file is the whole
+        // input, so a missing one is a dead end rather than a reason to fetch.
+        if src == .custom {
+            guard let imported = onDisk else {
+                setGuide(Guides.customIPA)
+                throw EngineError.message(L("No IPA imported yet. Tap “Import .ipa” and pick one."))
+            }
+            try adoptImported(imported, source: src, channel: channel)
+            return
         }
-        downloadedIPAPath = path
-        downloadedSource = src
+
+        // An IPA the user put in Documents themselves is the whole reason that
+        // folder is visible in Files: it's how you install where GitHub is
+        // unreachable. Take it as given — don't go to the network behind it, and
+        // don't overwrite it. Deleting it in Settings › Downloads is what opts
+        // back into downloading.
+        if let imported = onDisk, imported.isImported {
+            try adoptImported(imported, source: src, channel: channel)
+            return
+        }
+
+        log("Fetching \(channel.displayName.lowercased()) \(src.displayName) release…")
+        do {
+            let path = try await SideStoreDownloader.downloadLatest(source: src, channel: channel) { line in
+                self.log(line)
+            }
+            adopt(URL(fileURLWithPath: path), source: src, channel: channel)
+            log("\(src.displayName) IPA ready at \(path)")
+            setStep(.download, .done)
+        } catch {
+            // Blocked or offline, but an earlier run already left a copy here:
+            // installing that beats failing the whole pipeline over a network we
+            // can't reach.
+            if let cached = onDisk {
+                log("⚠️ Download failed (\(short(error))) — using \(cached.url.lastPathComponent) already in Documents instead.")
+                adopt(cached.url, source: src, channel: channel)
+                setStep(.download, .done)
+                return
+            }
+            logImportHint(source: src, channel: channel)
+            throw error
+        }
+    }
+
+    /// Point the rest of the pipeline at an IPA on disk, whatever its origin.
+    @MainActor
+    private func adopt(_ url: URL, source: InstallSource, channel: ReleaseChannel) {
+        downloadedIPAPath = url.path
+        downloadedSource = source
         downloadedChannel = channel
-        log("\(src.displayName) IPA ready at \(path)")
+    }
+
+    /// Take a user-supplied IPA as the download step's result, after checking
+    /// it's actually an IPA — see `IPALibrary.looksLikeIPA` for why that's worth
+    /// doing before the file reaches the signer.
+    @MainActor
+    private func adoptImported(_ entry: IPALibrary.Entry,
+                               source: InstallSource,
+                               channel: ReleaseChannel) throws {
+        guard IPALibrary.looksLikeIPA(entry.url) else {
+            throw EngineError.message(
+                L("%@ isn't a valid IPA — the download it came from probably returned an error page, or the copy stopped partway. Replace it and tap Install again.",
+                  entry.url.lastPathComponent))
+        }
+        adopt(entry.url, source: source, channel: channel)
+        log("Using your own \(entry.url.lastPathComponent) — skipping the download.")
         setStep(.download, .done)
+    }
+
+    /// Copy a picked IPA in as the custom import, replacing any previous one.
+    /// `url` comes from the document picker, so it needs security-scoped access
+    /// while it's read.
+    @MainActor
+    func importCustomIPA(from url: URL) {
+        log("Importing \(url.lastPathComponent) …")
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let dest = try IPALibrary.replaceCustomImport(with: url)
+            // The picker accepts any file — iOS has no `.ipa` type to filter on
+            // that every storage provider agrees with — so this is where a wrong
+            // pick is caught. An IPA is a zip; anything that isn't one is either
+            // the wrong file or a broken copy.
+            guard IPALibrary.looksLikeIPA(dest) else {
+                IPALibrary.clearCustomImport()
+                customIPAName = nil
+                lastError = L("%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.",
+                              url.lastPathComponent)
+                log("⛔️ Import: \(lastError ?? "")")
+                return
+            }
+            customIPAName = dest.lastPathComponent
+            // A new file invalidates whatever the previous run resolved, or the
+            // install would sign the IPA that was just replaced.
+            if downloadedSource == .custom { downloadedIPAPath = nil }
+            setGuide(nil)
+            log("Imported \(dest.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(dest.path)), countStyle: .file))).")
+        } catch {
+            lastError = L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
+            log("⛔️ Import: \(lastError ?? "")")
+        }
+    }
+
+    /// Re-read the custom import from disk — on launch, and after the downloads
+    /// screen deletes it.
+    @MainActor
+    func refreshCustomIPA() {
+        customIPAName = IPALibrary.customImport()?.url.lastPathComponent
+    }
+
+    /// Spell out the way past a failed download: the Documents folder is visible
+    /// in Files, so an IPA fetched anywhere else installs from there. Named
+    /// misses get called out too — a misnamed import is indistinguishable, from
+    /// the user's side, from one that was ignored for no reason.
+    @MainActor
+    private func logImportHint(source: InstallSource, channel: ReleaseChannel) {
+        let strays = IPALibrary.unrecognized()
+        if !strays.isEmpty {
+            log("Found \(strays.joined(separator: ", ")) in Documents, but the name doesn't say which build it is.")
+        }
+        log("Can't reach GitHub? Download \(source.displayName) on another device or through a proxy, rename it to \(source.fileName(channel)), copy it into Files › On My iPhone › SideInstaller, then tap Install again.")
     }
 
     // MARK: Step 6 — sign the IPA
@@ -760,6 +901,9 @@ final class Engine: ObservableObject {
                 try self.performSign(session: session, ipa: ipa, udid: udid, deviceName: name)
             }
             signedAppPath = path
+            // First point at which an imported IPA says what it is; everything
+            // downstream that names the app reads this.
+            signedDisplayName = signedAppName()
             setStep(.sign, .done)
         } catch {
             // Failures with a concrete, user-fixable cause get an explanatory
@@ -870,7 +1014,16 @@ final class Engine: ObservableObject {
         // Use the build that was actually installed (falls back to the current
         // selection) — it decides the host app and the path the file lands at.
         let source = downloadedSource ?? installSource
-        try await onDeviceQueue { try self.performWritePairing(path: path, source: source) }
+        do {
+            try await onDeviceQueue { try self.performWritePairing(path: path, source: source) }
+        } catch {
+            // For SideStore this file is the point of the whole run, so a failure
+            // is a failure. An imported IPA might not be an AltStore-family app
+            // at all — seeding it is a courtesy — and the app is already
+            // installed by now, so don't fail the run over the courtesy.
+            guard source == .custom else { throw error }
+            log("⚠️ Couldn't seed the pairing file into \(installedAppName) (\(short(error))). It's installed and ready — only AltStore-family apps need that file.")
+        }
         setStep(.writePairing, .done)
     }
 
@@ -886,14 +1039,21 @@ final class Engine: ObservableObject {
         // isideload performs), then by base bundle id; fall back to the signed
         // bundle's id only if the lookup is empty. For LiveContainer the host app
         // is LiveContainer (com.kdt.livecontainer.<teamID>), not SideStore.
-        let appName = source.pairingAppDisplayName
+        //
+        // An imported IPA has no known name or id to look up, so it skips
+        // straight to the signed bundle — which is what was just installed, and
+        // therefore already the answer the lookup would return.
+        let appName = source.pairingAppDisplayName ?? signedAppName() ?? source.displayName
         let bundleID: String
-        if let found = try connection.resolveInstalledBundleID(
-            displayName: appName, bundleIDBase: source.pairingBundleIDBase) {
+        if let displayName = source.pairingAppDisplayName,
+           let base = source.pairingBundleIDBase,
+           let found = try connection.resolveInstalledBundleID(displayName: displayName, bundleIDBase: base) {
             bundleID = found
         } else if let signed = signedAppBundleID() {
             bundleID = signed
-            log("\(appName) not found via installation_proxy; using signed bundle id \(signed).")
+            if source.pairingAppDisplayName != nil {
+                log("\(appName) not found via installation_proxy; using signed bundle id \(signed).")
+            }
         } else {
             throw EngineError.message(L("%@ isn't installed yet — install must run first.", source.displayName))
         }
@@ -941,15 +1101,15 @@ final class Engine: ObservableObject {
         let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceIP)
         vpnConnected = vpn
         wifiConnected = wifi
-        vpnStatus = vpn ? "tunnel up" : "no tunnel (start LocalDevVPN)"
+        vpnStatus = vpn ? "tunnel up" : "no tunnel (start a loopback VPN)"
         wifiStatus = wifi ? "on" : "off"
         log("Network: \(detail)")
         log("VPN(loopback)=\(vpnStatus), Wi-Fi=\(wifiStatus). RSD target \(deviceIP):\(DeviceConnection.rsdPort).")
-        if !vpn { log("⚠️ No LocalDevVPN tunnel on \(deviceIP)'s subnet — open LocalDevVPN and tap Connect.") }
+        if !vpn { log("⚠️ No tunnel on \(deviceIP)'s subnet — connect a loopback VPN (LocalDevVPN, ClashMi, …).") }
     }
 
     /// Poll the interface list so `vpnConnected` (and the plain-text readouts)
-    /// track LocalDevVPN coming up / dropping while the app is open. Added to the
+    /// track the tunnel coming up / dropping while the app is open. Added to the
     /// run loop in `.common` mode so it keeps firing during scrolling.
     private func startStatusMonitor() {
         statusTimer?.invalidate()
@@ -960,13 +1120,13 @@ final class Engine: ObservableObject {
         statusTimer = timer
     }
 
-    /// One quiet (non-logging) re-scan of the LocalDevVPN/Wi-Fi state. Used by the
+    /// One quiet (non-logging) re-scan of the tunnel/Wi-Fi state. Used by the
     /// poll above and as the authoritative check inside the Install gate.
     func refreshNetworkStatus() {
         let (vpn, wifi, _) = NetworkStatus.summarize(deviceIP: deviceIP)
         vpnConnected = vpn
         wifiConnected = wifi
-        vpnStatus = vpn ? "tunnel up" : "no tunnel (start LocalDevVPN)"
+        vpnStatus = vpn ? "tunnel up" : "no tunnel (start a loopback VPN)"
         wifiStatus = wifi ? "on" : "off"
     }
 
@@ -1034,12 +1194,23 @@ final class Engine: ObservableObject {
 
     /// Read CFBundleIdentifier from the signed .app's Info.plist.
     private func signedAppBundleID() -> String? {
+        signedAppPlist()?["CFBundleIdentifier"] as? String
+    }
+
+    /// The signed app's home-screen name. `CFBundleName` is the fallback — an
+    /// app is only required to carry one of the two.
+    private func signedAppName() -> String? {
+        guard let plist = signedAppPlist() else { return nil }
+        return (plist["CFBundleDisplayName"] as? String) ?? (plist["CFBundleName"] as? String)
+    }
+
+    private func signedAppPlist() -> [String: Any]? {
         guard let app = signedAppPath else { return nil }
         let plistPath = (app as NSString).appendingPathComponent("Info.plist")
         guard let data = FileManager.default.contents(atPath: plistPath),
               let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
         else { return nil }
-        return plist["CFBundleIdentifier"] as? String
+        return plist
     }
 
     // MARK: - Pairing tab
@@ -1048,7 +1219,7 @@ final class Engine: ObservableObject {
     // one-click install. Mirrors iLoader's "Manage Pairing files": the file is
     // produced by the same RPPairing host the install uses (PairingController),
     // then written into a chosen installed app the same way SideStore receives
-    // it — over LocalDevVPN via house_arrest/AFC.
+    // it — over the loopback tunnel via house_arrest/AFC.
 
     /// List the supported pairing-target apps actually installed on the device.
     /// Brings the device link up first (using the saved pairing file) if needed.
@@ -1084,7 +1255,7 @@ final class Engine: ObservableObject {
             throw EngineError.message(L("Wi-Fi is off. Connect to a Wi-Fi network, then try again."))
         }
         guard vpnConnected else {
-            throw EngineError.message(L("LocalDevVPN isn't connected. Turn it on, then try again."))
+            throw EngineError.message(L("No loopback VPN is connected. Turn one on, then try again."))
         }
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         guard fileExistsNonEmpty(path) else {
@@ -1214,23 +1385,43 @@ enum Guides {
             systemImage: "wifi",
             steps: [
                 L("Open Settings › Wi-Fi and join a network."),
-                L("LocalDevVPN's tunnel — and the whole install — run over Wi-Fi."),
+                L("The loopback tunnel — and the whole install — run over Wi-Fi."),
                 L("Then come back here — this continues automatically."),
             ],
             actionLabel: nil, actionURLString: nil)
     }
 
+    /// Any VPN app that puts this iPhone on the device subnet works — the check
+    /// behind this card tests the subnet, not the app. Worth spelling out,
+    /// because the choice decides whether the SideStore download can succeed:
+    /// iOS runs one VPN at a time, so a local-only tunnel like LocalDevVPN
+    /// leaves nothing to reach a blocked GitHub through, while a proxying client
+    /// that also exposes the loopback covers both jobs at once.
     static var vpn: Guide {
         Guide(
-            title: L("Turn on LocalDevVPN"),
+            title: L("Turn on a loopback VPN"),
             systemImage: "network",
             steps: [
-                L("Open the LocalDevVPN app (install it first if you haven't)."),
+                L("Open a VPN app that tunnels to this iPhone — LocalDevVPN, ClashMi, or another. Any of them works."),
+                L("If GitHub is blocked where you are, pick one that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through."),
                 L("Tap Connect so the toggle turns on."),
                 L("Keep Wi-Fi on, then come back here — this continues automatically."),
             ],
             actionLabel: L("Get LocalDevVPN"),
             actionURLString: "https://apps.apple.com/app/id6755608044")
+    }
+
+    /// Shown when Custom .ipa is selected but nothing has been imported yet.
+    static var customIPA: Guide {
+        Guide(
+            title: L("Import an .ipa first"),
+            systemImage: "square.and.arrow.down.on.square",
+            steps: [
+                L("Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive."),
+                L("Or copy it into Files › On My iPhone › SideInstaller, where SideInstaller also finds it."),
+                L("This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here."),
+            ],
+            actionLabel: nil, actionURLString: nil)
     }
 
     static var pairing: Guide {

@@ -58,7 +58,7 @@ struct DevCert: Identifiable, Decodable, Equatable {
 /// development certificates, and revokes them by serial number.
 ///
 /// Independent of the install pipeline — revocation is a pure developer-portal
-/// API call, so no device, pairing, or LocalDevVPN tunnel is involved.
+/// API call, so no device, pairing, or loopback tunnel is involved.
 ///
 /// Mirrors `Engine`'s threading: a plain `ObservableObject` (not `@MainActor`)
 /// whose `@Published` state is mutated inside `Task { @MainActor in … }`, with

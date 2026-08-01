@@ -122,35 +122,79 @@
     -webkit-backdrop-filter:blur(24px) saturate(140%); backdrop-filter:blur(24px) saturate(140%);
     box-shadow:0 24px 70px rgba(0,0,0,.55);
     animation:modal-pop .22s cubic-bezier(.22,.9,.35,1) both;
+    transition:width .34s cubic-bezier(.22,.9,.35,1);
   }
+  .modal-card.wide{width:min(760px,100%)}
   @keyframes modal-pop{from{opacity:0; transform:translateY(14px) scale(.96)}}
-  @media (prefers-reduced-motion:reduce){ .modal-card{animation:none} }
-  .modal-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px}
-  .modal-title{margin:0; font-size:18px; font-weight:800; letter-spacing:-.01em}
-  .modal-close{
-    display:grid; place-items:center; width:32px; height:32px; padding:0;
+  @media (prefers-reduced-motion:reduce){ .modal-card{animation:none; transition:none} }
+  .modal-head{display:flex; align-items:center; gap:10px; margin-bottom:14px}
+  .modal-title{margin:0 auto 0 0; font-size:18px; font-weight:800; letter-spacing:-.01em}
+  .modal-close,.modal-back{
+    display:grid; place-items:center; width:32px; height:32px; padding:0; flex:none;
     color:var(--muted); background:var(--card); border:1px solid var(--stroke); border-radius:999px;
     cursor:pointer; transition:background .14s, color .14s;
   }
-  .modal-close:hover{color:var(--text); background:var(--card-hover)}
-  .modal-close svg{width:15px; height:15px}
-  .modal-links{display:flex; flex-direction:column; gap:10px}
-  .modal-link{
-    display:flex; align-items:center; gap:13px; padding:14px 16px; text-decoration:none;
+  .modal-close:hover,.modal-back:hover{color:var(--text); background:var(--card-hover)}
+  .modal-close svg,.modal-back svg{width:15px; height:15px}
+  .modal-back[hidden]{display:none}
+
+  /* ---- tutorial wizard: one question on screen at a time ----
+     The panes are stacked absolutely so the outgoing one can slide away while
+     the next slides in; the wrapper's height is set from JS so the card morphs
+     between steps instead of snapping. */
+  .wizard{position:relative; overflow:hidden; transition:height .34s cubic-bezier(.22,.9,.35,1)}
+  .wizard.no-anim{transition:none}
+  .pane{position:absolute; top:0; left:0; width:100%}
+  .pane[hidden]{display:none}
+  .pane-q{display:flex; flex-direction:column; gap:10px}
+  @keyframes pane-in{from{opacity:0; transform:translateX(26px)}}
+  @keyframes pane-out{to{opacity:0; transform:translateX(-26px)}}
+  @keyframes pane-in-rev{from{opacity:0; transform:translateX(-26px)}}
+  @keyframes pane-out-rev{to{opacity:0; transform:translateX(26px)}}
+  .pane.in{animation:pane-in .3s cubic-bezier(.22,.9,.35,1) both}
+  .pane.out{animation:pane-out .22s ease both; pointer-events:none}
+  .pane.in.rev{animation-name:pane-in-rev}
+  .pane.out.rev{animation-name:pane-out-rev}
+  @media (prefers-reduced-motion:reduce){
+    .wizard{transition:none}
+    .pane.in,.pane.out{animation:none}
+  }
+
+  .opt{
+    display:flex; align-items:center; gap:13px; width:100%; padding:14px 16px;
+    text-align:left; font-family:inherit; color:var(--text); cursor:pointer;
     background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius-sm);
     transition:background .14s, border-color .14s, transform .14s;
   }
-  .modal-link:hover{background:var(--card-hover); border-color:var(--stroke-strong); transform:translateY(-1px)}
-  .modal-link:active{transform:scale(.98)}
-  .modal-link-icon{
+  .opt:hover{background:var(--card-hover); border-color:var(--stroke-strong); transform:translateY(-1px)}
+  .opt:active{transform:scale(.98)}
+  .opt-icon{
     flex:none; width:38px; height:38px; display:grid; place-items:center;
-    color:#fff; background:#ff0000; border-radius:12px;
+    color:#fff; background:var(--brand); border-radius:12px;
+    font-size:13px; font-weight:800; letter-spacing:.02em;
   }
-  .modal-link-icon svg{width:18px; height:18px}
-  .modal-link-text{min-width:0}
-  .modal-link-text b{display:block; color:var(--text); font-size:15px; font-weight:700}
-  .modal-link-text small{display:block; color:var(--muted); font-size:12.5px; margin-top:1px}
-  .modal-link-arrow{margin-left:auto; flex:none; width:16px; height:16px; color:var(--faint)}
+  .opt-icon svg{width:18px; height:18px}
+  .opt-text{min-width:0}
+  .opt-text b{display:block; color:var(--text); font-size:15px; font-weight:700}
+  .opt-text small{display:block; color:var(--muted); font-size:12.5px; margin-top:1px}
+  .opt-arrow{margin-left:auto; flex:none; width:16px; height:16px; color:var(--faint)}
+
+  /* ---- embedded tutorials ---- */
+  .videos{
+    display:flex; flex-direction:column; gap:16px;
+    max-height:min(64vh,560px); overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  .video-frame{
+    position:relative; aspect-ratio:16/9; background:#000; overflow:hidden;
+    border:1px solid var(--stroke); border-radius:var(--radius-sm);
+  }
+  .video-frame iframe{position:absolute; inset:0; width:100%; height:100%; border:0}
+  .video-cap{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    margin-top:8px; color:var(--muted); font-size:12.5px; font-weight:600;
+  }
+  .video-cap a{color:var(--accent2); text-decoration:none}
+  .video-cap a:hover{text-decoration:underline}
 
   /* ---- steps ---- */
   .step{margin-top:34px}
@@ -616,24 +660,50 @@
 
 <div class="modal" id="tutorialModal" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle" hidden>
   <div class="modal-backdrop" data-close></div>
-  <div class="modal-card">
+  <div class="modal-card" id="tutorialCard">
     <div class="modal-head">
-      <h3 class="modal-title" id="tutorialTitle">Tutorials</h3>
+      <button type="button" class="modal-back" id="tutorialBack" aria-label="Back" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <h3 class="modal-title" id="tutorialTitle">Language</h3>
       <button type="button" class="modal-close" data-close aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div class="modal-links">
-      <a class="modal-link" href="https://youtu.be/OyeYTSEheQw?is=j6FyM9iURyrMwcXy" target="_blank" rel="noopener">
-        <span class="modal-link-icon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></span>
-        <span class="modal-link-text"><b>Install SideStore</b></span>
-        <svg class="modal-link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-      </a>
-      <a class="modal-link" href="https://youtu.be/WCYkxfRHapg" target="_blank" rel="noopener">
-        <span class="modal-link-icon"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></span>
-        <span class="modal-link-text"><b>Enable JIT</b></span>
-        <svg class="modal-link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-      </a>
+
+    <div class="wizard" id="tutorialWizard">
+      <!-- step 1 — language -->
+      <div class="pane pane-q" data-step="0">
+        <button type="button" class="opt" data-value="en">
+          <span class="opt-icon" aria-hidden="true">EN</span>
+          <span class="opt-text"><b>English</b></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="opt" data-value="es">
+          <span class="opt-icon" aria-hidden="true">ES</span>
+          <span class="opt-text"><b>Spanish</b><small>Español</small></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <!-- step 2 — topic -->
+      <div class="pane pane-q" data-step="1" hidden>
+        <button type="button" class="opt" data-value="sidestore">
+          <span class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg></span>
+          <span class="opt-text"><b data-t="optSidestore">SideStore</b><small data-t="optSidestoreSub">Installing SideStore on your device</small></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="opt" data-value="jit">
+          <span class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></span>
+          <span class="opt-text"><b data-t="optJit">JIT</b><small data-t="optJitSub">Enabling JIT for your apps</small></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <!-- step 3 — the tutorials themselves -->
+      <div class="pane" data-step="2" hidden>
+        <div class="videos" id="tutorialVideos"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -691,18 +761,161 @@
   },true);
   applyTos();
 
-  /* Tutorial popup */
+  /* Tutorial popup: ask for a language, then a topic, then play the matching
+     tutorials. One pane is on screen at a time — the answered one slides out as
+     the next slides in. */
   var tutBtn=document.getElementById('tutorialBtn');
   var tutModal=document.getElementById('tutorialModal');
+  var tutCard=document.getElementById('tutorialCard');
+  var tutBack=document.getElementById('tutorialBack');
+  var tutTitle=document.getElementById('tutorialTitle');
+  var wizard=document.getElementById('tutorialWizard');
+  var videos=document.getElementById('tutorialVideos');
+  var panes=[].slice.call(wizard.querySelectorAll('.pane'));
+
+  var VIDEOS={
+    en:{sidestore:['4J4muoczR54','OyeYTSEheQw'], jit:['U90-4jA8Kj8','WCYkxfRHapg']},
+    es:{sidestore:['tXGihEkcg-4'], jit:['hEhkDEALNWo']}
+  };
+  var STRINGS={
+    en:{lang:'Language', topic:'Tutorial for', sidestore:'SideStore', jit:'JIT',
+        sidestoreSub:'Installing SideStore on your device', jitSub:'Enabling JIT for your apps',
+        tutorial:'Tutorial', watch:'Watch on YouTube'},
+    es:{lang:'Idioma', topic:'Tutorial para', sidestore:'SideStore', jit:'JIT',
+        sidestoreSub:'Instalar SideStore en tu dispositivo', jitSub:'Activar JIT en tus apps',
+        tutorial:'Tutorial', watch:'Ver en YouTube'}
+  };
+
+  var reduce=window.matchMedia?window.matchMedia('(prefers-reduced-motion:reduce)'):{matches:false};
+  var step=0, lang='en', topic='sidestore', outTimer=null;
+
+  function t(key){ return (STRINGS[lang]||STRINGS.en)[key]; }
+
+  /* The card also animates its width on the way to the videos, so a one-shot
+     measurement taken at swap time would be a frame too early and clip the
+     16:9 embeds. Track the live pane instead. */
+  function syncHeight(){
+    if(!tutModal.hidden) wizard.style.height=panes[step].offsetHeight+'px';
+  }
+  var ro=window.ResizeObserver?new ResizeObserver(syncHeight):null;
+  function watch(pane){ if(ro){ ro.disconnect(); ro.observe(pane); } }
+  tutCard.addEventListener('transitionend',function(e){
+    if(e.propertyName==='width') syncHeight();
+  });
+
+  /* Swap the visible pane. dir<0 reverses the slide for the back button. */
+  function showStep(next,dir){
+    if(next===step) return;
+    var cur=panes[step], nxt=panes[next];
+    if(next===2) buildVideos();
+    tutTitle.textContent = next===0 ? STRINGS.en.lang : next===1 ? t('topic') : t(topic);
+    tutBack.hidden = next===0;
+    tutCard.classList.toggle('wide', next===2);
+
+    clearTimeout(outTimer);
+    cur.classList.remove('in','out','rev');
+    nxt.classList.remove('in','out','rev');
+    nxt.hidden=false;
+    step=next;
+    watch(nxt);
+    syncHeight();
+
+    if(reduce.matches){
+      cur.hidden=true;
+    }else{
+      cur.classList.add('out'); nxt.classList.add('in');
+      if(dir<0){ cur.classList.add('rev'); nxt.classList.add('rev'); }
+      outTimer=setTimeout(function(){ cur.hidden=true; cur.classList.remove('out','rev'); },220);
+    }
+    focusPane(nxt);
+  }
+
+  function focusPane(pane){
+    var first=pane.querySelector('.opt');
+    if(first) first.focus();
+    else if(step===2) tutBack.focus();
+  }
+
+  function buildVideos(){
+    var ids=VIDEOS[lang][topic]||[];
+    var label=t(topic);
+    videos.textContent='';
+    ids.forEach(function(id,i){
+      var wrap=document.createElement('div');
+
+      var frame=document.createElement('div');
+      frame.className='video-frame';
+      var f=document.createElement('iframe');
+      f.src='https://www.youtube-nocookie.com/embed/'+id+'?rel=0';
+      f.title=label+' — '+t('tutorial')+' '+(i+1);
+      f.allow='accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
+      f.setAttribute('allowfullscreen','');
+      f.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+      frame.appendChild(f);
+
+      var cap=document.createElement('div');
+      cap.className='video-cap';
+      var name=document.createElement('span');
+      name.textContent = ids.length>1 ? t('tutorial')+' '+(i+1) : label;
+      var link=document.createElement('a');
+      link.href='https://youtu.be/'+id;
+      link.target='_blank'; link.rel='noopener';
+      link.textContent=t('watch');
+      cap.appendChild(name); cap.appendChild(link);
+
+      wrap.appendChild(frame); wrap.appendChild(cap);
+      videos.appendChild(wrap);
+    });
+  }
+
+  /* Back out of the modal entirely to step 0, with no animation. */
+  function resetTut(){
+    clearTimeout(outTimer);
+    step=0; lang='en'; topic='sidestore';
+    panes.forEach(function(p,i){
+      p.classList.remove('in','out','rev');
+      p.hidden = i!==0;
+    });
+    videos.textContent='';   /* drops the iframes so playback stops */
+    tutCard.classList.remove('wide');
+    tutBack.hidden=true;
+    tutTitle.textContent=STRINGS.en.lang;
+    applyLang();
+    /* No height tween on the way in — the card should just appear at size. */
+    wizard.classList.add('no-anim');
+    watch(panes[0]);
+    syncHeight();
+    void wizard.offsetHeight;
+    wizard.classList.remove('no-anim');
+  }
+
+  /* Step 2 speaks the language picked in step 1. */
+  function applyLang(){
+    wizard.querySelector('[data-t="optSidestore"]').textContent=t('sidestore');
+    wizard.querySelector('[data-t="optSidestoreSub"]').textContent=t('sidestoreSub');
+    wizard.querySelector('[data-t="optJit"]').textContent=t('jit');
+    wizard.querySelector('[data-t="optJitSub"]').textContent=t('jitSub');
+  }
+
+  wizard.addEventListener('click',function(e){
+    var btn=e.target.closest && e.target.closest('.opt');
+    if(!btn) return;
+    if(step===0){ lang=btn.getAttribute('data-value'); applyLang(); showStep(1,1); }
+    else if(step===1){ topic=btn.getAttribute('data-value'); showStep(2,1); }
+  });
+  tutBack.addEventListener('click',function(){ if(step>0) showStep(step-1,-1); });
+
   function openTut(){
     tutModal.hidden=false;
     document.body.style.overflow='hidden';
-    var first=tutModal.querySelector('.modal-link');
+    resetTut();
+    var first=wizard.querySelector('.opt');
     if(first) first.focus();
   }
   function closeTut(){
     tutModal.hidden=true;
     document.body.style.overflow='';
+    videos.textContent='';   /* stop any playing video */
     tutBtn.focus();
   }
   tutBtn.addEventListener('click',openTut);
@@ -712,6 +925,7 @@
   document.addEventListener('keydown',function(e){
     if(e.key==='Escape' && !tutModal.hidden) closeTut();
   });
+  window.addEventListener('resize',syncHeight);
 })();
 </script>
 </body>

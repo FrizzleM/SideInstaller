@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 /// The Install screen: enter an Apple ID, choose a build, and install it in one
 /// tap. While the pipeline runs, an animated step timeline and contextual
@@ -11,6 +12,21 @@ struct ContentView: View {
     @EnvironmentObject private var loc: Localizer
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
+    @State private var showImporter = false
+
+    /// What the import picker will let you choose.
+    ///
+    /// Deliberately just "any file". iOS declares no UTType for `.ipa`, so the
+    /// obvious `UTType(filenameExtension: "ipa")` mints a *dynamic* type — and a
+    /// file only becomes selectable if the type its storage provider resolved
+    /// happens to be that same dynamic type. When it isn't (iCloud Drive, a
+    /// share sheet, a third-party provider often report the file as a zip or as
+    /// plain data), the picker shows the file as normal and then silently
+    /// ignores every tap on it: no selection, no dismissal, no callback.
+    ///
+    /// So the filter accepts everything and `Engine.importCustomIPA` does the
+    /// real checking, by looking inside the file rather than trusting a label.
+    private static let importableTypes: [UTType] = [.data]
 
     var body: some View {
         NavigationStack {
@@ -25,7 +41,7 @@ struct ContentView: View {
                     // Most-blocking requirement first: an unsupported iOS can't
                     // be worked around at all, so it pre-empts the other two.
                     // Then Wi-Fi, the prerequisite for the tunnel: no Wi-Fi →
-                    // Wi-Fi callout; Wi-Fi but no tunnel → LocalDevVPN callout;
+                    // Wi-Fi callout; Wi-Fi but no tunnel → loopback-VPN callout;
                     // all three fine → none.
                     if !engine.isRunning {
                         if !engine.osSupported {
@@ -77,6 +93,17 @@ struct ContentView: View {
             .background(AppBackground())
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
             .sheet(isPresented: $showSettings) { SettingsView() }
+            // Attached here rather than on the card that owns the button: the
+            // card carries `.disabled(engine.isRunning)`, and a presentation
+            // inherits the environment of wherever its modifier lives, which
+            // can leave the picked file unresponsive to taps.
+            .fileImporter(isPresented: $showImporter,
+                          allowedContentTypes: Self.importableTypes) { result in
+                switch result {
+                case let .success(url):  engine.importCustomIPA(from: url)
+                case let .failure(error): engine.log("⛔️ Import cancelled: \(error.localizedDescription)")
+                }
+            }
         }
     }
 
@@ -224,15 +251,52 @@ struct ContentView: View {
                     .contentShape(Rectangle())
                 }
 
-                Picker(L("Release"), selection: $engine.releaseChannel) {
-                    ForEach(ReleaseChannel.allCases) { channel in
-                        Text(channel.displayName).tag(channel)
+                // A custom IPA has no release to choose between, so the channel
+                // picker gives its place up to the importer that replaces it.
+                ZStack {
+                    if engine.installSource == .custom {
+                        importControl.transition(.opacity)
+                    } else {
+                        Picker(L("Release"), selection: $engine.releaseChannel) {
+                            ForEach(ReleaseChannel.allCases) { channel in
+                                Text(channel.displayName).tag(channel)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .transition(.opacity)
                     }
                 }
-                .pickerStyle(.segmented)
+                .animation(.smooth(duration: 0.28), value: engine.installSource)
             }
         }
         .disabled(engine.isRunning)
+    }
+
+    /// Import button, which doubles as the readout of what's loaded: once a file
+    /// is in, its name is the label, so the card always answers "which IPA will
+    /// this install?" without a second row of text.
+    private var importControl: some View {
+        Button { showImporter = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: engine.customIPAName == nil
+                      ? "square.and.arrow.down" : "checkmark.circle.fill")
+                    .contentTransition(.symbolEffect(.replace))
+                    .foregroundStyle(engine.customIPAName == nil ? Color.secondary : Theme.accent2)
+                Text(engine.customIPAName ?? L("Import .ipa"))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(.primary)
+                Spacer()
+                if engine.customIPAName != nil {
+                    Text(L("Replace"))
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.accent2)
+                }
+            }
+            .fieldBackground()
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Primary action
@@ -265,7 +329,7 @@ struct ContentView: View {
     // MARK: iOS version requirement
 
     /// Shown above the Install button on an iPhone older than the minimum iOS.
-    /// Unlike the Wi-Fi and LocalDevVPN callouts this one isn't a "do this and
+    /// Unlike the Wi-Fi and loopback-VPN callouts this one isn't a "do this and
     /// carry on" — the install can't run here at all — so it replaces both.
     private var osRequirement: some View {
         CalloutCard(tint: .red) {
@@ -291,7 +355,7 @@ struct ContentView: View {
 
     /// Shown above the Install button while Wi-Fi is off. The tunnel — and so the
     /// whole install — rides on Wi-Fi, so it's the first thing to fix; enabling
-    /// it reveals the LocalDevVPN callout next if the tunnel is still down.
+    /// it reveals the loopback-VPN callout next if the tunnel is still down.
     private var wifiRequirement: some View {
         CalloutCard(tint: .red) {
             HStack(alignment: .top, spacing: 14) {
@@ -302,7 +366,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(L("Wi-Fi required"))
                         .font(.subheadline.weight(.semibold))
-                    Text(L("Connect to a Wi-Fi network. LocalDevVPN's tunnel and the install run over it."))
+                    Text(L("Connect to a Wi-Fi network. The loopback tunnel and the install run over it."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -311,9 +375,9 @@ struct ContentView: View {
         }
     }
 
-    // MARK: LocalDevVPN requirement
+    // MARK: Loopback-VPN requirement
 
-    /// Shown above the Install button while the LocalDevVPN tunnel is off — the
+    /// Shown above the Install button while the loopback tunnel is off — the
     /// whole install runs over it, so it must be on before tapping Install.
     private var vpnRequirement: some View {
         CalloutCard(tint: .red) {
@@ -323,9 +387,9 @@ struct ContentView: View {
                     .foregroundStyle(.red)
                     .symbolEffect(.pulse)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(L("LocalDevVPN required"))
+                    Text(L("Loopback VPN required"))
                         .font(.subheadline.weight(.semibold))
-                    Text(L("Open LocalDevVPN and tap Connect. The install runs over its tunnel."))
+                    Text(L("Turn on a loopback VPN — LocalDevVPN, ClashMi, or any app that tunnels to this iPhone. The install runs over it."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

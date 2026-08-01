@@ -5,7 +5,7 @@ import Foundation
 ///   • generate (extract) the device pairing file via the RPPairing host,
 ///   • export it (share sheet / Save to Files), and
 ///   • write it into a chosen installed app (SideStore, StikDebug, Feather, …)
-///     over LocalDevVPN, the same way the install flow seeds SideStore.
+///     over the loopback tunnel, the same way the install flow seeds SideStore.
 ///
 /// All device work is delegated to the shared `Engine` (it owns the connection
 /// and serializes it); this type holds only the tab's own UI state, mirroring
@@ -79,7 +79,7 @@ final class PairingManager: ObservableObject {
         }
     }
 
-    /// Connect over LocalDevVPN and list the supported apps installed on device.
+    /// Connect over the loopback tunnel and list the supported apps on device.
     func scan() {
         guard !isBusy else { return }
         lastError = nil

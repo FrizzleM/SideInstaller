@@ -122,9 +122,13 @@ struct SettingsView: View {
                 Text(item.displayName)
                     .font(.subheadline.weight(.medium))
                 if let modified = item.modified {
-                    Text(L("Downloaded %@", modified.formatted(
+                    let when = modified.formatted(
                         Date.FormatStyle(date: .abbreviated, time: .shortened)
-                            .locale(Localizer.locale))))
+                            .locale(Localizer.locale))
+                    // Nothing was downloaded for a file the user brought in, so
+                    // the timestamp is when it arrived rather than when it was
+                    // fetched.
+                    Text(item.isImported ? L("Added %@", when) : L("Downloaded %@", when))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -49,15 +49,18 @@ let vietnameseStrings: [String: String] = [
     "Release": "Kênh",
     "Reinstall": "Cài đặt lại",
     "Install %@": "Cài đặt %@",
+    "Custom .ipa": "IPA tùy chọn",
+    "Import .ipa": "Nhập .ipa",
+    "Replace": "Thay",
     "iOS %@ required": "Yêu cầu iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "iPhone này đang chạy iOS %@, SideInstaller không thể cài đặt trên phiên bản đó. Cập nhật lên iOS %@ trở lên trong Cài đặt › Cài đặt chung › Cập nhật phần mềm.",
     "Wi-Fi required": "Yêu cầu Wi-Fi",
-    "Connect to a Wi-Fi network. LocalDevVPN's tunnel and the install run over it.":
-        "Kết nối vào một mạng Wi-Fi. Đường hầm của LocalDevVPN và quá trình cài đặt đều chạy qua đó.",
-    "LocalDevVPN required": "Yêu cầu LocalDevVPN",
-    "Open LocalDevVPN and tap Connect. The install runs over its tunnel.":
-        "Mở LocalDevVPN và chạm vào Connect. Quá trình cài đặt chạy qua đường hầm của LocalDevVPN.",
+    "Connect to a Wi-Fi network. The loopback tunnel and the install run over it.":
+        "Kết nối vào một mạng Wi-Fi. Đường hầm loopback và quá trình cài đặt đều chạy qua đó.",
+    "Loopback VPN required": "Cần một VPN loopback",
+    "Turn on a loopback VPN — LocalDevVPN, ClashMi, or any app that tunnels to this iPhone. The install runs over it.":
+        "Bật một VPN loopback — LocalDevVPN, ClashMi hay bất kỳ ứng dụng nào tạo đường hầm tới iPhone này. Quá trình cài đặt chạy qua nó.",
     "Pairing code": "Mã ghép nối",
     "Type this into the prompt in Settings.":
         "Nhập mã này vào hộp thoại trong Cài đặt.",
@@ -73,6 +76,7 @@ let vietnameseStrings: [String: String] = [
     "Open the device link": "Mở liên kết tới thiết bị",
     "Sign in to Apple ID": "Đăng nhập Apple ID",
     "Download %@": "Tải %@",
+    "Use your imported IPA": "Dùng IPA đã nhập",
     "Sign the app": "Ký ứng dụng",
     "Finish setup": "Hoàn tất thiết lập",
 
@@ -90,10 +94,10 @@ let vietnameseStrings: [String: String] = [
     "Scanning": "Đang quét",
     "Rescan apps": "Quét lại ứng dụng",
     "Scan installed apps": "Quét ứng dụng đã cài",
-    "Connect to Wi-Fi to scan and install. LocalDevVPN's tunnel runs over it.":
-        "Kết nối Wi-Fi để quét và cài đặt. Đường hầm của LocalDevVPN chạy qua đó.",
-    "Turn on LocalDevVPN to scan and install. The write runs over its tunnel.":
-        "Bật LocalDevVPN để quét và cài đặt. Việc ghi tệp chạy qua đường hầm này.",
+    "Connect to Wi-Fi to scan and install. The loopback tunnel runs over it.":
+        "Kết nối Wi-Fi để quét và cài đặt. Đường hầm loopback chạy qua đó.",
+    "Turn on a loopback VPN to scan and install. The write runs over its tunnel.":
+        "Bật một VPN loopback để quét và cài đặt. Việc ghi tệp chạy qua đường hầm này.",
     "%d supported app installed": "Đã cài %d ứng dụng được hỗ trợ",
     "%d supported apps installed": "Đã cài %d ứng dụng được hỗ trợ",
     "No supported apps found": "Không tìm thấy ứng dụng được hỗ trợ",
@@ -155,9 +159,11 @@ let vietnameseStrings: [String: String] = [
     "Auto": "Tự động",
     "Downloaded IPAs": "Tệp IPA đã tải",
     "%@ used": "Đã dùng %@",
+    "imported": "đã nhập",
     "No downloaded IPAs. Ones you install from the Install tab are cached here.":
         "Chưa có tệp IPA nào được tải. Những tệp bạn cài từ tab Cài ứng dụng sẽ được lưu ở đây.",
     "Downloaded %@": "Đã tải vào %@",
+    "Added %@": "Đã thêm %@",
     "Delete this download?": "Xóa bản tải này?",
     "Delete": "Xóa",
     "“%@” (%@) will be removed. You can download it again any time from the Install tab.":
@@ -211,8 +217,18 @@ let vietnameseStrings: [String: String] = [
         "%@ chưa được cài đặt — phải cài đặt trước.",
     "Wi-Fi is off. Connect to a Wi-Fi network, then try again.":
         "Wi-Fi đang tắt. Kết nối vào một mạng Wi-Fi rồi thử lại.",
-    "LocalDevVPN isn't connected. Turn it on, then try again.":
-        "LocalDevVPN chưa kết nối. Bật lên rồi thử lại.",
+    "No loopback VPN is connected. Turn one on, then try again.":
+        "Chưa có VPN loopback nào được kết nối. Hãy bật một cái rồi thử lại.",
+    "%@ isn't a valid IPA — the download it came from probably returned an error page, or the copy stopped partway. Replace it and tap Install again.":
+        "%@ không phải là một IPA hợp lệ — có thể lượt tải về đã trả về một trang lỗi, hoặc việc sao chép bị dừng giữa chừng. Hãy thay tệp rồi chạm Cài đặt lại.",
+    "%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.":
+        "%@ không phải là IPA. Hãy chọn đúng tệp .ipa — nếu trông vẫn đúng thì có thể lượt tải đã lưu một trang lỗi, hoặc dừng giữa chừng.",
+    "No IPA imported yet. Tap “Import .ipa” and pick one.":
+        "Chưa nhập IPA nào. Hãy chạm “Nhập .ipa” và chọn một tệp.",
+    "Couldn't import %@: %@": "Không thể nhập %@: %@",
+    "there's nothing to download for a custom IPA — import one first":
+        "không có gì để tải cho IPA tùy chọn — hãy nhập một tệp trước",
+    "your app": "ứng dụng của bạn",
     "Apple allows only 3 signing certificates per Apple ID and this one already has 3, so a new one can't be made. Open the Certificates tab, tap “Load certificates”, and revoke an old or expired one to free a slot — then tap Install again. See the steps above.":
         "Apple chỉ cho phép 3 chứng chỉ ký trên mỗi Apple ID và Apple ID này đã có đủ 3, nên không thể tạo thêm. Mở tab Chứng chỉ, chạm vào “Tải danh sách chứng chỉ” và thu hồi một chứng chỉ cũ hoặc đã hết hạn để giải phóng chỗ — rồi chạm vào Cài đặt lần nữa. Xem các bước ở trên.",
     " (UDID %@)": " (UDID %@)",
@@ -224,18 +240,27 @@ let vietnameseStrings: [String: String] = [
     "Connect to Wi-Fi": "Kết nối Wi-Fi",
     "Open Settings › Wi-Fi and join a network.":
         "Mở Cài đặt › Wi-Fi và tham gia một mạng.",
-    "LocalDevVPN's tunnel — and the whole install — run over Wi-Fi.":
-        "Đường hầm của LocalDevVPN — và cả quá trình cài đặt — đều chạy qua Wi-Fi.",
+    "The loopback tunnel — and the whole install — run over Wi-Fi.":
+        "Đường hầm loopback — và cả quá trình cài đặt — đều chạy qua Wi-Fi.",
     "Then come back here — this continues automatically.":
         "Sau đó quay lại đây: quá trình sẽ tự tiếp tục.",
 
-    "Turn on LocalDevVPN": "Bật LocalDevVPN",
-    "Open the LocalDevVPN app (install it first if you haven't).":
-        "Mở ứng dụng LocalDevVPN (nếu chưa có, hãy cài trước).",
+    "Turn on a loopback VPN": "Bật một VPN loopback",
+    "Open a VPN app that tunnels to this iPhone — LocalDevVPN, ClashMi, or another. Any of them works.":
+        "Mở một ứng dụng VPN tạo đường hầm tới iPhone này — LocalDevVPN, ClashMi hay một ứng dụng khác. Cái nào cũng được.",
+    "If GitHub is blocked where you are, pick one that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through.":
+        "Nếu GitHub bị chặn ở nơi bạn ở, hãy chọn ứng dụng có thể làm proxy luôn: iOS chỉ cho phép một VPN tại một thời điểm, nên đường hầm chỉ cục bộ sẽ không còn đường nào để tải SideStore.",
     "Tap Connect so the toggle turns on.": "Chạm vào Connect để công tắc bật lên.",
     "Keep Wi-Fi on, then come back here — this continues automatically.":
         "Giữ Wi-Fi bật rồi quay lại đây: quá trình sẽ tự tiếp tục.",
     "Get LocalDevVPN": "Tải LocalDevVPN",
+    "Import an .ipa first": "Hãy nhập một .ipa trước",
+    "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
+        "Chạm “Nhập .ipa” ở trên và chọn tệp — tệp có thể nằm ở bất kỳ đâu mà app Tệp truy cập được, kể cả iCloud Drive hay ổ USB.",
+    "Or copy it into Files › On My iPhone › SideInstaller, where SideInstaller also finds it.":
+        "Hoặc chép tệp vào Tệp › Trên iPhone của tôi › SideInstaller — SideInstaller cũng tìm thấy ở đó.",
+    "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
+        "Đây là lối đi ở những nơi GitHub bị chặn: tải IPA trên bất kỳ thiết bị nào, mang sang đây rồi cài đặt.",
 
     "Pair this iPhone in Settings": "Ghép nối iPhone này trong Cài đặt",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":

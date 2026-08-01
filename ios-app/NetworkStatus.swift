@@ -1,8 +1,8 @@
 import Foundation
 import Darwin
 
-/// Best-effort detection of the LocalDevVPN loopback + Wi-Fi by scanning the
-/// active network interfaces. LocalDevVPN brings up a `utun*` tunnel interface;
+/// Best-effort detection of the loopback tunnel + Wi-Fi by scanning the active
+/// network interfaces. A loopback VPN brings up a `utun*` tunnel interface;
 /// Wi-Fi is `en0`. This is a quick readout — the real proof is whether the
 /// lockdown connection succeeds.
 enum NetworkStatus {
@@ -35,29 +35,33 @@ enum NetworkStatus {
         return result
     }
 
-    /// (vpnUp, wifiUp, detail) — vpnUp when the LocalDevVPN loopback tunnel is up
-    /// for the given `deviceIP` (see `localDevVPNUp`).
+    /// (vpnUp, wifiUp, detail) — vpnUp when a loopback tunnel to `deviceIP` is
+    /// up (see `loopbackTunnelUp`).
     static func summarize(deviceIP: String) -> (vpn: Bool, wifi: Bool, detail: String) {
         let ifs = interfaces()
-        let vpn = isLocalDevVPNUp(in: ifs, deviceIP: deviceIP)
+        let vpn = isLoopbackTunnelUp(in: ifs, deviceIP: deviceIP)
         let wifi = ifs.contains { $0.name == "en0" }
         let detail = ifs.map { "\($0.name)=\($0.ipv4)" }.joined(separator: ", ")
         return (vpn, wifi, detail)
     }
 
-    /// True when LocalDevVPN's loopback tunnel is up: some interface holds an
-    /// IPv4 in the same /24 as `deviceIP`. LocalDevVPN's default is `10.7.0.0/24`
-    /// (device side `10.7.0.0`, peer `10.7.0.1` — the address we connect to), so
-    /// the device gains a `utun*` address in that subnet while it's connected.
+    /// True when the loopback tunnel is up: some interface holds an IPv4 in the
+    /// same /24 as `deviceIP`. The convention is `10.7.0.0/24` (device side
+    /// `10.7.0.0`, peer `10.7.0.1` — the address we connect to), so the device
+    /// gains a `utun*` address in that subnet while it's connected.
+    ///
+    /// Testing the subnet is also what keeps this app-agnostic: nothing here
+    /// asks *which* VPN client put the address there, so LocalDevVPN, ClashMi or
+    /// anything else that exposes the same loopback all read as connected.
     ///
     /// Scoping to the subnet — rather than matching any `utun*` — is what makes
     /// this reliable: iOS keeps system `utun` interfaces around (Handoff, Wi-Fi
     /// calling, …) even with no VPN, so a bare name check yields false positives.
-    static func localDevVPNUp(deviceIP: String) -> Bool {
-        isLocalDevVPNUp(in: interfaces(), deviceIP: deviceIP)
+    static func loopbackTunnelUp(deviceIP: String) -> Bool {
+        isLoopbackTunnelUp(in: interfaces(), deviceIP: deviceIP)
     }
 
-    private static func isLocalDevVPNUp(in ifs: [Interface], deviceIP: String) -> Bool {
+    private static func isLoopbackTunnelUp(in ifs: [Interface], deviceIP: String) -> Bool {
         guard let prefix = subnetPrefix24(deviceIP) else {
             // Unparseable target IP — fall back to the broad tunnel-name check.
             return ifs.contains { isTunnelInterface($0.name) }

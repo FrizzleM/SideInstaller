@@ -9,6 +9,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case italian
     case vietnamese
     case french
+    case chinese
 
     var id: String { rawValue }
 
@@ -22,6 +23,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .italian:    return "Italiano"
         case .vietnamese: return "Tiếng Việt"
         case .french:     return "Français"
+        case .chinese:    return "简体中文"
         }
     }
 
@@ -36,6 +38,9 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "it": return .italian
         case "vi": return .vietnamese
         case "fr": return .french
+        // Only Simplified is translated, but a Traditional phone still reads
+        // closer to it than to English, so every zh- variant lands here.
+        case "zh": return .chinese
         default:   return .english
         }
     }
@@ -49,6 +54,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .italian:        return italianStrings
         case .vietnamese:     return vietnameseStrings
         case .french:         return frenchStrings
+        case .chinese:        return chineseStrings
         case .auto, .english: return nil
         }
     }
@@ -108,6 +114,7 @@ extension Localizer {
         case .italian:    return Locale(identifier: "it_IT")
         case .vietnamese: return Locale(identifier: "vi_VN")
         case .french:     return Locale(identifier: "fr_FR")
+        case .chinese:    return Locale(identifier: "zh_Hans_CN")
         }
     }
 }
