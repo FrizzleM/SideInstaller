@@ -38,6 +38,26 @@ All notable changes to SideInstaller are documented here.
   record, which only a complete file has.
 
 ### Fixed
+- **The Pairing tab no longer fails with “adapter closed” after sitting idle.** It reused the device
+  link on the strength of a check that only proves our handles aren't null — but iOS tears the tunnel
+  down underneath them, so scanning or writing minutes later hit a dead link. It now re-establishes
+  first, the same way the install step has since 0.6.5.
+- **A reconfigured tunnel is detected properly.** LocalDevVPN lets you change its tunnel IP, device IP
+  and subnet mask; SideInstaller assumed a /24 and would report “no loopback VPN” for a working tunnel
+  on any other mask. It now reads the interface's real netmask and asks the question that actually
+  matters — would traffic to this address go into that tunnel?
+- **A tunnel is no longer confused with a home network on the same range.** The check matched any
+  interface in the target's subnet, so a Wi-Fi LAN on `10.7.0.x` read as a connected tunnel. It now
+  has to be a tunnel interface *and* carry the address.
+- **Putting the wrong address in Device IP is caught immediately.** LocalDevVPN's main screen shows
+  `10.7.0.0` — its own end of the tunnel — while the address to connect to is the `10.7.0.1` under its
+  Settings › Device IP. Entering the first left a tunnel that read as up and a run that failed at
+  Connect after a sign-in and a download. SideInstaller now recognises an address this iPhone already
+  holds and says so before starting.
+- **Wi-Fi is only required for the step that needs it.** The tunnel is a loopback — it routes its own
+  subnet and excludes the default route — so it works fine on cellular, and so does everything else in
+  the run. Only pairing needs the local network, to be findable by Settings. With a pairing file
+  already saved, installing no longer demands Wi-Fi; nor do the Pairing tab's scan and write.
 - **The pairing file and your signing certificate are no longer sitting in a folder anyone can browse.**
   Making the Documents folder visible in Files — the point of the import feature — exposed everything
   in it, including the device pairing record and isideload's storage, which holds the developer

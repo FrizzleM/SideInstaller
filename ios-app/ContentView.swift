@@ -40,13 +40,14 @@ struct ContentView: View {
                     appCard.cascadeItem(2)
                     // Most-blocking requirement first: an unsupported iOS can't
                     // be worked around at all, so it pre-empts the other two.
-                    // Then Wi-Fi, the prerequisite for the tunnel: no Wi-Fi →
-                    // Wi-Fi callout; Wi-Fi but no tunnel → loopback-VPN callout;
-                    // all three fine → none.
+                    // Then Wi-Fi, but only for a run that has to pair — with a
+                    // pairing file already saved the tunnel is pure loopback and
+                    // cellular carries the rest, so there's nothing to warn
+                    // about. Wi-Fi settled but no tunnel → loopback-VPN callout.
                     if !engine.isRunning {
                         if !engine.osSupported {
                             osRequirement.cascadeItem(3)
-                        } else if !engine.wifiConnected {
+                        } else if !engine.wifiConnected, engine.needsFreshPairing {
                             wifiRequirement.cascadeItem(3)
                         } else if !engine.vpnConnected {
                             vpnRequirement.cascadeItem(3)
@@ -376,7 +377,7 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(L("Wi-Fi required"))
                         .font(.subheadline.weight(.semibold))
-                    Text(L("Connect to a Wi-Fi network. The loopback tunnel and the install run over it."))
+                    Text(L("Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

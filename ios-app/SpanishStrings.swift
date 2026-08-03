@@ -59,8 +59,6 @@ let spanishStrings: [String: String] = [
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Este iPhone tiene iOS %@, y con esa versión SideInstaller no puede instalar nada. Actualiza a iOS %@ o posterior en Ajustes › General › Actualización de software.",
     "Wi-Fi required": "Se requiere Wi-Fi",
-    "Connect to a Wi-Fi network. The loopback tunnel and the install run over it.":
-        "Conéctate a una red Wi-Fi. El túnel loopback y la instalación pasan por esa red.",
     "Loopback VPN required": "Se requiere una VPN loopback",
     "Turn on a loopback VPN — LocalDevVPN, ClashMi, or any app that tunnels to this iPhone. The install runs over it.":
         "Activa una VPN loopback: LocalDevVPN, ClashMi o cualquier app que haga un túnel a este iPhone. La instalación pasa por ella.",
@@ -97,8 +95,6 @@ let spanishStrings: [String: String] = [
     "Scanning": "Buscando",
     "Rescan apps": "Buscar apps otra vez",
     "Scan installed apps": "Buscar apps instaladas",
-    "Connect to Wi-Fi to scan and install. The loopback tunnel runs over it.":
-        "Conéctate al Wi-Fi para buscar e instalar. El túnel loopback pasa por esa red.",
     "Turn on a loopback VPN to scan and install. The write runs over its tunnel.":
         "Activa una VPN loopback para buscar e instalar. La escritura se hace por su túnel.",
     "%d supported app installed": "%d app compatible instalada",
@@ -197,7 +193,6 @@ let spanishStrings: [String: String] = [
     "Two-factor verification was cancelled.": "Se ha cancelado la verificación en dos pasos.",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
         "Apple ID o contraseña incorrectos. Comprueba el correo y la contraseña de tu Apple Account y vuelve a intentarlo.",
-    "Apple ID sign-in failed: %@": "No se ha podido iniciar sesión con el Apple ID: %@",
     "Apple ID sign-in failed on %@. Last error: %@":
         "No se ha podido iniciar sesión con el Apple ID en %@. Último error: %@",
     "the anisette server": "el servidor anisette",
@@ -218,8 +213,6 @@ let spanishStrings: [String: String] = [
         "Todavía no hay archivo de emparejamiento: toca antes “Generar archivo de emparejamiento”.",
     "%@ isn't installed yet — install must run first.":
         "%@ todavía no está instalado: primero hay que instalarlo.",
-    "Wi-Fi is off. Connect to a Wi-Fi network, then try again.":
-        "El Wi-Fi está desactivado. Conéctate a una red Wi-Fi e inténtalo de nuevo.",
     "No loopback VPN is connected. Turn one on, then try again.":
         "No hay ninguna VPN loopback conectada. Activa una e inténtalo de nuevo.",
     "%@ isn't a valid IPA — the download it came from probably returned an error page, or the copy stopped partway. Replace it and tap Install again.":
@@ -242,8 +235,6 @@ let spanishStrings: [String: String] = [
 
     "Connect to Wi-Fi": "Conéctate al Wi-Fi",
     "Open Settings › Wi-Fi and join a network.": "Abre Ajustes › Wi-Fi y únete a una red.",
-    "The loopback tunnel — and the whole install — run over Wi-Fi.":
-        "El túnel loopback —y toda la instalación— pasan por el Wi-Fi.",
     "Then come back here — this continues automatically.":
         "Después vuelve aquí: el proceso continúa solo.",
 
@@ -313,4 +304,15 @@ let spanishStrings: [String: String] = [
     "Tap the Settings tab.": "Toca la pestaña Settings.",
     "Tap “Import Certificate From SideStore”.":
         "Toca “Import Certificate From SideStore”.",
+    "Wrong device IP": "IP de dispositivo incorrecta",
+    "The address in Settings › Advanced › Device IP is one this iPhone already holds, so there's nothing at the other end to connect to.":
+        "La dirección en Ajustes › Avanzado › IP del dispositivo es una que este iPhone ya tiene, así que no hay nada al otro extremo a lo que conectarse.",
+    "Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end.":
+        "Vuelve a ponerla en 10.7.0.1, el valor por omisión. En LocalDevVPN es el valor de Ajustes › Device IP, no la dirección de su pantalla principal, que es el extremo del propio túnel.",
+    "If you changed LocalDevVPN's addresses, put its Device IP here, and make sure its Tunnel IP and subnet mask cover it.":
+        "Si cambiaste las direcciones de LocalDevVPN, pon aquí su Device IP y comprueba que su Tunnel IP y su máscara de subred la abarquen.",
+    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
+        "Emparejar este iPhone lo necesita: SideInstaller se anuncia en la red local para que Ajustes lo encuentre.",
+    "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
+        "Conéctate a una red Wi-Fi. Emparejar este iPhone lo necesita: SideInstaller tiene que ser localizable en la red local.",
 ]

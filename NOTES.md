@@ -92,6 +92,26 @@ runs the host off-thread, surfaces the PIN, and writes the pairing file to
 `Application Support/rp_pairing_file.plist`. Reports every step into the log
 console.
 
+**LocalDevVPN's actual shape** (read from its source, `TunnelProv/PacketTunnelProvider.swift`):
+`NEIPv4Settings(addresses: [TunnelDeviceIP])` puts **10.7.0.0** on the `utun`, with
+`includedRoutes` = that subnet only and `excludedRoutes = [.default()]`. We connect to
+the peer **10.7.0.1** (`TunnelFakeIP`), which is on no interface — the provider rewrites
+`dst == fakeIP → deviceIP` inbound and `src == deviceIP → fakeIP` outbound. Three
+consequences for us:
+
+- The tunnel routes nothing off-device, so it needs **no Wi-Fi**. Only pairing does
+  (Bonjour on the local network). `Engine.needsFreshPairing` is what gates the Wi-Fi
+  requirement now.
+- All three of tunnel IP, device IP and subnet mask are **user-editable** in LocalDevVPN,
+  so `NetworkStatus` reads the interface's real netmask instead of assuming /24.
+- Its config sets `isOnDemandEnabled = true` with `NEEvaluateConnectionRule(matchDomains:
+  ["10.7.0.0", "10.7.0.1"])`, and never disables it. Those are **DNS domain** matches and
+  we connect by raw IP, so they can never fire for our traffic — iOS is left free to tear
+  the tunnel down whenever it likes. That is the mechanism behind the 0.6.5 "adapter
+  closed (NetworkUnreachable)" failures. **Never trust `DeviceConnection.isConnected` to
+  mean the tunnel is alive** — it only says our handles are non-null. Re-establish before
+  any device work; a pair-verify is cheap and needs no PIN.
+
 Since 0.7.0 the pairing file and isideload's `FsStorage` root both live in
 Application Support rather than Documents — `UIFileSharingEnabled` exposes the
 whole of Documents in Files (so an IPA can be dropped in), and that's no place

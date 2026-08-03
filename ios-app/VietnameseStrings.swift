@@ -57,8 +57,6 @@ let vietnameseStrings: [String: String] = [
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "iPhone này đang chạy iOS %@, SideInstaller không thể cài đặt trên phiên bản đó. Cập nhật lên iOS %@ trở lên trong Cài đặt › Cài đặt chung › Cập nhật phần mềm.",
     "Wi-Fi required": "Yêu cầu Wi-Fi",
-    "Connect to a Wi-Fi network. The loopback tunnel and the install run over it.":
-        "Kết nối vào một mạng Wi-Fi. Đường hầm loopback và quá trình cài đặt đều chạy qua đó.",
     "Loopback VPN required": "Cần một VPN loopback",
     "Turn on a loopback VPN — LocalDevVPN, ClashMi, or any app that tunnels to this iPhone. The install runs over it.":
         "Bật một VPN loopback — LocalDevVPN, ClashMi hay bất kỳ ứng dụng nào tạo đường hầm tới iPhone này. Quá trình cài đặt chạy qua nó.",
@@ -95,8 +93,6 @@ let vietnameseStrings: [String: String] = [
     "Scanning": "Đang quét",
     "Rescan apps": "Quét lại ứng dụng",
     "Scan installed apps": "Quét ứng dụng đã cài",
-    "Connect to Wi-Fi to scan and install. The loopback tunnel runs over it.":
-        "Kết nối Wi-Fi để quét và cài đặt. Đường hầm loopback chạy qua đó.",
     "Turn on a loopback VPN to scan and install. The write runs over its tunnel.":
         "Bật một VPN loopback để quét và cài đặt. Việc ghi tệp chạy qua đường hầm này.",
     "%d supported app installed": "Đã cài %d ứng dụng được hỗ trợ",
@@ -195,7 +191,6 @@ let vietnameseStrings: [String: String] = [
     "Two-factor verification was cancelled.": "Đã hủy xác minh hai yếu tố.",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
         "Apple ID hoặc mật khẩu không đúng. Hãy kiểm tra lại email và mật khẩu Apple Account của bạn rồi thử lại.",
-    "Apple ID sign-in failed: %@": "Đăng nhập Apple ID thất bại: %@",
     "Apple ID sign-in failed on %@. Last error: %@":
         "Đăng nhập Apple ID thất bại trên %@. Lỗi cuối cùng: %@",
     "the anisette server": "máy chủ anisette",
@@ -216,8 +211,6 @@ let vietnameseStrings: [String: String] = [
         "Vẫn chưa có tệp ghép nối — hãy chạm vào “Tạo tệp ghép nối” trước.",
     "%@ isn't installed yet — install must run first.":
         "%@ chưa được cài đặt — phải cài đặt trước.",
-    "Wi-Fi is off. Connect to a Wi-Fi network, then try again.":
-        "Wi-Fi đang tắt. Kết nối vào một mạng Wi-Fi rồi thử lại.",
     "No loopback VPN is connected. Turn one on, then try again.":
         "Chưa có VPN loopback nào được kết nối. Hãy bật một cái rồi thử lại.",
     "%@ isn't a valid IPA — the download it came from probably returned an error page, or the copy stopped partway. Replace it and tap Install again.":
@@ -241,8 +234,6 @@ let vietnameseStrings: [String: String] = [
     "Connect to Wi-Fi": "Kết nối Wi-Fi",
     "Open Settings › Wi-Fi and join a network.":
         "Mở Cài đặt › Wi-Fi và tham gia một mạng.",
-    "The loopback tunnel — and the whole install — run over Wi-Fi.":
-        "Đường hầm loopback — và cả quá trình cài đặt — đều chạy qua Wi-Fi.",
     "Then come back here — this continues automatically.":
         "Sau đó quay lại đây: quá trình sẽ tự tiếp tục.",
 
@@ -310,4 +301,15 @@ let vietnameseStrings: [String: String] = [
     "Tap the Settings tab.": "Chạm vào tab Settings.",
     "Tap “Import Certificate From SideStore”.":
         "Chạm vào “Import Certificate From SideStore”.",
+    "Wrong device IP": "Sai IP thiết bị",
+    "The address in Settings › Advanced › Device IP is one this iPhone already holds, so there's nothing at the other end to connect to.":
+        "Địa chỉ trong Cài đặt › Nâng cao › IP thiết bị là địa chỉ mà iPhone này đã có, nên không có gì ở đầu bên kia để kết nối.",
+    "Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end.":
+        "Đặt lại thành 10.7.0.1, giá trị mặc định. Trong LocalDevVPN đó là giá trị ở Cài đặt › Device IP — không phải địa chỉ trên màn hình chính, vốn là đầu của chính đường hầm.",
+    "If you changed LocalDevVPN's addresses, put its Device IP here, and make sure its Tunnel IP and subnet mask cover it.":
+        "Nếu bạn đã đổi địa chỉ của LocalDevVPN, hãy nhập Device IP của nó vào đây và đảm bảo Tunnel IP cùng mặt nạ mạng con của nó bao phủ địa chỉ đó.",
+    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
+        "Việc ghép nối iPhone này cần đến nó: SideInstaller quảng bá chính mình trên mạng nội bộ để Cài đặt tìm thấy.",
+    "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
+        "Hãy kết nối vào một mạng Wi-Fi. Việc ghép nối iPhone này cần đến nó — SideInstaller phải tìm thấy được trên mạng nội bộ.",
 ]

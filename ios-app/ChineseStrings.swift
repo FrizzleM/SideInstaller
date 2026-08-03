@@ -62,8 +62,6 @@ let chineseStrings: [String: String] = [
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "此 iPhone 运行的是 iOS %@，SideInstaller 无法在该版本上安装。请在 设置 › 通用 › 软件更新 中更新到 iOS %@ 或更高版本。",
     "Wi-Fi required": "需要 Wi-Fi",
-    "Connect to a Wi-Fi network. The loopback tunnel and the install run over it.":
-        "请连接到 Wi-Fi 网络。回环隧道和安装过程都通过它运行。",
     "Loopback VPN required": "需要回环隧道 VPN",
     "Turn on a loopback VPN — LocalDevVPN, ClashMi, or any app that tunnels to this iPhone. The install runs over it.":
         "开启一个回环隧道 VPN —— LocalDevVPN、ClashMi 或任何能向本机建立隧道的应用都可以。安装过程通过它运行。",
@@ -100,8 +98,6 @@ let chineseStrings: [String: String] = [
     "Scanning": "正在扫描",
     "Rescan apps": "重新扫描应用",
     "Scan installed apps": "扫描已安装的应用",
-    "Connect to Wi-Fi to scan and install. The loopback tunnel runs over it.":
-        "连接 Wi-Fi 以扫描和安装。回环隧道通过它运行。",
     "Turn on a loopback VPN to scan and install. The write runs over its tunnel.":
         "开启一个回环隧道 VPN 以扫描和安装。写入操作通过它的隧道进行。",
     "%d supported app installed": "已安装 %d 个受支持的应用",
@@ -200,7 +196,6 @@ let chineseStrings: [String: String] = [
     "Two-factor verification was cancelled.": "双重认证验证已取消。",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
         "Apple ID 或密码不正确。请检查你的 Apple 账户电子邮件和密码，然后重试。",
-    "Apple ID sign-in failed: %@": "Apple ID 登录失败：%@",
     "Apple ID sign-in failed on %@. Last error: %@":
         "在 %@ 上登录 Apple ID 失败。最后的错误：%@",
     "the anisette server": "anisette 服务器",
@@ -221,8 +216,6 @@ let chineseStrings: [String: String] = [
         "还没有配对文件 —— 请先轻点“生成配对文件”。",
     "%@ isn't installed yet — install must run first.":
         "%@ 尚未安装 —— 必须先进行安装。",
-    "Wi-Fi is off. Connect to a Wi-Fi network, then try again.":
-        "Wi-Fi 已关闭。请连接到 Wi-Fi 网络，然后重试。",
     "No loopback VPN is connected. Turn one on, then try again.":
         "尚未连接任何回环隧道 VPN。请开启一个，然后重试。",
     "%@ isn't a valid IPA — the download it came from probably returned an error page, or the copy stopped partway. Replace it and tap Install again.":
@@ -246,8 +239,6 @@ let chineseStrings: [String: String] = [
     "Connect to Wi-Fi": "连接 Wi-Fi",
     "Open Settings › Wi-Fi and join a network.":
         "打开 设置 › Wi-Fi 并加入一个网络。",
-    "The loopback tunnel — and the whole install — run over Wi-Fi.":
-        "回环隧道 —— 以及整个安装过程 —— 都通过 Wi-Fi 运行。",
     "Then come back here — this continues automatically.":
         "然后回到这里 —— 接下来会自动继续。",
 
@@ -315,4 +306,15 @@ let chineseStrings: [String: String] = [
     "Tap the Settings tab.": "轻点 Settings 标签页。",
     "Tap “Import Certificate From SideStore”.":
         "轻点“Import Certificate From SideStore”。",
+    "Wrong device IP": "设备 IP 有误",
+    "The address in Settings › Advanced › Device IP is one this iPhone already holds, so there's nothing at the other end to connect to.":
+        "“设置 › 高级 › 设备 IP”中填的地址是本机已有的地址，另一端没有可连接的对象。",
+    "Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end.":
+        "改回默认值 10.7.0.1。在 LocalDevVPN 中，它是“设置 › Device IP”里的值，而不是主界面上显示的地址——那是隧道自己的一端。",
+    "If you changed LocalDevVPN's addresses, put its Device IP here, and make sure its Tunnel IP and subnet mask cover it.":
+        "若你改过 LocalDevVPN 的地址，请在此填入它的 Device IP，并确认它的 Tunnel IP 与子网掩码覆盖该地址。",
+    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
+        "配对这台 iPhone 需要它：SideInstaller 会在本地网络上广播自己，供“设置”发现。",
+    "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
+        "请连接到 Wi-Fi 网络。配对这台 iPhone 需要它——SideInstaller 必须能在本地网络上被找到。",
 ]

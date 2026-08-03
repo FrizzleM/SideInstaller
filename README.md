@@ -55,7 +55,8 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 ## Requirements
 
 - An iPhone or iPad on iOS 27
-- A Wi-Fi router or a hotspot connection
+- Wi-Fi, the first time only — pairing needs this iPhone to be findable on the local network. Once the
+  pairing file is saved, cellular is fine: the tunnel is a loopback and never leaves the device.
 - Your Apple account credentials (not collected)
 
 
@@ -63,6 +64,11 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 
 1. Connect a VPN app that tunnels to this device on `10.7.0.1` — **LocalDevVPN**, **ClashMi**, or any other.
    SideInstaller checks the loopback address, not which app provides it, so use whichever you prefer.
+
+   > With LocalDevVPN, `10.7.0.1` is the value under **Settings › Device IP**. Its main screen reads
+   > "connected to 10.7.0.0" — that's the tunnel's *own* end, not the one to connect to. If you change
+   > its addresses, put its Device IP into SideInstaller's Settings › Advanced › Device IP, and make
+   > sure its Tunnel IP and subnet mask cover that address.
 2. Open [the official install page](https://frizzlem.github.io/SideInstaller/) and install the app using any
    of the certificates.
 3. Once it's installed, open it.

@@ -164,11 +164,13 @@ struct PairingView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle(L("Install into an app"), systemImage: "tray.and.arrow.down.fill")
 
-                // Wi-Fi is the prerequisite for the tunnel, so it takes priority:
-                // no Wi-Fi → Wi-Fi note; Wi-Fi but no tunnel → loopback-VPN note.
-                if !engine.wifiConnected {
-                    wifiNote
-                } else if !engine.vpnConnected {
+                // The tunnel is the only requirement here. Scanning and writing
+                // both run over it — installation_proxy and house_arrest — and
+                // it's a loopback that routes nothing but its own subnet, so
+                // there's no Wi-Fi in the path to ask about. (Generating a
+                // pairing file is the step that needs the local network, and
+                // that lives on the card above.)
+                if !engine.vpnConnected {
                     vpnNote
                 }
 
@@ -185,23 +187,9 @@ struct PairingView: View {
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(manager.isBusy || !manager.pairingFileExists || !engine.wifiConnected || !engine.vpnConnected || engine.isRunning)
+                .disabled(manager.isBusy || !manager.pairingFileExists || !engine.vpnConnected || engine.isRunning)
             }
         }
-    }
-
-    private var wifiNote: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "wifi.slash")
-                .foregroundStyle(.red)
-            Text(L("Connect to Wi-Fi to scan and install. The loopback tunnel runs over it."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.red.opacity(0.12)))
     }
 
     private var vpnNote: some View {

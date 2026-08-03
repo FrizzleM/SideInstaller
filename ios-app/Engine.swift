@@ -414,20 +414,27 @@ final class Engine: ObservableObject {
             log("⛔️ No IPA imported yet. Tap “Import .ipa” and pick one, then tap Install again.")
             return
         }
-        // Pre-flight gate: the entire install runs over the loopback
-        // tunnel, which itself rides on Wi-Fi — so require Wi-Fi first, then the
-        // tunnel, showing how instead of just failing. (ensureNetwork() below
-        // still waits too, as a mid-run safety net in case either drops after
+        // Pre-flight gate: the entire install runs over the loopback tunnel, so
+        // require that, showing how instead of just failing. (ensureNetwork()
+        // below still waits too, as a mid-run safety net in case it drops after
         // this check passes.)
         refreshNetworkStatus()
-        guard wifiConnected else {
+        guard !needsFreshPairing || wifiConnected else {
             setGuide(Guides.wifi)
-            log("⛔️ Wi-Fi is off. Connect to a Wi-Fi network, then tap Install again.")
+            log("⛔️ Wi-Fi is off, and pairing this iPhone needs it. Connect to a Wi-Fi network, then tap Install again.")
             return
         }
         guard vpnConnected else {
             setGuide(Guides.vpn)
             log("⛔️ No loopback VPN is connected. Turn one on, then tap Install again.")
+            return
+        }
+        // The tunnel is up but pointed at this iPhone's own address, which can
+        // never complete a connection. Cheap to detect, and otherwise it costs
+        // the user a sign-in and a download before failing at Connect.
+        if NetworkStatus.isOwnAddress(deviceIP) {
+            setGuide(Guides.deviceIPMismatch)
+            log("⛔️ Device IP \(deviceIP) is an address this iPhone already holds — that's the tunnel's own end, not the one to connect to. Check Settings › Advanced › Device IP (the default is 10.7.0.1).")
             return
         }
         resetRun()
@@ -468,6 +475,19 @@ final class Engine: ObservableObject {
 
     // MARK: Step 1 — network (waits for the loopback tunnel)
 
+    /// True when this run will have to pair the device from scratch.
+    ///
+    /// It's the one step that genuinely needs Wi-Fi: pairing advertises a Bonjour
+    /// service that Settings has to find on the local network. Everything else
+    /// either rides the tunnel — which is pure loopback, routing only its own
+    /// subnet and excluding the default route, so it comes up with no Wi-Fi at
+    /// all — or is ordinary internet traffic that cellular carries just as well.
+    /// A cached pairing file therefore means Wi-Fi isn't needed, and gating on it
+    /// anyway locks out a setup that would have worked.
+    var needsFreshPairing: Bool {
+        !fileExistsNonEmpty(pairingFilePath ?? PairingController.pairingFilePath())
+    }
+
     @MainActor
     private func ensureNetwork() async throws {
         setStep(.network, .active)
@@ -479,18 +499,21 @@ final class Engine: ObservableObject {
             try Task.checkCancellation()
             let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceIP)
             publishNetwork(vpn: vpn, wifi: wifi, vpnText: vpn ? "tunnel up" : "no tunnel")
-            if wifi && vpn {
+            // Wi-Fi only has to be there for a run that pairs — see
+            // `needsFreshPairing`. The tunnel is the one hard requirement.
+            let wifiSatisfied = wifi || !needsFreshPairing
+            if wifiSatisfied && vpn {
                 log("Network OK: \(detail)")
                 setStep(.network, .done)
                 setGuide(nil)
                 return
             }
             setStep(.network, .waiting)
-            if !wifi {
-                // Wi-Fi is the prerequisite for the tunnel, so surface it first —
+            if !wifiSatisfied {
+                // Wi-Fi is the prerequisite for pairing, so surface it first —
                 // even if a stale tunnel interface still reads as up.
                 if announced != "wifi" {
-                    log("Waiting for Wi-Fi… connect to a Wi-Fi network.")
+                    log("Waiting for Wi-Fi… pairing this iPhone needs it. Connect to a Wi-Fi network.")
                     announced = "wifi"
                 }
                 setGuide(Guides.wifi)
@@ -1293,16 +1316,24 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// Bring up the device link for a standalone pairing operation: reuse an
-    /// existing connection, else connect with the saved pairing file. Unlike the
-    /// install pipeline's `connect()`, this touches no step states.
+    /// Bring up the device link for a standalone pairing operation, always with
+    /// a fresh tunnel. Unlike the install pipeline's `connect()`, this touches no
+    /// step states.
+    ///
+    /// It deliberately does *not* reuse an existing connection on the strength of
+    /// `connection.isConnected`, which only reports that our handles are
+    /// non-null. iOS tears the tunnel down underneath them — LocalDevVPN leaves
+    /// on-demand enabled with rules that match DNS domains, and nothing here
+    /// connects by name, so the system is free to decide the tunnel isn't needed
+    /// — and the handles look fine right up until a service connect fails with
+    /// "adapter closed". This is the same failure the install step hit before
+    /// 0.6.5; re-establishing costs a pair-verify with no PIN, and this screen is
+    /// entered by hand minutes after whatever last used the link.
     @MainActor
     private func ensurePairingConnection() async throws {
-        if connection.isConnected { return }
         refreshNetworkStatus()
-        guard wifiConnected else {
-            throw EngineError.message(L("Wi-Fi is off. Connect to a Wi-Fi network, then try again."))
-        }
+        // No Wi-Fi check: everything this serves — listing apps, writing the
+        // pairing file — runs over the tunnel, and the tunnel is a loopback.
         guard vpnConnected else {
             throw EngineError.message(L("No loopback VPN is connected. Turn one on, then try again."))
         }
@@ -1428,13 +1459,16 @@ final class Engine: ObservableObject {
 /// Every card is a computed `var`, not a stored `let`: the copy is translated at
 /// the moment it's read, so a language change picks up on the next redraw.
 enum Guides {
+    /// Only shown for a run that has to pair. The tunnel itself doesn't need
+    /// Wi-Fi — it routes nothing but its own subnet — but pairing advertises a
+    /// Bonjour service that Settings has to find on the local network.
     static var wifi: Guide {
         Guide(
             title: L("Connect to Wi-Fi"),
             systemImage: "wifi",
             steps: [
                 L("Open Settings › Wi-Fi and join a network."),
-                L("The loopback tunnel — and the whole install — run over Wi-Fi."),
+                L("Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find."),
                 L("Then come back here — this continues automatically."),
             ],
             actionLabel: nil, actionURLString: nil)
@@ -1458,6 +1492,26 @@ enum Guides {
             ],
             actionLabel: L("Get LocalDevVPN"),
             actionURLString: "https://apps.apple.com/app/id6755608044")
+    }
+
+    /// Shown when the tunnel is up but Advanced › Device IP holds an address
+    /// this iPhone already has.
+    ///
+    /// Almost always the same mistake: LocalDevVPN's main screen says "connected
+    /// to 10.7.0.0", which is its own end of the tunnel, while the address to
+    /// connect to is the peer — the 10.7.0.1 its settings list under Device IP.
+    /// Copying the number off the status line leaves a tunnel that reads as up
+    /// and a connection that can't complete.
+    static var deviceIPMismatch: Guide {
+        Guide(
+            title: L("Wrong device IP"),
+            systemImage: "arrow.triangle.branch",
+            steps: [
+                L("The address in Settings › Advanced › Device IP is one this iPhone already holds, so there's nothing at the other end to connect to."),
+                L("Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end."),
+                L("If you changed LocalDevVPN's addresses, put its Device IP here, and make sure its Tunnel IP and subnet mask cover it."),
+            ],
+            actionLabel: nil, actionURLString: nil)
     }
 
     /// Shown when Custom .ipa is selected but nothing has been imported yet.
