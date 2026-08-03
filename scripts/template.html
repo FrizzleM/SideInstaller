@@ -3,16 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <title>{{PAGE_TITLE}}</title>
+<link rel="icon" type="image/png" href="app-icon.png">
+<link rel="apple-touch-icon" href="app-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#17376f">
 <style>
-  /* Palette mirrors the app's Theme.swift: OLED black backdrop, brand blues
-     accent #2170F5 -> accent2 #4DADFF, deep-navy glow #011A5C. */
+  /* Palette mirrors the app's brand blues: accent #2170F5 -> accent2 #4DADFF.
+     The page sits on one flat soft blue (--page) pitched at roughly what the
+     old radial "spheres" composited to, so the look carries over without the
+     gradients. Cards stay dark and translucent for separation, and the muted
+     greys are lightened to keep >=4.5:1 against the lighter backdrop. */
   :root{
-    --card:rgba(23,28,42,.62); --card-hover:rgba(32,38,58,.72);
-    --stroke:rgba(255,255,255,.07); --stroke-strong:rgba(255,255,255,.14);
-    --text:#f4f6fb; --muted:#9ba3b8; --faint:#6c7386;
+    --page:#17376f;
+    --card:rgba(15,22,40,.62); --card-hover:rgba(24,32,54,.72);
+    --stroke:rgba(255,255,255,.10); --stroke-strong:rgba(255,255,255,.18);
+    --text:#f4f6fb; --muted:#c6cee0; --faint:#a5aec4;
     --accent:#2170f5; --accent2:#4dadff; --glow:#011a5c;
     --brand:linear-gradient(135deg,var(--accent),var(--accent2));
     --good:#34d399; --warn:#fbbf24; --crit:#fb923c; --bad:#f87171;
@@ -24,36 +30,22 @@
      layout viewport while the page scrolls, leaving an uncovered strip down the
      right edge the full height of the page. clip (not hidden) avoids creating a
      scroll container, so the fixed backdrop still pins to the viewport. */
-  html{-webkit-text-size-adjust:100%; overflow-x:clip; background:#000}
+  html{-webkit-text-size-adjust:100%; overflow-x:clip; background:var(--page)}
   body{
     margin:0; min-height:100vh; color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
-    line-height:1.55; background:transparent; overflow-x:clip; /* transparent so the fixed .bg backdrop shows through; html keeps the #000 backstop */
+    line-height:1.55; background:transparent; overflow-x:clip; /* transparent so the fixed .bg backdrop shows through; html keeps the --page backstop */
     padding:max(20px,env(safe-area-inset-top)) 18px 64px;
   }
 
   /* ---- backdrop ----
-     Same vibe as the app: OLED black with a deep-blue glow behind the hero, a
-     faint navy wash through the middle, and a low glow at the foot of the
-     screen. Plain CSS radial gradients on one fixed layer — no canvas, no JS,
-     no filter:blur (iOS Safari mis-renders large blurs on fixed layers).
-     ::before repaints the hero glow in a brighter sky blue and slowly fades in
-     and out, so the backdrop gently breathes like the app's mesh. */
+     One fixed layer of flat soft blue — no gradients, no canvas, no JS. The
+     colour is the tone the old hero/foot glows composited to, so the page
+     keeps the app's blue without the spheres. */
   .bg{
     position:fixed; inset:0; z-index:-1; pointer-events:none;
-    background:
-      radial-gradient(75% 42% at 50% 16%, rgba(33,112,245,.38), transparent 65%),
-      radial-gradient(140% 80% at 50% 50%, rgba(14,44,110,.35), transparent 78%),
-      radial-gradient(55% 32% at 82% 70%, rgba(77,173,255,.10), transparent 70%),
-      radial-gradient(80% 32% at 50% 102%, rgba(33,112,245,.18), transparent 72%),
-      #000;
+    background:var(--page);
   }
-  .bg::before{
-    content:""; position:absolute; inset:0;
-    background:radial-gradient(70% 40% at 50% 18%, rgba(77,173,255,.14), transparent 65%);
-    animation:bg-breathe 9s ease-in-out infinite alternate;
-  }
-  @keyframes bg-breathe{from{opacity:0}to{opacity:1}}
 
   /* ---- entrance cascade, echoing the app's per-object settle-in ---- */
   .hero,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
@@ -63,7 +55,6 @@
   .footer{animation-delay:.24s}
   @keyframes rise{from{opacity:0; transform:translateY(16px) scale(.98)}}
   @media (prefers-reduced-motion:reduce){
-    .bg::before{animation:none; opacity:0}
     .hero,.step,.footer{animation:none}
   }
 
@@ -222,6 +213,9 @@
     font-size:13px; color:var(--text);
   }
   .step-card .install-btn{width:100%; margin-top:16px}
+  .step-card ol:first-child{margin-top:0}
+  /* the DNS button stands on its own above the card, not inside it */
+  .step > .install-btn{display:flex; width:100%; margin:0 0 14px}
   .callout{
     margin-top:16px; padding:13px 16px; border-radius:var(--radius-sm);
     background:rgba(52,211,153,.08); border:1px solid rgba(52,211,153,.25);
@@ -388,17 +382,15 @@
       <span class="step-num">1</span>
       <div>
         <h2 class="step-title">Setup</h2>
-        <p class="step-sub">Install the SideInstaller DNS profile before anything else.</p>
       </div>
     </div>
+    <a class="install-btn" href="SideInstallerDNS.mobileconfig">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M12 3a15.3 15.3 0 0 1 0 18"/><path d="M12 3a15.3 15.3 0 0 0 0 18"/></svg>
+      Install DNS Profile
+    </a>
     <div class="step-card">
-      <p>SideInstaller needs its DNS active on your device during setup. Tap the button, then follow the steps to apply it:</p>
-      <a class="install-btn" href="SideInstallerDNS.mobileconfig">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M12 3a15.3 15.3 0 0 1 0 18"/><path d="M12 3a15.3 15.3 0 0 0 0 18"/></svg>
-        Install DNS Profile
-      </a>
       <ol>
-        <li>Tap <b>Install DNS Profile</b> above and tap <b>Allow</b> when Safari asks to download the configuration profile. If it gets saved as a regular file instead, open it from <code>Files → Downloads</code>.</li>
+        <li>Tap <b>Install DNS Profile</b> above and tap <b>Allow</b> when Safari asks to download the configuration profile.</li>
         <li>Open <code>Settings</code> and tap <b>Profile Downloaded</b> (or go to <code>Settings → General → VPN &amp; Device Management</code>), then tap <b>Install</b>.</li>
         <li>Apply the DNS: in <code>Settings → General → VPN &amp; Device Management</code>, open <b>DNS</b> and make sure <b>SideInstaller</b> is selected. Keep it enabled until setup is complete.</li>
       </ol>
@@ -410,7 +402,6 @@
       <span class="step-num">2</span>
       <div>
         <h2 class="step-title">Installation</h2>
-        <p class="step-sub">Pick a certificate and install the SideInstaller app.</p>
       </div>
     </div>
 
@@ -460,7 +451,7 @@
       </div>
     </div>
     <div class="step-card">
-      <p>That's it — open <b>SideInstaller</b> from your Home Screen and use it to install <b>SideStore</b> (or SideStore + LiveContainer), straight from your device. No PC needed.</p>
+      <p>That's it. Open <b>SideInstaller</b> from your Home Screen and use it to install <b>SideStore</b> (or SideStore + LiveContainer), straight from your device. No PC needed.</p>
       <div class="callout">
         <b>Once SideStore is installed, the DNS profile is no longer needed.</b> Remove it in <code>Settings → General → VPN &amp; Device Management</code> → <b>SideInstaller</b> → <b>Remove Profile</b> — or keep it and just stop using its DNS by switching <code>DNS</code> back to <b>Automatic</b> in the same menu.
       </div>
