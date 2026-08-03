@@ -130,14 +130,6 @@ struct PairingView: View {
                 Text(L("Type this into the prompt in Settings."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                Button {
-                    UIPasteboard.general.string = pin
-                } label: {
-                    Label(L("Copy"), systemImage: "doc.on.doc")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .buttonStyle(.bordered)
-                .tint(.orange)
             }
         }
     }
