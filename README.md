@@ -55,20 +55,13 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 ## Requirements
 
 - An iPhone or iPad on iOS 27
-- Wi-Fi, the first time only — pairing needs this iPhone to be findable on the local network. Once the
-  pairing file is saved, cellular is fine: the tunnel is a loopback and never leaves the device.
+- Wi-Fi (first time only)
 - Your Apple account credentials (not collected)
 
 
 ## How to use it
 
-1. Connect a VPN app that tunnels to this device on `10.7.0.1` — **LocalDevVPN**, **ClashMi**, or any other.
-   SideInstaller checks the loopback address, not which app provides it, so use whichever you prefer.
-
-   > With LocalDevVPN, `10.7.0.1` is the value under **Settings › Device IP**. Its main screen reads
-   > "connected to 10.7.0.0" — that's the tunnel's *own* end, not the one to connect to. If you change
-   > its addresses, put its Device IP into SideInstaller's Settings › Advanced › Device IP, and make
-   > sure its Tunnel IP and subnet mask cover that address.
+1. Connect the device to LocalDevVPN (or any alternative)
 2. Open [the official install page](https://frizzlem.github.io/SideInstaller/) and install the app using any
    of the certificates.
 3. Once it's installed, open it.
@@ -77,22 +70,6 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 6. Wait while your selection installs.
 7. That's it. No PC and no extra steps required.
 
-### If GitHub is blocked where you are
-
-SideInstaller pulls the SideStore IPA from GitHub, and iOS runs only one VPN at a time — so a local-only
-tunnel like LocalDevVPN leaves nothing to reach a blocked GitHub through. Two ways around it:
-
-- **Use a VPN app that does both jobs**, exposing the `10.7.0.1` loopback *and* proxying your traffic
-  (ClashMi, for example). Step 1 then covers the download too.
-- **Bring your own IPA.** Download it anywhere — another device, a mirror, a desktop — then either:
-  - pick **Custom .ipa** in the Install picker and tap **Import .ipa**, which opens the Files picker so
-    you can choose the file wherever it is (iCloud Drive, a USB drive, Downloads); or
-  - copy it into **Files › On My iPhone › SideInstaller** named `SideStore.ipa` (or
-    `LiveContainer+SideStore.ipa`; add `-nightly` for the nightly channel), and SideInstaller picks it
-    up on its own.
-
-  Either way it installs that file instead of downloading anything, and appears under Settings ›
-  Downloaded IPAs — delete it there to go back to downloading.
 
 ## Is SideInstaller safe?
 
