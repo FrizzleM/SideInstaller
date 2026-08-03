@@ -353,42 +353,95 @@ enum IPALibrary {
             .min { rank($0) < rank($1) }
     }
 
+    /// Why an import didn't take. Separate from the file-system errors so the
+    /// caller can tell "you picked the wrong file" — which needs its own advice
+    /// — from "the copy failed".
+    enum ImportError: Error {
+        case notAnIPA
+    }
+
     /// Replace the custom import with `url`, copying it into `customDir` under
-    /// its own name. Returns the new location. The caller is responsible for
-    /// any security-scoped access `url` needs.
+    /// its own name. Returns the new location. Blocking (it copies, and may wait
+    /// on an iCloud download) — call it off the main thread. The caller is
+    /// responsible for any security-scoped access `url` needs.
     ///
     /// The extension is forced to `.ipa`: an IPA is a zip, and a browser that
     /// saved one may well have named it `.zip`. Since the picker accepts any
     /// file and the contents are what get checked, normalising here is what
     /// keeps such a file findable afterwards.
+    ///
+    /// The copy lands in a staging directory and is checked there, so the
+    /// previous import survives everything that can go wrong — a full disk, a
+    /// cloud file that never materialises, a wrong pick. Only a complete, valid
+    /// IPA replaces it, and the replacement itself is a rename.
     static func replaceCustomImport(with url: URL) throws -> URL {
         let fm = FileManager.default
+        let name = url.deletingPathExtension().lastPathComponent
+        let staging = fm.temporaryDirectory
+            .appendingPathComponent("ipa-import-\(UUID().uuidString)", isDirectory: true)
+        try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: staging) }
+        let staged = staging.appendingPathComponent(name).appendingPathExtension("ipa")
+
+        try copy(url, to: staged)
+        guard looksLikeIPA(staged) else { throw ImportError.notAnIPA }
+
         // One import at a time: clearing the folder keeps "the custom IPA"
         // unambiguous, and stops old picks accumulating invisibly.
         try? fm.removeItem(at: customDir)
         try fm.createDirectory(at: customDir, withIntermediateDirectories: true)
-        let name = url.deletingPathExtension().lastPathComponent
         let dest = customDir.appendingPathComponent(name).appendingPathExtension("ipa")
-        try fm.copyItem(at: url, to: dest)
+        // Same volume as the staging dir, so this is a rename, not a second copy.
+        try fm.moveItem(at: staged, to: dest)
         return dest
     }
 
-    /// Forget the custom import, if any.
-    static func clearCustomImport() {
-        try? FileManager.default.removeItem(at: customDir)
+    /// Copy `src` to `dest`, coordinated so a file picked out of iCloud Drive
+    /// works.
+    ///
+    /// The picker hands back a URL for an item that may still be a placeholder —
+    /// nothing has been downloaded yet — and a plain `copyItem` on one of those
+    /// just fails. Asking for the download and then reading under a file
+    /// coordinator is what makes the wait happen instead: the coordinator blocks
+    /// until the file is really there. iCloud Drive is one of the sources the
+    /// import guide names, so this is the advertised path, not an edge case.
+    private static func copy(_ src: URL, to dest: URL) throws {
+        let fm = FileManager.default
+        try? fm.startDownloadingUbiquitousItem(at: src)   // throws for non-iCloud items
+        var copyError: Error?
+        var coordinationError: NSError?
+        NSFileCoordinator().coordinate(readingItemAt: src, options: [], error: &coordinationError) { readURL in
+            do { try fm.copyItem(at: readURL, to: dest) } catch { copyError = error }
+        }
+        if let copyError { throw copyError }
+        if let coordinationError { throw coordinationError }
     }
 
-    /// True when the file at least starts like a zip, which every `.ipa` is.
+    /// True when the file is a complete zip, which every `.ipa` is.
     ///
     /// Worth checking before an imported file is signed, because the population
     /// that imports is the population with an unreliable route to GitHub: a
     /// blocked download saves the block page under the name you asked for, and
     /// a copy through Files can stop halfway. Either way the file is only found
     /// out much later, as an opaque signing failure.
+    ///
+    /// Both halves are needed. The `PK` header rejects the block page; only the
+    /// end-of-central-directory record rejects the truncated copy, because a
+    /// half-written zip still opens with a perfectly good header. EOCD is the
+    /// last thing a zip writer emits and sits within the final 65557 bytes (22
+    /// fixed, plus a trailing comment of at most 65535), so finding it there is
+    /// what says the whole archive arrived.
     static func looksLikeIPA(_ url: URL) -> Bool {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
         defer { try? handle.close() }
-        return (try? handle.read(upToCount: 2)) == Data([0x50, 0x4B])   // "PK"
+        guard (try? handle.read(upToCount: 2)) == Data([0x50, 0x4B]) else { return false }   // "PK"
+
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size >= 22 else { return false }
+        let tailLength = min(size, 65_557)
+        guard (try? handle.seek(toOffset: UInt64(size - tailLength))) != nil,
+              let tail = try? handle.readToEnd() else { return false }
+        return tail.range(of: Data([0x50, 0x4B, 0x05, 0x06])) != nil
     }
 
     /// `.ipa` files in Documents whose names identify no known build — worth
@@ -397,6 +450,127 @@ enum IPALibrary {
     static func unrecognized() -> [String] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: documentsDir.path)) ?? []
         return names.filter { $0.lowercased().hasSuffix(".ipa") && classify($0) == nil }.sorted()
+    }
+}
+
+/// Everything the app keeps that shouldn't be handed to the user in Files.
+///
+/// Documents is a shared surface as of 0.7.0: `UIFileSharingEnabled` (see
+/// Info.plist) puts it in Files › On My iPhone › SideInstaller so an IPA can be
+/// dropped in where GitHub is unreachable. That switch is all-or-nothing — it
+/// exposes the whole directory, not a chosen subfolder — so anything in there
+/// is visible, movable and deletable by hand, and travels wherever the folder
+/// gets shared.
+///
+/// Two things must not be. The device pairing record is what authorises a host
+/// to talk to this iPhone. isideload's storage holds the anisette machine
+/// provisioning and the developer signing certificate — in plain files, because
+/// this build uses its `fs-storage` backend rather than the keychain. Both live
+/// in Application Support instead, which file sharing doesn't reach.
+enum PrivateStore {
+
+    /// The device pairing file produced by the RPPairing host.
+    static var pairingFile: URL {
+        resolve(private: directory.appendingPathComponent("rp_pairing_file.plist"),
+                legacy: IPALibrary.documentsDir.appendingPathComponent("rp_pairing_file.plist"))
+    }
+
+    /// isideload's `FsStorage` root — anisette provisioning plus the developer
+    /// certificate. Created on demand, since isideload expects it to exist.
+    static var isideload: URL {
+        let url = resolve(private: directory.appendingPathComponent("isideload", isDirectory: true),
+                          legacy: IPALibrary.documentsDir.appendingPathComponent("isideload", isDirectory: true))
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    /// Application Support, created on demand. Unlike Documents, iOS doesn't
+    /// make this directory for you.
+    private static var directory: URL {
+        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    /// The private location — unless the migration couldn't get the file there
+    /// and a usable copy is still in Documents, in which case keep using that.
+    /// Failing over rather than insisting is what stops a migration that didn't
+    /// work from costing the user a re-pair or a certificate slot.
+    private static func resolve(private url: URL, legacy: URL) -> URL {
+        _ = migrated
+        let fm = FileManager.default
+        if fm.fileExists(atPath: url.path) { return url }
+        if fm.fileExists(atPath: legacy.path) { return legacy }
+        return url          // nothing yet: new state goes to the private location
+    }
+
+    /// Runs `migrate()` exactly once per launch, before the first path is
+    /// handed out. A `static let` is Swift's dispatch-once.
+    private static let migrated: Void = migrate()
+
+    /// Bring 0.6.x's files across from Documents, where file sharing now
+    /// exposes them.
+    private static func migrate() {
+        let docs = IPALibrary.documentsDir
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        for name in ["rp_pairing_file.plist", "isideload"] {
+            relocate(docs.appendingPathComponent(name), to: support.appendingPathComponent(name))
+        }
+    }
+
+    /// Copy, verify, then delete the original — not `moveItem`.
+    ///
+    /// A move that dies partway leaves nothing behind, and losing either of
+    /// these costs real work: no pairing file means pairing the device again,
+    /// and no isideload store means isideload re-bootstraps and may mint a fresh
+    /// signing certificate, burning one of the three slots Apple allows per
+    /// Apple ID. So the original is only removed once the copy is provably
+    /// complete, and anything short of that leaves Documents untouched for
+    /// `resolve` to fall back to.
+    private static func relocate(_ src: URL, to dest: URL) {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: src.path) else { return }
+        // A destination that already exists is either a finished migration or
+        // newer state; either way the leftover in Documents is the stale one.
+        guard !fm.fileExists(atPath: dest.path) else {
+            try? fm.removeItem(at: src)
+            return
+        }
+        do {
+            try fm.copyItem(at: src, to: dest)
+            guard let before = tally(src), let after = tally(dest), before == after else {
+                try? fm.removeItem(at: dest)
+                return
+            }
+            try? fm.removeItem(at: src)
+        } catch {
+            try? fm.removeItem(at: dest)
+        }
+    }
+
+    /// (file count, total bytes) under `url` — enough to tell a complete copy
+    /// from a partial one without hashing megabytes. Nil if it can't be read.
+    private static func tally(_ url: URL) -> (Int, Int)? {
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else { return nil }
+        guard isDir.boolValue else {
+            guard let size = (try? fm.attributesOfItem(atPath: url.path)[.size]) as? Int else { return nil }
+            return (1, size)
+        }
+        guard let walker = fm.enumerator(atPath: url.path) else { return nil }
+        var count = 0, bytes = 0
+        for case let name as String in walker {
+            let child = url.appendingPathComponent(name)
+            var childIsDir: ObjCBool = false
+            guard fm.fileExists(atPath: child.path, isDirectory: &childIsDir), !childIsDir.boolValue
+            else { continue }
+            guard let size = (try? fm.attributesOfItem(atPath: child.path)[.size]) as? Int else { return nil }
+            count += 1
+            bytes += size
+        }
+        return (count, bytes)
     }
 }
 
@@ -424,6 +598,26 @@ enum DownloadLedger {
         return "\(size)@\(Int(modified))"
     }
 
+    /// A file's entry key: its path *relative to Documents*.
+    ///
+    /// Relative, not absolute, because the container path carries a UUID that
+    /// iOS changes on every app update — absolute keys would stop matching
+    /// after one. And a path rather than a bare filename, because IPAs live in
+    /// two directories: a custom import called `SideStore.ipa` (the obvious
+    /// name, since that's what GitHub hands you) would otherwise share an entry
+    /// with the download of the same name, and deleting the import would erase
+    /// the download's claim — leaving a file the app fetched itself reading as
+    /// user-supplied, never refreshed from GitHub again.
+    ///
+    /// Downloads live at the Documents root, so their keys are unchanged from
+    /// the filename-only scheme and existing entries carry over as they are.
+    private static func key(_ url: URL) -> String {
+        let docs = IPALibrary.documentsDir.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        guard path.hasPrefix(docs + "/") else { return url.lastPathComponent }
+        return String(path.dropFirst(docs.count + 1))
+    }
+
     private static var table: [String: String] {
         get { UserDefaults.standard.dictionary(forKey: defaultsKey) as? [String: String] ?? [:] }
         set { UserDefaults.standard.set(newValue, forKey: defaultsKey) }
@@ -432,19 +626,19 @@ enum DownloadLedger {
     /// True only for a file this app downloaded and nothing has touched since.
     static func isManaged(_ url: URL) -> Bool {
         guard let fp = fingerprint(url) else { return false }
-        return table[url.lastPathComponent] == fp
+        return table[key(url)] == fp
     }
 
     static func record(_ url: URL) {
         guard let fp = fingerprint(url) else { return }
         var t = table
-        t[url.lastPathComponent] = fp
+        t[key(url)] = fp
         table = t
     }
 
     static func forget(_ url: URL) {
         var t = table
-        t.removeValue(forKey: url.lastPathComponent)
+        t.removeValue(forKey: key(url))
         table = t
     }
 }

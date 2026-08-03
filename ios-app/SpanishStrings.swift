@@ -53,6 +53,7 @@ let spanishStrings: [String: String] = [
     "Install %@": "Instalar %@",
     "Custom .ipa": "IPA personalizado",
     "Import .ipa": "Importar .ipa",
+    "Importing…": "Importando…",
     "Replace": "Sustituir",
     "iOS %@ required": "Se requiere iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":

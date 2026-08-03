@@ -89,7 +89,15 @@ LocalDevVPN app, and a real Apple ID. A simulator has none of that. So:
 Network, keeps the app alive with silent audio (works iOS 17.4+, vs StikPair's
 iOS-26 `BGContinuedProcessingTask`), advertises over Bonjour via `NetService`,
 runs the host off-thread, surfaces the PIN, and writes the pairing file to
-`Documents/rp_pairing_file.plist`. Reports every step into the log console.
+`Application Support/rp_pairing_file.plist`. Reports every step into the log
+console.
+
+Since 0.7.0 the pairing file and isideload's `FsStorage` root both live in
+Application Support rather than Documents — `UIFileSharingEnabled` exposes the
+whole of Documents in Files (so an IPA can be dropped in), and that's no place
+for a pairing record or a signing certificate. `PrivateStore` in
+`SideStoreDownloader.swift` owns both paths and migrates 0.6.x's copies across
+on first use, falling back to the Documents location if the move can't complete.
 
 **Connection (loopback lockdown, make-or-break #2).** `DeviceConnection.swift`
 drives idevice's FFI on the StikDebug recipe:

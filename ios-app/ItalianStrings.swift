@@ -47,6 +47,7 @@ let italianStrings: [String: String] = [
     "Install %@": "Installa %@",
     "Custom .ipa": "IPA personalizzato",
     "Import .ipa": "Importa .ipa",
+    "Importing…": "Importazione…",
     "Replace": "Sostituisci",
     "iOS %@ required": "Serve iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":

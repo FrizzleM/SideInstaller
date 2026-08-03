@@ -323,7 +323,11 @@ final class DeviceConnection {
     }
 
     private func uploadFile(_ afc: OpaquePointer, localPath: String, remotePath: String) throws {
-        let data = try Data(contentsOf: URL(fileURLWithPath: localPath))
+        // Mapped, not read: the bundle's main binary runs to tens of megabytes,
+        // and pulling it into the heap in one go — only to hand it out a
+        // megabyte at a time below — is the kind of spike that gets an app
+        // jetsammed halfway through an install.
+        let data = try Data(contentsOf: URL(fileURLWithPath: localPath), options: .mappedIfSafe)
         var file: OpaquePointer?
         try check(remotePath.withCString { afc_file_open(afc, $0, AfcWrOnly, &file) },
                   "afc_file_open \(remotePath) failed")
@@ -451,7 +455,12 @@ final class DeviceConnection {
 /// bar and logs each update.
 private let installProgressCb: @convention(c) (UInt64, UnsafeMutableRawPointer?) -> Void = { progress, _ in
     DispatchQueue.main.async {
-        Engine.shared.installProgress = Double(progress) / 100.0
+        // installd repeats the same percentage across its phases. Publishing it
+        // again moves no bar and adds a duplicate log line, but does invalidate
+        // every view observing the engine — so only act when it really moves.
+        let fraction = Double(progress) / 100.0
+        guard Engine.shared.installProgress != fraction else { return }
+        Engine.shared.installProgress = fraction
         Engine.shared.log("install progress: \(progress)%")
     }
 }

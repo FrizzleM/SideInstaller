@@ -269,10 +269,7 @@ final class CertManager: ObservableObject {
     /// Same on-disk anisette/account storage the install flow uses, so machine
     /// provisioning is shared rather than re-bootstrapped.
     private var storageDir: String {
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("isideload")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.path
+        PrivateStore.isideload.path
     }
 
     private func short(_ error: Error) -> String {

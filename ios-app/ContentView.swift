@@ -100,7 +100,7 @@ struct ContentView: View {
             .fileImporter(isPresented: $showImporter,
                           allowedContentTypes: Self.importableTypes) { result in
                 switch result {
-                case let .success(url):  engine.importCustomIPA(from: url)
+                case let .success(url):   Task { await engine.importCustomIPA(from: url) }
                 case let .failure(error): engine.log("⛔️ Import cancelled: \(error.localizedDescription)")
                 }
             }
@@ -275,19 +275,28 @@ struct ContentView: View {
     /// Import button, which doubles as the readout of what's loaded: once a file
     /// is in, its name is the label, so the card always answers "which IPA will
     /// this install?" without a second row of text.
+    ///
+    /// While the copy runs it says so. Bringing a file over from iCloud Drive or
+    /// a USB drive is slow enough that a button which simply sat there would
+    /// read as a button that didn't work.
     private var importControl: some View {
         Button { showImporter = true } label: {
             HStack(spacing: 8) {
-                Image(systemName: engine.customIPAName == nil
-                      ? "square.and.arrow.down" : "checkmark.circle.fill")
-                    .contentTransition(.symbolEffect(.replace))
-                    .foregroundStyle(engine.customIPAName == nil ? Color.secondary : Theme.accent2)
-                Text(engine.customIPAName ?? L("Import .ipa"))
+                if engine.isImportingIPA {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: engine.customIPAName == nil
+                          ? "square.and.arrow.down" : "checkmark.circle.fill")
+                        .contentTransition(.symbolEffect(.replace))
+                        .foregroundStyle(engine.customIPAName == nil ? Color.secondary : Theme.accent2)
+                }
+                Text(engine.isImportingIPA ? L("Importing…")
+                                           : (engine.customIPAName ?? L("Import .ipa")))
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .foregroundStyle(.primary)
                 Spacer()
-                if engine.customIPAName != nil {
+                if engine.customIPAName != nil, !engine.isImportingIPA {
                     Text(L("Replace"))
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(Theme.accent2)
@@ -297,6 +306,7 @@ struct ContentView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(engine.isImportingIPA)
     }
 
     // MARK: Primary action

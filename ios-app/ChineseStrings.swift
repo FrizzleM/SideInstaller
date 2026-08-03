@@ -56,6 +56,7 @@ let chineseStrings: [String: String] = [
     "Install %@": "安装 %@",
     "Custom .ipa": "自定义 .ipa",
     "Import .ipa": "导入 .ipa",
+    "Importing…": "正在导入…",
     "Replace": "更换",
     "iOS %@ required": "需要 iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":

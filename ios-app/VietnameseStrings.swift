@@ -51,6 +51,7 @@ let vietnameseStrings: [String: String] = [
     "Install %@": "Cài đặt %@",
     "Custom .ipa": "IPA tùy chọn",
     "Import .ipa": "Nhập .ipa",
+    "Importing…": "Đang nhập…",
     "Replace": "Thay",
     "iOS %@ required": "Yêu cầu iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":

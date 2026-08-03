@@ -56,9 +56,10 @@ final class PairingController {
     }
 
     /// Pairing file destination (also read back when writing into SideStore).
+    /// Kept out of Documents — see `PrivateStore` for why — and migrated from
+    /// there on first use for anyone upgrading from 0.6.x.
     nonisolated static func pairingFilePath() -> String {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return docs.appendingPathComponent("rp_pairing_file.plist").path
+        PrivateStore.pairingFile.path
     }
 
     /// Awaitable pairing for the one-click orchestrator: starts the host and

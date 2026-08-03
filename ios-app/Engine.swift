@@ -248,6 +248,9 @@ final class Engine: ObservableObject {
     /// Filename of the IPA imported for `InstallSource.custom`, or nil if none.
     /// Published so the import button can show what's loaded.
     @Published private(set) var customIPAName: String?
+    /// True while a picked IPA is being copied in. The copy can be slow (iCloud
+    /// Drive, a USB drive), so the button says so rather than looking dead.
+    @Published private(set) var isImportingIPA = false
 
     // 2FA bridge: the FFI 2FA callback (on a Rust worker thread) blocks on this
     // semaphore until the UI submits/cancels a code.
@@ -320,13 +323,27 @@ final class Engine: ObservableObject {
         appendLine("[rust] " + message)
     }
 
+    /// How many log lines to keep. The console is a debugging aid, not a record:
+    /// rust tracing plus the install's per-percent callbacks run to thousands of
+    /// entries in a session, every one of which is retained forever and
+    /// invalidates every view observing the engine. The oldest go first, since
+    /// what someone copies out for a bug report is always the recent end.
+    private static let maxLogLines = 2000
+
     private func appendLine(_ message: String) {
         let stamp = dateFormatter.string(from: Date())
         let entry = LogEntry(stamp: stamp, text: message)
         if Thread.isMainThread {
-            lines.append(entry)
+            store(entry)
         } else {
-            DispatchQueue.main.async { [weak self] in self?.lines.append(entry) }
+            DispatchQueue.main.async { [weak self] in self?.store(entry) }
+        }
+    }
+
+    private func store(_ entry: LogEntry) {
+        lines.append(entry)
+        if lines.count > Self.maxLogLines {
+            lines.removeFirst(lines.count - Self.maxLogLines)
         }
     }
 
@@ -461,10 +478,7 @@ final class Engine: ObservableObject {
         while true {
             try Task.checkCancellation()
             let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceIP)
-            vpnConnected = vpn
-            wifiConnected = wifi
-            vpnStatus = vpn ? "tunnel up" : "no tunnel"
-            wifiStatus = wifi ? "on" : "off"
+            publishNetwork(vpn: vpn, wifi: wifi, vpnText: vpn ? "tunnel up" : "no tunnel")
             if wifi && vpn {
                 log("Network OK: \(detail)")
                 setStep(.network, .done)
@@ -829,34 +843,58 @@ final class Engine: ObservableObject {
     /// Copy a picked IPA in as the custom import, replacing any previous one.
     /// `url` comes from the document picker, so it needs security-scoped access
     /// while it's read.
+    ///
+    /// The copy runs off the main actor. The guide points people at iCloud Drive
+    /// and USB drives, and a hundred-megabyte read from either takes seconds to
+    /// minutes — long enough that doing it inline would freeze the UI and invite
+    /// the watchdog to kill the app. `isImportingIPA` is what the button reads
+    /// to show that it's working.
     @MainActor
-    func importCustomIPA(from url: URL) {
+    func importCustomIPA(from url: URL) async {
+        guard !isImportingIPA else { return }
+        isImportingIPA = true
+        defer { isImportingIPA = false }
+        lastError = nil
         log("Importing \(url.lastPathComponent) …")
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         do {
-            let dest = try IPALibrary.replaceCustomImport(with: url)
-            // The picker accepts any file — iOS has no `.ipa` type to filter on
-            // that every storage provider agrees with — so this is where a wrong
-            // pick is caught. An IPA is a zip; anything that isn't one is either
-            // the wrong file or a broken copy.
-            guard IPALibrary.looksLikeIPA(dest) else {
-                IPALibrary.clearCustomImport()
-                customIPAName = nil
-                lastError = L("%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.",
-                              url.lastPathComponent)
-                log("⛔️ Import: \(lastError ?? "")")
-                return
-            }
+            let dest = try await Self.copyImport(from: url)
             customIPAName = dest.lastPathComponent
             // A new file invalidates whatever the previous run resolved, or the
             // install would sign the IPA that was just replaced.
             if downloadedSource == .custom { downloadedIPAPath = nil }
             setGuide(nil)
             log("Imported \(dest.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(dest.path)), countStyle: .file))).")
+        } catch IPALibrary.ImportError.notAnIPA {
+            // The picker accepts any file — iOS has no `.ipa` type to filter on
+            // that every storage provider agrees with — so this is where a wrong
+            // pick is caught. An IPA is a zip; anything that isn't one is either
+            // the wrong file or a broken copy. A previous import is still there:
+            // the check runs on a staged copy, before anything is replaced.
+            refreshCustomIPA()
+            lastError = L("%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.",
+                          url.lastPathComponent)
+            log("⛔️ Import: \(lastError ?? "")")
         } catch {
+            // Re-read rather than assume: whatever failed, disk is the only
+            // honest answer for what the button should now say.
+            refreshCustomIPA()
             lastError = L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
             log("⛔️ Import: \(lastError ?? "")")
+        }
+    }
+
+    /// The blocking half of an import, on a background queue. Security-scoped
+    /// access is taken and released around the copy itself — it's a per-process
+    /// claim on the URL, not a per-thread one, so it holds for the copy wherever
+    /// that runs.
+    private static func copyImport(from url: URL) async throws -> URL {
+        try await withCheckedThrowingContinuation { cont in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                do { cont.resume(returning: try IPALibrary.replaceCustomImport(with: url)) }
+                catch { cont.resume(throwing: error) }
+            }
         }
     }
 
@@ -1099,10 +1137,8 @@ final class Engine: ObservableObject {
 
     func checkVPNAndWifi() {
         let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceIP)
-        vpnConnected = vpn
-        wifiConnected = wifi
-        vpnStatus = vpn ? "tunnel up" : "no tunnel (start a loopback VPN)"
-        wifiStatus = wifi ? "on" : "off"
+        publishNetwork(vpn: vpn, wifi: wifi,
+                       vpnText: vpn ? "tunnel up" : "no tunnel (start a loopback VPN)")
         log("Network: \(detail)")
         log("VPN(loopback)=\(vpnStatus), Wi-Fi=\(wifiStatus). RSD target \(deviceIP):\(DeviceConnection.rsdPort).")
         if !vpn { log("⚠️ No tunnel on \(deviceIP)'s subnet — connect a loopback VPN (LocalDevVPN, ClashMi, …).") }
@@ -1124,10 +1160,23 @@ final class Engine: ObservableObject {
     /// poll above and as the authoritative check inside the Install gate.
     func refreshNetworkStatus() {
         let (vpn, wifi, _) = NetworkStatus.summarize(deviceIP: deviceIP)
-        vpnConnected = vpn
-        wifiConnected = wifi
-        vpnStatus = vpn ? "tunnel up" : "no tunnel (start a loopback VPN)"
-        wifiStatus = wifi ? "on" : "off"
+        publishNetwork(vpn: vpn, wifi: wifi,
+                       vpnText: vpn ? "tunnel up" : "no tunnel (start a loopback VPN)")
+    }
+
+    /// Publish network state, but only what actually changed.
+    ///
+    /// `@Published` fires `objectWillChange` on every assignment, changed or
+    /// not, and the engine is the app-wide `@EnvironmentObject` — so an
+    /// unguarded write from a 2-second timer re-runs the body of every view
+    /// observing it thirty times a minute, for as long as the app is open,
+    /// whether or not anything moved.
+    private func publishNetwork(vpn: Bool, wifi: Bool, vpnText: String) {
+        let wifiText = wifi ? "on" : "off"
+        if vpnConnected != vpn { vpnConnected = vpn }
+        if wifiConnected != wifi { wifiConnected = wifi }
+        if vpnStatus != vpnText { vpnStatus = vpnText }
+        if wifiStatus != wifiText { wifiStatus = wifiText }
     }
 
     /// RPPairing host (fire-and-forget; reports back through the shared engine).
@@ -1321,11 +1370,11 @@ final class Engine: ObservableObject {
 
     // MARK: - Storage
 
+    /// isideload's storage — the anisette machine provisioning and the developer
+    /// signing certificate. Deliberately not in Documents, which file sharing
+    /// exposes; `PrivateStore` explains the move and handles the migration.
     private var storageDir: String {
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("isideload")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.path
+        PrivateStore.isideload.path
     }
 
     // MARK: - Helpers
