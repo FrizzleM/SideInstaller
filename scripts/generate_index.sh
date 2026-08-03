@@ -9,7 +9,7 @@ OUTPUT_PREFIX="${OUTPUT_PREFIX:-sideinstaller}"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/output}"
 APP_NAME="${APP_NAME:-SideInstaller}"
 APP_TAGLINE="${APP_TAGLINE:-On-device sideloader. Follow the three steps below to get set up.}"
-PAGE_TITLE="${PAGE_TITLE:-$APP_NAME — Install}"
+PAGE_TITLE="${PAGE_TITLE:-$APP_NAME}"
 OUTPUT_HTML="${OUTPUT_HTML:-index.html}"
 TEMPLATE="${TEMPLATE:-$SCRIPT_DIR/template.html}"
 
@@ -25,9 +25,11 @@ OUTPUT_BASE_URL="${OUTPUT_BASE_URL:-https://raw.githubusercontent.com/$GITHUB_US
 # Logo: the app's own icon, committed at the repo root so the standalone page
 # can load it by raw URL (Pages ships only the HTML).
 LOGO_URL="${LOGO_URL:-https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/$GITHUB_BRANCH/app-icon.png}"
-# "Download IPA" target: GitHub's /releases/latest always redirects to the
-# current latest release page, so it never needs updating per release.
-LATEST_RELEASE_URL="${LATEST_RELEASE_URL:-https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/latest}"
+# "Download IPA" target: /releases/latest/download/<asset> serves the asset of
+# the current latest release directly, so the button downloads the .ipa instead
+# of bouncing the user to the release page, and never needs updating per release.
+IPA_ASSET_NAME="${IPA_ASSET_NAME:-SideInstaller.ipa}"
+LATEST_RELEASE_URL="${LATEST_RELEASE_URL:-https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/latest/download/$IPA_ASSET_NAME}"
 
 CERT_METADATA_FILE="$OUTPUT_DIR/certificate-validity.tsv"
 APP_INFO_FILE="$OUTPUT_DIR/app-info.tsv"
