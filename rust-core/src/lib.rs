@@ -1,22 +1,10 @@
-//! SideInstaller Rust core — C FFI shim over `idevice` (and later `isideload`).
+//! SideInstaller's Rust core: a C FFI shim over `idevice` and `isideload`.
 //!
-//! Module map (filled in gate-by-gate per the build order):
-//!   * `logging`    — tracing -> FFI callback (STEP 1, done)
-//!   * `ffi_util`   — shared C-string helpers
-//!   * `pairing`    — RPPairing host à la StikPair          (STEP 2)
-//!   * `connection` — loopback lockdown session + device info (STEP 2)
-//!   * `install`    — AFC + installation_proxy               (STEP 4)
-//!   * `account`    — isideload: login / cert / profile / sign (STEP 3)
-//!
-//! FFI contract: no panics cross the boundary, every fallible call returns an
-//! error code + (optionally) a heap-allocated message the caller frees with
-//! `si_string_free`.
+//! No panic crosses the boundary, and every fallible call returns an error code
+//! plus a message the caller frees with `si_string_free`.
 
-// Force-link idevice's own C-FFI crate so its `#[no_mangle]` connection/install
-// symbols (tunnel_create_rppairing, installation_proxy_*, afc_*, rsd_*,
-// rp_pairing_file_*, lockdown_*, adapter_*) are re-exported from our staticlib
-// and callable from Swift. Aliased to `_` — we never reference it from Rust,
-// we only want its exported C symbols.
+// Force-link idevice's C-FFI crate so Swift can call its `#[no_mangle]`
+// symbols. Aliased to `_`: only the exports are wanted, never the crate itself.
 extern crate idevice_ffi as _;
 
 mod account;
@@ -43,8 +31,7 @@ pub extern "C" fn si_log_init(cb: logging::LogCallback, ctx: *mut c_void) -> i32
     logging::init(cb, ctx)
 }
 
-/// Liveness probe: logs through `tracing` (so it should appear in the console
-/// via the callback) and returns a heap string the caller must free.
+/// Liveness probe: logs through `tracing` and returns a string to free.
 #[no_mangle]
 pub extern "C" fn si_ping() -> *mut c_char {
     tracing::info!("si_ping: Rust core alive (idevice {} linked)", idevice_version());
@@ -56,8 +43,7 @@ pub extern "C" fn si_ping() -> *mut c_char {
 
 /// Best-effort idevice version string for diagnostics.
 fn idevice_version() -> &'static str {
-    // idevice doesn't export its own version at runtime; pin is documented in
-    // Cargo.toml. Keep a human-readable marker here.
+    // idevice exports no runtime version; the pin lives in Cargo.toml.
     "@7bd551c"
 }
 
@@ -71,14 +57,12 @@ pub unsafe extern "C" fn si_string_free(p: *mut c_char) {
 }
 
 // ---------------------------------------------------------------------------
-// STEP 2: pairing — RPPairing host (StikPair flow)
+// Pairing — the RPPairing host
 // ---------------------------------------------------------------------------
 
-/// Run the RPPairing host. Blocks until a device pairs or an error occurs, so
-/// the caller MUST run it off the main thread. `ready_cb` fires with the
-/// Bonjour advertising details; `pin_cb` fires with the PIN to confirm on the
-/// device. On success `out` is populated with the paired device's info and the
-/// path to the written pairing file.
+/// Run the RPPairing host, blocking until a device pairs, so run it off the
+/// main thread. `ready_cb` carries the Bonjour details and `pin_cb` the PIN;
+/// `out` receives the device info and the pairing file's path.
 ///
 /// # Safety
 /// See `pairing::run_host`. `out` must point to a writable `PairResult`.
@@ -110,11 +94,11 @@ pub unsafe extern "C" fn si_pairing_result_free(r: *mut PairResult) {
 
 
 // ---------------------------------------------------------------------------
-// STEP 3: account — Apple ID sign-in + on-device signing (isideload)
+// Account — Apple ID sign-in and signing
 // ---------------------------------------------------------------------------
 
-/// Log in to Apple ID, open a developer session, and build a signer. Blocks —
-/// run off the main thread. `twofa_cb` is invoked when a 2FA code is needed.
+/// Log in, open a developer session, and build a signer. Blocks; `twofa_cb`
+/// is invoked when a 2FA code is needed.
 ///
 /// # Safety
 /// See `account::apple_signin`.
@@ -138,10 +122,8 @@ pub unsafe extern "C" fn si_apple_signin(
     )
 }
 
-/// Sign the IPA at `ipa_path` using a session from `si_apple_signin`. Blocks.
-/// On success `*out_signed_path` is the signed `.app` bundle path. `udid` (with
-/// the friendly `device_name`) is registered with the developer team before the
-/// provisioning profile is requested; pass an empty/NULL `udid` to skip it.
+/// Sign the IPA at `ipa_path`, returning the `.app` bundle's path. Blocks.
+/// `udid` is registered with the team first; pass NULL to skip that.
 ///
 /// # Safety
 /// See `account::sign_ipa`.
@@ -167,12 +149,11 @@ pub unsafe extern "C" fn si_sign_session_free(session: *mut SignSession) {
 }
 
 // ---------------------------------------------------------------------------
-// Certificate management — list + revoke iOS development certificates
+// Certificates — list and revoke
 // ---------------------------------------------------------------------------
 
-/// Log in + open a developer session + select the first team for certificate
-/// management. Blocks — run off the main thread. `twofa_cb` is invoked when a
-/// 2FA code is needed. Independent of the install pipeline (no device needed).
+/// Open a developer session on the first team for certificate management.
+/// Blocks, and needs no device.
 ///
 /// # Safety
 /// See `certs::cert_signin`.
@@ -196,8 +177,7 @@ pub unsafe extern "C" fn si_cert_signin(
     )
 }
 
-/// List the team's iOS development certificates as a JSON array. Blocks.
-/// On success `*out_json` is a heap JSON string (free with `si_string_free`).
+/// List the team's certificates as JSON in `*out_json`. Blocks.
 ///
 /// # Safety
 /// See `certs::cert_list`.

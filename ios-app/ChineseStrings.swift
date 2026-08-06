@@ -1,18 +1,8 @@
 import Foundation
 
-/// Simplified Chinese (zh-Hans) copy, keyed by the English source string every
-/// call site passes to `L(_:)` — same contract as the other tables: same keys,
-/// same placeholders, product and third-party UI names left in English.
-///
-/// A few notes specific to Chinese. iOS Settings path labels use Apple's own
-/// zh-Hans wording (设置 › 通用 › 软件更新, 隐私与安全性 › 开发者模式, VPN 与设备管理,
-/// 开发者 App…) so the text matches what the user actually sees in the system UI.
-/// "tap" is 轻点 to match iOS, and prose uses full-width punctuation (。，：（）
-/// "") the way Apple's Chinese localizations do. Nouns don't inflect for number,
-/// so the singular and plural app-count strings share one wording. Note that 设置
-/// covers both the Settings app (in paths) and generic "setup" ("Finish setup" →
-/// 完成设置); context keeps them apart. Certificate "revoke" is 吊销 (the PKI term),
-/// not 撤销. Second person is the warmer 你 throughout, to fit an indie tool.
+/// Simplified Chinese copy, on the same contract as `spanishStrings`. Settings
+/// paths and "tap" follow Apple's own zh-Hans wording, prose uses full-width
+/// punctuation, "revoke" is the PKI term 吊销, and the second person is 你.
 let chineseStrings: [String: String] = [
 
     // MARK: - Shared

@@ -2,9 +2,7 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-/// The Install screen: enter an Apple ID, choose a build, and install it in one
-/// tap. While the pipeline runs, an animated step timeline and contextual
-/// callouts guide the user through anything they need to do by hand.
+/// The Install screen: an Apple ID, a build, and a step timeline while it runs.
 struct ContentView: View {
     @EnvironmentObject private var engine: Engine
     @EnvironmentObject private var updateChecker: UpdateChecker
@@ -15,23 +13,13 @@ struct ContentView: View {
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
     @State private var showImporter = false
-    /// True while the "which certificate do you want to give up?" chooser is
-    /// showing. Never revokes anything on its own: each certificate is its own
-    /// destructive button, and the dialog spells out what revoking breaks.
+    /// True while the certificate chooser is showing; each certificate there is
+    /// its own destructive button, so nothing is revoked without a choice.
     @State private var showRevokeChooser = false
 
-    /// What the import picker will let you choose.
-    ///
-    /// Deliberately just "any file". iOS declares no UTType for `.ipa`, so the
-    /// obvious `UTType(filenameExtension: "ipa")` mints a *dynamic* type — and a
-    /// file only becomes selectable if the type its storage provider resolved
-    /// happens to be that same dynamic type. When it isn't (iCloud Drive, a
-    /// share sheet, a third-party provider often report the file as a zip or as
-    /// plain data), the picker shows the file as normal and then silently
-    /// ignores every tap on it: no selection, no dismissal, no callback.
-    ///
-    /// So the filter accepts everything and `Engine.importCustomIPA` does the
-    /// real checking, by looking inside the file rather than trusting a label.
+    /// Any file: iOS declares no UTType for `.ipa`, and the dynamic type one
+    /// would mint makes the picker silently ignore taps. `importCustomIPA`
+    /// checks the contents instead.
     private static let importableTypes: [UTType] = [.data]
 
     var body: some View {
@@ -44,12 +32,8 @@ struct ContentView: View {
                     }
                     appleIDCard.cascadeItem(1)
                     appCard.cascadeItem(2)
-                    // Most-blocking requirement first: an unsupported iOS can't
-                    // be worked around at all, so it pre-empts the other two.
-                    // Then Wi-Fi, but only for a run that has to pair — with a
-                    // pairing file already saved the tunnel is pure loopback and
-                    // cellular carries the rest, so there's nothing to warn
-                    // about. Wi-Fi settled but no tunnel → loopback-VPN callout.
+                    // Most-blocking requirement first: an unsupported iOS, then
+                    // Wi-Fi if this run must pair, then the missing tunnel.
                     if !engine.isRunning {
                         if !engine.osSupported {
                             osRequirement.cascadeItem(3)
@@ -66,8 +50,7 @@ struct ContentView: View {
                     if let pin = engine.pairingPIN {
                         pinCallout(pin).transition(.cardAppear)
                     }
-                    // Sits above the guide card: it's the one-tap version of
-                    // what the guide then explains at length.
+                    // The one-tap version of what the guide below explains.
                     if engine.certConflict, !engine.isRunning {
                         certConflictCallout.transition(.cardAppear)
                     }
@@ -80,16 +63,14 @@ struct ContentView: View {
                     if engine.finished {
                         successCallout.transition(.cardAppear)
                     }
-                    // After a LiveContainer + SideStore install, the user still
-                    // needs to import SideStore's certificate into LiveContainer.
+                    // LiveContainer still needs SideStore's certificate imported.
                     if engine.finished, engine.installedIsLiveContainer {
                         guideCallout(Guides.liveContainerImport).transition(.cardAppear)
                     }
                     footer.cascadeItem(5)
                 }
                 .padding(20)
-                // Each modifier watches one piece of state so a change animates
-                // only its own card swap rather than the whole screen.
+                // One modifier per piece of state, so only its own card animates.
                 .animation(.smooth(duration: 0.35), value: updateChecker.showBanner)
                 .animation(.smooth(duration: 0.35), value: engine.vpnConnected)
                 .animation(.smooth(duration: 0.35), value: engine.wifiConnected)
@@ -107,10 +88,8 @@ struct ContentView: View {
             .background(AppBackground())
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
             .sheet(isPresented: $showSettings) { SettingsView() }
-            // Attached here rather than on the card that owns the button: the
-            // card carries `.disabled(engine.isRunning)`, and a presentation
-            // inherits the environment of wherever its modifier lives, which
-            // can leave the picked file unresponsive to taps.
+            // Not on the card that owns the button: its `.disabled` would be
+            // inherited here and leave the picked file unresponsive.
             .fileImporter(isPresented: $showImporter,
                           allowedContentTypes: Self.importableTypes) { result in
                 switch result {
@@ -161,8 +140,7 @@ struct ContentView: View {
 
     // MARK: Footer
 
-    /// A quiet brand credit at the foot of the screen, tucked below the flow so it
-    /// stays visible without crowding the header.
+    /// A quiet brand credit at the foot of the screen.
     private var footer: some View {
         Text(L("an app by Frizzle"))
             .font(.caption)
@@ -195,9 +173,7 @@ struct ContentView: View {
 
     // MARK: Update banner
 
-    /// Closable notice shown when GitHub advertises a newer version than this
-    /// build (see `UpdateChecker`). Tapping the body opens the install page; the
-    /// ✕ dismisses it for this launch.
+    /// Notice shown when GitHub advertises a newer version than this build.
     private var updateBanner: some View {
         CalloutCard(tint: Theme.accent) {
             VStack(alignment: .leading, spacing: 10) {
@@ -266,8 +242,7 @@ struct ContentView: View {
                     .contentShape(Rectangle())
                 }
 
-                // A custom IPA has no release to choose between, so the channel
-                // picker gives its place up to the importer that replaces it.
+                // A custom IPA has no release, so the importer takes that slot.
                 ZStack {
                     if engine.installSource == .custom {
                         importControl.transition(.opacity)
@@ -287,13 +262,8 @@ struct ContentView: View {
         .disabled(engine.isRunning)
     }
 
-    /// Import button, which doubles as the readout of what's loaded: once a file
-    /// is in, its name is the label, so the card always answers "which IPA will
-    /// this install?" without a second row of text.
-    ///
-    /// While the copy runs it says so. Bringing a file over from iCloud Drive or
-    /// a USB drive is slow enough that a button which simply sat there would
-    /// read as a button that didn't work.
+    /// Import button, labelled with the loaded file's name, or with the copy's
+    /// progress while one is coming in from iCloud Drive or a USB drive.
     private var importControl: some View {
         Button { showImporter = true } label: {
             HStack(spacing: 8) {
@@ -353,9 +323,7 @@ struct ContentView: View {
 
     // MARK: iOS version requirement
 
-    /// Shown above the Install button on an iPhone older than the minimum iOS.
-    /// Unlike the Wi-Fi and loopback-VPN callouts this one isn't a "do this and
-    /// carry on" — the install can't run here at all — so it replaces both.
+    /// Shown on an iPhone older than the minimum iOS, where nothing can run.
     private var osRequirement: some View {
         CalloutCard(tint: .red) {
             HStack(alignment: .top, spacing: 14) {
@@ -378,9 +346,7 @@ struct ContentView: View {
 
     // MARK: Wi-Fi requirement
 
-    /// Shown above the Install button while Wi-Fi is off. The tunnel — and so the
-    /// whole install — rides on Wi-Fi, so it's the first thing to fix; enabling
-    /// it reveals the loopback-VPN callout next if the tunnel is still down.
+    /// Shown while Wi-Fi is off, which pairing needs.
     private var wifiRequirement: some View {
         CalloutCard(tint: .red) {
             HStack(alignment: .top, spacing: 14) {
@@ -402,8 +368,7 @@ struct ContentView: View {
 
     // MARK: Loopback-VPN requirement
 
-    /// Shown above the Install button while the loopback tunnel is off — the
-    /// whole install runs over it, so it must be on before tapping Install.
+    /// Shown while the loopback tunnel the install runs over is off.
     private var vpnRequirement: some View {
         CalloutCard(tint: .red) {
             HStack(alignment: .top, spacing: 14) {
@@ -454,9 +419,7 @@ struct ContentView: View {
 
                 VStack(spacing: 0) {
                     ForEach(Array(Step.allCases.enumerated()), id: \.element) { idx, step in
-                        // The title is resolved here, not inside the row: it's
-                        // the stored property whose change makes the row redraw
-                        // when the language switches.
+                        // Resolved here so the row redraws on a language change.
                         StepRow(step: step,
                                 title: step.title(for: engine.installSource),
                                 state: engine.stepStates[step] ?? .pending,
@@ -534,13 +497,8 @@ struct ContentView: View {
 
     // MARK: Certificate conflict (Apple error 7460)
 
-    /// Shown when signing stopped because Apple already has a certificate for
-    /// this Apple ID and SideInstaller couldn't reuse it.
-    ///
-    /// The recovery is destructive and irreversible, so it is deliberately two
-    /// taps and never one: this button only *fetches* the certificates, and the
-    /// dialog it opens makes the user name the one they're giving up. Nothing
-    /// is revoked without that choice.
+    /// Shown when signing stopped on a certificate that couldn't be reused. The
+    /// button only fetches them; the dialog makes the user name what to revoke.
     private var certConflictCallout: some View {
         CalloutCard(tint: .orange) {
             VStack(alignment: .leading, spacing: 14) {
@@ -558,8 +516,7 @@ struct ContentView: View {
                     }
                 }
                 Button {
-                    // Loads (signing in first if needed) so the chooser can name
-                    // the certificates instead of asking blind.
+                    // Load first, so the chooser can name the certificates.
                     certManager.ensureLoaded { showRevokeChooser = true }
                 } label: {
                     HStack(spacing: 8) {
@@ -605,9 +562,7 @@ struct ContentView: View {
         }
     }
 
-    /// Names a certificate in the chooser, tagging the machine it was issued to
-    /// (usually the giveaway for which one is safe to give up) and whether it
-    /// has already expired.
+    /// Names a certificate in the chooser, with its machine and expiry.
     private func revokeButtonLabel(for cert: DevCert) -> String {
         var label = cert.displayName
         if let machine = cert.machineLabel { label += " — \(machine)" }
@@ -665,8 +620,7 @@ struct ContentView: View {
 // MARK: - Toolbar
 
 extension View {
-    /// A gear button that opens the Settings / diagnostics sheet, shared by both
-    /// tabs so it sits in the same spot everywhere.
+    /// The gear button that opens Settings, shared by both tabs.
     func settingsToolbarItem(isPresented: Binding<Bool>) -> some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
             Button { isPresented.wrappedValue = true } label: {
@@ -679,9 +633,7 @@ extension View {
 
 // MARK: - Step row
 
-/// One row of the install timeline: a status node connected by a vertical line
-/// to the next step, the step title, and a trailing badge (live percentage
-/// while installing, or an "Action needed" cue when blocked on the user).
+/// One row of the install timeline: a status node, the title, and a badge.
 private struct StepRow: View {
     let step: Step
     let title: String

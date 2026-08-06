@@ -1,10 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// The "Pairing" tab — manage the device pairing file on its own, the way
-/// iLoader's "Manage Pairing files" does. Generate (extract) the pairing file,
-/// export it (share / Save to Files), and write it into a supported app installed
-/// on this iPhone (SideStore, StikDebug, Feather, …) over the loopback tunnel.
+/// The Pairing tab: generate the pairing file, export it, and write it into a
+/// supported app installed on this iPhone over the loopback tunnel.
 struct PairingView: View {
     @EnvironmentObject private var engine: Engine
     /// Declared so every label on this screen redraws when the language changes.
@@ -116,7 +114,7 @@ struct PairingView: View {
         }
     }
 
-    // MARK: Pairing-code callout (shown while the RPPairing host is running)
+    // MARK: Pairing-code callout
 
     private func pinCard(_ pin: String) -> some View {
         CalloutCard(tint: .orange) {
@@ -156,12 +154,8 @@ struct PairingView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle(L("Install into an app"), systemImage: "tray.and.arrow.down.fill")
 
-                // The tunnel is the only requirement here. Scanning and writing
-                // both run over it — installation_proxy and house_arrest — and
-                // it's a loopback that routes nothing but its own subnet, so
-                // there's no Wi-Fi in the path to ask about. (Generating a
-                // pairing file is the step that needs the local network, and
-                // that lives on the card above.)
+                // Only the tunnel matters: scanning and writing both run over
+                // it, and it's a loopback with no Wi-Fi in the path.
                 if !engine.vpnConnected {
                     vpnNote
                 }

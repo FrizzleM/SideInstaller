@@ -1,15 +1,9 @@
-//! Apple ID auth + developer cert/App ID/profile + on-device IPA signing,
-//! wrapping `isideload` (nab138). We use only the sign-only path
-//! (`Sideloader::sign_app`) — the actual install is done separately over the
-//! RSD tunnel via idevice-ffi (step 4), so isideload never touches a device
-//! here.
+//! Apple ID sign-in and IPA signing through `isideload`, using only its
+//! sign-only path, since the install runs over our own RSD tunnel.
 //!
-//! `si_apple_signin` logs in (driving 2FA through a Swift callback), opens a
-//! developer session, and builds a `Sideloader` (auto-selecting the first
-//! team), returning an opaque `SignSession`. `si_sign_ipa` then signs an IPA
-//! with that session — `sign_app` registers the App ID + provisioning profile
-//! and retrieves/creates the development certificate internally before signing
-//! with `apple-codesign`.
+//! `si_apple_signin` logs in, opens a developer session on the first team, and
+//! returns an opaque `SignSession`. `si_sign_ipa` then signs an IPA with it,
+//! registering the App ID, profile and certificate along the way.
 
 use std::ffi::{c_char, c_void, CStr};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -30,19 +24,16 @@ use crate::ffi_util::cstr;
 pub type TwoFactorCb =
     Option<extern "C" fn(ctx: *mut c_void, out_buf: *mut c_char, buf_len: usize) -> i32>;
 
-/// Opaque session handle: owns the tokio runtime and the built Sideloader.
+/// Opaque handle owning the tokio runtime and the built Sideloader.
 pub struct SignSession {
     rt: tokio::runtime::Runtime,
     sideloader: Sideloader,
 }
 
-// The session is only ever used through its own runtime, and Swift serializes
-// calls to it on one queue. Raw-pointer 2FA ctx is handled inside login only.
+// Used only through its own runtime, serialized by Swift on one queue.
 unsafe impl Send for SignSession {}
 
-/// Wraps the opaque 2FA callback context so it can cross thread boundaries.
-/// Shared with the certificate-management module, which drives the same Swift
-/// 2FA prompt.
+/// Wraps the 2FA callback context so it can cross thread boundaries.
 pub(crate) struct TwoFaCtx(pub(crate) *mut c_void);
 unsafe impl Send for TwoFaCtx {}
 unsafe impl Sync for TwoFaCtx {}
@@ -54,8 +45,7 @@ unsafe fn opt(p: *const c_char, default: &str) -> String {
     CStr::from_ptr(p).to_str().unwrap_or(default).to_string()
 }
 
-/// Build the `Fn() -> Option<String>` 2FA closure that bridges to Swift. Shared
-/// with `certs.rs` so login and certificate management drive the same prompt.
+/// Build the 2FA closure that bridges to Swift, shared with `certs.rs`.
 pub(crate) fn make_2fa(cb: TwoFactorCb, ctx: TwoFaCtx) -> impl Fn() -> Option<String> {
     move || {
         let cb = cb?;
@@ -75,11 +65,8 @@ pub(crate) fn make_2fa(cb: TwoFactorCb, ctx: TwoFaCtx) -> impl Fn() -> Option<St
     }
 }
 
-/// Log in, open a developer session, and build a Sideloader.
-///
-/// Returns 0 on success (`*out_session` + `*out_summary` set), non-zero on
-/// error (`*out_error` set). All out strings are heap-allocated; free with
-/// `si_string_free`, and the session with `si_sign_session_free`.
+/// Log in, open a developer session, and build a Sideloader. Returns 0 on
+/// success; free the session with `si_sign_session_free`.
 ///
 /// # Safety
 /// All `*const c_char` args must be null or valid C strings; the out pointers
@@ -173,17 +160,11 @@ pub unsafe fn apple_signin(
     }
 }
 
-/// Sign the IPA at `ipa_path` with the session. Returns 0 on success
-/// (`*out_signed_path` set to the signed `.app` bundle path), non-zero on error.
+/// Sign the IPA at `ipa_path`, setting `*out_signed_path` to the `.app` bundle.
 ///
-/// `udid` (and the human-readable `device_name`) is the connected iPhone's
-/// UDID, taken from the lockdown handshake. It is registered with the developer
-/// team *before* the provisioning profile is requested — a fresh/free team has
-/// no devices, so `sign_app` would otherwise fail with developer error 8220
-/// ("Your team has no devices …"). This mirrors what Sideloadly/AltStore do
-/// transparently. A registration failure is reported with a `device
-/// registration failed for UDID <udid>:` prefix so the caller can show the UDID
-/// and an actionable message. Pass an empty `udid` to skip registration.
+/// `udid` is registered with the team before the profile is requested, or Apple
+/// rejects it with error 8220. A failure there is prefixed `device registration
+/// failed for UDID <udid>:` so the caller can show it. Empty `udid` skips this.
 ///
 /// # Safety
 /// `session` must be a valid pointer from `apple_signin`; out pointers valid.
@@ -206,10 +187,8 @@ pub unsafe fn sign_ipa(
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         session.rt.block_on(async {
-            // Register the connected device with the team before signing, so the
-            // provisioning-profile download has a device to bind to. `sign_app`
-            // itself never does this (only isideload's `install_app` does, and we
-            // don't use that path — we install over our own RSD tunnel).
+            // The profile needs a device to bind to, and `sign_app` never
+            // registers one; only isideload's unused `install_app` does.
             if udid.is_empty() {
                 tracing::warn!(
                     "No device UDID provided; skipping registration — provisioning \

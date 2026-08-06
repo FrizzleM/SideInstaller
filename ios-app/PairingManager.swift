@@ -1,19 +1,12 @@
 import Foundation
 
-/// Drives the "Pairing" tab — the standalone equivalent of iLoader's "Manage
-/// Pairing files". It can:
-///   • generate (extract) the device pairing file via the RPPairing host,
-///   • export it (share sheet / Save to Files), and
-///   • write it into a chosen installed app (SideStore, StikDebug, Feather, …)
-///     over the loopback tunnel, the same way the install flow seeds SideStore.
-///
-/// All device work is delegated to the shared `Engine` (it owns the connection
-/// and serializes it); this type holds only the tab's own UI state, mirroring
-/// `CertManager` / `DownloadsManager`.
+/// Drives the Pairing tab: generate the pairing file, export it, and write it
+/// into a chosen installed app. Only UI state lives here — the shared `Engine`
+/// owns the device connection and serializes the work.
 @MainActor
 final class PairingManager: ObservableObject {
 
-    // Pairing file on disk (drives the status line + the Export button).
+    // Pairing file on disk, behind the status line and the Export button.
     @Published private(set) var pairingFileExists = false
     @Published private(set) var pairingFileSize = 0
     @Published private(set) var pairingFileDate: Date?
@@ -26,14 +19,14 @@ final class PairingManager: ObservableObject {
 
     // Results.
     @Published private(set) var targets: [InstalledPairingTarget] = []
-    /// True once a scan has completed (drives the "no apps found" empty state).
+    /// True once a scan has completed, for the "no apps found" empty state.
     @Published private(set) var hasScanned = false
     @Published var lastError: String?
     @Published var lastSuccess: String?
 
     private var engine: Engine { Engine.shared }
 
-    /// Any device/file operation in flight — used to disable the controls.
+    /// Any operation in flight, which disables the controls.
     var isBusy: Bool { isGenerating || isScanning || installingTargetID != nil }
 
     /// The pairing file to hand to a share sheet, when one exists on disk.
@@ -44,7 +37,7 @@ final class PairingManager: ObservableObject {
 
     // MARK: - Actions
 
-    /// Re-stat the pairing file. Cheap; safe to call each time the tab appears.
+    /// Re-stat the pairing file, cheap enough to call whenever the tab appears.
     func refresh() {
         let path = PairingController.pairingFilePath()
         let attrs = try? FileManager.default.attributesOfItem(atPath: path)
@@ -54,9 +47,8 @@ final class PairingManager: ObservableObject {
         pairingFileDate = attrs?[.modificationDate] as? Date
     }
 
-    /// Run the RPPairing host to extract a fresh pairing file. Surfaces the PIN
-    /// through `Engine.pairingPIN` (shown by the tab) while the user pairs in
-    /// Settings. A re-pair invalidates any open device link, so drop it.
+    /// Run the RPPairing host for a fresh pairing file, showing the PIN through
+    /// `Engine.pairingPIN`. Drops the device link, which a re-pair invalidates.
     func generate() {
         guard !isBusy else { return }
         lastError = nil

@@ -1,13 +1,8 @@
 import Foundation
 
-/// Vietnamese copy, keyed by the English source string every call site passes to
-/// `L(_:)` — same contract as the other tables: same keys, same placeholders,
-/// product and third-party UI names left in English.
-///
-/// Two notes specific to Vietnamese. "Cài đặt" is both *Settings* and *install*,
-/// so the Install tab is "Cài ứng dụng" to keep it distinct from the Settings
-/// sheet and from references to the iOS Settings app. And nouns don't inflect
-/// for number, so the singular and plural app-count strings share one wording.
+/// Vietnamese copy, on the same contract as `spanishStrings`. The Install tab is
+/// "Cài ứng dụng", since "Cài đặt" also means Settings, and nouns don't inflect
+/// for number, so the app-count strings share one wording.
 let vietnameseStrings: [String: String] = [
 
     // MARK: - Shared

@@ -2,19 +2,10 @@ import Foundation
 import SideInstallerFFI
 import Darwin
 
-/// Wraps idevice's C-FFI to open the loopback connection to the local device
-/// over the loopback VPN and talk lockdown / installation_proxy over the RSD
-/// tunnel.
-///
-/// The recipe mirrors StikDebug's working path:
-///   rp_pairing_file_read  ->  tunnel_create_rppairing(deviceIP:49152, pairing)
-///     ->  (AdapterHandle, RsdHandshakeHandle)
-///   lockdownd_connect_rsd + lockdownd_get_value(nil)  ->  device-info plist
-///   installation_proxy_connect_rsd + installation_proxy_get_apps  ->  app list
-///
-/// The adapter + handshake are created once and reused; idevice's software TCP
-/// stack pumps on its own thread, so these handles are safe to hold and call
-/// from a background queue. All calls are blocking — never call from main.
+/// Wraps idevice's C-FFI to reach the device over the loopback tunnel and talk
+/// lockdown and installation_proxy across it, following StikDebug's path. The
+/// adapter and handshake are created once and reused; every call blocks, so
+/// none of this may run on the main thread.
 final class DeviceConnection {
 
     // idevice opaque handles import as OpaquePointer.
@@ -49,7 +40,7 @@ final class DeviceConnection {
 
     // MARK: Connect / disconnect
 
-    /// Establish the loopback tunnel + RSD handshake (make-or-break #2).
+    /// Establish the loopback tunnel and RSD handshake.
     func connect(deviceIP: String, pairingFilePath: String, hostname: String = "SideInstaller") throws {
         var pf: OpaquePointer?
         try pairingFilePath.withCString { p in
@@ -70,8 +61,7 @@ final class DeviceConnection {
         let err = withUnsafePointer(to: &addr) { aptr in
             aptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
                 hostname.withCString { host in
-                    // pin_callback nil -> pair-verify with the existing pairing
-                    // file (no PIN needed for iOS).
+                    // A nil pin_callback pair-verifies with the existing file.
                     tunnel_create_rppairing(
                         sa, socklen_t(MemoryLayout<sockaddr_in>.stride),
                         host, pairingFile, nil, nil,
@@ -170,22 +160,17 @@ final class DeviceConnection {
             out.append(line)
             if let appPlist { plist_free(appPlist) }
         }
-        // The outer plist_t array (Box::into_raw'd slice) has no exposed free;
-        // a tiny per-call leak, acceptable for this debug harness.
+        // The outer plist_t array has no exposed free: a tiny per-call leak.
         return out
     }
 
-    /// One installed app as installation_proxy reports it — the bundle id (used
-    /// to vend house_arrest for the pairing write) plus its display name (used to
-    /// match against the supported pairing-target table).
+    /// One installed app as installation_proxy reports it.
     struct InstalledApp: Equatable {
         let bundleID: String
         let displayName: String?
     }
 
-    /// Structured list of every installed app (bundle id + display name), for
-    /// matching against `PairingTargets`. Mirrors `listApps` but returns data
-    /// instead of pre-formatted log lines.
+    /// Every installed app as data, where `listApps` returns log lines.
     func installedApps() throws -> [InstalledApp] {
         guard let adapter, let handshake else { throw fail("not connected") }
         var client: OpaquePointer?
@@ -214,11 +199,8 @@ final class DeviceConnection {
         return out
     }
 
-    /// Resolve the installed host app's exact bundle id for the pairing write.
-    /// Prefers an exact CFBundleDisplayName match (how iLoader locates SideStore
-    /// / LiveContainer — robust to the bundle id rewrite isideload performs),
-    /// then falls back to the "<base>" / "<base>.<teamID>" bundle id forms.
-    /// Returns nil if no matching app is installed.
+    /// The host app's exact bundle id for the pairing write, matched on display
+    /// name first — isideload rewrites bundle ids — then on "<base>[.<teamID>]".
     func resolveInstalledBundleID(displayName: String, bundleIDBase: String) throws -> String? {
         guard let adapter, let handshake else { throw fail("not connected") }
         var client: OpaquePointer?
@@ -283,20 +265,9 @@ final class DeviceConnection {
         }
     }
 
-    /// installation_proxy `ClientOptions` for a developer-signed bundle.
-    ///
-    /// What we upload is a signed `.app` *directory*, not a zipped IPA, and
-    /// installd only applies developer-signing rules to a package it's been
-    /// told is one. Without `PackageType: Developer` it stages, extracts and
-    /// inspects the bundle happily, then rejects it at VerifyingApplication
-    /// with `0xe8008015 (A valid provisioning profile for this executable was
-    /// not found.)` — it never consults the bundle's embedded.mobileprovision,
-    /// because a default-type package is expected to carry an App Store
-    /// signature and need no profile at all.
-    ///
-    /// ideviceinstaller sets this for directory installs, and so does
-    /// isideload's own `install_app_rsd`; we reimplement the install over our
-    /// own RSD tunnel (see Engine's step 7), so setting it is on us.
+    /// installation_proxy options for a developer-signed bundle. Without
+    /// `PackageType: Developer`, installd never reads the embedded profile and
+    /// rejects the upload with 0xe8008015 at VerifyingApplication.
     private func developerInstallOptions() -> plist_t? {
         guard let options: plist_t = plist_new_dict() else { return nil }
         // The dict takes ownership of the value node, so freeing it is enough.
@@ -323,10 +294,7 @@ final class DeviceConnection {
     }
 
     private func uploadFile(_ afc: OpaquePointer, localPath: String, remotePath: String) throws {
-        // Mapped, not read: the bundle's main binary runs to tens of megabytes,
-        // and pulling it into the heap in one go — only to hand it out a
-        // megabyte at a time below — is the kind of spike that gets an app
-        // jetsammed halfway through an install.
+        // Mapped, not read: a tens-of-megabytes binary on the heap risks a jetsam.
         let data = try Data(contentsOf: URL(fileURLWithPath: localPath), options: .mappedIfSafe)
         var file: OpaquePointer?
         try check(remotePath.withCString { afc_file_open(afc, $0, AfcWrOnly, &file) },
@@ -349,20 +317,12 @@ final class DeviceConnection {
 
     // MARK: Write pairing file into another app's container (house_arrest)
 
-    /// Write `pairingFilePath` into `bundleID`'s Documents at
-    /// `remoteRelativePath` (relative to Documents, e.g.
-    /// `ALTPairingFile.mobiledevicepairing` for SideStore or
-    /// `SideStore/Documents/ALTPairingFile.mobiledevicepairing` for the
-    /// LiveContainer guest), then read it back to prove the write committed.
-    /// Returns the verified byte count.
+    /// Write `pairingFilePath` into `bundleID`'s Documents, then read it back to
+    /// prove the write committed, returning the verified byte count.
     ///
-    /// Ownership (confirmed against idevice-ffi source):
-    ///  - `house_arrest_vend_documents` CONSUMES the HouseArrestClient
-    ///    (`Box::from_raw` inside the FFI, on success AND failure) and moves the
-    ///    underlying `Idevice` into the returned AfcClient — so `ha` must NEVER
-    ///    be freed afterward (freeing it was the double-free crash).
-    ///  - `afc_file_close` and `afc_client_free` each consume their handle:
-    ///    close/free each exactly once. AFC commits the write only on close.
+    /// `house_arrest_vend_documents` consumes the HouseArrestClient on success
+    /// and failure alike, so `ha` must never be freed; `afc_file_close` and
+    /// `afc_client_free` likewise consume their handle exactly once.
     @discardableResult
     func writePairingFile(intoBundleID bundleID: String,
                           remoteRelativePath: String,
@@ -384,15 +344,12 @@ final class DeviceConnection {
         guard let afc else { throw fail("vended AFC client was null") }
         defer { afc_client_free(afc) }   // free the AfcClient (and its Idevice) once
 
-        // idevice's vend_documents roots AFC at the app CONTAINER, not at the
-        // Documents dir — so the path must include "/Documents/" (matches
-        // iLoader's place_file). Writing to the container root is denied
-        // (Afc PermDenied). Create the full parent chain first (no-op for dirs
-        // that already exist) — the LiveContainer guest path is nested.
+        // vend_documents roots AFC at the container, not Documents, and the
+        // container root itself is read-only, so the path carries "/Documents/".
         let remotePath = "/Documents/\(remoteRelativePath)"
         makeRemoteDirectories(afc, forFileAt: remotePath)
 
-        // --- Write: open (create+truncate), write whole buffer, CLOSE (commits).
+        // Open (create and truncate), write the whole buffer, then close.
         var wfile: OpaquePointer?
         try check(remotePath.withCString { afc_file_open(afc, $0, AfcWr, &wfile) },
                   "afc_file_open(\(remotePath), write) failed")
@@ -409,7 +366,7 @@ final class DeviceConnection {
         // Close commits the write AND consumes wfile — check its error.
         try check(afc_file_close(wfile), "afc_file_close failed (write not committed)")
 
-        // --- Read-back: re-open for read and assert the byte length committed.
+        // Re-open for read and assert the byte length committed.
         var rfile: OpaquePointer?
         try check(remotePath.withCString { afc_file_open(afc, $0, AfcRdOnly, &rfile) },
                   "afc_file_open(\(remotePath), read-back) failed")
@@ -426,9 +383,8 @@ final class DeviceConnection {
         return rlen
     }
 
-    /// Create every parent directory of `remoteFilePath` on the AFC volume,
-    /// one level at a time (each `afc_make_directory` is a no-op if the dir
-    /// already exists). Needed for the nested LiveContainer guest path.
+    /// Create every parent directory of `remoteFilePath` on the AFC volume, for
+    /// the nested LiveContainer guest path.
     private func makeRemoteDirectories(_ afc: OpaquePointer, forFileAt remoteFilePath: String) {
         let components = remoteFilePath.split(separator: "/").dropLast()  // drop the file name
         var path = ""
@@ -451,13 +407,10 @@ final class DeviceConnection {
     }
 }
 
-/// installation_proxy progress callback (C, no captures) — drives the progress
-/// bar and logs each update.
+/// installation_proxy progress callback, driving the bar and the log.
 private let installProgressCb: @convention(c) (UInt64, UnsafeMutableRawPointer?) -> Void = { progress, _ in
     DispatchQueue.main.async {
-        // installd repeats the same percentage across its phases. Publishing it
-        // again moves no bar and adds a duplicate log line, but does invalidate
-        // every view observing the engine — so only act when it really moves.
+        // installd repeats a percentage across phases; only act when it moves.
         let fraction = Double(progress) / 100.0
         guard Engine.shared.installProgress != fraction else { return }
         Engine.shared.installProgress = fraction

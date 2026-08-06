@@ -1,9 +1,6 @@
 import Foundation
 
-/// Italian copy, keyed by the English source string every call site passes to
-/// `L(_:)` — same contract as `spanishStrings`: same keys, same placeholders,
-/// and product / third-party UI names left alone so the user isn't sent looking
-/// for a button that doesn't exist under that name.
+/// Italian copy, on the same contract as `spanishStrings`.
 let italianStrings: [String: String] = [
 
     // MARK: - Shared

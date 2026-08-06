@@ -1,17 +1,14 @@
 import Foundation
 import Darwin
 
-/// Best-effort detection of the loopback tunnel + Wi-Fi by scanning the active
-/// network interfaces. A loopback VPN brings up a `utun*` tunnel interface;
-/// Wi-Fi is `en0`. This is a quick readout — the real proof is whether the
-/// lockdown connection succeeds.
+/// Detects the loopback tunnel (a `utun*` interface) and Wi-Fi (`en0`) by
+/// scanning the active interfaces. A readout only; connecting is the real proof.
 enum NetworkStatus {
 
     struct Interface {
         let name: String
         let ipv4: String
-        /// The interface's own netmask, when the kernel reported one. Used to
-        /// test subnet membership properly instead of assuming a prefix length.
+        /// The kernel's netmask, so subnet tests needn't assume a prefix length.
         let netmask: String?
     }
 
@@ -36,16 +33,14 @@ enum NetworkStatus {
 
     private static func numericHost(_ addr: UnsafeMutablePointer<sockaddr>) -> String? {
         var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-        // A netmask's sa_len is sometimes reported short; size from the family
-        // instead so getnameinfo doesn't reject an otherwise valid mask.
+        // A netmask's sa_len is sometimes short, so size from the family.
         let len = socklen_t(MemoryLayout<sockaddr_in>.size)
         guard getnameinfo(addr, len, &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0
         else { return nil }
         return String(cString: host)
     }
 
-    /// (vpnUp, wifiUp, detail) — vpnUp when a loopback tunnel to `deviceIP` is
-    /// up (see `loopbackTunnelUp`).
+    /// (vpnUp, wifiUp, detail) for the current interfaces.
     static func summarize(deviceIP: String) -> (vpn: Bool, wifi: Bool, detail: String) {
         let ifs = interfaces()
         let vpn = isLoopbackTunnelUp(in: ifs, deviceIP: deviceIP)
@@ -54,26 +49,8 @@ enum NetworkStatus {
         return (vpn, wifi, detail)
     }
 
-    /// True when the loopback tunnel is up: a tunnel interface exists whose own
-    /// subnet contains `deviceIP` — that is, traffic to the address we're about
-    /// to connect to would actually be routed into that tunnel.
-    ///
-    /// The convention is `10.7.0.0/24`: the tunnel interface takes `10.7.0.0`
-    /// and the address we connect to is the peer `10.7.0.1`, which no interface
-    /// holds — the VPN app rewrites packets addressed to it back to the local
-    /// side. So the test can't look for `deviceIP` itself; it has to ask which
-    /// interface would carry traffic to it.
-    ///
-    /// Testing the subnet is also what keeps this app-agnostic: nothing here
-    /// asks *which* VPN client put the address there, so LocalDevVPN, ClashMi or
-    /// anything else that exposes the same loopback all read as connected.
-    ///
-    /// Using the interface's real netmask rather than assuming a /24 is what
-    /// makes it survive a reconfigured tunnel. LocalDevVPN exposes the tunnel
-    /// IP, device IP *and* subnet mask as editable settings, and it only routes
-    /// its own configured subnet — so "is `deviceIP` inside this interface's
-    /// subnet?" is exactly the question that decides whether the connection can
-    /// work, at whatever mask the user chose.
+    /// True when a tunnel interface's subnet contains `deviceIP`. Tested by
+    /// subnet, not equality: `deviceIP` is the peer, which no interface holds.
     static func loopbackTunnelUp(deviceIP: String) -> Bool {
         isLoopbackTunnelUp(in: interfaces(), deviceIP: deviceIP)
     }
@@ -83,23 +60,13 @@ enum NetworkStatus {
             // Unparseable target IP — fall back to the broad tunnel-name check.
             return ifs.contains { isTunnelInterface($0.name) }
         }
-        // Both conditions together. The name alone yields false positives — iOS
-        // keeps system `utun` interfaces around for Handoff, Wi-Fi calling and
-        // the like even with no VPN. The subnet alone yields a false positive
-        // for anyone whose Wi-Fi LAN happens to use the same range as the
-        // tunnel, which for `10.7.0.0/24` is an ordinary enough home network.
+        // Both, since iOS keeps system `utun` interfaces up with no VPN, and a
+        // home LAN can share the tunnel's range.
         return ifs.contains { isTunnelInterface($0.name) && subnet($0, contains: target) }
     }
 
-    /// True when `deviceIP` is an address this iPhone itself holds.
-    ///
-    /// Always a misconfiguration: the address to connect to is the tunnel's
-    /// *peer*, which by construction is not assigned to any local interface. It
-    /// is an easy mistake to make, because LocalDevVPN's main screen reports
-    /// "connected to 10.7.0.0" — its tunnel-side address — while the address to
-    /// put here is the 10.7.0.1 shown under Settings › Device IP. Typing the one
-    /// on the status line gives a tunnel that reads as up and a connection that
-    /// can never complete, so it's worth naming rather than leaving to a timeout.
+    /// True when `deviceIP` is an address this iPhone holds, always a
+    /// misconfiguration: the address to connect to is the tunnel's peer.
     static func isOwnAddress(_ deviceIP: String) -> Bool {
         interfaces().contains { $0.ipv4 == deviceIP }
     }
@@ -109,8 +76,7 @@ enum NetworkStatus {
             || name.hasPrefix("tap") || name.hasPrefix("ppp")
     }
 
-    /// Whether `target` falls inside `interface`'s subnet. Falls back to a /24
-    /// comparison when the kernel gave us no usable netmask.
+    /// Whether `target` is in `interface`'s subnet, assuming /24 without a mask.
     private static func subnet(_ interface: Interface, contains target: UInt32) -> Bool {
         guard let address = ipv4Value(interface.ipv4) else { return false }
         guard let mask = interface.netmask.flatMap(ipv4Value), mask != 0 else {

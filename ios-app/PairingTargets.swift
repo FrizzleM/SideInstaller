@@ -1,25 +1,20 @@
 import Foundation
 
-/// One app that can receive the device pairing file, ported 1:1 from iLoader's
-/// PAIRING_APPS table (src-tauri/src/pairing.rs). The pairing file is written
-/// into the app's container at `remoteRelativePath` (relative to its Documents
-/// directory) over the same house_arrest/AFC path the SideStore install uses.
+/// One app that can receive the pairing file, as in iLoader's PAIRING_APPS
+/// table. The file is written into its container over house_arrest/AFC.
 struct PairingTargetApp: Identifiable, Equatable {
-    /// CFBundleDisplayName the installed app reports — both how it's matched and
-    /// how it's shown. (iLoader resolves targets by display name, not bundle id.)
+    /// The display name the installed app reports, matched on and shown.
     let name: String
     /// Where the pairing file must land, relative to the app's Documents dir.
     let remoteRelativePath: String
-    /// When set, this entry only applies to an installed app whose bundle id
-    /// contains this substring. Used to split StikDebug into its App Store and
-    /// sideloaded variants, which read the pairing file from different paths.
+    /// Restricts the entry to bundle ids containing this, which splits
+    /// StikDebug's App Store and sideloaded builds — they read different paths.
     let bundleIDContains: String?
 
     var id: String { name }
 
-    /// The supported apps, in display order (mirrors iLoader's PAIRING_APPS).
-    /// The `StikDebug (Sideloaded)` entry is reached only via the bundle-id check
-    /// in `PairingTargets.match` — no app reports that display name directly.
+    /// The supported apps, in display order. `StikDebug (Sideloaded)` is
+    /// reached only through the bundle-id check in `PairingTargets.match`.
     static let all: [PairingTargetApp] = [
         .init(name: "SideStore",
               remoteRelativePath: "ALTPairingFile.mobiledevicepairing",
@@ -60,9 +55,7 @@ struct PairingTargetApp: Identifiable, Equatable {
     ]
 }
 
-/// A supported app that's actually installed on the connected device — pairs a
-/// table entry with the exact bundle id installation_proxy reported, which is
-/// what the pairing-file write vends house_arrest for.
+/// A table entry paired with the bundle id installation_proxy reported for it.
 struct InstalledPairingTarget: Identifiable, Equatable {
     let app: PairingTargetApp
     let bundleID: String
@@ -74,12 +67,8 @@ struct InstalledPairingTarget: Identifiable, Equatable {
 
 enum PairingTargets {
 
-    /// Match the device's installed apps against `PairingTargetApp.all` exactly
-    /// the way iLoader does: by CFBundleDisplayName. StikDebug is special-cased —
-    /// the sideloaded build (bundle id contains `com.stik.stikdebug`) reads the
-    /// file from a different path than the App Store build, so it maps to the
-    /// `StikDebug (Sideloaded)` entry. Results keep the table's order and are
-    /// de-duplicated by entry.
+    /// Match the installed apps against `PairingTargetApp.all` by display name,
+    /// mapping sideloaded StikDebug to its own entry. Keeps the table's order.
     static func match(installed apps: [DeviceConnection.InstalledApp]) -> [InstalledPairingTarget] {
         var out: [InstalledPairingTarget] = []
         var seen = Set<String>()
@@ -94,7 +83,7 @@ enum PairingTargets {
                     $0.name == (sideloaded ? "StikDebug (Sideloaded)" : "StikDebug")
                 }
             } else {
-                // Plain entries only (skip the bundle-id-gated StikDebug variant).
+                // Plain entries only, skipping the bundle-id-gated variant.
                 entry = PairingTargetApp.all.first { $0.name == display && $0.bundleIDContains == nil }
             }
 

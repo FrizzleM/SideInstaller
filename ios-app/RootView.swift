@@ -1,22 +1,12 @@
 import SwiftUI
 
-/// Top-level tab container hosting the app's three screens — Install, Pairing
-/// and Certificates. (Managing downloaded IPAs now lives in the Settings sheet.)
-///
-/// Each page paints the shared animated `AppBackground` behind its own content.
-/// (`TabView` hosts each tab in an opaque container, so a single backdrop *behind*
-/// the `TabView` would be hidden — the background has to live inside each page.)
-/// Because that gradient is driven off the wall clock rather than an elapsed
-/// timer, every page renders the identical frame, so it stays perfectly in sync
-/// and reads as one continuous surface even across tab switches.
-///
-/// The two-factor prompt lives here, not inside a tab: every flow drives the same
-/// shared `Engine` 2FA bridge, and an `.alert` attached at the root presents
-/// regardless of which tab is active.
+/// The tab container for Install, Pairing and Certificates. Each page paints
+/// `AppBackground` itself, since a `TabView`'s opaque containers would hide one
+/// behind them, and they stay in sync because it animates off the wall clock.
+/// The 2FA alert lives here so it presents whichever tab is active.
 struct RootView: View {
     @EnvironmentObject private var engine: Engine
-    /// Declared so a language change invalidates this view and the tab bar
-    /// relabels itself.
+    /// Declared so a language change relabels the tab bar.
     @EnvironmentObject private var loc: Localizer
     /// Owned here so they survive tab switches and share the one `Engine`.
     @StateObject private var certManager = CertManager()
@@ -35,9 +25,7 @@ struct RootView: View {
                 CertsView(manager: certManager)
             }
         }
-        // The Install tab needs it too: when signing stops on Apple error 7460
-        // it offers to revoke a certificate and retry, and that runs through
-        // this same manager rather than opening a session of its own.
+        // The Install tab's revoke-and-retry runs through this same manager.
         .environmentObject(certManager)
         .tint(Theme.accent)
         .preferredColorScheme(.dark)

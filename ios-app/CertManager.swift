@@ -1,9 +1,8 @@
 import Foundation
 import SideInstallerFFI
 
-/// One iOS development certificate on the Apple ID, decoded from the Rust core's
-/// JSON (`si_cert_list`). Every field is a plain string — the Rust side flattens
-/// Apple's optionals to "" so the UI never has to unwrap.
+/// One iOS development certificate, decoded from `si_cert_list`'s JSON, where
+/// Apple's optionals arrive flattened to "".
 struct DevCert: Identifiable, Decodable, Equatable {
     let name: String
     let serialNumber: String
@@ -26,13 +25,12 @@ struct DevCert: Identifiable, Decodable, Equatable {
         case expiration
     }
 
-    /// Stable identity for SwiftUI / revocation. Serial is the revoke key; fall
-    /// back to the certificate id if Apple didn't send one.
+    /// Stable identity: the serial revocation keys on, or the certificate id.
     var id: String { serialNumber.isEmpty ? certificateId : serialNumber }
 
     var displayName: String { name.isEmpty ? L("Unnamed certificate") : name }
 
-    /// "Created on <machine>" label, or nil when Apple didn't tag a machine.
+    /// The machine Apple tagged the certificate with, if any.
     var machineLabel: String? {
         machineName.isEmpty ? nil : machineName
     }
@@ -53,16 +51,9 @@ struct DevCert: Identifiable, Decodable, Equatable {
     }
 }
 
-/// Drives the Apple-developer certificate manager: signs in (reusing the shared
-/// `Engine`'s credentials, anisette servers, and 2FA prompt), lists the iOS
-/// development certificates, and revokes them by serial number.
-///
-/// Independent of the install pipeline — revocation is a pure developer-portal
-/// API call, so no device, pairing, or loopback tunnel is involved.
-///
-/// Mirrors `Engine`'s threading: a plain `ObservableObject` (not `@MainActor`)
-/// whose `@Published` state is mutated inside `Task { @MainActor in … }`, with
-/// the BLOCKING FFI bridged onto a background queue.
+/// Lists and revokes the Apple ID's development certificates, reusing the
+/// engine's credentials and 2FA prompt. Purely a developer-portal API call, so
+/// no device or tunnel is involved, and the blocking FFI runs off the main queue.
 final class CertManager: ObservableObject {
 
     @Published private(set) var certs: [DevCert] = []
@@ -73,7 +64,7 @@ final class CertManager: ObservableObject {
     /// `id` of the certificate currently being revoked, if any.
     @Published private(set) var revokingID: String?
     @Published var lastError: String?
-    /// True once a list has been fetched at least once (drives the empty state).
+    /// True once a list has been fetched, so the empty state can tell them apart.
     @Published private(set) var hasLoaded = false
 
     private var session: OpaquePointer?            // CertSession*
@@ -87,8 +78,7 @@ final class CertManager: ObservableObject {
 
     // MARK: - Public actions
 
-    /// Sign in (if needed) and (re)load the certificate list. The primary action
-    /// of the Certificates tab. `then` runs only if the list actually arrived.
+    /// Sign in if needed and reload the list; `then` runs only if it arrived.
     @MainActor
     func loadCerts(then: (() -> Void)? = nil) {
         guard !isWorking, revokingID == nil else { return }
@@ -120,11 +110,8 @@ final class CertManager: ObservableObject {
         }
     }
 
-    /// Revoke one certificate, then refresh the list to reflect it.
-    ///
-    /// `onSuccess` runs only once Apple has accepted the revocation — it's how
-    /// the Install screen resumes a run that stopped on error 7460, so it must
-    /// not fire on a failed revoke.
+    /// Revoke one certificate and refresh the list. `onSuccess` — which resumes
+    /// a stopped install — runs only once Apple has accepted the revocation.
     @MainActor
     func revoke(_ cert: DevCert, onSuccess: (() -> Void)? = nil) {
         guard session != nil, revokingID == nil, !isWorking else { return }
@@ -149,18 +136,13 @@ final class CertManager: ObservableObject {
                 engine.log("⛔️ Revoke failed: \(lastError ?? "")")
             }
             revokingID = nil
-            // The refresh above can fail on its own; the revoke is what the
-            // caller is waiting for, so key the callback on that.
+            // The refresh can fail on its own; the revoke is what's awaited.
             if revoked { onSuccess?() }
         }
     }
 
-    /// Sign in and load the list if that hasn't happened yet, then run `then`.
-    ///
-    /// The Install screen's revoke-and-retry needs a populated list before it
-    /// can name what it's about to revoke, and the user may never have opened
-    /// the Certificates tab. Reuses `loadCerts`'s sign-in + list path rather
-    /// than opening a second session of its own.
+    /// Load the list if that hasn't happened yet, then run `then` — for the
+    /// Install screen, which must name a certificate before revoking it.
     @MainActor
     func ensureLoaded(then: @escaping () -> Void) {
         guard !isWorking, revokingID == nil else { return }
@@ -171,7 +153,7 @@ final class CertManager: ObservableObject {
         loadCerts(then: then)
     }
 
-    /// Forget the signed-in session (e.g. to switch Apple ID). Clears the list.
+    /// Forget the session and clear the list, to switch Apple ID.
     @MainActor
     func signOut() {
         if let session { si_cert_session_free(session) }
@@ -184,12 +166,11 @@ final class CertManager: ObservableObject {
         engine.log("Certificates: signed out.")
     }
 
-    // MARK: - Sign-in (mirrors Engine's anisette-fallback loop)
+    // MARK: - Sign-in
 
     @MainActor
     private func signIn(id: String, pw: String) async throws {
-        // Anisette servers are flaky, so try the user's pick first, then every
-        // other known server. Credential/2FA-cancel errors stop the loop early.
+        // Try each anisette server; a credential or 2FA error stops the loop.
         let servers = anisetteCandidates()
         let dir = storageDir
         engine.twoFactorWasCancelled = false
@@ -224,8 +205,7 @@ final class CertManager: ObservableObject {
         throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, lastError))
     }
 
-    /// One sign-in attempt against a specific anisette server. Stores the session
-    /// on success; throws `EngineError.message` with the raw failure otherwise.
+    /// One sign-in attempt against a specific anisette server.
     private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {
         var newSession: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
@@ -281,9 +261,7 @@ final class CertManager: ObservableObject {
 
     // MARK: - Helpers
 
-    /// Anisette servers to try, in order: the engine's current pick first, then
-    /// every other known server. De-duplicated; addresses only. (Same policy as
-    /// `Engine.anisetteCandidates`.)
+    /// Anisette addresses to try, the engine's current pick first.
     private func anisetteCandidates() -> [String] {
         var seen = Set<String>()
         var out: [String] = []
@@ -294,8 +272,7 @@ final class CertManager: ObservableObject {
         return out
     }
 
-    /// Same on-disk anisette/account storage the install flow uses, so machine
-    /// provisioning is shared rather than re-bootstrapped.
+    /// The install flow's storage, so provisioning isn't re-bootstrapped.
     private var storageDir: String {
         PrivateStore.isideload.path
     }
@@ -317,9 +294,7 @@ final class CertManager: ObservableObject {
 
 // MARK: - C 2FA callback
 
-/// Bare C function pointer — bridges isideload's 2FA request (during cert
-/// sign-in) to the engine's shared blocking prompt. Runs on a Rust worker
-/// thread. Same mechanism as the install flow's callback.
+/// Bridges a 2FA request during cert sign-in to the engine's shared prompt.
 private let certTwoFactorCallback: SITwoFactorCb = { _, outBuf, bufLen in
     guard let outBuf = outBuf else { return 0 }
     return Engine.shared.provideTwoFactorCode(outBuf, Int(bufLen))

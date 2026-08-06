@@ -2,12 +2,8 @@ import AVFAudio
 import CoreLocation
 import Foundation
 
-/// Keeps the app running in the background (silent looping audio +/or
-/// background location) so the RPPairing TCP listener stays alive while the
-/// user leaves for Settings to approve the Developer Mode PIN.
-///
-/// Ported verbatim from StephenDev0/StikPair. Works on iOS 17.4+ (unlike
-/// BGContinuedProcessingTask, which is iOS 26+).
+/// Keeps the app running on silent audio and background location, so the
+/// RPPairing listener survives the trip to Settings to approve the PIN.
 @MainActor
 final class KeepAlive: NSObject {
 

@@ -1,34 +1,28 @@
 import Foundation
 
-/// One anisette server the user can pick from. Anisette servers hand back the
-/// device-attestation data Apple's auth endpoints require; SideStore and iLoader
-/// both let the user choose one from a shared, community-maintained list instead
-/// of typing a URL by hand. We consume that same list here.
+/// One server from the community list, serving the device-attestation data
+/// Apple's auth endpoints require.
 struct AnisetteServer: Identifiable, Hashable, Decodable {
     let name: String
     let address: String
 
-    /// The address doubles as the identity — it's what we feed the sign-in call
-    /// and what the picker tags its rows with.
+    /// The address is the identity: what sign-in is given, and what rows carry.
     var id: String { address }
 }
 
 extension AnisetteServer {
-    /// The public list SideStore/iLoader read from. Shape:
-    /// `{ "servers": [ { "name": ..., "address": ... } ], "cache": "…" }`.
+    /// The public list SideStore and iLoader read from.
     private static let listURL = URL(string: "https://servers.sidestore.io/servers.json")!
 
     private struct ServerList: Decodable {
         let servers: [AnisetteServer]
     }
 
-    /// The server selected by default, and the one we fall back to whenever a
-    /// fetched/saved value can't be honoured.
+    /// The default server, and the fallback when a saved one can't be honoured.
     static let fallback = AnisetteServer(name: "SideStore", address: "https://ani.sidestore.io")
 
-    /// Bundled snapshot of the community list, shown immediately on launch and
-    /// used whenever the live list can't be fetched (offline, server down, …).
-    /// Kept in sync by occasionally refreshing from `listURL`.
+    /// Snapshot of the community list, shown on launch and used when the live
+    /// list can't be fetched.
     static let bundledDefaults: [AnisetteServer] = [
         AnisetteServer(name: "SideStore",                 address: "https://ani.sidestore.io"),
         AnisetteServer(name: "SideStore (.app)",          address: "https://ani.sidestore.app"),
@@ -46,8 +40,7 @@ extension AnisetteServer {
         AnisetteServer(name: "crystall1nedev's server",   address: "https://anisette.crystall1ne.dev"),
     ]
 
-    /// Fetch the live list. Throws on any network/decoding failure so the caller
-    /// can keep showing `bundledDefaults`.
+    /// Fetch the live list, throwing so the caller can keep the bundled one.
     static func fetchList() async throws -> [AnisetteServer] {
         var req = URLRequest(url: listURL)
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")

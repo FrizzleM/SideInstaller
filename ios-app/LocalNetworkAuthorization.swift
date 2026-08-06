@@ -1,11 +1,8 @@
 import Foundation
 import Network
 
-/// Triggers + awaits the iOS Local Network permission prompt by briefly
-/// advertising and browsing a throwaway Bonjour service. RPPairing needs Local
-/// Network granted before it can advertise the pairing host.
-///
-/// Ported from StephenDev0/StikPair.
+/// Raises the Local Network prompt, which RPPairing needs granted, by briefly
+/// advertising and browsing a throwaway Bonjour service.
 @MainActor
 final class LocalNetworkAuthorization {
     private var browser: NWBrowser?

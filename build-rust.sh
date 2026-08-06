@@ -1,26 +1,18 @@
 #!/bin/bash
-# Builds the SideInstaller Rust FFI for iOS (device + Apple-Silicon simulator)
-# and repackages SideInstallerFFI.xcframework. Run whenever rust-core/ changes,
-# then regenerate the project with `xcodegen generate`.
-#
-# Adapted from StephenDev0/StikPair's build-rust.sh.
+# Builds the Rust FFI for device and simulator and repackages
+# SideInstallerFFI.xcframework. Run on any rust-core/ change, then regenerate
+# the project with `xcodegen generate`.
 set -euo pipefail
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
-# Match the app's deployment floor so cc-rs (aws-lc-sys) C objects don't trip
-# "built for newer iOS version" linker warnings.
+# Match the app's deployment floor, or cc-rs objects trip linker warnings.
 export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-17.4}"
-# rustup/cargo live in ~/.cargo; make them visible to non-login shells (Xcode).
+# Make ~/.cargo visible to non-login shells such as Xcode's.
 # shellcheck disable=SC1090
 source "$HOME/.cargo/env" 2>/dev/null || true
 
-# PRIVACY: scrub the local build path out of the binary. Rust bakes absolute
-# source paths (panic/`file!()`/error `Location`, mostly from ~/.cargo deps) into
-# the staticlib as *string constants* — they survive stripping and get printed
-# in the app's log console (e.g. "/Users/<you>/.cargo/.../sideloader.rs:85").
-# `--remap-path-prefix` / `-ffile-prefix-map` rewrite $HOME -> /build at compile
-# time so no username/identity ends up in the shipped app. (Changing these flags
-# forces a full rebuild, which is intended — the old cache has the raw paths.)
+# Rewrite $HOME to /build, since Rust bakes absolute source paths in as string
+# constants that survive stripping and reach the app's log console.
 export RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=${HOME}=/build"
 export CFLAGS="${CFLAGS:-} -ffile-prefix-map=${HOME}=/build"
 export TARGET_CFLAGS="${TARGET_CFLAGS:-} -ffile-prefix-map=${HOME}=/build"

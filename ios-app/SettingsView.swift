@@ -1,24 +1,20 @@
 import SwiftUI
 import UIKit
 
-/// Settings & diagnostics, presented as a sheet from the toolbar gear. Holds the
-/// occasional-use configuration (anisette server, device IP) and the activity
-/// log for troubleshooting — kept out of the main flow so it stays uncluttered.
+/// The settings sheet: occasional configuration and the activity log, kept out
+/// of the main flow.
 struct SettingsView: View {
     @EnvironmentObject private var engine: Engine
-    /// The language setting lives here, so this sheet both drives it and
-    /// redraws itself the instant it changes.
+    /// The language setting lives here, so this sheet drives it and redraws.
     @EnvironmentObject private var loc: Localizer
     @Environment(\.dismiss) private var dismiss
 
-    /// Lists / deletes the IPAs the app has cached in Documents. Owned here (rather
-    /// than injected) because it's pure, cheap file-system work keyed off
-    /// `Engine.shared` — a fresh instance just re-scans the disk when the sheet opens.
+    /// Owned here rather than injected: a fresh instance just re-scans the disk.
     @StateObject private var downloadsManager = DownloadsManager()
     /// The IPA the user swiped to delete, pending confirmation.
     @State private var pendingDelete: DownloadedIPA?
 
-    /// `true` once the user picks "Custom…", revealing the free-form URL field.
+    /// True once "Custom…" is picked, revealing the free-form URL field.
     @State private var anisetteIsCustom = false
 
     var body: some View {
@@ -60,9 +56,7 @@ struct SettingsView: View {
 
     // MARK: Language
 
-    /// App-wide language. "Auto" tracks the iPhone's own language; picking a
-    /// language pins the app to it whatever the phone is set to. The change
-    /// lands immediately — every screen observes `Localizer`.
+    /// App-wide language, applied immediately since every screen observes it.
     private var languageSection: some View {
         Section {
             Picker(L("App language"), selection: $loc.language) {
@@ -77,9 +71,7 @@ struct SettingsView: View {
 
     // MARK: Downloaded IPAs
 
-    /// A compact download manager pinned to the top of Settings: every release
-    /// IPA the install flow has cached, its size and age, and swipe-to-delete to
-    /// reclaim space. Deleting is non-destructive — the next install re-fetches.
+    /// The cached IPAs with their size and age, and swipe-to-delete.
     private var downloadsSection: some View {
         Section {
             if let error = downloadsManager.lastError {
@@ -125,9 +117,7 @@ struct SettingsView: View {
                     let when = modified.formatted(
                         Date.FormatStyle(date: .abbreviated, time: .shortened)
                             .locale(Localizer.locale))
-                    // Nothing was downloaded for a file the user brought in, so
-                    // the timestamp is when it arrived rather than when it was
-                    // fetched.
+                    // An imported file's timestamp is when it arrived.
                     Text(item.isImported ? L("Added %@", when) : L("Downloaded %@", when))
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -171,8 +161,7 @@ struct SettingsView: View {
         }
     }
 
-    /// Drives the menu: a server's address when one is selected, `nil` for
-    /// "Custom…". Selecting a server also stores its address as the URL we use.
+    /// The menu's selection: a server's address, or nil for "Custom…".
     private var anisetteSelection: Binding<String?> {
         Binding(
             get: { anisetteIsCustom ? nil : engine.anisetteURL },

@@ -1,15 +1,9 @@
-//! RPPairing host — generate a pairing file in-process, à la StikPair.
+//! RPPairing host: generates a pairing file in-process, as StikPair does.
 //!
-//! Ported from StephenDev0/StikPair's `rust/src/lib.rs` (itself forked from
-//! idevice's `ffi/src/pairable_host.rs` @ 7bd551c), with the mDNS advertising
-//! moved to the Swift side (`NetService`) to avoid the iOS multicast
-//! entitlement. We link idevice's *library* directly and, right before
-//! `accept()`, hand the service identifier + port + TXT records to Swift via a
-//! `ready` callback so it can publish over Bonjour. Only Local Network +
-//! Developer Mode are required for this step (no LocalDevVPN).
-//!
-//! Licensing: StikPair is MIT but non-commercial — reusing this is fine for
-//! personal/non-commercial use; revisit before any distribution.
+//! mDNS advertising lives on the Swift side to avoid the iOS multicast
+//! entitlement, so just before `accept()` the service identifier, port and TXT
+//! records go out through a `ready` callback for Swift to publish over Bonjour.
+//! Only Local Network and Developer Mode are needed here, not the tunnel.
 
 use std::ffi::{c_char, c_void, CString};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -65,11 +59,8 @@ struct Callbacks {
 }
 unsafe impl Send for Callbacks {}
 
-/// Run the RPPairing host: bind a listener, hand the advertising details to
-/// Swift, wait for the device to connect, drive pairing (surfacing the PIN via
-/// `pin_cb`), and write the resulting pairing file to `out_path`.
-///
-/// Returns 0 on success (fields populated), non-zero on error (`error` set).
+/// Bind a listener, hand the advertising details to Swift, wait for the device,
+/// drive pairing through `pin_cb`, and write the pairing file to `out_path`.
 ///
 /// # Safety
 /// All `*const c_char` args must be null or valid C strings; `out` must be a
@@ -147,8 +138,7 @@ async fn run(
         .port();
     tracing::info!("RPPairing: listening on port {port}");
 
-    // Host identity. A production app should persist both the pairing file and
-    // host_info.alt_irk so already-paired devices keep working.
+    // Host identity; persisting alt_irk would keep paired devices working.
     let mut pairing_file = RpPairingFile::generate(&name);
     let host_info = PairableHostInfo::generate(&name, &model);
     let host_alt_irk = host_info.alt_irk;
@@ -189,8 +179,7 @@ async fn run(
         .await
         .map_err(|e| format!("failed to write pairing file: {e}"))?;
 
-    // Fail loudly unless the file actually landed and is non-empty — Connect
-    // depends on this existing.
+    // Connect needs this file, so fail loudly if it's missing or empty.
     let size = tokio::fs::metadata(&out_path)
         .await
         .map(|m| m.len())

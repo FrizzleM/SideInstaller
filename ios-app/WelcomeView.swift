@@ -1,9 +1,7 @@
 import SwiftUI
 
-/// The one-time first-launch gate shown before `RootView`: an OLED-black page
-/// with the app's name, a TOS-acceptance checkbox and a Start button. Start
-/// stays dimmed and inert until the box is ticked; tapping it flips the
-/// persisted flag (`hasAcceptedTOS`) so the page never shows again.
+/// The first-launch gate before `RootView`: Start stays inert until the TOS box
+/// is ticked, then sets `hasAcceptedTOS` and the page never returns.
 struct WelcomeView: View {
     @AppStorage("hasAcceptedTOS") private var hasAcceptedTOS = false
     /// Declared so the page redraws if the language changes underneath it.
@@ -46,8 +44,7 @@ struct WelcomeView: View {
         .preferredColorScheme(.dark)
     }
 
-    /// The tickbox row. Tapping the box or the sentence toggles acceptance;
-    /// tapping "TOS" opens the terms page instead.
+    /// The tickbox row, where only "TOS" itself opens the terms page.
     private var checkboxRow: some View {
         HStack(spacing: 4) {
             Button {
@@ -86,8 +83,7 @@ struct WelcomeView: View {
 
 // MARK: - Entrance
 
-/// Per-object entrance for the welcome page: each element zooms up from 80%
-/// while fading in, on its own beat (`index` staggers the start).
+/// The welcome page's entrance: each element zooms up from 80% as it fades in.
 private struct WelcomeItem: ViewModifier {
     let index: Int
     @State private var shown = false

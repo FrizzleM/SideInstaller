@@ -1,9 +1,7 @@
 import SwiftUI
 
-/// Certificate manager: list and revoke the iOS development certificates on the
-/// signed-in Apple ID. Apple refuses a new certificate while a current one
-/// exists (error 7460), so revoking a stale one here is what unblocks an install
-/// that stopped on it.
+/// Lists and revokes the Apple ID's development certificates, which is what
+/// unblocks an install stopped on error 7460.
 struct CertsView: View {
     @EnvironmentObject private var engine: Engine
     /// Declared so every label on this screen redraws when the language changes.
@@ -64,7 +62,7 @@ struct CertsView: View {
         }
     }
 
-    // MARK: Apple ID (shared with the Install tab)
+    // MARK: Apple ID
 
     private var appleIDCard: some View {
         PanelCard {
@@ -116,10 +114,7 @@ struct CertsView: View {
         } else if !manager.certs.isEmpty {
             VStack(spacing: 14) {
                 HStack {
-                    // Just the count. Apple never tells us the account's ceiling
-                    // — error 7460 fires whenever a current certificate exists,
-                    // with one on the team as readily as with several — so any
-                    // "x of N" here would be a number we invented.
+                    // Just the count: Apple never reports the account's ceiling.
                     Text(L("%d certificate(s)", manager.certs.count))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)

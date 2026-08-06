@@ -1,13 +1,7 @@
 import Foundation
 
-/// French copy, keyed by the English source string every call site passes to
-/// `L(_:)` — same contract as the other tables: same keys, same placeholders,
-/// product and third-party UI names left in English.
-///
-/// Two conventions here: the formal "vous", the way Apple's own French copy
-/// addresses users; and iOS's French vocabulary for anything the user has to go
-/// find on their phone — Réglages, jumelage, Faire confiance — so an instruction
-/// names what's actually printed on screen.
+/// French copy, on the same contract as `spanishStrings`. Uses the formal
+/// "vous" and iOS's own French vocabulary for anything on screen.
 let frenchStrings: [String: String] = [
 
     // MARK: - Shared

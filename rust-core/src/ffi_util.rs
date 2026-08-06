@@ -2,14 +2,13 @@
 
 use std::ffi::{c_char, CStr, CString};
 
-/// Allocate a heap C string the caller frees with `si_string_free`.
-/// Never panics — an interior NUL collapses to an empty string.
+/// Allocate a C string the caller frees with `si_string_free`; an interior NUL
+/// collapses to an empty string rather than panicking.
 pub fn cstr(s: impl Into<Vec<u8>>) -> *mut c_char {
     CString::new(s).unwrap_or_default().into_raw()
 }
 
-/// Read a borrowed C string into an owned `String`, falling back to `default`
-/// when null/empty/invalid-UTF8.
+/// Read a C string, falling back to `default` when null, empty or not UTF-8.
 ///
 /// # Safety
 /// `p` must be null or point to a valid NUL-terminated C string.
@@ -24,7 +23,7 @@ pub unsafe fn opt_str(p: *const c_char, default: &str) -> String {
     }
 }
 
-/// Read a required borrowed C string; returns `None` when null/invalid.
+/// Read a required C string, returning `None` when null or invalid.
 ///
 /// # Safety
 /// `p` must be null or point to a valid NUL-terminated C string.

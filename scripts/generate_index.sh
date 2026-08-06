@@ -1,6 +1,6 @@
 #!/bin/bash
-# Build the install page (index.html) from the signed IPAs + their OTA plists.
-# One card per certificate, color-coded by remaining validity, sorted by days left.
+# Build index.html from the signed IPAs and their OTA plists: one card per
+# certificate, colour-coded and sorted by remaining validity.
 set -euo pipefail
 
 ROOT_DIR="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -22,12 +22,10 @@ else
 fi
 GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
 OUTPUT_BASE_URL="${OUTPUT_BASE_URL:-https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/$GITHUB_BRANCH/output}"
-# Logo: the app's own icon, committed at the repo root so the standalone page
-# can load it by raw URL (Pages ships only the HTML).
+# The app icon, committed at the repo root so the page can load it by raw URL.
 LOGO_URL="${LOGO_URL:-https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/$GITHUB_BRANCH/app-icon.png}"
-# "Download IPA" target: /releases/latest/download/<asset> serves the asset of
-# the current latest release directly, so the button downloads the .ipa instead
-# of bouncing the user to the release page, and never needs updating per release.
+# The "Download IPA" target, which serves the latest release's asset directly
+# and so never needs updating per release.
 IPA_ASSET_NAME="${IPA_ASSET_NAME:-SideInstaller.ipa}"
 LATEST_RELEASE_URL="${LATEST_RELEASE_URL:-https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/latest/download/$IPA_ASSET_NAME}"
 
@@ -38,7 +36,7 @@ if [[ "$OUTPUT_HTML" = /* ]]; then OUTPUT="$OUTPUT_HTML"; else OUTPUT="$ROOT_DIR
 
 LAST_UPDATED="$(TZ=Europe/Paris date '+%d %b %Y, %H:%M CET')"
 
-# --- app metadata (display name + version) from the unsigned IPA ---
+# App display name and version, from the unsigned IPA.
 APP_VERSION="—"
 if [[ -f "$APP_INFO_FILE" ]]; then
   while IFS=$'\t' read -r k v; do
@@ -49,7 +47,7 @@ if [[ -f "$APP_INFO_FILE" ]]; then
   done < "$APP_INFO_FILE"
 fi
 
-# --- logo: use provided image, else a built-in inline SVG glyph ---
+# The provided image, or a built-in inline SVG glyph.
 if [[ -n "$LOGO_URL" ]]; then
   LOGO_HTML="<img src=\"$LOGO_URL\" alt=\"$APP_NAME\">"
 else
@@ -136,7 +134,7 @@ fi
 
 REPO_NOTE="Built automatically &middot; signed with $CERT_COUNT certificate(s)"
 
-# --- assemble: stream template, swap single-line tokens, splice the cards block ---
+# Stream the template, swap its tokens, and splice in the cards block.
 PAGE_TITLE_ESC="$(printf '%s' "$PAGE_TITLE" | html_escape)"
 APP_NAME_ESC="$(printf '%s' "$APP_NAME" | html_escape)"
 APP_TAGLINE_ESC="$(printf '%s' "$APP_TAGLINE" | html_escape)"
@@ -153,8 +151,7 @@ awk \
   -v last_updated="$LAST_UPDATED" \
   -v latest_release_url="$LATEST_RELEASE_URL" \
   -v repo_note="$REPO_NOTE" '
-  # Literal find/replace — avoids gsub treating & or \ in the value specially,
-  # which matters because names/notes can contain & (escaped to &amp;).
+  # Literal replace, since gsub would treat & or \ in the value specially.
   function rep(s, tok, val,   out, p){
     out=""
     while ((p=index(s, tok)) > 0){

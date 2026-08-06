@@ -1,16 +1,9 @@
 import Foundation
 import SideInstallerFFI
 
-/// Drives the RPPairing host (the make-or-break #1 flow). Requests Local
-/// Network, keeps the app alive (silent audio) so the listener survives while
-/// the user approves the Developer Mode PIN in Settings, advertises the pairing
-/// service over Bonjour (NetService — only Local Network needed, no multicast
-/// entitlement), runs `si_pairing_run_host` off the main thread, and reports
-/// every step into the shared `Engine`.
-///
-/// Structure ported from StephenDev0/StikPair's PairingController, simplified
-/// to keep-alive only (drops the iOS-26 BGContinuedProcessingTask so the
-/// deployment floor stays at 17.4).
+/// Drives the RPPairing host: requests Local Network, keeps the app alive while
+/// the user approves the PIN in Settings, advertises the service over Bonjour,
+/// and runs `si_pairing_run_host` off the main thread, logging into `Engine`.
 @MainActor
 final class PairingController {
 
@@ -26,8 +19,7 @@ final class PairingController {
 
     private var running = false
 
-    /// Resolved when an awaited (`startAndWait`) pairing finishes. Nil for the
-    /// fire-and-forget `start()` path used by the Advanced section.
+    /// Resolved when a `startAndWait` pairing finishes; nil for `start()`.
     private var pairContinuation: CheckedContinuation<String, Error>?
 
     private var engine: Engine { Engine.shared }
@@ -55,15 +47,12 @@ final class PairingController {
         }
     }
 
-    /// Pairing file destination (also read back when writing into SideStore).
-    /// Kept out of Documents — see `PrivateStore` for why — and migrated from
-    /// there on first use for anyone upgrading from 0.6.x.
+    /// Where the pairing file is written, and read back from; see `PrivateStore`.
     nonisolated static func pairingFilePath() -> String {
         PrivateStore.pairingFile.path
     }
 
-    /// Awaitable pairing for the one-click orchestrator: starts the host and
-    /// resolves with the pairing-file path on success, or throws on failure.
+    /// Start the host and resolve with the pairing-file path, or throw.
     func startAndWait() async throws -> String {
         if running { throw PairingError.busy }
         return try await withCheckedThrowingContinuation { cont in
@@ -72,9 +61,7 @@ final class PairingController {
         }
     }
 
-    /// Best-effort cancel for the awaited path: unblocks the orchestrator. The
-    /// underlying host thread ends when `si_pairing_run_host` returns; `finish`
-    /// then no-ops on the (already-cleared) continuation.
+    /// Unblock the awaited path; the host thread ends when the FFI call returns.
     func softCancel() {
         resolve(.failure(CancellationError()))
     }
@@ -114,7 +101,7 @@ final class PairingController {
         let name = hostName
         let model = hostModel
         let outPath = Self.pairingFilePath()
-        // Retained pointer handed to the C callbacks as ctx; released after run.
+        // Retained for the C callbacks' ctx, and released after the run.
         let ctx = UnsafeMutableRawPointer(Unmanaged.passRetained(self).toOpaque())
 
         engine.log("RPPairing: invoking si_pairing_run_host (out=\(outPath))")
@@ -185,7 +172,7 @@ final class PairingController {
         }
     }
 
-    // MARK: Bonjour advertising (called from the ready callback)
+    // MARK: Bonjour advertising
 
     fileprivate func startAdvertising(serviceID: String, port: Int32, txt: [String: Data]) {
         stopAdvertising()
@@ -204,7 +191,7 @@ final class PairingController {
     fileprivate func presentPin(_ pin: String) {
         engine.log("RPPairing: PIN = \(pin) — confirm it on this device (Settings → Developer Mode → Pair with SideInstaller).")
         engine.pairingStatus = L("enter PIN %@ in Settings", pin)
-        // Surfaced as a prominent card in the one-click UI.
+        // Shown as a card on the Install screen.
         engine.pairingPIN = pin
     }
 

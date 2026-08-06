@@ -1,15 +1,13 @@
 import SwiftUI
 
-/// The app's shared visual language: brand colours/gradients plus the reusable
-/// building blocks (cards, callouts, the primary button, the hero header) that
-/// every screen is composed from, so the whole app stays consistent.
+/// The app's shared visual language: brand colours, gradients and the cards,
+/// buttons and headers every screen is composed from.
 enum Theme {
-    /// Primary brand colour — a deep blue.
+    /// Primary brand colour, a deep blue.
     static let accent = Color(red: 0.13, green: 0.44, blue: 0.96)
-    /// Secondary brand colour — a brighter sky blue, the far end of the gradient.
+    /// Secondary brand colour, the far end of the gradient.
     static let accent2 = Color(red: 0.30, green: 0.68, blue: 1.0)
-    /// Deep-navy halo cast behind each header icon (#011A5C) — matches the icon
-    /// art's background so the glyph reads as lifted off the black backdrop.
+    /// Deep-navy halo behind each header icon, matching the icon art (#011A5C).
     static let glow = Color(red: 1 / 255, green: 26 / 255, blue: 92 / 255)
 
     /// The signature diagonal gradient used for the logo, CTA and accents.
@@ -27,39 +25,34 @@ enum Theme {
 
 // MARK: - Background
 
-/// The app's backdrop: OLED black with a slow, low-opacity blue **mesh gradient**
-/// drifting behind everything. Its control points sway on gentle sine waves so the
-/// blue blooms breathe and flow, while the dark corners and low overall opacity
-/// over pure black keep the app firmly dark-themed.
+/// The app's backdrop: OLED black under a slow, low-opacity blue mesh gradient
+/// whose control points sway on sine waves.
 struct AppBackground: View {
     var body: some View {
-        // `TimelineView(.animation)` ticks every frame; the mesh points are derived
-        // from the clock so the motion is smooth and continuous (no keyframe reset).
+        // Ticks every frame, with the points derived from the clock so the
+        // motion is continuous rather than resetting on a keyframe.
         TimelineView(.animation) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             ZStack {
                 Color.black
                 MeshGradient(width: 3, height: 3, points: meshPoints(at: t), colors: meshColors)
                     .blur(radius: 24)
-                    // Low opacity so it reads as a deep tint, not a light — the
-                    // UI stays dark-themed.
+                    // Low enough to read as a deep tint rather than a light.
                     .opacity(0.2)
             }
             .ignoresSafeArea()
         }
     }
 
-    /// Deep-navy corners with brighter blue blooms through the middle, so the
-    /// whole field reads as blue while the dark corners keep it grounded.
+    /// Deep-navy corners with brighter blue blooms through the middle.
     private let meshColors: [Color] = [
         Theme.glow,    Theme.accent,   Theme.glow,
         Theme.accent2, Theme.accent,   Theme.accent2,
         Theme.glow,    Theme.accent2,  Theme.glow,
     ]
 
-    /// A 3×3 grid of control points. The four corners stay pinned so the gradient
-    /// always fills the screen; the edge midpoints and centre sway on slow,
-    /// out-of-phase sine waves for an organic, flowing motion.
+    /// A 3×3 grid of control points: corners pinned so the gradient fills the
+    /// screen, the rest swaying on out-of-phase sine waves.
     private func meshPoints(at t: TimeInterval) -> [SIMD2<Float>] {
         func osc(_ base: Double, _ amp: Double, _ speed: Double, _ phase: Double) -> Float {
             Float(base + amp * sin(t * speed + phase))
@@ -80,8 +73,7 @@ struct AppBackground: View {
 
 // MARK: - Cards
 
-/// The neutral container every section sits in: a continuous rounded rectangle
-/// with a hairline highlight and a soft drop shadow.
+/// The neutral container every section sits in.
 struct PanelCard<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
@@ -101,8 +93,7 @@ struct PanelCard<Content: View>: View {
     }
 }
 
-/// A tinted container for contextual callouts (guidance, errors, success). Same
-/// silhouette as `PanelCard` but washed in the supplied colour.
+/// A `PanelCard` washed in a tint, for guidance, errors and success.
 struct CalloutCard<Content: View>: View {
     var tint: Color
     @ViewBuilder var content: () -> Content
@@ -129,9 +120,8 @@ struct StatusPill: View {
     var text: String
     var systemImage: String
     var color: Color
-    /// When true, the pill wears a translucent Liquid Glass capsule instead of
-    /// the tinted fill — for a neutral/idle state that should read as clear glass
-    /// over the background rather than a solid status chip.
+    /// Wears a translucent glass capsule instead of the tinted fill, for an
+    /// idle state that shouldn't read as a status chip.
     var glass: Bool = false
 
     var body: some View {
@@ -148,17 +138,14 @@ struct StatusPill: View {
     }
 }
 
-/// The hero at the top of each screen: a gradient app glyph, the title, and an
-/// optional accessory (e.g. a status pill).
+/// The hero at the top of each screen: a glyph, the title, and an accessory.
 struct BrandHeader<Accessory: View>: View {
     var icon: String
-    /// When set, the real app icon (an asset image) is shown in place of the
-    /// gradient SF Symbol — used on the app's brand (Install) screen so it wears
-    /// its home-screen identity. The other tabs keep their contextual glyphs.
+    /// Shows the real app icon in place of the gradient SF Symbol, as the
+    /// Install screen does to wear its home-screen identity.
     var image: String? = nil
     var title: String
-    /// Optional line directly beneath the title, tucked closer to it than the
-    /// header's own 14pt rhythm so the two read as one block.
+    /// A line tucked under the title, close enough to read as one block.
     var subtitle: String? = nil
     var animateIcon: Bool = false
     @ViewBuilder var accessory: () -> Accessory
@@ -190,8 +177,7 @@ struct BrandHeader<Accessory: View>: View {
                 .resizable()
                 .scaledToFill()
                 .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
-                // A gentle breathe while a run is in flight, mirroring the
-                // SF Symbol's `.pulse` on the other glyphs.
+                // A breathe while a run is in flight, mirroring `.pulse`.
                 .scaleEffect(animateIcon ? 1.04 : 1)
                 .animation(animateIcon ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
                                        : .default,
@@ -211,7 +197,7 @@ struct BrandHeader<Accessory: View>: View {
 
 // MARK: - Field styling
 
-/// Inset, filled text-field background — softer than `.roundedBorder`.
+/// Inset, filled text-field background, softer than `.roundedBorder`.
 private struct FieldBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
@@ -231,8 +217,7 @@ extension View {
 
 // MARK: - Buttons
 
-/// The full-width gradient call-to-action style. Pass a `gradient` to recolour
-/// it (e.g. a red gradient for a cancel action).
+/// The full-width gradient call-to-action; pass a `gradient` to recolour it.
 struct PrimaryButtonStyle: ButtonStyle {
     var gradient: LinearGradient = Theme.brand
     var glow: Color = Theme.accent
@@ -257,8 +242,7 @@ struct PrimaryButtonStyle: ButtonStyle {
 // MARK: - Transitions
 
 extension AnyTransition {
-    /// Shared insert/remove used by every status card: eases down and scales up
-    /// while fading in, then fades + shrinks slightly on the way out.
+    /// The insert and remove every status card uses: a fading scale.
     static var cardAppear: AnyTransition {
         .asymmetric(
             insertion: .opacity
@@ -271,20 +255,14 @@ extension AnyTransition {
 
 // MARK: - Page entrance
 
-/// One object's part in a page's entrance cascade: it fades up into place from
-/// slightly low and small, staggered by `index` so the objects settle one after
-/// another. The whole-page left/right slide is handled by `RootView`; this is the
-/// slight per-object delay layered on top as the incoming page's contents land.
-///
-/// Driven by `onAppear`/`onDisappear`, which fire on *every* page switch, so the
-/// cascade replays each time the page is opened (not just on first launch). A view
-/// only animates when it first appears, so rows added later (e.g. a freshly loaded
-/// list) settle in on arrival without re-animating the ones already shown.
+/// One object's part in a page's entrance cascade, staggered by `index` so they
+/// settle one after another. Driven by `onAppear`, so it replays on every page
+/// switch, and rows added later animate without disturbing the ones shown.
 private struct CascadeItem: ViewModifier {
     let index: Int
     @State private var shown = false
 
-    /// 55 ms between objects — enough to read as a cascade, quick enough not to drag.
+    /// 55 ms apart: enough to read as a cascade, quick enough not to drag.
     private var delay: Double { Double(index) * 0.055 }
 
     func body(content: Content) -> some View {
@@ -302,7 +280,6 @@ private struct CascadeItem: ViewModifier {
 }
 
 extension View {
-    /// Give an object its place in a page's entrance cascade (0 = first to appear).
-    /// Replays each time the page is opened.
+    /// Give an object its place in the entrance cascade (0 appears first).
     func cascadeItem(_ index: Int) -> some View { modifier(CascadeItem(index: index)) }
 }

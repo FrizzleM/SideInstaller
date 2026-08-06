@@ -1,15 +1,8 @@
 import Foundation
 
-/// Spanish copy, keyed by the English source string every call site passes to
-/// `L(_:)`. English is the source language, so there is no English table — a key
-/// missing from here simply renders as the English it already is.
-///
-/// Keys with `%@` / `%d` are `String(format:)` patterns: the placeholders must
-/// all survive translation, in a count and order the call site can satisfy.
-/// Product and third-party UI names (SideStore, LiveContainer, LocalDevVPN,
-/// Apple ID, and labels quoted from other apps' English interfaces) stay as they
-/// are — translating them would send the user looking for a button that doesn't
-/// exist.
+/// Spanish copy, keyed by the English source string passed to `L(_:)`. A missing
+/// key renders as that English. `%@` and `%d` placeholders must survive
+/// translation, and product or third-party UI names stay in English.
 let spanishStrings: [String: String] = [
 
     // MARK: - Shared

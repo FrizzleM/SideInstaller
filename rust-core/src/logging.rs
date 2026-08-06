@@ -1,13 +1,6 @@
-//! Logging spine.
-//!
-//! idevice logs everything through the `tracing` crate. We install a global
-//! `tracing` subscriber whose writer forwards each formatted line to a C
-//! callback supplied by Swift, so the iOS log console shows idevice's
-//! protocol-level logs verbatim (the whole point of this debug build).
-//!
-//! Timestamps are intentionally disabled here (`without_time`) — the Swift log
-//! console prepends a single uniform timestamp to every line, whether it
-//! originated in Rust or Swift.
+//! Forwards `tracing` output, idevice's included, to a C callback supplied by
+//! Swift, so its protocol-level logs reach the app's console verbatim.
+//! Timestamps are left off, since the Swift console adds its own.
 
 use std::ffi::{c_char, c_void, CString};
 use std::io::Write;
@@ -23,16 +16,14 @@ struct Sink {
     ctx: *mut c_void,
 }
 
-// The callback + ctx are only ever read; Swift guarantees the ctx (an
-// Unmanaged Engine pointer) outlives the process. The callback itself must be
-// thread-safe — Swift dispatches to the main queue inside it.
+// Both are read-only, the ctx outlives the process, and the callback itself
+// dispatches to the main queue, so it's thread-safe.
 unsafe impl Send for Sink {}
 unsafe impl Sync for Sink {}
 
 static SINK: OnceLock<Sink> = OnceLock::new();
 
-/// Install the global subscriber. Returns 0 on success, 1 if already
-/// initialized (idempotent — safe to call once per process).
+/// Install the global subscriber, returning 1 if one already exists.
 pub fn init(cb: LogCallback, ctx: *mut c_void) -> i32 {
     if SINK.set(Sink { cb, ctx }).is_err() {
         return 1;
@@ -44,8 +35,7 @@ pub fn init(cb: LogCallback, ctx: *mut c_void) -> i32 {
         .without_time()
         .with_target(true)
         .with_level(true)
-        // DEBUG so idevice's protocol-level logs are visible; set higher with
-        // RUST_LOG-style filtering later if it's too chatty.
+        // DEBUG, so idevice's protocol-level logs are visible.
         .with_max_level(tracing::Level::DEBUG)
         .finish();
 
@@ -60,8 +50,7 @@ fn true_emit(msg: &str) {
     emit_line(msg.as_bytes());
 }
 
-/// Push one already-formatted line to the Swift callback. NUL bytes are
-/// replaced so `CString::new` can't fail on binary-ish log payloads.
+/// Push one formatted line to Swift, replacing NULs so `CString` can't fail.
 fn emit_line(buf: &[u8]) {
     let Some(sink) = SINK.get() else { return };
     let Some(cb) = sink.cb else { return };
@@ -95,7 +84,7 @@ struct CbWriter;
 
 impl Write for CbWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        // The fmt layer writes one complete, newline-terminated event per call.
+        // The fmt layer writes one complete event per call.
         emit_line(buf);
         Ok(buf.len())
     }

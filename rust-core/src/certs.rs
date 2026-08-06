@@ -1,15 +1,8 @@
-//! Apple developer certificate management — list and revoke iOS development
-//! certificates, wrapping `isideload`'s `DeveloperSession` (the same path
-//! iLoader uses for "see and revoke development certificates"). This is fully
-//! independent of the install pipeline: revocation is a pure
-//! developer-portal API call over the internet, so no device, pairing, or
-//! LocalDevVPN tunnel is involved.
-//!
-//! `si_cert_signin` logs in (driving 2FA through the same Swift callback as
-//! `account.rs`), opens a developer session, and selects the first team —
-//! returning an opaque `CertSession`. `si_cert_list` returns the team's iOS
-//! development certificates as a JSON array; `si_cert_revoke` revokes one by
-//! its serial number.
+//! Lists and revokes iOS development certificates through `isideload`'s
+//! `DeveloperSession`. A pure developer-portal API call, so no device, pairing
+//! or tunnel is involved: `si_cert_signin` opens a session on the first team,
+//! `si_cert_list` returns its certificates as JSON, and `si_cert_revoke`
+//! revokes one by serial number.
 
 use std::ffi::{c_char, c_void};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -31,8 +24,7 @@ use serde::Serialize;
 use crate::account::{make_2fa, TwoFactorCb, TwoFaCtx};
 use crate::ffi_util::{cstr, opt_str};
 
-/// Opaque session handle: owns the tokio runtime, the developer session, and
-/// the selected team (the team id is needed for every cert request).
+/// Opaque handle owning the runtime, developer session and selected team.
 pub struct CertSession {
     rt: tokio::runtime::Runtime,
     dev: DeveloperSession,
@@ -42,8 +34,7 @@ pub struct CertSession {
 // Used only through its own runtime, serialized by Swift on one queue.
 unsafe impl Send for CertSession {}
 
-/// Flattened, JSON-friendly view of a development certificate. Every field is a
-/// plain string so the Swift side can decode it without optionals.
+/// A certificate flattened to plain strings, so Swift decodes no optionals.
 #[derive(Serialize)]
 struct CertInfo {
     name: String,
@@ -78,11 +69,8 @@ impl From<&DevelopmentCertificate> for CertInfo {
     }
 }
 
-/// Log in, open a developer session, and select the first team.
-///
-/// Returns 0 on success (`*out_session` + `*out_summary` set), non-zero on
-/// error (`*out_error` set). Free strings with `si_string_free`, the session
-/// with `si_cert_session_free`.
+/// Log in, open a developer session, and select the first team. Returns 0 on
+/// success; free the session with `si_cert_session_free`.
 ///
 /// # Safety
 /// All `*const c_char` args must be null or valid C strings; the out pointers
@@ -92,8 +80,7 @@ pub unsafe fn cert_signin(
     apple_id: *const c_char,
     password: *const c_char,
     anisette_url: *const c_char,
-    // Accepted for signature parity with `si_apple_signin` (and a future CSR
-    // path); listing/revoking certs needs no machine name.
+    // Taken for parity with `si_apple_signin`; unused here.
     _machine_name: *const c_char,
     storage_dir: *const c_char,
     twofa_cb: TwoFactorCb,
@@ -178,8 +165,7 @@ pub unsafe fn cert_signin(
     }
 }
 
-/// List the team's iOS development certificates as a JSON array of objects
-/// (see `CertInfo`). Returns 0 on success (`*out_json` set), non-zero on error.
+/// List the team's certificates as a JSON array of `CertInfo`.
 ///
 /// # Safety
 /// `session` must be a valid pointer from `cert_signin`; out pointers valid.
@@ -223,8 +209,7 @@ pub unsafe fn cert_list(
     }
 }
 
-/// Revoke the development certificate with `serial_number`. Returns 0 on
-/// success, non-zero on error (`*out_error` set).
+/// Revoke the certificate with `serial_number`.
 ///
 /// # Safety
 /// `session` must be a valid pointer from `cert_signin`; `serial_number` a

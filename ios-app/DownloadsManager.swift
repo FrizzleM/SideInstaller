@@ -1,9 +1,6 @@
 import Foundation
 
-/// One IPA sitting in Documents, ready to be deleted from the download manager
-/// in Settings. Either the app downloaded it, or the user copied it in through
-/// the Files app — `isImported` says which, and the install treats the two
-/// differently (see `Engine.download()`).
+/// One IPA in Documents, as the download manager in Settings lists it.
 struct DownloadedIPA: Identifiable, Equatable {
     let source: InstallSource
     let channel: ReleaseChannel
@@ -13,14 +10,11 @@ struct DownloadedIPA: Identifiable, Equatable {
     /// True when this file arrived from the Files app rather than a download.
     let isImported: Bool
 
-    /// Stable identity for SwiftUI — the file path is unique per source+channel.
+    /// Stable identity: the path is unique per source and channel.
     var id: String { url.path }
 
-    /// Full source name, channel-qualified: "LiveContainer + SideStore (Nightly)".
-    /// An imported file says so, because that's what explains why the install
-    /// stopped downloading — the question someone asks after dropping a file in.
-    /// A custom IPA is named by its file instead: "Custom .ipa — imported" would
-    /// say nothing the row doesn't already say twice.
+    /// Channel-qualified name, e.g. "LiveContainer + SideStore (Nightly)", or
+    /// the filename for a custom IPA, which the row already names.
     var displayName: String {
         guard source != .custom else { return fileName }
         var name = source.displayName
@@ -38,24 +32,20 @@ struct DownloadedIPA: Identifiable, Equatable {
     }
 }
 
-/// Lists and deletes the release IPAs in the app's Documents directory. Pure
-/// file-system work — no FFI, no network, no Apple sign-in — so, unlike
-/// `CertManager`, every operation is cheap and runs inline on the main thread.
-///
-/// Deleting a file the install flow had cached clears `Engine.downloadedIPAPath`
-/// so the next install re-fetches it instead of pointing at a missing file.
+/// Lists and deletes the IPAs in Documents. Pure file-system work, so it runs
+/// inline on the main thread.
 final class DownloadsManager: ObservableObject {
 
     @Published private(set) var downloads: [DownloadedIPA] = []
     /// `id` of the IPA currently being deleted, if any.
     @Published private(set) var deletingID: String?
     @Published var lastError: String?
-    /// True once `refresh()` has run at least once (drives the empty state).
+    /// True once `refresh()` has run, so the empty state can tell them apart.
     @Published private(set) var hasLoaded = false
 
     private var engine: Engine { Engine.shared }
 
-    /// Total bytes across every downloaded IPA — shown as a header summary.
+    /// Total bytes across every IPA, for the header summary.
     var totalSize: Int { downloads.reduce(0) { $0 + $1.size } }
 
     var totalSizeText: String {
@@ -64,11 +54,8 @@ final class DownloadsManager: ObservableObject {
 
     // MARK: - Actions
 
-    /// Re-scan Documents for every recognisable IPA. Safe to call repeatedly
-    /// (e.g. each time the tab appears) — it just rebuilds the list from disk.
-    /// Scanning the directory, rather than probing the four filenames the
-    /// downloader writes, is what makes a hand-copied `sidestore.ipa` show up
-    /// here at all.
+    /// Rebuild the list from disk, scanning the directory so hand-copied files
+    /// appear too. Safe to call repeatedly.
     @MainActor
     func refresh() {
         downloads = IPALibrary.scan().map {
@@ -87,13 +74,11 @@ final class DownloadsManager: ObservableObject {
         do {
             try FileManager.default.removeItem(at: item.url)
             DownloadLedger.forget(item.url)
-            // Keep the install pipeline honest: if it had cached this exact file,
-            // forget it so "Download" re-fetches rather than skipping.
+            // Drop the pipeline's cached path so it re-fetches this file.
             if engine.downloadedIPAPath == item.url.path {
                 engine.downloadedIPAPath = nil
             }
-            // Deleting the custom import here has to reach the Install tab's
-            // button, which is the only other place it's shown.
+            // The Install tab's button also shows the custom import.
             if item.source == .custom { engine.refreshCustomIPA() }
             engine.log("Downloads: deleted \(item.fileName) (\(item.sizeText)).")
         } catch {

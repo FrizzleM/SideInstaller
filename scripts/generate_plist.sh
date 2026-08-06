@@ -88,10 +88,8 @@ if [[ $# -ge 2 ]]; then
   generate_one "$1" "$2"; exit $?
 fi
 
-# Drop only stale *managed* manifests: a sideinstaller-*.plist whose IPA no
-# longer exists (e.g. one pruned as a duplicate). Manifests for present IPAs are
-# rewritten below. Anything else — a hand-added plist under a different prefix,
-# or one whose IPA is still present — is left untouched.
+# Drop stale managed manifests, meaning a sideinstaller-*.plist whose IPA is
+# gone. Everything else is rewritten below or left alone.
 shopt -s nullglob
 for plist in "$OUTPUT_DIR"/"$OUTPUT_PREFIX"-*.plist; do
   [[ -e "${plist%.plist}.ipa" ]] || rm -f "$plist"
