@@ -23,7 +23,7 @@
 > uploads your Apple ID and password to their own server, rebuild it, and redistribute it under the same
 > name and icon. A malicious fork looks identical to the real app from the outside.
 >
-> The **only** builds we publish are:
+> The **only** builds I publish are:
 > - **Website:** https://frizzlem.github.io/SideInstaller/
 > - **Repository:** https://github.com/FrizzleM/SideInstaller
 >
