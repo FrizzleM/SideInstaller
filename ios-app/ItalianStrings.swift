@@ -131,7 +131,7 @@ let italianStrings: [String: String] = [
     "Signing in": "Accesso in corso",
     "Refresh": "Aggiorna",
     "Load certificates": "Carica i certificati",
-    "%d of 3 certificates": "%d di 3 certificati",
+    "%d certificate(s)": "%d certificato/i",
     "No certificates": "Nessun certificato",
     "This Apple ID has no development certificates to revoke.":
         "Questo Apple ID non ha certificati di sviluppo da revocare.",
@@ -179,6 +179,14 @@ let italianStrings: [String: String] = [
         "impossibile trovare l'IPA nella release %@ di %@",
     "%@ has no %@ release right now": "%@ al momento non ha nessuna release %@",
     "bad asset URL": "URL della risorsa non valido",
+    "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
+        "GitHub sta limitando le richieste da questa rete — non è bloccato, e il limite si azzera da solo. Riprova %@.",
+    "GitHub answered HTTP %d%@": "GitHub ha risposto HTTP %d%@",
+    "couldn't reach GitHub: %@": "impossibile raggiungere GitHub: %@",
+    "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
+        "la risposta di GitHub non conteneva le informazioni sulla release (%@) — qualcosa su questa rete potrebbe averla sostituita.",
+    "what downloaded as %@ isn't an IPA — something on this network returned a page instead, or the transfer stopped partway.":
+        "ciò che è stato scaricato come %@ non è un IPA — qualcosa su questa rete ha restituito una pagina, oppure il trasferimento si è interrotto.",
 
     // MARK: - Engine failures
 
@@ -220,8 +228,8 @@ let italianStrings: [String: String] = [
     "there's nothing to download for a custom IPA — import one first":
         "non c'è nulla da scaricare per un IPA personalizzato: importalo prima",
     "your app": "la tua app",
-    "Apple allows only 3 signing certificates per Apple ID and this one already has 3, so a new one can't be made. Open the Certificates tab, tap “Load certificates”, and revoke an old or expired one to free a slot — then tap Install again. See the steps above.":
-        "Apple consente solo 3 certificati di firma per Apple ID e questo ne ha già 3, quindi non se ne può creare un altro. Apri la scheda Certificati, tocca “Carica i certificati” e revocane uno vecchio o scaduto per liberare un posto, poi tocca di nuovo Installa. Vedi i passaggi qui sopra.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists, or that a request for one is still pending (error 7460). SideInstaller couldn't reuse the certificate that's already there, so it stopped instead of replacing it. See the steps above.":
+        "Apple non rilascia un certificato di firma per questo Apple ID: segnala che ne esiste già uno, o che una richiesta è ancora in sospeso (errore 7460). SideInstaller non è riuscito a riutilizzare il certificato già presente, quindi si è fermato invece di sostituirlo. Vedi i passaggi qui sopra.",
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "Non è stato possibile registrare questo iPhone%@ nel team di sviluppo del tuo Apple ID, quindi Apple non rilascerà un profilo di provisioning. %@ — vedi i passaggi qui sopra.",
@@ -261,17 +269,31 @@ let italianStrings: [String: String] = [
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "Torna in SideInstaller, leggi il codice che ti mostra e scrivi lo stesso codice nella richiesta in Impostazioni.",
 
-    "Too many signing certificates": "Troppi certificati di firma",
-    "Apple allows only 3 signing certificates per Apple ID, and this one already has 3 — usually left over from setting up AltStore / SideStore on other devices.":
-        "Apple consente solo 3 certificati di firma per Apple ID e questo ne ha già 3 — di solito sono rimasti da vecchie configurazioni di AltStore / SideStore su altri dispositivi.",
-    "Open the Certificates tab at the bottom of the screen, make sure your Apple ID is filled in, and tap “Load certificates”.":
-        "Apri la scheda Certificati in fondo allo schermo, controlla di aver inserito il tuo Apple ID e tocca “Carica i certificati”.",
-    "Tap “Revoke” on an old or expired certificate to free up a slot. Revoking stops apps already signed with that certificate from launching on other devices, so pick one you no longer use.":
-        "Tocca “Revoca” su un certificato vecchio o scaduto per liberare un posto. Revocandolo, le app già firmate con quel certificato non si apriranno più sugli altri dispositivi: scegline uno che non usi più.",
-    "Come back to the Install tab and tap Install again.":
-        "Torna alla scheda Installa e tocca di nuovo Installa.",
+    "A signing certificate already exists": "Esiste già un certificato di firma",
+    "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
+        "Apple ha restituito l'errore 7460: questo Apple ID ha già un certificato di sviluppo iOS, oppure una richiesta è ancora in sospeso.",
+    "SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone.":
+        "SideInstaller non è riuscito a riutilizzarlo. Succede quando il certificato è stato rilasciato altrove — AltStore, SideStore, Sideloadly o Xcode su un altro dispositivo — quindi la chiave privata che serve non è su questo iPhone.",
+    "Use “Revoke and retry” above, or open the Certificates tab, tap “Load certificates”, and revoke it there.":
+        "Usa “Revoca e riprova” qui sopra, oppure apri la scheda Certificati, tocca “Carica i certificati” e revocalo da lì.",
+    "Revoking is permanent: every app already signed with that certificate stops launching, on every device.":
+        "La revoca è definitiva: tutte le app già firmate con quel certificato smettono di aprirsi, su qualsiasi dispositivo.",
     "Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again.":
         "In alternativa, accedi qui sopra con un altro Apple ID (o uno di riserva) e tocca di nuovo Installa.",
+
+    // MARK: - Revoke-and-retry (Apple error 7460)
+
+    "A certificate already exists": "Esiste già un certificato",
+    "Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone.":
+        "Apple non rilascia un secondo certificato di firma per questo Apple ID. Revocare quello che c'è già fa proseguire l'installazione, ma è un'operazione irreversibile.",
+    "Loading certificates": "Caricamento certificati",
+    "Revoke and retry": "Revoca e riprova",
+    "Which certificate should be revoked?": "Quale certificato vuoi revocare?",
+    "Apple reports a certificate on this Apple ID, but none came back in the list. It may be a request that's still pending — wait a few minutes and tap Install again.":
+        "Apple segnala un certificato su questo Apple ID, ma la lista è arrivata vuota. Potrebbe essere una richiesta ancora in sospeso: aspetta qualche minuto e tocca di nuovo Installa.",
+    "Every app already signed with the certificate you pick will stop launching, on every device — including apps installed by AltStore, SideStore, or a computer. This can't be undone. The install retries straight afterwards.":
+        "Tutte le app già firmate con il certificato che scegli smetteranno di aprirsi, su qualsiasi dispositivo, comprese quelle installate con AltStore, SideStore o da un computer. L'operazione è irreversibile. L'installazione riparte subito dopo.",
+    " (expired)": " (scaduto)",
 
     "Couldn't register this device": "Impossibile registrare questo dispositivo",
     "Your Apple ID has hit its limit of registered devices. Free accounts can only register a handful of devices per year and can't remove old ones until the year resets.":

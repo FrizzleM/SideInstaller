@@ -52,8 +52,15 @@ struct Guide: Equatable {
 /// (the raw FFI error is always also written to the log).
 enum EngineError: LocalizedError {
     case message(String)
-    /// Apple's free-account cap of 3 signing certificates is already used up.
-    case certLimit
+    /// Apple refused to issue a signing certificate because this Apple ID
+    /// already has one, or a request for one is still pending (error 7460).
+    ///
+    /// Deliberately *not* "the account is full": 7460 is what Apple returns
+    /// whenever a current certificate exists, and it fires just as readily with
+    /// a single certificate on the account — which is exactly what happens when
+    /// SideInstaller can't match its stored private key to the certificate
+    /// already on the team and asks for a second one.
+    case certExists
     /// The connected device's UDID couldn't be registered with the developer
     /// team, so the provisioning profile can't be issued (Apple error 8220).
     /// Carries the UDID and the raw error so both the message and the guide can
@@ -64,8 +71,8 @@ enum EngineError: LocalizedError {
         switch self {
         case let .message(m):
             return m
-        case .certLimit:
-            return L("Apple allows only 3 signing certificates per Apple ID and this one already has 3, so a new one can't be made. Open the Certificates tab, tap “Load certificates”, and revoke an old or expired one to free a slot — then tap Install again. See the steps above.")
+        case .certExists:
+            return L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists, or that a request for one is still pending (error 7460). SideInstaller couldn't reuse the certificate that's already there, so it stopped instead of replacing it. See the steps above.")
         case let .deviceRegistration(udid, raw):
             let tail = udid.isEmpty ? "" : L(" (UDID %@)", udid)
             return L("Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.",
@@ -174,6 +181,12 @@ final class Engine: ObservableObject {
 
     /// The current contextual instruction card (nil = none).
     @Published var guide: Guide?
+
+    /// True when signing stopped on Apple error 7460 — a certificate already
+    /// exists on the account. Drives the Install screen's revoke-and-retry
+    /// callout. Setting it only *offers* the recovery; nothing is revoked
+    /// without the user confirming which certificate to give up.
+    @Published var certConflict: Bool = false
 
     /// True while the one-click pipeline is running.
     @Published var isRunning: Bool = false
@@ -377,6 +390,7 @@ final class Engine: ObservableObject {
             self.deviceName = nil
             self.lastError = nil
             self.finished = false
+            self.certConflict = false
         }
     }
 
@@ -705,7 +719,7 @@ final class Engine: ObservableObject {
     /// account summary on success; throws `EngineError.message` with the raw
     /// failure text (so the caller can classify it) otherwise.
     private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {
-        log("Apple ID sign-in for \(id) via anisette \(ani) …")
+        log("Apple ID sign-in for \(Self.oneLine(id)) via anisette \(Self.oneLine(ani)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
@@ -724,6 +738,21 @@ final class Engine: ObservableObject {
             error.map { si_string_free($0) }
             throw EngineError.message(msg)
         }
+    }
+
+    /// Squeeze a value down to one line before it goes into the log console.
+    ///
+    /// The console renders one `Text` per entry, so a line break inside an
+    /// interpolated value silently turns a single entry into a wall of blank
+    /// rows — and the two values on the sign-in line are the least trustworthy
+    /// in the app: the Apple ID is typed or pasted into a text field, and the
+    /// anisette address comes from a JSON list fetched off the network. Trimming
+    /// the ends (which `normalizedAppleID` and `anisetteCandidates` already do)
+    /// doesn't catch a break in the middle.
+    static func oneLine(_ value: String) -> String {
+        value.split(whereSeparator: \.isNewline)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
     }
 
     /// Anisette servers to try, in order: the user's current pick first, then
@@ -833,7 +862,7 @@ final class Engine: ObservableObject {
                 setStep(.download, .done)
                 return
             }
-            logImportHint(source: src, channel: channel)
+            logImportHint(for: error, source: src, channel: channel)
             throw error
         }
     }
@@ -928,17 +957,31 @@ final class Engine: ObservableObject {
         customIPAName = IPALibrary.customImport()?.url.lastPathComponent
     }
 
-    /// Spell out the way past a failed download: the Documents folder is visible
-    /// in Files, so an IPA fetched anywhere else installs from there. Named
-    /// misses get called out too — a misnamed import is indistinguishable, from
-    /// the user's side, from one that was ignored for no reason.
+    /// Spell out the way past a failed download — but only the ways that
+    /// actually lead anywhere.
+    ///
+    /// An `.ipa` already sitting in Documents under a name nothing recognises is
+    /// worth pointing at whatever went wrong: renaming it is seconds of work and
+    /// beats both waiting and fetching the file again, and a misnamed import is
+    /// indistinguishable, from the user's side, from one ignored for no reason.
+    ///
+    /// Sending someone off to download the IPA elsewhere is only worth it when
+    /// the network is the obstacle — see `DownloadError.manualSideloadHelps`.
+    /// Printing it on every failure is how a rate limit, which clears itself in
+    /// minutes, came to read as "GitHub is unreachable" and cost the user ten
+    /// minutes of manual work they never needed to do. An error this method
+    /// doesn't recognise still gets the hint: an unexplained failure is exactly
+    /// when a way around is worth more than a diagnosis.
     @MainActor
-    private func logImportHint(source: InstallSource, channel: ReleaseChannel) {
+    private func logImportHint(for error: Error, source: InstallSource, channel: ReleaseChannel) {
+        let wanted = source.fileName(channel)
         let strays = IPALibrary.unrecognized()
         if !strays.isEmpty {
-            log("Found \(strays.joined(separator: ", ")) in Documents, but the name doesn't say which build it is.")
+            log("Found \(strays.joined(separator: ", ")) in Documents, but the name doesn't say which build it is. Rename it to \(wanted) and tap Install again.")
+            return
         }
-        log("Can't reach GitHub? Download \(source.displayName) on another device or through a proxy, rename it to \(source.fileName(channel)), copy it into Files › On My iPhone › SideInstaller, then tap Install again.")
+        guard (error as? SideStoreDownloader.DownloadError)?.manualSideloadHelps ?? true else { return }
+        log("Can't reach GitHub? Download \(source.displayName) on another device or through a proxy, rename it to \(wanted), copy it into Files › On My iPhone › SideInstaller, then tap Install again.")
     }
 
     // MARK: Step 6 — sign the IPA
@@ -969,7 +1012,13 @@ final class Engine: ObservableObject {
         } catch {
             // Failures with a concrete, user-fixable cause get an explanatory
             // card alongside the stopped step.
-            if case EngineError.certLimit = error { setGuide(Guides.certLimit) }
+            // A certificate already on the account isn't a dead end: offer to
+            // revoke it and retry (see `certConflict` and the Install screen's
+            // callout). Never revoked automatically — the user has to confirm.
+            if case EngineError.certExists = error {
+                setGuide(Guides.certExists)
+                certConflict = true
+            }
             if case let EngineError.deviceRegistration(udid, raw) = error {
                 setGuide(Guides.deviceRegistration(udid: udid, raw: raw))
             }
@@ -991,7 +1040,7 @@ final class Engine: ObservableObject {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
             log("Sign FAILED: \(msg)")
-            if Self.isCertLimitError(msg) { throw EngineError.certLimit }
+            if Self.isCertExistsError(msg) { throw EngineError.certExists }
             // Device-registration / "team has no devices" (8220) failures: carry
             // the UDID so the error and its guide can show it for manual entry.
             if Self.isDeviceRegistrationError(msg) {
@@ -1001,10 +1050,12 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// Detect Apple's "max certificates" rejection in a raw signing error.
-    /// Apple returns e.g. "Developer error 7460: Maximum number of certificates
-    /// reached" (surfaced by isideload as "sign_app failed: …").
-    static func isCertLimitError(_ raw: String) -> Bool {
+    /// Detect Apple's error 7460 in a raw signing error — "You already have a
+    /// current iOS Development certificate or a pending certificate request".
+    /// isideload restates it as "Maximum number of certificates reached" before
+    /// wrapping it in "sign_app failed: …", so both spellings are matched; the
+    /// numeric code is the reliable one.
+    static func isCertExistsError(_ raw: String) -> Bool {
         let m = raw.lowercased()
         return m.contains("7460")
             || m.contains("maximum number of certificates")
@@ -1540,15 +1591,22 @@ enum Guides {
             actionLabel: nil, actionURLString: nil)
     }
 
-    static var certLimit: Guide {
+    /// Shown when Apple refuses a new signing certificate because one already
+    /// exists on the account (error 7460).
+    ///
+    /// The copy states only what the error actually tells us. Apple's message is
+    /// "you already have a current certificate or a pending request" — it says
+    /// nothing about how many the account holds, and it fires with a single
+    /// certificate on the team just as readily as with a full one.
+    static var certExists: Guide {
         Guide(
-            title: L("Too many signing certificates"),
+            title: L("A signing certificate already exists"),
             systemImage: "exclamationmark.shield",
             steps: [
-                L("Apple allows only 3 signing certificates per Apple ID, and this one already has 3 — usually left over from setting up AltStore / SideStore on other devices."),
-                L("Open the Certificates tab at the bottom of the screen, make sure your Apple ID is filled in, and tap “Load certificates”."),
-                L("Tap “Revoke” on an old or expired certificate to free up a slot. Revoking stops apps already signed with that certificate from launching on other devices, so pick one you no longer use."),
-                L("Come back to the Install tab and tap Install again."),
+                L("Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending."),
+                L("SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone."),
+                L("Use “Revoke and retry” above, or open the Certificates tab, tap “Load certificates”, and revoke it there."),
+                L("Revoking is permanent: every app already signed with that certificate stops launching, on every device."),
                 L("Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again."),
             ],
             actionLabel: nil, actionURLString: nil)

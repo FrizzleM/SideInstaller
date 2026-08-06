@@ -88,9 +88,9 @@ final class CertManager: ObservableObject {
     // MARK: - Public actions
 
     /// Sign in (if needed) and (re)load the certificate list. The primary action
-    /// of the Certificates tab.
+    /// of the Certificates tab. `then` runs only if the list actually arrived.
     @MainActor
-    func loadCerts() {
+    func loadCerts(then: (() -> Void)? = nil) {
         guard !isWorking, revokingID == nil else { return }
         let id = engine.normalizedAppleID, pw = engine.applePassword
         guard !id.isEmpty, !pw.isEmpty else {
@@ -107,6 +107,9 @@ final class CertManager: ObservableObject {
                 certs = list
                 hasLoaded = true
                 engine.log("Certificates: \(list.count) iOS development certificate(s).")
+                isWorking = false
+                then?()
+                return
             } catch is CancellationError {
                 // not cancellable today, but keep parity with Engine
             } catch {
@@ -118,8 +121,12 @@ final class CertManager: ObservableObject {
     }
 
     /// Revoke one certificate, then refresh the list to reflect it.
+    ///
+    /// `onSuccess` runs only once Apple has accepted the revocation — it's how
+    /// the Install screen resumes a run that stopped on error 7460, so it must
+    /// not fire on a failed revoke.
     @MainActor
-    func revoke(_ cert: DevCert) {
+    func revoke(_ cert: DevCert, onSuccess: (() -> Void)? = nil) {
         guard session != nil, revokingID == nil, !isWorking else { return }
         let serial = cert.serialNumber
         guard !serial.isEmpty else {
@@ -130,8 +137,10 @@ final class CertManager: ObservableObject {
         lastError = nil
         engine.log("Certificates: revoking \(cert.displayName) (\(serial)) …")
         Task { @MainActor in
+            var revoked = false
             do {
                 try await onQueue { try self.performRevoke(serial: serial) }
+                revoked = true
                 engine.log("Certificates: revoked \(cert.displayName).")
                 let list = try await onQueue { try self.performList() }
                 certs = list
@@ -140,7 +149,26 @@ final class CertManager: ObservableObject {
                 engine.log("⛔️ Revoke failed: \(lastError ?? "")")
             }
             revokingID = nil
+            // The refresh above can fail on its own; the revoke is what the
+            // caller is waiting for, so key the callback on that.
+            if revoked { onSuccess?() }
         }
+    }
+
+    /// Sign in and load the list if that hasn't happened yet, then run `then`.
+    ///
+    /// The Install screen's revoke-and-retry needs a populated list before it
+    /// can name what it's about to revoke, and the user may never have opened
+    /// the Certificates tab. Reuses `loadCerts`'s sign-in + list path rather
+    /// than opening a second session of its own.
+    @MainActor
+    func ensureLoaded(then: @escaping () -> Void) {
+        guard !isWorking, revokingID == nil else { return }
+        if hasLoaded, session != nil {
+            then()
+            return
+        }
+        loadCerts(then: then)
     }
 
     /// Forget the signed-in session (e.g. to switch Apple ID). Clears the list.

@@ -90,6 +90,27 @@ serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 
+# idevice's OPACK decoder rejects the back-reference tags (0xA0-0xC4) that a
+# device emits when a pair record repeats a string — an iPad reporting `name`
+# equal to `model` sends 0xAB, and pairing died on "unsupported OPACK tag: 0xab"
+# right after the PIN was accepted. Upstream is still unfixed at the pinned rev,
+# so the crate is vendored with that one change (see vendor/idevice/README.md).
+# Patching the git source rather than repointing the dependency means
+# idevice-ffi's own `idevice` dep resolves here too, keeping cargo's single
+# unified instance and the matching-rev intent above.
+[patch."https://github.com/jkcoxson/idevice.git"]
+idevice = { path = "vendor/idevice" }
+
+# isideload writes `embedded.mobileprovision` into the main .app only, never into
+# PlugIns/*.appex — even though it registers an App ID for each extension and
+# signs them all with the main app's entitlements. SideStore's prepareDatabase
+# throws "The app extension is missing a valid provisioning profile" on every
+# launch as a result (surfacing, confusingly, as a Core Data "Can't add the same
+# store twice" loop), so its widget extension bricks the app. Vendored with that
+# one change — see vendor/isideload/README.md.
+[patch."https://github.com/nab138/isideload.git"]
+isideload = { path = "vendor/isideload" }
+
 [profile.release]
 opt-level = 3
 lto = "thin"

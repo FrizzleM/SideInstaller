@@ -140,7 +140,7 @@ let chineseStrings: [String: String] = [
     "Signing in": "正在登录",
     "Refresh": "刷新",
     "Load certificates": "加载证书",
-    "%d of 3 certificates": "%d / 3 个证书",
+    "%d certificate(s)": "%d 个证书",
     "No certificates": "没有证书",
     "This Apple ID has no development certificates to revoke.":
         "此 Apple ID 没有可吊销的开发证书。",
@@ -188,6 +188,14 @@ let chineseStrings: [String: String] = [
         "在 %@ 渠道的 %@ 发行版中找不到 IPA 文件",
     "%@ has no %@ release right now": "%@ 目前没有任何 %@ 发行版",
     "bad asset URL": "下载资源的 URL 无效",
+    "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
+        "GitHub 正在限制此网络的请求频率 —— 它没有被屏蔽，限制会自动解除。请在%@重试。",
+    "GitHub answered HTTP %d%@": "GitHub 返回了 HTTP %d%@",
+    "couldn't reach GitHub: %@": "无法连接到 GitHub：%@",
+    "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
+        "GitHub 的响应不是发行版信息（%@）—— 此网络上的某个环节可能替换了它。",
+    "what downloaded as %@ isn't an IPA — something on this network returned a page instead, or the transfer stopped partway.":
+        "以 %@ 为名下载到的文件不是 IPA —— 此网络上的某个环节可能返回了一个网页，或者传输中断了。",
 
     // MARK: - Engine failures
 
@@ -228,8 +236,8 @@ let chineseStrings: [String: String] = [
     "there's nothing to download for a custom IPA — import one first":
         "自定义 IPA 没有可下载的内容 —— 请先导入一个文件",
     "your app": "你的应用",
-    "Apple allows only 3 signing certificates per Apple ID and this one already has 3, so a new one can't be made. Open the Certificates tab, tap “Load certificates”, and revoke an old or expired one to free a slot — then tap Install again. See the steps above.":
-        "Apple 规定每个 Apple ID 最多只能有 3 个签名证书，而此 Apple ID 已经有 3 个了，因此无法再创建新的。请打开“证书”标签页，轻点“加载证书”，然后吊销一个旧的或已过期的证书来腾出名额 —— 之后再次轻点“安装”。请参见上面的步骤。",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists, or that a request for one is still pending (error 7460). SideInstaller couldn't reuse the certificate that's already there, so it stopped instead of replacing it. See the steps above.":
+        "Apple 不会为此 Apple ID 签发签名证书：它报告已经存在一个证书，或者仍有一个申请在处理中（错误 7460）。SideInstaller 无法复用已有的证书，因此停止了操作，而不是替换它。请参见上面的步骤。",
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "无法将此 iPhone%@ 注册到你 Apple ID 的开发者团队，因此 Apple 不会签发描述文件。%@ —— 请参见上面的步骤。",
@@ -268,17 +276,31 @@ let chineseStrings: [String: String] = [
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "回到 SideInstaller，查看它显示给你的验证码，然后把相同的验证码输入到 设置 中的提示框内。",
 
-    "Too many signing certificates": "签名证书过多",
-    "Apple allows only 3 signing certificates per Apple ID, and this one already has 3 — usually left over from setting up AltStore / SideStore on other devices.":
-        "Apple 规定每个 Apple ID 最多只能有 3 个签名证书，而此 Apple ID 已经有 3 个了 —— 通常是之前在其他设备上设置 AltStore / SideStore 时遗留下来的。",
-    "Open the Certificates tab at the bottom of the screen, make sure your Apple ID is filled in, and tap “Load certificates”.":
-        "打开屏幕底部的“证书”标签页，确认已填写你的 Apple ID，然后轻点“加载证书”。",
-    "Tap “Revoke” on an old or expired certificate to free up a slot. Revoking stops apps already signed with that certificate from launching on other devices, so pick one you no longer use.":
-        "在一个旧的或已过期的证书上轻点“吊销”，以腾出名额。吊销后，已用该证书签名的应用将无法在其他设备上启动，所以请选择一个你不再使用的证书。",
-    "Come back to the Install tab and tap Install again.":
-        "回到“安装”标签页，再次轻点“安装”。",
+    "A signing certificate already exists": "已存在签名证书",
+    "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
+        "Apple 返回错误 7460：此 Apple ID 已有一个 iOS 开发证书，或者有一个申请仍在处理中。",
+    "SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone.":
+        "SideInstaller 无法复用它。当证书是在别处签发时就会这样——另一台设备上的 AltStore、SideStore、Sideloadly 或 Xcode——所需的私钥并不在这台 iPhone 上。",
+    "Use “Revoke and retry” above, or open the Certificates tab, tap “Load certificates”, and revoke it there.":
+        "使用上方的“吊销并重试”，或打开“证书”标签页，点按“加载证书”，在那里吊销它。",
+    "Revoking is permanent: every app already signed with that certificate stops launching, on every device.":
+        "吊销不可撤回：所有已用该证书签名的 App 都将无法启动，在所有设备上都是如此。",
     "Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again.":
         "或者，在上面用另一个（或备用的）Apple ID 登录，然后再次轻点“安装”。",
+
+    // MARK: - Revoke-and-retry (Apple error 7460)
+
+    "A certificate already exists": "已存在证书",
+    "Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone.":
+        "Apple 不会为此 Apple ID 签发第二个签名证书。吊销已有的那个可以让安装继续——但此操作无法撤回。",
+    "Loading certificates": "正在加载证书",
+    "Revoke and retry": "吊销并重试",
+    "Which certificate should be revoked?": "要吊销哪个证书？",
+    "Apple reports a certificate on this Apple ID, but none came back in the list. It may be a request that's still pending — wait a few minutes and tap Install again.":
+        "Apple 报告此 Apple ID 上有证书，但列表返回为空。可能是仍在处理中的申请——请等几分钟后再次点按“安装”。",
+    "Every app already signed with the certificate you pick will stop launching, on every device — including apps installed by AltStore, SideStore, or a computer. This can't be undone. The install retries straight afterwards.":
+        "所有已用你选择的证书签名的 App 都将无法启动，在所有设备上都是如此——包括通过 AltStore、SideStore 或电脑安装的 App。此操作无法撤回。安装会紧接着重试。",
+    " (expired)": "（已过期）",
 
     "Couldn't register this device": "无法注册此设备",
     "Your Apple ID has hit its limit of registered devices. Free accounts can only register a handful of devices per year and can't remove old ones until the year resets.":

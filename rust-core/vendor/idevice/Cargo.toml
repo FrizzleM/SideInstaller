@@ -1,0 +1,291 @@
+[package]
+name = "idevice"
+description = "A Rust library to interact with services on iOS devices."
+authors = ["Jackson Coxson"]
+version = "0.1.63"
+edition = "2024"
+license = "MIT"
+documentation = "https://docs.rs/idevice"
+repository = "https://github.com/jkcoxson/idevice"
+keywords = ["lockdownd", "ios"]
+
+
+[dependencies]
+tokio = { version = "1", features = ["io-util", "time"] }
+tokio-rustls = { version = "0.26", default-features = false, optional = true }
+rustls = { version = "0.23", default-features = false, features = [
+  "std",
+  "tls12",
+], optional = true }
+tokio-openssl = { version = "0.6", optional = true }
+openssl = { version = "0.10", optional = true }
+
+plist = { version = "1.8" }
+plist-macro = { version = "0.1.6" }
+serde = { version = "1", features = ["derive"] }
+ns-keyed-archive = { version = "0.1.5", optional = true }
+jktcp = { version = "0.1.6", optional = true, default-features = false }
+
+thiserror = { version = "2" }
+tracing = { version = "0.1.41" }
+base64 = { version = "0.22" }
+
+indexmap = { version = "2.11", features = ["serde"], optional = true }
+uuid = { version = "1.18", features = ["serde", "v3", "v4"], optional = true }
+chrono = { version = "0.4", optional = true, default-features = false, features = [
+  "serde",
+] }
+
+serde_json = { version = "1", optional = true }
+bytes = { version = "1.10", optional = true }
+
+reqwest = { version = "0.13", features = [
+  "json",
+], optional = true, default-features = false }
+futures = { version = "0.3", optional = true }
+async-stream = { version = "0.3.6", optional = true }
+
+sha2 = { version = "0.10", optional = true, features = ["oid"] }
+
+rsa = { version = "0.9", optional = true, features = ["sha2"] }
+x509-cert = { version = "0.2", optional = true, features = [
+  "builder",
+  "pem",
+], default-features = false }
+x25519-dalek = { version = "2", optional = true }
+ed25519-dalek = { version = "2", features = ["rand_core"], optional = true }
+hkdf = { version = "0.12", optional = true }
+chacha20poly1305 = { version = "0.10", optional = true }
+aes = { version = "0.8", optional = true }
+cbc = { version = "0.1", features = ["alloc"], optional = true }
+hmac = { version = "0.12", optional = true }
+sha1 = { version = "0.10", optional = true }
+siphasher = { version = "1", optional = true }
+idevice-srp = { version = "0.6", optional = true }
+rand = { version = "0.10" }
+
+obfstr = { version = "0.4", optional = true }
+
+async_zip = { version = "0.0.18", optional = true }
+flate2 = { version = "1", optional = true }
+
+# Drop-in for `std::time::SystemTime` that's a zero-cost alias on native and
+# uses `Date.now()` on wasm32-unknown-unknown (where `SystemTime::now()` panics).
+web-time = { version = "1", optional = true }
+
+[target.'cfg(not(windows))'.dependencies]
+libc = "0.2"
+
+# Native-only tokio feature: `fs` is used by `utils::installation` helpers.
+# Rejected by tokio on wasm32-unknown-unknown.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1", features = ["fs"] }
+
+# wasm32-unknown-unknown: forward `js` / `wasm_js` features through to the
+# transitive `getrandom` crates so Web Crypto is used for randomness, and
+# pull in a pure-Rust rustls `CryptoProvider` (`rustls-rustcrypto`).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = { version = "1.23", default-features = false, features = [
+  "js",
+], optional = true }
+getrandom_02 = { package = "getrandom", version = "0.2", default-features = false, features = [
+  "js",
+], optional = true }
+getrandom_04 = { package = "getrandom", version = "0.4", default-features = false, features = [
+  "wasm_js",
+], optional = true }
+rustls-rustcrypto = { version = "0.0.2-alpha", optional = true }
+# Forwards the `web` feature so `rustls-pki-types::UnixTime::now()` uses `Date.now()`.
+rustls-pki-types = { version = "1", default-features = false, features = [
+  "web",
+], optional = true }
+# Drop-in replacement for `tokio::time` on wasm32-unknown-unknown; tokio's own
+# timer panics at runtime on this target (see tokio docs).
+wasmtimer = { version = "0.4", default-features = false, features = [
+  "tokio",
+], optional = true }
+# `tokio::spawn` requires the `rt` feature, which doesn't compile on
+# wasm32-unknown-unknown. The `crate::spawn` shim falls back to
+# `wasm_bindgen_futures::spawn_local` here.
+wasm-bindgen-futures = { version = "0.4", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1.43", features = ["full"] }
+tun-rs = { version = "2.0.8", features = ["async_tokio"] }
+bytes = "1.10.1"
+
+[features]
+default = ["aws-lc"]
+aws-lc = ["rustls", "rustls/aws-lc-rs", "tokio-rustls/aws-lc-rs"]
+ring = ["rustls", "rustls/ring", "tokio-rustls/ring"]
+rustls = ["dep:rustls", "dep:tokio-rustls"]
+openssl = ["dep:openssl", "dep:tokio-openssl"]
+# Internal features: gate error‐conversion impls so every feature that pulls
+# in the dep automatically gets `From<…> for IdeviceError`.
+_serde_json = ["dep:serde_json"]
+_reqwest = ["dep:reqwest"]
+
+afc = ["dep:chrono", "dep:futures"]
+amfi = []
+bt_packet_logger = []
+companion_proxy = []
+core_device = ["xpc", "dep:uuid", "dep:ns-keyed-archive"]
+core_device_proxy = ["_serde_json"]
+display_stream = [
+  "core_device",
+  "rsd",
+  "dep:flate2",
+  "dep:futures",
+  "dep:web-time",
+]
+crashreportcopymobile = ["afc"]
+debug_proxy = []
+diagnostics_relay = []
+dvt = ["dep:ns-keyed-archive"]
+energy_monitor = ["dvt"]
+graphics = ["dvt", "rsd"]
+device_info = ["dvt"]
+application_listing = ["dvt"]
+condition_inducer = ["dvt"]
+network_monitor = ["dvt"]
+sysmontap = ["dvt", "energy_monitor"]
+heartbeat = ["tokio/macros", "tokio/time"]
+house_arrest = ["afc"]
+installation_proxy = [
+  "dep:async_zip",
+  "dep:futures",
+  "async_zip/tokio",
+  "async_zip/deflate",
+]
+installcoordination_proxy = []
+xctest = [
+  "dvt",
+  "installation_proxy",
+  "afc",
+  "dep:uuid",
+  "dep:ns-keyed-archive",
+  "tunnel_tcp_stack",
+  "rsd",
+  "core_device_proxy",
+]
+springboardservices = []
+misagent = []
+mobile_image_mounter = ["dep:sha2"]
+mobileactivationd = ["_reqwest"]
+mobilebackup2 = []
+wda = ["_serde_json", "tokio/time", "tokio/net"]
+notification_proxy = [
+  "tokio/macros",
+  "tokio/time",
+  "dep:async-stream",
+  "dep:futures",
+]
+location_simulation = []
+pair = [
+  "chrono/default",
+  "tokio/time",
+  "dep:sha2",
+  "dep:rsa",
+  "dep:x509-cert",
+  "dep:web-time",
+]
+pcapd = []
+preboard_service = []
+obfuscate = ["dep:obfstr"]
+# Pure-Rust rustls `CryptoProvider` for environments where ring/aws-lc-rs
+# can't be built (notably wasm32-unknown-unknown).
+wasm-crypto = ["rustls", "dep:rustls-rustcrypto"]
+# Enables wasm32-unknown-unknown support: forwards Web Crypto features to
+# the transitive `getrandom` crates and selects `rustls-rustcrypto` as the
+# TLS crypto backend. Consumers must bring their own transport implementing
+# `ReadWrite` (no `tcp`/`usbmuxd` on this target).
+wasm = [
+  "dep:getrandom_02",
+  "dep:getrandom_04",
+  "dep:rustls-pki-types",
+  "dep:wasmtimer",
+  "dep:wasm-bindgen-futures",
+  "wasm-crypto",
+]
+remote_pairing = [
+  "_serde_json",
+  "xpc",
+  "dep:x25519-dalek",
+  "dep:ed25519-dalek",
+  "dep:hkdf",
+  "dep:chacha20poly1305",
+  "dep:idevice-srp",
+  "dep:siphasher",
+  "dep:uuid",
+  "dep:aes",
+  "dep:cbc",
+  "dep:hmac",
+  "dep:sha1",
+  "dep:sha2",
+  "dep:rsa",
+]
+restore_service = []
+rsd = ["xpc"]
+screenshotr = []
+syslog_relay = ["dep:bytes", "dep:chrono"]
+tcp = ["tokio/net"]
+tunnel_tcp_stack = ["dep:jktcp"]
+# Adds pcap (`tokio::fs`) support to the software TCP tunnel. Pulls in
+# `tokio/fs`, which doesn't compile on wasm32, so it is opt-in rather than
+# implied by `tunnel_tcp_stack`.
+tunnel_tcp_stack_pcap = ["tunnel_tcp_stack", "jktcp/pcap"]
+tss = ["dep:uuid", "_reqwest"]
+tunneld = ["_serde_json", "_reqwest"]
+usbmuxd = ["tokio/net", "dep:futures"]
+xpc = ["dep:indexmap", "dep:uuid", "dep:async-stream", "dep:futures"]
+full = [
+  "afc",
+  "amfi",
+  "bt_packet_logger",
+  "companion_proxy",
+  "core_device",
+  "core_device_proxy",
+  "display_stream",
+  "crashreportcopymobile",
+  "debug_proxy",
+  "diagnostics_relay",
+  "dvt",
+  "energy_monitor",
+  "graphics",
+  "device_info",
+  "application_listing",
+  "condition_inducer",
+  "network_monitor",
+  "sysmontap",
+  "heartbeat",
+  "house_arrest",
+  "installation_proxy",
+  "installcoordination_proxy",
+  "xctest",
+  "location_simulation",
+  "misagent",
+  "mobile_image_mounter",
+  "mobileactivationd",
+  "mobilebackup2",
+  "wda",
+  "notification_proxy",
+  "pair",
+  "pcapd",
+  "preboard_service",
+  "remote_pairing",
+  "restore_service",
+  "rsd",
+  "screenshotr",
+  "springboardservices",
+  "syslog_relay",
+  "tcp",
+  "tunnel_tcp_stack",
+  "tss",
+  "tunneld",
+  "usbmuxd",
+  "xpc",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

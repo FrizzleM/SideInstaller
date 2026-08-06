@@ -10,9 +10,15 @@ struct ContentView: View {
     @EnvironmentObject private var updateChecker: UpdateChecker
     /// Declared so every label on this screen redraws when the language changes.
     @EnvironmentObject private var loc: Localizer
+    /// Shared with the Certificates tab — see `certConflictCallout`.
+    @EnvironmentObject private var certManager: CertManager
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
     @State private var showImporter = false
+    /// True while the "which certificate do you want to give up?" chooser is
+    /// showing. Never revokes anything on its own: each certificate is its own
+    /// destructive button, and the dialog spells out what revoking breaks.
+    @State private var showRevokeChooser = false
 
     /// What the import picker will let you choose.
     ///
@@ -60,6 +66,11 @@ struct ContentView: View {
                     if let pin = engine.pairingPIN {
                         pinCallout(pin).transition(.cardAppear)
                     }
+                    // Sits above the guide card: it's the one-tap version of
+                    // what the guide then explains at length.
+                    if engine.certConflict, !engine.isRunning {
+                        certConflictCallout.transition(.cardAppear)
+                    }
                     if let guide = engine.guide {
                         guideCallout(guide).transition(.cardAppear)
                     }
@@ -85,6 +96,8 @@ struct ContentView: View {
                 .animation(.smooth(duration: 0.35), value: showProgress)
                 .animation(.smooth(duration: 0.35), value: engine.pairingPIN)
                 .animation(.smooth(duration: 0.35), value: engine.guide?.title)
+                .animation(.smooth(duration: 0.35), value: engine.certConflict)
+                .animation(.smooth(duration: 0.3), value: certManager.isWorking)
                 .animation(.smooth(duration: 0.35), value: showError)
                 .animation(.smooth(duration: 0.4, extraBounce: 0.12), value: engine.finished)
                 .animation(.smooth(duration: 0.35), value: engine.deviceSummary)
@@ -122,6 +135,7 @@ struct ContentView: View {
 
     private var header: some View {
         BrandHeader(icon: "arrow.down.app.fill", image: "AppLogo", title: "SideInstaller",
+                    subtitle: "Beta",
                     animateIcon: engine.isRunning) {
             statusPill
                 .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
@@ -516,6 +530,89 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    // MARK: Certificate conflict (Apple error 7460)
+
+    /// Shown when signing stopped because Apple already has a certificate for
+    /// this Apple ID and SideInstaller couldn't reuse it.
+    ///
+    /// The recovery is destructive and irreversible, so it is deliberately two
+    /// taps and never one: this button only *fetches* the certificates, and the
+    /// dialog it opens makes the user name the one they're giving up. Nothing
+    /// is revoked without that choice.
+    private var certConflictCallout: some View {
+        CalloutCard(tint: .orange) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(systemName: "exclamationmark.shield.fill")
+                        .font(.title2)
+                        .foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L("A certificate already exists"))
+                            .font(.subheadline.weight(.semibold))
+                        Text(L("Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone."))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Button {
+                    // Loads (signing in first if needed) so the chooser can name
+                    // the certificates instead of asking blind.
+                    certManager.ensureLoaded { showRevokeChooser = true }
+                } label: {
+                    HStack(spacing: 8) {
+                        if certManager.isWorking {
+                            ProgressView().controlSize(.small)
+                            Text(L("Loading certificates"))
+                        } else {
+                            Image(systemName: "arrow.clockwise.circle")
+                            Text(L("Revoke and retry"))
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(.orange)
+                .disabled(certManager.isWorking || certManager.revokingID != nil)
+
+                if let error = certManager.lastError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .confirmationDialog(L("Which certificate should be revoked?"),
+                            isPresented: $showRevokeChooser,
+                            titleVisibility: .visible) {
+            ForEach(certManager.certs) { cert in
+                Button(revokeButtonLabel(for: cert), role: .destructive) {
+                    certManager.revoke(cert) {
+                        engine.log("Retrying the install after revoking \(cert.displayName).")
+                        engine.runOneClick()
+                    }
+                }
+            }
+            Button(L("Cancel"), role: .cancel) { }
+        } message: {
+            Text(certManager.certs.isEmpty
+                 ? L("Apple reports a certificate on this Apple ID, but none came back in the list. It may be a request that's still pending — wait a few minutes and tap Install again.")
+                 : L("Every app already signed with the certificate you pick will stop launching, on every device — including apps installed by AltStore, SideStore, or a computer. This can't be undone. The install retries straight afterwards."))
+        }
+    }
+
+    /// Names a certificate in the chooser, tagging the machine it was issued to
+    /// (usually the giveaway for which one is safe to give up) and whether it
+    /// has already expired.
+    private func revokeButtonLabel(for cert: DevCert) -> String {
+        var label = cert.displayName
+        if let machine = cert.machineLabel { label += " — \(machine)" }
+        if cert.isExpired { label += L(" (expired)") }
+        return label
     }
 
     // MARK: Error / success

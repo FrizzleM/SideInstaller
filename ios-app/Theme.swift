@@ -157,6 +157,9 @@ struct BrandHeader<Accessory: View>: View {
     /// its home-screen identity. The other tabs keep their contextual glyphs.
     var image: String? = nil
     var title: String
+    /// Optional line directly beneath the title, tucked closer to it than the
+    /// header's own 14pt rhythm so the two read as one block.
+    var subtitle: String? = nil
     var animateIcon: Bool = false
     @ViewBuilder var accessory: () -> Accessory
 
@@ -165,8 +168,15 @@ struct BrandHeader<Accessory: View>: View {
             glyph
                 .frame(width: 86, height: 86)
                 .shadow(color: Theme.glow, radius: 20, x: 0, y: 12)
-            Text(title)
-                .font(.largeTitle.weight(.bold))
+            VStack(spacing: 4) {
+                Text(title)
+                    .font(.largeTitle.weight(.bold))
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
             accessory()
         }
         .frame(maxWidth: .infinity)

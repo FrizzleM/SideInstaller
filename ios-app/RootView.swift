@@ -35,6 +35,10 @@ struct RootView: View {
                 CertsView(manager: certManager)
             }
         }
+        // The Install tab needs it too: when signing stops on Apple error 7460
+        // it offers to revoke a certificate and retry, and that runs through
+        // this same manager rather than opening a session of its own.
+        .environmentObject(certManager)
         .tint(Theme.accent)
         .preferredColorScheme(.dark)
         .alert(L("Two-Factor Code"), isPresented: $engine.pendingTwoFactor) {

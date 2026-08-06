@@ -135,7 +135,7 @@ let vietnameseStrings: [String: String] = [
     "Signing in": "Đang đăng nhập",
     "Refresh": "Làm mới",
     "Load certificates": "Tải danh sách chứng chỉ",
-    "%d of 3 certificates": "%d trên 3 chứng chỉ",
+    "%d certificate(s)": "%d chứng chỉ",
     "No certificates": "Không có chứng chỉ",
     "This Apple ID has no development certificates to revoke.":
         "Apple ID này không có chứng chỉ phát triển nào để thu hồi.",
@@ -183,6 +183,14 @@ let vietnameseStrings: [String: String] = [
         "không tìm thấy tệp IPA trong bản phát hành %@ của %@",
     "%@ has no %@ release right now": "%@ hiện không có bản phát hành %@ nào",
     "bad asset URL": "URL tệp tải không hợp lệ",
+    "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
+        "GitHub đang giới hạn số yêu cầu từ mạng này — GitHub không bị chặn, và giới hạn sẽ tự hết. Hãy thử lại %@.",
+    "GitHub answered HTTP %d%@": "GitHub đã trả về HTTP %d%@",
+    "couldn't reach GitHub: %@": "không kết nối được tới GitHub: %@",
+    "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
+        "phản hồi của GitHub không phải là thông tin bản phát hành (%@) — có thể thứ gì đó trên mạng này đã thay thế nó.",
+    "what downloaded as %@ isn't an IPA — something on this network returned a page instead, or the transfer stopped partway.":
+        "tệp tải về dưới tên %@ không phải là IPA — có thể thứ gì đó trên mạng này đã trả về một trang web, hoặc quá trình tải bị gián đoạn.",
 
     // MARK: - Engine failures
 
@@ -223,8 +231,8 @@ let vietnameseStrings: [String: String] = [
     "there's nothing to download for a custom IPA — import one first":
         "không có gì để tải cho IPA tùy chọn — hãy nhập một tệp trước",
     "your app": "ứng dụng của bạn",
-    "Apple allows only 3 signing certificates per Apple ID and this one already has 3, so a new one can't be made. Open the Certificates tab, tap “Load certificates”, and revoke an old or expired one to free a slot — then tap Install again. See the steps above.":
-        "Apple chỉ cho phép 3 chứng chỉ ký trên mỗi Apple ID và Apple ID này đã có đủ 3, nên không thể tạo thêm. Mở tab Chứng chỉ, chạm vào “Tải danh sách chứng chỉ” và thu hồi một chứng chỉ cũ hoặc đã hết hạn để giải phóng chỗ — rồi chạm vào Cài đặt lần nữa. Xem các bước ở trên.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists, or that a request for one is still pending (error 7460). SideInstaller couldn't reuse the certificate that's already there, so it stopped instead of replacing it. See the steps above.":
+        "Apple sẽ không cấp chứng chỉ ký cho Apple ID này: Apple báo rằng đã có một chứng chỉ, hoặc một yêu cầu vẫn đang chờ xử lý (lỗi 7460). SideInstaller không dùng lại được chứng chỉ sẵn có nên đã dừng lại thay vì thay thế nó. Xem các bước ở trên.",
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "Không thể đăng ký iPhone này%@ vào nhóm phát triển của Apple ID, nên Apple sẽ không cấp hồ sơ cấp phép. %@ — xem các bước ở trên.",
@@ -263,17 +271,31 @@ let vietnameseStrings: [String: String] = [
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "Quay lại SideInstaller, xem mã mà ứng dụng hiển thị, rồi nhập đúng mã đó vào hộp thoại trong Cài đặt.",
 
-    "Too many signing certificates": "Quá nhiều chứng chỉ ký",
-    "Apple allows only 3 signing certificates per Apple ID, and this one already has 3 — usually left over from setting up AltStore / SideStore on other devices.":
-        "Apple chỉ cho phép 3 chứng chỉ ký trên mỗi Apple ID và Apple ID này đã có đủ 3 — thường là còn sót lại từ việc thiết lập AltStore / SideStore trên các thiết bị khác.",
-    "Open the Certificates tab at the bottom of the screen, make sure your Apple ID is filled in, and tap “Load certificates”.":
-        "Mở tab Chứng chỉ ở cuối màn hình, kiểm tra đã điền Apple ID của bạn, rồi chạm vào “Tải danh sách chứng chỉ”.",
-    "Tap “Revoke” on an old or expired certificate to free up a slot. Revoking stops apps already signed with that certificate from launching on other devices, so pick one you no longer use.":
-        "Chạm vào “Thu hồi” trên một chứng chỉ cũ hoặc đã hết hạn để giải phóng chỗ. Khi thu hồi, các ứng dụng đã ký bằng chứng chỉ đó sẽ không mở được trên các thiết bị khác, nên hãy chọn chứng chỉ bạn không còn dùng.",
-    "Come back to the Install tab and tap Install again.":
-        "Quay lại tab Cài ứng dụng và chạm vào Cài đặt lần nữa.",
+    "A signing certificate already exists": "Đã có một chứng chỉ ký",
+    "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
+        "Apple trả về lỗi 7460: Apple ID này đã có chứng chỉ phát triển iOS, hoặc một yêu cầu vẫn đang chờ xử lý.",
+    "SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone.":
+        "SideInstaller không dùng lại được chứng chỉ đó. Điều này xảy ra khi chứng chỉ được cấp ở nơi khác — AltStore, SideStore, Sideloadly hoặc Xcode trên một thiết bị khác — nên khoá riêng tư cần thiết không có trên iPhone này.",
+    "Use “Revoke and retry” above, or open the Certificates tab, tap “Load certificates”, and revoke it there.":
+        "Dùng “Thu hồi và thử lại” ở trên, hoặc mở thẻ Chứng chỉ, chạm “Tải danh sách chứng chỉ” rồi thu hồi ở đó.",
+    "Revoking is permanent: every app already signed with that certificate stops launching, on every device.":
+        "Thu hồi là vĩnh viễn: mọi ứng dụng đã ký bằng chứng chỉ đó sẽ không mở được nữa, trên mọi thiết bị.",
     "Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again.":
         "Hoặc đăng nhập bằng một Apple ID khác (hoặc tài khoản dự phòng) ở trên, rồi chạm vào Cài đặt lần nữa.",
+
+    // MARK: - Revoke-and-retry (Apple error 7460)
+
+    "A certificate already exists": "Đã có một chứng chỉ",
+    "Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone.":
+        "Apple sẽ không cấp chứng chỉ ký thứ hai cho Apple ID này. Thu hồi chứng chỉ sẵn có sẽ giúp quá trình cài đặt tiếp tục — nhưng không thể hoàn tác.",
+    "Loading certificates": "Đang tải chứng chỉ",
+    "Revoke and retry": "Thu hồi và thử lại",
+    "Which certificate should be revoked?": "Bạn muốn thu hồi chứng chỉ nào?",
+    "Apple reports a certificate on this Apple ID, but none came back in the list. It may be a request that's still pending — wait a few minutes and tap Install again.":
+        "Apple báo rằng Apple ID này có chứng chỉ, nhưng danh sách trả về lại trống. Có thể đó là một yêu cầu vẫn đang chờ xử lý — hãy đợi vài phút rồi chạm Cài đặt lại.",
+    "Every app already signed with the certificate you pick will stop launching, on every device — including apps installed by AltStore, SideStore, or a computer. This can't be undone. The install retries straight afterwards.":
+        "Mọi ứng dụng đã ký bằng chứng chỉ bạn chọn sẽ không mở được nữa, trên mọi thiết bị — kể cả ứng dụng cài bằng AltStore, SideStore hoặc từ máy tính. Không thể hoàn tác. Quá trình cài đặt sẽ thử lại ngay sau đó.",
+    " (expired)": " (đã hết hạn)",
 
     "Couldn't register this device": "Không thể đăng ký thiết bị này",
     "Your Apple ID has hit its limit of registered devices. Free accounts can only register a handful of devices per year and can't remove old ones until the year resets.":

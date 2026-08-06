@@ -75,12 +75,53 @@ enum InstallSource: String, CaseIterable, Identifiable {
     /// GitHub releases API endpoint for a channel. `/releases/latest` skips
     /// pre-releases, so the nightly build is fetched by its `nightly` tag. Nil
     /// when there's no release to ask about.
+    ///
+    /// Only a fallback now: the download itself goes through `downloadURL`,
+    /// which costs no API quota. This is asked only when an asset has been
+    /// renamed, since what it's called now is the one thing a derived URL can't
+    /// know.
     func releaseAPI(_ channel: ReleaseChannel) -> URL? {
         guard let repo else { return nil }
         let base = "https://api.github.com/repos/\(repo)/releases"
         switch channel {
         case .stable:  return URL(string: "\(base)/latest")!
         case .nightly: return URL(string: "\(base)/tags/nightly")!
+        }
+    }
+
+    /// The `.ipa` this build publishes in its releases.
+    ///
+    /// Both repos have used these names on every release this app has shipped
+    /// against, and use them on the stable and nightly tags alike — which is
+    /// what lets the download URL be derived rather than looked up (see
+    /// `downloadURL`). A rename doesn't break the install: the derived URL 404s,
+    /// and the download falls back to the API, where `selectAsset` finds
+    /// whatever the asset is called now.
+    var assetFileName: String? {
+        switch self {
+        case .sideStore:     return "SideStore.ipa"
+        case .liveContainer: return "LiveContainer+SideStore.ipa"
+        case .custom:        return nil
+        }
+    }
+
+    /// Direct download for the release asset, off github.com rather than the
+    /// API. Nil for a build that doesn't come from a release.
+    ///
+    /// `releases/latest/download/<asset>` redirects to the newest tag's copy of
+    /// that file, and release downloads aren't metered by the API's rate limit.
+    /// That limit is 60 requests an hour counted *per public IP*, so behind
+    /// carrier-grade NAT — where thousands of unrelated subscribers share one
+    /// egress address — the quota can already be spent by strangers before this
+    /// app asks for anything, and no amount of retrying gets around it. Deriving
+    /// the URL takes that failure off the install path entirely.
+    func downloadURL(_ channel: ReleaseChannel) -> URL? {
+        guard let repo, let assetFileName else { return nil }
+        let base = "https://github.com/\(repo)/releases"
+        switch channel {
+        case .stable:  return URL(string: "\(base)/latest/download/\(assetFileName)")
+        // The nightly tag is fixed, so its asset needs no resolving at all.
+        case .nightly: return URL(string: "\(base)/download/nightly/\(assetFileName)")
         }
     }
 
@@ -181,6 +222,19 @@ enum SideStoreDownloader {
         /// The chosen source has no release to download — `.custom`, which is
         /// supplied by the user rather than fetched.
         case notDownloadable
+        /// GitHub answered, but with a status rather than a release or an IPA.
+        /// Carries the explanation GitHub put in the body and — when the answer
+        /// amounts to "you've asked too often" — when it will answer again.
+        case badStatus(status: Int, detail: String?, retryAfter: Date?)
+        /// The request never reached GitHub: offline, DNS, TLS, timeout, a host
+        /// that's blocked. The only failure here that means GitHub is out of
+        /// reach.
+        case unreachable(URLError)
+        /// A 2xx whose body isn't the release JSON this app models.
+        case badRelease(String)
+        /// The bytes arrived and aren't an IPA.
+        case notAnIPA(String)
+
         var description: String {
             switch self {
             case let .noIPAAsset(source, channel):
@@ -193,26 +247,174 @@ enum SideStoreDownloader {
                 return L("bad asset URL")
             case .notDownloadable:
                 return L("there's nothing to download for a custom IPA — import one first")
+            case let .badStatus(status, detail, retryAfter):
+                // GitHub's own rate-limit text names the public IP it counted
+                // against, which is neither the user's business to read back nor
+                // ours to put in a log they may paste somewhere. It also talks
+                // about authenticating, which isn't an option here. Our own
+                // wording says the part that's actionable: wait.
+                if let retryAfter {
+                    return L("GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.",
+                             Self.relative(retryAfter))
+                }
+                return L("GitHub answered HTTP %d%@", status, detail.map { ": \($0)" } ?? "")
+            case let .unreachable(error):
+                return L("couldn't reach GitHub: %@", error.localizedDescription)
+            case let .badRelease(detail):
+                return L("GitHub's answer wasn't release information (%@) — something on this network may have replaced it.",
+                         detail)
+            case let .notAnIPA(name):
+                return L("what downloaded as %@ isn't an IPA — something on this network returned a page instead, or the transfer stopped partway.",
+                         name)
             }
+        }
+
+        /// True when fetching the IPA elsewhere and copying it in is genuinely
+        /// the way past this failure.
+        ///
+        /// A rate limit isn't: nothing is blocked, the quota comes back on its
+        /// own, and sending someone off to do ten minutes of manual work to get
+        /// around a wait is worse advice than none. Neither is a release that
+        /// doesn't exist or an asset that isn't in it — there's nothing to go
+        /// and fetch. What's left is the network failing or interfering, which
+        /// is the case the Files folder exists for.
+        var manualSideloadHelps: Bool {
+            switch self {
+            case .unreachable, .badRelease, .notAnIPA:
+                return true
+            case .noIPAAsset, .noRelease, .badURL, .notDownloadable:
+                return false
+            case let .badStatus(_, _, retryAfter):
+                return retryAfter == nil
+            }
+        }
+
+        /// A 404 on the derived download URL — the asset isn't published under
+        /// the name this app expects, the one question left that only the API
+        /// can answer.
+        var isAssetMissing: Bool {
+            if case let .badStatus(status, _, _) = self { return status == 404 }
+            return false
+        }
+
+        /// "in 12 minutes", in the language the rest of the sentence is in. A
+        /// wait is what the user acts on; a clock time makes them do the
+        /// subtraction themselves.
+        private static func relative(_ date: Date) -> String {
+            let formatter = RelativeDateTimeFormatter()
+            formatter.locale = Localizer.locale
+            formatter.unitsStyle = .full
+            return formatter.localizedString(for: date, relativeTo: Date())
         }
     }
 
+    /// An IPA downloaded to a temporary file, whichever route found it.
+    private struct Fetched {
+        let file: URL
+        /// What GitHub called it — the asset name, which the API route may
+        /// resolve to something other than the one that was asked for.
+        let name: String
+    }
+
     /// Returns the local path of the downloaded IPA. `log` receives progress.
+    ///
+    /// The IPA comes off github.com's release redirect, which costs no API quota
+    /// (see `InstallSource.downloadURL`). api.github.com is consulted only when
+    /// that 404s, since an asset having been renamed is the one thing a derived
+    /// URL can't survive by itself.
     static func downloadLatest(source: InstallSource,
                                channel: ReleaseChannel,
                                log: @escaping (String) -> Void) async throws -> String {
+        guard let direct = source.downloadURL(channel), let assetName = source.assetFileName else {
+            throw DownloadError.notDownloadable
+        }
+
+        let fetched: Fetched
+        do {
+            fetched = try await fetch(direct, named: assetName, log: log)
+        } catch let error as DownloadError where error.isAssetMissing {
+            log("No \(assetName) on that release — asking GitHub's API what the asset is called now.")
+            fetched = try await fetchViaAPI(source: source, channel: channel, log: log)
+        }
+
+        // That GitHub answered is not proof it answered with an IPA. A network
+        // that interferes hands back a login or block page under the name that
+        // was asked for, and a transfer that stops partway leaves a valid prefix
+        // of a real archive. Either is otherwise found out much later, as an
+        // opaque signing failure — so a download gets the same check an import
+        // does, before anything downstream trusts it.
+        guard IPALibrary.looksLikeIPA(fetched.file) else {
+            try? FileManager.default.removeItem(at: fetched.file)
+            throw DownloadError.notAnIPA(fetched.name)
+        }
+
+        let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
+        try? FileManager.default.removeItem(at: dest)
+        try FileManager.default.moveItem(at: fetched.file, to: dest)
+        // Claim the file, so a later run knows this copy came off GitHub and is
+        // safe to replace — unlike one the user put there by hand.
+        DownloadLedger.record(dest)
+        return dest.path
+    }
+
+    /// Download one URL to a temporary file, after checking the response is an
+    /// answer rather than a refusal.
+    private static func fetch(_ url: URL, named name: String,
+                              log: @escaping (String) -> Void) async throws -> Fetched {
+        var req = URLRequest(url: url)
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        let redirects = ReleaseTagRecorder()
+
+        log("Downloading \(name) …")
+        let (file, response) = try await perform {
+            try await URLSession.shared.download(for: req, delegate: redirects)
+        }
+        do {
+            // Nothing to quote from the body: a refusal from the download host
+            // is plain text, not the JSON envelope the API returns.
+            try check(response)
+        } catch {
+            try? FileManager.default.removeItem(at: file)
+            throw error
+        }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let tag = redirects.tag.map { ", release \($0)" } ?? ""
+        log("HTTP \(status) for \(name) — \(response.expectedContentLength) bytes\(tag)")
+        return Fetched(file: file, name: name)
+    }
+
+    /// Ask the releases API where the IPA is, and take it from there.
+    ///
+    /// Only reached when the derived URL 404s, i.e. when the asset has been
+    /// renamed and `selectAsset` has to find the new name. Everything that made
+    /// this the *primary* route — and with it the rate limit that comes with
+    /// api.github.com — is gone; what's left is the recovery path.
+    private static func fetchViaAPI(source: InstallSource,
+                                    channel: ReleaseChannel,
+                                    log: @escaping (String) -> Void) async throws -> Fetched {
         guard let api = source.releaseAPI(channel) else { throw DownloadError.notDownloadable }
         var req = URLRequest(url: api)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
 
-        let (data, releaseResponse) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await perform { try await URLSession.shared.data(for: req) }
         // A repo that has dropped (or never published) the `nightly` tag answers
-        // 404 — report that as a missing channel rather than a decode failure.
-        if let http = releaseResponse as? HTTPURLResponse, http.statusCode == 404 {
+        // 404 — report that as a missing channel rather than a bare status.
+        if (response as? HTTPURLResponse)?.statusCode == 404 {
             throw DownloadError.noRelease(source.displayName, channel)
         }
-        let release = try JSONDecoder().decode(GHRelease.self, from: data)
+        try check(response, body: data)
+
+        let release: GHRelease
+        do {
+            release = try JSONDecoder().decode(GHRelease.self, from: data)
+        } catch {
+            // A 2xx that won't decode is a different animal from a refusal that
+            // won't decode, and only reachable once the status has been ruled
+            // out — so it can be reported as what it is instead of standing in
+            // for every failure this step has.
+            throw DownloadError.badRelease(String(describing: error))
+        }
         log("\(channel.displayName) \(source.displayName) release: \(release.tag_name) with \(release.assets.count) assets")
 
         guard let asset = source.selectAsset(from: release.assets) else {
@@ -221,20 +423,104 @@ enum SideStoreDownloader {
         guard let assetURL = URL(string: asset.browser_download_url) else {
             throw DownloadError.badURL
         }
-        log("Downloading \(asset.name) (\(asset.size) bytes) …")
+        return try await fetch(assetURL, named: asset.name, log: log)
+    }
 
-        let (tmp, response) = try await URLSession.shared.download(from: assetURL)
-        if let http = response as? HTTPURLResponse {
-            log("HTTP \(http.statusCode) for \(asset.name)")
+    /// Run a URLSession call, typing the failures it can throw.
+    ///
+    /// `URLError` is the transport layer reporting that no answer came back —
+    /// offline, DNS, TLS, timeout, a host that can't be reached. It's the only
+    /// failure in this file that means GitHub is out of reach, and pulling it
+    /// out here is what lets the caller say so only when it's true.
+    private static func perform<T>(_ work: () async throws -> T) async throws -> T {
+        do {
+            return try await work()
+        } catch let error as URLError {
+            // A cancelled install surfaces here as a URLError rather than a
+            // CancellationError, and the pipeline tells those apart (see
+            // `Engine.startOneClick`) — a cancel isn't a failed download.
+            if error.code == .cancelled { throw CancellationError() }
+            throw DownloadError.unreachable(error)
         }
+    }
 
-        let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
-        try? FileManager.default.removeItem(at: dest)
-        try FileManager.default.moveItem(at: tmp, to: dest)
-        // Claim the file, so a later run knows this copy came off GitHub and is
-        // safe to replace — unlike one the user put there by hand.
-        DownloadLedger.record(dest)
-        return dest.path
+    /// Reject anything that isn't a 2xx *before* its body is trusted.
+    ///
+    /// This is the check whose absence made a spent rate limit read as a Codable
+    /// bug: GitHub answers a used-up quota with a 403 carrying a perfectly good
+    /// explanation, and handing that body to the release decoder threw the
+    /// explanation away in favour of "key 'tag_name' not found".
+    private static func check(_ response: URLResponse, body: Data? = nil) throws {
+        guard let http = response as? HTTPURLResponse else { return }
+        guard (200...299).contains(http.statusCode) else {
+            throw DownloadError.badStatus(status: http.statusCode,
+                                          detail: body.flatMap(errorMessage(in:)),
+                                          retryAfter: retryAfter(http))
+        }
+    }
+
+    /// When GitHub will start answering again, if this response is a rate limit
+    /// rather than some other refusal.
+    ///
+    /// `retry-after` covers the secondary limits, which report a number of
+    /// seconds. The primary hourly quota reports `x-ratelimit-reset` as a Unix
+    /// timestamp, and only means "wait" once nothing is left on the clock —
+    /// otherwise the header is just the counter every response carries.
+    private static func retryAfter(_ http: HTTPURLResponse) -> Date? {
+        if let seconds = http.value(forHTTPHeaderField: "retry-after").flatMap(Double.init) {
+            return Date().addingTimeInterval(seconds)
+        }
+        guard http.value(forHTTPHeaderField: "x-ratelimit-remaining") == "0",
+              let reset = http.value(forHTTPHeaderField: "x-ratelimit-reset").flatMap(Double.init)
+        else { return nil }
+        return Date(timeIntervalSince1970: reset)
+    }
+
+    /// The readable half of GitHub's error envelope
+    /// (`{"message": …, "documentation_url": …}`) — the actual explanation that
+    /// used to be discarded in favour of a decode failure.
+    private static func errorMessage(in data: Data) -> String? {
+        struct Envelope: Decodable { let message: String }
+        guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
+              !envelope.message.isEmpty else { return nil }
+        return envelope.message
+    }
+}
+
+/// Reads the release tag out of GitHub's redirect chain.
+///
+/// `releases/latest/download/<asset>` redirects to
+/// `releases/download/<tag>/<asset>` before it redirects again to the storage
+/// host, so the version is already passing through on the way to the bytes.
+/// Taking it from there costs no extra request and, being part of a download
+/// that has to happen anyway, can't fail on its own — which is the point. The
+/// version is only ever logged, and what this replaces was an install stopped
+/// dead by a request made solely to print one.
+private final class ReleaseTagRecorder: NSObject, URLSessionTaskDelegate {
+
+    /// Written on the session's delegate queue while the download runs, read
+    /// once it has finished — the await between them orders the two.
+    private(set) var tag: String?
+
+    func urlSession(_ session: URLSession,
+                    task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        if let found = Self.tag(in: request.url) { tag = found }
+        completionHandler(request)          // follow it, unchanged
+    }
+
+    /// The `<tag>` in `…/releases/download/<tag>/<asset>`, or nil for any other
+    /// shape — including the `…/releases/latest/download/<asset>` the chain
+    /// starts from, where "latest" sits where a tag would and names no version.
+    static func tag(in url: URL?) -> String? {
+        let parts = url?.pathComponents ?? []
+        guard let download = parts.lastIndex(of: "download"),
+              download > 0, parts[download - 1] == "releases",
+              download + 2 < parts.count            // a tag *and* an asset after it
+        else { return nil }
+        return parts[download + 1]
     }
 }
 

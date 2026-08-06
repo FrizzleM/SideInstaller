@@ -38,6 +38,12 @@ All notable changes to SideInstaller are documented here.
   record, which only a complete file has.
 
 ### Fixed
+- **Recent SideStore nightlies launch again.** They refuse to start unless every app extension inside
+  the bundle carries its own provisioning profile, and SideStore ships a widget. Signing wrote the
+  profile into the app but never into the widget, so the app died on the splash screen behind a
+  misleading Core Data error — *“Can't add the same store twice”* — that came back on every Retry. The
+  widget now gets the profile it is signed against, and the same fix covers any other IPA with
+  extensions. The signature was always correct; only the file was missing.
 - **The Pairing tab no longer fails with “adapter closed” after sitting idle.** It reused the device
   link on the strength of a check that only proves our handles aren't null — but iOS tears the tunnel
   down underneath them, so scanning or writing minutes later hit a dead link. It now re-establishes
@@ -72,8 +78,20 @@ All notable changes to SideInstaller are documented here.
   long as the app was open.
 - **Installing a large build no longer risks being killed for memory.** Each file of the signed bundle
   was read into memory whole before being uploaded a megabyte at a time; it's now mapped.
-- The activity log is capped at 2000 lines instead of growing for the whole session, and repeated
-  install-progress percentages are no longer logged.
+- **A busy GitHub no longer stops the install, or sends you off to sideload by hand.** The SideStore
+  download went through api.github.com, whose 60-requests-an-hour limit is counted per public IP — so
+  behind carrier-grade NAT the quota can be spent by strangers before SideInstaller asks for anything.
+  GitHub said so plainly, but the reply's status was never looked at: its body went to the release
+  decoder and came out as “Key 'tag_name' not found”, under a hint about GitHub being unreachable that
+  cost people ten minutes of manual work to get around a wait that clears itself. The IPA now comes off
+  GitHub's ordinary download link, which isn't rate-limited at all; the API is asked only if an asset
+  has been renamed. When something does go wrong the reasons stay apart — out of reach, refused (with
+  how long the wait is, when it's a limit), or an answer that wasn't a release — and the *fetch it
+  elsewhere and copy it in* hint appears only where that's genuinely the way past it.
+- **A download that isn't an IPA is caught when it arrives.** The status of the download itself was
+  logged but never checked, so a block page or a transfer that stopped partway was filed in Documents
+  under the name that had been asked for, and only found out much later as an unexplained signing
+  failure. A download now gets the same check an imported file has had since earlier in this release.
 
 ## 0.6.5
 

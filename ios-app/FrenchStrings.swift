@@ -135,7 +135,7 @@ let frenchStrings: [String: String] = [
     "Signing in": "Connexion en cours",
     "Refresh": "Actualiser",
     "Load certificates": "Charger les certificats",
-    "%d of 3 certificates": "Certificats : %d sur 3",
+    "%d certificate(s)": "%d certificat(s)",
     "No certificates": "Aucun certificat",
     "This Apple ID has no development certificates to revoke.":
         "Cet Apple ID n'a aucun certificat de développement à révoquer.",
@@ -183,6 +183,14 @@ let frenchStrings: [String: String] = [
         "impossible de trouver l'IPA dans la version %@ de %@",
     "%@ has no %@ release right now": "%@ n'a aucune version %@ pour le moment",
     "bad asset URL": "URL de ressource incorrecte",
+    "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
+        "GitHub limite les requêtes de ce réseau — il n'est pas bloqué, et la limite se réinitialise d'elle-même. Réessayez %@.",
+    "GitHub answered HTTP %d%@": "GitHub a répondu HTTP %d%@",
+    "couldn't reach GitHub: %@": "impossible de joindre GitHub : %@",
+    "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
+        "la réponse de GitHub n'était pas les informations de version (%@) — quelque chose sur ce réseau les a peut-être remplacées.",
+    "what downloaded as %@ isn't an IPA — something on this network returned a page instead, or the transfer stopped partway.":
+        "ce qui a été téléchargé sous le nom %@ n'est pas un IPA — quelque chose sur ce réseau a renvoyé une page, ou le transfert s'est interrompu.",
 
     // MARK: - Engine failures
 
@@ -224,8 +232,8 @@ let frenchStrings: [String: String] = [
     "there's nothing to download for a custom IPA — import one first":
         "il n'y a rien à télécharger pour un IPA personnalisé — importez-en un d'abord",
     "your app": "votre app",
-    "Apple allows only 3 signing certificates per Apple ID and this one already has 3, so a new one can't be made. Open the Certificates tab, tap “Load certificates”, and revoke an old or expired one to free a slot — then tap Install again. See the steps above.":
-        "Apple n'autorise que 3 certificats de signature par Apple ID et celui-ci en a déjà 3 : impossible d'en créer un nouveau. Ouvrez l'onglet Certificats, touchez « Charger les certificats » et révoquez-en un ancien ou expiré pour libérer une place, puis touchez à nouveau Installer. Voir les étapes ci-dessus.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists, or that a request for one is still pending (error 7460). SideInstaller couldn't reuse the certificate that's already there, so it stopped instead of replacing it. See the steps above.":
+        "Apple n'émettra pas de certificat de signature pour cet Apple ID : il indique qu'il en existe déjà un, ou qu'une demande est encore en attente (erreur 7460). SideInstaller n'a pas pu réutiliser le certificat déjà présent, il s'est donc arrêté au lieu de le remplacer. Voir les étapes ci-dessus.",
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "Impossible d'enregistrer cet iPhone%@ auprès de l'équipe de développement de votre Apple ID, Apple ne délivrera donc pas de profil de provisionnement. %@ — voir les étapes ci-dessus.",
@@ -265,17 +273,31 @@ let frenchStrings: [String: String] = [
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "Revenez dans SideInstaller, notez le code qu'il affiche, puis saisissez ce même code dans la demande affichée dans Réglages.",
 
-    "Too many signing certificates": "Trop de certificats de signature",
-    "Apple allows only 3 signing certificates per Apple ID, and this one already has 3 — usually left over from setting up AltStore / SideStore on other devices.":
-        "Apple n'autorise que 3 certificats de signature par Apple ID et celui-ci en a déjà 3 — en général des restes de la configuration d'AltStore / SideStore sur d'autres appareils.",
-    "Open the Certificates tab at the bottom of the screen, make sure your Apple ID is filled in, and tap “Load certificates”.":
-        "Ouvrez l'onglet Certificats en bas de l'écran, vérifiez que votre Apple ID est bien renseigné, puis touchez « Charger les certificats ».",
-    "Tap “Revoke” on an old or expired certificate to free up a slot. Revoking stops apps already signed with that certificate from launching on other devices, so pick one you no longer use.":
-        "Touchez « Révoquer » sur un certificat ancien ou expiré pour libérer une place. La révocation empêche les apps déjà signées avec ce certificat de s'ouvrir sur les autres appareils : choisissez-en un que vous n'utilisez plus.",
-    "Come back to the Install tab and tap Install again.":
-        "Revenez à l'onglet Installer et touchez à nouveau Installer.",
+    "A signing certificate already exists": "Un certificat de signature existe déjà",
+    "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
+        "Apple a renvoyé l'erreur 7460 : cet Apple ID possède déjà un certificat de développement iOS, ou une demande est encore en attente.",
+    "SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone.":
+        "SideInstaller n'a pas pu le réutiliser. Cela arrive quand le certificat a été émis ailleurs — AltStore, SideStore, Sideloadly ou Xcode sur un autre appareil — la clé privée nécessaire n'est donc pas sur cet iPhone.",
+    "Use “Revoke and retry” above, or open the Certificates tab, tap “Load certificates”, and revoke it there.":
+        "Utilise « Révoquer et réessayer » ci-dessus, ou ouvre l'onglet Certificats, touche « Charger les certificats » et révoque-le là.",
+    "Revoking is permanent: every app already signed with that certificate stops launching, on every device.":
+        "La révocation est définitive : toutes les apps déjà signées avec ce certificat cessent de se lancer, sur tous les appareils.",
     "Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again.":
         "Vous pouvez aussi vous connecter ci-dessus avec un autre Apple ID (ou un compte de secours), puis toucher à nouveau Installer.",
+
+    // MARK: - Revoke-and-retry (Apple error 7460)
+
+    "A certificate already exists": "Un certificat existe déjà",
+    "Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone.":
+        "Apple n'émettra pas un second certificat de signature pour cet Apple ID. Révoquer celui qui existe déjà permet de poursuivre l'installation, mais c'est irréversible.",
+    "Loading certificates": "Chargement des certificats",
+    "Revoke and retry": "Révoquer et réessayer",
+    "Which certificate should be revoked?": "Quel certificat faut-il révoquer ?",
+    "Apple reports a certificate on this Apple ID, but none came back in the list. It may be a request that's still pending — wait a few minutes and tap Install again.":
+        "Apple signale un certificat sur cet Apple ID, mais la liste est revenue vide. C'est peut-être une demande encore en attente : attends quelques minutes puis touche Installer à nouveau.",
+    "Every app already signed with the certificate you pick will stop launching, on every device — including apps installed by AltStore, SideStore, or a computer. This can't be undone. The install retries straight afterwards.":
+        "Toutes les apps déjà signées avec le certificat choisi cesseront de se lancer, sur tous les appareils — y compris celles installées par AltStore, SideStore ou depuis un ordinateur. C'est irréversible. L'installation reprend juste après.",
+    " (expired)": " (expiré)",
 
     "Couldn't register this device": "Impossible d'enregistrer cet appareil",
     "Your Apple ID has hit its limit of registered devices. Free accounts can only register a handful of devices per year and can't remove old ones until the year resets.":

@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Certificate manager: list and revoke the iOS development certificates on the
-/// signed-in Apple ID. Apple caps a free account at 3 signing certificates, so
-/// revoking a stale one here frees a slot when "Install" hits that limit.
+/// signed-in Apple ID. Apple refuses a new certificate while a current one
+/// exists (error 7460), so revoking a stale one here is what unblocks an install
+/// that stopped on it.
 struct CertsView: View {
     @EnvironmentObject private var engine: Engine
     /// Declared so every label on this screen redraws when the language changes.
@@ -115,7 +116,11 @@ struct CertsView: View {
         } else if !manager.certs.isEmpty {
             VStack(spacing: 14) {
                 HStack {
-                    Text(L("%d of 3 certificates", manager.certs.count))
+                    // Just the count. Apple never tells us the account's ceiling
+                    // — error 7460 fires whenever a current certificate exists,
+                    // with one on the team as readily as with several — so any
+                    // "x of N" here would be a number we invented.
+                    Text(L("%d certificate(s)", manager.certs.count))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
