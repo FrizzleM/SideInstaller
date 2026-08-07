@@ -243,7 +243,7 @@ creation, and signing. Real code, unverified until run with real credentials.
   signed bundle's Info.plist (isideload rewrites it to `<orig>.<teamID>`),
   falling back to `com.SideStore.SideStore`.
 
-**Pairing-file format — resolved in 0.8.0 (was a documented caveat).** What the
+**Pairing-file format — resolved in 0.9.0 (was a documented caveat).** What the
 RPPairing host produces is an **RPPairing** record (`public_key`,
 `private_key`, `identifier`, `alt_irk`). That is all *our* tunnel needs, and all
 StikDebug's sideloaded build reads — and nothing an AltStore-family app can
