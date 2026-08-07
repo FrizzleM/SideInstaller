@@ -122,6 +122,113 @@ final class DeviceConnection {
         }
     }
 
+    // MARK: Classic lockdown pair record
+
+    /// A classic lockdown pair record, and how enabling wireless lockdown went.
+    struct LockdownPairRecord {
+        /// The record as XML plist bytes.
+        let data: Data
+        /// nil when `EnableWifiDebugging` was set, the failure otherwise. Every
+        /// app that reads this record reaches lockdownd over a loopback, so a
+        /// failure here usually means the record won't work — it's still
+        /// returned, since the setting may already be on from an earlier pairing.
+        let wirelessLockdownError: String?
+    }
+
+    /// Run the classic lockdown `Pair` handshake over the RSD tunnel, then turn
+    /// on wireless lockdown, as iLoader does while building its pairing file.
+    ///
+    /// This is the half SideInstaller's RPPairing record doesn't carry: minimuxer
+    /// (SideStore, LiveContainer + SideStore) and Feather parse a classic record
+    /// — host/root/device certificates, HostID, SystemBUID, escrow bag — and
+    /// can't read RPPairing's key pair. Blocks while the device shows its Trust
+    /// prompt: idevice retries `Pair` until the user answers.
+    func lockdownPairRecord(hostID: String,
+                            systemBUID: String,
+                            hostName: String = "SideInstaller") throws -> LockdownPairRecord {
+        guard let adapter, let handshake else { throw fail("not connected") }
+
+        var client: OpaquePointer?
+        try check(lockdownd_connect_rsd(adapter, handshake, &client),
+                  "lockdownd_connect_rsd failed")
+        guard let client else { throw fail("lockdownd client was null") }
+        defer { lockdownd_client_free(client) }
+
+        var pf: OpaquePointer?
+        let pairError = hostID.withCString { host in
+            systemBUID.withCString { buid in
+                hostName.withCString { name in
+                    lockdownd_pair(client, host, buid, name, &pf)
+                }
+            }
+        }
+        try check(pairError, "lockdownd_pair failed")
+        guard let pf else { throw fail("lockdownd_pair returned no pair record") }
+        defer { idevice_pairing_file_free(pf) }
+
+        var bytes: UnsafeMutablePointer<UInt8>?
+        var length: UInt = 0
+        try check(idevice_pairing_file_serialize(pf, &bytes, &length),
+                  "idevice_pairing_file_serialize failed")
+        guard let bytes, length > 0 else { throw fail("serialized pair record was empty") }
+        let record = Data(bytes: bytes, count: Int(length))
+        idevice_data_free(bytes, length)
+
+        var wirelessError: String?
+        do { try enableWirelessLockdown(pairRecord: pf) }
+        catch { wirelessError = String(describing: error) }
+
+        return LockdownPairRecord(data: record, wirelessLockdownError: wirelessError)
+    }
+
+    /// Set `EnableWifiDebugging`, without which lockdownd answers over USB only —
+    /// and every app reading this record reaches it over a network loopback.
+    ///
+    /// Tried without a session first. Over USB, iLoader's route, setting a value
+    /// in that domain needs `StartSession`; over RSD the stream is already inside
+    /// the RPPairing tunnel and the endpoint is the *trusted* one, so the plain
+    /// request usually stands — and `StartSession` there wants to negotiate a
+    /// second TLS session inside the first, which it can't. The session is still
+    /// worth one attempt if the plain request is refused.
+    private func enableWirelessLockdown(pairRecord: OpaquePointer) throws {
+        do {
+            try setWirelessLockdown(startingSessionWith: nil)
+        } catch let sessionless {
+            do {
+                try setWirelessLockdown(startingSessionWith: pairRecord)
+            } catch {
+                // Both ways, so the log says which door was shut.
+                throw fail("without a session: \(sessionless); with one: \(error)")
+            }
+        }
+    }
+
+    /// One `SetValue` attempt on a fresh lockdown client — `Pair`, and a failed
+    /// request, both leave the client that ran them mid-protocol.
+    private func setWirelessLockdown(startingSessionWith pairRecord: OpaquePointer?) throws {
+        guard let adapter, let handshake else { throw fail("not connected") }
+
+        var client: OpaquePointer?
+        try check(lockdownd_connect_rsd(adapter, handshake, &client),
+                  "lockdownd_connect_rsd (wireless lockdown) failed")
+        guard let client else { throw fail("lockdownd client was null") }
+        defer { lockdownd_client_free(client) }
+
+        if let pairRecord {
+            try check(lockdownd_start_session(client, pairRecord),
+                      "lockdownd_start_session failed")
+        }
+
+        guard let value: plist_t = plist_new_bool(1) else { throw fail("couldn't build a plist bool") }
+        defer { plist_free(value) }          // set_value clones it
+        let setError = "EnableWifiDebugging".withCString { key in
+            "com.apple.mobile.wireless_lockdown".withCString { domain in
+                lockdownd_set_value(client, key, value, domain)
+            }
+        }
+        try check(setError, "lockdownd_set_value(EnableWifiDebugging) failed")
+    }
+
     // MARK: Installed apps (installation_proxy over RSD)
 
     /// Proves installation_proxy is reachable. `applicationType` nil = all.

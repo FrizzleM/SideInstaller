@@ -2,6 +2,30 @@
 
 All notable changes to SideInstaller are documented here.
 
+## Unreleased
+
+### Fixed
+- **SideStore, LiveContainer + SideStore and Feather can now read the pairing file SideInstaller
+  gives them.** SideInstaller pairs with your iPhone the only way an app on the phone can — the
+  code you type into Settings — and that produces one kind of pairing record. SideStore reads a
+  different, older kind, and so does Feather. What they were handed was a file they had no way to
+  parse, so they carried on asking for a pairing file as if none had been placed. SideInstaller now
+  produces the second kind as well, over the connection it already has open, and writes both of them
+  into a single file the way iLoader does — every app takes the half it understands and ignores the
+  rest. The step may ask you to tap Trust and unlock your iPhone once; after that the record is kept
+  and reused. It also turns on the wireless-lockdown setting these apps need to reach your iPhone
+  over the local tunnel, which nothing was doing before. If any of it fails, the install still
+  finishes and writes the record it always wrote — the log says which one went out.
+
+### Added
+- **Install the pairing file into every app at once.** The Pairing tab lists each supported app it
+  finds; with more than one, a single button now writes to all of them, as iLoader's *Place In All
+  Apps* does. One app refusing the write no longer stops the others — the summary names whichever
+  failed.
+- **Export hands over the file that works.** The Export button shared the raw pairing record, which
+  only StikDebug's sideloaded build could read. It now shares the combined file once one has been
+  built, so a manual import into SideStore or Feather works the same as an automatic one.
+
 ## 0.7.0
 
 ### Added

@@ -130,8 +130,10 @@ default), configurable in the UI.
 
 **Transport used:** RPPairing pair-verify over the LocalDevVPN Wi-Fi loopback →
 TLS-PSK tunnel → in-process software TCP stack (`tunnel_tcp_stack`) → RSD
-handshake → services over RSD. Pairing-record type: **RPPairing**
-(`rp_pairing_file.plist`), not a classic lockdown pairing record.
+handshake → services over RSD. Pairing-record type for **our own connection**:
+**RPPairing** (`rp_pairing_file.plist`), not a classic lockdown record. The file
+handed to *other* apps carries both records — see the format section under
+step 4.
 
 **Verified here (simulator):** project builds for device + sim; app launches;
 network scan works; the idevice FFI is callable and errors surface raw —
@@ -241,17 +243,66 @@ creation, and signing. Real code, unverified until run with real credentials.
   signed bundle's Info.plist (isideload rewrites it to `<orig>.<teamID>`),
   falling back to `com.SideStore.SideStore`.
 
-**Format caveat (documented, not papered over):** the pairing file we generate
-is an **RPPairing** record (`rp_pairing_file.plist`). SideStore's
-`ALTPairingFile.mobiledevicepairing` historically is a *classic* lockdown
-pairing record. Recent SideStore builds that use the LocalDevVPN/RSD path may
-accept the RPPairing record; this needs confirming on-device. The app logs this
-caveat after writing.
+**Pairing-file format — resolved in 0.8.0 (was a documented caveat).** What the
+RPPairing host produces is an **RPPairing** record (`public_key`,
+`private_key`, `identifier`, `alt_irk`). That is all *our* tunnel needs, and all
+StikDebug's sideloaded build reads — and nothing an AltStore-family app can
+parse. SideStore hands its `ALTPairingFile.mobiledevicepairing` straight to
+**minimuxer** (`AppBootManager.startMinimuxer`, via
+`PairingFileManager.fetchPairingFile`), which wants a *classic* lockdown record:
+`HostID`, `SystemBUID`, the host/root/device certificates and keys, `EscrowBag`,
+`WiFiMACAddress`, `UDID`. Feather is the same.
 
-**Transport used (whole pipeline):** classic lockdown is **not** used — every
-device service (lockdown info, installation_proxy, AFC, house_arrest) is reached
-over the in-process RSD tunnel (`tunnel_create_rppairing` → software TCP stack →
-RSD handshake), authenticated by the RPPairing record.
+iLoader ships **both records in one plist** (`pairing.rs::pairing_file` merges
+`generate_lockdown_plist` with `generate_rppairing_plist`), and every reader
+ignores the keys it doesn't know: idevice's `RpPairingFile::from_bytes` `remove`s
+its four and drops the rest, and the classic side is a serde struct
+(`RawPairingFile`) with no `deny_unknown_fields`.
+
+We now build the same merged file, minting the missing half **on-device**:
+
+- `DeviceConnection.lockdownPairRecord` runs the classic `Pair` handshake over
+  the RSD tunnel that is already open — `lockdownd_connect_rsd` →
+  `lockdownd_pair` → `idevice_pairing_file_serialize`. All of it is idevice-ffi
+  that was already linked (`pair` is in our feature list); **no Rust change and
+  no `build-rust.sh` run was needed**. idevice retries `Pair` internally on
+  `PairingDialogResponsePending`, so the call blocks while the device shows its
+  Trust prompt.
+- Then `EnableWifiDebugging` in `com.apple.mobile.wireless_lockdown`, as iLoader
+  does — without it lockdownd answers over USB only, and every app reading this
+  record reaches it over a loopback. Tried **without** a session first: over USB
+  (iLoader's route) `SetValue` in that domain needs `StartSession`, but over RSD
+  the stream is already inside the RPPairing tunnel and the endpoint is the
+  *trusted* one, while `StartSession` there would have to negotiate a second TLS
+  session inside the first. A session attempt is the fallback.
+- `CompositePairingFile` (in `PairingTargets.swift`) merges the two and stamps in
+  the `UDID`, which the `Pair` response doesn't carry and minimuxer needs. Output
+  is **XML, never binary**: SideStore reads the file with `String(contentsOf:)`
+  and hands minimuxer the *string*.
+- The classic half is cached (`Application Support/lockdown_pair_record.plist`,
+  keyed on the device UDID) because minting it is interactive and spends a
+  pairing slot; the merge itself is redone per write. A new RPPairing record
+  invalidates the merged file but keeps the cached classic one.
+
+Our lockdown half has the **same key set as iLoader's**: iLoader also
+round-trips usbmuxd's record through `PairingFile::serialize()`, i.e. the same
+`RawPairingFile` ten fields. Only the provenance differs — lockdown `Pair` over
+RSD instead of a usbmuxd cache entry.
+
+**Fallback, not a hard dependency:** if any of that fails, the write proceeds
+with the RPPairing record alone — what shipped before — and says so in the log.
+
+**Still unverified on hardware:** whether lockdownd accepts `Pair` on
+`com.apple.mobile.lockdown.remote.trusted`, and which of the two
+`EnableWifiDebugging` attempts lands. Both paths are logged explicitly.
+
+**Transport used (whole pipeline):** the classic lockdown *transport* (usbmuxd,
+port 62078) is **not** used — every device service (lockdown info,
+installation_proxy, AFC, house_arrest) is reached over the in-process RSD tunnel
+(`tunnel_create_rppairing` → software TCP stack → RSD handshake), authenticated
+by the RPPairing record. The classic lockdown *protocol* is spoken over that same
+tunnel for exactly one thing: minting the pair record other apps read
+(`lockdownd_pair` on `com.apple.mobile.lockdown.remote.trusted`).
 
 **Verified here:** full app builds for **both** the iOS *simulator* and a
 *generic iOS device* (no undefined/duplicate symbols despite idevice 0.1.61 +

@@ -209,11 +209,35 @@ struct PairingView: View {
                     Spacer()
                 }
                 .cascadeItem(3)
+                if manager.targets.count > 1 {
+                    placeInAllButton.cascadeItem(4)
+                }
                 ForEach(Array(manager.targets.enumerated()), id: \.element.id) { idx, target in
-                    targetRow(target).cascadeItem(4 + idx)
+                    targetRow(target).cascadeItem(5 + idx)
                 }
             }
         }
+    }
+
+    /// One tap for every scanned app, matching iLoader's "Place In All Apps".
+    private var placeInAllButton: some View {
+        Button { manager.installIntoAll() } label: {
+            HStack(spacing: 8) {
+                if manager.isInstallingAll {
+                    ProgressView().controlSize(.small)
+                    Text(L("Installing into all apps"))
+                } else {
+                    Image(systemName: "square.and.arrow.down.on.square")
+                    Text(L("Install pairing into all apps"))
+                }
+            }
+            .font(.subheadline.weight(.medium))
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .tint(Theme.brand)
+        .controlSize(.regular)
+        .disabled(manager.isBusy || engine.isRunning)
     }
 
     private var emptyTargets: some View {

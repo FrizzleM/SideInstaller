@@ -578,6 +578,18 @@ enum PrivateStore {
                 legacy: IPALibrary.documentsDir.appendingPathComponent("rp_pairing_file.plist"))
     }
 
+    /// The classic lockdown pair record, minted over the tunnel. Cached because
+    /// producing it is interactive and takes one of the device's pairing slots.
+    static var lockdownPairRecord: URL {
+        directory.appendingPathComponent("lockdown_pair_record.plist")
+    }
+
+    /// The pairing file handed to other apps: the RPPairing and lockdown records
+    /// merged into one plist. Rebuilt from those two whenever it's needed.
+    static var combinedPairingFile: URL {
+        directory.appendingPathComponent("combined_pairing_file.plist")
+    }
+
     /// isideload's `FsStorage` root, created on demand as isideload expects.
     static var isideload: URL {
         let url = resolve(private: directory.appendingPathComponent("isideload", isDirectory: true),

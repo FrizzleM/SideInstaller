@@ -163,6 +163,10 @@ final class PairingController {
             } else {
                 engine.pairingFilePath = path
                 engine.pairingStatus = L("paired: %@ (%dB)", name, size)
+                // A new RPPairing record makes half of the merged file stale;
+                // the cached lockdown record stays, since re-minting that one is
+                // interactive and spends a pairing slot on the device.
+                CompositePairingFile.invalidateMerged()
                 resolve(.success(path))
             }
         case let .failure(message):

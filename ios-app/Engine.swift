@@ -942,9 +942,11 @@ final class Engine: ObservableObject {
         // Built here, on the sign queue every other isideload call is
         // serialized on, rather than inside the device-queue write below.
         let accountConfig = await accountConfigJSON(source: source)
+        let udid = deviceUDID
         do {
             try await onDeviceQueue {
-                try self.performWritePairing(path: path, source: source, accountConfig: accountConfig)
+                try self.performWritePairing(path: path, udid: udid,
+                                             source: source, accountConfig: accountConfig)
             }
         } catch {
             // Only AltStore-family apps need this file, so an imported IPA
@@ -955,12 +957,15 @@ final class Engine: ObservableObject {
         setStep(.writePairing, .done)
     }
 
-    private func performWritePairing(path: String, source: InstallSource, accountConfig: String?) throws {
+    private func performWritePairing(path: String, udid: String?,
+                                     source: InstallSource, accountConfig: String?) throws {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
         let size = fileSize(path)
         guard FileManager.default.fileExists(atPath: path), size > 0 else {
             throw EngineError.message(L("Pairing file missing — pairing must run first."))
         }
+        // AltStore-family apps can't read the RPPairing record on its own.
+        let placement = placementPairingFile(rpPairingPath: path, udid: udid)
 
         // Resolve the host app's bundle id from installation_proxy, by display
         // name then base id, falling back to the signed bundle's own id.
@@ -984,7 +989,7 @@ final class Engine: ObservableObject {
         log("Writing pairing file into \(bundleID) /Documents/\(remoteRel) …")
         let written = try connection.writePairingFile(intoBundleID: bundleID,
                                                        remoteRelativePath: remoteRel,
-                                                       pairingFilePath: path)
+                                                       pairingFilePath: placement)
         log("Pairing file written into \(appName) and read-back VERIFIED (\(written) bytes).")
 
         // Hand SideStore the certificate it was signed with, so its first
@@ -1218,8 +1223,43 @@ final class Engine: ObservableObject {
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         let bundleID = target.bundleID
         let rel = target.remoteRelativePath
+        let udid = deviceUDID
         try await onDeviceQueue {
-            try self.performInstallPairing(bundleID: bundleID, remoteRelativePath: rel, path: path)
+            let placement = try self.resolvePlacement(rpPairingPath: path, udid: udid)
+            try self.performInstallPairing(bundleID: bundleID, remoteRelativePath: rel,
+                                           placementPath: placement)
+        }
+    }
+
+    /// Write the pairing file into every scanned target, as iLoader's
+    /// "Place In All Apps" does. Connects once, then writes each in turn.
+    @MainActor
+    func installPairing(intoAll targets: [InstalledPairingTarget]) async throws {
+        try await ensurePairingConnection()
+        let path = pairingFilePath ?? PairingController.pairingFilePath()
+        let udid = deviceUDID
+        // Resolved once for the whole run: minting the lockdown record can ask
+        // the user to tap Trust, and every app is handed the same file anyway.
+        let placement = try await onDeviceQueue {
+            try self.resolvePlacement(rpPairingPath: path, udid: udid)
+        }
+        var failures: [String] = []
+        for target in targets {
+            let bundleID = target.bundleID
+            let rel = target.remoteRelativePath
+            do {
+                try await onDeviceQueue {
+                    try self.performInstallPairing(bundleID: bundleID, remoteRelativePath: rel,
+                                                   placementPath: placement)
+                }
+            } catch {
+                // One app refusing the write shouldn't cost the rest.
+                log("⚠️ Couldn't write into \(target.name) (\(short(error))).")
+                failures.append(target.name)
+            }
+        }
+        guard failures.isEmpty else {
+            throw EngineError.message(L("Couldn't write into %@.", failures.joined(separator: ", ")))
         }
     }
 
@@ -1245,18 +1285,73 @@ final class Engine: ObservableObject {
         pairingStatus = L("connected")
     }
 
-    /// Write `path` into `bundleID`'s Documents, verifying the read-back.
-    private func performInstallPairing(bundleID: String, remoteRelativePath: String, path: String) throws {
+    /// Write the resolved pairing file into `bundleID`'s Documents, verifying
+    /// the read-back.
+    private func performInstallPairing(bundleID: String, remoteRelativePath: String,
+                                       placementPath: String) throws {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
-        let size = fileSize(path)
-        guard FileManager.default.fileExists(atPath: path), size > 0 else {
-            throw EngineError.message(L("Pairing file missing — generate it first."))
-        }
         log("Writing pairing file into \(bundleID) /Documents/\(remoteRelativePath) …")
         let written = try connection.writePairingFile(intoBundleID: bundleID,
                                                        remoteRelativePath: remoteRelativePath,
-                                                       pairingFilePath: path)
+                                                       pairingFilePath: placementPath)
         log("Pairing file written into \(bundleID) and read-back VERIFIED (\(written) bytes).")
+    }
+
+    /// The file to hand over, once the RPPairing record it's built from is known
+    /// to be there. Runs on `deviceQueue`.
+    private func resolvePlacement(rpPairingPath: String, udid: String?) throws -> String {
+        guard FileManager.default.fileExists(atPath: rpPairingPath), fileSize(rpPairingPath) > 0 else {
+            throw EngineError.message(L("Pairing file missing — generate it first."))
+        }
+        return placementPairingFile(rpPairingPath: rpPairingPath, udid: udid)
+    }
+
+    // MARK: The file other apps actually read
+
+    /// The pairing file to hand to another app: the RPPairing record merged with
+    /// a classic lockdown one, falling back to the RPPairing record alone.
+    ///
+    /// SideInstaller's own tunnel runs on RPPairing, but that's the only record
+    /// it produces, and minimuxer — SideStore, LiveContainer + SideStore — and
+    /// Feather all parse a classic lockdown record instead. iLoader's pairing
+    /// file carries both; this mints the missing half over the tunnel that's
+    /// already open and merges the two, exactly as iLoader does.
+    ///
+    /// Must run on `deviceQueue`: it talks to the device. Never throws — a
+    /// failure costs the classic half, not the write, and the RPPairing record
+    /// alone is what shipped before and still serves StikDebug's sideloaded
+    /// build.
+    private func placementPairingFile(rpPairingPath: String, udid: String?) -> String {
+        do {
+            let rpPairing = try Data(contentsOf: URL(fileURLWithPath: rpPairingPath))
+
+            let lockdown: Data
+            if let cached = CompositePairingFile.cachedLockdownRecord(forUDID: udid) {
+                lockdown = cached
+            } else {
+                log("Pairing with lockdown as well, so AltStore-family apps can read the file. Tap Trust if this iPhone asks, and unlock it if it's locked …")
+                let record = try connection.lockdownPairRecord(hostID: CompositePairingFile.hostID,
+                                                               systemBUID: CompositePairingFile.systemBUID)
+                if let problem = record.wirelessLockdownError {
+                    // The record still goes in: the setting may already be on.
+                    log("⚠️ Couldn't turn on wireless lockdown (\(problem)). Apps read this file over a loopback, so they may still refuse it.")
+                } else {
+                    log("Lockdown pairing done, wireless lockdown enabled.")
+                }
+                lockdown = record.data
+                try CompositePairingFile.storeLockdownRecord(lockdown, forUDID: udid)
+            }
+
+            let merged = try CompositePairingFile.merge(lockdown: lockdown,
+                                                        rpPairing: rpPairing,
+                                                        udid: udid)
+            let path = try CompositePairingFile.store(merged)
+            log("Pairing file carries both records (\(merged.count) bytes) — readable by SideStore, LiveContainer and Feather as well as StikDebug.")
+            return path
+        } catch {
+            log("⚠️ Couldn't add the lockdown record to the pairing file (\(short(error))). Writing the RPPairing record on its own — StikDebug (sideloaded) reads that, SideStore and Feather won't.")
+            return rpPairingPath
+        }
     }
 
     // MARK: 2FA bridge

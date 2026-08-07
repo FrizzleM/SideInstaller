@@ -16,6 +16,8 @@ final class PairingManager: ObservableObject {
     @Published private(set) var isScanning = false
     /// `id` (bundle id) of the target currently being written, if any.
     @Published private(set) var installingTargetID: String?
+    /// True while writing into every scanned target at once.
+    @Published private(set) var isInstallingAll = false
 
     // Results.
     @Published private(set) var targets: [InstalledPairingTarget] = []
@@ -27,11 +29,16 @@ final class PairingManager: ObservableObject {
     private var engine: Engine { Engine.shared }
 
     /// Any operation in flight, which disables the controls.
-    var isBusy: Bool { isGenerating || isScanning || installingTargetID != nil }
+    var isBusy: Bool { isGenerating || isScanning || isInstallingAll || installingTargetID != nil }
 
     /// The pairing file to hand to a share sheet, when one exists on disk.
+    /// Prefers the merged record, which is the one every supported app can read;
+    /// it only exists once a write has built it.
     var exportURL: URL? {
         guard pairingFileExists else { return nil }
+        if let merged = CompositePairingFile.existingPath() {
+            return URL(fileURLWithPath: merged)
+        }
         return URL(fileURLWithPath: PairingController.pairingFilePath())
     }
 
@@ -101,6 +108,27 @@ final class PairingManager: ObservableObject {
                 lastError = message(error)
             }
             installingTargetID = nil
+        }
+    }
+
+    /// Write the pairing file into every scanned target, as iLoader's
+    /// "Place In All Apps" does.
+    func installIntoAll() {
+        guard !isBusy, !targets.isEmpty else { return }
+        lastError = nil
+        lastSuccess = nil
+        isInstallingAll = true
+        let all = targets
+        Task {
+            do {
+                try await engine.installPairing(intoAll: all)
+                lastSuccess = all.count == 1
+                    ? L("Pairing file installed into %@.", all[0].name)
+                    : L("Pairing file installed into all %d apps.", all.count)
+            } catch {
+                lastError = message(error)
+            }
+            isInstallingAll = false
         }
     }
 
