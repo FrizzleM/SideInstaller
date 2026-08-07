@@ -139,6 +139,20 @@ pub unsafe extern "C" fn si_sign_ipa(
     account::sign_ipa(session, ipa_path, udid, device_name, out_signed_path, out_error)
 }
 
+/// Build SideStore's `Account.sideconf` payload, setting `*out_json` to it.
+/// Blocks.
+///
+/// # Safety
+/// See `account::account_config`.
+#[no_mangle]
+pub unsafe extern "C" fn si_account_config(
+    session: *mut SignSession,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    account::account_config(session, out_json, out_error)
+}
+
 /// Free a sign session.
 ///
 /// # Safety

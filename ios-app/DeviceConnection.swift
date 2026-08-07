@@ -327,10 +327,23 @@ final class DeviceConnection {
     func writePairingFile(intoBundleID bundleID: String,
                           remoteRelativePath: String,
                           pairingFilePath: String) throws -> Int {
-        guard let adapter, let handshake else { throw fail("not connected") }
-
         let data = try Data(contentsOf: URL(fileURLWithPath: pairingFilePath))
         guard !data.isEmpty else { throw fail("pairing file at \(pairingFilePath) is empty") }
+        return try writeFile(intoBundleID: bundleID,
+                             remoteRelativePath: remoteRelativePath,
+                             data: data)
+    }
+
+    /// Write `data` into `bundleID`'s Documents at `remoteRelativePath`, then
+    /// read it back to prove the write committed, returning the verified byte
+    /// count. The pairing file is one caller; SideStore's `Account.sideconf`
+    /// hand-off is the other.
+    @discardableResult
+    func writeFile(intoBundleID bundleID: String,
+                   remoteRelativePath: String,
+                   data: Data) throws -> Int {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        guard !data.isEmpty else { throw fail("refusing to write an empty file") }
 
         var ha: OpaquePointer?
         try check(house_arrest_client_connect_rsd(adapter, handshake, &ha),

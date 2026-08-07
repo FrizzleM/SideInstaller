@@ -939,8 +939,13 @@ final class Engine: ObservableObject {
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         // The installed build decides the host app and where the file lands.
         let source = downloadedSource ?? installSource
+        // Built here, on the sign queue every other isideload call is
+        // serialized on, rather than inside the device-queue write below.
+        let accountConfig = await accountConfigJSON(source: source)
         do {
-            try await onDeviceQueue { try self.performWritePairing(path: path, source: source) }
+            try await onDeviceQueue {
+                try self.performWritePairing(path: path, source: source, accountConfig: accountConfig)
+            }
         } catch {
             // Only AltStore-family apps need this file, so an imported IPA
             // failing here doesn't fail the run.
@@ -950,7 +955,7 @@ final class Engine: ObservableObject {
         setStep(.writePairing, .done)
     }
 
-    private func performWritePairing(path: String, source: InstallSource) throws {
+    private func performWritePairing(path: String, source: InstallSource, accountConfig: String?) throws {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
         let size = fileSize(path)
         guard FileManager.default.fileExists(atPath: path), size > 0 else {
@@ -981,6 +986,67 @@ final class Engine: ObservableObject {
                                                        remoteRelativePath: remoteRel,
                                                        pairingFilePath: path)
         log("Pairing file written into \(appName) and read-back VERIFIED (\(written) bytes).")
+
+        // Hand SideStore the certificate it was signed with, so its first
+        // sign-in doesn't revoke ours, mint its own, and put up "Resign
+        // SideStore". Never fails the run: the install is complete either way.
+        if let accountConfig, let remoteRel = accountConfigRemoteRelativePath(source: source) {
+            do {
+                let handed = try connection.writeFile(intoBundleID: bundleID,
+                                                      remoteRelativePath: remoteRel,
+                                                      data: Data(accountConfig.utf8))
+                log("Certificate handed to \(appName): /Documents/\(remoteRel) written and read-back VERIFIED (\(handed) bytes). SideStore imports and deletes it on first launch.")
+            } catch {
+                log("⚠️ Couldn't hand \(appName) the signing certificate (\(short(error))). It's installed and ready, but it will ask to resign itself on first sign-in.")
+            }
+        }
+    }
+
+    /// The `Account.sideconf` payload for this install, or nil when there's
+    /// nothing to hand over. Never throws — a failure here costs the automatic
+    /// hand-off, not the install.
+    @MainActor
+    private func accountConfigJSON(source: InstallSource) async -> String? {
+        guard accountConfigRemoteRelativePath(source: source) != nil else { return nil }
+        guard let session = signSession else {
+            log("No Apple ID session to build the account config from — skipping the certificate hand-off.")
+            return nil
+        }
+        do {
+            return try await onSignQueue { try self.buildAccountConfig(session: session) }
+        } catch {
+            log("⚠️ Couldn't build the certificate hand-off (\(short(error))). SideStore will ask to resign itself on first sign-in.")
+            return nil
+        }
+    }
+
+    /// Where `Account.sideconf` goes, or nil if this install isn't SideStore.
+    /// Under LiveContainer, SideStore is a guest with a nested Documents folder;
+    /// a custom IPA qualifies only when it really is a SideStore build — its
+    /// bundle id is the signed one, which isideload suffixes with ".<teamID>".
+    private func accountConfigRemoteRelativePath(source: InstallSource) -> String? {
+        switch source {
+        case .sideStore:     return "Account.sideconf"
+        case .liveContainer: return "SideStore/Documents/Account.sideconf"
+        case .custom:
+            guard signedAppBundleID()?.hasPrefix("com.SideStore.SideStore") == true else { return nil }
+            return "Account.sideconf"
+        }
+    }
+
+    private func buildAccountConfig(session: OpaquePointer) throws -> String {
+        var json: UnsafeMutablePointer<CChar>?
+        var error: UnsafeMutablePointer<CChar>?
+        let rc = si_account_config(session, &json, &error)
+        guard rc == 0 else {
+            let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
+            error.map { si_string_free($0) }
+            throw EngineError.message(msg)
+        }
+        let payload = json.map { String(cString: $0) } ?? ""
+        json.map { si_string_free($0) }
+        guard !payload.isEmpty else { throw EngineError.message("empty account config") }
+        return payload
     }
 
     // MARK: Success

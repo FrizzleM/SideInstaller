@@ -167,7 +167,7 @@ Fixes applied (connect path + pairing gate only):
 
 ### Step 3 — Apple ID + signing — code complete; device/account steps unverified
 
-`account.rs` wraps isideload behind two FFI calls:
+`account.rs` wraps isideload behind three FFI calls:
 - `si_apple_signin` — `AppleAccount::builder().anisette_provider(RemoteV3…)
   .login(password, 2fa_cb)` → `DeveloperSession::from_account` →
   `SideloaderBuilder` (team `First`, `FsStorage`, machine name) → opaque
@@ -185,6 +185,30 @@ Fixes applied (connect path + pairing gate only):
   team has no devices …"). The UDID comes from the lockdown handshake, captured
   by Swift during Connect and passed down; a registration failure is prefixed
   `device registration failed for UDID <udid>:` so Swift can surface the UDID.
+- `si_account_config(session, …)` — builds the `Account.sideconf` payload
+  SideStore imports at launch: Apple ID, the signing certificate as a PKCS#12
+  encrypted with its machine id (the convention AltStore-family apps expect),
+  and the anisette identity. Swift writes it into SideStore's Documents in the
+  same step as the pairing file (step 8), and SideStore's
+  `LaunchViewController.detectAndImportAccountFile` adopts it and deletes it.
+
+  **Why:** SideStore only signs with a certificate it holds the private key for.
+  Ours never leaves this app, so its first sign-in revokes ours, mints its own,
+  and shows "Resign SideStore". Nothing else fixes that. In particular isideload
+  *already* injects `ALTCertificate.p12` + `ALTCertificateID` into the bundle
+  (`application.rs::apply_special_app_behavior`) — recent SideStore reads
+  neither for itself, so that path is inert here. `Account.sideconf` is the one
+  hand-off it still honours automatically.
+
+  Two **vendored additions** back this: `CertificateIdentity::retrieve_existing`
+  (isideload's `retrieve` mints a certificate when it finds no match, which on a
+  free account means revoking the one in use — reading the identity must never
+  be able to do that, so this returns `None` instead), and `pub mod state` in
+  `anisette::remote_v3`, so the stored `AnisetteState` can be read back.
+  `anisetteIdentifier`/`anisetteAdiBlob` are base64 of `keychain_identifier` and
+  `adi_pb` — exactly the encoding both sides already send the anisette server.
+  The Apple ID password is omitted: it isn't needed to keep the certificate, and
+  the file is plaintext JSON until SideStore consumes it.
 
 **idevice version coexistence:** isideload pulls idevice **0.1.61** (crates.io,
 behind its `install` feature, which is required because its feature-gating is

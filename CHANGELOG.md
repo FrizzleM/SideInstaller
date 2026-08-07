@@ -5,6 +5,19 @@ All notable changes to SideInstaller are documented here.
 ## 0.7.0
 
 ### Added
+- **SideStore is handed the certificate it was installed with.** SideStore only signs with a
+  certificate it holds the private key for, and the one SideInstaller installs it with lives here,
+  not there. On a free Apple ID — one certificate, no room for a second — SideStore's first sign-in
+  therefore revoked ours, issued its own, and put up *Resign SideStore*, asking to reinstall itself
+  before it would refresh. The install now seeds `Account.sideconf` into SideStore's container in
+  the same step that writes the pairing file, over the same tunnel: SideStore imports the
+  certificate on first launch, deletes the file, and carries on with the certificate it already has.
+  No revoke, no reinstall, nothing for you to do. Your Apple ID password is deliberately not
+  included — it isn't needed to keep the certificate, and the file is plain JSON until SideStore
+  reads it. Reinstalling over a SideStore you had already set up replaces its stored account, so
+  you'll enter your Apple ID password there once more. Building the file only ever reads the
+  certificate: it can't create one, so it can't revoke one either, and a failure is logged and
+  skipped rather than failing an install that is otherwise complete.
 - **Custom .ipa.** A third option in the Install picker, alongside SideStore and LiveContainer +
   SideStore. Choosing it swaps the Stable/Nightly control for an **Import .ipa** button that opens the
   Files picker — pick any IPA, from iCloud Drive, a USB drive, anywhere — and SideInstaller signs and

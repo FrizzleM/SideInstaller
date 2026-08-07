@@ -1,4 +1,6 @@
-mod state;
+// Public so the anisette identity can be read back out of storage and handed to
+// another AltStore-family app (SideInstaller's Account.sideconf seeding).
+pub mod state;
 
 use std::sync::Arc;
 use std::time::SystemTime;

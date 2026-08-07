@@ -118,6 +118,17 @@ int32_t si_sign_ipa(SignSession *session,
                     char **out_signed_path,
                     char **out_error);
 
+// Build the Account.sideconf payload SideStore imports on launch (Apple ID,
+// signing certificate as an encrypted p12, and the anisette identity). BLOCKS.
+// On success *out_json is that JSON, to be written into SideStore's Documents.
+// The Apple ID password is deliberately omitted. Never mints a certificate (so
+// it can never revoke one): fails if this Apple ID has no SideInstaller
+// certificate yet, or if anisette hasn't been provisioned. Returns 0 on
+// success, non-zero on error (*out_error set). Free strings with si_string_free.
+int32_t si_account_config(SignSession *session,
+                          char **out_json,
+                          char **out_error);
+
 // Free a sign session.
 void si_sign_session_free(SignSession *session);
 

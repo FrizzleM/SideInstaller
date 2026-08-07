@@ -4123,9 +4123,11 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 name = "sideinstaller_ffi"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "idevice 0.1.63",
  "idevice-ffi",
  "isideload",
+ "plist",
  "serde",
  "serde_json",
  "tokio",

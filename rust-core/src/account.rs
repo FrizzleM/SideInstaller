@@ -9,12 +9,16 @@ use std::ffi::{c_char, c_void, CStr};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
 
+use base64::{prelude::BASE64_STANDARD, Engine as _};
 use isideload::{
-    anisette::remote_v3::RemoteV3AnisetteProvider,
+    anisette::remote_v3::{state::AnisetteState, RemoteV3AnisetteProvider},
     auth::apple_account::AppleAccount,
     dev::{developer_session::DeveloperSession, devices::DevicesApi},
-    sideload::{builder::MaxCertsBehavior, sideloader::Sideloader, SideloaderBuilder, TeamSelection},
-    util::fs_storage::FsStorage,
+    sideload::{
+        builder::MaxCertsBehavior, cert_identity::CertificateIdentity, sideloader::Sideloader,
+        SideloaderBuilder, TeamSelection,
+    },
+    util::{fs_storage::FsStorage, storage::SideloadingStorage},
 };
 
 use crate::ffi_util::cstr;
@@ -28,6 +32,10 @@ pub type TwoFactorCb =
 pub struct SignSession {
     rt: tokio::runtime::Runtime,
     sideloader: Sideloader,
+    /// Kept because `Sideloader` exposes neither, and `export_p12` needs both to
+    /// look the signing identity up the same way `sign_app` does.
+    machine_name: String,
+    storage_dir: PathBuf,
 }
 
 // Used only through its own runtime, serialized by Swift on one queue.
@@ -144,7 +152,12 @@ pub unsafe fn apple_signin(
 
     match result {
         Ok(Ok((rt, (sideloader, summary)))) => {
-            let session = Box::new(SignSession { rt, sideloader });
+            let session = Box::new(SignSession {
+                rt,
+                sideloader,
+                machine_name,
+                storage_dir: PathBuf::from(&storage_dir),
+            });
             *out_session = Box::into_raw(session);
             *out_summary = cstr(summary);
             0
@@ -237,6 +250,127 @@ pub unsafe fn sign_ipa(
         }
         Err(_) => {
             *out_error = cstr("panic during signing");
+            2
+        }
+    }
+}
+
+/// Build the `Account.sideconf` payload SideStore imports on launch, setting
+/// `*out_json` to it.
+///
+/// SideStore only signs with a certificate it holds the private key for, so an
+/// install signed by us is revoked and resigned on its first sign-in unless it
+/// is given ours. `LaunchViewController.detectAndImportAccountFile` reads this
+/// file from SideStore's Documents, adopts the certificate, and deletes it —
+/// which is what Swift then writes over the tunnel.
+///
+/// The Apple ID password is deliberately **not** included. It isn't needed to
+/// keep the certificate (SideStore prompts for it as usual), and the payload
+/// travels as plaintext JSON through a directory the Files app can see until
+/// SideStore consumes it.
+///
+/// The certificate must already exist on the portal — this never mints one, so
+/// it cannot revoke anything as a side effect; sign an IPA first if it doesn't.
+///
+/// # Safety
+/// `session` must be a valid pointer from `apple_signin`; out pointers valid.
+pub unsafe fn account_config(
+    session: *mut SignSession,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    if session.is_null() {
+        *out_error = cstr("null session");
+        return 2;
+    }
+    let session = &mut *session;
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let machine_name = session.machine_name.clone();
+        let storage = FsStorage::new(session.storage_dir.clone());
+
+        // SideStore wants the same two values isideload hands the anisette
+        // server, encoded the same way: base64 of the 16 identifier bytes, and
+        // base64 of the provisioned adi.pb.
+        let (anisette_identifier, anisette_adi_blob) = {
+            let raw = storage
+                .retrieve_data("anisette_state")
+                .map_err(|e| format!("could not read the anisette state: {e}"))?
+                .ok_or("no anisette state stored yet — sign in first")?;
+            let state: AnisetteState = plist::from_bytes(&raw)
+                .map_err(|e| format!("could not parse the anisette state: {e}"))?;
+            let adi_pb = state
+                .adi_pb
+                .ok_or("this device hasn't been provisioned with the anisette server yet")?;
+            (
+                BASE64_STANDARD.encode(state.keychain_identifier),
+                BASE64_STANDARD.encode(adi_pb),
+            )
+        };
+
+        session.rt.block_on(async {
+            let team = session
+                .sideloader
+                .get_team()
+                .await
+                .map_err(|e| format!("get_team: {e}"))?;
+            let email = session.sideloader.get_email().to_string();
+
+            tracing::info!("Looking up the '{machine_name}' certificate to hand over");
+            let identity = CertificateIdentity::retrieve_existing(
+                &machine_name,
+                &email,
+                session.sideloader.get_dev_session(),
+                &team,
+                &storage,
+            )
+            .await
+            .map_err(|e| format!("certificate lookup failed: {e}"))?
+            .ok_or_else(|| {
+                format!(
+                    "no '{machine_name}' certificate on this Apple ID yet — install \
+                     an app first, which is what creates it"
+                )
+            })?;
+
+            // The machine id is the password AltStore-family apps expect a
+            // handed-over p12 to carry.
+            let cert_password = identity.machine_id.clone();
+            let p12 = identity
+                .as_p12(&cert_password)
+                .await
+                .map_err(|e| format!("failed to build the PKCS#12 archive: {e}"))?;
+
+            let payload = serde_json::json!({
+                "version": "2.0",
+                "email": email,
+                "certificateData": BASE64_STANDARD.encode(&p12),
+                "certType": "encrypted",
+                "certificatePassword": cert_password,
+                "anisetteIdentifier": anisette_identifier,
+                "anisetteAdiBlob": anisette_adi_blob,
+            });
+
+            tracing::info!(
+                "Built account config for certificate {} ({} byte p12)",
+                identity.get_serial_number(),
+                p12.len()
+            );
+            Ok::<_, String>(payload.to_string())
+        })
+    }));
+
+    match result {
+        Ok(Ok(json)) => {
+            *out_json = cstr(json);
+            0
+        }
+        Ok(Err(e)) => {
+            *out_error = cstr(e);
+            1
+        }
+        Err(_) => {
+            *out_error = cstr("panic while building the account config");
             2
         }
     }

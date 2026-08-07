@@ -149,6 +149,38 @@ impl CertificateIdentity {
         })
     }
 
+    /// Like [`Self::retrieve`], but never asks Apple for a new certificate:
+    /// returns `Ok(None)` when the portal holds none matching this private key
+    /// and machine name. Reading the identity must not be able to trigger the
+    /// revoke-and-replace that minting a certificate implies on a free account.
+    pub async fn retrieve_existing(
+        machine_name: &str,
+        apple_email: &str,
+        developer_session: &mut DeveloperSession,
+        team: &DeveloperTeam,
+        storage: &dyn SideloadingStorage,
+    ) -> Result<Option<Self>, Report> {
+        let pr = Self::retrieve_private_key(apple_email, storage).await?;
+        let signing_key = Self::build_signing_key(&pr)?;
+
+        match Self::find_matching(&pr, machine_name, developer_session, team).await {
+            Ok(Some((cert, x509_cert))) => Ok(Some(Self {
+                machine_id: cert.machine_id.clone().unwrap_or_default(),
+                machine_name: cert.machine_name.clone().unwrap_or_default(),
+                certificate: x509_cert,
+                private_key: pr,
+                signing_key,
+            })),
+            Ok(None) => Ok(None),
+            // Matched `retrieve`'s handling: a lookup failure is indistinguishable
+            // from a miss here, and neither is worth failing the caller over.
+            Err(e) => {
+                error!("Failed to check for matching certificate: {:?}", e);
+                Ok(None)
+            }
+        }
+    }
+
     async fn retrieve_private_key(
         apple_email: &str,
         storage: &dyn SideloadingStorage,

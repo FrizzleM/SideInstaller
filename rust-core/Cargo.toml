@@ -85,6 +85,12 @@ tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# Reading isideload's stored anisette state (an XML plist) so the identity can
+# be handed to SideStore, and base64 for the fields SideStore expects encoded.
+# Both are already in the tree via isideload, so this adds no new deps.
+plist = "1.8"
+base64 = "0.22.1"
+
 # Logging spine: forward idevice's `tracing` events (and any `log` records via
 # the tracing-log compat layer, enabled by default) through the FFI callback.
 tracing = "0.1"
