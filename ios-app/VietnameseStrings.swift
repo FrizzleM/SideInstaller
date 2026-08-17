@@ -459,18 +459,10 @@ let vietnameseStrings: [String: String] = [
     "Version %@ (%@)": "Phiên bản %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller cài SideStore và LiveContainer thẳng vào iPhone của bạn, không cần đến máy tính.",
-    "Everything runs on the device: your Apple ID signs the apps locally and is never sent anywhere, and there's no server, no account and no analytics behind any of it.":
-        "Mọi thứ đều chạy trên máy: Apple ID của bạn ký ứng dụng ngay tại chỗ và không bao giờ được gửi đi đâu, phía sau cũng không có máy chủ, tài khoản hay thống kê nào.",
 
     "Links": "Liên kết",
     "Source code": "Mã nguồn",
-    "Read it, audit it or open a pull request on GitHub.":
-        "Hãy đọc, kiểm tra hoặc mở một pull request trên GitHub.",
-    "Get help, report bugs and follow what's being worked on.":
-        "Nhận trợ giúp, báo lỗi và theo dõi những gì đang được phát triển.",
     "Support the project": "Ủng hộ dự án",
-    "SideInstaller is free. Ko-fi is there if you'd like to chip in anyway.":
-        "SideInstaller miễn phí. Ko-fi ở đó phòng khi bạn vẫn muốn góp một chút.",
 
     "Special thanks": "Lời cảm ơn đặc biệt",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
@@ -479,20 +471,18 @@ let vietnameseStrings: [String: String] = [
         "Vì đã hỗ trợ và phát hiện những lỗi sau đó được sửa.",
 
     "Built with": "Được xây dựng với",
-    "The open-source work this app is built on:":
+    "The open source work this app is built on:":
         "Những dự án mã nguồn mở mà ứng dụng này dựa trên:",
-    "Pairing, the tunnel and the install itself — by jkcoxson, MIT.":
-        "Ghép nối, đường hầm và chính việc cài đặt — của jkcoxson, giấy phép MIT.",
-    "Apple ID sign-in, certificates and on-device signing — by nab138, MIT.":
-        "Đăng nhập Apple ID, chứng chỉ và ký ngay trên máy — của nab138, giấy phép MIT.",
+    "Pairing, the tunnel and the install itself. By jkcoxson, MIT.":
+        "Ghép nối, đường hầm và chính việc cài đặt. Của jkcoxson, giấy phép MIT.",
+    "Apple ID sign in, certificates and signing on the device. By nab138, MIT.":
+        "Đăng nhập Apple ID, chứng chỉ và ký ngay trên máy. Của nab138, giấy phép MIT.",
     "The sideloading app this installs for you.":
         "Ứng dụng sideload mà ứng dụng này cài giúp bạn.",
     "Runs sideloaded apps without spending an app slot on each one.":
         "Chạy các ứng dụng sideload mà không tốn một suất ứng dụng cho mỗi cái.",
-    "The developer disk image location spoofing mounts — mirrored by doronz88.":
-        "Ảnh đĩa nhà phát triển mà chức năng giả lập vị trí gắn kết — được doronz88 lưu bản sao.",
-    "Plus the Rust crates tokio, serde, plist, base64 and tracing.":
-        "Cùng các crate Rust tokio, serde, plist, base64 và tracing.",
+    "The developer disk image location spoofing mounts. Mirrored by doronz88.":
+        "Ảnh đĩa nhà phát triển mà chức năng giả lập vị trí gắn kết. Được doronz88 lưu bản sao.",
 
     "Where to get it": "Nơi tải ứng dụng",
     "Only the builds on the official install page and repository are mine. Anyone can fork the source, add a credential stealer and ship it under the same name and icon — so don't trust your Apple ID to a copy from anywhere else.":
