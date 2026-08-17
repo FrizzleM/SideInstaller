@@ -26,9 +26,12 @@ use crate::ffi_util::{cstr, opt_str};
 
 /// Opaque handle owning the runtime, developer session and selected team.
 pub struct CertSession {
-    rt: tokio::runtime::Runtime,
-    dev: DeveloperSession,
-    team: DeveloperTeam,
+    // `pub(crate)` so `entitlements` can reuse this session: the App ID
+    // capability calls need the same developer session and team, and signing in
+    // twice would mean a second 2FA prompt for the same account.
+    pub(crate) rt: tokio::runtime::Runtime,
+    pub(crate) dev: DeveloperSession,
+    pub(crate) team: DeveloperTeam,
 }
 
 // Used only through its own runtime, serialized by Swift on one queue.

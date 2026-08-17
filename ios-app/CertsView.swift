@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// Lists and revokes the Apple ID's development certificates, which is what
-/// unblocks an install stopped on error 7460.
+/// unblocks an install stopped on error 7460. Pushed from Tools, whose
+/// `NavigationStack` this relies on.
 struct CertsView: View {
-    @EnvironmentObject private var engine: Engine
     /// Declared so every label on this screen redraws when the language changes.
     @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: CertManager
@@ -13,28 +13,25 @@ struct CertsView: View {
     @State private var pendingRevoke: DevCert?
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 18) {
-                    header.cascadeItem(0)
-                    appleIDCard.cascadeItem(1)
-                    loadButton.cascadeItem(2)
-                    if let error = manager.lastError {
-                        errorCallout(error).transition(.cardAppear)
-                    }
-                    certList
+        ScrollView {
+            VStack(spacing: 18) {
+                header.cascadeItem(0)
+                loadButton.cascadeItem(1)
+                if let error = manager.lastError {
+                    errorCallout(error).transition(.cardAppear)
                 }
-                .padding(20)
-                .animation(.smooth(duration: 0.35), value: manager.lastError)
-                .animation(.smooth(duration: 0.35), value: manager.certs)
-                .animation(.smooth(duration: 0.3), value: manager.isWorking)
-                .animation(.smooth(duration: 0.35), value: manager.teamSummary)
+                certList
             }
-            .scrollDismissesKeyboard(.interactively)
-            .background(AppBackground())
-            .toolbar { settingsToolbarItem(isPresented: $showSettings) }
-            .sheet(isPresented: $showSettings) { SettingsView() }
+            .padding(20)
+            .animation(.smooth(duration: 0.35), value: manager.lastError)
+            .animation(.smooth(duration: 0.35), value: manager.certs)
+            .animation(.smooth(duration: 0.3), value: manager.isWorking)
+            .animation(.smooth(duration: 0.35), value: manager.teamSummary)
         }
+        .background(AppBackground())
+        .toolbar { settingsToolbarItem(isPresented: $showSettings) }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .onAppear { manager.autoLoad() }
         .alert(L("Revoke this certificate?"),
                isPresented: Binding(get: { pendingRevoke != nil },
                                     set: { if !$0 { pendingRevoke = nil } })) {
@@ -60,28 +57,6 @@ struct CertsView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
             }
         }
-    }
-
-    // MARK: Apple ID
-
-    private var appleIDCard: some View {
-        PanelCard {
-            VStack(alignment: .leading, spacing: 12) {
-                sectionTitle("Apple ID", systemImage: "person.crop.circle.fill")
-                TextField(L("Email"), text: $engine.appleID)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.emailAddress)
-                    .textContentType(.username)
-                    .textFieldStyle(.plain)
-                    .fieldBackground()
-                SecureField(L("Password"), text: $engine.applePassword)
-                    .textContentType(.password)
-                    .textFieldStyle(.plain)
-                    .fieldBackground()
-            }
-        }
-        .disabled(manager.isWorking || manager.revokingID != nil)
     }
 
     // MARK: Primary action
@@ -120,9 +95,9 @@ struct CertsView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
-                .cascadeItem(3)
+                .cascadeItem(2)
                 ForEach(Array(manager.certs.enumerated()), id: \.element.id) { idx, cert in
-                    certRow(cert).cascadeItem(4 + idx)
+                    certRow(cert).cascadeItem(3 + idx)
                 }
             }
         }
@@ -232,17 +207,6 @@ struct CertsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-        }
-    }
-
-    // MARK: Helpers
-
-    private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        Label {
-            Text(title).font(.headline)
-        } icon: {
-            Image(systemName: systemImage)
-                .foregroundStyle(Theme.brand)
         }
     }
 }

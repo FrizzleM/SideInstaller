@@ -2,6 +2,7 @@ import Foundation
 
 /// French copy, on the same contract as `spanishStrings`. Uses the formal
 /// "vous" and iOS's own French vocabulary for anything on screen.
+
 let frenchStrings: [String: String] = [
 
     // MARK: - Shared
@@ -21,6 +22,52 @@ let frenchStrings: [String: String] = [
 
     "I have accepted the": "J'accepte les",
     "Start": "Commencer",
+
+    // Pre-iOS 27: the pairing file has to be imported
+
+    "You'll need a pairing file": "Il vous faudra un fichier de jumelage",
+    "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
+        "Cet iPhone est sous iOS %@. Seul iOS %@ peut se jumeler tout seul : vous devrez créer un fichier de jumelage sur un ordinateur — avec jitterbugpair ou pymobiledevice3 — puis l'importer dans l'app. SideInstaller vous guide pas à pas.",
+
+    // MARK: - Account setup & Settings › Account
+
+    "Sign in with your Apple ID": "Connectez-vous avec votre Apple ID",
+    "Don't worry, these are stored locally":
+        "Pas d'inquiétude, tout reste stocké sur cet iPhone",
+    "Saved in this iPhone's keychain, and sent only to Apple when signing in.":
+        "Enregistré dans le trousseau de cet iPhone, et envoyé uniquement à Apple lors de la connexion.",
+    "Continue": "Continuer",
+    "Set this up later": "Configurer plus tard",
+    "Add Apple ID": "Ajouter un Apple ID",
+    "Edit Apple ID": "Modifier l'Apple ID",
+    "Save": "Enregistrer",
+    "Enter the password again to save this Apple ID.":
+        "Saisissez à nouveau le mot de passe pour enregistrer cet Apple ID.",
+    "Account": "Compte",
+    "In use": "Utilisé",
+    "Edit": "Modifier",
+    "Remove": "Supprimer",
+    "No Apple ID saved yet. Add one and SideInstaller will use it for every sign-in.":
+        "Aucun Apple ID enregistré. Ajoutez-en un et SideInstaller l'utilisera à chaque connexion.",
+    "Saved in this iPhone's keychain, and sent only to Apple when signing in. Swipe a row to edit its password or remove it.":
+        "Enregistré dans le trousseau de cet iPhone, et envoyé uniquement à Apple lors de la connexion. Balayez une ligne pour modifier son mot de passe ou la supprimer.",
+    "Remove this Apple ID?": "Supprimer cet Apple ID ?",
+    "“%@” and its saved password will be deleted from this iPhone. Nothing changes on your Apple account.":
+        "« %@ » et son mot de passe enregistré seront supprimés de cet iPhone. Votre compte Apple reste inchangé.",
+    "This iPhone's keychain refused to store the password (error %d), so it's kept only until SideInstaller quits.":
+        "Le trousseau de cet iPhone a refusé d'enregistrer le mot de passe (erreur %d) : il n'est conservé que tant que SideInstaller est ouvert.",
+    "No Apple ID saved. Add one in Settings › Account.":
+        "Aucun Apple ID enregistré. Ajoutez-en un dans Réglages › Compte.",
+
+    "Add your Apple ID": "Ajoutez votre Apple ID",
+    "Open Settings with the gear at the top right.":
+        "Ouvrez les Réglages avec la roue dentée en haut à droite.",
+    "Under Account, tap “Add Apple ID” and enter your email and password.":
+        "Dans la section Compte, touchez « Ajouter un Apple ID » et saisissez votre e-mail et votre mot de passe.",
+
+    // MARK: - Tabs, Tools menu & two-factor prompt
+
+    "Tools": "Outils",
 
     // MARK: - Tabs & two-factor prompt
 
@@ -47,13 +94,13 @@ let frenchStrings: [String: String] = [
     "Import .ipa": "Importer un .ipa",
     "Importing…": "Importation…",
     "Replace": "Remplacer",
+    "or": "ou",
+    "Paste a download link": "Collez un lien de téléchargement",
+    "Downloading… %d%%": "Téléchargement… %d%%",
     "iOS %@ required": "iOS %@ requis",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Cet iPhone est sous iOS %@, sur lequel SideInstaller ne peut rien installer. Mettez à jour vers iOS %@ ou une version ultérieure dans Réglages › Général › Mise à jour logicielle.",
     "Wi-Fi required": "Wi-Fi requis",
-    "Loopback VPN required": "VPN loopback requis",
-    "Turn on a loopback VPN — LocalDevVPN, ClashMi, or any app that tunnels to this iPhone. The install runs over it.":
-        "Activez un VPN loopback : LocalDevVPN, ClashMi ou toute app qui crée un tunnel vers cet iPhone. L'installation passe par lui.",
     "Pairing code": "Code de jumelage",
     "Type this into the prompt in Settings.":
         "Saisissez ce code dans la demande affichée dans Réglages.",
@@ -61,11 +108,31 @@ let frenchStrings: [String: String] = [
     "%@ is installed. Finish the trust step above to open it.":
         "%@ est installé. Terminez l'étape de confiance ci-dessus pour l'ouvrir.",
     "Action needed": "Action requise",
+    "Step %@ of %@": "Étape %@ sur %@",
+    "Show all steps": "Afficher toutes les étapes",
+    "Show fewer steps": "Afficher moins d'étapes",
+
+    // MARK: - LocalDevVPN
+
+    "LocalDevVPN required": "LocalDevVPN requis",
+    "Install LocalDevVPN and connect it. The install runs over its tunnel.":
+        "Installe LocalDevVPN et connecte-le. L'installation passe par son tunnel.",
+    "Connect LocalDevVPN to scan and install. The write runs over its tunnel.":
+        "Connecte LocalDevVPN pour chercher et installer. L'écriture passe par son tunnel.",
+    "Connect LocalDevVPN. Spoofing runs over its tunnel, like everything else here.":
+        "Connecte LocalDevVPN. La simulation passe par son tunnel, comme tout le reste ici.",
+    "LocalDevVPN isn't connected. Connect it, then try again.":
+        "LocalDevVPN n'est pas connecté. Connecte-le, puis réessaie.",
+    "Connect LocalDevVPN": "Connecte LocalDevVPN",
+    "Install LocalDevVPN from the App Store and open it.":
+        "Installe LocalDevVPN depuis l'App Store et ouvre-le.",
+    "If GitHub is blocked where you are, use a VPN that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through.":
+        "Si GitHub est bloqué là où tu es, utilise un VPN qui peut aussi acheminer ton trafic : iOS n'exécute qu'un VPN à la fois, donc un tunnel purement local ne laisse rien pour télécharger SideStore.",
 
     // MARK: - Install steps
 
     "Connect the VPN": "Connecter le VPN",
-    "Pair with this iPhone": "Jumeler avec cet iPhone",
+    "Get pairing file": "Obtenir le fichier de jumelage",
     "Open the device link": "Ouvrir la liaison avec l'appareil",
     "Sign in to Apple ID": "Se connecter à l'Apple ID",
     "Download %@": "Télécharger %@",
@@ -87,8 +154,6 @@ let frenchStrings: [String: String] = [
     "Scanning": "Recherche",
     "Rescan apps": "Rechercher à nouveau",
     "Scan installed apps": "Rechercher les apps installées",
-    "Turn on a loopback VPN to scan and install. The write runs over its tunnel.":
-        "Activez un VPN loopback pour rechercher et installer. L'écriture passe par son tunnel.",
     "%d supported app installed": "%d app compatible installée",
     "%d supported apps installed": "%d apps compatibles installées",
     "No supported apps found": "Aucune app compatible trouvée",
@@ -98,6 +163,19 @@ let frenchStrings: [String: String] = [
     "Pairing file ready. You can export it or install it into an app below.":
         "Fichier de jumelage prêt. Vous pouvez l'exporter ou l'installer dans une app ci-dessous.",
     "Pairing file installed into %@.": "Fichier de jumelage installé dans %@.",
+
+    // Importing a pairing file (iOS 26 and below)
+
+    "Import pairing file": "Importer le fichier de jumelage",
+    "How do I make one?": "Comment en créer un ?",
+    "imported pairing file": "fichier de jumelage importé",
+    "No pairing file yet — tap “Import pairing file” first.":
+        "Aucun fichier de jumelage — touchez d'abord « Importer le fichier de jumelage ».",
+    "Pairing file missing — import it first.": "Fichier de jumelage manquant : importez-le d'abord.",
+    "%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.":
+        "%@ n'est pas un fichier de jumelage. Choisissez le fichier créé par votre ordinateur — un .mobiledevicepairing ou .plist contenant l'enregistrement de jumelage de cet iPhone.",
+    "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
+        "iOS %@ ne peut pas créer son propre fichier de jumelage : cela demande iOS %@. Importez-en un créé sur un ordinateur dans « Fichier de jumelage », puis réessayez.",
 
     // MARK: - Pairing service status
 
@@ -136,10 +214,50 @@ let frenchStrings: [String: String] = [
     "Expired": "Expiré",
     "Expires %@": "Expire le %@",
     "Unnamed certificate": "Certificat sans nom",
-    "Enter your Apple ID email and password first.":
-        "Saisissez d'abord l'e-mail et le mot de passe de votre Apple ID.",
     "This certificate has no serial number, so it can't be revoked.":
         "Ce certificat n'a pas de numéro de série, il ne peut donc pas être révoqué.",
+
+    // MARK: - Location tab
+
+    "Location spoofing": "Simulation de position",
+    "Not simulating": "Aucune simulation",
+    "Simulated": "Simulée",
+    "Pick a place": "Choisis un lieu",
+    "Search for a place": "Rechercher un lieu",
+    "Nothing found for “%@”.": "Aucun résultat pour « %@ ».",
+    "Set location": "Définir la position",
+    "Setting": "Application",
+    "Reset to real location": "Revenir à la position réelle",
+    "Location set to %@.": "Position définie sur %@.",
+    "Location reset. The device is using its own again.":
+        "Position réinitialisée. L'appareil utilise de nouveau la sienne.",
+    "That isn't a valid coordinate.": "Cette coordonnée n'est pas valide.",
+    "Location session closed — set it up again.":
+        "La session de position est fermée — relance la préparation.",
+    "Downloading %@ failed (HTTP %d).": "Le téléchargement de %@ a échoué (HTTP %d).",
+    "Couldn't build the download URL for %@.":
+        "Impossible de construire l'URL de téléchargement pour %@.",
+
+    // MARK: - Entitlements tab
+
+    "Entitlements": "Droits",
+    "Load apps": "Charger les apps",
+    "%d App ID": "%d App ID",
+    "%d App IDs": "%d App ID",
+    "No App IDs": "Aucun App ID",
+    "This Apple ID hasn't registered any apps yet. Install something with SideInstaller first, then come back.":
+        "Cet Apple ID n'a encore enregistré aucune app. Installes-en une avec SideInstaller, puis reviens ici.",
+    "Memory and performance": "Mémoire et performances",
+    "Other free capabilities": "Autres fonctionnalités gratuites",
+    "Beta": "Bêta",
+    "Recommended": "Recommandés",
+    "Select all": "Tout sélectionner",
+    "None": "Aucun",
+    "Enable %d selected": "Activer %d sélectionnés",
+    "Asking Apple": "Demande à Apple",
+    "%d of %d enabled": "%d sur %d activés",
+    "Install the app again for these to take effect.":
+        "Réinstalle l'app pour qu'ils prennent effet.",
 
     // MARK: - Settings
 
@@ -185,11 +303,11 @@ let frenchStrings: [String: String] = [
         "la réponse de GitHub n'était pas les informations de version (%@) — quelque chose sur ce réseau les a peut-être remplacées.",
     "what downloaded as %@ isn't an IPA — something on this network returned a page instead, or the transfer stopped partway.":
         "ce qui a été téléchargé sous le nom %@ n'est pas un IPA — quelque chose sur ce réseau a renvoyé une page, ou le transfert s'est interrompu.",
+    "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
+        "ce lien a répondu HTTP %d — ce n'est pas un téléchargement direct, ou il exige une connexion.",
 
     // MARK: - Engine failures
 
-    "Enter your Apple ID email + password.":
-        "Saisissez l'e-mail et le mot de passe de votre Apple ID.",
     "Two-factor verification was cancelled.":
         "La validation en deux étapes a été annulée.",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
@@ -214,8 +332,6 @@ let frenchStrings: [String: String] = [
         "Pas encore de fichier de jumelage — touchez d'abord « Générer le fichier de jumelage ».",
     "%@ isn't installed yet — install must run first.":
         "%@ n'est pas encore installé — il faut d'abord l'installer.",
-    "No loopback VPN is connected. Turn one on, then try again.":
-        "Aucun VPN loopback n'est connecté. Activez-en un, puis réessayez.",
     "%@ isn't a valid IPA — the download it came from probably returned an error page, or the copy stopped partway. Replace it and tap Install again.":
         "%@ n'est pas un IPA valide : le téléchargement a sans doute renvoyé une page d'erreur, ou la copie s'est arrêtée en cours de route. Remplacez-le et touchez Installer à nouveau.",
     "%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.":
@@ -223,6 +339,11 @@ let frenchStrings: [String: String] = [
     "No IPA imported yet. Tap “Import .ipa” and pick one.":
         "Aucun IPA importé pour l'instant. Touchez « Importer un .ipa » et choisissez-en un.",
     "Couldn't import %@: %@": "Impossible d'importer %@ : %@",
+    "That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.":
+        "SideInstaller ne peut pas télécharger ce lien. Collez l'adresse https:// complète depuis laquelle le .ipa se télécharge.",
+    "That link didn't return an IPA. It has to download the file itself — a page that only links to the .ipa, or one that asks you to sign in first, arrives here as a web page.":
+        "Ce lien n'a pas renvoyé d'IPA. Il doit télécharger le fichier lui-même : une page qui se contente de pointer vers le .ipa, ou qui demande d'abord une connexion, arrive ici sous forme de page web.",
+    "Couldn't download that link: %@": "Impossible de télécharger ce lien : %@",
     "there's nothing to download for a custom IPA — import one first":
         "il n'y a rien à télécharger pour un IPA personnalisé — importez-en un d'abord",
     "your app": "votre app",
@@ -231,33 +352,25 @@ let frenchStrings: [String: String] = [
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "Impossible d'enregistrer cet iPhone%@ auprès de l'équipe de développement de votre Apple ID, Apple ne délivrera donc pas de profil de provisionnement. %@ — voir les étapes ci-dessus.",
-
-    // MARK: - Guide cards
-
     "Connect to Wi-Fi": "Connectez-vous au Wi-Fi",
-    "Open Settings › Wi-Fi and join a network.":
-        "Ouvrez Réglages › Wi-Fi et rejoignez un réseau.",
+    "Open Settings › Wi-Fi and join a network.": "Ouvrez Réglages › Wi-Fi et rejoignez un réseau.",
     "Then come back here — this continues automatically.":
         "Revenez ensuite ici : la suite se fait toute seule.",
-
-    "Turn on a loopback VPN": "Activez un VPN loopback",
-    "Open a VPN app that tunnels to this iPhone — LocalDevVPN, ClashMi, or another. Any of them works.":
-        "Ouvrez une app VPN qui crée un tunnel vers cet iPhone : LocalDevVPN, ClashMi ou une autre. N'importe laquelle convient.",
-    "If GitHub is blocked where you are, pick one that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through.":
-        "Si GitHub est bloqué là où vous êtes, choisissez-en une qui sait aussi servir de proxy : iOS n'autorise qu'un VPN à la fois, donc un tunnel purement local ne laisse rien pour télécharger SideStore.",
-    "Tap Connect so the toggle turns on.":
-        "Touchez Connect pour que l'interrupteur s'active.",
+    "Tap Connect so the toggle turns on.": "Touchez Connect pour que l'interrupteur s'active.",
     "Keep Wi-Fi on, then come back here — this continues automatically.":
         "Laissez le Wi-Fi activé, puis revenez ici : la suite se fait toute seule.",
     "Get LocalDevVPN": "Obtenir LocalDevVPN",
     "Import an .ipa first": "Importez d'abord un .ipa",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
         "Touchez « Importer un .ipa » ci-dessus et choisissez le fichier : il peut se trouver partout où l'app Fichiers a accès, y compris iCloud Drive ou une clé USB.",
+    "Or paste a direct download link under that button, and SideInstaller fetches the .ipa itself.":
+        "Ou collez un lien de téléchargement direct sous ce bouton : SideInstaller récupère le .ipa lui-même.",
+    "Or open the Files app, press and hold the .ipa, tap Share, and pick SideInstaller — that hands the file over without the picker.":
+        "Ou ouvrez l'app Fichiers, maintenez le .ipa, touchez Partager et choisissez SideInstaller : le fichier arrive sans passer par le sélecteur.",
     "Or copy it into Files › On My iPhone › SideInstaller, where SideInstaller also finds it.":
         "Ou copiez-le dans Fichiers › Sur mon iPhone › SideInstaller, où SideInstaller le trouve aussi.",
     "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
         "C'est la solution là où GitHub est bloqué : récupérez l'IPA sur n'importe quel appareil, apportez-le ici et installez-le.",
-
     "Pair this iPhone in Settings": "Jumelez cet iPhone dans Réglages",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "Ouvrez l'app Réglages, puis allez dans Confidentialité et sécurité › Mode développeur.",
@@ -266,18 +379,32 @@ let frenchStrings: [String: String] = [
         "Saisissez le code de votre iPhone s'il vous le demande.",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "Revenez dans SideInstaller, notez le code qu'il affiche, puis saisissez ce même code dans la demande affichée dans Réglages.",
-
     "A signing certificate already exists": "Un certificat de signature existe déjà",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple a renvoyé l'erreur 7460 : cet Apple ID possède déjà un certificat de développement iOS, ou une demande est encore en attente.",
     "SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone.":
         "SideInstaller n'a pas pu le réutiliser. Cela arrive quand le certificat a été émis ailleurs — AltStore, SideStore, Sideloadly ou Xcode sur un autre appareil — la clé privée nécessaire n'est donc pas sur cet iPhone.",
-    "Use “Revoke and retry” above, or open the Certificates tab, tap “Load certificates”, and revoke it there.":
-        "Utilise « Révoquer et réessayer » ci-dessus, ou ouvre l'onglet Certificats, touche « Charger les certificats » et révoque-le là.",
+    "Use “Revoke and retry” above, or open Certificates in the Tools tab, tap “Load certificates”, and revoke it there.":
+        "Utilise « Révoquer et réessayer » ci-dessus, ou ouvre Certificats dans l'onglet Outils, touche « Charger les certificats » et révoque-le là.",
     "Revoking is permanent: every app already signed with that certificate stops launching, on every device.":
         "La révocation est définitive : toutes les apps déjà signées avec ce certificat cessent de se lancer, sur tous les appareils.",
     "Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again.":
         "Vous pouvez aussi vous connecter ci-dessus avec un autre Apple ID (ou un compte de secours), puis toucher à nouveau Installer.",
+
+    // MARK: - Guide cards
+
+    // Guide: import a pairing file
+
+    "Import a pairing file": "Importer un fichier de jumelage",
+    "iOS %@ is the first version an iPhone can pair with itself on. On this one the pairing file has to be made on a computer.":
+        "iOS %@ est la première version où un iPhone peut se jumeler tout seul. Sur celui-ci, le fichier de jumelage doit être créé sur un ordinateur.",
+    "On a Mac, Windows PC or Linux box, plug this iPhone in, trust the computer, and run jitterbugpair (or “pymobiledevice3 lockdown pair”).":
+        "Sur un Mac, un PC Windows ou Linux, branchez cet iPhone, faites confiance à l'ordinateur et lancez jitterbugpair (ou « pymobiledevice3 lockdown pair »).",
+    "Send the file it writes — a .mobiledevicepairing or .plist — to this iPhone, by AirDrop, iCloud Drive or a cable.":
+        "Envoyez le fichier obtenu — un .mobiledevicepairing ou .plist — vers cet iPhone, par AirDrop, iCloud Drive ou un câble.",
+    "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
+        "Revenez ici, touchez « Importer le fichier de jumelage » et choisissez-le. Ensuite, tout fonctionne comme sur iOS %@.",
+    "Get jitterbugpair": "Télécharger jitterbugpair",
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
@@ -331,4 +458,51 @@ let frenchStrings: [String: String] = [
         "L’appairage de cet iPhone en a besoin : SideInstaller s’annonce sur le réseau local pour que Réglages le trouve.",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
         "Connectez-vous à un réseau Wi-Fi. L’appairage de cet iPhone en a besoin : SideInstaller doit être détectable sur le réseau local.",
+
+    // MARK: - About
+
+    "About": "À propos",
+    "Version %@ (%@)": "Version %@ (%@)",
+    "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
+        "SideInstaller installe SideStore et LiveContainer directement sur votre iPhone, sans PC.",
+    "Everything runs on the device: your Apple ID signs the apps locally and is never sent anywhere, and there's no server, no account and no analytics behind any of it.":
+        "Tout se passe sur l’appareil : votre Apple ID signe les apps en local et n’est jamais envoyé nulle part, et il n’y a derrière ni serveur, ni compte, ni statistiques.",
+
+    "Links": "Liens",
+    "Source code": "Code source",
+    "Read it, audit it or open a pull request on GitHub.":
+        "Lisez-le, auditez-le ou ouvrez une pull request sur GitHub.",
+    "Get help, report bugs and follow what's being worked on.":
+        "Demandez de l’aide, signalez des bugs et suivez le développement.",
+    "Support the project": "Soutenir le projet",
+    "SideInstaller is free. Ko-fi is there if you'd like to chip in anyway.":
+        "SideInstaller est gratuit. Ko-fi est là si vous voulez quand même participer.",
+
+    "Special thanks": "Remerciements",
+    "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
+        "Pour idevice, la bibliothèque avec laquelle SideInstaller communique avec votre iPhone. Rien de tout cela n’existerait sans elle.",
+    "For the support, and for spotting the bugs that got fixed because of it.":
+        "Pour le soutien et pour avoir repéré les bugs qui ont ensuite été corrigés.",
+
+    "Built with": "Construit avec",
+    "The open-source work this app is built on:":
+        "Le travail open source sur lequel cette app repose :",
+    "Pairing, the tunnel and the install itself — by jkcoxson, MIT.":
+        "L’appairage, le tunnel et l’installation elle-même — par jkcoxson, MIT.",
+    "Apple ID sign-in, certificates and on-device signing — by nab138, MIT.":
+        "La connexion à l’Apple ID, les certificats et la signature sur l’appareil — par nab138, MIT.",
+    "The sideloading app this installs for you.":
+        "L’app de sideloading que celle-ci installe pour vous.",
+    "Runs sideloaded apps without spending an app slot on each one.":
+        "Exécute les apps sideloadées sans consommer un emplacement pour chacune.",
+    "The developer disk image location spoofing mounts — mirrored by doronz88.":
+        "L’image disque développeur que monte la simulation de position — miroir de doronz88.",
+    "Plus the Rust crates tokio, serde, plist, base64 and tracing.":
+        "Ainsi que les crates Rust tokio, serde, plist, base64 et tracing.",
+
+    "Where to get it": "Où le télécharger",
+    "Only the builds on the official install page and repository are mine. Anyone can fork the source, add a credential stealer and ship it under the same name and icon — so don't trust your Apple ID to a copy from anywhere else.":
+        "Seules les versions publiées sur la page d’installation et le dépôt officiels sont les miennes. N’importe qui peut forker le code, y ajouter un voleur d’identifiants et le diffuser sous le même nom et la même icône : ne confiez pas votre Apple ID à une copie trouvée ailleurs.",
+    "Install page": "Page d’installation",
+    "Terms": "Conditions",
 ]

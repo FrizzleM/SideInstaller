@@ -102,7 +102,11 @@ final class PairingController {
         let model = hostModel
         let outPath = Self.pairingFilePath()
         // Retained for the C callbacks' ctx, and released after the run.
-        let ctx = UnsafeMutableRawPointer(Unmanaged.passRetained(self).toOpaque())
+        //
+        // `nonisolated(unsafe)` because a raw pointer isn't `Sendable` and the
+        // closure below is: the compiler can't see that this one is uniquely
+        // owned by that closure, handed straight to C, and released there once.
+        nonisolated(unsafe) let ctx = UnsafeMutableRawPointer(Unmanaged.passRetained(self).toOpaque())
 
         engine.log("RPPairing: invoking si_pairing_run_host (out=\(outPath))")
 
@@ -162,6 +166,8 @@ final class PairingController {
                 resolve(.failure(PairingError.zeroBytes))
             } else {
                 engine.pairingFilePath = path
+                // This record has replaced whatever was imported before it.
+                engine.clearImportedPairingMark()
                 engine.pairingStatus = L("paired: %@ (%dB)", name, size)
                 // A new RPPairing record makes half of the merged file stale;
                 // the cached lockdown record stays, since re-minting that one is

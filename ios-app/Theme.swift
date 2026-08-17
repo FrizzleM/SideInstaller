@@ -23,10 +23,60 @@ enum Theme {
     }
 }
 
+// MARK: - Backdrop level
+
+/// How dark the backdrop is, and where it has got to on its way between two
+/// levels.
+///
+/// Every page paints its own `AppBackground`, so the wash cannot live in any one
+/// of them: two pages overlap for the length of a tab change, and a page built
+/// part-way through one would start from the wrong place — which is what made
+/// switching tabs look arbitrary. It lives here instead, as the level left
+/// behind, the level being travelled to, and the moment the move began. Each
+/// backdrop reads its value off the clock, exactly as the mesh does, so all of
+/// them show the same frame and a switch reads as one backdrop changing rather
+/// than two crossing.
+@MainActor
+enum Backdrop {
+    /// The wash each tab settles on, as black laid over the mesh. The tabs are a
+    /// descent: Install bright, Tools dark, About darkest.
+    enum Level: Double {
+        case bright  = 0
+        case dark    = 0.55
+        case darkest = 0.75
+    }
+
+    /// Long enough to read as the room changing brightness, short enough to be
+    /// over before the incoming page has finished its entrance cascade.
+    private static let duration: TimeInterval = 0.55
+
+    private static var origin = Level.bright.rawValue
+    private static var target = Level.bright.rawValue
+    /// Far enough in the past that the first frame is at rest on `bright`.
+    private static var departed = -Double.greatestFiniteMagnitude
+
+    /// Start the move to `level` from wherever the wash is right now, so a tab
+    /// switch made mid-transition turns around smoothly instead of jumping.
+    static func settle(on level: Level) {
+        guard target != level.rawValue else { return }
+        let now = Date.timeIntervalSinceReferenceDate
+        origin = wash(at: now)
+        target = level.rawValue
+        departed = now
+    }
+
+    /// The wash at `t`, on a smoothstep so it both leaves and arrives at rest.
+    static func wash(at t: TimeInterval) -> Double {
+        let p = min(max((t - departed) / duration, 0), 1)
+        return origin + (target - origin) * (p * p * (3 - 2 * p))
+    }
+}
+
 // MARK: - Background
 
 /// The app's backdrop: OLED black under a slow, low-opacity blue mesh gradient
-/// whose control points sway on sine waves.
+/// whose control points sway on sine waves, and over that the tab's `Backdrop`
+/// wash.
 struct AppBackground: View {
     var body: some View {
         // Ticks every frame, with the points derived from the clock so the
@@ -39,6 +89,9 @@ struct AppBackground: View {
                     .blur(radius: 24)
                     // Low enough to read as a deep tint rather than a light.
                     .opacity(0.2)
+                // Off the same clock as the mesh, so every page's copy of this
+                // backdrop is at the identical point of the transition.
+                Color.black.opacity(Backdrop.wash(at: t))
             }
             .ignoresSafeArea()
         }
@@ -130,7 +183,9 @@ struct StatusPill: View {
             .foregroundStyle(color)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-        if glass {
+        // Liquid Glass is iOS 26+; older releases get the tinted capsule, which
+        // is what every other pill on the screen already wears.
+        if glass, #available(iOS 26.0, *) {
             label.glassEffect(.regular, in: Capsule())
         } else {
             label.background(Capsule().fill(color.opacity(0.16)))

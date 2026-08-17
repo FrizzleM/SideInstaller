@@ -28,6 +28,11 @@ final class PairingManager: ObservableObject {
 
     private var engine: Engine { Engine.shared }
 
+    /// True once a scan has been started without being asked, for the current
+    /// pairing file. Keeps `autoScan` to one attempt, so re-opening the page
+    /// keeps what the last one found and a failed one doesn't retry on a loop.
+    private var didAutoScan = false
+
     /// Any operation in flight, which disables the controls.
     var isBusy: Bool { isGenerating || isScanning || isInstallingAll || installingTargetID != nil }
 
@@ -67,6 +72,8 @@ final class PairingManager: ObservableObject {
                 engine.connection.disconnect()
                 targets = []
                 hasScanned = false
+                // A new pairing file earns a fresh look next time it opens.
+                didAutoScan = false
                 lastSuccess = L("Pairing file ready. You can export it or install it into an app below.")
             } catch is CancellationError {
                 // User backed out — no error banner.
@@ -76,6 +83,19 @@ final class PairingManager: ObservableObject {
             refresh()
             isGenerating = false
         }
+    }
+
+    /// Scan without being asked, for a page that opens with the tunnel already
+    /// up and a file to write. Silent about every case it can't run in — the
+    /// card explains those, and the button is still there.
+    func autoScan() {
+        // The poll only runs every couple of seconds; a stale `false` here
+        // would skip the scan for a tunnel that is actually up.
+        engine.refreshNetworkStatus()
+        guard !didAutoScan, !hasScanned, !isBusy, !engine.isRunning,
+              engine.vpnConnected, pairingFileExists else { return }
+        didAutoScan = true
+        scan()
     }
 
     /// Connect over the loopback tunnel and list the supported apps on device.

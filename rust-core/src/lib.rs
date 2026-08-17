@@ -9,6 +9,7 @@ extern crate idevice_ffi as _;
 
 mod account;
 mod certs;
+mod entitlements;
 mod ffi_util;
 mod logging;
 mod pairing;
@@ -224,4 +225,33 @@ pub unsafe extern "C" fn si_cert_revoke(
 #[no_mangle]
 pub unsafe extern "C" fn si_cert_session_free(session: *mut CertSession) {
     certs::cert_session_free(session)
+}
+
+/// List the team's App IDs as JSON in `*out_json`. Blocks.
+///
+/// # Safety
+/// See `entitlements::appid_list`.
+#[no_mangle]
+pub unsafe extern "C" fn si_appid_list(
+    session: *mut CertSession,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    entitlements::appid_list(session, out_json, out_error)
+}
+
+/// Enable the comma-separated `capabilities` on one App ID, reporting each
+/// outcome as JSON in `*out_json`. Blocks.
+///
+/// # Safety
+/// See `entitlements::appid_enable`.
+#[no_mangle]
+pub unsafe extern "C" fn si_appid_enable(
+    session: *mut CertSession,
+    app_id_id: *const c_char,
+    capabilities: *const c_char,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    entitlements::appid_enable(session, app_id_id, capabilities, out_json, out_error)
 }

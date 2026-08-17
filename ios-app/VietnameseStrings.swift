@@ -3,6 +3,7 @@ import Foundation
 /// Vietnamese copy, on the same contract as `spanishStrings`. The Install tab is
 /// "Cài ứng dụng", since "Cài đặt" also means Settings, and nouns don't inflect
 /// for number, so the app-count strings share one wording.
+
 let vietnameseStrings: [String: String] = [
 
     // MARK: - Shared
@@ -22,6 +23,51 @@ let vietnameseStrings: [String: String] = [
 
     "I have accepted the": "Tôi đã chấp nhận",
     "Start": "Bắt đầu",
+
+    // Pre-iOS 27: the pairing file has to be imported
+
+    "You'll need a pairing file": "Bạn sẽ cần một tệp ghép nối",
+    "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
+        "iPhone này chạy iOS %@. Chỉ iOS %@ mới tự ghép nối được, nên bạn phải tạo tệp ghép nối trên máy tính — bằng jitterbugpair hoặc pymobiledevice3 — rồi nhập vào ứng dụng. SideInstaller sẽ hướng dẫn bạn từng bước.",
+
+    // MARK: - Account setup & Settings › Account
+
+    "Sign in with your Apple ID": "Đăng nhập bằng Apple ID của bạn",
+    "Don't worry, these are stored locally":
+        "Đừng lo, những thông tin này chỉ được lưu trên máy",
+    "Saved in this iPhone's keychain, and sent only to Apple when signing in.":
+        "Được lưu trong keychain của iPhone này và chỉ gửi cho Apple khi đăng nhập.",
+    "Continue": "Tiếp tục",
+    "Set this up later": "Thiết lập sau",
+    "Add Apple ID": "Thêm Apple ID",
+    "Edit Apple ID": "Sửa Apple ID",
+    "Save": "Lưu",
+    "Enter the password again to save this Apple ID.": "Nhập lại mật khẩu để lưu Apple ID này.",
+    "Account": "Tài khoản",
+    "In use": "Đang dùng",
+    "Edit": "Sửa",
+    "Remove": "Xóa",
+    "No Apple ID saved yet. Add one and SideInstaller will use it for every sign-in.":
+        "Chưa lưu Apple ID nào. Thêm một tài khoản và SideInstaller sẽ dùng nó cho mọi lần đăng nhập.",
+    "Saved in this iPhone's keychain, and sent only to Apple when signing in. Swipe a row to edit its password or remove it.":
+        "Được lưu trong keychain của iPhone này và chỉ gửi cho Apple khi đăng nhập. Vuốt một hàng để sửa mật khẩu hoặc xóa.",
+    "Remove this Apple ID?": "Xóa Apple ID này?",
+    "“%@” and its saved password will be deleted from this iPhone. Nothing changes on your Apple account.":
+        "“%@” và mật khẩu đã lưu sẽ bị xóa khỏi iPhone này. Tài khoản Apple của bạn không thay đổi.",
+    "This iPhone's keychain refused to store the password (error %d), so it's kept only until SideInstaller quits.":
+        "Keychain của iPhone này từ chối lưu mật khẩu (lỗi %d), nên mật khẩu chỉ được giữ đến khi thoát SideInstaller.",
+    "No Apple ID saved. Add one in Settings › Account.":
+        "Chưa lưu Apple ID nào. Hãy thêm một tài khoản trong Cài đặt › Tài khoản.",
+
+    "Add your Apple ID": "Thêm Apple ID của bạn",
+    "Open Settings with the gear at the top right.":
+        "Mở Cài đặt bằng biểu tượng bánh răng ở góc trên bên phải.",
+    "Under Account, tap “Add Apple ID” and enter your email and password.":
+        "Trong mục Tài khoản, chạm “Thêm Apple ID” rồi nhập email và mật khẩu của bạn.",
+
+    // MARK: - Tabs, Tools menu & two-factor prompt
+
+    "Tools": "Công cụ",
 
     // MARK: - Tabs & two-factor prompt
 
@@ -48,13 +94,13 @@ let vietnameseStrings: [String: String] = [
     "Import .ipa": "Nhập .ipa",
     "Importing…": "Đang nhập…",
     "Replace": "Thay",
+    "or": "hoặc",
+    "Paste a download link": "Dán liên kết tải xuống",
+    "Downloading… %d%%": "Đang tải… %d%%",
     "iOS %@ required": "Yêu cầu iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "iPhone này đang chạy iOS %@, SideInstaller không thể cài đặt trên phiên bản đó. Cập nhật lên iOS %@ trở lên trong Cài đặt › Cài đặt chung › Cập nhật phần mềm.",
     "Wi-Fi required": "Yêu cầu Wi-Fi",
-    "Loopback VPN required": "Cần một VPN loopback",
-    "Turn on a loopback VPN — LocalDevVPN, ClashMi, or any app that tunnels to this iPhone. The install runs over it.":
-        "Bật một VPN loopback — LocalDevVPN, ClashMi hay bất kỳ ứng dụng nào tạo đường hầm tới iPhone này. Quá trình cài đặt chạy qua nó.",
     "Pairing code": "Mã ghép nối",
     "Type this into the prompt in Settings.":
         "Nhập mã này vào hộp thoại trong Cài đặt.",
@@ -62,11 +108,31 @@ let vietnameseStrings: [String: String] = [
     "%@ is installed. Finish the trust step above to open it.":
         "%@ đã được cài đặt. Hoàn tất bước tin cậy ở trên để mở ứng dụng.",
     "Action needed": "Cần thao tác",
+    "Step %@ of %@": "Bước %@ trên %@",
+    "Show all steps": "Hiện tất cả các bước",
+    "Show fewer steps": "Ẩn bớt các bước",
+
+    // MARK: - LocalDevVPN
+
+    "LocalDevVPN required": "Cần LocalDevVPN",
+    "Install LocalDevVPN and connect it. The install runs over its tunnel.":
+        "Cài LocalDevVPN và kết nối. Quá trình cài đặt chạy qua đường hầm của nó.",
+    "Connect LocalDevVPN to scan and install. The write runs over its tunnel.":
+        "Kết nối LocalDevVPN để quét và cài đặt. Việc ghi tệp chạy qua đường hầm của nó.",
+    "Connect LocalDevVPN. Spoofing runs over its tunnel, like everything else here.":
+        "Kết nối LocalDevVPN. Việc giả lập chạy qua đường hầm của nó, như mọi thứ khác ở đây.",
+    "LocalDevVPN isn't connected. Connect it, then try again.":
+        "LocalDevVPN chưa được kết nối. Hãy kết nối rồi thử lại.",
+    "Connect LocalDevVPN": "Kết nối LocalDevVPN",
+    "Install LocalDevVPN from the App Store and open it.":
+        "Cài LocalDevVPN từ App Store rồi mở ứng dụng.",
+    "If GitHub is blocked where you are, use a VPN that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through.":
+        "Nếu GitHub bị chặn ở nơi bạn ở, hãy dùng một VPN cũng có thể định tuyến lưu lượng của bạn: iOS chỉ chạy một VPN tại một thời điểm, nên đường hầm chỉ nội bộ sẽ không còn đường nào để tải SideStore.",
 
     // MARK: - Install steps
 
     "Connect the VPN": "Kết nối VPN",
-    "Pair with this iPhone": "Ghép nối với iPhone này",
+    "Get pairing file": "Lấy tệp ghép nối",
     "Open the device link": "Mở liên kết tới thiết bị",
     "Sign in to Apple ID": "Đăng nhập Apple ID",
     "Download %@": "Tải %@",
@@ -88,8 +154,6 @@ let vietnameseStrings: [String: String] = [
     "Scanning": "Đang quét",
     "Rescan apps": "Quét lại ứng dụng",
     "Scan installed apps": "Quét ứng dụng đã cài",
-    "Turn on a loopback VPN to scan and install. The write runs over its tunnel.":
-        "Bật một VPN loopback để quét và cài đặt. Việc ghi tệp chạy qua đường hầm này.",
     "%d supported app installed": "Đã cài %d ứng dụng được hỗ trợ",
     "%d supported apps installed": "Đã cài %d ứng dụng được hỗ trợ",
     "No supported apps found": "Không tìm thấy ứng dụng được hỗ trợ",
@@ -99,6 +163,19 @@ let vietnameseStrings: [String: String] = [
     "Pairing file ready. You can export it or install it into an app below.":
         "Tệp ghép nối đã sẵn sàng. Bạn có thể xuất tệp hoặc cài vào một ứng dụng bên dưới.",
     "Pairing file installed into %@.": "Đã cài tệp ghép nối vào %@.",
+
+    // Importing a pairing file (iOS 26 and below)
+
+    "Import pairing file": "Nhập tệp ghép nối",
+    "How do I make one?": "Tạo nó như thế nào?",
+    "imported pairing file": "đã nhập tệp ghép nối",
+    "No pairing file yet — tap “Import pairing file” first.":
+        "Chưa có tệp ghép nối — hãy chạm “Nhập tệp ghép nối” trước.",
+    "Pairing file missing — import it first.": "Thiếu tệp ghép nối — hãy nhập trước.",
+    "%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.":
+        "%@ không phải tệp ghép nối. Hãy chọn tệp máy tính đã tạo — một .mobiledevicepairing hoặc .plist chứa bản ghi ghép nối của iPhone này.",
+    "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
+        "iOS %@ không thể tự tạo tệp ghép nối — việc đó cần iOS %@. Hãy nhập một tệp tạo trên máy tính trong mục “Tệp ghép nối” rồi thử lại.",
 
     // MARK: - Pairing service status
 
@@ -137,10 +214,47 @@ let vietnameseStrings: [String: String] = [
     "Expired": "Đã hết hạn",
     "Expires %@": "Hết hạn ngày %@",
     "Unnamed certificate": "Chứng chỉ không có tên",
-    "Enter your Apple ID email and password first.":
-        "Nhập email và mật khẩu Apple ID của bạn trước.",
     "This certificate has no serial number, so it can't be revoked.":
         "Chứng chỉ này không có số sê-ri nên không thể thu hồi.",
+
+    // MARK: - Location tab
+
+    "Location spoofing": "Giả lập vị trí",
+    "Not simulating": "Không mô phỏng",
+    "Simulated": "Đã mô phỏng",
+    "Pick a place": "Chọn một nơi",
+    "Search for a place": "Tìm một địa điểm",
+    "Nothing found for “%@”.": "Không tìm thấy kết quả cho “%@”.",
+    "Set location": "Đặt vị trí",
+    "Setting": "Đang đặt",
+    "Reset to real location": "Trở lại vị trí thật",
+    "Location set to %@.": "Đã đặt vị trí thành %@.",
+    "Location reset. The device is using its own again.":
+        "Đã đặt lại vị trí. Thiết bị dùng lại vị trí của chính nó.",
+    "That isn't a valid coordinate.": "Tọa độ đó không hợp lệ.",
+    "Location session closed — set it up again.": "Phiên vị trí đã đóng — hãy thiết lập lại.",
+    "Downloading %@ failed (HTTP %d).": "Tải %@ thất bại (HTTP %d).",
+    "Couldn't build the download URL for %@.": "Không thể tạo URL tải cho %@.",
+
+    // MARK: - Entitlements tab
+
+    "Entitlements": "Quyền",
+    "Load apps": "Tải danh sách ứng dụng",
+    "%d App ID": "%d App ID",
+    "%d App IDs": "%d App ID",
+    "No App IDs": "Không có App ID",
+    "This Apple ID hasn't registered any apps yet. Install something with SideInstaller first, then come back.":
+        "Apple ID này chưa đăng ký ứng dụng nào. Hãy cài một ứng dụng bằng SideInstaller rồi quay lại.",
+    "Memory and performance": "Bộ nhớ và hiệu năng",
+    "Other free capabilities": "Các khả năng miễn phí khác",
+    "Recommended": "Khuyến nghị",
+    "Select all": "Chọn tất cả",
+    "None": "Không chọn",
+    "Enable %d selected": "Bật %d mục đã chọn",
+    "Asking Apple": "Đang hỏi Apple",
+    "%d of %d enabled": "Đã bật %d trong %d",
+    "Install the app again for these to take effect.":
+        "Cài lại ứng dụng để các quyền có hiệu lực.",
 
     // MARK: - Settings
 
@@ -186,11 +300,11 @@ let vietnameseStrings: [String: String] = [
         "phản hồi của GitHub không phải là thông tin bản phát hành (%@) — có thể thứ gì đó trên mạng này đã thay thế nó.",
     "what downloaded as %@ isn't an IPA — something on this network returned a page instead, or the transfer stopped partway.":
         "tệp tải về dưới tên %@ không phải là IPA — có thể thứ gì đó trên mạng này đã trả về một trang web, hoặc quá trình tải bị gián đoạn.",
+    "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
+        "liên kết đó trả về HTTP %d — không phải liên kết tải trực tiếp, hoặc cần đăng nhập.",
 
     // MARK: - Engine failures
 
-    "Enter your Apple ID email + password.":
-        "Nhập email và mật khẩu Apple ID của bạn.",
     "Two-factor verification was cancelled.": "Đã hủy xác minh hai yếu tố.",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
         "Apple ID hoặc mật khẩu không đúng. Hãy kiểm tra lại email và mật khẩu Apple Account của bạn rồi thử lại.",
@@ -214,8 +328,6 @@ let vietnameseStrings: [String: String] = [
         "Vẫn chưa có tệp ghép nối — hãy chạm vào “Tạo tệp ghép nối” trước.",
     "%@ isn't installed yet — install must run first.":
         "%@ chưa được cài đặt — phải cài đặt trước.",
-    "No loopback VPN is connected. Turn one on, then try again.":
-        "Chưa có VPN loopback nào được kết nối. Hãy bật một cái rồi thử lại.",
     "%@ isn't a valid IPA — the download it came from probably returned an error page, or the copy stopped partway. Replace it and tap Install again.":
         "%@ không phải là một IPA hợp lệ — có thể lượt tải về đã trả về một trang lỗi, hoặc việc sao chép bị dừng giữa chừng. Hãy thay tệp rồi chạm Cài đặt lại.",
     "%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.":
@@ -223,6 +335,11 @@ let vietnameseStrings: [String: String] = [
     "No IPA imported yet. Tap “Import .ipa” and pick one.":
         "Chưa nhập IPA nào. Hãy chạm “Nhập .ipa” và chọn một tệp.",
     "Couldn't import %@: %@": "Không thể nhập %@: %@",
+    "That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.":
+        "SideInstaller không tải được liên kết đó. Hãy dán đầy đủ địa chỉ https:// mà tệp .ipa được tải về.",
+    "That link didn't return an IPA. It has to download the file itself — a page that only links to the .ipa, or one that asks you to sign in first, arrives here as a web page.":
+        "Liên kết đó không trả về IPA. Nó phải tải thẳng tệp về — một trang chỉ dẫn tới tệp .ipa, hoặc bắt đăng nhập trước, sẽ về đây dưới dạng trang web.",
+    "Couldn't download that link: %@": "Không tải được liên kết đó: %@",
     "there's nothing to download for a custom IPA — import one first":
         "không có gì để tải cho IPA tùy chọn — hãy nhập một tệp trước",
     "your app": "ứng dụng của bạn",
@@ -231,20 +348,10 @@ let vietnameseStrings: [String: String] = [
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "Không thể đăng ký iPhone này%@ vào nhóm phát triển của Apple ID, nên Apple sẽ không cấp hồ sơ cấp phép. %@ — xem các bước ở trên.",
-
-    // MARK: - Guide cards
-
     "Connect to Wi-Fi": "Kết nối Wi-Fi",
-    "Open Settings › Wi-Fi and join a network.":
-        "Mở Cài đặt › Wi-Fi và tham gia một mạng.",
+    "Open Settings › Wi-Fi and join a network.": "Mở Cài đặt › Wi-Fi và tham gia một mạng.",
     "Then come back here — this continues automatically.":
         "Sau đó quay lại đây: quá trình sẽ tự tiếp tục.",
-
-    "Turn on a loopback VPN": "Bật một VPN loopback",
-    "Open a VPN app that tunnels to this iPhone — LocalDevVPN, ClashMi, or another. Any of them works.":
-        "Mở một ứng dụng VPN tạo đường hầm tới iPhone này — LocalDevVPN, ClashMi hay một ứng dụng khác. Cái nào cũng được.",
-    "If GitHub is blocked where you are, pick one that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through.":
-        "Nếu GitHub bị chặn ở nơi bạn ở, hãy chọn ứng dụng có thể làm proxy luôn: iOS chỉ cho phép một VPN tại một thời điểm, nên đường hầm chỉ cục bộ sẽ không còn đường nào để tải SideStore.",
     "Tap Connect so the toggle turns on.": "Chạm vào Connect để công tắc bật lên.",
     "Keep Wi-Fi on, then come back here — this continues automatically.":
         "Giữ Wi-Fi bật rồi quay lại đây: quá trình sẽ tự tiếp tục.",
@@ -252,31 +359,47 @@ let vietnameseStrings: [String: String] = [
     "Import an .ipa first": "Hãy nhập một .ipa trước",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
         "Chạm “Nhập .ipa” ở trên và chọn tệp — tệp có thể nằm ở bất kỳ đâu mà app Tệp truy cập được, kể cả iCloud Drive hay ổ USB.",
+    "Or paste a direct download link under that button, and SideInstaller fetches the .ipa itself.":
+        "Hoặc dán liên kết tải trực tiếp ngay dưới nút đó, SideInstaller sẽ tự tải tệp .ipa về.",
+    "Or open the Files app, press and hold the .ipa, tap Share, and pick SideInstaller — that hands the file over without the picker.":
+        "Hoặc mở ứng dụng Tệp, chạm giữ tệp .ipa, chọn Chia sẻ rồi chọn SideInstaller — tệp sẽ được chuyển sang mà không cần trình chọn tệp.",
     "Or copy it into Files › On My iPhone › SideInstaller, where SideInstaller also finds it.":
         "Hoặc chép tệp vào Tệp › Trên iPhone của tôi › SideInstaller — SideInstaller cũng tìm thấy ở đó.",
     "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
         "Đây là lối đi ở những nơi GitHub bị chặn: tải IPA trên bất kỳ thiết bị nào, mang sang đây rồi cài đặt.",
-
     "Pair this iPhone in Settings": "Ghép nối iPhone này trong Cài đặt",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "Mở ứng dụng Cài đặt, rồi vào Quyền riêng tư & Bảo mật › Chế độ nhà phát triển.",
     "Tap “Pair with SideInstaller”.": "Chạm vào “Ghép nối với SideInstaller”.",
-    "Enter your iPhone’s passcode if it asks for it.":
-        "Nhập mật mã iPhone của bạn nếu được hỏi.",
+    "Enter your iPhone’s passcode if it asks for it.": "Nhập mật mã iPhone của bạn nếu được hỏi.",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "Quay lại SideInstaller, xem mã mà ứng dụng hiển thị, rồi nhập đúng mã đó vào hộp thoại trong Cài đặt.",
-
     "A signing certificate already exists": "Đã có một chứng chỉ ký",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple trả về lỗi 7460: Apple ID này đã có chứng chỉ phát triển iOS, hoặc một yêu cầu vẫn đang chờ xử lý.",
     "SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone.":
         "SideInstaller không dùng lại được chứng chỉ đó. Điều này xảy ra khi chứng chỉ được cấp ở nơi khác — AltStore, SideStore, Sideloadly hoặc Xcode trên một thiết bị khác — nên khoá riêng tư cần thiết không có trên iPhone này.",
-    "Use “Revoke and retry” above, or open the Certificates tab, tap “Load certificates”, and revoke it there.":
-        "Dùng “Thu hồi và thử lại” ở trên, hoặc mở thẻ Chứng chỉ, chạm “Tải danh sách chứng chỉ” rồi thu hồi ở đó.",
+    "Use “Revoke and retry” above, or open Certificates in the Tools tab, tap “Load certificates”, and revoke it there.":
+        "Dùng “Thu hồi và thử lại” ở trên, hoặc mở Chứng chỉ trong thẻ Công cụ, chạm “Tải danh sách chứng chỉ” rồi thu hồi ở đó.",
     "Revoking is permanent: every app already signed with that certificate stops launching, on every device.":
         "Thu hồi là vĩnh viễn: mọi ứng dụng đã ký bằng chứng chỉ đó sẽ không mở được nữa, trên mọi thiết bị.",
     "Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again.":
         "Hoặc đăng nhập bằng một Apple ID khác (hoặc tài khoản dự phòng) ở trên, rồi chạm vào Cài đặt lần nữa.",
+
+    // MARK: - Guide cards
+
+    // Guide: import a pairing file
+
+    "Import a pairing file": "Nhập một tệp ghép nối",
+    "iOS %@ is the first version an iPhone can pair with itself on. On this one the pairing file has to be made on a computer.":
+        "iOS %@ là phiên bản đầu tiên mà iPhone có thể tự ghép nối. Trên máy này, tệp ghép nối phải được tạo trên máy tính.",
+    "On a Mac, Windows PC or Linux box, plug this iPhone in, trust the computer, and run jitterbugpair (or “pymobiledevice3 lockdown pair”).":
+        "Trên Mac, PC Windows hoặc Linux, cắm iPhone này vào, tin cậy máy tính rồi chạy jitterbugpair (hoặc “pymobiledevice3 lockdown pair”).",
+    "Send the file it writes — a .mobiledevicepairing or .plist — to this iPhone, by AirDrop, iCloud Drive or a cable.":
+        "Gửi tệp thu được — một .mobiledevicepairing hoặc .plist — sang iPhone này bằng AirDrop, iCloud Drive hoặc cáp.",
+    "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
+        "Quay lại đây, chạm “Nhập tệp ghép nối” và chọn tệp. Sau đó mọi thứ hoạt động giống như trên iOS %@.",
+    "Get jitterbugpair": "Tải jitterbugpair",
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
@@ -329,4 +452,51 @@ let vietnameseStrings: [String: String] = [
         "Việc ghép nối iPhone này cần đến nó: SideInstaller quảng bá chính mình trên mạng nội bộ để Cài đặt tìm thấy.",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
         "Hãy kết nối vào một mạng Wi-Fi. Việc ghép nối iPhone này cần đến nó — SideInstaller phải tìm thấy được trên mạng nội bộ.",
+
+    // MARK: - About
+
+    "About": "Giới thiệu",
+    "Version %@ (%@)": "Phiên bản %@ (%@)",
+    "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
+        "SideInstaller cài SideStore và LiveContainer thẳng vào iPhone của bạn, không cần đến máy tính.",
+    "Everything runs on the device: your Apple ID signs the apps locally and is never sent anywhere, and there's no server, no account and no analytics behind any of it.":
+        "Mọi thứ đều chạy trên máy: Apple ID của bạn ký ứng dụng ngay tại chỗ và không bao giờ được gửi đi đâu, phía sau cũng không có máy chủ, tài khoản hay thống kê nào.",
+
+    "Links": "Liên kết",
+    "Source code": "Mã nguồn",
+    "Read it, audit it or open a pull request on GitHub.":
+        "Hãy đọc, kiểm tra hoặc mở một pull request trên GitHub.",
+    "Get help, report bugs and follow what's being worked on.":
+        "Nhận trợ giúp, báo lỗi và theo dõi những gì đang được phát triển.",
+    "Support the project": "Ủng hộ dự án",
+    "SideInstaller is free. Ko-fi is there if you'd like to chip in anyway.":
+        "SideInstaller miễn phí. Ko-fi ở đó phòng khi bạn vẫn muốn góp một chút.",
+
+    "Special thanks": "Lời cảm ơn đặc biệt",
+    "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
+        "Vì idevice, thư viện mà SideInstaller dùng để giao tiếp với iPhone của bạn. Không có nó thì mọi thứ này đều không tồn tại.",
+    "For the support, and for spotting the bugs that got fixed because of it.":
+        "Vì đã hỗ trợ và phát hiện những lỗi sau đó được sửa.",
+
+    "Built with": "Được xây dựng với",
+    "The open-source work this app is built on:":
+        "Những dự án mã nguồn mở mà ứng dụng này dựa trên:",
+    "Pairing, the tunnel and the install itself — by jkcoxson, MIT.":
+        "Ghép nối, đường hầm và chính việc cài đặt — của jkcoxson, giấy phép MIT.",
+    "Apple ID sign-in, certificates and on-device signing — by nab138, MIT.":
+        "Đăng nhập Apple ID, chứng chỉ và ký ngay trên máy — của nab138, giấy phép MIT.",
+    "The sideloading app this installs for you.":
+        "Ứng dụng sideload mà ứng dụng này cài giúp bạn.",
+    "Runs sideloaded apps without spending an app slot on each one.":
+        "Chạy các ứng dụng sideload mà không tốn một suất ứng dụng cho mỗi cái.",
+    "The developer disk image location spoofing mounts — mirrored by doronz88.":
+        "Ảnh đĩa nhà phát triển mà chức năng giả lập vị trí gắn kết — được doronz88 lưu bản sao.",
+    "Plus the Rust crates tokio, serde, plist, base64 and tracing.":
+        "Cùng các crate Rust tokio, serde, plist, base64 và tracing.",
+
+    "Where to get it": "Nơi tải ứng dụng",
+    "Only the builds on the official install page and repository are mine. Anyone can fork the source, add a credential stealer and ship it under the same name and icon — so don't trust your Apple ID to a copy from anywhere else.":
+        "Chỉ những bản dựng trên trang cài đặt và kho mã chính thức mới là của tôi. Bất kỳ ai cũng có thể fork mã nguồn, thêm mã đánh cắp thông tin đăng nhập rồi phát hành với cùng tên và biểu tượng — vì vậy đừng giao Apple ID của bạn cho một bản sao lấy từ nơi khác.",
+    "Install page": "Trang cài đặt",
+    "Terms": "Điều khoản",
 ]

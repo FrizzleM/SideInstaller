@@ -182,6 +182,9 @@ enum SideStoreDownloader {
         case badRelease(String)
         /// The bytes arrived and aren't an IPA.
         case notAnIPA(String)
+        /// A pasted link answered with a status instead of a file. Separate from
+        /// `badStatus` because nothing about GitHub applies to a link.
+        case linkStatus(Int)
 
         var description: String {
             switch self {
@@ -211,6 +214,11 @@ enum SideStoreDownloader {
             case let .notAnIPA(name):
                 return L("what downloaded as %@ isn't an IPA — something on this network returned a page instead, or the transfer stopped partway.",
                          name)
+            case let .linkStatus(status):
+                // 401/403 is the common one: a link behind a sign-in, which the
+                // app can't answer, rather than a link that has gone.
+                return L("that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.",
+                         status)
             }
         }
 
@@ -220,7 +228,7 @@ enum SideStoreDownloader {
             switch self {
             case .unreachable, .badRelease, .notAnIPA:
                 return true
-            case .noIPAAsset, .noRelease, .badURL, .notDownloadable:
+            case .noIPAAsset, .noRelease, .badURL, .notDownloadable, .linkStatus:
                 return false
             case let .badStatus(_, _, retryAfter):
                 return retryAfter == nil
@@ -302,6 +310,57 @@ enum SideStoreDownloader {
         let tag = redirects.tag.map { ", release \($0)" } ?? ""
         log("HTTP \(status) for \(name) — \(response.expectedContentLength) bytes\(tag)")
         return Fetched(file: file, name: name)
+    }
+
+    /// Download a link the user pasted, into a temporary directory of its own so
+    /// the file keeps the name the link gave it. `progress` is called on an
+    /// arbitrary queue as the bytes arrive.
+    ///
+    /// Kept apart from `fetch`: there is no release behind a pasted link, no tag
+    /// to record, and its failures have to name the link rather than GitHub.
+    static func fetchDirect(_ url: URL,
+                            named name: String,
+                            progress: @escaping (Double) -> Void) async throws -> URL {
+        var req = URLRequest(url: url)
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+
+        let staging = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ipa-link-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        let dest = staging.appendingPathComponent(name)
+
+        return try await withCheckedThrowingContinuation { cont in
+            // Progress comes off the task's own `Progress` rather than a
+            // `URLSessionDownloadDelegate`: the delegate's completion callback
+            // and the async `download(for:)` both claim the downloaded file,
+            // and KVO leaves no object to keep alive by hand.
+            var observation: NSKeyValueObservation?
+            let task = URLSession.shared.downloadTask(with: req) { file, response, error in
+                observation?.invalidate()
+                do {
+                    if let error { throw error }
+                    guard let file, let http = response as? HTTPURLResponse else {
+                        throw DownloadError.badURL
+                    }
+                    guard (200...299).contains(http.statusCode) else {
+                        throw DownloadError.linkStatus(http.statusCode)
+                    }
+                    // This handler's file is deleted the moment it returns, so
+                    // the move belongs here rather than at the call site.
+                    try FileManager.default.moveItem(at: file, to: dest)
+                    cont.resume(returning: dest)
+                } catch let urlError as URLError {
+                    cont.resume(throwing: urlError.code == .cancelled
+                                ? CancellationError() : DownloadError.unreachable(urlError))
+                } catch {
+                    cont.resume(throwing: error)
+                }
+            }
+            observation = task.progress.observe(\.fractionCompleted) { done, _ in
+                progress(done.fractionCompleted)
+            }
+            task.resume()
+        }
     }
 
     /// Ask the releases API where the IPA is, once the derived URL has 404'd.
