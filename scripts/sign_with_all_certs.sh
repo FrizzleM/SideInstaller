@@ -11,6 +11,11 @@
 #   OUTPUT_PREFIX     filename prefix for signed IPAs (default: sideinstaller)
 #   P12_PASSWORD      fallback p12 password when no sidecar file exists
 #   FORCED_BUNDLE_ID  override bundle id for wildcard profiles
+#   SIGN_STATE_FILE   also record the resolved IPA URL and one line per unique
+#                     certificate (name, leaf SHA-1, expiry date) here
+#   PRECHECK_ONLY     1 = assemble the pool, write SIGN_STATE_FILE and stop —
+#                     no IPA download, no keychains, no signing. Used by
+#                     check_for_changes.sh to decide whether a run is needed.
 #
 # Pool layout, one folder per cert per source:
 #   <Name>/<Name>.p12  +  <Name>/<Name>.mobileprovision  [+ <Name>/password.txt]
@@ -34,6 +39,8 @@ https://github.com/NovaDev404/NexCerts"
 DEFAULT_P12_PASSWORD="${P12_PASSWORD:-WSF}"
 KC_PASSWORD="${KC_PASSWORD:-temp123}"
 FORCED_BUNDLE_ID="${FORCED_BUNDLE_ID:-}"
+SIGN_STATE_FILE="${SIGN_STATE_FILE:-}"
+PRECHECK_ONLY="${PRECHECK_ONLY:-0}"
 
 TMP_DIR="$(mktemp -d)"
 POOL_DIR="$TMP_DIR/pool"                 # merged cert pool, one subdir per source
@@ -439,8 +446,13 @@ mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 # Never wipe sideinstaller-*.ipa here: each cert rewrites only its own file
 # below, so builds from certs outside this pool survive.
-printf 'name\tcertificate_expires_at\tdays_left\n' > "$CERT_METADATA_FILE"
-if [[ -n "$CERT_NAME_LIST_FILE" ]]; then : > "$CERT_NAME_LIST_FILE"; fi
+# A precheck must leave the committed output untouched, so it writes neither of
+# these — it only produces SIGN_STATE_FILE.
+if [[ "$PRECHECK_ONLY" != "1" ]]; then
+  printf 'name\tcertificate_expires_at\tdays_left\n' > "$CERT_METADATA_FILE"
+  if [[ -n "$CERT_NAME_LIST_FILE" ]]; then : > "$CERT_NAME_LIST_FILE"; fi
+fi
+if [[ -n "$SIGN_STATE_FILE" ]]; then : > "$SIGN_STATE_FILE"; fi
 
 CERT_SOURCES="$(resolve_cert_sources)"
 if ! UNSIGNED_IPA_RESOLVED_URL="$(resolve_unsigned_ipa_url)"; then
@@ -458,20 +470,30 @@ while IFS= read -r _src; do
 done <<< "$CERT_SOURCES"
 echo "[*] Expected cert layout per source: <Name>/<Name>.p12 + <Name>/<Name>.mobileprovision [+ password]"
 
-if ! curl -fSL "$UNSIGNED_IPA_RESOLVED_URL" -o "$UNSIGNED_IPA"; then
-  fail "Could not download the unsigned IPA from: $UNSIGNED_IPA_RESOLVED_URL"
-  exit 1
-fi
-# Guard against the URL serving an HTML error page instead of a real IPA.
-if ! unzip -tq "$UNSIGNED_IPA" >/dev/null 2>&1; then
-  fail "Downloaded file is not a valid IPA (zip). Check the URL in $IPA_URL_FILE."
-  exit 1
+if [[ -n "$SIGN_STATE_FILE" ]]; then
+  printf 'ipa\t%s\n' "$UNSIGNED_IPA_RESOLVED_URL" >> "$SIGN_STATE_FILE"
 fi
 
-record_app_info "$UNSIGNED_IPA" || warn "Could not read app info from the unsigned IPA"
-echo "[*] Fetching Apple WWDR intermediates"
-download_apple_intermediates
-setup_intermediates_keychain
+# A precheck stops before all of this: it needs the certificate pool and nothing
+# else, so it skips the IPA download, the WWDR intermediates and the keychains.
+if [[ "$PRECHECK_ONLY" == "1" ]]; then
+  echo "[*] Precheck mode: inspecting the certificate pool only"
+else
+  if ! curl -fSL "$UNSIGNED_IPA_RESOLVED_URL" -o "$UNSIGNED_IPA"; then
+    fail "Could not download the unsigned IPA from: $UNSIGNED_IPA_RESOLVED_URL"
+    exit 1
+  fi
+  # Guard against the URL serving an HTML error page instead of a real IPA.
+  if ! unzip -tq "$UNSIGNED_IPA" >/dev/null 2>&1; then
+    fail "Downloaded file is not a valid IPA (zip). Check the URL in $IPA_URL_FILE."
+    exit 1
+  fi
+
+  record_app_info "$UNSIGNED_IPA" || warn "Could not read app info from the unsigned IPA"
+  echo "[*] Fetching Apple WWDR intermediates"
+  download_apple_intermediates
+  setup_intermediates_keychain
+fi
 echo "[*] Assembling certificate pool"
 acquire_sources "$CERT_SOURCES"
 
@@ -495,7 +517,9 @@ while IFS= read -r P12_FILE; do
 
   # Clear only this cert's own IPA, which drops its stale build if signing
   # fails and lets the zip below start from a clean archive.
-  rm -f "$OUTPUT_DIR/$OUTPUT_PREFIX-$OUTPUT_NAME.ipa"
+  if [[ "$PRECHECK_ONLY" != "1" ]]; then
+    rm -f "$OUTPUT_DIR/$OUTPUT_PREFIX-$OUTPUT_NAME.ipa"
+  fi
 
   if [[ "$RAW_NAME" != "$CERT_GROUP_NAME" ]]; then
     warn "Certificate filename $RAW_NAME.p12 does not match directory $CERT_GROUP_NAME; using directory name for output"
@@ -535,6 +559,20 @@ while IFS= read -r P12_FILE; do
     IFS=$'\t' read -r CERT_EXPIRES_AT CERT_DAYS_LEFT <<< "$CERT_EXPIRY_INFO"
   else
     warn "Unable to read certificate expiry for $CERT_GROUP_NAME"
+  fi
+
+  # Everything the install page needs to know about this certificate is settled
+  # by now — name, identity and expiry — so a precheck can stop here, before the
+  # expensive part. Certificates that fail later (bad profile, codesign error)
+  # are recorded too: the next precheck reaches this same point and produces the
+  # same line, so a permanently-broken certificate never forces a pointless run.
+  if [[ -n "$SIGN_STATE_FILE" ]]; then
+    printf 'cert\t%s\t%s\t%s\n' "$OUTPUT_NAME" "${CERT_FP:-unknown}" "$CERT_EXPIRES_AT" >> "$SIGN_STATE_FILE"
+  fi
+  if [[ "$PRECHECK_ONLY" == "1" ]]; then
+    log "Pool: $OUTPUT_NAME (expires $CERT_EXPIRES_AT)"
+    SUCCESS=$((SUCCESS + 1))
+    continue
   fi
 
   echo
@@ -673,10 +711,17 @@ fi
 
 echo
 echo "[✓] Done"
-echo "[✓] Successful: $SUCCESS"
+if [[ "$PRECHECK_ONLY" == "1" ]]; then
+  echo "[✓] Certificates in pool: $SUCCESS"
+else
+  echo "[✓] Successful: $SUCCESS"
+fi
 echo "[!] Failed: $FAILED"
 echo "[=] Skipped (duplicate certificates): $SKIPPED_DUP"
 
 if [[ $SUCCESS -eq 0 ]]; then
+  if [[ "$PRECHECK_ONLY" == "1" ]]; then
+    fail "No usable certificates found in the pool"; exit 1
+  fi
   fail "No signed IPAs were created"; exit 1
 fi

@@ -465,18 +465,10 @@ let frenchStrings: [String: String] = [
     "Version %@ (%@)": "Version %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller installe SideStore et LiveContainer directement sur votre iPhone, sans PC.",
-    "Everything runs on the device: your Apple ID signs the apps locally and is never sent anywhere, and there's no server, no account and no analytics behind any of it.":
-        "Tout se passe sur l’appareil : votre Apple ID signe les apps en local et n’est jamais envoyé nulle part, et il n’y a derrière ni serveur, ni compte, ni statistiques.",
 
     "Links": "Liens",
     "Source code": "Code source",
-    "Read it, audit it or open a pull request on GitHub.":
-        "Lisez-le, auditez-le ou ouvrez une pull request sur GitHub.",
-    "Get help, report bugs and follow what's being worked on.":
-        "Demandez de l’aide, signalez des bugs et suivez le développement.",
     "Support the project": "Soutenir le projet",
-    "SideInstaller is free. Ko-fi is there if you'd like to chip in anyway.":
-        "SideInstaller est gratuit. Ko-fi est là si vous voulez quand même participer.",
 
     "Special thanks": "Remerciements",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
@@ -485,20 +477,18 @@ let frenchStrings: [String: String] = [
         "Pour le soutien et pour avoir repéré les bugs qui ont ensuite été corrigés.",
 
     "Built with": "Construit avec",
-    "The open-source work this app is built on:":
+    "The open source work this app is built on:":
         "Le travail open source sur lequel cette app repose :",
-    "Pairing, the tunnel and the install itself — by jkcoxson, MIT.":
-        "L’appairage, le tunnel et l’installation elle-même — par jkcoxson, MIT.",
-    "Apple ID sign-in, certificates and on-device signing — by nab138, MIT.":
-        "La connexion à l’Apple ID, les certificats et la signature sur l’appareil — par nab138, MIT.",
+    "Pairing, the tunnel and the install itself. By jkcoxson, MIT.":
+        "L’appairage, le tunnel et l’installation elle-même. Par jkcoxson, MIT.",
+    "Apple ID sign in, certificates and signing on the device. By nab138, MIT.":
+        "La connexion à l’Apple ID, les certificats et la signature sur l’appareil. Par nab138, MIT.",
     "The sideloading app this installs for you.":
         "L’app de sideloading que celle-ci installe pour vous.",
     "Runs sideloaded apps without spending an app slot on each one.":
         "Exécute les apps sideloadées sans consommer un emplacement pour chacune.",
-    "The developer disk image location spoofing mounts — mirrored by doronz88.":
-        "L’image disque développeur que monte la simulation de position — miroir de doronz88.",
-    "Plus the Rust crates tokio, serde, plist, base64 and tracing.":
-        "Ainsi que les crates Rust tokio, serde, plist, base64 et tracing.",
+    "The developer disk image location spoofing mounts. Mirrored by doronz88.":
+        "L’image disque développeur que monte la simulation de position. Miroir de doronz88.",
 
     "Where to get it": "Où le télécharger",
     "Only the builds on the official install page and repository are mine. Anyone can fork the source, add a credential stealer and ship it under the same name and icon — so don't trust your Apple ID to a copy from anywhere else.":

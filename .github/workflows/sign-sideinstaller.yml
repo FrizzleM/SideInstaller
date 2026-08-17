@@ -3,6 +3,12 @@ name: sign-sideinstaller
 # Re-signs the SideInstaller IPA with every certificate in the cert pool and
 # publishes a tap-to-install page. The IPA source is whatever URL you put in
 # ipa-url.txt (editable any time) — or a one-off override passed below.
+#
+# Every run starts with a precheck (scripts/check_for_changes.sh) that compares
+# the certificate pool, the unsigned IPA and the page template against the state
+# the last run recorded in <output>/sign-state.tsv. If a re-run would rebuild
+# the same page, the job stops there: nothing is signed, nothing is committed
+# and the published page is left as it is. Tick "force" to override that.
 
 on:
   workflow_dispatch:
@@ -23,11 +29,16 @@ on:
         description: "Override cert pool source(s): space-separated .zip and/or github.com/owner/repo URLs, merged and de-duped (blank = use cert-url.txt)"
         required: false
         default: ""
+      force:
+        description: "Re-sign even when nothing has changed (skips the no-change check)"
+        required: false
+        type: boolean
+        default: false
   push:
     paths:
       - "ipa-url.txt"          # re-run automatically when you point at a new IPA
   schedule:
-    - cron: "0 23 * * *"       # daily refresh so the page tracks cert expiry
+    - cron: "0 23 * * 0"       # weekly refresh (Sunday) so the page tracks cert expiry
 
 concurrency:
   group: sign-sideinstaller
@@ -41,6 +52,10 @@ permissions:
 jobs:
   sign:
     runs-on: macos-latest
+    outputs:
+      # "true" when the precheck found nothing to rebuild, which also holds the
+      # Pages deploy below so the live page is left exactly as it is.
+      skipped: ${{ steps.precheck.outputs.skip }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -52,7 +67,7 @@ jobs:
           ref: ${{ github.ref_type == 'tag' && (github.event.repository.default_branch || 'main') || github.ref_name }}
 
       - name: Make scripts executable
-        run: chmod +x scripts/sign_with_all_certs.sh scripts/generate_plist.sh scripts/generate_index.sh
+        run: chmod +x scripts/sign_with_all_certs.sh scripts/generate_plist.sh scripts/generate_index.sh scripts/check_for_changes.sh
 
       # Resolve the channel once and export the paths every later step + script
       # reads from env. Beta gets its own output dir and page so a test build is
@@ -94,7 +109,21 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "Resolved channel: $channel (target branch: $target_branch)"
 
+      # Cheap gate in front of the expensive job: resolve the certificate pool
+      # and the IPA, and compare them with what the last run published. When
+      # nothing that feeds the page has moved, every step below is skipped and
+      # the committed index.html — and the live site — stay untouched.
+      - name: Check whether anything changed
+        id: precheck
+        env:
+          UNSIGNED_IPA_URL: ${{ github.event.inputs.ipa_url }}
+          CERT_ZIP_URL: ${{ github.event.inputs.cert_zip_url }}
+          FORCE_RUN: ${{ github.event.inputs.force }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./scripts/check_for_changes.sh
+
       - name: Sign IPA with all certificates
+        if: steps.precheck.outputs.skip != 'true'
         env:
           # Dispatch overrides win; otherwise the scripts fall back to the
           # ipa-url.txt / cert-url.txt files in the repo, then the latest release.
@@ -105,6 +134,7 @@ jobs:
         run: ./scripts/sign_with_all_certs.sh
 
       - name: Ensure signed IPAs exist
+        if: steps.precheck.outputs.skip != 'true'
         shell: bash
         run: |
           shopt -s nullglob
@@ -117,12 +147,32 @@ jobs:
           printf '%s\n' "${signed[@]}"
 
       - name: Generate OTA manifests
+        if: steps.precheck.outputs.skip != 'true'
         run: ./scripts/generate_plist.sh
 
       - name: Generate install page
+        if: steps.precheck.outputs.skip != 'true'
         run: ./scripts/generate_index.sh
 
+      # Commit the state the precheck computed, not a fresh one, so next week's
+      # comparison is against exactly the inputs this page was built from.
+      - name: Record signing state
+        if: steps.precheck.outputs.skip != 'true'
+        shell: bash
+        run: |
+          # The precheck leaves the state it computed at $NEW_STATE_FILE. If it
+          # could not compute one (pool inspection failed, and the run went ahead
+          # anyway), drop the recorded state rather than keep a stale one — the
+          # next run then rebuilds from scratch instead of trusting it.
+          if [[ -f "${NEW_STATE_FILE:-}" ]]; then
+            cp "$NEW_STATE_FILE" "$OUTPUT_DIR/sign-state.tsv"
+          else
+            echo "No precheck state to record; clearing the previous one." >&2
+            rm -f "$OUTPUT_DIR/sign-state.tsv"
+          fi
+
       - name: Commit and push generated files
+        if: steps.precheck.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -146,6 +196,7 @@ jobs:
           exit 1
 
       - name: Assemble Pages site
+        if: steps.precheck.outputs.skip != 'true'
         run: |
           rm -rf _site
           mkdir -p _site
@@ -161,14 +212,18 @@ jobs:
           if [[ -f terms.html ]]; then cp terms.html _site/terms.html; fi
 
       - name: Upload Pages artifact
+        if: steps.precheck.outputs.skip != 'true'
         uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
   # Publishes the install page. Requires Settings -> Pages -> Source = "GitHub Actions"
   # (one-time). This job is what shows up in the Actions tab as the Pages deploy.
+  # It is skipped entirely when the precheck found nothing to rebuild, which
+  # leaves the current deployment serving as-is.
   deploy-pages:
     needs: sign
+    if: needs.sign.outputs.skipped != 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

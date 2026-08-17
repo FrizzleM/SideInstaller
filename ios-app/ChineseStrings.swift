@@ -452,18 +452,10 @@ let chineseStrings: [String: String] = [
     "Version %@ (%@)": "版本 %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller 直接把 SideStore 和 LiveContainer 装到你的 iPhone 上，全程不需要电脑。",
-    "Everything runs on the device: your Apple ID signs the apps locally and is never sent anywhere, and there's no server, no account and no analytics behind any of it.":
-        "一切都在本机运行：你的 Apple ID 只在本地为应用签名，绝不会被发送到任何地方，背后也没有服务器、账户或数据统计。",
 
     "Links": "链接",
     "Source code": "源代码",
-    "Read it, audit it or open a pull request on GitHub.":
-        "可以在 GitHub 上阅读、审查代码，或者提交 pull request。",
-    "Get help, report bugs and follow what's being worked on.":
-        "获取帮助、报告问题，并了解正在进行的开发。",
     "Support the project": "支持这个项目",
-    "SideInstaller is free. Ko-fi is there if you'd like to chip in anyway.":
-        "SideInstaller 是免费的。如果你仍然想出一份力，可以去 Ko-fi。",
 
     "Special thanks": "特别感谢",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
@@ -472,20 +464,17 @@ let chineseStrings: [String: String] = [
         "感谢一路以来的支持，以及发现了那些因此得到修复的问题。",
 
     "Built with": "基于以下项目",
-    "The open-source work this app is built on:":
-        "这个应用所依赖的开源成果：",
-    "Pairing, the tunnel and the install itself — by jkcoxson, MIT.":
-        "配对、隧道以及安装本身——由 jkcoxson 开发，MIT 许可证。",
-    "Apple ID sign-in, certificates and on-device signing — by nab138, MIT.":
-        "Apple ID 登录、证书与本机签名——由 nab138 开发，MIT 许可证。",
+    "The open source work this app is built on:": "这个应用所依赖的开源成果：",
+    "Pairing, the tunnel and the install itself. By jkcoxson, MIT.":
+        "配对、隧道以及安装本身，由 jkcoxson 开发，MIT 许可证。",
+    "Apple ID sign in, certificates and signing on the device. By nab138, MIT.":
+        "Apple ID 登录、证书与本机签名，由 nab138 开发，MIT 许可证。",
     "The sideloading app this installs for you.":
         "本应用为你安装的侧载应用。",
     "Runs sideloaded apps without spending an app slot on each one.":
         "运行侧载应用，而不必为每个应用占用一个名额。",
-    "The developer disk image location spoofing mounts — mirrored by doronz88.":
-        "位置模拟所挂载的开发者磁盘映像——由 doronz88 镜像存放。",
-    "Plus the Rust crates tokio, serde, plist, base64 and tracing.":
-        "此外还有 Rust crate：tokio、serde、plist、base64 和 tracing。",
+    "The developer disk image location spoofing mounts. Mirrored by doronz88.":
+        "位置模拟所挂载的开发者磁盘映像，由 doronz88 镜像存放。",
 
     "Where to get it": "从哪里获取",
     "Only the builds on the official install page and repository are mine. Anyone can fork the source, add a credential stealer and ship it under the same name and icon — so don't trust your Apple ID to a copy from anywhere else.":

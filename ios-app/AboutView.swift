@@ -6,7 +6,6 @@ import SwiftUI
 struct AboutView: View {
     /// Declared so every label on this screen redraws when the language changes.
     @EnvironmentObject private var loc: Localizer
-    @Environment(\.openURL) private var openURL
 
     @State private var showSettings = false
 
@@ -19,7 +18,6 @@ struct AboutView: View {
                     links.cascadeItem(2)
                     thanks.cascadeItem(3)
                     builtWith.cascadeItem(4)
-                    license.cascadeItem(5)
                 }
                 .padding(20)
             }
@@ -57,10 +55,6 @@ struct AboutView: View {
                 Text(L("SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved."))
                     .font(.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(L("Everything runs on the device: your Apple ID signs the apps locally and is never sent anywhere, and there's no server, no account and no analytics behind any of it."))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -74,17 +68,14 @@ struct AboutView: View {
                 AboutRow(systemImage: "chevron.left.forwardslash.chevron.right",
                          tint: Theme.accent2,
                          title: L("Source code"),
-                         detail: L("Read it, audit it or open a pull request on GitHub."),
                          urlString: "https://github.com/FrizzleM/SideInstaller/tree/main")
                 AboutRow(systemImage: "bubble.left.and.bubble.right.fill",
                          tint: Color(red: 0.35, green: 0.40, blue: 0.95),
                          title: L("Discord"),
-                         detail: L("Get help, report bugs and follow what's being worked on."),
                          urlString: "https://discord.gg/sQ5Y8vbYJS")
                 AboutRow(systemImage: "cup.and.saucer.fill",
                          tint: Color(red: 1.0, green: 0.36, blue: 0.42),
                          title: L("Support the project"),
-                         detail: L("SideInstaller is free. Ko-fi is there if you'd like to chip in anyway."),
                          urlString: "https://ko-fi.com/frizzlem")
             }
         }
@@ -115,19 +106,19 @@ struct AboutView: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 16) {
                 sectionTitle(L("Built with"), systemImage: "shippingbox.fill")
-                Text(L("The open-source work this app is built on:"))
+                Text(L("The open source work this app is built on:"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 AboutRow(systemImage: "iphone.gen3",
                          tint: Theme.accent2,
                          title: "idevice",
-                         detail: L("Pairing, the tunnel and the install itself — by jkcoxson, MIT."),
+                         detail: L("Pairing, the tunnel and the install itself. By jkcoxson, MIT."),
                          urlString: "https://github.com/jkcoxson/idevice")
                 AboutRow(systemImage: "signature",
                          tint: Theme.accent2,
                          title: "isideload",
-                         detail: L("Apple ID sign-in, certificates and on-device signing — by nab138, MIT."),
+                         detail: L("Apple ID sign in, certificates and signing on the device. By nab138, MIT."),
                          urlString: "https://github.com/nab138/isideload")
                 AboutRow(systemImage: "shippingbox.fill",
                          tint: .green,
@@ -142,48 +133,8 @@ struct AboutView: View {
                 AboutRow(systemImage: "externaldrive.fill",
                          tint: .purple,
                          title: "DeveloperDiskImage",
-                         detail: L("The developer disk image location spoofing mounts — mirrored by doronz88."),
+                         detail: L("The developer disk image location spoofing mounts. Mirrored by doronz88."),
                          urlString: "https://github.com/doronz88/DeveloperDiskImage")
-                Text(L("Plus the Rust crates tokio, serde, plist, base64 and tracing."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    // MARK: Licence and provenance
-
-    /// The one warning worth repeating here: a fork can look identical and take
-    /// the Apple ID typed into it, so both official sources are one tap away.
-    private var license: some View {
-        CalloutCard(tint: Theme.accent) {
-            VStack(alignment: .leading, spacing: 12) {
-                sectionTitle(L("Where to get it"), systemImage: "checkmark.shield.fill")
-                Text(L("Only the builds on the official install page and repository are mine. Anyone can fork the source, add a credential stealer and ship it under the same name and icon — so don't trust your Apple ID to a copy from anywhere else."))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 10) {
-                    if let url = URL(string: UpdateChecker.installPageURL) {
-                        Button { openURL(url) } label: {
-                            Label(L("Install page"), systemImage: "arrow.up.right")
-                                .font(.footnote.weight(.semibold))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .tint(Theme.accent)
-                    }
-                    if let url = URL(string: "https://frizzlem.github.io/SideInstaller/terms.html") {
-                        Button { openURL(url) } label: {
-                            Label(L("Terms"), systemImage: "doc.text")
-                                .font(.footnote.weight(.semibold))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .tint(Theme.accent)
-                    }
-                }
             }
         }
     }
@@ -202,13 +153,14 @@ struct AboutView: View {
 
 // MARK: - Row
 
-/// One entry on this page: a tinted glyph, a name and a line about it. Rows
-/// carrying a `urlString` open it and wear an arrow; the rest are plain credits.
+/// One entry on this page: a tinted glyph, a name and — where there is one — a
+/// line about it. Rows carrying a `urlString` open it and wear an arrow; the
+/// rest are plain credits.
 private struct AboutRow: View {
     var systemImage: String
     var tint: Color
     var title: String
-    var detail: String
+    var detail: String? = nil
     var urlString: String? = nil
 
     @Environment(\.openURL) private var openURL
@@ -234,10 +186,12 @@ private struct AboutRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 8)
             if isLink {
