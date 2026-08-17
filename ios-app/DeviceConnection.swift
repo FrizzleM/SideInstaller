@@ -40,8 +40,61 @@ final class DeviceConnection {
 
     // MARK: Connect / disconnect
 
-    /// Establish the loopback tunnel and RSD handshake.
+    /// Establish the loopback tunnel and RSD handshake, by whichever route the
+    /// pairing file supports.
+    ///
+    /// Two routes end in the same adapter + RSD handshake, so everything below
+    /// this is identical either way:
+    ///
+    /// - **RPPairing** (`tunnel_create_rppairing`): talks straight to the
+    ///   device's remote-pairing listener with the Ed25519 record iOS 27's
+    ///   on-device pairing produces. The route SideInstaller has always taken.
+    /// - **CoreDeviceProxy** (`tunnel_create_usb`): opens a lockdown session
+    ///   with a *classic* pair record and starts
+    ///   `com.apple.internal.devicecompute.CoreDeviceProxy`, which vends the
+    ///   same tunnel. Works back to iOS 17, and is the only route open to a
+    ///   pairing file made on a computer — the pre-27 path, and StikDebug's.
+    ///
+    /// A file carrying both records tries the route its OS is likeliest to
+    /// answer on first, then the other.
     func connect(deviceIP: String, pairingFilePath: String, hostname: String = "SideInstaller") throws {
+        let kind = PairingFileKind.of(path: pairingFilePath)
+        guard kind.isUsable else {
+            throw fail("\((pairingFilePath as NSString).lastPathComponent) isn't a pairing file: it carries neither a remote-pairing key pair nor a lockdown pair record.")
+        }
+        // iOS 27 answers on the remote-pairing listener; anything older only has
+        // lockdownd. With one record there's no choice to make.
+        let remoteFirst = Engine.deviceCanSelfPair
+        let routes: [Bool] = (kind.hasRemotePairing && kind.hasLockdown)
+            ? (remoteFirst ? [true, false] : [false, true])
+            : [kind.hasRemotePairing]
+
+        var firstFailure: Error?
+        for (index, useRemotePairing) in routes.enumerated() {
+            do {
+                if useRemotePairing {
+                    try connectRemotePairing(deviceIP: deviceIP,
+                                             pairingFilePath: pairingFilePath,
+                                             hostname: hostname)
+                } else {
+                    try connectCoreDeviceProxy(deviceIP: deviceIP,
+                                               pairingFilePath: pairingFilePath,
+                                               hostname: hostname)
+                }
+                return
+            } catch {
+                // Report what the preferred route said, not the fallback's noise.
+                if firstFailure == nil { firstFailure = error }
+                let more = index + 1 < routes.count ? " Trying the other route…" : ""
+                Engine.shared.log("\(useRemotePairing ? "Remote-pairing" : "Lockdown") tunnel didn't come up (\(error)).\(more)")
+            }
+        }
+        throw firstFailure ?? fail("no tunnel route available for this pairing file")
+    }
+
+    /// The RPPairing route: straight to the device's remote-pairing listener.
+    private func connectRemotePairing(deviceIP: String, pairingFilePath: String,
+                                      hostname: String) throws {
         var pf: OpaquePointer?
         try pairingFilePath.withCString { p in
             try check(rp_pairing_file_read(p, &pf), "failed to read pairing file at \(pairingFilePath)")
@@ -78,7 +131,63 @@ final class DeviceConnection {
         handshake = newHandshake
     }
 
+    /// The CoreDeviceProxy route, for a classic lockdown pair record.
+    ///
+    /// `tunnel_create_usb` is named for the transport idevice built it against;
+    /// what it actually does is start CoreDeviceProxy through whatever provider
+    /// it's handed, and a `TcpProvider` reaches lockdownd over the loopback
+    /// tunnel exactly as the USB one reaches it over usbmuxd. No RPPairing
+    /// record is involved, which is what makes an imported pairing file work.
+    private func connectCoreDeviceProxy(deviceIP: String, pairingFilePath: String,
+                                        hostname: String) throws {
+        var pf: OpaquePointer?
+        try pairingFilePath.withCString { p in
+            try check(idevice_pairing_file_read(p, &pf),
+                      "failed to read the lockdown pair record at \(pairingFilePath)")
+        }
+        guard let pairingFile = pf else { throw fail("pairing file handle was null") }
+        // Freed only on the paths where the provider never takes ownership.
+        var pairingFileOwned = true
+        defer { if pairingFileOwned { idevice_pairing_file_free(pairingFile) } }
+
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        // The provider picks the port per service; only the address is read.
+        addr.sin_port = 0
+        guard deviceIP.withCString({ inet_pton(AF_INET, $0, &addr.sin_addr) }) == 1 else {
+            throw fail("invalid device IP: \(deviceIP)")
+        }
+
+        var provider: OpaquePointer?
+        let providerError = withUnsafePointer(to: &addr) { aptr in
+            aptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+                hostname.withCString { label in
+                    idevice_tcp_provider_new(sa, pairingFile, label, &provider)
+                }
+            }
+        }
+        // The provider takes ownership of the pairing file, but only once it
+        // gets far enough to build one — an early argument error leaves it ours.
+        if providerError == nil { pairingFileOwned = false }
+        try check(providerError, "idevice_tcp_provider_new failed")
+        guard let provider else { throw fail("lockdown provider was null") }
+        defer { idevice_provider_free(provider) }
+
+        var newAdapter: OpaquePointer?
+        var newHandshake: OpaquePointer?
+        try check(tunnel_create_usb(provider, &newAdapter, &newHandshake),
+                  "CoreDeviceProxy tunnel failed (is a loopback VPN connected, device IP \(deviceIP), and is this pairing file this iPhone's?)")
+        guard newAdapter != nil, newHandshake != nil else {
+            throw fail("tunnel created without valid handles")
+        }
+        disconnect()
+        adapter = newAdapter
+        handshake = newHandshake
+    }
+
     func disconnect() {
+        // Before the tunnel they run over: both hold the adapter's connections.
+        endLocationSimulation()
         if let handshake { rsd_handshake_free(handshake); self.handshake = nil }
         if let adapter { adapter_free(adapter); self.adapter = nil }
     }
@@ -514,6 +623,149 @@ final class DeviceConnection {
         }
     }
 
+    // MARK: Developer disk image (image_mounter over RSD)
+
+    /// How many developer images the device has mounted. Zero means the DVT
+    /// services — location simulation among them — aren't reachable yet.
+    func mountedDeveloperImageCount() throws -> Int {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var client: OpaquePointer?
+        try check(image_mounter_connect_rsd(adapter, handshake, &client),
+                  "image_mounter_connect_rsd failed")
+        guard let client else { throw fail("image mounter client was null") }
+        defer { image_mounter_free(client) }
+
+        var devices: UnsafeMutablePointer<plist_t?>?
+        var count = 0
+        try check(image_mounter_copy_devices(client, &devices, &count),
+                  "image_mounter_copy_devices failed")
+        if let devices {
+            for i in 0..<count { plist_free(devices[i]) }
+            idevice_data_free(UnsafeMutableRawPointer(devices).assumingMemoryBound(to: UInt8.self),
+                              UInt(count * MemoryLayout<plist_t?>.stride))
+        }
+        return count
+    }
+
+    /// Mount the personalized developer disk image, the way StikDebug does:
+    /// lockdownd for the device's UniqueChipID, then image_mounter over the same
+    /// RSD tunnel. Apple personalizes the image per chip, so the manifest and
+    /// the chip id both go to the device and it signs its own copy.
+    func mountPersonalizedDeveloperImage(imagePath: String,
+                                         trustcachePath: String,
+                                         manifestPath: String,
+                                         progress: ((Double) -> Void)? = nil) throws {
+        guard let adapter, let handshake else { throw fail("not connected") }
+
+        // Mapped, not read: the image is tens of megabytes.
+        let image = try Data(contentsOf: URL(fileURLWithPath: imagePath), options: .mappedIfSafe)
+        let trustcache = try Data(contentsOf: URL(fileURLWithPath: trustcachePath), options: .mappedIfSafe)
+        let manifest = try Data(contentsOf: URL(fileURLWithPath: manifestPath), options: .mappedIfSafe)
+        guard !image.isEmpty, !trustcache.isEmpty, !manifest.isEmpty else {
+            throw fail("developer disk image files are empty — download them again")
+        }
+
+        let chipID = try uniqueChipID()
+
+        var client: OpaquePointer?
+        try check(image_mounter_connect_rsd(adapter, handshake, &client),
+                  "image_mounter_connect_rsd failed")
+        guard let client else { throw fail("image mounter client was null") }
+        defer { image_mounter_free(client) }
+
+        // The callback fires on idevice's thread; the box is freed below.
+        let box = progress.map { Unmanaged.passRetained(ProgressBox($0)).toOpaque() }
+        defer { if let box { Unmanaged<ProgressBox>.fromOpaque(box).release() } }
+
+        let err = image.withUnsafeBytes { img in
+            trustcache.withUnsafeBytes { tc in
+                manifest.withUnsafeBytes { man in
+                    image_mounter_mount_personalized_with_callback_rsd(
+                        client, adapter, handshake,
+                        img.bindMemory(to: UInt8.self).baseAddress, image.count,
+                        tc.bindMemory(to: UInt8.self).baseAddress, trustcache.count,
+                        man.bindMemory(to: UInt8.self).baseAddress, manifest.count,
+                        nil, chipID,
+                        box == nil ? nil : mountProgressCb, box)
+                }
+            }
+        }
+        try check(err, "mounting the developer disk image failed")
+    }
+
+    /// The device's UniqueChipID, which personalizing the image is keyed on.
+    private func uniqueChipID() throws -> UInt64 {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var client: OpaquePointer?
+        try check(lockdownd_connect_rsd(adapter, handshake, &client), "lockdownd_connect_rsd failed")
+        guard let client else { throw fail("lockdownd client was null") }
+        defer { lockdownd_client_free(client) }
+
+        var value: plist_t?
+        try check("UniqueChipID".withCString { lockdownd_get_value(client, $0, nil, &value) },
+                  "lockdownd_get_value(UniqueChipID) failed")
+        guard let value else { throw fail("device reported no UniqueChipID") }
+        defer { plist_free(value) }
+
+        var chipID: UInt64 = 0
+        plist_get_uint_val(value, &chipID)
+        guard chipID != 0 else { throw fail("device reported an empty UniqueChipID") }
+        return chipID
+    }
+
+    // MARK: Location simulation (DVT over RSD)
+
+    /// The DVT remote server, and the location client that borrows it. Kept
+    /// alive between calls: the device holds the simulated location only as long
+    /// as this session is open.
+    private var remoteServer: OpaquePointer?
+    private var locationSim: OpaquePointer?
+
+    var isSimulatingLocation: Bool { locationSim != nil }
+
+    /// Open the DVT location-simulation session, reusing the existing tunnel.
+    /// Needs a mounted developer disk image — without one the RemoteServer
+    /// handshake is what fails.
+    func beginLocationSimulation() throws {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        guard locationSim == nil else { return }
+
+        var server: OpaquePointer?
+        try check(remote_server_connect_rsd(adapter, handshake, &server),
+                  "remote_server_connect_rsd failed (is the developer disk image mounted?)")
+        guard let server else { throw fail("remote server handle was null") }
+
+        var sim: OpaquePointer?
+        let err = location_simulation_new(server, &sim)
+        if err != nil || sim == nil {
+            remote_server_free(server)
+            try check(err, "location_simulation_new failed")
+            throw fail("location simulation handle was null")
+        }
+        // The client borrows the server rather than taking it, so the server has
+        // to outlive it and be freed after — see `endLocationSimulation`.
+        remoteServer = server
+        locationSim = sim
+    }
+
+    func setSimulatedLocation(latitude: Double, longitude: Double) throws {
+        guard let locationSim else { throw fail("no location simulation session") }
+        try check(location_simulation_set(locationSim, latitude, longitude),
+                  "location_simulation_set failed")
+    }
+
+    /// Hand the device back its real location. Leaves the session open.
+    func clearSimulatedLocation() throws {
+        guard let locationSim else { throw fail("no location simulation session") }
+        try check(location_simulation_clear(locationSim), "location_simulation_clear failed")
+    }
+
+    /// Close the session. Order matters: the client borrows the server.
+    func endLocationSimulation() {
+        if let locationSim { location_simulation_free(locationSim); self.locationSim = nil }
+        if let remoteServer { remote_server_free(remoteServer); self.remoteServer = nil }
+    }
+
     // MARK: plist helpers
 
     private func plistString(_ dict: plist_t?, _ key: String) -> String? {
@@ -525,6 +777,20 @@ final class DeviceConnection {
         let s = String(validatingUTF8: out) ?? ""
         return s.isEmpty ? nil : s
     }
+}
+
+/// Carries a Swift closure through the C mount callback's `void *context`.
+private final class ProgressBox {
+    let report: (Double) -> Void
+    init(_ report: @escaping (Double) -> Void) { self.report = report }
+}
+
+/// image_mounter progress callback, driving the DDI mount bar.
+private let mountProgressCb: @convention(c) (Int, Int, UnsafeMutableRawPointer?) -> Void = { done, total, context in
+    guard let context, total > 0 else { return }
+    let report = Unmanaged<ProgressBox>.fromOpaque(context).takeUnretainedValue().report
+    let fraction = Double(done) / Double(total)
+    DispatchQueue.main.async { report(fraction) }
 }
 
 /// installation_proxy progress callback, driving the bar and the log.

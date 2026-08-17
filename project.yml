@@ -3,8 +3,10 @@ options:
   # Brand reverse-DNS prefix. NOTE: this is a chosen handle only — it is NOT
   # tied to an Apple Developer account (DEVELOPMENT_TEAM stays empty below).
   bundleIdPrefix: com.frizzle
+  # iOS 27 is what pairs itself; 18 is what the rest of the pipeline needs, and
+  # an older iPhone gets there by importing a pairing file made on a computer.
   deploymentTarget:
-    iOS: "27.0"
+    iOS: "18.0"
   createIntermediateGroups: true
 
 settings:

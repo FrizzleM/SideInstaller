@@ -1,8 +1,9 @@
 import SwiftUI
 import UIKit
 
-/// The Pairing tab: generate the pairing file, export it, and write it into a
-/// supported app installed on this iPhone over the loopback tunnel.
+/// The Pairing page: generate the pairing file, export it, and write it into a
+/// supported app installed on this iPhone over the loopback tunnel. Pushed from
+/// Tools, whose `NavigationStack` this relies on.
 struct PairingView: View {
     @EnvironmentObject private var engine: Engine
     /// Declared so every label on this screen redraws when the language changes.
@@ -12,43 +13,50 @@ struct PairingView: View {
     @State private var showSettings = false
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 18) {
-                    header.cascadeItem(0)
-                    pairingFileCard.cascadeItem(1)
-                    if let pin = engine.pairingPIN {
-                        pinCard(pin).transition(.cardAppear)
-                    }
-                    if manager.isGenerating {
-                        generatingSteps.transition(.cardAppear)
-                    }
-                    installCard.cascadeItem(2)
-                    if let error = manager.lastError {
-                        errorCallout(error).transition(.cardAppear)
-                    }
-                    if let success = manager.lastSuccess {
-                        successCallout(success).transition(.cardAppear)
-                    }
-                    targetList
+        ScrollView {
+            VStack(spacing: 18) {
+                header.cascadeItem(0)
+                pairingFileCard.cascadeItem(1)
+                if let pin = engine.pairingPIN {
+                    pinCard(pin).transition(.cardAppear)
                 }
-                .padding(20)
-                .animation(.smooth(duration: 0.35), value: manager.pairingFileExists)
-                .animation(.smooth(duration: 0.35), value: engine.pairingPIN)
-                .animation(.smooth(duration: 0.35), value: manager.isGenerating)
-                .animation(.smooth(duration: 0.35), value: manager.lastError)
-                .animation(.smooth(duration: 0.35), value: manager.lastSuccess)
-                .animation(.smooth(duration: 0.35), value: manager.targets)
-                .animation(.smooth(duration: 0.3), value: engine.deviceSummary)
-                .animation(.smooth(duration: 0.3), value: engine.vpnConnected)
-                .animation(.smooth(duration: 0.3), value: engine.wifiConnected)
+                if manager.isGenerating {
+                    generatingSteps.transition(.cardAppear)
+                }
+                installCard.cascadeItem(2)
+                if let error = manager.lastError {
+                    errorCallout(error).transition(.cardAppear)
+                }
+                if let success = manager.lastSuccess {
+                    successCallout(success).transition(.cardAppear)
+                }
+                targetList
             }
-            .scrollDismissesKeyboard(.interactively)
-            .background(AppBackground())
-            .toolbar { settingsToolbarItem(isPresented: $showSettings) }
-            .sheet(isPresented: $showSettings) { SettingsView() }
+            .padding(20)
+            .animation(.smooth(duration: 0.35), value: manager.pairingFileExists)
+            .animation(.smooth(duration: 0.35), value: engine.pairingPIN)
+            .animation(.smooth(duration: 0.35), value: manager.isGenerating)
+            .animation(.smooth(duration: 0.35), value: manager.lastError)
+            .animation(.smooth(duration: 0.35), value: manager.lastSuccess)
+            .animation(.smooth(duration: 0.35), value: manager.targets)
+            .animation(.smooth(duration: 0.3), value: engine.deviceSummary)
+            .animation(.smooth(duration: 0.3), value: engine.vpnConnected)
+            .animation(.smooth(duration: 0.3), value: engine.wifiConnected)
         }
-        .onAppear { manager.refresh() }
+        .scrollDismissesKeyboard(.interactively)
+        .background(AppBackground())
+        .toolbar { settingsToolbarItem(isPresented: $showSettings) }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .onAppear {
+            manager.refresh()
+            manager.autoScan()
+        }
+        // Connecting the tunnel means leaving the app, so the page is usually
+        // already open when it comes up — scan then rather than making the user
+        // come back and tap.
+        .onChange(of: engine.vpnConnected) { _, connected in
+            if connected { manager.autoScan() }
+        }
     }
 
     // MARK: Header
@@ -84,6 +92,9 @@ struct PairingView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle(L("Pairing file"), systemImage: "lock.doc.fill")
 
+                // Only reachable on iOS 27: the Tools row that pushes this page
+                // is hidden below it, where the pairing file is imported on the
+                // Install screen instead of being made here.
                 Button { manager.generate() } label: {
                     HStack(spacing: 10) {
                         if manager.isGenerating {
@@ -137,12 +148,6 @@ struct PairingView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle(L("Pair in Settings"), systemImage: "gearshape")
                 stepsList(Guides.pairing.steps)
-                if !engine.pairingStatus.isEmpty {
-                    Text(engine.pairingStatus)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
         }
     }
@@ -182,7 +187,7 @@ struct PairingView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "shield.lefthalf.filled")
                 .foregroundStyle(.red)
-            Text(L("Turn on a loopback VPN to scan and install. The write runs over its tunnel."))
+            Text(L("Connect LocalDevVPN to scan and install. The write runs over its tunnel."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

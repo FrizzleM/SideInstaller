@@ -28,20 +28,54 @@ struct WelcomeView: View {
                 Spacer()
 
                 VStack(spacing: 20) {
+                    // Said before anything is agreed to: on this iPhone the
+                    // pairing file has to come from a computer, and that's worth
+                    // knowing before the first install run asks for one.
+                    if !Engine.deviceCanSelfPair {
+                        pairingFileNotice
+                            .welcomeItem(2)
+                    }
                     checkboxRow
-                        .welcomeItem(2)
+                        .welcomeItem(Engine.deviceCanSelfPair ? 2 : 3)
                     Button(L("Start")) { hasAcceptedTOS = true }
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(!accepted)
                         .opacity(accepted ? 1 : 0.35)
                         .animation(.snappy(duration: 0.25), value: accepted)
-                        .welcomeItem(3)
+                        .welcomeItem(Engine.deviceCanSelfPair ? 3 : 4)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 28)
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    /// What an iPhone below iOS 27 will be asked for. Everything else about the
+    /// install is the same, so this says what the extra step is rather than
+    /// reading as an unsupported-device warning.
+    private var pairingFileNotice: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "lock.doc.fill")
+                .font(.title3)
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("You'll need a pairing file"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text(L("This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.",
+                       Engine.shared.osVersionText, Engine.minimumOSText))
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(Color.orange.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1))
     }
 
     /// The tickbox row, where only "TOS" itself opens the terms page.

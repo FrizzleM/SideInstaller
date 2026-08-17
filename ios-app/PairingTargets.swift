@@ -98,6 +98,61 @@ enum PairingTargets {
     }
 }
 
+/// Which of the two records a pairing file on disk actually carries.
+///
+/// It decides both how the tunnel to the device can be built — RPPairing's
+/// TLS-PSK listener, or CoreDeviceProxy over classic lockdown — and whether the
+/// file can be handed to an AltStore-family app as it stands.
+struct PairingFileKind {
+
+    /// `public_key` + `private_key` + `identifier`: what `RpPairingFile` parses,
+    /// and what `tunnel_create_rppairing` needs. Only iOS 27's on-device pairing
+    /// produces one, so an imported file rarely has it.
+    let hasRemotePairing: Bool
+    /// `HostCertificate` + `HostPrivateKey` + `DeviceCertificate`: the record
+    /// jitterbugpair, pymobiledevice3 and idevicepair write, which reaches the
+    /// device through lockdownd + CoreDeviceProxy instead. minimuxer (SideStore,
+    /// LiveContainer) and Feather read this half.
+    let hasLockdown: Bool
+    /// The device the record was minted for, when the file names one.
+    let udid: String?
+
+    /// True when at least one record is there to connect with.
+    var isUsable: Bool { hasRemotePairing || hasLockdown }
+
+    /// Nothing at all — a file that isn't a pairing file, or isn't a plist.
+    static let none = PairingFileKind(hasRemotePairing: false, hasLockdown: false, udid: nil)
+
+    static func of(path: String) -> PairingFileKind {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return .none }
+        return of(data: data)
+    }
+
+    static func of(data: Data) -> PairingFileKind {
+        guard !data.isEmpty,
+              let parsed = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
+              let dict = parsed as? [String: Any]
+        else { return .none }
+
+        // idevice rejects a key that isn't exactly 32 bytes, so check the length
+        // here too rather than calling a file usable that it will refuse.
+        let ed25519 = { (key: String) in (dict[key] as? Data)?.count == 32 }
+        let remote = ed25519("public_key") && ed25519("private_key")
+            && (dict["identifier"] as? String)?.isEmpty == false
+
+        let present = { (key: String) in
+            // Both plist parsers accept these as data; XML plists from some
+            // tools carry the PEM as a string instead.
+            (dict[key] as? Data)?.isEmpty == false || (dict[key] as? String)?.isEmpty == false
+        }
+        let lockdown = present("HostCertificate") && present("HostPrivateKey")
+            && present("DeviceCertificate")
+
+        let udid = (dict["UDID"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        return PairingFileKind(hasRemotePairing: remote, hasLockdown: lockdown, udid: udid)
+    }
+}
+
 /// The pairing file handed to other apps, which is two records in one plist.
 ///
 /// SideInstaller pairs with this iPhone over RPPairing, and that record —
@@ -185,6 +240,19 @@ enum CompositePairingFile {
         return try PropertyListSerialization.data(fromPropertyList: merged,
                                                   format: .xml,
                                                   options: 0)
+    }
+
+    /// Put a UDID into a record that doesn't name one, leaving it alone if it
+    /// does. The classic `Pair` response omits it, and so does some of what the
+    /// desktop pairing tools write — but minimuxer needs it to know which device
+    /// the record is for.
+    static func stampingUDID(_ udid: String, into data: Data) throws -> Data {
+        var dict = try dictionary(from: data, describing: "pairing")
+        guard (dict["UDID"] as? String)?.isEmpty != false else { return data }
+        dict["UDID"] = udid
+        // XML for the same reason `merge` writes XML: SideStore reads the file
+        // as a UTF-8 string and hands that string to minimuxer.
+        return try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
     }
 
     private static func dictionary(from data: Data, describing what: String) throws -> [String: Any] {

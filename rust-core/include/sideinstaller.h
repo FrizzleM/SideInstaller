@@ -171,6 +171,32 @@ int32_t si_cert_revoke(CertSession *session,
 // Free a certificate session.
 void si_cert_session_free(CertSession *session);
 
+// ---------------------------------------------------------------------------
+// Entitlements — enable developer-portal capabilities on an App ID
+// ---------------------------------------------------------------------------
+//
+// Reuses the certificate session: same Apple ID, same developer session, same
+// team, so signing in once covers both. Enabling a capability only changes what
+// Apple will put in the NEXT provisioning profile — the app must be signed and
+// installed again for it to take effect.
+
+// List the team's App IDs. BLOCKS. On success *out_json is a heap JSON array of
+// objects: {app_id_id, identifier, name}. Free with si_string_free.
+int32_t si_appid_list(CertSession *session,
+                      char **out_json,
+                      char **out_error);
+
+// Enable each capability id in the comma-separated `capabilities` list on the
+// App ID `app_id_id` (the opaque id from si_appid_list, not the bundle id).
+// BLOCKS. Each id is one request, so a refusal costs only itself; on success
+// *out_json is a heap JSON array of {capability, ok, error}, one per requested
+// id. Returns non-zero only when nothing could be attempted (*out_error set).
+int32_t si_appid_enable(CertSession *session,
+                        const char *app_id_id,
+                        const char *capabilities,
+                        char **out_json,
+                        char **out_error);
+
 #ifdef __cplusplus
 }
 #endif

@@ -72,11 +72,27 @@ final class CertManager: ObservableObject {
 
     private var engine: Engine { Engine.shared }
 
+    /// True once the page has loaded on its own. Keeps `autoLoad` to a single
+    /// attempt, so a sign-in that failed — or a 2FA prompt the user dismissed —
+    /// isn't put back in front of them every time the page opens.
+    private var didAutoLoad = false
+
     deinit {
         if let session { si_cert_session_free(session) }
     }
 
     // MARK: - Public actions
+
+    /// Load the list on the page's own when it opens. Quiet when there's nothing
+    /// to load with: an Apple ID that hasn't been entered yet isn't an error
+    /// worth painting on arrival, and the button says the same thing calmly.
+    @MainActor
+    func autoLoad() {
+        guard !didAutoLoad, !hasLoaded, !isWorking, revokingID == nil else { return }
+        guard !engine.normalizedAppleID.isEmpty, !engine.applePassword.isEmpty else { return }
+        didAutoLoad = true
+        loadCerts()
+    }
 
     /// Sign in if needed and reload the list; `then` runs only if it arrived.
     @MainActor
@@ -84,7 +100,7 @@ final class CertManager: ObservableObject {
         guard !isWorking, revokingID == nil else { return }
         let id = engine.normalizedAppleID, pw = engine.applePassword
         guard !id.isEmpty, !pw.isEmpty else {
-            lastError = L("Enter your Apple ID email and password first.")
+            lastError = L("No Apple ID saved. Add one in Settings › Account.")
             return
         }
         isWorking = true
@@ -153,15 +169,18 @@ final class CertManager: ObservableObject {
         loadCerts(then: then)
     }
 
-    /// Forget the session and clear the list, to switch Apple ID.
+    /// Forget the session and clear the list, to switch Apple ID. A no-op when
+    /// nothing was signed in, so switching account doesn't log a phantom.
     @MainActor
     func signOut() {
-        if let session { si_cert_session_free(session) }
-        session = nil
+        guard let session else { return }
+        si_cert_session_free(session)
+        self.session = nil
         isSignedIn = false
         teamSummary = nil
         certs = []
         hasLoaded = false
+        didAutoLoad = false
         lastError = nil
         engine.log("Certificates: signed out.")
     }

@@ -11,7 +11,7 @@ enum Step: Int, CaseIterable, Identifiable {
     func title(for source: InstallSource) -> String {
         switch self {
         case .network:      return L("Connect the VPN")
-        case .pair:         return L("Pair with this iPhone")
+        case .pair:         return L("Get pairing file")
         case .connect:      return L("Open the device link")
         case .signIn:       return L("Sign in to Apple ID")
         // An imported IPA is read off disk rather than downloaded.
@@ -82,8 +82,11 @@ final class Engine: ObservableObject {
 
     // MARK: Inputs
 
-    @Published var appleID: String = ""
-    @Published var applePassword: String = ""
+    /// The credentials in use, owned by `AccountStore` rather than typed on each
+    /// screen: they are entered once during setup and switched in Settings ›
+    /// Account. Views observe the store, so these need no `@Published`.
+    var appleID: String { AccountStore.shared.activeAppleID }
+    var applePassword: String { AccountStore.shared.activePassword }
     @Published var anisetteURL: String = AnisetteServer.fallback.address
     /// Servers for the picker; a bundled snapshot until the live list loads.
     @Published private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
@@ -103,16 +106,40 @@ final class Engine: ObservableObject {
     @Published var vpnStatus: String = "unknown"
     @Published var wifiStatus: String = "unknown"
 
-    /// Lowest iOS the install pipeline supports.
+    /// Lowest iOS that can produce its own pairing file: the RPPairing host and
+    /// the Settings prompt that answers it are iOS 27 features.
     static let minimumOSMajorVersion = 27
     /// The same number as text, for UI copy.
     static var minimumOSText: String { "\(minimumOSMajorVersion)" }
 
-    /// False when this iPhone is older than `minimumOSMajorVersion`.
+    /// Lowest iOS the rest of the pipeline works on. Everything after pairing
+    /// runs over an RSD tunnel, which needs CoreDeviceProxy — iOS 17 and later —
+    /// and this build's interface needs 18.
+    static let minimumTunnelOSMajorVersion = 18
+    static var minimumTunnelOSText: String { "\(minimumTunnelOSMajorVersion)" }
+
+    /// True when this iPhone can pair with itself, so no pairing file has to be
+    /// brought in from a computer. Static as well, for the non-isolated callers
+    /// that pick a tunnel route.
+    static var deviceCanSelfPair: Bool {
+        ProcessInfo.processInfo.isOperatingSystemAtLeast(
+            OperatingSystemVersion(majorVersion: minimumOSMajorVersion,
+                                   minorVersion: 0, patchVersion: 0))
+    }
+
+    var canSelfPair: Bool { Engine.deviceCanSelfPair }
+
+    /// False when this iPhone is too old for the tunnel the install runs over,
+    /// where an imported pairing file wouldn't help either.
     var osSupported: Bool {
         ProcessInfo.processInfo.isOperatingSystemAtLeast(
-            OperatingSystemVersion(majorVersion: Engine.minimumOSMajorVersion,
+            OperatingSystemVersion(majorVersion: Engine.minimumTunnelOSMajorVersion,
                                    minorVersion: 0, patchVersion: 0))
+    }
+
+    /// True when there's a pairing file on disk to connect with.
+    var hasPairingFile: Bool {
+        fileExistsNonEmpty(pairingFilePath ?? PairingController.pairingFilePath())
     }
 
     /// This iPhone's iOS version, e.g. "18.5".
@@ -120,6 +147,15 @@ final class Engine: ObservableObject {
         let v = ProcessInfo.processInfo.operatingSystemVersion
         return "\(v.majorVersion).\(v.minorVersion)"
     }
+
+    /// Filename of the pairing file the user imported, when the one on disk came
+    /// in that way. Persisted, so it survives a relaunch like the file does.
+    @Published private(set) var importedPairingName: String? =
+        UserDefaults.standard.string(forKey: Engine.importedPairingNameKey)
+    /// True while a picked pairing file is being read in.
+    @Published private(set) var isImportingPairing = false
+
+    static let importedPairingNameKey = "importedPairingFileName"
     @Published var pairingStatus: String = L("not paired")
     @Published var signInStatus: String = "signed out"
 
@@ -159,6 +195,10 @@ final class Engine: ObservableObject {
 
     /// Set once the whole pipeline has completed successfully.
     @Published var finished: Bool = false
+
+    /// True once the Local Network prompt has been raised this launch, so the
+    /// imported-pairing path asks at most once.
+    private var askedLocalNetwork = false
 
     private var pipelineTask: Task<Void, Never>?
     /// Poll that keeps `vpnConnected` live; NWPathMonitor never fires for a
@@ -211,6 +251,9 @@ final class Engine: ObservableObject {
     @Published private(set) var customIPAName: String?
     /// True while a picked IPA is being copied in.
     @Published private(set) var isImportingIPA = false
+    /// How much of a link import has arrived (0…1). Nil for a file import,
+    /// where the copy reports nothing to show.
+    @Published private(set) var importProgress: Double?
 
     // 2FA bridge: the FFI callback blocks on this semaphore until the UI answers.
     @Published var pendingTwoFactor = false
@@ -347,11 +390,19 @@ final class Engine: ObservableObject {
         guard !isRunning else { return }
         // Nothing downstream works on an older iOS.
         guard osSupported else {
-            log("⛔️ iOS \(osVersionText) isn't supported — SideInstaller needs iOS \(Engine.minimumOSText) or later.")
+            log("⛔️ iOS \(osVersionText) isn't supported — SideInstaller needs iOS \(Engine.minimumTunnelOSText) or later.")
+            return
+        }
+        // Below iOS 27 this iPhone can't pair with itself, so the run needs a
+        // pairing file made elsewhere and imported.
+        guard canSelfPair || hasPairingFile else {
+            setGuide(Guides.importPairing)
+            log("⛔️ iOS \(osVersionText) can't create its own pairing file. Import one under “Pairing file”, then tap Install again.")
             return
         }
         guard !normalizedAppleID.isEmpty, !applePassword.isEmpty else {
-            log("Enter your Apple ID email + password first.")
+            setGuide(Guides.account)
+            log("⛔️ No Apple ID saved. Add one in Settings › Account, then tap Install again.")
             return
         }
         // A custom install needs its IPA before anything else runs.
@@ -464,18 +515,24 @@ final class Engine: ObservableObject {
         let path = PairingController.pairingFilePath()
         let reused = fileExistsNonEmpty(path)
         if reused {
-            log("Found an existing pairing file — trying it first.")
+            log(importedPairingName == nil
+                ? "Found an existing pairing file — trying it first."
+                : "Using the pairing file you imported (\(importedPairingName ?? "")).")
             pairingFilePath = path
             setStep(.pair, .done)
         } else {
             try await pair()
         }
 
+        await ensureLocalNetworkForImportedPairing()
+
         do {
             try await connect()
         } catch {
             // A reused pairing file can be stale: pair fresh once, then retry.
-            guard reused else { throw error }
+            // Only iOS 27 can, though — below it there's nothing to fall back on
+            // but the user importing a fresh file.
+            guard reused, canSelfPair else { throw error }
             log("Saved pairing didn't work (\(short(error))). Pairing fresh…")
             try await pair()
             try await connect()
@@ -484,6 +541,12 @@ final class Engine: ObservableObject {
 
     @MainActor
     private func pair() async throws {
+        guard canSelfPair else {
+            setGuide(Guides.importPairing)
+            throw EngineError.message(
+                L("iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.",
+                  osVersionText, Engine.minimumOSText))
+        }
         setStep(.pair, .waiting)
         setGuide(Guides.pairing)
         log("Pairing: starting on-device pairing service…")
@@ -492,6 +555,27 @@ final class Engine: ObservableObject {
         pairingPIN = nil
         setStep(.pair, .done)
         setGuide(nil)
+    }
+
+    /// Raise the Local Network prompt on the imported-pairing-file path.
+    ///
+    /// Reaching lockdownd at the tunnel's far end counts as a local-network
+    /// connection, and iOS refuses it silently until the permission is granted.
+    /// On iOS 27 the RPPairing host asks for it as a matter of course; below 27
+    /// nothing does, so a first run would fail with an unexplained socket error.
+    /// Best-effort: a denial still lets the connection attempt speak for itself.
+    @MainActor
+    private func ensureLocalNetworkForImportedPairing() async {
+        guard !canSelfPair, !askedLocalNetwork else { return }
+        askedLocalNetwork = true
+        log("Checking Local Network permission — the device link needs it…")
+        // Held only for the call; the browser and listener die with it.
+        let localNetwork = LocalNetworkAuthorization()
+        if await localNetwork.request(timeout: 8) {
+            log("Local Network OK.")
+        } else {
+            log("⚠️ Local Network didn't confirm. If the link won't open, turn it on in Settings › SideInstaller › Local Network.")
+        }
     }
 
     @MainActor
@@ -552,6 +636,19 @@ final class Engine: ObservableObject {
         appleID.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Drop the cached sign-in, so the next run authenticates as whichever
+    /// account is active now. Called when the credentials change under it.
+    /// Freed on `signQueue`, the only queue that touches `signSession`.
+    func forgetAppleSession() {
+        signQueue.async { [weak self] in
+            guard let self, let session = self.signSession else { return }
+            si_sign_session_free(session)
+            self.signSession = nil
+            self.setMain { self.signInStatus = "signed out" }
+            self.log("Apple ID changed — signed out of the previous account.")
+        }
+    }
+
     @MainActor
     private func signIn() async throws {
         if signSession != nil {
@@ -560,7 +657,7 @@ final class Engine: ObservableObject {
             return
         }
         guard !normalizedAppleID.isEmpty, !applePassword.isEmpty else {
-            throw EngineError.message(L("Enter your Apple ID email + password."))
+            throw EngineError.message(L("No Apple ID saved. Add one in Settings › Account."))
         }
         setStep(.signIn, .active)
 
@@ -767,7 +864,9 @@ final class Engine: ObservableObject {
     func importCustomIPA(from url: URL) async {
         guard !isImportingIPA else { return }
         isImportingIPA = true
-        defer { isImportingIPA = false }
+        // The picker copies the file into this app's Inbox before handing it
+        // over; once it's imported, that copy is dead weight.
+        defer { isImportingIPA = false; Self.discardInboxCopy(url) }
         lastError = nil
         log("Importing \(url.lastPathComponent) …")
         do {
@@ -790,6 +889,92 @@ final class Engine: ObservableObject {
             lastError = L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
             log("⛔️ Import: \(lastError ?? "")")
         }
+    }
+
+    /// Fetch an IPA from a link the user pasted and adopt it as the custom
+    /// import. The way in for a build that isn't on GitHub, and the one that
+    /// needs no second device to download it on.
+    @MainActor
+    func importCustomIPA(fromLink text: String) async {
+        guard !isImportingIPA else { return }
+        guard let url = Self.downloadLink(text) else {
+            lastError = L("That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.")
+            log("⛔️ Import: \(lastError ?? "")")
+            return
+        }
+        isImportingIPA = true
+        importProgress = 0
+        defer { isImportingIPA = false; importProgress = nil }
+        lastError = nil
+        log("Downloading \(url.absoluteString) …")
+        do {
+            let downloaded = try await SideStoreDownloader.fetchDirect(
+                url, named: Self.importFileName(for: url)) { fraction in
+                    Task { @MainActor in self.importProgress = fraction }
+                }
+            // Its own staging directory, so removing it takes the file too.
+            defer { try? FileManager.default.removeItem(at: downloaded.deletingLastPathComponent()) }
+            let dest = try await Self.copyImport(from: downloaded)
+            customIPAName = dest.lastPathComponent
+            // A new file invalidates whatever the previous run resolved.
+            if downloadedSource == .custom { downloadedIPAPath = nil }
+            setGuide(nil)
+            log("Imported \(dest.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(dest.path)), countStyle: .file))).")
+        } catch IPALibrary.ImportError.notAnIPA {
+            refreshCustomIPA()
+            lastError = L("That link didn't return an IPA. It has to download the file itself — a page that only links to the .ipa, or one that asks you to sign in first, arrives here as a web page.")
+            log("⛔️ Import: \(lastError ?? "")")
+        } catch is CancellationError {
+            refreshCustomIPA()
+            log("Import cancelled.")
+        } catch {
+            refreshCustomIPA()
+            lastError = L("Couldn't download that link: %@", short(error))
+            log("⛔️ Import: \(lastError ?? "")")
+        }
+    }
+
+    /// A pasted address, tidied into something downloadable: whitespace off, and
+    /// a missing scheme filled in, since an address copied out of a message
+    /// often arrives bare. Anything that isn't http(s) is refused rather than
+    /// repaired — a `file://` or an app scheme is a different mistake.
+    static func downloadLink(_ text: String) -> URL? {
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let lowered = trimmed.lowercased()
+        let hadScheme = lowered.hasPrefix("http://") || lowered.hasPrefix("https://")
+        if !hadScheme {
+            guard !trimmed.contains("://") else { return nil }
+            trimmed = "https://" + trimmed
+        }
+        guard let url = URL(string: trimmed), let host = url.host, !host.isEmpty else { return nil }
+        // A dot is what separates a hostname from a sentence, but only worth
+        // insisting on where the scheme was inferred: `http://nas/App.ipa` is a
+        // deliberate address, and typing one is saying so.
+        guard hadScheme || (host.contains(".") && !host.hasPrefix(".") && !host.hasSuffix("."))
+        else { return nil }
+        return url
+    }
+
+    /// What to call what a link points at. Its own last path component when that
+    /// names a file, and the host otherwise — a link ending in `/download` still
+    /// has to land somewhere with a name on it.
+    static func importFileName(for url: URL) -> String {
+        let base = url.deletingPathExtension().lastPathComponent
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespaces)
+        let name = base.isEmpty ? (url.host ?? "Custom") : base
+        return name + ".ipa"
+    }
+
+    /// Delete a copy the picker left in this app's own temporary directory.
+    /// Guarded on the path, so a file picked where it lives — or one handed
+    /// over in place from the share sheet — is never touched.
+    private static func discardInboxCopy(_ url: URL) {
+        let tmp = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path
+        guard url.resolvingSymlinksInPath().path.hasPrefix(tmp + "/") else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 
     /// The blocking half of an import, on a background queue.
@@ -1206,6 +1391,67 @@ final class Engine: ObservableObject {
     // the same RPPairing host produces the file, which is then written into a
     // chosen installed app over the tunnel via house_arrest/AFC.
 
+    /// Adopt a pairing file the user made elsewhere, replacing whatever is on
+    /// disk. The way in for an iPhone older than iOS 27, which can't pair with
+    /// itself: the file comes from jitterbugpair, pymobiledevice3, idevicepair
+    /// or another app that already holds one for this device.
+    @MainActor
+    func importPairingFile(from url: URL) async {
+        guard !isImportingPairing else { return }
+        isImportingPairing = true
+        // The picker copies the file into this app's Inbox before handing it
+        // over; once it's read, that copy is dead weight.
+        defer { isImportingPairing = false; Self.discardInboxCopy(url) }
+        lastError = nil
+        log("Importing pairing file \(url.lastPathComponent) …")
+        do {
+            let data = try Self.readImport(from: url)
+            let kind = PairingFileKind.of(data: data)
+            guard kind.isUsable else {
+                lastError = L("%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.",
+                              url.lastPathComponent)
+                log("⛔️ Pairing import: \(lastError ?? "")")
+                return
+            }
+            try data.write(to: PrivateStore.pairingFile, options: .atomic)
+            // The merged file was built from the record this just replaced.
+            CompositePairingFile.invalidateMerged()
+            pairingFilePath = PrivateStore.pairingFile.path
+            importedPairingName = url.lastPathComponent
+            UserDefaults.standard.set(url.lastPathComponent, forKey: Engine.importedPairingNameKey)
+            connection.disconnect()
+            deviceSummary = nil
+            pairingStatus = L("imported pairing file")
+            setGuide(nil)
+            let records = [kind.hasLockdown ? "lockdown" : nil,
+                           kind.hasRemotePairing ? "remote-pairing" : nil]
+                .compactMap { $0 }.joined(separator: " + ")
+            log("Imported \(url.lastPathComponent) (\(data.count) bytes, \(records) record\(records.contains("+") ? "s" : "")\(kind.udid.map { ", UDID \($0)" } ?? "")).")
+            if !kind.hasLockdown {
+                log("⚠️ No lockdown record in that file — SideStore and Feather can't read it, though the install itself will work.")
+            }
+        } catch {
+            lastError = L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
+            log("⛔️ Pairing import: \(lastError ?? "")")
+        }
+    }
+
+    /// Forget that the pairing file was imported, once a fresh one has been
+    /// paired on this iPhone and overwritten it.
+    @MainActor
+    func clearImportedPairingMark() {
+        importedPairingName = nil
+        UserDefaults.standard.removeObject(forKey: Engine.importedPairingNameKey)
+    }
+
+    /// Read a picked file off the main thread, taking the security-scoped handle
+    /// an "Open with" hand-off comes with.
+    private static func readImport(from url: URL) throws -> Data {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        return try Data(contentsOf: url)
+    }
+
     /// List the supported pairing-target apps installed on the device.
     @MainActor
     func installedPairingTargets() async throws -> [InstalledPairingTarget] {
@@ -1270,11 +1516,13 @@ final class Engine: ObservableObject {
         refreshNetworkStatus()
         // No Wi-Fi check: this all runs over the loopback tunnel.
         guard vpnConnected else {
-            throw EngineError.message(L("No loopback VPN is connected. Turn one on, then try again."))
+            throw EngineError.message(L("LocalDevVPN isn't connected. Connect it, then try again."))
         }
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         guard fileExistsNonEmpty(path) else {
-            throw EngineError.message(L("No pairing file yet — tap “Generate pairing file” first."))
+            throw EngineError.message(canSelfPair
+                ? L("No pairing file yet — tap “Generate pairing file” first.")
+                : L("No pairing file yet — tap “Import pairing file” first."))
         }
         pairingFilePath = path
         let ip = deviceIP
@@ -1301,9 +1549,68 @@ final class Engine: ObservableObject {
     /// to be there. Runs on `deviceQueue`.
     private func resolvePlacement(rpPairingPath: String, udid: String?) throws -> String {
         guard FileManager.default.fileExists(atPath: rpPairingPath), fileSize(rpPairingPath) > 0 else {
-            throw EngineError.message(L("Pairing file missing — generate it first."))
+            throw EngineError.message(Engine.deviceCanSelfPair
+                ? L("Pairing file missing — generate it first.")
+                : L("Pairing file missing — import it first."))
         }
         return placementPairingFile(rpPairingPath: rpPairingPath, udid: udid)
+    }
+
+    // MARK: - Location tab
+    //
+    // Location simulation is a DVT service, so it needs two things the install
+    // flow never sets up: a mounted developer disk image, and a session held
+    // open for as long as the fake location should stick. Both follow
+    // StikDebug's path, over the same RPPairing tunnel used everywhere else.
+
+    /// Connect, and mount the developer disk image unless the device already has
+    /// one. Returns true when a mount actually ran, so the UI can say so.
+    @MainActor
+    @discardableResult
+    func prepareLocationSimulation(imagePath: String,
+                                   trustcachePath: String,
+                                   manifestPath: String,
+                                   progress: @escaping (Double) -> Void) async throws -> Bool {
+        try await ensurePairingConnection()
+        let mounted = try await onDeviceQueue { try self.connection.mountedDeveloperImageCount() }
+        if mounted > 0 {
+            log("Developer disk image already mounted (\(mounted) image(s)).")
+            try await onDeviceQueue { try self.connection.beginLocationSimulation() }
+            return false
+        }
+        log("No developer disk image mounted — mounting the personalized one…")
+        try await onDeviceQueue {
+            try self.connection.mountPersonalizedDeveloperImage(imagePath: imagePath,
+                                                               trustcachePath: trustcachePath,
+                                                               manifestPath: manifestPath,
+                                                               progress: progress)
+        }
+        log("Developer disk image mounted.")
+        try await onDeviceQueue { try self.connection.beginLocationSimulation() }
+        return true
+    }
+
+    /// Push a coordinate to the device. The caller repeats this on a timer —
+    /// iOS lets the simulated location lapse if nothing refreshes it.
+    @MainActor
+    func simulateLocation(latitude: Double, longitude: Double) async throws {
+        guard connection.isSimulatingLocation else {
+            throw EngineError.message(L("Location session closed — set it up again."))
+        }
+        try await onDeviceQueue {
+            try self.connection.setSimulatedLocation(latitude: latitude, longitude: longitude)
+        }
+    }
+
+    /// Give the device its real location back and close the session.
+    @MainActor
+    func stopSimulatingLocation() async throws {
+        guard connection.isSimulatingLocation else { return }
+        try await onDeviceQueue {
+            try self.connection.clearSimulatedLocation()
+            self.connection.endLocationSimulation()
+        }
+        log("Simulated location cleared.")
     }
 
     // MARK: The file other apps actually read
@@ -1322,6 +1629,28 @@ final class Engine: ObservableObject {
     /// alone is what shipped before and still serves StikDebug's sideloaded
     /// build.
     private func placementPairingFile(rpPairingPath: String, udid: String?) -> String {
+        // An imported file is usually a classic record already — exactly what
+        // those apps parse — so hand it over as it stands rather than spending
+        // a pairing slot and a Trust prompt minting a second one.
+        let kind = PairingFileKind.of(path: rpPairingPath)
+        if kind.hasLockdown {
+            // Unless it names no device: pymobiledevice3 and idevicepair leave
+            // UDID out, and minimuxer wants it.
+            guard kind.udid == nil, let udid, !udid.isEmpty else {
+                log("Pairing file already carries a lockdown record — handing it over as it is.")
+                return rpPairingPath
+            }
+            do {
+                let data = try Data(contentsOf: URL(fileURLWithPath: rpPairingPath))
+                let path = try CompositePairingFile.store(
+                    CompositePairingFile.stampingUDID(udid, into: data))
+                log("Pairing file carries a lockdown record but no UDID — stamping in \(udid).")
+                return path
+            } catch {
+                log("⚠️ Couldn't stamp the UDID into the pairing file (\(short(error))). Handing it over as it is.")
+                return rpPairingPath
+            }
+        }
         do {
             let rpPairing = try Data(contentsOf: URL(fileURLWithPath: rpPairingPath))
 
@@ -1457,14 +1786,16 @@ enum Guides {
             actionLabel: nil, actionURLString: nil)
     }
 
-    /// Shown when no tunnel is up. Any VPN app on the device subnet works.
+    /// Shown when no tunnel is up. The copy names LocalDevVPN, since offering a
+    /// choice sent people looking for the "right" one; any VPN app on the device
+    /// subnet still works, and `vpnConnected` never checks which one it is.
     static var vpn: Guide {
         Guide(
-            title: L("Turn on a loopback VPN"),
+            title: L("Connect LocalDevVPN"),
             systemImage: "network",
             steps: [
-                L("Open a VPN app that tunnels to this iPhone — LocalDevVPN, ClashMi, or another. Any of them works."),
-                L("If GitHub is blocked where you are, pick one that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through."),
+                L("Install LocalDevVPN from the App Store and open it."),
+                L("If GitHub is blocked where you are, use a VPN that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through."),
                 L("Tap Connect so the toggle turns on."),
                 L("Keep Wi-Fi on, then come back here — this continues automatically."),
             ],
@@ -1486,6 +1817,19 @@ enum Guides {
             actionLabel: nil, actionURLString: nil)
     }
 
+    /// Shown when no Apple ID is saved. Since the credential fields left this
+    /// screen, the empty state has to be spelt out rather than shown as a gap.
+    static var account: Guide {
+        Guide(
+            title: L("Add your Apple ID"),
+            systemImage: "person.crop.circle.badge.plus",
+            steps: [
+                L("Open Settings with the gear at the top right."),
+                L("Under Account, tap “Add Apple ID” and enter your email and password."),
+            ],
+            actionLabel: nil, actionURLString: nil)
+    }
+
     /// Shown when Custom .ipa is selected but nothing has been imported yet.
     static var customIPA: Guide {
         Guide(
@@ -1493,6 +1837,8 @@ enum Guides {
             systemImage: "square.and.arrow.down.on.square",
             steps: [
                 L("Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive."),
+                L("Or paste a direct download link under that button, and SideInstaller fetches the .ipa itself."),
+                L("Or open the Files app, press and hold the .ipa, tap Share, and pick SideInstaller — that hands the file over without the picker."),
                 L("Or copy it into Files › On My iPhone › SideInstaller, where SideInstaller also finds it."),
                 L("This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here."),
             ],
@@ -1512,6 +1858,22 @@ enum Guides {
             actionLabel: nil, actionURLString: nil)
     }
 
+    /// Shown on an iPhone below iOS 27, where the pairing file has to be made
+    /// somewhere else and brought over.
+    static var importPairing: Guide {
+        Guide(
+            title: L("Import a pairing file"),
+            systemImage: "lock.doc",
+            steps: [
+                L("iOS %@ is the first version an iPhone can pair with itself on. On this one the pairing file has to be made on a computer.", Engine.minimumOSText),
+                L("On a Mac, Windows PC or Linux box, plug this iPhone in, trust the computer, and run jitterbugpair (or “pymobiledevice3 lockdown pair”)."),
+                L("Send the file it writes — a .mobiledevicepairing or .plist — to this iPhone, by AirDrop, iCloud Drive or a cable."),
+                L("Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.", Engine.minimumOSText),
+            ],
+            actionLabel: L("Get jitterbugpair"),
+            actionURLString: "https://github.com/osy/Jitterbug/releases")
+    }
+
     /// Shown when Apple refuses a certificate because one exists (error 7460).
     static var certExists: Guide {
         Guide(
@@ -1520,7 +1882,7 @@ enum Guides {
             steps: [
                 L("Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending."),
                 L("SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone."),
-                L("Use “Revoke and retry” above, or open the Certificates tab, tap “Load certificates”, and revoke it there."),
+                L("Use “Revoke and retry” above, or open Certificates in the Tools tab, tap “Load certificates”, and revoke it there."),
                 L("Revoking is permanent: every app already signed with that certificate stops launching, on every device."),
                 L("Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again."),
             ],
