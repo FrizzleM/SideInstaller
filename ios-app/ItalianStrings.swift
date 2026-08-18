@@ -256,6 +256,40 @@ let italianStrings: [String: String] = [
     "Install the app again for these to take effect.":
         "Installa di nuovo l'app perché abbiano effetto.",
 
+    // MARK: - Sideloaded apps tab
+
+    "Sideloaded apps": "App sideloadate",
+    "Reading the device": "Lettura del dispositivo",
+    "%d app": "%d app",
+    "%d apps": "%d app",
+    "%d app needs refreshing": "%d app da rinnovare",
+    "%d apps need refreshing": "%d app da rinnovare",
+    "No sideloaded apps": "Nessuna app sideloadata",
+    "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
+        "Niente su questo dispositivo è stato installato con un profilo di provisioning. Le app dell'App Store non scadono, quindi non compaiono qui.",
+    "No matching profile": "Nessun profilo corrispondente",
+    "Expires today": "Scade oggi",
+    "Expires tomorrow": "Scade domani",
+    "Expires in %d days — %@": "Scade tra %d giorni — %@",
+    "Expired %@": "Scaduto il %@",
+    "Unused profiles": "Profili inutilizzati",
+    "Issued to App IDs no installed app is running on.":
+        "Rilasciati per App ID su cui non gira nessuna app installata.",
+    "Older profiles": "Profili più vecchi",
+    "Bundle identifier": "Identificativo bundle",
+    "App ID": "App ID",
+    "Version": "Versione",
+    "Profile name": "Nome del profilo",
+    "Team": "Team",
+    "Team ID": "ID del team",
+    "Issued": "Rilasciato",
+    "Profile UUID": "UUID del profilo",
+    "Capabilities": "Funzionalità",
+    "Wildcard App ID — it covers any bundle id under it, and can't carry app-specific capabilities.":
+        "App ID con carattere jolly: copre qualsiasi bundle id sotto di sé e non può contenere funzionalità specifiche di un'app.",
+    "The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that.":
+        "Il dispositivo non ha un profilo di provisioning per questo App ID. L'app potrebbe già aver smesso di avviarsi: installala di nuovo per risolvere.",
+
     // MARK: - Settings
 
     "Settings": "Impostazioni",

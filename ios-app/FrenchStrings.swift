@@ -259,6 +259,40 @@ let frenchStrings: [String: String] = [
     "Install the app again for these to take effect.":
         "Réinstalle l'app pour qu'ils prennent effet.",
 
+    // MARK: - Sideloaded apps tab
+
+    "Sideloaded apps": "Apps sideloadées",
+    "Reading the device": "Lecture de l'appareil",
+    "%d app": "%d app",
+    "%d apps": "%d apps",
+    "%d app needs refreshing": "%d app à renouveler",
+    "%d apps need refreshing": "%d apps à renouveler",
+    "No sideloaded apps": "Aucune app sideloadée",
+    "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
+        "Rien sur cet appareil n'a été installé avec un profil de provisionnement. Les apps de l'App Store n'expirent pas, elles ne figurent donc pas ici.",
+    "No matching profile": "Aucun profil correspondant",
+    "Expires today": "Expire aujourd'hui",
+    "Expires tomorrow": "Expire demain",
+    "Expires in %d days — %@": "Expire dans %d jours — %@",
+    "Expired %@": "Expiré le %@",
+    "Unused profiles": "Profils inutilisés",
+    "Issued to App IDs no installed app is running on.":
+        "Émis pour des App ID sur lesquels aucune app installée ne tourne.",
+    "Older profiles": "Profils plus anciens",
+    "Bundle identifier": "Identifiant du bundle",
+    "App ID": "App ID",
+    "Version": "Version",
+    "Profile name": "Nom du profil",
+    "Team": "Équipe",
+    "Team ID": "ID de l'équipe",
+    "Issued": "Émis",
+    "Profile UUID": "UUID du profil",
+    "Capabilities": "Fonctionnalités",
+    "Wildcard App ID — it covers any bundle id under it, and can't carry app-specific capabilities.":
+        "App ID générique : il couvre n'importe quel bundle id en dessous et ne peut pas porter de fonctionnalités propres à une app.",
+    "The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that.":
+        "L'appareil n'a aucun profil de provisionnement pour cet App ID. L'app a peut-être déjà cessé de se lancer — réinstallez-la pour corriger cela.",
+
     // MARK: - Settings
 
     "Settings": "Réglages",

@@ -30,6 +30,7 @@ struct RootView: View {
     @StateObject private var pairingManager = PairingManager()
     @StateObject private var locationManager = LocationManager()
     @StateObject private var entitlementsManager = EntitlementsManager()
+    @StateObject private var appsManager = SideloadedAppsManager()
     @State private var twoFactorCode = ""
     @State private var page: Page = .install
 
@@ -42,7 +43,8 @@ struct RootView: View {
                 ToolsView(pairingManager: pairingManager,
                           certManager: certManager,
                           locationManager: locationManager,
-                          entitlementsManager: entitlementsManager)
+                          entitlementsManager: entitlementsManager,
+                          appsManager: appsManager)
             }
             Tab(L("About"), systemImage: "info.circle", value: Page.about) {
                 AboutView()
@@ -87,6 +89,7 @@ struct ToolsView: View {
     @ObservedObject var certManager: CertManager
     @ObservedObject var locationManager: LocationManager
     @ObservedObject var entitlementsManager: EntitlementsManager
+    @ObservedObject var appsManager: SideloadedAppsManager
 
     @State private var showSettings = false
 
@@ -129,6 +132,13 @@ struct ToolsView: View {
                     }
                     .buttonStyle(.plain)
                     .cascadeItem(rowIndex(3))
+                    NavigationLink {
+                        AppsView(manager: appsManager)
+                    } label: {
+                        ToolRow(image: "AppsLogo", title: L("Sideloaded apps"))
+                    }
+                    .buttonStyle(.plain)
+                    .cascadeItem(rowIndex(4))
                 }
                 .padding(20)
             }
