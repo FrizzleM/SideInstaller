@@ -415,6 +415,53 @@ final class DeviceConnection {
         return out
     }
 
+    /// Every installed app as its whole installation_proxy plist, rather than
+    /// the two fields `installedApps` picks out. `Entitlements` and
+    /// `ProfileValidated` only exist here, and they are what tells a sideloaded
+    /// app from an App Store one.
+    ///
+    /// Each app plist is re-serialized to binary and read back through
+    /// `PropertyListSerialization`, which is StikDebug's route too: walking a
+    /// nested `Entitlements` dictionary through the plist C API by hand would be
+    /// a lot of code for a structure Foundation already decodes.
+    func installedAppPlists() throws -> [[String: Any]] {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var client: OpaquePointer?
+        try check(installation_proxy_connect_rsd(adapter, handshake, &client),
+                  "installation_proxy_connect_rsd failed")
+        guard let client else { throw fail("installation_proxy client was null") }
+        defer { installation_proxy_client_free(client) }
+
+        var result: UnsafeMutableRawPointer?
+        var count = 0
+        try check(installation_proxy_get_apps(client, nil, nil, 0, &result, &count),
+                  "installation_proxy_get_apps failed")
+        guard let result, count > 0 else { return [] }
+
+        let apps = result.assumingMemoryBound(to: plist_t?.self)
+        defer {
+            for i in 0..<count { plist_free(apps[i]) }
+            idevice_data_free(result.assumingMemoryBound(to: UInt8.self),
+                              UInt(count * MemoryLayout<plist_t?>.stride))
+        }
+
+        var out: [[String: Any]] = []
+        out.reserveCapacity(count)
+        for i in 0..<count {
+            var binary: UnsafeMutablePointer<CChar>?
+            var length: UInt32 = 0
+            guard plist_to_bin(apps[i], &binary, &length) == PLIST_ERR_SUCCESS,
+                  let binary, length > 0 else { continue }
+            let data = Data(bytes: binary, count: Int(length))
+            plist_mem_free(binary)
+            // One app that won't decode shouldn't cost the whole list.
+            guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
+                  let dict = plist as? [String: Any] else { continue }
+            out.append(dict)
+        }
+        return out
+    }
+
     /// The host app's exact bundle id for the pairing write, matched on display
     /// name first — isideload rewrites bundle ids — then on "<base>[.<teamID>]".
     func resolveInstalledBundleID(displayName: String, bundleIDBase: String) throws -> String? {
@@ -447,6 +494,36 @@ final class DeviceConnection {
             if let appPlist { plist_free(appPlist) }
         }
         return byName ?? exact ?? suffixed
+    }
+
+    // MARK: Provisioning profiles (misagent over RSD)
+
+    /// Every provisioning profile installed on the device, as the raw CMS blobs
+    /// misagent hands back — the same bytes a `.mobileprovision` file holds.
+    /// Decoding them is the caller's job.
+    func provisioningProfiles() throws -> [Data] {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var client: OpaquePointer?
+        try check(misagent_connect_rsd(adapter, handshake, &client),
+                  "misagent_connect_rsd failed")
+        guard let client else { throw fail("misagent client was null") }
+        defer { misagent_client_free(client) }
+
+        var profiles: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?
+        var lengths: UnsafeMutablePointer<Int>?
+        var count = 0
+        try check(misagent_copy_all(client, &profiles, &lengths, &count),
+                  "misagent_copy_all failed")
+        guard let profiles, let lengths else { return [] }
+        defer { misagent_free_profiles(profiles, lengths, count) }
+
+        var out: [Data] = []
+        out.reserveCapacity(count)
+        for i in 0..<count {
+            guard let bytes = profiles[i] else { continue }
+            out.append(Data(bytes: bytes, count: lengths[i]))
+        }
+        return out
     }
 
     // MARK: Install (AFC upload to /PublicStaging + installation_proxy)

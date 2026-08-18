@@ -259,6 +259,40 @@ let spanishStrings: [String: String] = [
     "Install the app again for these to take effect.":
         "Vuelve a instalar la app para que surtan efecto.",
 
+    // MARK: - Sideloaded apps tab
+
+    "Sideloaded apps": "Apps sideloadeadas",
+    "Reading the device": "Leyendo el dispositivo",
+    "%d app": "%d app",
+    "%d apps": "%d apps",
+    "%d app needs refreshing": "%d app por renovar",
+    "%d apps need refreshing": "%d apps por renovar",
+    "No sideloaded apps": "Ninguna app sideloadeada",
+    "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
+        "Nada de este dispositivo se instaló con un perfil de aprovisionamiento. Las apps de la App Store no caducan, así que no aparecen aquí.",
+    "No matching profile": "Ningún perfil coincidente",
+    "Expires today": "Caduca hoy",
+    "Expires tomorrow": "Caduca mañana",
+    "Expires in %d days — %@": "Caduca en %d días — %@",
+    "Expired %@": "Caducó el %@",
+    "Unused profiles": "Perfiles sin usar",
+    "Issued to App IDs no installed app is running on.":
+        "Emitidos para App ID en los que no se ejecuta ninguna app instalada.",
+    "Older profiles": "Perfiles más antiguos",
+    "Bundle identifier": "Identificador del paquete",
+    "App ID": "App ID",
+    "Version": "Versión",
+    "Profile name": "Nombre del perfil",
+    "Team": "Equipo",
+    "Team ID": "ID del equipo",
+    "Issued": "Emitido",
+    "Profile UUID": "UUID del perfil",
+    "Capabilities": "Capacidades",
+    "Wildcard App ID — it covers any bundle id under it, and can't carry app-specific capabilities.":
+        "App ID con comodín: cubre cualquier bundle id por debajo y no puede llevar capacidades específicas de una app.",
+    "The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that.":
+        "El dispositivo no tiene ningún perfil de aprovisionamiento para este App ID. Puede que la app ya no arranque: instálala de nuevo para arreglarlo.",
+
     // MARK: - Settings
 
     "Settings": "Ajustes",

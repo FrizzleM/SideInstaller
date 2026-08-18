@@ -256,6 +256,40 @@ let vietnameseStrings: [String: String] = [
     "Install the app again for these to take effect.":
         "Cài lại ứng dụng để các quyền có hiệu lực.",
 
+    // MARK: - Sideloaded apps tab
+
+    "Sideloaded apps": "Ứng dụng sideload",
+    "Reading the device": "Đang đọc thiết bị",
+    "%d app": "%d ứng dụng",
+    "%d apps": "%d ứng dụng",
+    "%d app needs refreshing": "%d ứng dụng cần gia hạn",
+    "%d apps need refreshing": "%d ứng dụng cần gia hạn",
+    "No sideloaded apps": "Không có ứng dụng sideload nào",
+    "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
+        "Không có gì trên thiết bị này được cài bằng hồ sơ cấp phép. Ứng dụng từ App Store không hết hạn nên không xuất hiện ở đây.",
+    "No matching profile": "Không có hồ sơ nào khớp",
+    "Expires today": "Hết hạn hôm nay",
+    "Expires tomorrow": "Hết hạn ngày mai",
+    "Expires in %d days — %@": "Hết hạn sau %d ngày — %@",
+    "Expired %@": "Đã hết hạn ngày %@",
+    "Unused profiles": "Hồ sơ không dùng đến",
+    "Issued to App IDs no installed app is running on.":
+        "Được cấp cho các App ID mà không ứng dụng nào đã cài đang chạy trên đó.",
+    "Older profiles": "Hồ sơ cũ hơn",
+    "Bundle identifier": "Định danh bundle",
+    "App ID": "App ID",
+    "Version": "Phiên bản",
+    "Profile name": "Tên hồ sơ",
+    "Team": "Nhóm",
+    "Team ID": "ID nhóm",
+    "Issued": "Ngày cấp",
+    "Profile UUID": "UUID hồ sơ",
+    "Capabilities": "Khả năng",
+    "Wildcard App ID — it covers any bundle id under it, and can't carry app-specific capabilities.":
+        "App ID ký tự đại diện — nó bao trùm mọi bundle id bên dưới nên không mang được khả năng riêng của từng ứng dụng.",
+    "The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that.":
+        "Thiết bị không có hồ sơ cấp phép cho App ID này. Ứng dụng có thể đã không mở được nữa — hãy cài lại để khắc phục.",
+
     // MARK: - Settings
 
     "Settings": "Cài đặt",

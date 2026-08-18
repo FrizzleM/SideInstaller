@@ -1556,6 +1556,20 @@ final class Engine: ObservableObject {
         return placementPairingFile(rpPairingPath: rpPairingPath, udid: udid)
     }
 
+    // MARK: - Sideloaded apps tab
+
+    /// What the device says is installed, and every provisioning profile it
+    /// holds. Two round trips over the one tunnel, since matching an app to the
+    /// profile that signed it can only be done with both in hand.
+    @MainActor
+    func sideloadedAppInventory() async throws -> (apps: [[String: Any]], profiles: [Data]) {
+        try await ensurePairingConnection()
+        let apps = try await onDeviceQueue { try self.connection.installedAppPlists() }
+        let profiles = try await onDeviceQueue { try self.connection.provisioningProfiles() }
+        log("Apps: \(apps.count) installed, \(profiles.count) provisioning profile(s) on the device.")
+        return (apps, profiles)
+    }
+
     // MARK: - Location tab
     //
     // Location simulation is a DVT service, so it needs two things the install

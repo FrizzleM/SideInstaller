@@ -250,6 +250,40 @@ let chineseStrings: [String: String] = [
     "%d of %d enabled": "已启用 %d/%d",
     "Install the app again for these to take effect.": "重新安装应用后这些权限才会生效。",
 
+    // MARK: - Sideloaded apps tab
+
+    "Sideloaded apps": "侧载应用",
+    "Reading the device": "正在读取设备",
+    "%d app": "%d 个应用",
+    "%d apps": "%d 个应用",
+    "%d app needs refreshing": "%d 个应用需要续签",
+    "%d apps need refreshing": "%d 个应用需要续签",
+    "No sideloaded apps": "没有侧载应用",
+    "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
+        "这台设备上没有任何应用是用描述文件安装的。App Store 的应用不会过期，因此不会列在这里。",
+    "No matching profile": "没有匹配的描述文件",
+    "Expires today": "今天过期",
+    "Expires tomorrow": "明天过期",
+    "Expires in %d days — %@": "%d 天后过期 — %@",
+    "Expired %@": "已于 %@ 过期",
+    "Unused profiles": "未使用的描述文件",
+    "Issued to App IDs no installed app is running on.":
+        "签发给了没有任何已安装应用在使用的 App ID。",
+    "Older profiles": "较旧的描述文件",
+    "Bundle identifier": "Bundle 标识符",
+    "App ID": "App ID",
+    "Version": "版本",
+    "Profile name": "描述文件名称",
+    "Team": "团队",
+    "Team ID": "团队 ID",
+    "Issued": "签发时间",
+    "Profile UUID": "描述文件 UUID",
+    "Capabilities": "功能",
+    "Wildcard App ID — it covers any bundle id under it, and can't carry app-specific capabilities.":
+        "通配符 App ID：它涵盖其下的任意 bundle id，因此无法携带针对单个应用的功能。",
+    "The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that.":
+        "设备上没有这个 App ID 的描述文件。该应用可能已经无法启动——重新安装一次即可解决。",
+
     // MARK: - Settings
 
     "Settings": "设置",
