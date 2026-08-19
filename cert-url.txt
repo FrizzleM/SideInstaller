@@ -6,8 +6,7 @@
 # source. Override the whole list for a one-off run with the CERT_ZIP_URL env
 # var (space/newline-separated).
 #
-# Two source kinds are supported (the two below have different layouts — the
-# workflow handles both):
+# Three source kinds are supported (the workflow detects and handles each):
 #
 #   1) A direct .zip URL. Expected layout inside the zip (one folder per cert):
 #        <Name>/<Name>.p12
@@ -20,6 +19,16 @@
 #      unrelated assets in the repo are never downloaded. Same per-folder
 #      layout as above; extra per-cert subfolders (e.g. NexStore/) are ignored.
 #
+#   3) The NexCerts API (https://sideloading.net). NexCerts is no longer cloned
+#      as a Git repo — it now serves its certificates over a REST API. The
+#      workflow lists the certificates and downloads each one's p12,
+#      provisioning profile and password by id, then feeds them into the same
+#      per-folder layout as the other sources. The legacy repo URL
+#      (https://github.com/NovaDev404/NexCerts) is also recognised and routed to
+#      the API automatically. Set NEXCERTS_STATUS to choose which certificates
+#      to pull — all (default) | signed | revoked | missingP12; 'signed' drops
+#      Apple-revoked certificates.
+#
 # MERGE / DE-DUPLICATION: the same signing certificate often appears in more
 # than one source (and, within a source, across several provisioning-profile
 # variants). Each unique certificate is signed only ONCE — duplicates are
@@ -27,4 +36,4 @@
 # listed here wins. Order the lines to control which copy is kept.
 
 https://github.com/WSF-Team/WSF/raw/refs/heads/main/portal/resources/certificates.zip
-https://github.com/NovaDev404/NexCerts
+https://sideloading.net
