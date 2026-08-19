@@ -9,14 +9,22 @@
 //! - **Network via raw RPPairing** (Wi-Fi/LAN): `tunnel_create_rppairing`
 
 use std::ffi::{CStr, c_char, c_void};
+use std::io::ErrorKind;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::ptr::null_mut;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use idevice::RemoteXpcClient;
-use idevice::remote_pairing::{RemotePairingClient, RpPairingSocket};
-use idevice::{
-    IdeviceError, IdeviceService, core_device_proxy::CoreDeviceProxy, provider::IdeviceProvider,
-    rsd::RsdHandshake,
+use idevice::remote_pairing::{
+    CdTunnel, RemotePairingClient, RpPairingSocket, RpPairingSocketProvider,
 };
+use idevice::{
+    IdeviceError, IdeviceService, ReadWrite, core_device_proxy::CoreDeviceProxy,
+    provider::IdeviceProvider, rsd::RsdHandshake, tcp::handle::AdapterHandle as TcpAdapterHandle,
+};
+use tokio::net::TcpStream;
+use tracing::{info, warn};
 
 use crate::core_device_proxy::AdapterHandle;
 use crate::rp_pairing_file::RpPairingFileHandle;
@@ -28,33 +36,236 @@ struct PinCtx(*mut c_void);
 unsafe impl Send for PinCtx {}
 unsafe impl Sync for PinCtx {}
 
-/// Shared logic: given a connected & paired `RemotePairingClient`, create
-/// the TLS-PSK tunnel and return adapter + handshake.
-async fn finish_tunnel(
-    rpc: &mut idevice::remote_pairing::RemotePairingClient<
-        impl idevice::remote_pairing::RpPairingSocketProvider,
-    >,
-    connect_addr: std::net::SocketAddr,
-) -> Result<(idevice::tcp::handle::AdapterHandle, RsdHandshake), IdeviceError> {
-    use idevice::remote_pairing::connect_tls_psk_tunnel_native;
+// ---------------------------------------------------------------------------
+// Tunnel dial — candidate hosts, instrumentation, failure classification
+// ---------------------------------------------------------------------------
 
-    let tunnel_port = rpc.create_tcp_listener().await?;
-    let tunnel_addr = std::net::SocketAddr::new(connect_addr.ip(), tunnel_port);
-    let tunnel_stream = tokio::net::TcpStream::connect(tunnel_addr)
-        .await
-        .map_err(|e| IdeviceError::InternalError(format!("TLS tunnel: {e}")))?;
-    let tunnel = connect_tls_psk_tunnel_native(tunnel_stream, rpc.encryption_key()).await?;
+/// Why a tunnel attempt ultimately failed, so the caller can say something more
+/// useful than whichever OS error happened to come last. Written through the
+/// `out_failure_kind` argument of [`tunnel_create_rppairing_multihost`].
+///
+/// The raw error still comes back in the `IdeviceFfiError` message, and every
+/// step is logged as it happens; this only says *which* wall was hit.
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TunnelFailureKind {
+    /// No failure — the tunnel came up.
+    TunnelFailureNone = 0,
+    /// The device's RSD port never answered, so nothing below it was attempted.
+    TunnelFailureRsdUnreachable = 1,
+    /// RSD answered but pair-verify was refused: this pairing file no longer
+    /// matches the device.
+    TunnelFailurePairVerify = 2,
+    /// Every candidate host actively refused the port `createListener` opened,
+    /// while the RSD port itself was reachable — the device is there, but the
+    /// route in front of it is only forwarding some ports.
+    TunnelFailureHostsRefused = 3,
+    /// Candidates swallowed the connection: no refusal, no answer.
+    TunnelFailureTimeout = 4,
+    /// A candidate accepted the TCP connection but the TLS-PSK or CDTunnel
+    /// handshake on top of it failed.
+    TunnelFailureTlsHandshake = 5,
+    /// Anything else — the RSD handshake inside the tunnel, a parse failure, …
+    TunnelFailureOther = 6,
+}
 
-    let client_ip: std::net::IpAddr = tunnel
+/// Where a candidate host came from, named in the dial log so a failing run
+/// says which addresses were tried and why each one was on the list.
+#[derive(Clone, Copy)]
+enum HostSource {
+    SessionCache,
+    RsdPeer,
+    LoopbackDefault,
+    PairingInterface,
+}
+
+impl HostSource {
+    fn label(self) -> &'static str {
+        match self {
+            HostSource::SessionCache => "cached from this session's first tunnel",
+            HostSource::RsdPeer => "RSD peer address",
+            HostSource::LoopbackDefault => "hardcoded default",
+            HostSource::PairingInterface => "pairing session's local interface",
+        }
+    }
+}
+
+/// Total wall clock the whole candidate sweep may spend.
+///
+/// Sized to the budget one refused host already burned, so the fallbacks cost a
+/// failing run no extra time: each candidate's window is whatever is *left*
+/// divided by however many candidates are still to try, never a fresh
+/// allowance. A candidate that refuses instantly hands its slack to the next.
+const DIAL_BUDGET: Duration = Duration::from_secs(18);
+
+/// Cap on a single `connect()`, so a host that black-holes the SYN can't sit on
+/// its candidate's whole window — iOS would otherwise wait out its own retries.
+const DIAL_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Pause between attempts on one candidate. The device's listener is
+/// occasionally not accepting yet when `createListener` returns, which is the
+/// only thing retrying the same host can fix.
+const DIAL_RETRY_DELAY: Duration = Duration::from_millis(700);
+
+/// Attempts per candidate. Bounded so a host that refuses instantly moves on
+/// quickly instead of spinning out its window, leaving that time for the rest.
+const DIAL_MAX_ATTEMPTS: u32 = 6;
+
+/// The host that worked, remembered so later tunnels in the same session dial
+/// it first instead of re-walking the list. Process-wide: the process is the
+/// session, and a wrong guess here only costs one refused connect.
+static CACHED_TUNNEL_HOST: Mutex<Option<IpAddr>> = Mutex::new(None);
+
+/// A failed tunnel attempt: the raw error for the log, and what kind of failure
+/// it was for what the user is told.
+struct TunnelFailure {
+    kind: TunnelFailureKind,
+    error: IdeviceError,
+}
+
+impl TunnelFailure {
+    fn new(kind: TunnelFailureKind, error: IdeviceError) -> Self {
+        Self { kind, error }
+    }
+
+    fn other(error: IdeviceError) -> Self {
+        Self::new(TunnelFailureKind::TunnelFailureOther, error)
+    }
+}
+
+/// `createListener` hands back a port and no host, so the host has to be
+/// guessed. These are the guesses, best first, without duplicates.
+fn tunnel_host_candidates(rsd_host: IpAddr, extra: &[IpAddr]) -> Vec<(IpAddr, HostSource)> {
+    let mut out: Vec<(IpAddr, HostSource)> = Vec::new();
+    fn push(out: &mut Vec<(IpAddr, HostSource)>, ip: IpAddr, source: HostSource) {
+        if !out.iter().any(|(seen, _)| *seen == ip) {
+            out.push((ip, source));
+        }
+    }
+
+    // A host that already worked goes first, but the rest stay behind it: a VPN
+    // reconnect can renumber the tunnel under a cached address.
+    if let Ok(cached) = CACHED_TUNNEL_HOST.lock()
+        && let Some(ip) = *cached
+    {
+        push(&mut out, ip, HostSource::SessionCache);
+    }
+    push(&mut out, rsd_host, HostSource::RsdPeer);
+    push(
+        &mut out,
+        IpAddr::V4(Ipv4Addr::LOCALHOST),
+        HostSource::LoopbackDefault,
+    );
+    for ip in extra {
+        push(&mut out, *ip, HostSource::PairingInterface);
+    }
+    out
+}
+
+/// How one candidate's retry window ended.
+enum DialOutcome {
+    Connected(TcpStream),
+    /// Every attempt was actively refused — nothing is listening there.
+    Refused(std::io::Error),
+    /// Attempts ran out of time without an answer or a refusal.
+    TimedOut,
+    /// Some other socket error (no route, permission denied, …).
+    Failed(std::io::Error),
+}
+
+/// Dial one candidate until it answers or its window closes, logging every
+/// attempt before it is made and every failure at the point it happens.
+async fn dial_candidate(
+    addr: SocketAddr,
+    source: HostSource,
+    index: usize,
+    total: usize,
+    window_end: Instant,
+) -> DialOutcome {
+    let mut refused: Option<std::io::Error> = None;
+    let mut failed: Option<std::io::Error> = None;
+    let mut timed_out = false;
+
+    for attempt in 1..=DIAL_MAX_ATTEMPTS {
+        let left = window_end.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            break;
+        }
+        info!(
+            "tunnel dial: connecting to {addr} — host from {}, candidate {}/{total}, \
+             attempt {attempt}/{DIAL_MAX_ATTEMPTS} ({:.1}s left in this candidate's window)",
+            source.label(),
+            index + 1,
+            left.as_secs_f64()
+        );
+
+        let cap = left.min(DIAL_ATTEMPT_TIMEOUT);
+        match tokio::time::timeout(cap, TcpStream::connect(addr)).await {
+            Ok(Ok(stream)) => {
+                info!("tunnel dial: {addr} accepted the connection on attempt {attempt}");
+                return DialOutcome::Connected(stream);
+            }
+            Ok(Err(e)) => {
+                // Logged here, not once the sweep drains, so the console shows
+                // which address produced which errno as it happens.
+                warn!(
+                    "tunnel dial: {addr} failed on attempt {attempt}: {e} (kind {:?}, os error {:?})",
+                    e.kind(),
+                    e.raw_os_error()
+                );
+                if e.kind() == ErrorKind::ConnectionRefused {
+                    refused = Some(e);
+                } else {
+                    failed = Some(e);
+                }
+            }
+            Err(_) => {
+                warn!(
+                    "tunnel dial: {addr} did not answer within {:.1}s on attempt {attempt} — \
+                     no refusal either, so the connection is being dropped rather than rejected",
+                    cap.as_secs_f64()
+                );
+                timed_out = true;
+            }
+        }
+
+        let left = window_end.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            break;
+        }
+        tokio::time::sleep(DIAL_RETRY_DELAY.min(left)).await;
+    }
+
+    // Most informative first: an unusual errno says more than a refusal, and a
+    // refusal is only worth reporting as such if nothing else went wrong.
+    if let Some(e) = failed {
+        return DialOutcome::Failed(e);
+    }
+    if timed_out {
+        return DialOutcome::TimedOut;
+    }
+    match refused {
+        Some(e) => DialOutcome::Refused(e),
+        // The window closed before a single attempt finished.
+        None => DialOutcome::TimedOut,
+    }
+}
+
+/// Turn a live CDTunnel into the adapter + RSD handshake every `_connect_rsd`
+/// function expects.
+async fn adapter_over_tunnel<S: ReadWrite + 'static>(
+    tunnel: CdTunnel<S>,
+) -> Result<(TcpAdapterHandle, RsdHandshake), TunnelFailure> {
+    let client_ip: IpAddr = tunnel
         .info
         .client_address
         .parse()
-        .map_err(|e| IdeviceError::InternalError(format!("{e}")))?;
-    let server_ip: std::net::IpAddr = tunnel
+        .map_err(|e| TunnelFailure::other(IdeviceError::InternalError(format!("{e}"))))?;
+    let server_ip: IpAddr = tunnel
         .info
         .server_address
         .parse()
-        .map_err(|e| IdeviceError::InternalError(format!("{e}")))?;
+        .map_err(|e| TunnelFailure::other(IdeviceError::InternalError(format!("{e}"))))?;
     let mtu = tunnel.info.mtu as usize;
     let rsd_port = tunnel.info.server_rsd_port;
 
@@ -63,13 +274,198 @@ async fn finish_tunnel(
     adapter.set_mss(mtu.saturating_sub(60));
     let mut adapter = adapter.to_async_handle();
 
+    info!("tunnel dial: tunnel up (client {client_ip}, server {server_ip}, mtu {mtu}); connecting to RSD on port {rsd_port} inside it");
     let rsd_stream = adapter
         .connect(rsd_port)
         .await
-        .map_err(|e| IdeviceError::InternalError(format!("{e}")))?;
-    let handshake = RsdHandshake::new(rsd_stream).await?;
+        .map_err(|e| TunnelFailure::other(IdeviceError::InternalError(format!("{e}"))))?;
+    let handshake = RsdHandshake::new(rsd_stream)
+        .await
+        .map_err(TunnelFailure::other)?;
 
     Ok((adapter, handshake))
+}
+
+/// Shared logic: given a connected & paired `RemotePairingClient`, create the
+/// TLS-PSK tunnel and return adapter + handshake.
+///
+/// `createListener` returns the port the device opened but not the host to
+/// reach it on, so the host is guessed — the address RSD was reached at first,
+/// then loopback, then whatever local interface the caller supplied. A
+/// loopback VPN that forwards the RSD port but not the ephemeral one the device
+/// just picked refuses all of them, which is what the failure kind is for.
+async fn finish_tunnel(
+    rpc: &mut RemotePairingClient<impl RpPairingSocketProvider>,
+    connect_addr: SocketAddr,
+    extra_hosts: &[IpAddr],
+) -> Result<(TcpAdapterHandle, RsdHandshake), TunnelFailure> {
+    use idevice::remote_pairing::connect_tls_psk_tunnel_native;
+
+    let mut tunnel_port = rpc
+        .create_tcp_listener()
+        .await
+        .map_err(TunnelFailure::other)?;
+    let candidates = tunnel_host_candidates(connect_addr.ip(), extra_hosts);
+    info!(
+        "tunnel dial: createListener opened port {tunnel_port} and named no host; \
+         trying {} candidate(s) within {:.0}s: {}",
+        candidates.len(),
+        DIAL_BUDGET.as_secs_f64(),
+        candidates
+            .iter()
+            .map(|(ip, source)| format!("{ip} ({})", source.label()))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    let started = Instant::now();
+    let deadline = started + DIAL_BUDGET;
+    let mut tried = 0usize;
+    let mut refused = 0usize;
+    let mut timed_out = 0usize;
+    let mut tls_failures = 0usize;
+    let mut outcomes: Vec<String> = Vec::with_capacity(candidates.len());
+    let mut last: Option<IdeviceError> = None;
+
+    for (index, (host, source)) in candidates.iter().enumerate() {
+        let now = Instant::now();
+        if now >= deadline {
+            warn!(
+                "tunnel dial: {:.0}s budget spent; skipping {host} and the {} candidate(s) behind it",
+                DIAL_BUDGET.as_secs_f64(),
+                candidates.len() - index - 1
+            );
+            break;
+        }
+        // What's left, split over what's left to try.
+        let window = (deadline - now) / (candidates.len() - index) as u32;
+        let addr = SocketAddr::new(*host, tunnel_port);
+        tried += 1;
+
+        let stream = match dial_candidate(addr, *source, index, candidates.len(), now + window).await
+        {
+            DialOutcome::Connected(stream) => stream,
+            DialOutcome::Refused(e) => {
+                refused += 1;
+                outcomes.push(format!("{host} refused"));
+                last = Some(IdeviceError::InternalError(format!("TLS tunnel: {addr}: {e}")));
+                continue;
+            }
+            DialOutcome::TimedOut => {
+                timed_out += 1;
+                outcomes.push(format!("{host} timed out"));
+                last = Some(IdeviceError::InternalError(format!(
+                    "TLS tunnel: {addr}: no answer and no refusal"
+                )));
+                continue;
+            }
+            DialOutcome::Failed(e) => {
+                outcomes.push(format!("{host} failed ({})", e.kind_str()));
+                last = Some(IdeviceError::InternalError(format!("TLS tunnel: {addr}: {e}")));
+                continue;
+            }
+        };
+
+        match connect_tls_psk_tunnel_native(stream, rpc.encryption_key()).await {
+            Ok(tunnel) => {
+                info!("tunnel dial: TLS-PSK + CDTunnel handshake succeeded over {addr} — host {host} ({}) is the one that works", source.label());
+                if let Ok(mut cached) = CACHED_TUNNEL_HOST.lock() {
+                    *cached = Some(*host);
+                }
+                return adapter_over_tunnel(tunnel).await;
+            }
+            Err(e) => {
+                tls_failures += 1;
+                outcomes.push(format!("{host} accepted but failed the TLS handshake"));
+                warn!(
+                    "tunnel dial: {addr} accepted the connection but the TLS-PSK/CDTunnel handshake failed: {e:?}"
+                );
+                last = Some(e);
+                // That connection consumed the listener, so anything after this
+                // candidate needs the device to open a fresh one.
+                if index + 1 < candidates.len() {
+                    match rpc.create_tcp_listener().await {
+                        Ok(port) => {
+                            tunnel_port = port;
+                            info!("tunnel dial: asked the device for a replacement listener — now on port {port}");
+                        }
+                        Err(e) => return Err(TunnelFailure::other(e)),
+                    }
+                }
+            }
+        }
+    }
+
+    let kind = if tls_failures > 0 {
+        // Reaching a listener at all is the most specific signal there is.
+        TunnelFailureKind::TunnelFailureTlsHandshake
+    } else if tried > 0 && refused == tried {
+        TunnelFailureKind::TunnelFailureHostsRefused
+    } else if timed_out > 0 {
+        TunnelFailureKind::TunnelFailureTimeout
+    } else {
+        TunnelFailureKind::TunnelFailureOther
+    };
+    let summary = outcomes.join(", ");
+    warn!(
+        "tunnel dial: no candidate host answered on port {tunnel_port} after {:.1}s — \
+         {tried} tried, {refused} refused, {timed_out} timed out, \
+         {tls_failures} failed the TLS handshake [{summary}]",
+        started.elapsed().as_secs_f64()
+    );
+
+    let last = last.unwrap_or_else(|| {
+        IdeviceError::InternalError(format!(
+            "TLS tunnel: no candidate host was reached on port {tunnel_port}"
+        ))
+    });
+    Err(TunnelFailure::new(
+        kind,
+        IdeviceError::InternalError(format!(
+            "TLS tunnel: none of {tried} candidate host(s) answered on port {tunnel_port} \
+             [{summary}]; last error: {last:?}"
+        )),
+    ))
+}
+
+/// `io::ErrorKind` as a short word for the outcome summary.
+trait ErrorKindStr {
+    fn kind_str(&self) -> String;
+}
+
+impl ErrorKindStr for std::io::Error {
+    fn kind_str(&self) -> String {
+        match self.raw_os_error() {
+            Some(errno) => format!("{:?}, os error {errno}", self.kind()),
+            None => format!("{:?}", self.kind()),
+        }
+    }
+}
+
+/// Read a `char **` list of dotted-quad / IPv6 literals into addresses,
+/// skipping (and naming) anything unparseable rather than failing the dial.
+///
+/// # Safety
+/// `hosts` must be null or point to `count` valid C strings.
+unsafe fn read_extra_hosts(hosts: *const *const c_char, count: usize) -> Vec<IpAddr> {
+    if hosts.is_null() || count == 0 {
+        return Vec::new();
+    }
+    let mut out = Vec::with_capacity(count);
+    for i in 0..count {
+        let entry = unsafe { *hosts.add(i) };
+        if entry.is_null() {
+            continue;
+        }
+        let Ok(text) = (unsafe { CStr::from_ptr(entry) }).to_str() else {
+            continue;
+        };
+        match text.parse::<IpAddr>() {
+            Ok(ip) => out.push(ip),
+            Err(_) => warn!("tunnel dial: ignoring unparseable candidate host {text:?}"),
+        }
+    }
+    out
 }
 
 fn write_result(
@@ -263,7 +659,9 @@ pub unsafe extern "C" fn tunnel_create_remotexpc(
         rpc.connect(rpf, async || get_pin(pin_callback, &ctx))
             .await?;
 
-        finish_tunnel(&mut rpc, socket_addr).await
+        finish_tunnel(&mut rpc, socket_addr, &[])
+            .await
+            .map_err(|f| f.error)
     });
 
     match res {
@@ -283,6 +681,9 @@ pub unsafe extern "C" fn tunnel_create_remotexpc(
 /// This path only supports pair-verify (existing pairing file required).
 /// For initial pairing, use `tunnel_pair_usb`.
 ///
+/// Equivalent to [`tunnel_create_rppairing_multihost`] with no extra candidate
+/// hosts and no interest in the failure kind.
+///
 /// # Safety
 /// All pointer arguments must be valid and non-null (except `pin_callback`/`pin_context`).
 /// `pairing_file` is borrowed, not consumed.
@@ -297,38 +698,120 @@ pub unsafe extern "C" fn tunnel_create_rppairing(
     out_adapter: *mut *mut AdapterHandle,
     out_handshake: *mut *mut RsdHandshakeHandle,
 ) -> *mut IdeviceFfiError {
+    unsafe {
+        tunnel_create_rppairing_multihost(
+            addr,
+            addr_len,
+            hostname,
+            pairing_file,
+            pin_callback,
+            pin_context,
+            null_mut(),
+            0,
+            null_mut(),
+            out_adapter,
+            out_handshake,
+        )
+    }
+}
+
+/// [`tunnel_create_rppairing`], plus caller-supplied fallback hosts and a
+/// classified failure kind.
+///
+/// `createListener` tells us which port the device opened but not which address
+/// reaches it, so the host is guessed: whatever `addr` reached RSD on, then
+/// `127.0.0.1`, then each entry of `extra_hosts` (dotted-quad or IPv6 literals —
+/// in practice the local address of the interface the pairing session ran over,
+/// which the caller knows and this library does not). Duplicates are dropped and
+/// the whole sweep is bounded by one wall-clock budget, so extra candidates
+/// never lengthen a run that was going to fail anyway. The host that works is
+/// remembered and dialled first for the rest of the process.
+///
+/// `out_failure_kind`, when non-null, is set on every return: `TunnelFailureNone`
+/// on success, otherwise which wall was hit. The raw error is still in the
+/// returned `IdeviceFfiError`'s message, and every attempt is logged as it is
+/// made.
+///
+/// # Safety
+/// All pointer arguments must be valid and non-null except `pin_callback`,
+/// `pin_context`, `extra_hosts` and `out_failure_kind`. `extra_hosts` must point
+/// to `extra_host_count` valid C strings when non-null. `pairing_file` is
+/// borrowed, not consumed.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn tunnel_create_rppairing_multihost(
+    addr: *const idevice_sockaddr,
+    addr_len: idevice_socklen_t,
+    hostname: *const c_char,
+    pairing_file: *mut RpPairingFileHandle,
+    pin_callback: Option<extern "C" fn(context: *mut c_void) -> *const c_char>,
+    pin_context: *mut c_void,
+    extra_hosts: *const *const c_char,
+    extra_host_count: usize,
+    out_failure_kind: *mut TunnelFailureKind,
+    out_adapter: *mut *mut AdapterHandle,
+    out_handshake: *mut *mut RsdHandshakeHandle,
+) -> *mut IdeviceFfiError {
+    let set_kind = |kind: TunnelFailureKind| {
+        if !out_failure_kind.is_null() {
+            unsafe { *out_failure_kind = kind };
+        }
+    };
+    set_kind(TunnelFailureKind::TunnelFailureNone);
+
     if addr.is_null()
         || hostname.is_null()
         || pairing_file.is_null()
         || out_adapter.is_null()
         || out_handshake.is_null()
     {
+        set_kind(TunnelFailureKind::TunnelFailureOther);
         return ffi_err!(IdeviceError::FfiInvalidArg);
     }
 
     let socket_addr = match crate::util::c_socket_to_rust(addr as *const SockAddr, addr_len) {
         Ok(a) => a,
-        Err(e) => return ffi_err!(e),
+        Err(e) => {
+            set_kind(TunnelFailureKind::TunnelFailureOther);
+            return ffi_err!(e);
+        }
     };
     let host = match unsafe { CStr::from_ptr(hostname) }.to_str() {
         Ok(s) => s.to_string(),
-        Err(_) => return ffi_err!(IdeviceError::FfiInvalidString),
+        Err(_) => {
+            set_kind(TunnelFailureKind::TunnelFailureOther);
+            return ffi_err!(IdeviceError::FfiInvalidString);
+        }
     };
     let rpf = unsafe { &mut (*pairing_file).0 };
     let ctx = PinCtx(pin_context);
+    let extras = unsafe { read_extra_hosts(extra_hosts, extra_host_count) };
 
     let res = run_sync_local(async {
         // Connect directly and use raw RPPairing protocol
-        let stream = tokio::net::TcpStream::connect(socket_addr)
-            .await
-            .map_err(|e| IdeviceError::InternalError(format!("connect: {e}")))?;
+        info!("tunnel dial: opening the RPPairing connection to {socket_addr}");
+        let stream = TcpStream::connect(socket_addr).await.map_err(|e| {
+            warn!(
+                "tunnel dial: RPPairing connect to {socket_addr} failed: {e} (kind {:?}, os error {:?})",
+                e.kind(),
+                e.raw_os_error()
+            );
+            TunnelFailure::new(
+                TunnelFailureKind::TunnelFailureRsdUnreachable,
+                IdeviceError::InternalError(format!("connect: {e}")),
+            )
+        })?;
         let conn = RpPairingSocket::new(stream);
 
         let mut rpc = RemotePairingClient::new(conn, &host);
         rpc.connect(rpf, async || get_pin(pin_callback, &ctx))
-            .await?;
+            .await
+            .map_err(|e| {
+                warn!("tunnel dial: pair-verify against {socket_addr} failed: {e:?}");
+                TunnelFailure::new(TunnelFailureKind::TunnelFailurePairVerify, e)
+            })?;
 
-        finish_tunnel(&mut rpc, socket_addr).await
+        finish_tunnel(&mut rpc, socket_addr, &extras).await
     });
 
     match res {
@@ -336,7 +819,10 @@ pub unsafe extern "C" fn tunnel_create_rppairing(
             write_result(adapter, handshake, out_adapter, out_handshake);
             null_mut()
         }
-        Err(e) => ffi_err!(e),
+        Err(failure) => {
+            set_kind(failure.kind);
+            ffi_err!(failure.error)
+        }
     }
 }
 

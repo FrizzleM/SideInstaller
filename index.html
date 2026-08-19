@@ -48,14 +48,14 @@
   }
 
   /* ---- entrance cascade, echoing the app's per-object settle-in ---- */
-  .hero,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
+  .hero,.notice,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
   .step:nth-of-type(1){animation-delay:.06s}
   .step:nth-of-type(2){animation-delay:.12s}
   .step:nth-of-type(3){animation-delay:.18s}
   .footer{animation-delay:.24s}
   @keyframes rise{from{opacity:0; transform:translateY(16px) scale(.98)}}
   @media (prefers-reduced-motion:reduce){
-    .hero,.step,.footer{animation:none}
+    .hero,.notice,.step,.footer{animation:none}
   }
 
   .wrap{max-width:920px; margin:0 auto}
@@ -186,6 +186,21 @@
   }
   .video-cap a{color:var(--accent2); text-decoration:none}
   .video-cap a:hover{text-decoration:underline}
+
+  /* ---- affiliation note, above the first step ----
+     Bare text, no card, so it reads as a footnote beside the boxed steps.
+     A <div>, not a <section>, so the .step:nth-of-type() cascade delays below
+     keep counting the three step sections. */
+  .notice{
+    margin-top:34px; padding:0 2px; color:var(--faint); font-size:13.5px;
+  }
+  .notice b{
+    display:block; margin-bottom:2px; color:var(--faint);
+    font-size:12.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  }
+  .notice p{margin:0}
+  .notice a{color:inherit; font-weight:600; text-decoration:underline}
+  .notice a:hover{color:var(--muted)}
 
   /* ---- steps ---- */
   .step{margin-top:34px}
@@ -376,6 +391,11 @@
       </a>
     </div>
   </header>
+
+  <div class="notice">
+    <b>Note</b>
+    <p>SideInstaller is not affiliated anyhow with SideStore. Please do not ask questions to the SideStore staff about SideInstaller as they are not able to answer. Instead, if you have issues or suggestions, write them in the <a href="https://discord.gg/sQ5Y8vbYJS" target="_blank" rel="noopener">SideInstaller Discord</a>.</p>
+  </div>
 
   <section class="step" id="setup">
     <div class="step-head">

@@ -71,6 +71,22 @@ enum NetworkStatus {
         interfaces().contains { $0.ipv4 == deviceIP }
     }
 
+    /// Local addresses worth dialling when the device opens a tunnel listener
+    /// and names a port but no host. Wi-Fi first: the remote-pairing session
+    /// itself is established over `en0`, so the listener is reachable there
+    /// even when the VPN's subnet forwards the RSD port and nothing else.
+    ///
+    /// Loopback is left out — the Rust side already tries `127.0.0.1` — and so
+    /// are the tunnel interfaces, whose peer address is the one being dialled
+    /// first anyway.
+    static func tunnelHostCandidates() -> [String] {
+        let ifs = interfaces().filter {
+            !isTunnelInterface($0.name) && !$0.ipv4.hasPrefix("127.")
+        }
+        return (ifs.filter { $0.name == "en0" } + ifs.filter { $0.name != "en0" })
+            .map(\.ipv4)
+    }
+
     private static func isTunnelInterface(_ name: String) -> Bool {
         name.hasPrefix("utun") || name.hasPrefix("ipsec")
             || name.hasPrefix("tap") || name.hasPrefix("ppp")
