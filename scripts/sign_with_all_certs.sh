@@ -34,13 +34,25 @@ CERT_NAME_LIST_FILE="${CERT_NAME_LIST_FILE:-}"
 
 # Fallback sources, one per line, kept in sync with cert-url.txt.
 DEFAULT_CERT_SOURCES="https://github.com/WSF-Team/WSF/raw/refs/heads/main/portal/resources/certificates.zip
-https://github.com/NovaDev404/NexCerts"
+https://sideloading.net"
 
 DEFAULT_P12_PASSWORD="${P12_PASSWORD:-WSF}"
 KC_PASSWORD="${KC_PASSWORD:-temp123}"
 FORCED_BUNDLE_ID="${FORCED_BUNDLE_ID:-}"
 SIGN_STATE_FILE="${SIGN_STATE_FILE:-}"
 PRECHECK_ONLY="${PRECHECK_ONLY:-0}"
+
+# NexCerts is no longer cloned as a Git repo — it exposes a REST API
+# (https://sideloading.net) that lists certificates and serves each one's p12,
+# provisioning profile and password by id. Any source URL pointing at this host
+# (or the legacy github.com/NovaDev404/NexCerts repo, kept as an alias) is routed
+# through the API instead of a clone/zip download; see fetch_nexcerts_certs.
+#   NEXCERTS_API_BASE  API origin (default https://sideloading.net)
+#   NEXCERTS_STATUS    which list to pull: all | signed | revoked | missingP12
+#                      (default all; 'signed' drops Apple-revoked certificates)
+NEXCERTS_HOST="${NEXCERTS_HOST:-sideloading.net}"
+NEXCERTS_API_BASE="${NEXCERTS_API_BASE:-https://$NEXCERTS_HOST}"
+NEXCERTS_STATUS="${NEXCERTS_STATUS:-all}"
 
 TMP_DIR="$(mktemp -d)"
 POOL_DIR="$TMP_DIR/pool"                 # merged cert pool, one subdir per source
@@ -169,16 +181,127 @@ fetch_zip_certs() {   # $1 url  $2 dest-dir
   rm -f "$archive"
 }
 
+# Echo the API base for a NexCerts source, non-zero for anything else. Matches
+# the API host directly (any scheme/path) and the legacy NovaDev404/NexCerts
+# GitHub URL, which is now served through the API rather than cloned.
+nexcerts_api_base() {   # $1 = source url
+  local u="${1%/}"; u="${u%.git}"
+  case "$u" in
+    *github.com/NovaDev404/NexCerts | *github.com/NovaDev404/NexCerts/*)
+      echo "$NEXCERTS_API_BASE"; return 0 ;;
+  esac
+  case "$u" in
+    http://* | https://*)
+      # Separate declarations: a single `local a=.. b="${a..}"` would evaluate b
+      # before a is committed, yielding an empty host under `set -u`.
+      local scheme="${u%%://*}"
+      local rest="${u#*://}"
+      local host="${rest%%/*}"
+      if [[ "$host" == "$NEXCERTS_HOST" || "$host" == *."$NEXCERTS_HOST" ]]; then
+        echo "$scheme://$host"; return 0
+      fi ;;
+  esac
+  return 1
+}
+
+# Fetch NexCerts through its REST API instead of cloning the repo. The list
+# endpoint enumerates certificates; the per-id download endpoints return each
+# cert's p12, provisioning profile and password. Files land in the same layout
+# as every other source (<Name>/<Name>.p12 + .mobileprovision [+ password.txt]),
+# so the signing loop treats the merged pool uniformly. $NEXCERTS_STATUS selects
+# the list (all | signed | revoked | missingP12); each folder is named after the
+# certificate exactly as the repo folder was, keeping output filenames stable.
+fetch_nexcerts_certs() {   # $1 = api base  $2 = dest dir
+  local base="${1%/}" dest="$2" status="${NEXCERTS_STATUS:-all}"
+  local list_json="$TMP_DIR/nexcerts-$(basename "$dest").json"
+
+  command -v python3 >/dev/null 2>&1 || { warn "python3 is required to read the NexCerts API"; return 1; }
+  if ! curl -fsSL "$base/api/certificates/list/$status" -o "$list_json"; then
+    warn "NexCerts API list request failed: $base/api/certificates/list/$status"
+    return 1
+  fi
+
+  # One "id<TAB>name" line per certificate. folder_name is what the clone would
+  # have produced on disk; fall back to name. Control characters and path
+  # separators are neutralised so the value is a safe single path component.
+  local roster
+  if ! roster="$(python3 - "$list_json" <<'PY'
+import json, sys
+try:
+    with open(sys.argv[1]) as fh:
+        data = json.load(fh)
+except Exception:
+    sys.exit(1)
+if not isinstance(data, list):
+    sys.exit(1)
+for entry in data:
+    if not isinstance(entry, dict):
+        continue
+    cid = entry.get("id")
+    name = entry.get("folder_name") or entry.get("name")
+    if cid is None or not name:
+        continue
+    name = "".join((" " if ord(c) < 32 else c) for c in str(name))
+    name = name.replace("/", "-").replace("\\", "-").strip()
+    if name:
+        print(f"{cid}\t{name}")
+PY
+)"; then
+    warn "Could not parse the NexCerts API response from $base"
+    return 1
+  fi
+
+  if [[ -z "$roster" ]]; then
+    warn "NexCerts API returned no certificates for status '$status'"
+    return 0
+  fi
+
+  local count=0 id name cert_dir pw
+  while IFS=$'\t' read -r id name; do
+    [[ -n "$id" && -n "$name" ]] || continue
+
+    # Repo folder names are unique; guard the rare API duplicate so one cert
+    # never clobbers another's files.
+    cert_dir="$dest/$name"
+    if [[ -e "$cert_dir" ]]; then name="$name ($id)"; cert_dir="$dest/$name"; fi
+    mkdir -p "$cert_dir"
+
+    if ! curl -fsSL "$base/api/certificates/download/$id/cert.p12" -o "$cert_dir/$name.p12"; then
+      warn "NexCerts: could not download p12 for '$name' (id $id); skipping"
+      rm -rf "$cert_dir"; continue
+    fi
+    if ! curl -fsSL "$base/api/certificates/download/$id/cert.mobileprovision" -o "$cert_dir/$name.mobileprovision"; then
+      warn "NexCerts: could not download provisioning profile for '$name' (id $id); skipping"
+      rm -rf "$cert_dir"; continue
+    fi
+
+    # Password is per-certificate ("NexCerts" today, not the WSF fallback), so
+    # persist it as password.txt for resolve_p12_password. Optional: a missing
+    # value just falls through to DEFAULT_P12_PASSWORD.
+    if pw="$(curl -fsSL "$base/api/certificates/download/$id/password.txt" 2>/dev/null)" && [[ -n "$pw" ]]; then
+      printf '%s\n' "$pw" > "$cert_dir/password.txt"
+    fi
+
+    count=$((count + 1))
+  done <<< "$roster"
+
+  echo "[*]   NexCerts API: fetched $count certificate(s) [status: $status]"
+  [[ "$count" -gt 0 ]]
+}
+
 # Populate $POOL_DIR, each source in its own zero-padded subdir so the walk
 # below visits them in list order and the first source wins a duplicate.
 acquire_sources() {   # $1 = newline-separated source URLs
-  local idx=0 url dest
+  local idx=0 url dest nex_base
   mkdir -p "$POOL_DIR"
   while IFS= read -r url; do
     [[ -n "$url" ]] || continue
     dest="$POOL_DIR/$(printf '%02d' "$idx")-src"
     mkdir -p "$dest"
-    if is_github_repo_url "$url"; then
+    if nex_base="$(nexcerts_api_base "$url")"; then
+      echo "[*] Source $idx (NexCerts API @ $nex_base): $url"
+      fetch_nexcerts_certs "$nex_base" "$dest" || warn "Failed to fetch certificates from the NexCerts API: $url"
+    elif is_github_repo_url "$url"; then
       echo "[*] Source $idx (GitHub repo, cert files only): $url"
       clone_repo_certs "$url" "$dest" || warn "Failed to fetch certificates from repo: $url"
     else
