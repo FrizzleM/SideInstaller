@@ -100,7 +100,7 @@ jobs:
               echo "OUTPUT_DIR=output-beta"
               echo "OUTPUT_BASE_URL=$base/output-beta"
               echo "PAGE_TITLE=SideInstaller — Beta"
-              echo "APP_TAGLINE=Beta test build — not the public release. Follow the three steps below to get set up."
+              echo "APP_TAGLINE=Beta test build, not the public release. Follow the three steps below to get set up."
             else
               echo "OUTPUT_HTML=index.html"
               echo "OUTPUT_DIR=output"
@@ -152,6 +152,10 @@ jobs:
 
       - name: Generate install page
         if: steps.precheck.outputs.skip != 'true'
+        env:
+          # Points the page's "Download IPA" button at the overridden build when
+          # this run was dispatched with one; blank leaves it on the latest release.
+          UNSIGNED_IPA_URL: ${{ github.event.inputs.ipa_url }}
         run: ./scripts/generate_index.sh
 
       # Commit the state the precheck computed, not a fresh one, so next week's

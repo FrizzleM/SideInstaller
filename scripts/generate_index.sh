@@ -24,10 +24,14 @@ GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
 OUTPUT_BASE_URL="${OUTPUT_BASE_URL:-https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/$GITHUB_BRANCH/output}"
 # The app icon, committed at the repo root so the page can load it by raw URL.
 LOGO_URL="${LOGO_URL:-https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/$GITHUB_BRANCH/app-icon.png}"
-# The "Download IPA" target, which serves the latest release's asset directly
-# and so never needs updating per release.
+# The "Download IPA" target. By default it serves the latest release's asset
+# directly and so never needs updating per release; when the run was started
+# with a one-off IPA override (UNSIGNED_IPA_URL, the workflow's ipa_url input),
+# the button points at that build instead, so the page always hands out the same
+# IPA the install cards were signed from.
 IPA_ASSET_NAME="${IPA_ASSET_NAME:-SideInstaller.ipa}"
-LATEST_RELEASE_URL="${LATEST_RELEASE_URL:-https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/latest/download/$IPA_ASSET_NAME}"
+DEFAULT_RELEASE_URL="https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/latest/download/$IPA_ASSET_NAME"
+LATEST_RELEASE_URL="${LATEST_RELEASE_URL:-${UNSIGNED_IPA_URL:-$DEFAULT_RELEASE_URL}}"
 
 CERT_METADATA_FILE="$OUTPUT_DIR/certificate-validity.tsv"
 APP_INFO_FILE="$OUTPUT_DIR/app-info.tsv"
@@ -139,6 +143,9 @@ PAGE_TITLE_ESC="$(printf '%s' "$PAGE_TITLE" | html_escape)"
 APP_NAME_ESC="$(printf '%s' "$APP_NAME" | html_escape)"
 APP_TAGLINE_ESC="$(printf '%s' "$APP_TAGLINE" | html_escape)"
 APP_VERSION_ESC="$(printf '%s' "$APP_VERSION" | html_escape)"
+# An override URL is arbitrary text, and query separators would otherwise end up
+# raw inside the href.
+LATEST_RELEASE_URL_ESC="$(printf '%s' "$LATEST_RELEASE_URL" | html_escape)"
 
 awk \
   -v cards_file="$CARDS_FILE" \
@@ -149,7 +156,7 @@ awk \
   -v cert_count="$CERT_COUNT" \
   -v logo="$LOGO_HTML" \
   -v last_updated="$LAST_UPDATED" \
-  -v latest_release_url="$LATEST_RELEASE_URL" \
+  -v latest_release_url="$LATEST_RELEASE_URL_ESC" \
   -v repo_note="$REPO_NOTE" '
   # Literal replace, since gsub would treat & or \ in the value specially.
   function rep(s, tok, val,   out, p){

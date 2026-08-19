@@ -70,6 +70,49 @@ typedef enum IdeviceLogLevel {
   Trace = 5,
 } IdeviceLogLevel;
 
+/**
+ * Why a tunnel attempt ultimately failed, so the caller can say something more
+ * useful than whichever OS error happened to come last. Written through the
+ * `out_failure_kind` argument of `tunnel_create_rppairing_multihost`.
+ *
+ * The raw error still comes back in the `IdeviceFfiError` message, and every
+ * step is logged as it happens; this only says *which* wall was hit.
+ */
+typedef enum TunnelFailureKind {
+  /**
+   * No failure — the tunnel came up.
+   */
+  TunnelFailureNone = 0,
+  /**
+   * The device's RSD port never answered, so nothing below it was attempted.
+   */
+  TunnelFailureRsdUnreachable = 1,
+  /**
+   * RSD answered but pair-verify was refused: this pairing file no longer
+   * matches the device.
+   */
+  TunnelFailurePairVerify = 2,
+  /**
+   * Every candidate host actively refused the port `createListener` opened,
+   * while the RSD port itself was reachable — the device is there, but the
+   * route in front of it is only forwarding some ports.
+   */
+  TunnelFailureHostsRefused = 3,
+  /**
+   * Candidates swallowed the connection: no refusal, no answer.
+   */
+  TunnelFailureTimeout = 4,
+  /**
+   * A candidate accepted the TCP connection but the TLS-PSK or CDTunnel
+   * handshake on top of it failed.
+   */
+  TunnelFailureTlsHandshake = 5,
+  /**
+   * Anything else — the RSD handshake inside the tunnel, a parse failure, …
+   */
+  TunnelFailureOther = 6,
+} TunnelFailureKind;
+
 typedef struct AdapterHandle AdapterHandle;
 
 typedef struct AdapterStreamHandle AdapterStreamHandle;
@@ -6589,6 +6632,9 @@ struct IdeviceFfiError *tunnel_create_remotexpc(const idevice_sockaddr *addr,
  * This path only supports pair-verify (existing pairing file required).
  * For initial pairing, use `tunnel_pair_usb`.
  *
+ * Equivalent to `tunnel_create_rppairing_multihost` with no extra candidate
+ * hosts and no interest in the failure kind.
+ *
  * # Safety
  * All pointer arguments must be valid and non-null (except `pin_callback`/`pin_context`).
  * `pairing_file` is borrowed, not consumed.
@@ -6601,6 +6647,42 @@ struct IdeviceFfiError *tunnel_create_rppairing(const idevice_sockaddr *addr,
                                                 void *pin_context,
                                                 struct AdapterHandle **out_adapter,
                                                 struct RsdHandshakeHandle **out_handshake);
+
+/**
+ * `tunnel_create_rppairing`, plus caller-supplied fallback hosts and a
+ * classified failure kind.
+ *
+ * `createListener` tells us which port the device opened but not which address
+ * reaches it, so the host is guessed: whatever `addr` reached RSD on, then
+ * `127.0.0.1`, then each entry of `extra_hosts` (dotted-quad or IPv6 literals —
+ * in practice the local address of the interface the pairing session ran over,
+ * which the caller knows and this library does not). Duplicates are dropped and
+ * the whole sweep is bounded by one wall-clock budget, so extra candidates
+ * never lengthen a run that was going to fail anyway. The host that works is
+ * remembered and dialled first for the rest of the process.
+ *
+ * `out_failure_kind`, when non-null, is set on every return: `TunnelFailureNone`
+ * on success, otherwise which wall was hit. The raw error is still in the
+ * returned `IdeviceFfiError`'s message, and every attempt is logged as it is
+ * made.
+ *
+ * # Safety
+ * All pointer arguments must be valid and non-null except `pin_callback`,
+ * `pin_context`, `extra_hosts` and `out_failure_kind`. `extra_hosts` must point
+ * to `extra_host_count` valid C strings when non-null. `pairing_file` is
+ * borrowed, not consumed.
+ */
+struct IdeviceFfiError *tunnel_create_rppairing_multihost(const idevice_sockaddr *addr,
+                                                          idevice_socklen_t addr_len,
+                                                          const char *hostname,
+                                                          struct RpPairingFileHandle *pairing_file,
+                                                          const char *(*pin_callback)(void *context),
+                                                          void *pin_context,
+                                                          const char *const *extra_hosts,
+                                                          uintptr_t extra_host_count,
+                                                          enum TunnelFailureKind *out_failure_kind,
+                                                          struct AdapterHandle **out_adapter,
+                                                          struct RsdHandshakeHandle **out_handshake);
 
 /**
  * Connects to a usbmuxd instance over TCP

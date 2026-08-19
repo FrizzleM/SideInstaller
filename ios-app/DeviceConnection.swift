@@ -24,18 +24,92 @@ final class DeviceConnection {
         var description: String { "idevice FFI error code=\(code) sub=\(subCode): \(message)" }
     }
 
-    /// Turn a returned IdeviceFfiError* into a thrown error (null == success).
-    private func check(_ err: UnsafeMutablePointer<IdeviceFfiError>?, _ fallback: String) throws {
-        guard let err = err else { return }
+    /// A tunnel failure said in terms of what the user can change, with the raw
+    /// FFI error kept alongside it for the log.
+    ///
+    /// The FFI's own text — `code=16 sub=0: InternalError("TLS tunnel:
+    /// Connection refused (os error 61)")` — names the errno of whichever
+    /// attempt happened to be last, which is the same string for a VPN that
+    /// forwards one port, a device that never opened the listener, and a
+    /// pairing file that no longer matches. The Rust side classifies which of
+    /// those it was; this turns that into a sentence.
+    struct TunnelError: Error, CustomStringConvertible, LocalizedError {
+        let advice: String
+        /// The unclassified FFI error, for the debug log — never presented.
+        let underlying: FFIError
+        var description: String { advice }
+        var errorDescription: String? { advice }
+    }
+
+    /// Consume an `IdeviceFfiError*` into an `FFIError` (null == success).
+    private func ffiError(_ err: UnsafeMutablePointer<IdeviceFfiError>?,
+                          _ fallback: String) -> FFIError? {
+        guard let err = err else { return nil }
         let code = err.pointee.code
         let sub = err.pointee.sub_code
         let msg = err.pointee.message.flatMap { String(validatingUTF8: $0) } ?? fallback
         idevice_error_free(err)
-        throw FFIError(code: code, subCode: sub, message: msg.isEmpty ? fallback : msg)
+        return FFIError(code: code, subCode: sub, message: msg.isEmpty ? fallback : msg)
+    }
+
+    /// Turn a returned IdeviceFfiError* into a thrown error (null == success).
+    private func check(_ err: UnsafeMutablePointer<IdeviceFfiError>?, _ fallback: String) throws {
+        if let error = ffiError(err, fallback) { throw error }
     }
 
     private func fail(_ message: String) -> FFIError {
         FFIError(code: -1, subCode: 0, message: message)
+    }
+
+    /// What to tell the user for each way the tunnel dial can end, given the
+    /// candidate hosts that were tried. The raw error goes to the log; only
+    /// this string is presented.
+    private func tunnelAdvice(kind: TunnelFailureKind,
+                              deviceIP: String,
+                              candidates: [String]) -> String {
+        let tried = ([deviceIP, "127.0.0.1"] + candidates).joined(separator: ", ")
+        switch kind {
+        case TunnelFailureHostsRefused:
+            return """
+                The device answered on the RSD port, then refused the tunnel on every \
+                address it could be reached at (\(tried)). The device is there — what's \
+                in front of it is only forwarding some ports. The tunnel listener opens \
+                on a fresh high port each time, so a rule-based proxy that forwards the \
+                RSD port alone can never cover it. Use a loopback VPN that blanket-forwards \
+                every port on the RSD subnet.
+                """
+        case TunnelFailureTimeout:
+            return """
+                The tunnel port never answered and never refused on any address \
+                (\(tried)) — the connection is being swallowed rather than rejected. \
+                That's usually a VPN or firewall dropping traffic on the RSD subnet. \
+                Check the VPN is still up, then try again.
+                """
+        case TunnelFailureTlsHandshake:
+            return """
+                Something accepted the tunnel connection but failed the encrypted \
+                handshake on top of it. Either another process holds that port, or this \
+                pairing file's key no longer matches the device. Pair again, and if that \
+                doesn't take, restart the loopback VPN.
+                """
+        case TunnelFailurePairVerify:
+            return """
+                The device rejected this pairing file: it's for a different device, or \
+                the pairing was revoked (a reset, a restore, or Developer Mode being \
+                turned off). Pair with this iPhone again to get a fresh file.
+                """
+        case TunnelFailureRsdUnreachable:
+            return """
+                Couldn't reach the device at \(deviceIP):\(Self.rsdPort) at all. The \
+                loopback VPN is most likely off, or is handing out a different address \
+                than the one configured here.
+                """
+        default:
+            return """
+                The tunnel didn't come up, and the failure didn't match any known cause. \
+                The raw error is in the log.
+                """
+        }
     }
 
     // MARK: Connect / disconnect
@@ -109,20 +183,40 @@ final class DeviceConnection {
             throw fail("invalid device IP: \(deviceIP)")
         }
 
+        // createListener names a port but no host, so the Rust side sweeps
+        // candidates: the RSD address, loopback, then these — the local
+        // addresses of the interfaces the pairing session runs over. The whole
+        // sweep shares one wall-clock budget, so the extra hosts don't lengthen
+        // a run that was going to fail.
+        let candidates = NetworkStatus.tunnelHostCandidates()
+        let cHosts: [UnsafePointer<CChar>?] = candidates.map { UnsafePointer(strdup($0)) }
+        defer { for p in cHosts { free(UnsafeMutablePointer(mutating: p)) } }
+
         var newAdapter: OpaquePointer?
         var newHandshake: OpaquePointer?
+        var failureKind = TunnelFailureNone
         let err = withUnsafePointer(to: &addr) { aptr in
             aptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
                 hostname.withCString { host in
-                    // A nil pin_callback pair-verifies with the existing file.
-                    tunnel_create_rppairing(
-                        sa, socklen_t(MemoryLayout<sockaddr_in>.stride),
-                        host, pairingFile, nil, nil,
-                        &newAdapter, &newHandshake)
+                    cHosts.withUnsafeBufferPointer { extra in
+                        // A nil pin_callback pair-verifies with the existing file.
+                        tunnel_create_rppairing_multihost(
+                            sa, socklen_t(MemoryLayout<sockaddr_in>.stride),
+                            host, pairingFile, nil, nil,
+                            extra.baseAddress, UInt(extra.count), &failureKind,
+                            &newAdapter, &newHandshake)
+                    }
                 }
             }
         }
-        try check(err, "tunnel_create_rppairing failed (is a loopback VPN connected, Wi-Fi on, device IP \(deviceIP)?)")
+        if let raw = ffiError(err, "tunnel_create_rppairing failed (is a loopback VPN connected, Wi-Fi on, device IP \(deviceIP)?)") {
+            // The unclassified error stays in the log; only what's thrown changes.
+            Engine.shared.log("tunnel dial failed — raw error: \(raw)")
+            throw TunnelError(advice: tunnelAdvice(kind: failureKind,
+                                                   deviceIP: deviceIP,
+                                                   candidates: candidates),
+                              underlying: raw)
+        }
         guard newAdapter != nil, newHandshake != nil else {
             throw fail("tunnel created without valid handles")
         }

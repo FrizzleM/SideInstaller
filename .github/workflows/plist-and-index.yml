@@ -74,7 +74,7 @@ jobs:
               echo "OUTPUT_DIR=output-beta"
               echo "OUTPUT_BASE_URL=$base/output-beta"
               echo "PAGE_TITLE=SideInstaller — Beta"
-              echo "APP_TAGLINE=Beta test build — not the public release. Follow the three steps below to get set up."
+              echo "APP_TAGLINE=Beta test build, not the public release. Follow the three steps below to get set up."
             else
               echo "OUTPUT_HTML=index.html"
               echo "OUTPUT_DIR=output"
