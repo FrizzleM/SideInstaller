@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SideInstaller — Beta</title>
+<link rel="icon" type="image/png" href="app-icon.png">
+<link rel="apple-touch-icon" href="app-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#17376f">
+<style>
+  /* Palette mirrors the app's brand blues: accent #2170F5 -> accent2 #4DADFF.
+     The page sits on one flat soft blue (--page) pitched at roughly what the
+     old radial "spheres" composited to, so the look carries over without the
+     gradients. Cards stay dark and translucent for separation, and the muted
+     greys are lightened to keep >=4.5:1 against the lighter backdrop. */
+  :root{
+    --page:#17376f;
+    --card:rgba(15,22,40,.62); --card-hover:rgba(24,32,54,.72);
+    --stroke:rgba(255,255,255,.10); --stroke-strong:rgba(255,255,255,.18);
+    --text:#f4f6fb; --muted:#c6cee0; --faint:#a5aec4;
+    --accent:#2170f5; --accent2:#4dadff; --glow:#011a5c;
+    --brand:linear-gradient(135deg,var(--accent),var(--accent2));
+    --good:#34d399; --warn:#fbbf24; --crit:#fb923c; --bad:#f87171;
+    --radius:22px; --radius-btn:18px; --radius-sm:14px;
+  }
+  *{box-sizing:border-box}
+  /* overflow-x:clip on the root kills any phantom horizontal overflow. Without
+     it, a few stray pixels of width make iOS Safari anchor the fixed .bg to the
+     layout viewport while the page scrolls, leaving an uncovered strip down the
+     right edge the full height of the page. clip (not hidden) avoids creating a
+     scroll container, so the fixed backdrop still pins to the viewport. */
+  html{-webkit-text-size-adjust:100%; overflow-x:clip; background:var(--page)}
+  body{
+    margin:0; min-height:100vh; color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    line-height:1.55; background:transparent; overflow-x:clip; /* transparent so the fixed .bg backdrop shows through; html keeps the --page backstop */
+    padding:max(20px,env(safe-area-inset-top)) 18px 64px;
+  }
+
+  /* ---- backdrop ----
+     One fixed layer of flat soft blue — no gradients, no canvas, no JS. The
+     colour is the tone the old hero/foot glows composited to, so the page
+     keeps the app's blue without the spheres. */
+  .bg{
+    position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:var(--page);
+  }
+
+  /* ---- entrance cascade, echoing the app's per-object settle-in ---- */
+  .hero,.notice,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
+  .step:nth-of-type(1){animation-delay:.06s}
+  .step:nth-of-type(2){animation-delay:.12s}
+  .step:nth-of-type(3){animation-delay:.18s}
+  .footer{animation-delay:.24s}
+  @keyframes rise{from{opacity:0; transform:translateY(16px) scale(.98)}}
+  @media (prefers-reduced-motion:reduce){
+    .hero,.notice,.step,.footer{animation:none}
+  }
+
+  .wrap{max-width:920px; margin:0 auto}
+
+  /* ---- hero ---- */
+  .hero{text-align:center; padding:18px 8px 8px}
+  .logo{
+    width:96px; height:96px; margin:0 auto 18px; display:grid; place-items:center;
+    border-radius:23px; background:linear-gradient(150deg,#0d1530,#05070f);
+    border:1px solid var(--stroke-strong);
+    box-shadow:0 12px 40px rgba(33,112,245,.32), 0 18px 60px rgba(1,26,92,.85), inset 0 1px 0 rgba(255,255,255,.06);
+    overflow:hidden;
+  }
+  .logo img{width:100%; height:100%; object-fit:cover}
+  .logo svg{width:54px; height:54px}
+  h1{margin:0; color:#fff; font-size:clamp(28px,6vw,40px); font-weight:800; letter-spacing:-.02em}
+  .tagline{margin:8px auto 0; max-width:540px; color:var(--muted); font-size:16px}
+  .badges{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
+  .badge{
+    font-size:13px; font-weight:600; color:var(--muted);
+    padding:7px 14px; border-radius:999px; background:var(--card); border:1px solid var(--stroke);
+  }
+  .badge b{color:var(--text)}
+
+  /* ---- hero links: social row above, repo/download row below ---- */
+  .links{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px}
+  .links.repo{margin-top:10px}
+  .link-btn{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 16px; font-size:14px; font-weight:700; text-decoration:none;
+    color:var(--text); border-radius:999px; cursor:pointer; font-family:inherit;
+    background:var(--card); border:1px solid var(--stroke);
+    transition:transform .14s, background .14s, border-color .14s, filter .14s;
+  }
+  .link-btn svg{width:17px; height:17px; flex:none}
+  .link-btn:hover{background:var(--card-hover); border-color:var(--stroke-strong); transform:translateY(-2px)}
+  .link-btn:active{transform:scale(.97)}
+  .link-btn.discord{color:#fff; background:#5865f2; border-color:transparent}
+  .link-btn.discord:hover{background:#5865f2; filter:brightness(1.08)}
+  .link-btn.kofi{color:#fff; background:#ff5e5b; border-color:transparent}
+  .link-btn.kofi:hover{background:#ff5e5b; filter:brightness(1.08)}
+  .link-btn.youtube{color:#fff; background:#ff0000; border-color:transparent}
+  .link-btn.youtube:hover{background:#ff0000; filter:brightness(1.08)}
+  .link-btn.ipa{padding:8px 13px; font-size:12.5px; font-weight:600; color:var(--muted)}
+  .link-btn.ipa svg{width:15px; height:15px}
+  .link-btn.ipa:hover{color:var(--text)}
+
+  /* ---- tutorial popup ---- */
+  .modal{position:fixed; inset:0; z-index:50; display:grid; place-items:center; padding:20px}
+  .modal[hidden]{display:none}
+  .modal-backdrop{position:absolute; inset:0; background:rgba(0,0,0,.6)}
+  .modal-card{
+    position:relative; width:min(420px,100%); padding:20px;
+    background:rgba(17,22,36,.92); border:1px solid var(--stroke-strong); border-radius:var(--radius);
+    -webkit-backdrop-filter:blur(24px) saturate(140%); backdrop-filter:blur(24px) saturate(140%);
+    box-shadow:0 24px 70px rgba(0,0,0,.55);
+    animation:modal-pop .22s cubic-bezier(.22,.9,.35,1) both;
+    transition:width .34s cubic-bezier(.22,.9,.35,1);
+  }
+  .modal-card.wide{width:min(760px,100%)}
+  @keyframes modal-pop{from{opacity:0; transform:translateY(14px) scale(.96)}}
+  @media (prefers-reduced-motion:reduce){ .modal-card{animation:none; transition:none} }
+  .modal-head{display:flex; align-items:center; gap:10px; margin-bottom:14px}
+  .modal-title{margin:0 auto 0 0; font-size:18px; font-weight:800; letter-spacing:-.01em}
+  .modal-close,.modal-back{
+    display:grid; place-items:center; width:32px; height:32px; padding:0; flex:none;
+    color:var(--muted); background:var(--card); border:1px solid var(--stroke); border-radius:999px;
+    cursor:pointer; transition:background .14s, color .14s;
+  }
+  .modal-close:hover,.modal-back:hover{color:var(--text); background:var(--card-hover)}
+  .modal-close svg,.modal-back svg{width:15px; height:15px}
+  .modal-back[hidden]{display:none}
+
+  /* ---- tutorial wizard: one question on screen at a time ----
+     The panes are stacked absolutely so the outgoing one can slide away while
+     the next slides in; the wrapper's height is set from JS so the card morphs
+     between steps instead of snapping. */
+  .wizard{position:relative; overflow:hidden; transition:height .34s cubic-bezier(.22,.9,.35,1)}
+  .wizard.no-anim{transition:none}
+  .pane{position:absolute; top:0; left:0; width:100%}
+  .pane[hidden]{display:none}
+  .pane-q{display:flex; flex-direction:column; gap:10px}
+  @keyframes pane-in{from{opacity:0; transform:translateX(26px)}}
+  @keyframes pane-out{to{opacity:0; transform:translateX(-26px)}}
+  @keyframes pane-in-rev{from{opacity:0; transform:translateX(-26px)}}
+  @keyframes pane-out-rev{to{opacity:0; transform:translateX(26px)}}
+  .pane.in{animation:pane-in .3s cubic-bezier(.22,.9,.35,1) both}
+  .pane.out{animation:pane-out .22s ease both; pointer-events:none}
+  .pane.in.rev{animation-name:pane-in-rev}
+  .pane.out.rev{animation-name:pane-out-rev}
+  @media (prefers-reduced-motion:reduce){
+    .wizard{transition:none}
+    .pane.in,.pane.out{animation:none}
+  }
+
+  .opt{
+    display:flex; align-items:center; gap:13px; width:100%; padding:14px 16px;
+    text-align:left; font-family:inherit; color:var(--text); cursor:pointer;
+    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius-sm);
+    transition:background .14s, border-color .14s, transform .14s;
+  }
+  .opt:hover{background:var(--card-hover); border-color:var(--stroke-strong); transform:translateY(-1px)}
+  .opt:active{transform:scale(.98)}
+  .opt-icon{
+    flex:none; width:38px; height:38px; display:grid; place-items:center;
+    color:#fff; background:var(--brand); border-radius:12px;
+    font-size:13px; font-weight:800; letter-spacing:.02em;
+  }
+  .opt-icon svg{width:18px; height:18px}
+  .opt-text{min-width:0}
+  .opt-text b{display:block; color:var(--text); font-size:15px; font-weight:700}
+  .opt-text small{display:block; color:var(--muted); font-size:12.5px; margin-top:1px}
+  .opt-arrow{margin-left:auto; flex:none; width:16px; height:16px; color:var(--faint)}
+
+  /* ---- embedded tutorials ---- */
+  .videos{
+    display:flex; flex-direction:column; gap:16px;
+    max-height:min(64vh,560px); overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  .video-frame{
+    position:relative; aspect-ratio:16/9; background:#000; overflow:hidden;
+    border:1px solid var(--stroke); border-radius:var(--radius-sm);
+  }
+  .video-frame iframe{position:absolute; inset:0; width:100%; height:100%; border:0}
+  .video-cap{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    margin-top:8px; color:var(--muted); font-size:12.5px; font-weight:600;
+  }
+  .video-cap a{color:var(--accent2); text-decoration:none}
+  .video-cap a:hover{text-decoration:underline}
+
+  /* ---- affiliation note, above the first step ----
+     Bare text, no card, so it reads as a footnote beside the boxed steps.
+     A <div>, not a <section>, so the .step:nth-of-type() cascade delays below
+     keep counting the three step sections. */
+  .notice{
+    margin-top:34px; padding:0 2px; color:var(--faint); font-size:13.5px;
+  }
+  .notice b{
+    display:block; margin-bottom:2px; color:var(--faint);
+    font-size:12.5px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  }
+  .notice p{margin:0}
+  .notice a{color:inherit; font-weight:600; text-decoration:underline}
+  .notice a:hover{color:var(--muted)}
+
+  /* ---- steps ---- */
+  .step{margin-top:34px}
+  .step-head{display:flex; align-items:center; gap:14px; margin-bottom:14px}
+  .step-num{
+    flex:none; width:34px; height:34px; display:grid; place-items:center;
+    font-size:16px; font-weight:800; color:#fff; border-radius:12px;
+    background:var(--brand);
+    box-shadow:0 8px 22px rgba(33,112,245,.35);
+  }
+  .step-title{margin:0; font-size:20px; font-weight:800; letter-spacing:-.01em}
+  .step-sub{margin:2px 0 0; color:var(--muted); font-size:13.5px}
+  .step-card{
+    padding:18px 20px; color:var(--muted); font-size:14.5px;
+    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius);
+    -webkit-backdrop-filter:blur(20px) saturate(140%); backdrop-filter:blur(20px) saturate(140%);
+    box-shadow:0 7px 14px rgba(0,0,0,.07);
+  }
+  .step-card p{margin:0}
+  .step-card b{color:var(--text)}
+  .step-card ol{margin:14px 0 0; padding-left:20px}
+  .step-card li{margin:8px 0}
+  .step-card code{
+    background:rgba(255,255,255,.07); padding:1px 6px; border-radius:6px;
+    font-size:13px; color:var(--text);
+  }
+  .step-card .install-btn{width:100%; margin-top:16px}
+  .step-card ol:first-child{margin-top:0}
+  /* the DNS button stands on its own above the card, not inside it */
+  .step > .install-btn{display:flex; width:100%; margin:0 0 14px}
+  .callout{
+    margin-top:16px; padding:13px 16px; border-radius:var(--radius-sm);
+    background:rgba(52,211,153,.08); border:1px solid rgba(52,211,153,.25);
+  }
+  .callout b{color:var(--good)}
+
+  /* ---- TOS gate ----
+     Downloads stay dimmed and non-interactive until the box is ticked. */
+  .tos-gate{
+    display:flex; align-items:center; gap:12px; margin:0 0 14px; padding:15px 18px;
+    background:rgba(33,112,245,.08); border:1px solid rgba(33,112,245,.3);
+    border-radius:var(--radius-sm); cursor:pointer;
+    -webkit-user-select:none; user-select:none;
+  }
+  .tos-gate input{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
+  .tos-gate .box{
+    flex:none; width:22px; height:22px; border-radius:7px; display:grid; place-items:center;
+    background:rgba(255,255,255,.06); border:1px solid var(--stroke-strong);
+    transition:background .15s, border-color .15s, box-shadow .15s;
+  }
+  .tos-gate .box svg{width:13px; height:13px; color:#fff; opacity:0; transform:scale(.6); transition:opacity .15s, transform .15s}
+  .tos-gate input:checked ~ .box{background:var(--brand); border-color:transparent; box-shadow:0 4px 14px rgba(33,112,245,.4)}
+  .tos-gate input:checked ~ .box svg{opacity:1; transform:scale(1)}
+  .tos-gate input:focus-visible ~ .box{outline:2px solid var(--accent2); outline-offset:2px}
+  .tos-text{color:var(--muted); font-size:14.5px}
+  .tos-text b{color:var(--text)}
+  .tos-text a{color:var(--accent2); text-decoration:none; font-weight:600}
+  .tos-text a:hover{text-decoration:underline}
+  .grid{transition:opacity .25s, filter .25s}
+  .grid.locked{opacity:.4; filter:saturate(.6); pointer-events:none}
+
+  /* ---- controls ---- */
+  .controls{
+    display:flex; gap:10px; margin:0 0 14px; flex-wrap:wrap; align-items:center;
+  }
+  .search{position:relative; flex:1 1 240px}
+  .search svg{position:absolute; left:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--faint)}
+  .search input{
+    width:100%; padding:13px 14px 13px 42px; font-size:15px; color:var(--text);
+    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius-sm);
+    outline:none; transition:border-color .15s, background .15s;
+  }
+  .search input:focus{border-color:var(--accent); background:var(--card-hover)}
+  .search input::placeholder{color:var(--faint)}
+  .sort{
+    padding:13px 38px 13px 14px; font-size:14px; font-weight:600; color:var(--text);
+    background:var(--card) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ba3b8' stroke-width='2.5' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>") no-repeat right 14px center;
+    border:1px solid var(--stroke); border-radius:var(--radius-sm); outline:none;
+    appearance:none; -webkit-appearance:none; cursor:pointer;
+  }
+
+  /* ---- cert grid ---- */
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(248px,1fr)); gap:14px}
+  .cert-card{
+    display:flex; flex-direction:column; gap:12px; padding:18px;
+    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius);
+    -webkit-backdrop-filter:blur(20px) saturate(140%); backdrop-filter:blur(20px) saturate(140%);
+    box-shadow:0 7px 14px rgba(0,0,0,.07);
+    transition:transform .16s ease, border-color .16s, background .16s;
+  }
+  .cert-card:hover{transform:translateY(-3px); background:var(--card-hover); border-color:var(--stroke-strong)}
+  .cert-head{display:flex; align-items:flex-start; justify-content:space-between; gap:10px}
+  .cert-name{margin:0; font-size:17px; font-weight:700; min-width:0; word-break:break-word; overflow-wrap:anywhere}
+  .cert-meta{margin:0; font-size:12.5px; color:var(--faint)}
+  .pill{
+    flex:none; font-size:11.5px; font-weight:700; letter-spacing:.01em;
+    padding:5px 10px; border-radius:999px; white-space:nowrap;
+    border:1px solid transparent;
+  }
+  .pill.good{color:var(--good); background:rgba(52,211,153,.12); border-color:rgba(52,211,153,.25)}
+  .pill.warn{color:var(--warn); background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.25)}
+  .pill.crit{color:var(--crit); background:rgba(251,146,60,.13); border-color:rgba(251,146,60,.28)}
+  .pill.bad{color:var(--bad); background:rgba(248,113,113,.13); border-color:rgba(248,113,113,.3)}
+  .pill.unknown{color:var(--muted); background:rgba(255,255,255,.05); border-color:var(--stroke)}
+  .install-btn{
+    margin-top:auto; display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:13px 16px; font-size:15px; font-weight:700; text-decoration:none; color:#fff;
+    border-radius:var(--radius-btn);
+    background:var(--brand);
+    box-shadow:0 8px 24px rgba(33,112,245,.4);
+    transition:transform .14s, box-shadow .14s, filter .14s;
+  }
+  .install-btn svg{width:17px; height:17px}
+  .install-btn:hover{filter:brightness(1.08); box-shadow:0 12px 30px rgba(77,173,255,.45)}
+  .install-btn:active{transform:scale(.97)}
+  .cert-card[data-days^="-"] .install-btn{filter:saturate(.5) brightness(.85)}
+
+  .empty{display:none; text-align:center; color:var(--muted); padding:50px 0; font-size:15px}
+  .empty.show{display:block}
+
+  /* ---- how-to ---- */
+  details.howto{
+    margin-top:14px; background:var(--card); border:1px solid var(--stroke);
+    border-radius:var(--radius); overflow:hidden;
+    -webkit-backdrop-filter:blur(20px) saturate(140%); backdrop-filter:blur(20px) saturate(140%);
+  }
+  details.howto summary{
+    list-style:none; cursor:pointer; padding:16px 20px; font-weight:700; font-size:15px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+  }
+  details.howto summary::-webkit-details-marker{display:none}
+  details.howto summary::after{content:"+"; color:var(--muted); font-size:20px; font-weight:400; transition:transform .2s}
+  details.howto[open] summary::after{transform:rotate(45deg)}
+  .howto-body{padding:0 20px 20px; color:var(--muted); font-size:14.5px}
+  .howto-body ol{margin:0; padding-left:20px}
+  .howto-body li{margin:8px 0}
+  .howto-body code{
+    background:rgba(255,255,255,.07); padding:1px 6px; border-radius:6px;
+    font-size:13px; color:var(--text);
+  }
+
+  .footer{margin-top:40px; text-align:center; color:var(--faint); font-size:13px}
+  .footer a{color:var(--muted); text-decoration:none}
+  .footer a:hover{color:var(--text)}
+
+  @media (max-width:520px){
+    .grid{grid-template-columns:1fr}
+    .controls{flex-direction:column; align-items:stretch}
+    .search{flex:0 0 auto} /* in column direction the 240px basis becomes height */
+    .sort{width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="logo"><img src="https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/app-icon.png" alt="SideInstaller"></div>
+    <h1>SideInstaller</h1>
+    <p class="tagline">Beta test build, not the public release. Follow the three steps below to get set up.</p>
+    <div class="badges">
+      <span class="badge">Version <b>1.0.0</b></span>
+      <span class="badge"><b>19</b> certificates</span>
+    </div>
+    <div class="links social">
+      <button type="button" class="link-btn youtube" id="tutorialBtn" aria-haspopup="dialog" aria-controls="tutorialModal">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        Tutorial
+      </button>
+      <a class="link-btn discord" href="https://discord.gg/sQ5Y8vbYJS" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.211.375-.446.865-.61 1.249a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.036A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.1 14.1 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.009c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.893.077.077 0 0 0-.041.106c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.331c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+        Join the Discord
+      </a>
+      <a class="link-btn kofi" href="https://ko-fi.com/frizzlem" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        Ko-fi
+      </a>
+    </div>
+    <div class="links repo">
+      <a class="link-btn ipa" href="https://ts.buzzheavier.com/d/c9lss96h3mkj?v=A43d7EcKZG6TDdA1qbBMk4Qiz8-Bc68PpAH3WgtjHXpgLEjiCKOmZETnE-3SmM87iykp7VP9p9sFTFUdExVlytekcZZzeOCaSo9f3PkuXgLDbaIcQucTFW-opYfityfsNfXgOdIU1pQ-4WzchQx3eBGiOBGm" download rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>
+        Download IPA
+      </a>
+      <a class="link-btn github" href="https://github.com/FrizzleM/SideInstaller/tree/main" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23a11.5 11.5 0 0 1 3.003-.404c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </header>
+
+  <div class="notice">
+    <b>Note</b>
+    <p>SideInstaller is not affiliated anyhow with SideStore. Please do not ask questions to the SideStore staff about SideInstaller as they are not able to answer. Instead, if you have issues or suggestions, write them in the <a href="https://discord.gg/sQ5Y8vbYJS" target="_blank" rel="noopener">SideInstaller Discord</a>.</p>
+  </div>
+
+  <section class="step" id="setup">
+    <div class="step-head">
+      <span class="step-num">1</span>
+      <div>
+        <h2 class="step-title">Setup</h2>
+      </div>
+    </div>
+    <a class="install-btn" href="SideInstallerDNS.mobileconfig">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M12 3a15.3 15.3 0 0 1 0 18"/><path d="M12 3a15.3 15.3 0 0 0 0 18"/></svg>
+      Install DNS Profile
+    </a>
+    <div class="step-card">
+      <ol>
+        <li>Tap <b>Install DNS Profile</b> above and tap <b>Allow</b> when Safari asks to download the configuration profile.</li>
+        <li>Open <code>Settings</code> and tap <b>Profile Downloaded</b> (or go to <code>Settings → General → VPN &amp; Device Management</code>), then tap <b>Install</b>.</li>
+        <li>Apply the DNS: in <code>Settings → General → VPN &amp; Device Management</code>, open <b>DNS</b> and make sure <b>SideInstaller</b> is selected. Keep it enabled until setup is complete.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="step" id="installation">
+    <div class="step-head">
+      <span class="step-num">2</span>
+      <div>
+        <h2 class="step-title">Installation</h2>
+      </div>
+    </div>
+
+    <label class="tos-gate">
+      <input type="checkbox" id="tosCheck">
+      <span class="box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span>
+      <span class="tos-text">I have read and accept the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a>.</span>
+    </label>
+
+    <div class="controls">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="q" type="search" placeholder="Search certificates…" autocomplete="off" spellcheck="false">
+      </div>
+      <select id="sort" class="sort" aria-label="Sort certificates">
+        <option value="days">Most days left</option>
+        <option value="days-asc">Soonest to expire</option>
+        <option value="name">Name (A–Z)</option>
+      </select>
+    </div>
+
+    <main id="grid" class="grid">
+    <article class="cert-card" data-name="Moving-Increasingly-Interconnected-Technology-Co.-Ltd-com.oa11" data-days="1028">
+      <div class="cert-head">
+        <h3 class="cert-name">Moving-Increasingly-Interconnected-Technology-Co.-Ltd-com.oa11</h3>
+        <span class="pill good">1028 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2029-06-12</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Moving-Increasingly-Interconnected-Technology-Co.-Ltd-com.oa11.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-inde" data-days="919">
+      <div class="cert-head">
+        <h3 class="cert-name">China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-inde</h3>
+        <span class="pill good">919 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2029-02-23</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-inde.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="XL" data-days="914">
+      <div class="cert-head">
+        <h3 class="cert-name">XL</h3>
+        <span class="pill good">914 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2029-02-17</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-XL.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="National" data-days="891">
+      <div class="cert-head">
+        <h3 class="cert-name">National</h3>
+        <span class="pill good">891 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2029-01-25</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-National.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Rural" data-days="818">
+      <div class="cert-head">
+        <h3 class="cert-name">Rural</h3>
+        <span class="pill good">818 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-11-14</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Rural.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.thinghiemdien" data-days="806">
+      <div class="cert-head">
+        <h3 class="cert-name">CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.thinghiemdien</h3>
+        <span class="pill good">806 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-11-02</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.thinghiemdien.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="ChinaAcademy" data-days="800">
+      <div class="cert-head">
+        <h3 class="cert-name">ChinaAcademy</h3>
+        <span class="pill good">800 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-10-27</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-ChinaAcademy.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="ChinaPower" data-days="794">
+      <div class="cert-head">
+        <h3 class="cert-name">ChinaPower</h3>
+        <span class="pill good">794 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-10-21</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-ChinaPower.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Viet-Nam-Rubber-Group-Limited" data-days="787">
+      <div class="cert-head">
+        <h3 class="cert-name">Viet-Nam-Rubber-Group-Limited</h3>
+        <span class="pill good">787 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-10-14</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Viet-Nam-Rubber-Group-Limited.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Postal" data-days="721">
+      <div class="cert-head">
+        <h3 class="cert-name">Postal</h3>
+        <span class="pill good">721 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-08-09</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Postal.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Takeoff" data-days="655">
+      <div class="cert-head">
+        <h3 class="cert-name">Takeoff</h3>
+        <span class="pill good">655 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-06-04</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Takeoff.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Election" data-days="617">
+      <div class="cert-head">
+        <h3 class="cert-name">Election</h3>
+        <span class="pill good">617 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-04-27</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Election.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Vietnam" data-days="611">
+      <div class="cert-head">
+        <h3 class="cert-name">Vietnam</h3>
+        <span class="pill good">611 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-04-21</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Vietnam.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-workone" data-days="565">
+      <div class="cert-head">
+        <h3 class="cert-name">Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-workone</h3>
+        <span class="pill good">565 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2028-03-06</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-workone.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Wuling" data-days="284">
+      <div class="cert-head">
+        <h3 class="cert-name">Wuling</h3>
+        <span class="pill good">284 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2027-05-30</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Wuling.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Forever" data-days="171">
+      <div class="cert-head">
+        <h3 class="cert-name">Forever</h3>
+        <span class="pill good">171 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2027-02-05</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Forever.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="BOC" data-days="79">
+      <div class="cert-head">
+        <h3 class="cert-name">BOC</h3>
+        <span class="pill good">79 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2026-11-06</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-BOC.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Aramco" data-days="36">
+      <div class="cert-head">
+        <h3 class="cert-name">Aramco</h3>
+        <span class="pill good">36 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2026-09-24</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Aramco.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    <article class="cert-card" data-name="Beijing" data-days="3">
+      <div class="cert-head">
+        <h3 class="cert-name">Beijing</h3>
+        <span class="pill crit">3 days left</span>
+      </div>
+      <p class="cert-meta">Expires 2026-08-22</p>
+      <a class="install-btn" href="itms-services://?action=download-manifest&amp;url=https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta/sideinstaller-Beijing.plist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg> Install</a>
+    </article>
+    </main>
+    <p id="empty" class="empty">No certificates match your search.</p>
+
+    <details class="howto">
+      <summary>How to install</summary>
+      <div class="howto-body">
+        <ol>
+          <li>Open this page <b>on your iPhone or iPad in Safari</b>.</li>
+          <li>Pick any certificate above and tap <b>Install</b>, then confirm the prompt.</li>
+          <li>Wait for the app to finish installing on your Home Screen.</li>
+          <li>Go to <code>Settings → General → VPN &amp; Device Management</code>, tap the developer profile, and <b>Trust</b> it.</li>
+          <li>Launch the app. If one certificate is revoked or won't open, just install with another.</li>
+        </ol>
+      </div>
+    </details>
+  </section>
+
+  <section class="step" id="completion">
+    <div class="step-head">
+      <span class="step-num">3</span>
+      <div>
+        <h2 class="step-title">Completion</h2>
+        <p class="step-sub">You're all set.</p>
+      </div>
+    </div>
+    <div class="step-card">
+      <p>That's it. Open <b>SideInstaller</b> from your Home Screen and use it to install <b>SideStore</b> (or SideStore + LiveContainer), straight from your device. No PC needed.</p>
+      <div class="callout">
+        <b>Once SideStore is installed, the DNS profile is no longer needed.</b> Remove it in <code>Settings → General → VPN &amp; Device Management</code> → <b>SideInstaller</b> → <b>Remove Profile</b> — or keep it and just stop using its DNS by switching <code>DNS</code> back to <b>Automatic</b> in the same menu.
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    Built automatically &middot; signed with 19 certificate(s)
+    <br>Last updated: 19 Aug 2026, 15:49 CET
+    <br><a href="terms.html">Terms of Service</a>
+  </footer>
+
+</div>
+
+<div class="modal" id="tutorialModal" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-card" id="tutorialCard">
+    <div class="modal-head">
+      <button type="button" class="modal-back" id="tutorialBack" aria-label="Back" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <h3 class="modal-title" id="tutorialTitle">Language</h3>
+      <button type="button" class="modal-close" data-close aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+
+    <div class="wizard" id="tutorialWizard">
+      <!-- step 1 — language -->
+      <div class="pane pane-q" data-step="0">
+        <button type="button" class="opt" data-value="en">
+          <span class="opt-icon" aria-hidden="true">EN</span>
+          <span class="opt-text"><b>English</b></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="opt" data-value="es">
+          <span class="opt-icon" aria-hidden="true">ES</span>
+          <span class="opt-text"><b>Spanish</b><small>Español</small></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <!-- step 2 — topic -->
+      <div class="pane pane-q" data-step="1" hidden>
+        <button type="button" class="opt" data-value="sidestore">
+          <span class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg></span>
+          <span class="opt-text"><b data-t="optSidestore">SideStore</b><small data-t="optSidestoreSub">Installing SideStore on your device</small></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="opt" data-value="jit">
+          <span class="opt-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></span>
+          <span class="opt-text"><b data-t="optJit">JIT</b><small data-t="optJitSub">Enabling JIT for your apps</small></span>
+          <svg class="opt-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <!-- step 3 — the tutorials themselves -->
+      <div class="pane" data-step="2" hidden>
+        <div class="videos" id="tutorialVideos"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var grid=document.getElementById('grid');
+  var q=document.getElementById('q');
+  var sortSel=document.getElementById('sort');
+  var empty=document.getElementById('empty');
+  var cards=[].slice.call(grid.querySelectorAll('.cert-card'));
+  function days(c){ var d=parseInt(c.getAttribute('data-days'),10); return isNaN(d)?-1e9:d; }
+  function name(c){ return (c.getAttribute('data-name')||'').toLowerCase(); }
+  function apply(){
+    var term=(q.value||'').trim().toLowerCase();
+    var mode=sortSel.value;
+    var sorted=cards.slice().sort(function(a,b){
+      if(mode==='name') return name(a).localeCompare(name(b));
+      if(mode==='days-asc') return days(a)-days(b);
+      return days(b)-days(a);
+    });
+    var visible=0;
+    sorted.forEach(function(c){
+      var show=!term || name(c).indexOf(term)>-1;
+      c.style.display=show?'':'none';
+      if(show) visible++;
+      grid.appendChild(c);
+    });
+    empty.classList.toggle('show', visible===0);
+  }
+  q.addEventListener('input',apply);
+  sortSel.addEventListener('change',apply);
+  apply();
+
+  /* TOS gate: installs stay dimmed and inert until the box is ticked.
+     Acceptance is remembered per device. */
+  var tos=document.getElementById('tosCheck');
+  var TOS_KEY='si-tos-accepted';
+  function tosLocked(){ return !tos.checked; }
+  function applyTos(){
+    grid.classList.toggle('locked', tosLocked());
+    grid.setAttribute('aria-disabled', tosLocked()?'true':'false');
+    if('inert' in grid) grid.inert=tosLocked();
+    try{
+      if(tos.checked) localStorage.setItem(TOS_KEY,'1');
+      else localStorage.removeItem(TOS_KEY);
+    }catch(e){}
+  }
+  try{ if(localStorage.getItem(TOS_KEY)==='1') tos.checked=true; }catch(e){}
+  tos.addEventListener('change',applyTos);
+  /* Belt and braces for browsers without inert: swallow activations
+     (including keyboard Enter) while locked. */
+  grid.addEventListener('click',function(e){
+    if(tosLocked()){ e.preventDefault(); e.stopPropagation(); }
+  },true);
+  applyTos();
+
+  /* Tutorial popup: ask for a language, then a topic, then play the matching
+     tutorials. One pane is on screen at a time — the answered one slides out as
+     the next slides in. */
+  var tutBtn=document.getElementById('tutorialBtn');
+  var tutModal=document.getElementById('tutorialModal');
+  var tutCard=document.getElementById('tutorialCard');
+  var tutBack=document.getElementById('tutorialBack');
+  var tutTitle=document.getElementById('tutorialTitle');
+  var wizard=document.getElementById('tutorialWizard');
+  var videos=document.getElementById('tutorialVideos');
+  var panes=[].slice.call(wizard.querySelectorAll('.pane'));
+
+  var VIDEOS={
+    en:{sidestore:['4J4muoczR54','OyeYTSEheQw'], jit:['U90-4jA8Kj8','WCYkxfRHapg']},
+    es:{sidestore:['tXGihEkcg-4'], jit:['hEhkDEALNWo']}
+  };
+  var STRINGS={
+    en:{lang:'Language', topic:'Tutorial for', sidestore:'SideStore', jit:'JIT',
+        sidestoreSub:'Installing SideStore on your device', jitSub:'Enabling JIT for your apps',
+        tutorial:'Tutorial', watch:'Watch on YouTube'},
+    es:{lang:'Idioma', topic:'Tutorial para', sidestore:'SideStore', jit:'JIT',
+        sidestoreSub:'Instalar SideStore en tu dispositivo', jitSub:'Activar JIT en tus apps',
+        tutorial:'Tutorial', watch:'Ver en YouTube'}
+  };
+
+  var reduce=window.matchMedia?window.matchMedia('(prefers-reduced-motion:reduce)'):{matches:false};
+  var step=0, lang='en', topic='sidestore', outTimer=null;
+
+  function t(key){ return (STRINGS[lang]||STRINGS.en)[key]; }
+
+  /* The card also animates its width on the way to the videos, so a one-shot
+     measurement taken at swap time would be a frame too early and clip the
+     16:9 embeds. Track the live pane instead. */
+  function syncHeight(){
+    if(!tutModal.hidden) wizard.style.height=panes[step].offsetHeight+'px';
+  }
+  var ro=window.ResizeObserver?new ResizeObserver(syncHeight):null;
+  function watch(pane){ if(ro){ ro.disconnect(); ro.observe(pane); } }
+  tutCard.addEventListener('transitionend',function(e){
+    if(e.propertyName==='width') syncHeight();
+  });
+
+  /* Swap the visible pane. dir<0 reverses the slide for the back button. */
+  function showStep(next,dir){
+    if(next===step) return;
+    var cur=panes[step], nxt=panes[next];
+    if(next===2) buildVideos();
+    tutTitle.textContent = next===0 ? STRINGS.en.lang : next===1 ? t('topic') : t(topic);
+    tutBack.hidden = next===0;
+    tutCard.classList.toggle('wide', next===2);
+
+    clearTimeout(outTimer);
+    cur.classList.remove('in','out','rev');
+    nxt.classList.remove('in','out','rev');
+    nxt.hidden=false;
+    step=next;
+    watch(nxt);
+    syncHeight();
+
+    if(reduce.matches){
+      cur.hidden=true;
+    }else{
+      cur.classList.add('out'); nxt.classList.add('in');
+      if(dir<0){ cur.classList.add('rev'); nxt.classList.add('rev'); }
+      outTimer=setTimeout(function(){ cur.hidden=true; cur.classList.remove('out','rev'); },220);
+    }
+    focusPane(nxt);
+  }
+
+  function focusPane(pane){
+    var first=pane.querySelector('.opt');
+    if(first) first.focus();
+    else if(step===2) tutBack.focus();
+  }
+
+  function buildVideos(){
+    var ids=VIDEOS[lang][topic]||[];
+    var label=t(topic);
+    videos.textContent='';
+    ids.forEach(function(id,i){
+      var wrap=document.createElement('div');
+
+      var frame=document.createElement('div');
+      frame.className='video-frame';
+      var f=document.createElement('iframe');
+      f.src='https://www.youtube-nocookie.com/embed/'+id+'?rel=0';
+      f.title=label+' — '+t('tutorial')+' '+(i+1);
+      f.allow='accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
+      f.setAttribute('allowfullscreen','');
+      f.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+      frame.appendChild(f);
+
+      var cap=document.createElement('div');
+      cap.className='video-cap';
+      var name=document.createElement('span');
+      name.textContent = ids.length>1 ? t('tutorial')+' '+(i+1) : label;
+      var link=document.createElement('a');
+      link.href='https://youtu.be/'+id;
+      link.target='_blank'; link.rel='noopener';
+      link.textContent=t('watch');
+      cap.appendChild(name); cap.appendChild(link);
+
+      wrap.appendChild(frame); wrap.appendChild(cap);
+      videos.appendChild(wrap);
+    });
+  }
+
+  /* Back out of the modal entirely to step 0, with no animation. */
+  function resetTut(){
+    clearTimeout(outTimer);
+    step=0; lang='en'; topic='sidestore';
+    panes.forEach(function(p,i){
+      p.classList.remove('in','out','rev');
+      p.hidden = i!==0;
+    });
+    videos.textContent='';   /* drops the iframes so playback stops */
+    tutCard.classList.remove('wide');
+    tutBack.hidden=true;
+    tutTitle.textContent=STRINGS.en.lang;
+    applyLang();
+    /* No height tween on the way in — the card should just appear at size. */
+    wizard.classList.add('no-anim');
+    watch(panes[0]);
+    syncHeight();
+    void wizard.offsetHeight;
+    wizard.classList.remove('no-anim');
+  }
+
+  /* Step 2 speaks the language picked in step 1. */
+  function applyLang(){
+    wizard.querySelector('[data-t="optSidestore"]').textContent=t('sidestore');
+    wizard.querySelector('[data-t="optSidestoreSub"]').textContent=t('sidestoreSub');
+    wizard.querySelector('[data-t="optJit"]').textContent=t('jit');
+    wizard.querySelector('[data-t="optJitSub"]').textContent=t('jitSub');
+  }
+
+  wizard.addEventListener('click',function(e){
+    var btn=e.target.closest && e.target.closest('.opt');
+    if(!btn) return;
+    if(step===0){ lang=btn.getAttribute('data-value'); applyLang(); showStep(1,1); }
+    else if(step===1){ topic=btn.getAttribute('data-value'); showStep(2,1); }
+  });
+  tutBack.addEventListener('click',function(){ if(step>0) showStep(step-1,-1); });
+
+  function openTut(){
+    tutModal.hidden=false;
+    document.body.style.overflow='hidden';
+    resetTut();
+    var first=wizard.querySelector('.opt');
+    if(first) first.focus();
+  }
+  function closeTut(){
+    tutModal.hidden=true;
+    document.body.style.overflow='';
+    videos.textContent='';   /* stop any playing video */
+    tutBtn.focus();
+  }
+  tutBtn.addEventListener('click',openTut);
+  tutModal.addEventListener('click',function(e){
+    if(e.target.closest && e.target.closest('[data-close]')) closeTut();
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape' && !tutModal.hidden) closeTut();
+  });
+  window.addEventListener('resize',syncHeight);
+})();
+</script>
+</body>
+</html>
