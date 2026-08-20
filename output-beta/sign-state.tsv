@@ -2,10 +2,10 @@
 # Written by the last full run and compared before the next one; the run
 # is skipped when this file would come out identical. Delete to force.
 channel	beta
-ipa_url	https://ts.buzzheavier.com/d/c9lss96h3mkj?v=A43d7EcKZG6TDdA1qbBMk4Qiz8-Bc68PpAH3WgtjHXpgLEjiCKOmZETnE-3SmM87iykp7VP9p9sFTFUdExVlytekcZZzeOCaSo9f3PkuXgLDbaIcQucTFW-opYfityfsNfXgOdIU1pQ-4WzchQx3eBGiOBGm
-ipa_size	8939694
+ipa_url	https://ts.buzzheavier.com/d/vzhhqnhcd7dn?v=1ECm1DhZld-xN8tmyDrL_GGxhrj5HBah1HWOL6KLPca8lVez-XS5p6Tajr9dRs26I5cyEVEqcb7T9lAV7V3SU1X77jfamqVxeGLf1hJ6FgnKheS3P5-4QOyYFSw71JjzgzhG4c_C37HnIlLhGAl3I4M2QhY8
+ipa_size	8942290
 output_base_url	https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta
-inputs_sha256	87c95dadd83b0594653f5b93f3af4f5b9fbce174a59b637a484bfba1841fe941
+inputs_sha256	cf4c0bdb1701a659e92a0c3c2303e3c0a07e25f224371fe647e10783a98e829a
 cert	Aramco	7E5CF3F26B293474757B449DF5FBFFAF0816D2F7	2026-09-24
 cert	BOC	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06
 cert	Beijing	A3ABDAD2AC280704A095E4B62FF7ABFFFC7C10E6	2026-08-22
