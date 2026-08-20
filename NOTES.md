@@ -212,6 +212,29 @@ Fixes applied (connect path + pairing gate only):
   The Apple ID password is omitted: it isn't needed to keep the certificate, and
   the file is plaintext JSON until SideStore consumes it.
 
+  **Only builds that import it silently get the file.** SideStore's
+  `ImportAccountAlertController` (2026-08-10) changed `detectAndImportAccountFile`:
+  it now puts up an *Import Account* alert asking for a **file password**, accepts
+  only the AES-GCM format `ImportExport.exportAccount` writes, never deletes the
+  file, and records its checksum only once a decryption succeeds. Handing plaintext
+  JSON to such a build means that alert on **every** launch, forever — it can never
+  decrypt, so the checksum is never stored. iLoader shows no alert for the simple
+  reason that it never writes the file (`install_sidestore_operation` places only
+  `ALTPairingFile.mobiledevicepairing`), and step 8 now does the same when the
+  hand-off can't land silently.
+
+  `Engine.importsAccountConfigSilently()` decides, by scanning the SideStore
+  binary in the signed bundle for `acctFileChecksum` — the `UserDefaults` key
+  added in that same change, present as both a `#function` literal and an `@objc`
+  accessor name. It is read off the binary rather than the version because the
+  two don't track each other: LiveContainer's *stable* IPA bundles SideStore
+  `0.6.4-20260714`, which still imports silently, while its nightly bundles
+  `0.6.4-20260816`, which doesn't. Verified against all four shipping IPAs.
+  Under LiveContainer the binary to read is the guest copy at
+  `Frameworks/SideStoreApp.framework/SideStore`, where `build_github.sh` moves
+  and dylibifies `SideStore.app`. When the check can't run, it errs towards not
+  writing the file.
+
 **idevice version coexistence:** isideload pulls idevice **0.1.61** (crates.io,
 behind its `install` feature, which is required because its feature-gating is
 incomplete) while the rest of the app uses idevice **0.1.63** (git). The two

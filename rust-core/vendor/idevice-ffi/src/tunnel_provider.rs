@@ -56,9 +56,11 @@ pub enum TunnelFailureKind {
     /// RSD answered but pair-verify was refused: this pairing file no longer
     /// matches the device.
     TunnelFailurePairVerify = 2,
-    /// Every candidate host actively refused the port `createListener` opened,
-    /// while the RSD port itself was reachable — the device is there, but the
-    /// route in front of it is only forwarding some ports.
+    /// The port `createListener` opened was unreachable — refused outright, or
+    /// dropped with no answer — on the very host RSD had just answered on,
+    /// while RSD itself kept working. The device is there; the route in front
+    /// of it forwards some ports and not others. Also covers the case where
+    /// every candidate refused.
     TunnelFailureHostsRefused = 3,
     /// Candidates swallowed the connection: no refusal, no answer.
     TunnelFailureTimeout = 4,
@@ -326,6 +328,8 @@ async fn finish_tunnel(
     let mut tls_failures = 0usize;
     let mut outcomes: Vec<String> = Vec::with_capacity(candidates.len());
     let mut last: Option<IdeviceError> = None;
+    // Whether the tunnel port was unreachable on the very host RSD answered on.
+    let mut rsd_peer_blocked = false;
 
     for (index, (host, source)) in candidates.iter().enumerate() {
         let now = Instant::now();
@@ -342,8 +346,15 @@ async fn finish_tunnel(
         let addr = SocketAddr::new(*host, tunnel_port);
         tried += 1;
 
-        let stream = match dial_candidate(addr, *source, index, candidates.len(), now + window).await
-        {
+        let outcome = dial_candidate(addr, *source, index, candidates.len(), now + window).await;
+        // RSD answered on this host, so the tunnel port failing here — dropped
+        // or refused — is the route in front of the device forwarding some
+        // ports and not others. Recorded before the fallbacks can overwrite it.
+        if matches!(source, HostSource::RsdPeer) && !matches!(outcome, DialOutcome::Connected(_)) {
+            rsd_peer_blocked = true;
+        }
+
+        let stream = match outcome {
             DialOutcome::Connected(stream) => stream,
             DialOutcome::Refused(e) => {
                 refused += 1;
@@ -396,8 +407,16 @@ async fn finish_tunnel(
         }
     }
 
-    let kind = if tls_failures > 0 {
-        // Reaching a listener at all is the most specific signal there is.
+    // Order matters, and not the obvious way. Reaching a listener looks like
+    // the most specific signal, but a *fallback* host reaching one did so over
+    // a different interface than the user's route, so it says nothing about why
+    // that route failed. When the tunnel port was unreachable on the same host
+    // RSD answered on, that is the diagnosis, and it outranks anything a
+    // fallback went on to do — otherwise the user is told to re-pair when their
+    // VPN is filtering, and the PIN dance cannot possibly help.
+    let kind = if rsd_peer_blocked {
+        TunnelFailureKind::TunnelFailureHostsRefused
+    } else if tls_failures > 0 {
         TunnelFailureKind::TunnelFailureTlsHandshake
     } else if tried > 0 && refused == tried {
         TunnelFailureKind::TunnelFailureHostsRefused

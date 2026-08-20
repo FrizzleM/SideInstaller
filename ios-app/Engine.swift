@@ -533,6 +533,13 @@ final class Engine: ObservableObject {
             // Only iOS 27 can, though — below it there's nothing to fall back on
             // but the user importing a fresh file.
             guard reused, canSelfPair else { throw error }
+            // A route that never reached the device says nothing about the
+            // pairing file, and re-pairing it costs the user a PIN to fail the
+            // same way a second time.
+            if let tunnel = error as? DeviceConnection.TunnelError,
+               !tunnel.repairingCouldHelp {
+                throw error
+            }
             log("Saved pairing didn't work (\(short(error))). Pairing fresh…")
             try await pair()
             try await connect()
@@ -1203,11 +1210,76 @@ final class Engine: ObservableObject {
             return nil
         }
         do {
-            return try await onSignQueue { try self.buildAccountConfig(session: session) }
+            return try await onSignQueue { () -> String? in
+                guard self.importsAccountConfigSilently() else {
+                    self.log("This SideStore build asks for a file password before importing Account.sideconf, "
+                             + "and re-asks on every launch until one decrypts — so nothing is handed over, "
+                             + "the same as iLoader. It will offer to resign itself on first sign-in instead.")
+                    return nil
+                }
+                return try self.buildAccountConfig(session: session)
+            }
         } catch {
             log("⚠️ Couldn't build the certificate hand-off (\(short(error))). SideStore will ask to resign itself on first sign-in.")
             return nil
         }
+    }
+
+    /// Marker for SideStore's password-prompting account importer: the
+    /// `UserDefaults.acctFileChecksum` key added in the same change, present in
+    /// the binary as both a `#function` literal and an `@objc` accessor name.
+    private static let promptingImporterMarker = Data("acctFileChecksum".utf8)
+
+    /// Whether the SideStore build being installed imports `Account.sideconf`
+    /// without asking anything.
+    ///
+    /// Builds up to 2026-08 read the file, adopt the certificate and delete it
+    /// on first launch. From `ImportAccountAlertController` (2026-08-10) on,
+    /// `detectAndImportAccountFile` instead puts up an "Import Account" alert
+    /// asking for a file password, only accepts the AES-GCM format
+    /// `ImportExport.exportAccount` writes, and never deletes the file — and it
+    /// records the file's checksum only once a decryption succeeds. Our
+    /// plaintext JSON can never decrypt, so handing it to such a build means
+    /// that alert on *every* launch, forever. iLoader never writes the file at
+    /// all, which is why it never shows the alert; when we can't hand over
+    /// silently we don't hand over either.
+    ///
+    /// Read off the binary rather than the version, because the two don't track
+    /// each other: LiveContainer's stable IPA bundles SideStore
+    /// 0.6.4-20260714, which still imports silently, while its nightly bundles
+    /// 0.6.4-20260816, which doesn't.
+    private func importsAccountConfigSilently() -> Bool {
+        guard let exec = sideStoreExecutablePath() else {
+            log("Couldn't find SideStore's binary in the signed bundle to check how it imports Account.sideconf.")
+            return false
+        }
+        guard let binary = try? Data(contentsOf: URL(fileURLWithPath: exec), options: .mappedIfSafe) else {
+            log("Couldn't read \(exec) to check how SideStore imports Account.sideconf.")
+            return false
+        }
+        return binary.range(of: Engine.promptingImporterMarker) == nil
+    }
+
+    /// The SideStore executable inside the signed bundle. Under LiveContainer
+    /// that is the guest copy, moved into `Frameworks/SideStoreApp.framework`
+    /// and dylibified by LiveContainer's `build_github.sh`; otherwise it is the
+    /// signed .app itself. Either way the bundle has to really be SideStore, so
+    /// a build that isn't can't be mistaken for one that imports silently —
+    /// isideload only ever suffixes the id with ".<teamID>", so the prefix holds.
+    private func sideStoreExecutablePath() -> String? {
+        guard let app = signedAppPath else { return nil }
+        let framework = (app as NSString).appendingPathComponent("Frameworks/SideStoreApp.framework")
+        return sideStoreExecutable(inBundle: framework) ?? sideStoreExecutable(inBundle: app)
+    }
+
+    private func sideStoreExecutable(inBundle bundlePath: String) -> String? {
+        guard let plist = bundlePlist(at: bundlePath),
+              let id = plist["CFBundleIdentifier"] as? String,
+              id.hasPrefix("com.SideStore.SideStore"),
+              let name = plist["CFBundleExecutable"] as? String
+        else { return nil }
+        let exec = (bundlePath as NSString).appendingPathComponent(name)
+        return FileManager.default.fileExists(atPath: exec) ? exec : nil
     }
 
     /// Where `Account.sideconf` goes, or nil if this install isn't SideStore.
@@ -1378,7 +1450,13 @@ final class Engine: ObservableObject {
 
     private func signedAppPlist() -> [String: Any]? {
         guard let app = signedAppPath else { return nil }
-        let plistPath = (app as NSString).appendingPathComponent("Info.plist")
+        return bundlePlist(at: app)
+    }
+
+    /// Read the Info.plist of any bundle directory, not just the signed .app —
+    /// LiveContainer carries SideStore as a nested framework with its own.
+    private func bundlePlist(at bundlePath: String) -> [String: Any]? {
+        let plistPath = (bundlePath as NSString).appendingPathComponent("Info.plist")
         guard let data = FileManager.default.contents(atPath: plistPath),
               let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
         else { return nil }
