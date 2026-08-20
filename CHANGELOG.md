@@ -5,6 +5,16 @@ All notable changes to SideInstaller are documented here.
 ## 0.9.0
 
 ### Fixed
+- **No more "Import Account" box on first launch.** Recent SideStore builds — including the one
+  inside LiveContainer + SideStore nightly — stopped importing the certificate hand-off on their
+  own and started asking for a *file password* instead. They only accept a file encrypted by
+  SideStore's own Export Account, never delete the one they find, and only remember it once a
+  password has worked, so the box came back every single launch and could never be dismissed for
+  good. SideInstaller now checks the SideStore build it just signed and skips the hand-off entirely
+  when that build would ask, exactly as iLoader does. Builds that still import it quietly — SideStore
+  stable, and LiveContainer + SideStore stable — are unaffected and keep the certificate as before.
+  On the builds that ask, SideStore offers to resign itself on first sign-in instead, which is the
+  normal flow and takes one tap.
 - SideStore, LiveContainer + SideStore and Feather now accept the pairing file SideInstaller puts in
   them, instead of asking you for one as though nothing had been placed.
 - SideInstaller now switches on the setting those apps need to reach your iPhone over your local

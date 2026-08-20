@@ -34,11 +34,23 @@ final class DeviceConnection {
     /// pairing file that no longer matches. The Rust side classifies which of
     /// those it was; this turns that into a sentence.
     struct TunnelError: Error, CustomStringConvertible, LocalizedError {
+        let kind: TunnelFailureKind
         let advice: String
         /// The unclassified FFI error, for the debug log — never presented.
         let underlying: FFIError
         var description: String { advice }
         var errorDescription: String? { advice }
+
+        /// Whether pairing again could plausibly change the outcome.
+        ///
+        /// False when the route to the device is what failed: the pairing file
+        /// is fine, and re-pairing walks the user through a PIN for nothing —
+        /// then fails identically, which is exactly what a nightly tester hit.
+        var repairingCouldHelp: Bool {
+            kind != TunnelFailureHostsRefused
+                && kind != TunnelFailureTimeout
+                && kind != TunnelFailureRsdUnreachable
+        }
     }
 
     /// Consume an `IdeviceFfiError*` into an `FFIError` (null == success).
@@ -71,12 +83,13 @@ final class DeviceConnection {
         switch kind {
         case TunnelFailureHostsRefused:
             return """
-                The device answered on the RSD port, then refused the tunnel on every \
-                address it could be reached at (\(tried)). The device is there — what's \
-                in front of it is only forwarding some ports. The tunnel listener opens \
-                on a fresh high port each time, so a rule-based proxy that forwards the \
-                RSD port alone can never cover it. Use a loopback VPN that blanket-forwards \
-                every port on the RSD subnet.
+                The device answered on the RSD port at \(deviceIP), then the tunnel port \
+                it opened was unreachable on that same address — dropped or refused, \
+                across \(tried). The device is there; what's in front of it is forwarding \
+                some ports and not others. The tunnel opens on a fresh high port every \
+                attempt, so a rule-based proxy that forwards the RSD port alone can never \
+                cover it. Use a loopback VPN that blanket-forwards every port on the RSD \
+                subnet. Re-pairing won't help — the pairing is fine.
                 """
         case TunnelFailureTimeout:
             return """
@@ -212,7 +225,8 @@ final class DeviceConnection {
         if let raw = ffiError(err, "tunnel_create_rppairing failed (is a loopback VPN connected, Wi-Fi on, device IP \(deviceIP)?)") {
             // The unclassified error stays in the log; only what's thrown changes.
             Engine.shared.log("tunnel dial failed — raw error: \(raw)")
-            throw TunnelError(advice: tunnelAdvice(kind: failureKind,
+            throw TunnelError(kind: failureKind,
+                              advice: tunnelAdvice(kind: failureKind,
                                                    deviceIP: deviceIP,
                                                    candidates: candidates),
                               underlying: raw)

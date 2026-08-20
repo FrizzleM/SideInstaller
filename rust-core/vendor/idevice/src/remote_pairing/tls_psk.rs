@@ -21,6 +21,7 @@ use crate::IdeviceError;
 const TLS_12: [u8; 2] = [0x03, 0x03];
 const CT_HANDSHAKE: u8 = 0x16;
 const CT_CHANGE_CIPHER_SPEC: u8 = 0x14;
+const CT_ALERT: u8 = 0x15;
 const CT_APPLICATION_DATA: u8 = 0x17;
 /// Maximum plaintext bytes per TLS record (RFC 5246 §6.2.1)
 const TLS_MAX_PLAINTEXT: usize = 16384;
@@ -216,6 +217,50 @@ fn encrypt_record(keys: &KeyBlock, seq: u64, ct: u8, plaintext: &[u8]) -> Vec<u8
     result
 }
 
+/// An alert record body (`level`, `description`) as a readable phrase.
+///
+/// Which alert the peer sent is usually the whole diagnosis — `close_notify`
+/// means it hung up politely, `handshake_failure` or `access_denied` means it
+/// looked at us and said no — so it is worth naming rather than reporting the
+/// content type alone.
+fn describe_alert(body: &[u8]) -> String {
+    let level = body.first().copied().unwrap_or(0);
+    let desc = body.get(1).copied().unwrap_or(0);
+    let name = match desc {
+        0 => "close_notify",
+        10 => "unexpected_message",
+        20 => "bad_record_mac",
+        21 => "decryption_failed",
+        22 => "record_overflow",
+        30 => "decompression_failure",
+        40 => "handshake_failure",
+        42 => "bad_certificate",
+        45 => "certificate_expired",
+        46 => "certificate_unknown",
+        47 => "illegal_parameter",
+        48 => "unknown_ca",
+        49 => "access_denied",
+        50 => "decode_error",
+        51 => "decrypt_error",
+        70 => "protocol_version",
+        71 => "insufficient_security",
+        80 => "internal_error",
+        86 => "inappropriate_fallback",
+        90 => "user_canceled",
+        100 => "no_renegotiation",
+        112 => "unrecognized_name",
+        115 => "unknown_psk_identity",
+        120 => "no_application_protocol",
+        _ => "unknown",
+    };
+    let severity = match level {
+        1 => "warning",
+        2 => "fatal",
+        _ => "level?",
+    };
+    format!("{severity} {name} (level={level} desc={desc})")
+}
+
 fn decrypt_record(
     keys: &KeyBlock,
     is_server: bool,
@@ -366,23 +411,11 @@ pub async fn tls_psk_handshake<S: AsyncRead + AsyncWrite + Unpin + Send>(
     // 2. Read ServerHello, optional ServerKeyExchange (PSK hint), ServerHelloDone
     loop {
         let (ct, payload) = read_record(&mut stream).await?;
-        if ct == 21 {
-            // TLS Alert
-            let level = payload.first().copied().unwrap_or(0);
-            let desc = payload.get(1).copied().unwrap_or(0);
+        if ct == CT_ALERT {
+            // Pre-ChangeCipherSpec, so the alert body is still plaintext.
             return Err(IdeviceError::InternalError(format!(
-                "TLS Alert: level={level} desc={desc} ({})",
-                match desc {
-                    0 => "close_notify",
-                    10 => "unexpected_message",
-                    20 => "bad_record_mac",
-                    40 => "handshake_failure",
-                    47 => "illegal_parameter",
-                    70 => "protocol_version",
-                    71 => "insufficient_security",
-                    80 => "internal_error",
-                    _ => "unknown",
-                }
+                "TLS Alert during handshake: {}",
+                describe_alert(&payload)
             )));
         }
         if ct != CT_HANDSHAKE {
@@ -556,6 +589,22 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> TlsPskStream<S> {
     /// Read and decrypt application data.
     pub async fn read_app_data(&mut self) -> Result<Vec<u8>, IdeviceError> {
         let (ct, payload) = read_record(&mut self.inner).await?;
+        if ct == CT_ALERT {
+            // By this point both sides have sent ChangeCipherSpec, so the alert
+            // body is ciphertext and its level and description only appear
+            // after decryption. Decrypting is what separates "the peer hung up"
+            // from "the peer rejected us", which reporting ct=21 alone did not.
+            let detail = match decrypt_record(&self.keys, true, self.read_seq, CT_ALERT, &payload) {
+                Ok(plain) => {
+                    self.read_seq += 1;
+                    describe_alert(&plain)
+                }
+                Err(e) => format!("could not be decrypted ({e})"),
+            };
+            return Err(IdeviceError::InternalError(format!(
+                "peer sent a TLS alert instead of application data: {detail}"
+            )));
+        }
         if ct != CT_APPLICATION_DATA {
             return Err(IdeviceError::InternalError(format!(
                 "Expected application data, got ct={ct}"

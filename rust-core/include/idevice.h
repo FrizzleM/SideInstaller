@@ -93,9 +93,11 @@ typedef enum TunnelFailureKind {
    */
   TunnelFailurePairVerify = 2,
   /**
-   * Every candidate host actively refused the port `createListener` opened,
-   * while the RSD port itself was reachable — the device is there, but the
-   * route in front of it is only forwarding some ports.
+   * The port `createListener` opened was unreachable — refused outright, or
+   * dropped with no answer — on the very host RSD had just answered on, while
+   * RSD itself kept working. The device is there; the route in front of it
+   * forwards some ports and not others. Also covers the case where every
+   * candidate refused.
    */
   TunnelFailureHostsRefused = 3,
   /**
