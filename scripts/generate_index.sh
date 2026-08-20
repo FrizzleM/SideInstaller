@@ -138,6 +138,11 @@ fi
 
 REPO_NOTE="Built automatically &middot; signed with $CERT_COUNT certificate(s)"
 
+# The beta call-out ships on the public page only: on beta.html it would point
+# at the page the reader is already on.
+INCLUDE_BETA_BANNER=0
+[[ "$(basename "$OUTPUT")" == "index.html" ]] && INCLUDE_BETA_BANNER=1
+
 # Stream the template, swap its tokens, and splice in the cards block.
 PAGE_TITLE_ESC="$(printf '%s' "$PAGE_TITLE" | html_escape)"
 APP_NAME_ESC="$(printf '%s' "$APP_NAME" | html_escape)"
@@ -157,7 +162,8 @@ awk \
   -v logo="$LOGO_HTML" \
   -v last_updated="$LAST_UPDATED" \
   -v latest_release_url="$LATEST_RELEASE_URL_ESC" \
-  -v repo_note="$REPO_NOTE" '
+  -v repo_note="$REPO_NOTE" \
+  -v include_beta_banner="$INCLUDE_BETA_BANNER" '
   # Literal replace, since gsub would treat & or \ in the value specially.
   function rep(s, tok, val,   out, p){
     out=""
@@ -179,6 +185,11 @@ awk \
     s = rep(s, "{{REPO_NOTE}}", repo_note)
     return s
   }
+  # The banner lives in the template between its markers; drop the markers
+  # always, and the block itself on every page but index.html.
+  /<!-- BETA_BANNER:START -->/ { in_beta = 1; next }
+  /<!-- BETA_BANNER:END -->/   { in_beta = 0; next }
+  in_beta && include_beta_banner != 1 { next }
   {
     if ($0 ~ /{{CARDS}}/) {
       while ((getline line < cards_file) > 0) print line

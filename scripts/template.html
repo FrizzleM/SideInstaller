@@ -48,14 +48,14 @@
   }
 
   /* ---- entrance cascade, echoing the app's per-object settle-in ---- */
-  .hero,.notice,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
+  .hero,.beta-banner,.notice,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
   .step:nth-of-type(1){animation-delay:.06s}
   .step:nth-of-type(2){animation-delay:.12s}
   .step:nth-of-type(3){animation-delay:.18s}
   .footer{animation-delay:.24s}
   @keyframes rise{from{opacity:0; transform:translateY(16px) scale(.98)}}
   @media (prefers-reduced-motion:reduce){
-    .hero,.notice,.step,.footer{animation:none}
+    .hero,.beta-banner,.notice,.step,.footer{animation:none}
   }
 
   .wrap{max-width:920px; margin:0 auto}
@@ -191,6 +191,20 @@
      Bare text, no card, so it reads as a footnote beside the boxed steps.
      A <div>, not a <section>, so the .step:nth-of-type() cascade delays below
      keep counting the three step sections. */
+  <!-- BETA_BANNER:START -->
+  /* ---- beta call-out ----
+     Spliced in for the stable page only; beta.html is the page it points at. */
+  .beta-banner{
+    margin-top:34px; padding:20px 22px; text-align:center;
+    background:var(--card); border:1px solid rgba(33,112,245,.35);
+    border-radius:var(--radius);
+    -webkit-backdrop-filter:blur(20px) saturate(140%); backdrop-filter:blur(20px) saturate(140%);
+  }
+  .beta-banner h2{margin:0; font-size:20px; font-weight:800; letter-spacing:-.01em}
+  .beta-banner p{margin:8px auto 0; max-width:520px; color:var(--muted); font-size:14.5px}
+  .beta-banner .install-btn{display:inline-flex; margin-top:16px}
+  <!-- BETA_BANNER:END -->
+
   .notice{
     margin-top:34px; padding:0 2px; color:var(--faint); font-size:13.5px;
   }
@@ -391,6 +405,17 @@
       </a>
     </div>
   </header>
+
+  <!-- BETA_BANNER:START -->
+  <div class="beta-banner">
+    <h2>The v1.0.0 beta is live!</h2>
+    <p>The update features a better UI and multiple bug fixes. Please test it and send any feedback in the discord server</p>
+    <a class="install-btn" href="https://sideinstaller.net/beta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+      Try the beta
+    </a>
+  </div>
+  <!-- BETA_BANNER:END -->
 
   <div class="notice">
     <b>Note</b>
