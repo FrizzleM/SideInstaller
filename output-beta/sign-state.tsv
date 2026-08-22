@@ -2,8 +2,8 @@
 # Written by the last full run and compared before the next one; the run
 # is skipped when this file would come out identical. Delete to force.
 channel	beta
-ipa_url	https://files.catbox.moe/87zk28.ipa
-ipa_size	0
+ipa_url	https://github.com/FrizzleM/SideInstaller/raw/refs/heads/main/SideInstaller-v1beta.ipa
+ipa_size	8942294
 output_base_url	https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta
 inputs_sha256	cf4c0bdb1701a659e92a0c3c2303e3c0a07e25f224371fe647e10783a98e829a
 cert	Aramco	7E5CF3F26B293474757B449DF5FBFFAF0816D2F7	2026-09-24
