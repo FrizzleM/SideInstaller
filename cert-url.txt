@@ -6,7 +6,12 @@
 # source. Override the whole list for a one-off run with the CERT_ZIP_URL env
 # var (space/newline-separated).
 #
-# Three source kinds are supported (the workflow detects and handles each):
+# Four source kinds are supported (the workflow detects and handles each):
+#
+#   0) A local folder in this repo — anything that is not a URL is treated as a
+#      path, relative to the repo root. "certs" below is the drop-in folder for
+#      your own certificates; see certs/README.md for the layout. A folder that
+#      does not exist, or holds no certificates, is simply skipped.
 #
 #   1) A direct .zip URL. Expected layout inside the zip (one folder per cert):
 #        <Name>/<Name>.p12
@@ -35,5 +40,6 @@
 # detected by the leaf certificate's SHA-1 fingerprint, and the first source
 # listed here wins. Order the lines to control which copy is kept.
 
+certs
 https://github.com/WSF-Team/WSF/raw/refs/heads/main/portal/resources/certificates.zip
 https://sideloading.net
