@@ -5,7 +5,7 @@ channel	stable
 ipa_url	https://github.com/FrizzleM/SideInstaller/releases/download/v0.9.0/SideInstaller.ipa
 ipa_size	7908297
 output_base_url	https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output
-inputs_sha256	cf4c0bdb1701a659e92a0c3c2303e3c0a07e25f224371fe647e10783a98e829a
+inputs_sha256	4ec0668d5d24294f505f0479b7bd186438291b0c86f3f540c05175df43e43643
 cert	Aramco	7E5CF3F26B293474757B449DF5FBFFAF0816D2F7	2026-09-24
 cert	BOC	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06
 cert	Beijing	A3ABDAD2AC280704A095E4B62FF7ABFFFC7C10E6	2026-08-22
