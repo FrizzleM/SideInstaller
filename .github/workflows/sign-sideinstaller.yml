@@ -4,6 +4,10 @@ name: sign-sideinstaller
 # publishes a tap-to-install page. The IPA source is whatever URL you put in
 # ipa-url.txt (editable any time) — or a one-off override passed below.
 #
+# The cert pool is the merge of every source in cert-url.txt. That list starts
+# with the repo's own certs/ folder, so dropping a certificate in there (see
+# certs/README.md for the layout) adds it to the pool and triggers a run.
+#
 # Every run starts with a precheck (scripts/check_for_changes.sh) that compares
 # the certificate pool, the unsigned IPA and the page template against the state
 # the last run recorded in <output>/sign-state.tsv. If a re-run would rebuild
@@ -26,7 +30,7 @@ on:
         required: false
         default: ""
       cert_zip_url:
-        description: "Override cert pool source(s): space-separated .zip and/or github.com/owner/repo URLs, merged and de-duped (blank = use cert-url.txt)"
+        description: "Override cert pool source(s): space-separated .zip URLs, github.com/owner/repo URLs and/or repo folder paths (e.g. certs), merged and de-duped (blank = use cert-url.txt)"
         required: false
         default: ""
       force:
@@ -37,6 +41,7 @@ on:
   push:
     paths:
       - "ipa-url.txt"          # re-run automatically when you point at a new IPA
+      - "certs/**"             # ...and when you upload/remove your own certificates
   schedule:
     - cron: "0 23 * * 0"       # weekly refresh (Sunday) so the page tracks cert expiry
 

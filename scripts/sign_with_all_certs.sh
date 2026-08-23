@@ -5,8 +5,9 @@
 #   UNSIGNED_IPA_URL  the IPA to sign; falls back to ipa-url.txt, then the
 #                     latest release's .ipa asset
 #   RELEASE_REPO      owner/repo to pull that release from
-#   CERT_ZIP_URL      pool sources, each a .zip or GitHub repo URL; falls back
-#                     to cert-url.txt
+#   CERT_ZIP_URL      pool sources, each a .zip URL, a GitHub repo URL or a
+#                     local folder path (relative paths resolve against the repo
+#                     root, e.g. "certs"); falls back to cert-url.txt
 #   OUTPUT_DIR        where signed IPAs and metadata land (default: ./output)
 #   OUTPUT_PREFIX     filename prefix for signed IPAs (default: sideinstaller)
 #   P12_PASSWORD      fallback p12 password when no sidecar file exists
@@ -33,7 +34,8 @@ APP_INFO_FILE="${APP_INFO_FILE:-$OUTPUT_DIR/app-info.tsv}"
 CERT_NAME_LIST_FILE="${CERT_NAME_LIST_FILE:-}"
 
 # Fallback sources, one per line, kept in sync with cert-url.txt.
-DEFAULT_CERT_SOURCES="https://github.com/WSF-Team/WSF/raw/refs/heads/main/portal/resources/certificates.zip
+DEFAULT_CERT_SOURCES="certs
+https://github.com/WSF-Team/WSF/raw/refs/heads/main/portal/resources/certificates.zip
 https://sideloading.net"
 
 DEFAULT_P12_PASSWORD="${P12_PASSWORD:-WSF}"
@@ -141,6 +143,32 @@ resolve_cert_sources() {
     [[ -n "$lines" ]] && { printf '%s\n' "$lines"; return 0; }
   fi
   printf '%s\n' "$DEFAULT_CERT_SOURCES"
+}
+
+# True when $1 names a folder rather than a remote URL — the repo's own certs/
+# drop-in folder, or any other path. Checked before the URL kinds below.
+is_local_source() {   # $1 = source
+  case "${1%/}" in
+    "" | http://* | https://* | git@* | *://*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+# Absolute path a local source points at; relative paths resolve against the
+# repo root so cert-url.txt can just say "certs".
+local_source_path() {   # $1 = source
+  local src="${1%/}"
+  [[ "$src" = /* ]] || src="$ROOT_DIR/${src#./}"
+  echo "$src"
+}
+
+# Copy a local cert folder's contents into the pool. Everything is copied as-is;
+# the walk below only ever looks for .p12 files, so notes and placeholders that
+# live alongside them are inert.
+copy_local_certs() {   # $1 src-dir  $2 dest-dir
+  # The /. copies the folder's *contents*, so each per-cert subfolder lands
+  # directly under $2 exactly like a zip or a clone would leave it.
+  cp -R "$1/." "$2/" || return 1
 }
 
 # True when $1 is a GitHub repo root, which is sparse-cloned rather than
@@ -292,13 +320,28 @@ PY
 # Populate $POOL_DIR, each source in its own zero-padded subdir so the walk
 # below visits them in list order and the first source wins a duplicate.
 acquire_sources() {   # $1 = newline-separated source URLs
-  local idx=0 url dest nex_base
+  local idx=0 url dest nex_base local_dir local_count
   mkdir -p "$POOL_DIR"
   while IFS= read -r url; do
     [[ -n "$url" ]] || continue
     dest="$POOL_DIR/$(printf '%02d' "$idx")-src"
     mkdir -p "$dest"
-    if nex_base="$(nexcerts_api_base "$url")"; then
+    if is_local_source "$url"; then
+      local_dir="$(local_source_path "$url")"
+      echo "[*] Source $idx (local folder): $local_dir"
+      if [[ -d "$local_dir" ]]; then
+        if copy_local_certs "$local_dir" "$dest"; then
+          local_count="$(find "$dest" -type f -name '*.p12' | wc -l | tr -d ' ')"
+          # An empty folder is the normal state until certificates are added to
+          # it, so this is a note rather than a warning.
+          echo "[*]   Local folder: found $local_count certificate(s)"
+        else
+          warn "Failed to read certificates from folder: $local_dir"
+        fi
+      else
+        warn "Certificate folder does not exist, skipping: $local_dir"
+      fi
+    elif nex_base="$(nexcerts_api_base "$url")"; then
       echo "[*] Source $idx (NexCerts API @ $nex_base): $url"
       fetch_nexcerts_certs "$nex_base" "$dest" || warn "Failed to fetch certificates from the NexCerts API: $url"
     elif is_github_repo_url "$url"; then
@@ -635,6 +678,11 @@ while IFS= read -r P12_FILE; do
   CERT_PATH="$(dirname "$P12_FILE")"
   RAW_NAME="$(basename "$P12_FILE" .p12)"
   CERT_GROUP_NAME="$(basename "$CERT_PATH")"
+  # A p12 sitting loose at a source's root has no folder to take its name from,
+  # so fall back to the file's own name instead of the pool's internal NN-src.
+  if [[ "$(dirname "$CERT_PATH")" == "$POOL_DIR" ]]; then
+    CERT_GROUP_NAME="$RAW_NAME"
+  fi
   OUTPUT_NAME="$(safe_name "$CERT_GROUP_NAME")"
   PROFILE="$CERT_PATH/$RAW_NAME.mobileprovision"
 
