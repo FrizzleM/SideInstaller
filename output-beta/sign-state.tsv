@@ -2,8 +2,8 @@
 # Written by the last full run and compared before the next one; the run
 # is skipped when this file would come out identical. Delete to force.
 channel	beta
-ipa_url	https://github.com/FrizzleM/SideInstaller/raw/refs/heads/main/SideInstaller-v1beta.ipa
-ipa_size	8942294
+ipa_url	https://ts.buzzheavier.com/d/wc7pp9j9x4cb?v=ZwtKxMUPHjnZeIDTMRj_oIGhuzrmhOQX55nt-7vn8Fyzz2-rRisbMVLHfyJAC17Zp7j5rCM1ALVdfSIZkaj0CWePuh31t_VSbb38dXRT80Fn8NGbzg-_AY8lLJRCypUBee0WwoPeOsHboMkpeYpqv-SW-ghKVtUaXrwunenENN02JEKt1qtr5tArkDocmQvdjjjYzcm4I3d5RrgK
+ipa_size	8935339
 output_base_url	https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta
 inputs_sha256	4ec0668d5d24294f505f0479b7bd186438291b0c86f3f540c05175df43e43643
 cert	Aramco	7E5CF3F26B293474757B449DF5FBFFAF0816D2F7	2026-09-24
