@@ -42,6 +42,13 @@ on:
     paths:
       - "ipa-url.txt"          # re-run automatically when you point at a new IPA
       - "certs/**"             # ...and when you upload/remove your own certificates
+      - "cert-url.txt"         # ...or change a certificate source
+      - "scripts/**"           # ...or alter the generated-page/signing pipeline
+      - "site.css"
+      - "tokens.css"
+      - "legal.css"
+      - "terms.html"
+      - ".github/workflows/sign-sideinstaller.yml"
   schedule:
     - cron: "0 23 * * 0"       # weekly refresh (Sunday) so the page tracks cert expiry
 
@@ -215,6 +222,10 @@ jobs:
           # standalone; Pages just needs the HTML itself.
           if [[ -f index.html ]]; then cp index.html _site/index.html; fi
           if [[ -f beta.html ]]; then cp beta.html _site/beta.html; fi
+          if [[ -f site.css ]]; then cp site.css _site/site.css; fi
+          if [[ -f legal.css ]]; then cp legal.css _site/legal.css; fi
+          if [[ -f tokens.css ]]; then cp tokens.css _site/tokens.css; fi
+          if [[ -f app-icon.png ]]; then cp app-icon.png _site/app-icon.png; fi
           # DNS profile linked from the page's Setup step — must ship with the site.
           if [[ -f SideInstallerDNS.mobileconfig ]]; then cp SideInstallerDNS.mobileconfig _site/SideInstallerDNS.mobileconfig; fi
           # Terms of Service linked from the page footer.

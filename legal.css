@@ -1,0 +1,27 @@
+/* Hallmark · macrostructure: Long Document · design-system: design.md · designed-as-app · contrast: pass (40–41) */
+@import url("tokens.css");
+html, body { overflow-x: clip; background: var(--color-paper); }
+body { color: var(--color-ink); font-family: var(--font-body); }
+.bg { background: var(--color-paper); }
+.wrap { max-width: 66ch; }
+.head { position: relative; text-align: left; padding: var(--space-xl) 0 var(--space-2xl); border-bottom: 1px solid var(--color-rule); }
+.head::before { content: "SIDEINSTALLER / LEGAL"; display: block; margin-bottom: var(--space-lg); color: var(--color-accent); font: 700 var(--text-xs)/1 var(--font-outlier); letter-spacing: .12em; }
+.logo { width: 3.5rem; height: 3.5rem; margin: 0 0 var(--space-lg); border-radius: var(--radius-input); border-color: var(--color-rule); box-shadow: none; }
+.head .app { color: var(--color-muted); font: 700 var(--text-xs)/1 var(--font-outlier); letter-spacing: .1em; }
+h1 { color: var(--color-ink); font: 800 clamp(2.5rem, 9vw, 4.5rem)/1 var(--font-display); letter-spacing: -.05em; overflow-wrap: anywhere; min-width: 0; }
+.updated { color: var(--color-muted); background: transparent; border-color: var(--color-rule); border-radius: var(--radius-btn); }
+.intro, section p, section li { color: var(--color-muted); }
+.intro { max-width: 65ch; font-size: var(--text-md); }
+.intro b, section b { color: var(--color-ink); }
+.toc { margin: var(--space-xl) 0; padding: var(--space-lg); background: var(--color-paper-2); border-color: var(--color-rule); border-radius: var(--radius-card); backdrop-filter: none; }
+.toc h2 { color: var(--color-faint); font-family: var(--font-outlier); }
+.toc a, section a { color: var(--color-focus); }
+section { margin-top: 0; padding: var(--space-xl) 0; border-top: 1px solid var(--color-rule); scroll-margin-top: var(--space-md); }
+h2.sec { display: block; color: var(--color-ink); font: 800 var(--text-xl)/1.1 var(--font-display); }
+h2.sec .num { display: block; margin-bottom: var(--space-xs); color: var(--color-accent); font: 700 var(--text-xs)/1 var(--font-outlier); }
+.notice { color: var(--color-ink); background: var(--color-paper-3); border-color: var(--color-rule); border-radius: var(--radius-input); }
+.footer { padding: var(--space-xl) 0; text-align: left; }
+.footer a { color: var(--color-muted); white-space: nowrap; }
+a:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+@media (max-width: 40rem) { body { padding-left: var(--space-sm); padding-right: var(--space-sm); } .toc ol { columns: 1; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 150ms !important; transition-duration: 150ms !important; scroll-behavior: auto !important; } }
