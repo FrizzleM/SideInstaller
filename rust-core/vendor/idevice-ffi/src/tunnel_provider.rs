@@ -92,26 +92,30 @@ impl HostSource {
     }
 }
 
-/// Total wall clock the whole candidate sweep may spend.
-///
-/// Sized to the budget one refused host already burned, so the fallbacks cost a
-/// failing run no extra time: each candidate's window is whatever is *left*
-/// divided by however many candidates are still to try, never a fresh
-/// allowance. A candidate that refuses instantly hands its slack to the next.
+/// Total wall clock the whole candidate sweep may spend, across every round.
 const DIAL_BUDGET: Duration = Duration::from_secs(18);
 
-/// Cap on a single `connect()`, so a host that black-holes the SYN can't sit on
-/// its candidate's whole window — iOS would otherwise wait out its own retries.
-const DIAL_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(3);
+/// Cap on a single `connect()`.
+///
+/// Every candidate is a local address — loopback, the VPN's peer, this device's
+/// own LAN address — so a listener that is up answers in single-digit
+/// milliseconds. This is not a latency allowance, it is only there so a host
+/// that black-holes the SYN can't stall the candidates behind it.
+const DIAL_ATTEMPT_TIMEOUT: Duration = Duration::from_millis(800);
 
-/// Pause between attempts on one candidate. The device's listener is
-/// occasionally not accepting yet when `createListener` returns, which is the
-/// only thing retrying the same host can fix.
-const DIAL_RETRY_DELAY: Duration = Duration::from_millis(700);
+/// Pause between rounds. The device's listener is occasionally not accepting
+/// yet when `createListener` returns, which is the only thing dialling the same
+/// host again can fix.
+const DIAL_ROUND_DELAY: Duration = Duration::from_millis(700);
 
-/// Attempts per candidate. Bounded so a host that refuses instantly moves on
-/// quickly instead of spinning out its window, leaving that time for the rest.
-const DIAL_MAX_ATTEMPTS: u32 = 6;
+/// Rounds over the whole candidate list, so each candidate gets this many
+/// attempts in total.
+const DIAL_MAX_ROUNDS: u32 = 6;
+
+/// Cap on TLS-PSK/CDTunnel handshakes attempted in one sweep. Each one burns
+/// the listener `createListener` opened and needs a replacement, so this bounds
+/// how many replacements a device that keeps rejecting us is asked for.
+const DIAL_MAX_HANDSHAKES: u32 = 3;
 
 /// The host that worked, remembered so later tunnels in the same session dial
 /// it first instead of re-walking the list. Process-wide: the process is the
@@ -164,92 +168,86 @@ fn tunnel_host_candidates(rsd_host: IpAddr, extra: &[IpAddr]) -> Vec<(IpAddr, Ho
     out
 }
 
-/// How one candidate's retry window ended.
+/// How one dial of one candidate ended.
 enum DialOutcome {
     Connected(TcpStream),
-    /// Every attempt was actively refused — nothing is listening there.
+    /// Actively refused — nothing is bound to that address:port right now.
     Refused(std::io::Error),
-    /// Attempts ran out of time without an answer or a refusal.
+    /// No answer and no refusal before the attempt's cap ran out.
     TimedOut,
     /// Some other socket error (no route, permission denied, …).
     Failed(std::io::Error),
 }
 
-/// Dial one candidate until it answers or its window closes, logging every
-/// attempt before it is made and every failure at the point it happens.
-async fn dial_candidate(
+/// The last thing a candidate did, kept per candidate so the failure summary
+/// reports where the sweep ended up rather than one line per round.
+#[derive(Clone)]
+enum CandidateState {
+    Refused,
+    TimedOut,
+    Failed(String),
+    /// Reached the listener, but the TLS-PSK/CDTunnel handshake on top of it
+    /// was rejected.
+    HandshakeFailed,
+}
+
+impl CandidateState {
+    fn describe(&self) -> &str {
+        match self {
+            CandidateState::Refused => "refused",
+            CandidateState::TimedOut => "timed out",
+            CandidateState::Failed(text) => text,
+            CandidateState::HandshakeFailed => "accepted but failed the TLS handshake",
+        }
+    }
+}
+
+/// Dial one candidate once, logging the attempt before it is made and its
+/// failure at the point it happens.
+async fn dial_once(
     addr: SocketAddr,
     source: HostSource,
     index: usize,
     total: usize,
-    window_end: Instant,
+    round: u32,
+    left: Duration,
 ) -> DialOutcome {
-    let mut refused: Option<std::io::Error> = None;
-    let mut failed: Option<std::io::Error> = None;
-    let mut timed_out = false;
+    info!(
+        "tunnel dial: connecting to {addr} — host from {}, candidate {}/{total}, \
+         round {round}/{DIAL_MAX_ROUNDS} ({:.1}s left in the dial budget)",
+        source.label(),
+        index + 1,
+        left.as_secs_f64()
+    );
 
-    for attempt in 1..=DIAL_MAX_ATTEMPTS {
-        let left = window_end.saturating_duration_since(Instant::now());
-        if left.is_zero() {
-            break;
+    let cap = left.min(DIAL_ATTEMPT_TIMEOUT);
+    match tokio::time::timeout(cap, TcpStream::connect(addr)).await {
+        Ok(Ok(stream)) => {
+            info!("tunnel dial: {addr} accepted the connection in round {round}");
+            DialOutcome::Connected(stream)
         }
-        info!(
-            "tunnel dial: connecting to {addr} — host from {}, candidate {}/{total}, \
-             attempt {attempt}/{DIAL_MAX_ATTEMPTS} ({:.1}s left in this candidate's window)",
-            source.label(),
-            index + 1,
-            left.as_secs_f64()
-        );
-
-        let cap = left.min(DIAL_ATTEMPT_TIMEOUT);
-        match tokio::time::timeout(cap, TcpStream::connect(addr)).await {
-            Ok(Ok(stream)) => {
-                info!("tunnel dial: {addr} accepted the connection on attempt {attempt}");
-                return DialOutcome::Connected(stream);
-            }
-            Ok(Err(e)) => {
-                // Logged here, not once the sweep drains, so the console shows
-                // which address produced which errno as it happens.
-                warn!(
-                    "tunnel dial: {addr} failed on attempt {attempt}: {e} (kind {:?}, os error {:?})",
-                    e.kind(),
-                    e.raw_os_error()
-                );
-                if e.kind() == ErrorKind::ConnectionRefused {
-                    refused = Some(e);
-                } else {
-                    failed = Some(e);
-                }
-            }
-            Err(_) => {
-                warn!(
-                    "tunnel dial: {addr} did not answer within {:.1}s on attempt {attempt} — \
-                     no refusal either, so the connection is being dropped rather than rejected",
-                    cap.as_secs_f64()
-                );
-                timed_out = true;
+        Ok(Err(e)) => {
+            // Logged here, not once the sweep drains, so the console shows
+            // which address produced which errno as it happens.
+            warn!(
+                "tunnel dial: {addr} failed in round {round}: {e} (kind {:?}, os error {:?})",
+                e.kind(),
+                e.raw_os_error()
+            );
+            if e.kind() == ErrorKind::ConnectionRefused {
+                DialOutcome::Refused(e)
+            } else {
+                DialOutcome::Failed(e)
             }
         }
-
-        let left = window_end.saturating_duration_since(Instant::now());
-        if left.is_zero() {
-            break;
+        Err(_) => {
+            warn!(
+                "tunnel dial: {addr} did not answer within {:.1}s in round {round} — \
+                 no refusal either, so the connection is being dropped rather than rejected",
+                cap.as_secs_f64()
+            );
+            DialOutcome::TimedOut
         }
-        tokio::time::sleep(DIAL_RETRY_DELAY.min(left)).await;
-    }
-
-    // Most informative first: an unusual errno says more than a refusal, and a
-    // refusal is only worth reporting as such if nothing else went wrong.
-    if let Some(e) = failed {
-        return DialOutcome::Failed(e);
-    }
-    if timed_out {
-        return DialOutcome::TimedOut;
-    }
-    match refused {
-        Some(e) => DialOutcome::Refused(e),
-        // The window closed before a single attempt finished.
-        None => DialOutcome::TimedOut,
     }
 }
 
@@ -296,6 +294,16 @@ async fn adapter_over_tunnel<S: ReadWrite + 'static>(
 /// then loopback, then whatever local interface the caller supplied. A
 /// loopback VPN that forwards the RSD port but not the ephemeral one the device
 /// just picked refuses all of them, which is what the failure kind is for.
+///
+/// The list is swept **breadth-first**: one attempt at every candidate, then
+/// round again, rather than spending one candidate's whole retry allowance
+/// before looking at the next. Depth-first put ten seconds of dead candidates —
+/// a black-holed SYN waited out twice, then a refusal re-tried five more times —
+/// in front of the address that does answer, and the listener the device opens
+/// does not survive that: it accepted the connection and then rejected the
+/// tunnel handshake on top of it. Breadth-first reaches a live listener inside
+/// the first round, while still giving a listener that isn't accepting yet the
+/// same number of attempts it had before.
 async fn finish_tunnel(
     rpc: &mut RemotePairingClient<impl RpPairingSocketProvider>,
     connect_addr: SocketAddr,
@@ -310,7 +318,7 @@ async fn finish_tunnel(
     let candidates = tunnel_host_candidates(connect_addr.ip(), extra_hosts);
     info!(
         "tunnel dial: createListener opened port {tunnel_port} and named no host; \
-         trying {} candidate(s) within {:.0}s: {}",
+         trying {} candidate(s) over up to {DIAL_MAX_ROUNDS} round(s) within {:.0}s: {}",
         candidates.len(),
         DIAL_BUDGET.as_secs_f64(),
         candidates
@@ -322,90 +330,144 @@ async fn finish_tunnel(
 
     let started = Instant::now();
     let deadline = started + DIAL_BUDGET;
-    let mut tried = 0usize;
-    let mut refused = 0usize;
-    let mut timed_out = 0usize;
-    let mut tls_failures = 0usize;
-    let mut outcomes: Vec<String> = Vec::with_capacity(candidates.len());
+    let mut handshakes = 0u32;
+    let mut states: Vec<Option<CandidateState>> = vec![None; candidates.len()];
     let mut last: Option<IdeviceError> = None;
-    // Whether the tunnel port was unreachable on the very host RSD answered on.
-    let mut rsd_peer_blocked = false;
+    // Whether the host RSD answered on was dialled at all, and whether the
+    // tunnel port was ever reached on it.
+    let mut rsd_peer_tried = false;
+    let mut rsd_peer_connected = false;
 
-    for (index, (host, source)) in candidates.iter().enumerate() {
-        let now = Instant::now();
-        if now >= deadline {
-            warn!(
-                "tunnel dial: {:.0}s budget spent; skipping {host} and the {} candidate(s) behind it",
-                DIAL_BUDGET.as_secs_f64(),
-                candidates.len() - index - 1
-            );
-            break;
-        }
-        // What's left, split over what's left to try.
-        let window = (deadline - now) / (candidates.len() - index) as u32;
-        let addr = SocketAddr::new(*host, tunnel_port);
-        tried += 1;
-
-        let outcome = dial_candidate(addr, *source, index, candidates.len(), now + window).await;
-        // RSD answered on this host, so the tunnel port failing here — dropped
-        // or refused — is the route in front of the device forwarding some
-        // ports and not others. Recorded before the fallbacks can overwrite it.
-        if matches!(source, HostSource::RsdPeer) && !matches!(outcome, DialOutcome::Connected(_)) {
-            rsd_peer_blocked = true;
-        }
-
-        let stream = match outcome {
-            DialOutcome::Connected(stream) => stream,
-            DialOutcome::Refused(e) => {
-                refused += 1;
-                outcomes.push(format!("{host} refused"));
-                last = Some(IdeviceError::InternalError(format!("TLS tunnel: {addr}: {e}")));
-                continue;
-            }
-            DialOutcome::TimedOut => {
-                timed_out += 1;
-                outcomes.push(format!("{host} timed out"));
-                last = Some(IdeviceError::InternalError(format!(
-                    "TLS tunnel: {addr}: no answer and no refusal"
-                )));
-                continue;
-            }
-            DialOutcome::Failed(e) => {
-                outcomes.push(format!("{host} failed ({})", e.kind_str()));
-                last = Some(IdeviceError::InternalError(format!("TLS tunnel: {addr}: {e}")));
-                continue;
-            }
-        };
-
-        match connect_tls_psk_tunnel_native(stream, rpc.encryption_key()).await {
-            Ok(tunnel) => {
-                info!("tunnel dial: TLS-PSK + CDTunnel handshake succeeded over {addr} — host {host} ({}) is the one that works", source.label());
-                if let Ok(mut cached) = CACHED_TUNNEL_HOST.lock() {
-                    *cached = Some(*host);
-                }
-                return adapter_over_tunnel(tunnel).await;
-            }
-            Err(e) => {
-                tls_failures += 1;
-                outcomes.push(format!("{host} accepted but failed the TLS handshake"));
+    'sweep: for round in 1..=DIAL_MAX_ROUNDS {
+        // Index-based, because a rejected handshake steps back onto the same
+        // candidate rather than advancing.
+        let mut index = 0usize;
+        while index < candidates.len() {
+            let (host, source) = &candidates[index];
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left.is_zero() {
                 warn!(
-                    "tunnel dial: {addr} accepted the connection but the TLS-PSK/CDTunnel handshake failed: {e:?}"
+                    "tunnel dial: {:.0}s budget spent in round {round}; stopping",
+                    DIAL_BUDGET.as_secs_f64()
                 );
-                last = Some(e);
-                // That connection consumed the listener, so anything after this
-                // candidate needs the device to open a fresh one.
-                if index + 1 < candidates.len() {
+                break 'sweep;
+            }
+            let addr = SocketAddr::new(*host, tunnel_port);
+            if matches!(source, HostSource::RsdPeer) {
+                rsd_peer_tried = true;
+            }
+
+            let stream = match dial_once(addr, *source, index, candidates.len(), round, left).await
+            {
+                DialOutcome::Connected(stream) => stream,
+                DialOutcome::Refused(e) => {
+                    states[index] = Some(CandidateState::Refused);
+                    last = Some(IdeviceError::InternalError(format!("TLS tunnel: {addr}: {e}")));
+                    index += 1;
+                    continue;
+                }
+                DialOutcome::TimedOut => {
+                    states[index] = Some(CandidateState::TimedOut);
+                    last = Some(IdeviceError::InternalError(format!(
+                        "TLS tunnel: {addr}: no answer and no refusal"
+                    )));
+                    index += 1;
+                    continue;
+                }
+                DialOutcome::Failed(e) => {
+                    states[index] =
+                        Some(CandidateState::Failed(format!("failed ({})", e.kind_str())));
+                    last = Some(IdeviceError::InternalError(format!("TLS tunnel: {addr}: {e}")));
+                    index += 1;
+                    continue;
+                }
+            };
+
+            // RSD answered here and so did the tunnel port, so whatever goes
+            // wrong next is not the route in front of the device.
+            if matches!(source, HostSource::RsdPeer) {
+                rsd_peer_connected = true;
+            }
+            // Worth remembering even if the handshake then fails: it is the
+            // only host the next run has any evidence for, and the cache only
+            // decides what order the candidates are tried in.
+            if let Ok(mut cached) = CACHED_TUNNEL_HOST.lock() {
+                *cached = Some(*host);
+            }
+
+            handshakes += 1;
+            match connect_tls_psk_tunnel_native(stream, rpc.encryption_key()).await {
+                Ok(tunnel) => {
+                    info!(
+                        "tunnel dial: TLS-PSK + CDTunnel handshake succeeded over {addr} — \
+                         host {host} ({}) is the one that works",
+                        source.label()
+                    );
+                    return adapter_over_tunnel(tunnel).await;
+                }
+                Err(e) => {
+                    states[index] = Some(CandidateState::HandshakeFailed);
+                    warn!(
+                        "tunnel dial: {addr} accepted the connection but the TLS-PSK/CDTunnel \
+                         handshake failed: {e:?}"
+                    );
+                    last = Some(e);
+                    if handshakes >= DIAL_MAX_HANDSHAKES {
+                        warn!(
+                            "tunnel dial: {handshakes} handshake(s) rejected — not asking the \
+                             device for another listener"
+                        );
+                        break 'sweep;
+                    }
+                    // That connection consumed the listener, so anything
+                    // further needs the device to open a fresh one — and a
+                    // fresh one is also the remedy if the last one had gone
+                    // stale. So this host is dialled again immediately, on the
+                    // new port, instead of being written off: it is the only
+                    // candidate known to reach a listener at all, and the
+                    // replacement is at its youngest right now.
                     match rpc.create_tcp_listener().await {
                         Ok(port) => {
                             tunnel_port = port;
-                            info!("tunnel dial: asked the device for a replacement listener — now on port {port}");
+                            info!(
+                                "tunnel dial: asked the device for a replacement listener — \
+                                 now on port {port}; dialling {host} again straight away"
+                            );
                         }
                         Err(e) => return Err(TunnelFailure::other(e)),
                     }
+                    // Deliberately not advancing: same host, new listener.
+                    continue;
                 }
             }
         }
+
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() || round == DIAL_MAX_ROUNDS {
+            break;
+        }
+        tokio::time::sleep(DIAL_ROUND_DELAY.min(left)).await;
     }
+
+    let tried = states.iter().filter(|s| s.is_some()).count();
+    let refused = states
+        .iter()
+        .filter(|s| matches!(s, Some(CandidateState::Refused)))
+        .count();
+    let timed_out = states
+        .iter()
+        .filter(|s| matches!(s, Some(CandidateState::TimedOut)))
+        .count();
+    let tls_failures = states
+        .iter()
+        .filter(|s| matches!(s, Some(CandidateState::HandshakeFailed)))
+        .count();
+    let summary = candidates
+        .iter()
+        .zip(states.iter())
+        .filter_map(|((host, _), state)| state.as_ref().map(|s| format!("{host} {}", s.describe())))
+        .collect::<Vec<_>>()
+        .join(", ");
 
     // Order matters, and not the obvious way. Reaching a listener looks like
     // the most specific signal, but a *fallback* host reaching one did so over
@@ -414,7 +476,7 @@ async fn finish_tunnel(
     // RSD answered on, that is the diagnosis, and it outranks anything a
     // fallback went on to do — otherwise the user is told to re-pair when their
     // VPN is filtering, and the PIN dance cannot possibly help.
-    let kind = if rsd_peer_blocked {
+    let kind = if rsd_peer_tried && !rsd_peer_connected {
         TunnelFailureKind::TunnelFailureHostsRefused
     } else if tls_failures > 0 {
         TunnelFailureKind::TunnelFailureTlsHandshake
@@ -425,9 +487,8 @@ async fn finish_tunnel(
     } else {
         TunnelFailureKind::TunnelFailureOther
     };
-    let summary = outcomes.join(", ");
     warn!(
-        "tunnel dial: no candidate host answered on port {tunnel_port} after {:.1}s — \
+        "tunnel dial: no candidate host completed a tunnel on port {tunnel_port} after {:.1}s — \
          {tried} tried, {refused} refused, {timed_out} timed out, \
          {tls_failures} failed the TLS handshake [{summary}]",
         started.elapsed().as_secs_f64()

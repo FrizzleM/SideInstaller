@@ -167,6 +167,58 @@ Fixes applied (connect path + pairing gate only):
   error 61)")` — ECONNREFUSED, a real TCP error, **never ENOENT**. (Verified in
   the simulator via a temporary helper, since removed.)
 
+#### Tunnel dial — the candidate sweep is breadth-first, and why
+
+`createListener` returns the port the device opened and **no host**, so
+`finish_tunnel` (`tunnel_provider.rs`) guesses: the RSD peer address first, then
+`127.0.0.1`, then the local interface addresses the Swift side passes in.
+
+On a 2026-08-24 nightly log the three guesses behaved as three different
+failures at once — `10.7.0.1` (the LocalDevVPN fake IP) black-holed the SYN,
+`127.0.0.1` refused it, and the device's own Wi-Fi address `192.168.31.125`
+accepted it, completed the TLS-PSK handshake (`Server Finished verified!`) and
+then answered the CDTunnel request with a TLS alert. So the listener really is
+bound to the local-network interface only, and the session key really is the
+right one — the connection just arrived too late. The sweep used to be
+**depth-first**: each candidate got its whole retry window before the next was
+looked at, which spent **10.2s** — two black-holed SYNs waited out, then a
+refusal re-tried six times at 700ms apart — before dialling the one address that
+answers. Both runs in that log took the same 10.2s and failed the same way.
+
+The sweep is now **breadth-first**: one attempt at every candidate, then round
+again, up to `DIAL_MAX_ROUNDS` within the same 18s `DIAL_BUDGET`. Every
+candidate is a local address, so `DIAL_ATTEMPT_TIMEOUT` dropped from 3s to
+800ms — it is not a latency allowance, only a cap so a black-holed SYN can't
+stall the candidates behind it. Same log, same candidates: the live listener is
+now reached ~0.85s after `createListener` instead of 10.2s, and a listener that
+genuinely isn't accepting yet still gets its six attempts.
+
+Two smaller changes fall out of the same log:
+
+- **A rejected handshake re-dials the same host immediately.** That connection
+  burns the listener, so a replacement has to be requested either way; the
+  replacement is at its youngest right now, so the sweep steps back onto the
+  same candidate instead of advancing. Bounded by `DIAL_MAX_HANDSHAKES` (3).
+- **`CACHED_TUNNEL_HOST` records a host that merely *accepted*,** not only one
+  that completed a tunnel. It was written on full success only, so the second
+  run in that log re-walked all three dead guesses in the same order. The cache
+  decides ordering alone, so a weaker signal is the right thing to store.
+
+**Unproven, and deliberately so:** that the device's listener expires is the
+leading reading of "accepted the TCP connection, verified the TLS Finished, then
+alerted", not a measured fact — nothing here can watch remotepairingd. The
+changes cost nothing if it is wrong, and the log now says which alert it was:
+`read_app_data` decrypts the alert body and names it (`describe_alert`), which
+landed in 36fc210 but **had never been built** — `build-rust.sh` last ran
+2026-08-19, so every Rust change from 36fc210 onwards was missing from the
+shipped `.a` while the Swift half of that commit shipped. That mismatch is why
+the app blamed the pairing file and sent the user through a second PIN dance:
+the classification that was supposed to say *the route in front of the device
+is filtering, re-pairing won't help* was in the source and not in the binary.
+**Check `strings SideInstallerFFI.xcframework/ios-arm64/libsideinstaller_ffi.a`
+against the source before reading any FFI log as evidence.**
+
+
 ### Step 3 — Apple ID + signing — code complete; device/account steps unverified
 
 `account.rs` wraps isideload behind three FFI calls:
