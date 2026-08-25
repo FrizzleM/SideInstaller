@@ -367,6 +367,7 @@
     .sort{width:100%}
   }
 </style>
+<link rel="stylesheet" href="site.css">
 </head>
 <body>
 <div class="bg" aria-hidden="true"></div>
@@ -570,10 +571,13 @@
   var cards=[].slice.call(grid.querySelectorAll('.cert-card'));
   function days(c){ var d=parseInt(c.getAttribute('data-days'),10); return isNaN(d)?-1e9:d; }
   function name(c){ return (c.getAttribute('data-name')||'').toLowerCase(); }
+  function statusRank(c){ var s=c.getAttribute('data-status'); return s==='signed'?0:s==='revoked'?2:1; }
   function apply(){
     var term=(q.value||'').trim().toLowerCase();
     var mode=sortSel.value;
     var sorted=cards.slice().sort(function(a,b){
+      var statusOrder=statusRank(a)-statusRank(b);
+      if(statusOrder) return statusOrder;
       if(mode==='name') return name(a).localeCompare(name(b));
       if(mode==='days-asc') return days(a)-days(b);
       return days(b)-days(a);

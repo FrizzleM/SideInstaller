@@ -61,9 +61,9 @@ fi
 html_escape() { sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
 
 certificate_days_left() {
-  local name="$1" cert_name cert_expires_at cert_days_left
+  local name="$1" cert_name cert_expires_at cert_days_left cert_status
   if [[ ! -f "$CERT_METADATA_FILE" ]]; then printf '%s\n' "-999999"; return 0; fi
-  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left; do
+  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left cert_status; do
     if [[ "$cert_name" == "$name" && "$cert_days_left" =~ ^-?[0-9]+$ ]]; then
       printf '%s\n' "$cert_days_left"; return 0
     fi
@@ -72,12 +72,36 @@ certificate_days_left() {
 }
 
 certificate_expires_at() {
-  local name="$1" cert_name cert_expires_at cert_days_left
+  local name="$1" cert_name cert_expires_at cert_days_left cert_status
   [[ -f "$CERT_METADATA_FILE" ]] || { printf '\n'; return 0; }
-  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left; do
+  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left cert_status; do
     if [[ "$cert_name" == "$name" ]]; then printf '%s\n' "$cert_expires_at"; return 0; fi
   done < "$CERT_METADATA_FILE"
   printf '\n'
+}
+
+certificate_status() {
+  local name="$1" cert_name cert_expires_at cert_days_left cert_status
+  [[ -f "$CERT_METADATA_FILE" ]] || { printf 'unknown\n'; return 0; }
+  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left cert_status; do
+    if [[ "$cert_name" == "$name" ]]; then
+      case "$cert_status" in signed|revoked) printf '%s\n' "$cert_status" ;; *) printf 'unknown\n' ;; esac
+      return 0
+    fi
+  done < "$CERT_METADATA_FILE"
+  printf 'unknown\n'
+}
+
+status_pill_for() {
+  case "$1" in
+    signed)  printf 'status-signed\tSigned' ;;
+    revoked) printf 'status-revoked\tRevoked' ;;
+    *)       printf 'status-unknown\tStatus unknown' ;;
+  esac
+}
+
+status_rank() {
+  case "$1" in signed) printf '0\n' ;; unknown) printf '1\n' ;; *) printf '2\n' ;; esac
 }
 
 pill_for() {  # days -> "class<TAB>label"
@@ -101,10 +125,12 @@ CARDS_FILE="$(mktemp)"
 CERT_COUNT=0
 
 if [[ ${#PLISTS[@]} -gt 0 ]]; then
-  while IFS=$'\t' read -r days_left name plist; do
+  while IFS=$'\t' read -r _status_rank days_left name plist; do
     filename="$(basename "$plist")"
     expires_at="$(certificate_expires_at "$name")"
+    cert_status="$(certificate_status "$name")"
     IFS=$'\t' read -r pill_class pill_label <<< "$(pill_for "$days_left")"
+    IFS=$'\t' read -r status_class status_label <<< "$(status_pill_for "$cert_status")"
 
     name_esc="$(printf '%s' "$name" | html_escape)"
     expires_line=""
@@ -114,10 +140,13 @@ if [[ ${#PLISTS[@]} -gt 0 ]]; then
     install_url="itms-services://?action=download-manifest&amp;url=$OUTPUT_BASE_URL/$filename"
 
     cat >> "$CARDS_FILE" <<EOF
-    <article class="cert-card" data-name="$name_esc" data-days="$days_left">
+    <article class="cert-card" data-name="$name_esc" data-days="$days_left" data-status="$cert_status">
       <div class="cert-head">
         <h3 class="cert-name">$name_esc</h3>
-        <span class="pill $pill_class">$pill_label</span>
+        <div class="cert-pills">
+          <span class="pill $status_class">$status_label</span>
+          <span class="pill $pill_class">$pill_label</span>
+        </div>
       </div>
       $expires_line
       <a class="install-btn" href="$install_url">$INSTALL_ICON Install</a>
@@ -127,8 +156,9 @@ EOF
   done < <(
     for plist in "${PLISTS[@]}"; do
       filename="$(basename "$plist")"; name="${filename%.plist}"; name="${name#"$OUTPUT_PREFIX"-}"
-      printf '%s\t%s\t%s\n' "$(certificate_days_left "$name")" "$name" "$plist"
-    done | LC_ALL=C sort -t $'\t' -k1,1nr -k2,2
+      cert_status="$(certificate_status "$name")"
+      printf '%s\t%s\t%s\t%s\n' "$(status_rank "$cert_status")" "$(certificate_days_left "$name")" "$name" "$plist"
+    done | LC_ALL=C sort -t $'\t' -k1,1n -k2,2nr -k3,3
   )
 fi
 

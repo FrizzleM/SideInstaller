@@ -17,6 +17,7 @@
 #   PRECHECK_ONLY     1 = assemble the pool, write SIGN_STATE_FILE and stop —
 #                     no IPA download, no keychains, no signing. Used by
 #                     check_for_changes.sh to decide whether a run is needed.
+#   CERTCHECKER_API_BASE API origin for OCSP checks of sources without a status
 #
 # Pool layout, one folder per cert per source:
 #   <Name>/<Name>.p12  +  <Name>/<Name>.mobileprovision  [+ <Name>/password.txt]
@@ -55,8 +56,10 @@ PRECHECK_ONLY="${PRECHECK_ONLY:-0}"
 NEXCERTS_HOST="${NEXCERTS_HOST:-sideloading.net}"
 NEXCERTS_API_BASE="${NEXCERTS_API_BASE:-https://$NEXCERTS_HOST}"
 NEXCERTS_STATUS="${NEXCERTS_STATUS:-all}"
+CERTCHECKER_API_BASE="${CERTCHECKER_API_BASE:-$NEXCERTS_API_BASE}"
 
 TMP_DIR="$(mktemp -d)"
+SIGNED_NAME_LIST_FILE="${CERT_NAME_LIST_FILE:-$TMP_DIR/signed-cert-names.txt}"
 POOL_DIR="$TMP_DIR/pool"                 # merged cert pool, one subdir per source
 SEEN_FP_FILE="$TMP_DIR/seen-fingerprints.tsv"  # fingerprint<TAB>kept-name, for dedup
 UNSIGNED_IPA="$TMP_DIR/unsigned.ipa"
@@ -249,7 +252,7 @@ fetch_nexcerts_certs() {   # $1 = api base  $2 = dest dir
     return 1
   fi
 
-  # One "id<TAB>name" line per certificate. folder_name is what the clone would
+  # One "id<TAB>name<TAB>status" line per certificate. folder_name is what the clone would
   # have produced on disk; fall back to name. Control characters and path
   # separators are neutralised so the value is a safe single path component.
   local roster
@@ -272,7 +275,9 @@ for entry in data:
     name = "".join((" " if ord(c) < 32 else c) for c in str(name))
     name = name.replace("/", "-").replace("\\", "-").strip()
     if name:
-        print(f"{cid}\t{name}")
+        raw_status = str(entry.get("status", "")).lower()
+        status = "revoked" if "revoked" in raw_status else "signed" if "signed" in raw_status else "unknown"
+        print(f"{cid}\t{name}\t{status}")
 PY
 )"; then
     warn "Could not parse the NexCerts API response from $base"
@@ -284,8 +289,8 @@ PY
     return 0
   fi
 
-  local count=0 id name cert_dir pw
-  while IFS=$'\t' read -r id name; do
+  local count=0 id name cert_status cert_dir pw
+  while IFS=$'\t' read -r id name cert_status; do
     [[ -n "$id" && -n "$name" ]] || continue
 
     # Repo folder names are unique; guard the rare API duplicate so one cert
@@ -309,12 +314,71 @@ PY
     if pw="$(curl -fsSL "$base/api/certificates/download/$id/password.txt" 2>/dev/null)" && [[ -n "$pw" ]]; then
       printf '%s\n' "$pw" > "$cert_dir/password.txt"
     fi
+    printf '%s\n' "${cert_status:-unknown}" > "$cert_dir/.sideinstaller-cert-status"
 
     count=$((count + 1))
   done <<< "$roster"
 
   echo "[*]   NexCerts API: fetched $count certificate(s) [status: $status]"
   [[ "$count" -gt 0 ]]
+}
+
+certificate_status() { # $1 = certificate directory
+  local status_file="$1/.sideinstaller-cert-status" status="unknown"
+  [[ -f "$status_file" ]] && status="$(tr -d '[:space:]' < "$status_file")"
+  case "$status" in signed|revoked) printf '%s\n' "$status" ;; *) printf '%s\n' "unknown" ;; esac
+}
+
+# Sources such as a zip or local folder do not include a revocation state. Use
+# the checker in mobileprovision-only mode: it extracts the embedded leaf cert
+# and performs the OCSP lookup, without sending a P12 password anywhere.
+certificate_checker_status() { # $1 = mobileprovision path
+  local profile="$1" response status
+  [[ -f "$profile" ]] || { printf '%s\n' "unknown"; return 0; }
+  if ! response="$(curl -fsSL --max-time 30 -X POST "$CERTCHECKER_API_BASE/api/certchecker/checkCert" -F "mobileprovision=@$profile" 2>/dev/null)"; then
+    warn "Certificate Checker could not check $(basename "$profile")"
+    printf '%s\n' "unknown"; return 0
+  fi
+  if ! status="$(python3 -c '
+import json, sys
+try:
+    result = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(1)
+value = str((result.get("p12") or {}).get("Status") or (result.get("mobileprovision") or {}).get("Status") or "").lower()
+if "revoked" in value:
+    print("revoked")
+elif "signed" in value:
+    print("signed")
+else:
+    print("unknown")
+' <<< "$response")"; then
+    warn "Certificate Checker returned an unreadable response for $(basename "$profile")"
+    printf '%s\n' "unknown"; return 0
+  fi
+  case "$status" in signed|revoked) printf '%s\n' "$status" ;; *) printf '%s\n' "unknown" ;; esac
+}
+
+# A successful signing run is authoritative for managed SideInstaller outputs.
+# Drop only IPA/plist pairs bearing this workflow's prefix when their name did
+# not make the successful-sign list; unrelated output files are untouched.
+prune_stale_signed_artifacts() {
+  local artifact base filename name removed=0
+  [[ -f "$SIGNED_NAME_LIST_FILE" ]] || return 0
+  shopt -s nullglob
+  for artifact in "$OUTPUT_DIR"/"$OUTPUT_PREFIX"-*.ipa "$OUTPUT_DIR"/"$OUTPUT_PREFIX"-*.plist; do
+    [[ -f "$artifact" ]] || continue
+    base="${artifact%.*}"
+    filename="$(basename "$base")"
+    name="${filename#"$OUTPUT_PREFIX"-}"
+    if ! grep -Fqx -- "$name" "$SIGNED_NAME_LIST_FILE"; then
+      rm -f -- "$base.ipa" "$base.plist"
+      echo "[*] Removed stale certificate artifacts: $filename"
+      removed=$((removed + 1))
+    fi
+  done
+  shopt -u nullglob
+  echo "[*] Stale certificate artifact groups removed: $removed"
 }
 
 # Populate $POOL_DIR, each source in its own zero-padded subdir so the walk
@@ -610,13 +674,11 @@ if [[ "$OPENSSL_PKCS12_HELP" == *"-legacy"* ]]; then OPENSSL_LEGACY_FLAG="-legac
 mkdir -p "$OUTPUT_DIR"
 # Absolute, since zip writes relative to the cwd and the loop below pushd's.
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
-# Never wipe sideinstaller-*.ipa here: each cert rewrites only its own file
-# below, so builds from certs outside this pool survive.
-# A precheck must leave the committed output untouched, so it writes neither of
-# these — it only produces SIGN_STATE_FILE.
+# A precheck must leave the committed output untouched, so it writes neither
+# metadata nor the successful-output list — it only produces SIGN_STATE_FILE.
 if [[ "$PRECHECK_ONLY" != "1" ]]; then
-  printf 'name\tcertificate_expires_at\tdays_left\n' > "$CERT_METADATA_FILE"
-  if [[ -n "$CERT_NAME_LIST_FILE" ]]; then : > "$CERT_NAME_LIST_FILE"; fi
+  printf 'name\tcertificate_expires_at\tdays_left\tstatus\n' > "$CERT_METADATA_FILE"
+  : > "$SIGNED_NAME_LIST_FILE"
 fi
 if [[ -n "$SIGN_STATE_FILE" ]]; then : > "$SIGN_STATE_FILE"; fi
 
@@ -731,6 +793,10 @@ while IFS= read -r P12_FILE; do
   else
     warn "Unable to read certificate expiry for $CERT_GROUP_NAME"
   fi
+  CERT_STATUS="$(certificate_status "$CERT_PATH")"
+  if [[ "$CERT_STATUS" == "unknown" ]]; then
+    CERT_STATUS="$(certificate_checker_status "$PROFILE")"
+  fi
 
   # Everything the install page needs to know about this certificate is settled
   # by now — name, identity and expiry — so a precheck can stop here, before the
@@ -738,7 +804,7 @@ while IFS= read -r P12_FILE; do
   # are recorded too: the next precheck reaches this same point and produces the
   # same line, so a permanently-broken certificate never forces a pointless run.
   if [[ -n "$SIGN_STATE_FILE" ]]; then
-    printf 'cert\t%s\t%s\t%s\n' "$OUTPUT_NAME" "${CERT_FP:-unknown}" "$CERT_EXPIRES_AT" >> "$SIGN_STATE_FILE"
+    printf 'cert\t%s\t%s\t%s\t%s\n' "$OUTPUT_NAME" "${CERT_FP:-unknown}" "$CERT_EXPIRES_AT" "$CERT_STATUS" >> "$SIGN_STATE_FILE"
   fi
   if [[ "$PRECHECK_ONLY" == "1" ]]; then
     log "Pool: $OUTPUT_NAME (expires $CERT_EXPIRES_AT)"
@@ -766,6 +832,7 @@ while IFS= read -r P12_FILE; do
   log "Profile App ID: ${PROFILE_APP_ID:-unknown}"
   log "Profile Expiry: $EXPIRY"
   log "Certificate Expiry: $CERT_EXPIRES_AT ($CERT_DAYS_LEFT days left)"
+  log "Certificate status: $CERT_STATUS"
 
   if [[ -z "$TEAM_ID" || -z "$PROFILE_APP_ID" ]]; then
     fail "Provisioning profile is missing TeamIdentifier or application-identifier"
@@ -868,8 +935,8 @@ while IFS= read -r P12_FILE; do
   popd >/dev/null
 
   log "Signed IPA created: $OUTPUT_PREFIX-$OUTPUT_NAME.ipa"
-  printf '%s\t%s\t%s\n' "$OUTPUT_NAME" "$CERT_EXPIRES_AT" "$CERT_DAYS_LEFT" >> "$CERT_METADATA_FILE"
-  if [[ -n "$CERT_NAME_LIST_FILE" ]]; then printf '%s\n' "$OUTPUT_NAME" >> "$CERT_NAME_LIST_FILE"; fi
+  printf '%s\t%s\t%s\t%s\n' "$OUTPUT_NAME" "$CERT_EXPIRES_AT" "$CERT_DAYS_LEFT" "$CERT_STATUS" >> "$CERT_METADATA_FILE"
+  printf '%s\n' "$OUTPUT_NAME" >> "$SIGNED_NAME_LIST_FILE"
 
   restore_keychains
   security delete-keychain "$KEYCHAIN" >/dev/null 2>&1 || true
@@ -895,4 +962,8 @@ if [[ $SUCCESS -eq 0 ]]; then
     fail "No usable certificates found in the pool"; exit 1
   fi
   fail "No signed IPAs were created"; exit 1
+fi
+
+if [[ "$PRECHECK_ONLY" != "1" ]]; then
+  prune_stale_signed_artifacts
 fi
