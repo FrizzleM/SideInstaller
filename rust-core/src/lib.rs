@@ -68,19 +68,21 @@ pub unsafe extern "C" fn si_string_free(p: *mut c_char) {
 /// # Safety
 /// See `pairing::run_host`. `out` must point to a writable `PairResult`.
 #[no_mangle]
+#[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn si_pairing_run_host(
     bind_addr: *const c_char,
     port: u16,
     name: *const c_char,
     model: *const c_char,
     out_path: *const c_char,
+    host_alt_irk_hex: *const c_char,
     ready_cb: ReadyCb,
     pin_cb: PinCb,
     ctx: *mut c_void,
     out: *mut PairResult,
 ) -> i32 {
     pairing::run_host(
-        bind_addr, port, name, model, out_path, ready_cb, pin_cb, ctx, out,
+        bind_addr, port, name, model, out_path, host_alt_irk_hex, ready_cb, pin_cb, ctx, out,
     )
 }
 

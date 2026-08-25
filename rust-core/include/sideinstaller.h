@@ -64,11 +64,16 @@ typedef struct {
 // Run the RPPairing host. BLOCKS until a device pairs or an error occurs — run
 // it off the main thread. Returns 0 on success, non-zero on error (with
 // `out->error` set). `port` 0 lets the OS pick a port.
+// `host_alt_irk_hex` is the `host_alt_irk_hex` a previous successful run
+// returned, or NULL/"" the first time. Passing it back keeps this host's
+// identity stable, so a device that has paired before recognises it instead of
+// being offered a brand-new pairing.
 int32_t si_pairing_run_host(const char *bind_addr,
                             uint16_t port,
                             const char *name,
                             const char *model,
                             const char *out_path,
+                            const char *host_alt_irk_hex,
                             SIPairReadyCb ready_cb,
                             SIPairPinCb pin_cb,
                             void *ctx,

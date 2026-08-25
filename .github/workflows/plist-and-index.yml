@@ -6,7 +6,8 @@ name: plist-and-index
 # Byte-identical duplicate IPAs are pruned first so a build can't show up twice.
 #
 # Cert validity shown on the page comes from the committed certificate-validity.tsv
-# (recorded at the last signing run); this workflow does not refresh expiry dates.
+# (recorded at the last signing run); this workflow refreshes neither the expiry
+# dates nor the Valid/Revoked verdict — both are re-queried by a signing run.
 
 on:
   workflow_dispatch:

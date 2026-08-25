@@ -14,6 +14,10 @@
 # here against what the committed page currently shows, so a certificate that
 # has crossed into a new band still forces a run.
 #
+# Revocation needs no such treatment: the pool walk re-queries Apple's OCSP
+# responder for every certificate, so a cert Apple killed since the last run
+# comes back with a different state line and the plain state diff catches it.
+#
 # Config, all overridable by env:
 #   OUTPUT_DIR       channel output folder holding the recorded state
 #   CHANNEL          stable | beta, recorded so channels never match each other

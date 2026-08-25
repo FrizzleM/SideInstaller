@@ -1,6 +1,7 @@
 #!/bin/bash
 # Build index.html from the signed IPAs and their OTA plists: one card per
-# certificate, colour-coded and sorted by remaining validity.
+# certificate, colour-coded and ordered so the ones that still work come first —
+# certificates Apple has not revoked, then unverified ones, then the dead.
 set -euo pipefail
 
 ROOT_DIR="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -61,9 +62,9 @@ fi
 html_escape() { sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
 
 certificate_days_left() {
-  local name="$1" cert_name cert_expires_at cert_days_left
+  local name="$1" cert_name cert_expires_at cert_days_left cert_revocation
   if [[ ! -f "$CERT_METADATA_FILE" ]]; then printf '%s\n' "-999999"; return 0; fi
-  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left; do
+  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left cert_revocation; do
     if [[ "$cert_name" == "$name" && "$cert_days_left" =~ ^-?[0-9]+$ ]]; then
       printf '%s\n' "$cert_days_left"; return 0
     fi
@@ -72,12 +73,30 @@ certificate_days_left() {
 }
 
 certificate_expires_at() {
-  local name="$1" cert_name cert_expires_at cert_days_left
+  local name="$1" cert_name cert_expires_at cert_days_left cert_revocation
   [[ -f "$CERT_METADATA_FILE" ]] || { printf '\n'; return 0; }
-  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left; do
+  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left cert_revocation; do
     if [[ "$cert_name" == "$name" ]]; then printf '%s\n' "$cert_expires_at"; return 0; fi
   done < "$CERT_METADATA_FILE"
   printf '\n'
+}
+
+# valid | revoked | unknown, as recorded by the last signing run. A metadata
+# file written before the column existed yields "unknown" for every row, which
+# is the honest answer: nothing asked Apple at the time.
+certificate_revocation() {
+  local name="$1" cert_name cert_expires_at cert_days_left cert_revocation
+  [[ -f "$CERT_METADATA_FILE" ]] || { printf 'unknown\n'; return 0; }
+  while IFS=$'\t' read -r cert_name cert_expires_at cert_days_left cert_revocation; do
+    if [[ "$cert_name" == "$name" ]]; then
+      case "$cert_revocation" in
+        valid|revoked) printf '%s\n' "$cert_revocation" ;;
+        *)             printf 'unknown\n' ;;
+      esac
+      return 0
+    fi
+  done < "$CERT_METADATA_FILE"
+  printf 'unknown\n'
 }
 
 pill_for() {  # days -> "class<TAB>label"
@@ -91,6 +110,46 @@ pill_for() {  # days -> "class<TAB>label"
   else printf 'good\t%s days left' "$d"; fi
 }
 
+# True when the metadata file had nothing at all to say about a certificate —
+# certificate_days_left's miss sentinel. Cards like this are leftovers: a signed
+# IPA still sitting in the output folder after its certificate left the pool.
+no_metadata() { ! [[ "$1" =~ ^-?[0-9]+$ ]] || (( $1 <= -999999 )); }
+
+# The headline verdict on a card: whether installing it is worth the reader's
+# time. Revocation outranks everything — Apple kills these certificates far
+# faster than they expire, and a revoked one installs perfectly and then refuses
+# to launch, which is the single most confusing failure this page can hand out.
+# An expired certificate is just as dead, so it collapses into the same answer.
+status_pill_for() {  # revocation, days -> "class<TAB>label"
+  local revocation="$1" d="$2"
+  if [[ "$revocation" == "revoked" ]]; then printf 'bad\tRevoked'; return; fi
+  if ! no_metadata "$d" && (( d < 0 )); then printf 'bad\tExpired'; return; fi
+  case "$revocation" in
+    valid) printf 'good\tValid' ;;
+    *)     if no_metadata "$d"; then printf 'unknown\tUnknown'
+           else printf 'unknown\tUnverified'; fi ;;
+  esac
+}
+
+# Sort rank, and the ordering the reader actually wants: certificates that work
+# first. Ties inside a rank fall back to days left, so the longest-lived working
+# certificate leads the page.
+#
+# A leftover with no metadata ranks with the dead rather than the unverified.
+# The page has never had anything to say about those cards and has always shown
+# them last; promoting them above certificates Apple is known to have revoked
+# would be a downgrade dressed up as caution.
+rank_for() {  # revocation, days -> 0 (works) | 1 (unverified) | 2 (dead)
+  local revocation="$1" d="$2"
+  if [[ "$revocation" == "revoked" ]]; then printf '2'; return; fi
+  case "$revocation" in
+    valid) printf '0'; return ;;
+  esac
+  if no_metadata "$d"; then printf '2'; return; fi
+  if (( d < 0 )); then printf '2'; return; fi
+  printf '1'
+}
+
 INSTALL_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>'
 
 shopt -s nullglob
@@ -99,36 +158,50 @@ shopt -u nullglob
 
 CARDS_FILE="$(mktemp)"
 CERT_COUNT=0
+VALID_COUNT=0
 
 if [[ ${#PLISTS[@]} -gt 0 ]]; then
-  while IFS=$'\t' read -r days_left name plist; do
+  while IFS=$'\t' read -r rank days_left name plist; do
     filename="$(basename "$plist")"
     expires_at="$(certificate_expires_at "$name")"
-    IFS=$'\t' read -r pill_class pill_label <<< "$(pill_for "$days_left")"
+    revocation="$(certificate_revocation "$name")"
+    IFS=$'\t' read -r pill_class pill_label <<< "$(status_pill_for "$revocation" "$days_left")"
+    IFS=$'\t' read -r days_class days_label <<< "$(pill_for "$days_left")"
 
     name_esc="$(printf '%s' "$name" | html_escape)"
-    expires_line=""
+    # Expiry moved out of the pill to make room for the verdict, so the meta
+    # line now carries both the date and the countdown, still colour-coded.
+    meta_bits=""
     if [[ -n "$expires_at" && "$expires_at" != "unknown" ]]; then
-      expires_line="<p class=\"cert-meta\">Expires $(printf '%s' "$expires_at" | html_escape)</p>"
+      meta_bits="Expires $(printf '%s' "$expires_at" | html_escape)"
     fi
+    if [[ "$days_class" != "unknown" ]]; then
+      [[ -n "$meta_bits" ]] && meta_bits="$meta_bits &middot; "
+      meta_bits="$meta_bits<span class=\"days $days_class\">$days_label</span>"
+    fi
+    meta_line=""
+    [[ -n "$meta_bits" ]] && meta_line="<p class=\"cert-meta\">$meta_bits</p>"
+
     install_url="itms-services://?action=download-manifest&amp;url=$OUTPUT_BASE_URL/$filename"
 
     cat >> "$CARDS_FILE" <<EOF
-    <article class="cert-card" data-name="$name_esc" data-days="$days_left">
+    <article class="cert-card" data-name="$name_esc" data-days="$days_left" data-rank="$rank" data-status="$revocation">
       <div class="cert-head">
         <h3 class="cert-name">$name_esc</h3>
         <span class="pill $pill_class">$pill_label</span>
       </div>
-      $expires_line
+      $meta_line
       <a class="install-btn" href="$install_url">$INSTALL_ICON Install</a>
     </article>
 EOF
     CERT_COUNT=$((CERT_COUNT + 1))
+    if [[ "$rank" == "0" ]]; then VALID_COUNT=$((VALID_COUNT + 1)); fi
   done < <(
     for plist in "${PLISTS[@]}"; do
       filename="$(basename "$plist")"; name="${filename%.plist}"; name="${name#"$OUTPUT_PREFIX"-}"
-      printf '%s\t%s\t%s\n' "$(certificate_days_left "$name")" "$name" "$plist"
-    done | LC_ALL=C sort -t $'\t' -k1,1nr -k2,2
+      d="$(certificate_days_left "$name")"
+      printf '%s\t%s\t%s\t%s\n' "$(rank_for "$(certificate_revocation "$name")" "$d")" "$d" "$name" "$plist"
+    done | LC_ALL=C sort -t $'\t' -k1,1n -k2,2nr -k3,3
   )
 fi
 
@@ -136,7 +209,7 @@ if [[ $CERT_COUNT -eq 0 ]]; then
   printf '    <p class="empty show">No signed builds available yet. Check back soon.</p>\n' > "$CARDS_FILE"
 fi
 
-REPO_NOTE="Built automatically &middot; signed with $CERT_COUNT certificate(s)"
+REPO_NOTE="Built automatically &middot; signed with $CERT_COUNT certificate(s), $VALID_COUNT currently valid"
 
 # The beta call-out ships on the public page only: on beta.html it would point
 # at the page the reader is already on.

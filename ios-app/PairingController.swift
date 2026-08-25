@@ -19,6 +19,21 @@ final class PairingController {
 
     private var running = false
 
+    /// This host's `altIRK`, kept across pairings.
+    ///
+    /// The `authTag` advertised over Bonjour is derived from it, and that is how
+    /// an iPhone that has paired with SideInstaller before recognises it. The
+    /// Rust side hands one out on every successful pairing; storing it and
+    /// passing it back is what makes it an identity rather than a fresh random
+    /// value each run. StikPair, which this pairing path is forked from, returns
+    /// the same value and drops it — its own comment says a production app
+    /// shouldn't.
+    private static let altIRKKey = "rpPairingHostAltIRK"
+    private static var storedAltIRK: String {
+        get { UserDefaults.standard.string(forKey: altIRKKey) ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: altIRKKey) }
+    }
+
     /// Resolved when a `startAndWait` pairing finishes; nil for `start()`.
     private var pairContinuation: CheckedContinuation<String, Error>?
 
@@ -101,6 +116,7 @@ final class PairingController {
         let name = hostName
         let model = hostModel
         let outPath = Self.pairingFilePath()
+        let altIRK = Self.storedAltIRK
         // Retained for the C callbacks' ctx, and released after the run.
         //
         // `nonisolated(unsafe)` because a raw pointer isn't `Sendable` and the
@@ -116,9 +132,11 @@ final class PairingController {
                 name.withCString { nameC in
                     model.withCString { modelC in
                         outPath.withCString { outC in
-                            si_pairing_run_host(
-                                bindC, 0, nameC, modelC, outC,
-                                pairReadyCallback, pairPinCallback, ctx, &result)
+                            altIRK.withCString { irkC in
+                                si_pairing_run_host(
+                                    bindC, 0, nameC, modelC, outC, irkC,
+                                    pairReadyCallback, pairPinCallback, ctx, &result)
+                            }
                         }
                     }
                 }
@@ -126,6 +144,11 @@ final class PairingController {
 
             let outcome: PairOutcome
             if rc == 0 {
+                // Whatever identity the run settled on — the stored one, or a
+                // fresh one when there wasn't a usable stored one — is what the
+                // device now knows this host by, so keep it.
+                let issued = cStr(result.host_alt_irk_hex)
+                if !issued.isEmpty { Self.storedAltIRK = issued }
                 outcome = .success(
                     name: cStr(result.device_name),
                     model: cStr(result.device_model),

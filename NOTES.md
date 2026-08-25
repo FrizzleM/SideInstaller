@@ -92,6 +92,49 @@ runs the host off-thread, surfaces the PIN, and writes the pairing file to
 `Application Support/rp_pairing_file.plist`. Reports every step into the log
 console.
 
+**Re-read against StikPair 1.1.0 (2026-08-24).** `pairing.rs` is still a faithful
+port — same bind, same `RpPairingSocket::new_device`, same TXT records from
+`PairableHostInfo::mdns_txt_records`, same callback shape — plus the milestone
+logging and the zero-byte guard, which StikPair doesn't have. **StikPair has no
+tunnel code at all**: it pairs, writes the file, and stops, so it has nothing to
+say about the `createListener` failure below. Two other differences are
+deliberate and stay as they are: silent audio instead of
+`BGContinuedProcessingTask` (iOS 17.4+ vs 26+), and no Apple TV path, which needs
+`RemotePairingClient` as a *client* and is out of scope here.
+
+One real defect came out of the comparison, and it was in both apps. StikPair's
+own comment — *"A production app should persist both the pairing file and
+`host_info.alt_irk` so already-paired devices keep working"* — describes what
+neither did:
+
+- `PairableHostInfo::generate` mints a **random `alt_irk` every run**, and the
+  `authTag` in the Bonjour TXT record is derived from it
+  (`compute_auth_tag(alt_irk, identifier)`). A device that has paired before can
+  therefore never recognise this host.
+- `RpPairingFile::generate` mints a **fresh Ed25519 key pair every run**. The
+  identifier doesn't move (it's `Uuid::new_v3(NAMESPACE_DNS, name)` — which is
+  why `d8442cca-…` is constant in every log), but the keys do. That costs
+  SideInstaller much more than it costs StikPair, because SideInstaller *writes
+  its pairing file into other apps*: every re-pair silently invalidated the copy
+  already placed in SideStore, Feather and StikDebug, while the file on disk
+  still looked fine.
+
+Both are now carried across pairings. `si_pairing_run_host` takes the
+`host_alt_irk_hex` a previous run returned (`PairingController` keeps it in
+`UserDefaults` under `rpPairingHostAltIRK`; it was already being returned and
+thrown away, exactly as in StikPair), and `run()` loads the existing
+`rp_pairing_file.plist` and reuses its key pair instead of generating one,
+falling back to generation when there isn't a usable file. Safe because
+`pair_setup` only ever *reads* `e_private_key`/`e_public_key`/`identifier` — to
+sign M6 — and the one field it writes is `pairing_file.alt_irk`, the **device's**
+IRK (responder.rs:402), which is cleared before a re-pair so a different iPhone
+can't inherit the last one's. Re-presenting a stable key across a pair-setup is
+what a real Mac does; the device replaces its record for the identifier and every
+previously placed file keeps working.
+
+`si_pairing_run_host` gained a parameter, so `rust-core/include/sideinstaller.h`
+had to be hand-edited alongside it — there is no cbindgen for that header.
+
 **LocalDevVPN's actual shape** (read from its source, `TunnelProv/PacketTunnelProvider.swift`):
 `NEIPv4Settings(addresses: [TunnelDeviceIP])` puts **10.7.0.0** on the `utun`, with
 `includedRoutes` = that subnet only and `excludedRoutes = [.default()]`. We connect to
@@ -204,19 +247,70 @@ Two smaller changes fall out of the same log:
   run in that log re-walked all three dead guesses in the same order. The cache
   decides ordering alone, so a weaker signal is the right thing to store.
 
-**Unproven, and deliberately so:** that the device's listener expires is the
-leading reading of "accepted the TCP connection, verified the TLS Finished, then
-alerted", not a measured fact — nothing here can watch remotepairingd. The
-changes cost nothing if it is wrong, and the log now says which alert it was:
-`read_app_data` decrypts the alert body and names it (`describe_alert`), which
-landed in 36fc210 but **had never been built** — `build-rust.sh` last ran
-2026-08-19, so every Rust change from 36fc210 onwards was missing from the
-shipped `.a` while the Swift half of that commit shipped. That mismatch is why
-the app blamed the pairing file and sent the user through a second PIN dance:
-the classification that was supposed to say *the route in front of the device
-is filtering, re-pairing won't help* was in the source and not in the binary.
-**Check `strings SideInstallerFFI.xcframework/ios-arm64/libsideinstaller_ffi.a`
-against the source before reading any FFI log as evidence.**
+None of that made the tunnel come up, and the next log said why. `read_app_data`
+now decrypts the alert body and names it (`describe_alert`, from 36fc210 — which
+**had never been built**: `build-rust.sh` last ran 2026-08-19, so every Rust
+change from 36fc210 onwards was missing from the shipped `.a` while the Swift
+half of that commit shipped. **Check `strings
+SideInstallerFFI.xcframework/ios-arm64/libsideinstaller_ffi.a` against the source
+before reading any FFI log as evidence.**) The alert is
+`warning close_notify` — an *orderly* shutdown, not a rejection.
+
+#### The RPPairing `createListener` route cannot work on-device
+
+With the sweep fixed, the live listener is dialled 13ms after `createListener`
+and still gets `close_notify`, three times in a row on three fresh listeners.
+That kills the expiry reading and leaves a much simpler one. Put the three
+candidates' behaviour together:
+
+| candidate | tunnel port | what it means |
+|---|---|---|
+| `127.0.0.1` | refused (RST) | the listener is **not** bound to `0.0.0.0` |
+| `10.7.0.1` (LocalDevVPN) | no answer, no RST | not on the VPN's address either |
+| `192.168.31.125` (en0) | accepts, TLS-PSK completes | bound to the **local network interface** |
+
+So `createListener` opens the tunnel listener on the Wi-Fi interface alone —
+which is coherent, since the same response carries a Bonjour `serviceName`. Two
+consequences, and they close the route off:
+
+1. Over the loopback VPN the tunnel port is **unreachable by construction**. The
+   VPN can forward the fixed RSD port all it likes; the tunnel port is a fresh
+   ephemeral one the listener never binds on that interface.
+2. Over en0 it is reachable, but the peer is this iPhone's own address — the
+   device is being asked to build a tunnel to itself. It completes the TLS
+   handshake (the PSK is genuinely right: `Server Finished verified!` compares
+   real `verify_data`) and then hangs up cleanly, before it has even read the
+   `clientHandshakeRequest` — the `close_notify` arrives in the same millisecond
+   as the write.
+
+Nothing the client sends changes that, which is why re-pairing, retrying, fresh
+listeners and candidate ordering all failed identically. The whole point of the
+loopback VPN is to present a peer address that is *not* the device's own; the
+en0 fallback quietly threw that away and only looked like progress.
+
+#### The way through: mint the classic record, take CoreDeviceProxy
+
+CoreDeviceProxy needs no inbound listener at all — it rides the lockdown
+connection that already works (see [Two tunnel routes](#step-2--pairing--connection--code-complete-device-steps-unverified)).
+`DeviceConnection.connect` already prefers it whenever the pairing file carries a
+classic lockdown record. On-device pairing produces only the RPPairing half, so
+that route was never offered, and `lockdownPairRecord` — which mints the classic
+half — runs *inside* the RSD tunnel, so it could never break the deadlock.
+
+`DeviceConnection.pairOverLockdown` breaks it: `idevice_new_tcp_socket` →
+`lockdownd_new` → `lockdownd_pair` against **lockdownd's own port (62078)**, no
+tunnel, no provider, no pre-existing pair record. All three symbols were already
+exported. `connect` falls back to it when every route the pairing file supports
+is spent, stores the record (minting is interactive and spends a device pairing
+slot), and retries CoreDeviceProxy with it.
+
+**The open question is whether lockdownd answers on 62078 from on-device**, and
+on which address — `enableWirelessLockdown`'s own comment says lockdownd answers
+over USB only until `EnableWifiDebugging` is set, and setting it needs a session,
+which needs a record. That is why `lockdownPairRecordDirect` takes a *list* of
+hosts and tries the VPN peer and plain loopback in turn, logging each. If neither
+answers, the record can't be minted on-device at all and an imported pairing file
+stays the only way through for this iPhone.
 
 
 ### Step 3 — Apple ID + signing — code complete; device/account steps unverified

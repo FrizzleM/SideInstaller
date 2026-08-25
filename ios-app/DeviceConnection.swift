@@ -15,6 +15,10 @@ final class DeviceConnection {
     /// RemoteServiceDiscovery port reached over the VPN loopback.
     static let rsdPort: UInt16 = 49152
 
+    /// lockdownd's own port. Fixed, unlike the ephemeral port `createListener`
+    /// opens, so a route that forwards only well-known ports still reaches it.
+    static let lockdownPort: UInt16 = 62078
+
     var isConnected: Bool { adapter != nil && handshake != nil }
 
     struct FFIError: Error, CustomStringConvertible {
@@ -157,6 +161,9 @@ final class DeviceConnection {
             : [kind.hasRemotePairing]
 
         var firstFailure: Error?
+        // A file with only the RPPairing half still has one route left after
+        // its own are spent: mint the classic half here. See below.
+        let canMintLockdownRecord = !kind.hasLockdown
         for (index, useRemotePairing) in routes.enumerated() {
             do {
                 if useRemotePairing {
@@ -172,8 +179,32 @@ final class DeviceConnection {
             } catch {
                 // Report what the preferred route said, not the fallback's noise.
                 if firstFailure == nil { firstFailure = error }
-                let more = index + 1 < routes.count ? " Trying the other route…" : ""
+                let more = (index + 1 < routes.count || canMintLockdownRecord)
+                    ? " Trying the other route…" : ""
                 Engine.shared.log("\(useRemotePairing ? "Remote-pairing" : "Lockdown") tunnel didn't come up (\(error)).\(more)")
+            }
+        }
+
+        // Every route the pairing file itself supports is spent — but on this
+        // iPhone the RPPairing one can fail for a reason no pairing file fixes.
+        // It needs the device to accept an inbound connection on the port
+        // `createListener` opens, and that listener is bound to the local
+        // network interface alone: loopback refuses it and the loopback VPN's
+        // address never answers, so the only address that reaches it is this
+        // iPhone's own Wi-Fi address — where the device is being asked to build
+        // a tunnel to itself, and closes the connection cleanly instead
+        // (`close_notify`, right after a TLS handshake it completed happily).
+        //
+        // CoreDeviceProxy needs no inbound listener at all: it rides the
+        // lockdown connection that is already working. The only thing it wants
+        // is the classic pair record this file doesn't carry — and lockdownd
+        // mints one on its own port, with no tunnel in front of it.
+        if canMintLockdownRecord {
+            do {
+                try connectByMintingLockdownRecord(deviceIP: deviceIP, hostname: hostname)
+                return
+            } catch {
+                Engine.shared.log("Pairing with lockdown didn't open a tunnel either (\(error)).")
             }
         }
         throw firstFailure ?? fail("no tunnel route available for this pairing file")
@@ -291,6 +322,118 @@ final class DeviceConnection {
         disconnect()
         adapter = newAdapter
         handshake = newHandshake
+    }
+
+    /// Take the CoreDeviceProxy route with a lockdown pair record minted here,
+    /// for a pairing file that carries only the RPPairing half.
+    ///
+    /// The record is kept once made: minting one is interactive (the device puts
+    /// up a Trust prompt) and spends one of the device's pairing slots. A stored
+    /// one is tried first and re-minted only when it no longer opens a tunnel,
+    /// which is what a reset, a restore, or a record from another iPhone looks
+    /// like from here.
+    private func connectByMintingLockdownRecord(deviceIP: String, hostname: String) throws {
+        let stored = PrivateStore.lockdownPairRecord
+        let storedSize = ((try? FileManager.default.attributesOfItem(atPath: stored.path)[.size]) as? Int) ?? 0
+        if storedSize > 0 {
+            do {
+                try connectCoreDeviceProxy(deviceIP: deviceIP,
+                                           pairingFilePath: stored.path,
+                                           hostname: hostname)
+                Engine.shared.log("Tunnel up over CoreDeviceProxy, with the lockdown pair record already stored here.")
+                return
+            } catch {
+                Engine.shared.log("The stored lockdown pair record didn't open a tunnel (\(error)). Pairing with lockdown again…")
+            }
+        }
+
+        Engine.shared.log("Asking lockdownd for a pair record — unlock this iPhone and tap Trust if it asks …")
+        let record = try lockdownPairRecordDirect(hosts: [deviceIP, "127.0.0.1"],
+                                                  hostID: CompositePairingFile.hostID,
+                                                  systemBUID: CompositePairingFile.systemBUID,
+                                                  hostName: hostname)
+        try record.write(to: stored, options: .atomic)
+        Engine.shared.log("Lockdown pair record minted (\(record.count) bytes). Opening the tunnel over CoreDeviceProxy …")
+        try connectCoreDeviceProxy(deviceIP: deviceIP,
+                                   pairingFilePath: stored.path,
+                                   hostname: hostname)
+    }
+
+    /// Run the classic lockdown `Pair` handshake straight against lockdownd,
+    /// with no tunnel in front of it.
+    ///
+    /// `lockdownPairRecord` runs the same handshake *inside* the RSD tunnel, so
+    /// it can never be what produces the record a missing tunnel needs. This one
+    /// talks to lockdownd's own port instead. Blocks while the device shows its
+    /// Trust prompt: idevice retries `Pair` until the user answers.
+    ///
+    /// Each host is tried in turn, because which address reaches lockdownd from
+    /// on-device is exactly what isn't known: the loopback VPN's peer is what
+    /// every other lockdown client here uses, and plain loopback is the one that
+    /// needs no VPN at all.
+    func lockdownPairRecordDirect(hosts: [String], hostID: String, systemBUID: String,
+                                  hostName: String) throws -> Data {
+        var lastError: Error?
+        for host in hosts {
+            do {
+                return try pairOverLockdown(host: host, hostID: hostID,
+                                            systemBUID: systemBUID, hostName: hostName)
+            } catch {
+                lastError = error
+                Engine.shared.log("lockdownd at \(host):\(Self.lockdownPort) didn't pair (\(error)).")
+            }
+        }
+        throw lastError ?? fail("no address to reach lockdownd on")
+    }
+
+    private func pairOverLockdown(host: String, hostID: String, systemBUID: String,
+                                  hostName: String) throws -> Data {
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = Self.lockdownPort.bigEndian
+        guard host.withCString({ inet_pton(AF_INET, $0, &addr.sin_addr) }) == 1 else {
+            throw fail("invalid lockdown address: \(host)")
+        }
+
+        var device: OpaquePointer?
+        let connectError = withUnsafePointer(to: &addr) { aptr in
+            aptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+                hostName.withCString { label in
+                    idevice_new_tcp_socket(sa, socklen_t(MemoryLayout<sockaddr_in>.stride),
+                                           label, &device)
+                }
+            }
+        }
+        try check(connectError, "couldn't reach lockdownd at \(host):\(Self.lockdownPort)")
+        guard let device else { throw fail("lockdown socket handle was null") }
+
+        // `lockdownd_new` consumes the socket and can only fail on a null
+        // argument, so there is no path back where it is still ours to free.
+        var client: OpaquePointer?
+        try check(lockdownd_new(device, &client), "lockdownd_new failed")
+        guard let client else { throw fail("lockdown client was null") }
+        defer { lockdownd_client_free(client) }
+
+        var pf: OpaquePointer?
+        let pairError = hostID.withCString { h in
+            systemBUID.withCString { b in
+                hostName.withCString { n in
+                    lockdownd_pair(client, h, b, n, &pf)
+                }
+            }
+        }
+        try check(pairError, "lockdownd_pair failed")
+        guard let pf else { throw fail("lockdownd_pair returned no pair record") }
+        defer { idevice_pairing_file_free(pf) }
+
+        var bytes: UnsafeMutablePointer<UInt8>?
+        var length: UInt = 0
+        try check(idevice_pairing_file_serialize(pf, &bytes, &length),
+                  "idevice_pairing_file_serialize failed")
+        guard let bytes, length > 0 else { throw fail("serialized pair record was empty") }
+        let record = Data(bytes: bytes, count: Int(length))
+        idevice_data_free(bytes, length)
+        return record
     }
 
     func disconnect() {

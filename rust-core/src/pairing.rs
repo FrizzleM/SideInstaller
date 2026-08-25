@@ -65,12 +65,14 @@ unsafe impl Send for Callbacks {}
 /// # Safety
 /// All `*const c_char` args must be null or valid C strings; `out` must be a
 /// valid, writable `PairResult`.
+#[allow(clippy::too_many_arguments)]
 pub unsafe fn run_host(
     bind_addr: *const c_char,
     port: u16,
     name: *const c_char,
     model: *const c_char,
     out_path: *const c_char,
+    host_alt_irk_hex: *const c_char,
     ready_cb: ReadyCb,
     pin_cb: PinCb,
     ctx: *mut c_void,
@@ -85,6 +87,7 @@ pub unsafe fn run_host(
     let name = opt_str(name, "SideInstaller");
     let model = opt_str(model, "Mac17,7");
     let out_path = opt_str(out_path, "rp_pairing_file.plist");
+    let saved_alt_irk = parse_alt_irk(&opt_str(host_alt_irk_hex, ""));
     let cbs = Callbacks { ready: ready_cb, pin: pin_cb, ctx };
 
     let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
@@ -95,7 +98,7 @@ pub unsafe fn run_host(
         }
     };
 
-    match rt.block_on(run(bind_addr, port, name, model, out_path, cbs)) {
+    match rt.block_on(run(bind_addr, port, name, model, out_path, saved_alt_irk, cbs)) {
         Ok(res) => {
             (*out).device_name = cstr(res.name);
             (*out).device_model = cstr(res.model);
@@ -119,12 +122,14 @@ struct Paired {
     host_alt_irk_hex: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run(
     bind_addr: String,
     port: u16,
     name: String,
     model: String,
     out_path: String,
+    saved_alt_irk: Option<[u8; 16]>,
     cbs: Callbacks,
 ) -> Result<Paired, String> {
     tracing::info!("RPPairing: binding listener on {bind_addr}:{port}");
@@ -138,9 +143,42 @@ async fn run(
         .port();
     tracing::info!("RPPairing: listening on port {port}");
 
-    // Host identity; persisting alt_irk would keep paired devices working.
-    let mut pairing_file = RpPairingFile::generate(&name);
-    let host_info = PairableHostInfo::generate(&name, &model);
+    // Host identity, carried across pairings rather than minted afresh each
+    // time. StikPair — which this file is a fork of — regenerates both and says
+    // in a comment that a production app shouldn't; two things here depend on
+    // it not being regenerated:
+    //
+    // - The `authTag` advertised in the Bonjour TXT record is derived from
+    //   `alt_irk`, so a new one every run means an already-paired device can
+    //   never recognise this host and offers a fresh pairing instead.
+    // - The Ed25519 key pair is what every pairing file this app has already
+    //   written into SideStore, Feather and StikDebug was signed with. Rotating
+    //   it on a re-pair silently invalidates all of those copies — a cost
+    //   StikPair doesn't carry, because it only ever exports once by hand.
+    //
+    // A re-pair is a full pair-setup either way, so re-presenting the same key
+    // is what a real Mac does; the device replaces its record for this
+    // identifier and every previously placed file keeps working.
+    let mut pairing_file = match RpPairingFile::read_from_file(&out_path).await {
+        Ok(mut existing) => {
+            // The device's altIRK, learned in the last pairing. Cleared so a
+            // pairing with a *different* iPhone can't inherit it.
+            existing.alt_irk = None;
+            tracing::info!(
+                "RPPairing: reusing the host key pair from {out_path} — files already placed in other apps stay valid"
+            );
+            existing
+        }
+        Err(_) => {
+            tracing::info!("RPPairing: no reusable host key pair at {out_path}; generating one");
+            RpPairingFile::generate(&name)
+        }
+    };
+    let mut host_info = PairableHostInfo::generate(&name, &model);
+    if let Some(alt_irk) = saved_alt_irk {
+        host_info.alt_irk = alt_irk;
+        tracing::info!("RPPairing: reusing this host's stored altIRK, so the device knows us");
+    }
     let host_alt_irk = host_info.alt_irk;
     let service_identifier = pairing_file.identifier.clone();
 
@@ -198,6 +236,20 @@ async fn run(
         path: out_path,
         host_alt_irk_hex: hex(&host_alt_irk),
     })
+}
+
+/// Read back the 32-character hex `run_host` handed out last time. Anything
+/// that isn't exactly 16 bytes of hex is ignored rather than rejected: a fresh
+/// `alt_irk` costs recognition, not correctness.
+fn parse_alt_irk(hex: &str) -> Option<[u8; 16]> {
+    if hex.len() != 32 {
+        return None;
+    }
+    let mut out = [0u8; 16];
+    for (i, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(hex.get(i * 2..i * 2 + 2)?, 16).ok()?;
+    }
+    Some(out)
 }
 
 fn hex(bytes: &[u8]) -> String {
