@@ -34,12 +34,13 @@
 #      to pull — all (default) | signed | revoked | missingP12; 'signed' drops
 #      Apple-revoked certificates.
 #
-# MERGE / DE-DUPLICATION: the same signing certificate often appears in more
-# than one source (and, within a source, across several provisioning-profile
-# variants). Each unique certificate is signed only ONCE — duplicates are
-# detected by the leaf certificate's SHA-1 fingerprint, and the first source
-# listed here wins. Order the lines to control which copy is kept.
+# MERGE: the sources are concatenated into one pool and EVERY certificate in it
+# is signed — there is no de-duplication. The same signing certificate often
+# appears in more than one source, and within a source across several
+# provisioning-profile variants; each of those produces its own install card,
+# named after its folder. Two entries whose folder names normalise to the same
+# output name write the same file, so the later source in this list wins that
+# one; entries with different names both survive.
 
 certs
-https://github.com/WSF-Team/WSF/raw/refs/heads/main/portal/resources/certificates.zip
 https://sideloading.net

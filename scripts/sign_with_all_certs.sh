@@ -20,8 +20,10 @@
 #
 # Pool layout, one folder per cert per source:
 #   <Name>/<Name>.p12  +  <Name>/<Name>.mobileprovision  [+ <Name>/password.txt]
-# Sources merge into one pool, keyed by the leaf certificate's SHA-1 so each is
-# signed once, with the first source listed winning.
+# Sources merge into one pool and every p12 in it is signed. Two entries that
+# normalise to the same output name write the same file, so the later one in
+# pool order wins; entries whose names differ each produce their own card, even
+# when they carry the same underlying certificate.
 set -euo pipefail
 
 ROOT_DIR="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -35,7 +37,6 @@ CERT_NAME_LIST_FILE="${CERT_NAME_LIST_FILE:-}"
 
 # Fallback sources, one per line, kept in sync with cert-url.txt.
 DEFAULT_CERT_SOURCES="certs
-https://github.com/WSF-Team/WSF/raw/refs/heads/main/portal/resources/certificates.zip
 https://sideloading.net"
 
 DEFAULT_P12_PASSWORD="${P12_PASSWORD:-WSF}"
@@ -58,7 +59,6 @@ NEXCERTS_STATUS="${NEXCERTS_STATUS:-all}"
 
 TMP_DIR="$(mktemp -d)"
 POOL_DIR="$TMP_DIR/pool"                 # merged cert pool, one subdir per source
-SEEN_FP_FILE="$TMP_DIR/seen-fingerprints.tsv"  # fingerprint<TAB>kept-name, for dedup
 UNSIGNED_IPA="$TMP_DIR/unsigned.ipa"
 APPLE_CERTS_DIR="$TMP_DIR/apple-certs"
 INTERMEDIATES_KC="$TMP_DIR/intermediates.keychain-db"
@@ -318,7 +318,7 @@ PY
 }
 
 # Populate $POOL_DIR, each source in its own zero-padded subdir so the walk
-# below visits them in list order and the first source wins a duplicate.
+# below visits them in list order.
 acquire_sources() {   # $1 = newline-separated source URLs
   local idx=0 url dest nex_base local_dir local_count
   mkdir -p "$POOL_DIR"
@@ -354,13 +354,6 @@ acquire_sources() {   # $1 = newline-separated source URLs
     idx=$((idx + 1))
   done <<< "$1"
 }
-
-# Whether this fingerprint was signed already, printing the name it used.
-dedup_lookup() {   # $1 = fingerprint
-  [[ -f "$SEEN_FP_FILE" ]] || return 1
-  awk -F'\t' -v fp="$1" '$1 == fp { print $2; found = 1; exit } END { exit(found ? 0 : 1) }' "$SEEN_FP_FILE"
-}
-dedup_record() { printf '%s\t%s\n' "$1" "$2" >> "$SEEN_FP_FILE"; }
 
 # owner/repo for the Releases API: CI's slug, else the origin remote.
 resolve_repo_slug() {
@@ -695,7 +688,7 @@ fi
 echo "[*] Root dir: $ROOT_DIR"
 echo "[*] Output dir: $OUTPUT_DIR"
 echo "[*] Unsigned IPA URL: $UNSIGNED_IPA_RESOLVED_URL"
-echo "[*] Certificate sources (merged, de-duplicated by certificate fingerprint):"
+echo "[*] Certificate sources (merged; every certificate in the pool is signed):"
 while IFS= read -r _src; do
   [[ -n "$_src" ]] || continue
   echo "      - $_src"
@@ -732,8 +725,6 @@ acquire_sources "$CERT_SOURCES"
 SUCCESS=0
 FAILED=0
 FOUND_P12=0
-SKIPPED_DUP=0
-: > "$SEEN_FP_FILE"
 
 # Enumerate p12s across the pool. The zero-padded subdirs make this sorted walk
 # follow list order, so the first source keeps a cert that recurs later.
@@ -776,20 +767,11 @@ while IFS= read -r P12_FILE; do
 
   P12_PASSWORD_FOR_CERT="$(resolve_p12_password "$CERT_PATH" "$RAW_NAME")"
 
-  # Sign each unique certificate once, keyed on the leaf's SHA-1, since one
-  # cert routinely appears across sources and profile variants. The first
-  # occurrence wins and keeps its filename. A cert that can't be
-  # fingerprinted is signed anyway rather than dropped.
+  # Every p12 in the pool is signed; the same certificate appearing under more
+  # than one name therefore produces one card per name. The leaf's SHA-1 is
+  # still read, because check_for_changes.sh compares it to tell a genuinely
+  # new certificate from a renamed one.
   CERT_FP="$(certificate_fingerprint "$P12_FILE" "$P12_PASSWORD_FOR_CERT" || true)"
-  if [[ -n "$CERT_FP" ]]; then
-    if PRIOR="$(dedup_lookup "$CERT_FP")"; then
-      warn "Skipping $CERT_GROUP_NAME — duplicate certificate (already signed as $PRIOR)"
-      SKIPPED_DUP=$((SKIPPED_DUP + 1)); continue
-    fi
-    dedup_record "$CERT_FP" "$OUTPUT_NAME"
-  else
-    warn "Could not fingerprint $CERT_GROUP_NAME; signing without a duplicate check"
-  fi
 
   CERT_EXPIRES_AT="unknown"; CERT_DAYS_LEFT="unknown"
   if CERT_EXPIRY_INFO="$(certificate_expiry_info "$P12_FILE" "$P12_PASSWORD_FOR_CERT")"; then
@@ -966,7 +948,6 @@ else
   echo "[✓] Successful: $SUCCESS"
 fi
 echo "[!] Failed: $FAILED"
-echo "[=] Skipped (duplicate certificates): $SKIPPED_DUP"
 
 if [[ $SUCCESS -eq 0 ]]; then
   if [[ "$PRECHECK_ONLY" == "1" ]]; then
