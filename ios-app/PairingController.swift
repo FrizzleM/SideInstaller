@@ -28,8 +28,13 @@ final class PairingController {
     /// value each run. StikPair, which this pairing path is forked from, returns
     /// the same value and drops it — its own comment says a production app
     /// shouldn't.
-    private static let altIRKKey = "rpPairingHostAltIRK"
-    private static var storedAltIRK: String {
+    /// `nonisolated` because the run that produces a new one finishes on a
+    /// background queue, and this class is `@MainActor`: without it, storing the
+    /// value is a main-actor mutation from a `Sendable` closure. There is no
+    /// actor state to protect — the value lives in `UserDefaults`, which is
+    /// thread-safe, and this is the only writer.
+    private nonisolated static let altIRKKey = "rpPairingHostAltIRK"
+    private nonisolated static var storedAltIRK: String {
         get { UserDefaults.standard.string(forKey: altIRKKey) ?? "" }
         set { UserDefaults.standard.set(newValue, forKey: altIRKKey) }
     }
