@@ -332,6 +332,11 @@ impl<R: RpPairingSocketProvider> RemotePairingClient<R> {
 
         debug!("Waiting for attemptPairVerify response");
         let response = self.inner.recv_plain().await?;
+        // The device's own handshake reply — its wire protocol version and, in
+        // `deviceOptions`, what it says it will and won't do. Only the byte
+        // count was ever logged, which is no help when the device later accepts
+        // a tunnel connection and then closes it without saying why.
+        debug!("attemptPairVerify response: {response:#?}");
 
         let response = response
             .as_dictionary()

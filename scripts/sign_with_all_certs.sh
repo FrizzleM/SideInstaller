@@ -539,6 +539,72 @@ print(f"{expiry.date().isoformat()}\t{days_left}")
 PY
 }
 
+# Apple revokes leaked enterprise certificates constantly, and a revoked one
+# still signs and still installs — it just refuses to launch. Expiry alone
+# therefore says nothing about whether a build works, so ask Apple directly.
+#
+# The leaf carries both URLs we need in its Authority Information Access
+# extension: the OCSP responder to query, and the CA Issuers URI for the
+# intermediate that issued it (OCSP needs the issuer to compute the cert ID).
+# Issuers are fetched once and cached, since a whole pool shares a handful.
+OCSP_ISSUER_CACHE="$TMP_DIR/ocsp-issuers"
+
+# Issuer PEM for a CA Issuers URI, downloaded on first use. DER is the norm at
+# certs.apple.com; PEM is accepted too so a mirror can't break the check.
+ocsp_issuer_pem() {
+  local url="$1" key pem
+  key="$(printf '%s' "$url" | shasum -a 256 | cut -c1-16)"
+  pem="$OCSP_ISSUER_CACHE/$key.pem"
+  if [[ ! -s "$pem" ]]; then
+    mkdir -p "$OCSP_ISSUER_CACHE"
+    curl -fsSL --max-time 20 "$url" -o "$pem.der" 2>/dev/null || return 1
+    openssl x509 -inform DER -in "$pem.der" -out "$pem" 2>/dev/null \
+      || openssl x509 -inform PEM -in "$pem.der" -out "$pem" 2>/dev/null \
+      || { rm -f "$pem" "$pem.der"; return 1; }
+    rm -f "$pem.der"
+  fi
+  printf '%s\n' "$pem"
+}
+
+# valid | revoked | unknown, for the leaf certificate in a p12. Anything that
+# stops the query short — no AIA, no network, an unreadable response — is
+# "unknown" rather than a guess in either direction: the page shows that as its
+# own state, so an offline runner never advertises a dead cert as working, and
+# never buries a live one either.
+certificate_revocation_status() {
+  local p12_file="$1" password="$2"
+  local base="$TMP_DIR/ocsp-$(basename "$p12_file" .p12)"
+  local cert_pem="$base.pem" txt ocsp_url ca_url issuer_pem out status="unknown"
+
+  openssl pkcs12 $OPENSSL_LEGACY_FLAG -in "$p12_file" -passin "pass:$password" \
+    -nokeys -clcerts -out "$cert_pem" >/dev/null 2>&1 || { printf 'unknown\n'; return 0; }
+
+  txt="$(openssl x509 -in "$cert_pem" -noout -text 2>/dev/null || true)"
+  ocsp_url="$(printf '%s' "$txt" | sed -n 's/.*OCSP - URI:\(.*\)/\1/p'       | head -n1 | tr -d ' \r')"
+  ca_url="$(  printf '%s' "$txt" | sed -n 's/.*CA Issuers - URI:\(.*\)/\1/p' | head -n1 | tr -d ' \r')"
+
+  if [[ -n "$ocsp_url" && -n "$ca_url" ]] && issuer_pem="$(ocsp_issuer_pem "$ca_url")"; then
+    # -noverify skips the response signature check. The responder is reached
+    # over plain HTTP (OCSP always is), so this trusts the transport; a lying
+    # MITM could only mislabel a card on the page, never affect what gets
+    # signed. Kept off because verifying needs a trust chain this script does
+    # not otherwise assemble.
+    #
+    # The `|| true` matters: openssl ocsp exits non-zero on an unreachable
+    # responder, and this script runs under set -e, so without it a network
+    # blip would abort signing instead of recording "unknown" and moving on.
+    out="$(openssl ocsp -issuer "$issuer_pem" -cert "$cert_pem" -url "$ocsp_url" \
+             -no_nonce -noverify -timeout 20 2>&1 || true)"
+    case "$out" in
+      *": good"*)    status="valid"   ;;
+      *": revoked"*) status="revoked" ;;
+    esac
+  fi
+
+  rm -f "$cert_pem"
+  printf '%s\n' "$status"
+}
+
 # Read display name and version from the unsigned IPA, for the page's hero.
 record_app_info() {
   local ipa="$1" work; work="$TMP_DIR/appinfo"
@@ -615,7 +681,7 @@ OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 # A precheck must leave the committed output untouched, so it writes neither of
 # these — it only produces SIGN_STATE_FILE.
 if [[ "$PRECHECK_ONLY" != "1" ]]; then
-  printf 'name\tcertificate_expires_at\tdays_left\n' > "$CERT_METADATA_FILE"
+  printf 'name\tcertificate_expires_at\tdays_left\trevocation\n' > "$CERT_METADATA_FILE"
   if [[ -n "$CERT_NAME_LIST_FILE" ]]; then : > "$CERT_NAME_LIST_FILE"; fi
 fi
 if [[ -n "$SIGN_STATE_FILE" ]]; then : > "$SIGN_STATE_FILE"; fi
@@ -732,16 +798,27 @@ while IFS= read -r P12_FILE; do
     warn "Unable to read certificate expiry for $CERT_GROUP_NAME"
   fi
 
+  CERT_REVOCATION="$(certificate_revocation_status "$P12_FILE" "$P12_PASSWORD_FOR_CERT")"
+  if [[ "$CERT_REVOCATION" == "unknown" ]]; then
+    warn "Could not check revocation for $CERT_GROUP_NAME"
+  fi
+
   # Everything the install page needs to know about this certificate is settled
-  # by now — name, identity and expiry — so a precheck can stop here, before the
-  # expensive part. Certificates that fail later (bad profile, codesign error)
-  # are recorded too: the next precheck reaches this same point and produces the
-  # same line, so a permanently-broken certificate never forces a pointless run.
+  # by now — name, identity, expiry and revocation — so a precheck can stop
+  # here, before the expensive part. Certificates that fail later (bad profile,
+  # codesign error) are recorded too: the next precheck reaches this same point
+  # and produces the same line, so a permanently-broken certificate never forces
+  # a pointless run.
+  #
+  # Revocation is part of the state on purpose. Expiry decays predictably and is
+  # re-derived by check_for_changes.sh, but a revocation lands whenever Apple
+  # decides — so recording it here is what makes the weekly run notice a cert
+  # that died since the page was built, and rebuild the page to say so.
   if [[ -n "$SIGN_STATE_FILE" ]]; then
-    printf 'cert\t%s\t%s\t%s\n' "$OUTPUT_NAME" "${CERT_FP:-unknown}" "$CERT_EXPIRES_AT" >> "$SIGN_STATE_FILE"
+    printf 'cert\t%s\t%s\t%s\t%s\n' "$OUTPUT_NAME" "${CERT_FP:-unknown}" "$CERT_EXPIRES_AT" "$CERT_REVOCATION" >> "$SIGN_STATE_FILE"
   fi
   if [[ "$PRECHECK_ONLY" == "1" ]]; then
-    log "Pool: $OUTPUT_NAME (expires $CERT_EXPIRES_AT)"
+    log "Pool: $OUTPUT_NAME (expires $CERT_EXPIRES_AT, $CERT_REVOCATION)"
     SUCCESS=$((SUCCESS + 1))
     continue
   fi
@@ -766,6 +843,7 @@ while IFS= read -r P12_FILE; do
   log "Profile App ID: ${PROFILE_APP_ID:-unknown}"
   log "Profile Expiry: $EXPIRY"
   log "Certificate Expiry: $CERT_EXPIRES_AT ($CERT_DAYS_LEFT days left)"
+  log "Certificate Revocation: $CERT_REVOCATION"
 
   if [[ -z "$TEAM_ID" || -z "$PROFILE_APP_ID" ]]; then
     fail "Provisioning profile is missing TeamIdentifier or application-identifier"
@@ -868,7 +946,7 @@ while IFS= read -r P12_FILE; do
   popd >/dev/null
 
   log "Signed IPA created: $OUTPUT_PREFIX-$OUTPUT_NAME.ipa"
-  printf '%s\t%s\t%s\n' "$OUTPUT_NAME" "$CERT_EXPIRES_AT" "$CERT_DAYS_LEFT" >> "$CERT_METADATA_FILE"
+  printf '%s\t%s\t%s\t%s\n' "$OUTPUT_NAME" "$CERT_EXPIRES_AT" "$CERT_DAYS_LEFT" "$CERT_REVOCATION" >> "$CERT_METADATA_FILE"
   if [[ -n "$CERT_NAME_LIST_FILE" ]]; then printf '%s\n' "$OUTPUT_NAME" >> "$CERT_NAME_LIST_FILE"; fi
 
   restore_keychains

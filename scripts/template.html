@@ -309,6 +309,13 @@
   .cert-head{display:flex; align-items:flex-start; justify-content:space-between; gap:10px}
   .cert-name{margin:0; font-size:17px; font-weight:700; min-width:0; word-break:break-word; overflow-wrap:anywhere}
   .cert-meta{margin:0; font-size:12.5px; color:var(--faint)}
+  /* The countdown used to be the pill; the verdict took that slot, so the
+     colour rides along here instead of being lost. */
+  .days{font-weight:600}
+  .days.good{color:var(--good)}
+  .days.warn{color:var(--warn)}
+  .days.crit{color:var(--crit)}
+  .days.bad{color:var(--bad)}
   .pill{
     flex:none; font-size:11.5px; font-weight:700; letter-spacing:.01em;
     padding:5px 10px; border-radius:999px; white-space:nowrap;
@@ -330,7 +337,12 @@
   .install-btn svg{width:17px; height:17px}
   .install-btn:hover{filter:brightness(1.08); box-shadow:0 12px 30px rgba(77,173,255,.45)}
   .install-btn:active{transform:scale(.97)}
-  .cert-card[data-days^="-"] .install-btn{filter:saturate(.5) brightness(.85)}
+  .cert-card[data-days^="-"] .install-btn,
+  .cert-card[data-status="revoked"] .install-btn{filter:saturate(.5) brightness(.85)}
+  /* A working certificate is the whole point of the page, so give the first
+     ones a visible edge rather than relying on position alone. */
+  .cert-card[data-rank="0"]{border-color:rgba(52,211,153,.4); background:var(--card-hover)}
+  .cert-card[data-rank="0"]:hover{border-color:rgba(52,211,153,.65)}
 
   .empty{display:none; text-align:center; color:var(--muted); padding:50px 0; font-size:15px}
   .empty.show{display:block}
@@ -570,10 +582,16 @@
   var cards=[].slice.call(grid.querySelectorAll('.cert-card'));
   function days(c){ var d=parseInt(c.getAttribute('data-days'),10); return isNaN(d)?-1e9:d; }
   function name(c){ return (c.getAttribute('data-name')||'').toLowerCase(); }
+  /* 0 = Apple still honours it, 1 = never checked, 2 = revoked or expired. */
+  function rank(c){ var r=parseInt(c.getAttribute('data-rank'),10); return isNaN(r)?1:r; }
   function apply(){
     var term=(q.value||'').trim().toLowerCase();
     var mode=sortSel.value;
     var sorted=cards.slice().sort(function(a,b){
+      /* Rank leads in every mode. Sorting by name or by expiry is a way to
+         find one certificate among many, never a reason to be handed a dead
+         one first. */
+      if(rank(a)!==rank(b)) return rank(a)-rank(b);
       if(mode==='name') return name(a).localeCompare(name(b));
       if(mode==='days-asc') return days(a)-days(b);
       return days(b)-days(a);
