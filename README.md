@@ -24,7 +24,7 @@
 > name and icon. A malicious fork looks identical to the real app from the outside.
 >
 > The **only** builds I publish are:
-> - **Website:** https://frizzlem.github.io/SideInstaller/
+> - **Website:** https://sideinstaller.net
 > - **Repository:** https://github.com/FrizzleM/SideInstaller
 >
 > Do not install SideInstaller from any other site, AltStore source, Telegram channel, Discord server,
@@ -62,7 +62,7 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 ## How to use it
 
 1. Connect the device to LocalDevVPN (or any alternative)
-2. Open [the official install page](https://frizzlem.github.io/SideInstaller/) and install the app using any
+2. Open [the official install page](https://sideinstaller.net/) and install the app using any
    of the certificates.
 3. Once it's installed, open it.
 4. Log in with your Apple account credentials.
