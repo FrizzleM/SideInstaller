@@ -59,6 +59,7 @@ NEXCERTS_STATUS="${NEXCERTS_STATUS:-all}"
 CERTCHECKER_API_BASE="${CERTCHECKER_API_BASE:-$NEXCERTS_API_BASE}"
 
 TMP_DIR="$(mktemp -d)"
+SIGNED_NAME_LIST_FILE="${CERT_NAME_LIST_FILE:-$TMP_DIR/signed-cert-names.txt}"
 POOL_DIR="$TMP_DIR/pool"                 # merged cert pool, one subdir per source
 SEEN_FP_FILE="$TMP_DIR/seen-fingerprints.tsv"  # fingerprint<TAB>kept-name, for dedup
 UNSIGNED_IPA="$TMP_DIR/unsigned.ipa"
@@ -358,6 +359,28 @@ else:
   case "$status" in signed|revoked) printf '%s\n' "$status" ;; *) printf '%s\n' "unknown" ;; esac
 }
 
+# A successful signing run is authoritative for managed SideInstaller outputs.
+# Drop only IPA/plist pairs bearing this workflow's prefix when their name did
+# not make the successful-sign list; unrelated output files are untouched.
+prune_stale_signed_artifacts() {
+  local artifact base filename name removed=0
+  [[ -f "$SIGNED_NAME_LIST_FILE" ]] || return 0
+  shopt -s nullglob
+  for artifact in "$OUTPUT_DIR"/"$OUTPUT_PREFIX"-*.ipa "$OUTPUT_DIR"/"$OUTPUT_PREFIX"-*.plist; do
+    [[ -f "$artifact" ]] || continue
+    base="${artifact%.*}"
+    filename="$(basename "$base")"
+    name="${filename#"$OUTPUT_PREFIX"-}"
+    if ! grep -Fqx -- "$name" "$SIGNED_NAME_LIST_FILE"; then
+      rm -f -- "$base.ipa" "$base.plist"
+      echo "[*] Removed stale certificate artifacts: $filename"
+      removed=$((removed + 1))
+    fi
+  done
+  shopt -u nullglob
+  echo "[*] Stale certificate artifact groups removed: $removed"
+}
+
 # Populate $POOL_DIR, each source in its own zero-padded subdir so the walk
 # below visits them in list order and the first source wins a duplicate.
 acquire_sources() {   # $1 = newline-separated source URLs
@@ -651,13 +674,11 @@ if [[ "$OPENSSL_PKCS12_HELP" == *"-legacy"* ]]; then OPENSSL_LEGACY_FLAG="-legac
 mkdir -p "$OUTPUT_DIR"
 # Absolute, since zip writes relative to the cwd and the loop below pushd's.
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
-# Never wipe sideinstaller-*.ipa here: each cert rewrites only its own file
-# below, so builds from certs outside this pool survive.
-# A precheck must leave the committed output untouched, so it writes neither of
-# these — it only produces SIGN_STATE_FILE.
+# A precheck must leave the committed output untouched, so it writes neither
+# metadata nor the successful-output list — it only produces SIGN_STATE_FILE.
 if [[ "$PRECHECK_ONLY" != "1" ]]; then
   printf 'name\tcertificate_expires_at\tdays_left\tstatus\n' > "$CERT_METADATA_FILE"
-  if [[ -n "$CERT_NAME_LIST_FILE" ]]; then : > "$CERT_NAME_LIST_FILE"; fi
+  : > "$SIGNED_NAME_LIST_FILE"
 fi
 if [[ -n "$SIGN_STATE_FILE" ]]; then : > "$SIGN_STATE_FILE"; fi
 
@@ -915,7 +936,7 @@ while IFS= read -r P12_FILE; do
 
   log "Signed IPA created: $OUTPUT_PREFIX-$OUTPUT_NAME.ipa"
   printf '%s\t%s\t%s\t%s\n' "$OUTPUT_NAME" "$CERT_EXPIRES_AT" "$CERT_DAYS_LEFT" "$CERT_STATUS" >> "$CERT_METADATA_FILE"
-  if [[ -n "$CERT_NAME_LIST_FILE" ]]; then printf '%s\n' "$OUTPUT_NAME" >> "$CERT_NAME_LIST_FILE"; fi
+  printf '%s\n' "$OUTPUT_NAME" >> "$SIGNED_NAME_LIST_FILE"
 
   restore_keychains
   security delete-keychain "$KEYCHAIN" >/dev/null 2>&1 || true
@@ -941,4 +962,8 @@ if [[ $SUCCESS -eq 0 ]]; then
     fail "No usable certificates found in the pool"; exit 1
   fi
   fail "No signed IPAs were created"; exit 1
+fi
+
+if [[ "$PRECHECK_ONLY" != "1" ]]; then
+  prune_stale_signed_artifacts
 fi
