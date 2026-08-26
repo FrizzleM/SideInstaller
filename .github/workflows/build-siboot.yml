@@ -128,8 +128,18 @@ jobs:
           if-no-files-found: error
 
       - name: Resolve the release tag
+        # A push to the default branch attaches too, not just a published
+        # release. The install instructions hardcode
+        # `releases/latest/download/siboot-i686`, so that asset *is* the
+        # distribution — leaving it to a manual tick means every change ships
+        # only if someone remembers to tick it. Branch pushes and pull requests
+        # still build without touching any release.
         id: tag
-        if: github.event_name == 'release' || inputs.attach_to_release
+        if: >-
+          github.event_name == 'release' ||
+          inputs.attach_to_release ||
+          (github.event_name == 'push' &&
+           github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
