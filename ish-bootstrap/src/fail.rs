@@ -35,10 +35,26 @@ pub trait Advise<T> {
     fn advise(self, advice: impl Into<String>) -> Result<T>;
 }
 
-impl<T, E: fmt::Display> Advise<T> for std::result::Result<T, E> {
+impl<T, E: std::error::Error> Advise<T> for std::result::Result<T, E> {
     fn advise(self, advice: impl Into<String>) -> Result<T> {
-        self.map_err(|e| Fail::new(advice, e.to_string()))
+        self.map_err(|e| Fail::new(advice, chain(&e)))
     }
+}
+
+/// Render an error together with everything it wraps.
+///
+/// `idevice`'s errors need this: `IdeviceError::Socket` displays as the fixed
+/// string "device socket io failed" and keeps the `io::Error` — the part that
+/// says *reset* rather than *timeout* — only in `source()`. Without walking the
+/// chain the verbose channel prints a sentence that names no cause at all.
+pub fn chain(e: &dyn std::error::Error) -> String {
+    let mut out = e.to_string();
+    let mut source = e.source();
+    while let Some(s) = source {
+        out.push_str(&format!(": {s}"));
+        source = s.source();
+    }
+    out
 }
 
 impl<T> Advise<T> for Option<T> {

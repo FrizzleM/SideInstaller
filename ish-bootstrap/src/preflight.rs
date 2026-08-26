@@ -13,10 +13,11 @@
 use std::time::Duration;
 
 use idevice::{Idevice, services::lockdown::LockdownClient};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
 
-use crate::fail::{Fail, Result};
+use crate::fail::{Fail, Result, chain};
 use crate::ui;
 
 /// LocalDevVPN's default peer address. Measured on device: `lockdownd` and RSD
@@ -24,6 +25,8 @@ use crate::ui;
 /// non-native process loopback access to system services.
 pub const DEFAULT_DEVICE_IP: &str = "10.7.0.1";
 pub const LOCKDOWN_PORT: u16 = 62078;
+/// RemoteServiceDiscovery. Probed only as a comparison in the failure path.
+pub const RSD_PORT: u16 = 49152;
 
 /// What lockdownd will say before it has any reason to trust us.
 const LOCKDOWN_TYPE: &str = "com.apple.mobile.lockdown";
@@ -106,16 +109,19 @@ pub async fn run(host: &str) -> Result<Greeting> {
                 "QueryType timed out after 20s",
             )
         })?
-        .map_err(|e| {
-            Fail::new(
-                format!(
-                    "{host}:{LOCKDOWN_PORT} answered, but not the way lockdownd does.\n\n\
-                     Check LocalDevVPN's tunnel address, and pass --device-ip if it is\n\
-                     not {DEFAULT_DEVICE_IP}."
-                ),
-                format!("QueryType failed: {e}"),
-            )
-        })?;
+        .map_err(|e| chain(&e));
+
+    let lockdown_type = match lockdown_type {
+        Ok(t) => t,
+        Err(raw) => {
+            // The exchange failed after the connection came up, which is the
+            // one case worth spending a round trip on: it is also exactly what
+            // a proxy that accepts eagerly and dials late looks like. Diagnose
+            // now rather than asking for another run — the user is on a phone.
+            ui::detail(&format!("QueryType failed: {raw}"));
+            return Err(diagnose(host, raw).await);
+        }
+    };
 
     if lockdown_type != LOCKDOWN_TYPE {
         return Err(Fail::new(
@@ -176,4 +182,137 @@ fn render(value: &plist::Value) -> String {
         plist::Value::Data(d) => format!("<{} bytes>", d.len()),
         other => format!("{other:?}"),
     }
+}
+
+
+/// Work out *why* a connection that opened could not complete one exchange.
+///
+/// The question this answers is whether anything was ever really behind the
+/// port. A userspace VPN can complete the TCP handshake locally and only then
+/// try to reach the service, so "connect succeeded" is not evidence that
+/// lockdownd exists — and every measurement taken so far, including
+/// checkpoint 1's, only ever connected.
+///
+/// The control is a port nothing serves. If that connects too, "open" means
+/// nothing on this setup and the finding has to be re-read.
+async fn diagnose(host: &str, raw: String) -> Fail {
+    println!();
+    ui::info("working out what is behind that port …");
+
+    // Two arbitrary ports no iOS service listens on.
+    let mut phantom = Vec::new();
+    for control in [12345u16, 51763] {
+        if connects(host, control).await {
+            phantom.push(control);
+        }
+    }
+    let accepts_anything = !phantom.is_empty();
+
+    if accepts_anything {
+        ui::warn(&format!(
+            "{host}:{} connected too, and nothing serves that port",
+            phantom.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(" and ")
+        ));
+    } else {
+        ui::detail("control ports were refused, so an open port does mean a live service");
+    }
+
+    for (label, port) in [("lockdownd", LOCKDOWN_PORT), ("RSD", RSD_PORT)] {
+        match exchange(host, port).await {
+            Ok(outcome) => ui::info(&format!("{host}:{port} ({label}) — {outcome}")),
+            Err(e) => ui::info(&format!("{host}:{port} ({label}) — {e}")),
+        }
+    }
+
+    let advice = if accepts_anything {
+        [
+            format!("LocalDevVPN accepted a connection to {host}:{LOCKDOWN_PORT}, but it also"),
+            "accepts connections to ports nothing serves — so the port being open".to_string(),
+            "never meant lockdownd was listening. Writing to it is what fails.".to_string(),
+            String::new(),
+            "The likely reading is that lockdownd is not accepting network connections".to_string(),
+            "on this iOS version: it answers over USB until wireless debugging is".to_string(),
+            "enabled, and enabling that needs a session, which needs a pair record.".to_string(),
+            String::new(),
+            "That is the case siboot cannot pair its way out of. If it holds, a pairing".to_string(),
+            "file has to be made on a computer once and imported — which is the thing".to_string(),
+            "this tool exists to avoid, so it is worth confirming before accepting it.".to_string(),
+        ]
+        .join("\n")
+    } else {
+        [
+            format!("Something is listening at {host}:{LOCKDOWN_PORT}, but it closed the"),
+            "connection instead of answering a lockdown QueryType.".to_string(),
+            String::new(),
+            "If LocalDevVPN is connected and its tunnel address is still".to_string(),
+            format!("{DEFAULT_DEVICE_IP}, this is lockdownd refusing a network client rather"),
+            "than a configuration problem.".to_string(),
+        ]
+        .join("\n")
+    };
+
+    Fail::new(advice, raw)
+}
+
+async fn connects(host: &str, port: u16) -> bool {
+    matches!(
+        timeout(Duration::from_secs(5), TcpStream::connect((host, port))).await,
+        Ok(Ok(_))
+    )
+}
+
+/// Send one lockdown `QueryType` by hand and describe exactly what came back.
+///
+/// Hand-rolled rather than reusing `Idevice`, because the interesting part is
+/// the part `idevice` abstracts away: whether the write lands, whether the
+/// length prefix arrives, and whether the peer resets or simply closes.
+async fn exchange(host: &str, port: u16) -> std::result::Result<String, String> {
+    let mut stream = timeout(Duration::from_secs(5), TcpStream::connect((host, port)))
+        .await
+        .map_err(|_| "connect timed out".to_string())?
+        .map_err(|e| format!("connect failed: {e}"))?;
+    let _ = stream.set_nodelay(true);
+
+    let body = query_type_plist();
+    let mut frame = (body.len() as u32).to_be_bytes().to_vec();
+    frame.extend_from_slice(&body);
+
+    if let Err(e) = stream.write_all(&frame).await {
+        return Ok(format!("write of {} bytes failed: {e}", frame.len()));
+    }
+    if let Err(e) = stream.flush().await {
+        return Ok(format!("flush failed: {e}"));
+    }
+
+    let mut prefix = [0u8; 4];
+    match timeout(Duration::from_secs(10), stream.read_exact(&mut prefix)).await {
+        Err(_) => Ok(format!("wrote {} bytes, then no reply within 10s", frame.len())),
+        Ok(Err(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+            Ok(format!("wrote {} bytes, then the peer closed without replying", frame.len()))
+        }
+        Ok(Err(e)) => Ok(format!("wrote {} bytes, then the read failed: {e}", frame.len())),
+        Ok(Ok(_)) => {
+            let len = u32::from_be_bytes(prefix);
+            let mut buf = vec![0u8; len.min(512) as usize];
+            match timeout(Duration::from_secs(10), stream.read_exact(&mut buf)).await {
+                Ok(Ok(_)) => Ok(format!(
+                    "replied with a {len}-byte message starting {:?}",
+                    String::from_utf8_lossy(&buf[..buf.len().min(60)])
+                )),
+                _ => Ok(format!("announced {len} bytes but did not send them")),
+            }
+        }
+    }
+}
+
+fn query_type_plist() -> Vec<u8> {
+    let mut dict = plist::Dictionary::new();
+    dict.insert("Label".into(), plist::Value::String(crate::LABEL.into()));
+    dict.insert("Request".into(), plist::Value::String("QueryType".into()));
+    let mut out = Vec::new();
+    // Matches what `Idevice::send_plist` writes: XML, length-prefixed.
+    plist::Value::Dictionary(dict)
+        .to_writer_xml(&mut out)
+        .expect("serialising a two-key plist cannot fail");
+    out
 }
