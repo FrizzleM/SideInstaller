@@ -187,66 +187,80 @@ fn render(value: &plist::Value) -> String {
 
 /// Work out *why* a connection that opened could not complete one exchange.
 ///
-/// The question this answers is whether anything was ever really behind the
-/// port. A userspace VPN can complete the TCP handshake locally and only then
-/// try to reach the service, so "connect succeeded" is not evidence that
-/// lockdownd exists — and every measurement taken so far, including
-/// checkpoint 1's, only ever connected.
+/// The decisive question is whether lockdownd closes because of what we sent,
+/// or would have closed regardless. If it hangs up before reading a byte, it is
+/// refusing network clients outright and no message we could craft would help —
+/// that is the deadlock `NOTES.md` predicted, where enabling wireless lockdown
+/// needs a session, a session needs a pair record, and the pair record needs
+/// the connection that was just refused.
 ///
-/// The control is a port nothing serves. If that connects too, "open" means
-/// nothing on this setup and the finding has to be re-read.
+/// If instead it waits for input and only then closes, the message is the
+/// problem, and a message is something we can change.
+///
+/// Each experiment is one connection, so nothing here depends on the state left
+/// by the one before it.
 async fn diagnose(host: &str, raw: String) -> Fail {
     println!();
     ui::info("working out what is behind that port …");
 
-    // Two arbitrary ports no iOS service listens on.
+    // Control: two ports no iOS service listens on. If these connect, an open
+    // port would prove nothing and every earlier measurement would need
+    // re-reading. (On 2026-08-27 they were refused, so it does prove something.)
     let mut phantom = Vec::new();
     for control in [12345u16, 51763] {
         if connects(host, control).await {
-            phantom.push(control);
+            phantom.push(control.to_string());
         }
     }
-    let accepts_anything = !phantom.is_empty();
-
-    if accepts_anything {
-        ui::warn(&format!(
-            "{host}:{} connected too, and nothing serves that port",
-            phantom.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(" and ")
-        ));
+    if phantom.is_empty() {
+        ui::detail("control ports refused — an open port here does mean a live service");
     } else {
-        ui::detail("control ports were refused, so an open port does mean a live service");
+        ui::warn(&format!(
+            "ports {} connected too, and nothing serves those",
+            phantom.join(" and ")
+        ));
     }
 
-    for (label, port) in [("lockdownd", LOCKDOWN_PORT), ("RSD", RSD_PORT)] {
-        match exchange(host, port).await {
-            Ok(outcome) => ui::info(&format!("{host}:{port} ({label}) — {outcome}")),
-            Err(e) => ui::info(&format!("{host}:{port} ({label}) — {e}")),
-        }
+    // The experiment that decides the outcome.
+    let silent = listen_only(host, LOCKDOWN_PORT).await;
+    ui::info(&format!("62078, saying nothing  — {silent}"));
+
+    let closes_unprompted = matches!(silent, Silence::ClosedBy(_));
+
+    for (what, outcome) in [
+        ("XML QueryType, one write ", write_then_read(host, LOCKDOWN_PORT, Framing::XmlOneWrite).await),
+        ("XML QueryType, two writes", write_then_read(host, LOCKDOWN_PORT, Framing::XmlTwoWrites).await),
+        ("binary plist QueryType   ", write_then_read(host, LOCKDOWN_PORT, Framing::Binary).await),
+    ] {
+        ui::info(&format!("62078, {what} — {outcome}"));
     }
 
-    let advice = if accepts_anything {
+    ui::info(&format!("49152, saying nothing  — {}", listen_only(host, RSD_PORT).await));
+
+    let advice = if closes_unprompted {
         [
-            format!("LocalDevVPN accepted a connection to {host}:{LOCKDOWN_PORT}, but it also"),
-            "accepts connections to ports nothing serves — so the port being open".to_string(),
-            "never meant lockdownd was listening. Writing to it is what fails.".to_string(),
+            format!("lockdownd is listening at {host}:{LOCKDOWN_PORT}, but it hangs up before"),
+            "reading anything at all — so it is refusing network clients outright,".to_string(),
+            "not rejecting the message siboot sent.".to_string(),
             String::new(),
-            "The likely reading is that lockdownd is not accepting network connections".to_string(),
-            "on this iOS version: it answers over USB until wireless debugging is".to_string(),
-            "enabled, and enabling that needs a session, which needs a pair record.".to_string(),
+            "That is the deadlock this approach had to clear: lockdownd answers over".to_string(),
+            "USB until wireless debugging is switched on, switching it on needs a".to_string(),
+            "session, and a session needs a pair record — which is what could not be".to_string(),
+            "minted here.".to_string(),
             String::new(),
-            "That is the case siboot cannot pair its way out of. If it holds, a pairing".to_string(),
-            "file has to be made on a computer once and imported — which is the thing".to_string(),
-            "this tool exists to avoid, so it is worth confirming before accepting it.".to_string(),
+            "If this holds, a pairing file has to be made once on a computer and".to_string(),
+            "imported. Worth confirming before accepting it, because it is the one".to_string(),
+            "thing this tool exists to avoid.".to_string(),
         ]
         .join("\n")
     } else {
         [
-            format!("Something is listening at {host}:{LOCKDOWN_PORT}, but it closed the"),
-            "connection instead of answering a lockdown QueryType.".to_string(),
+            format!("lockdownd at {host}:{LOCKDOWN_PORT} waits for input and then closes without"),
+            "answering — so it is reading what siboot sent and rejecting it, rather".to_string(),
+            "than refusing network clients on principle.".to_string(),
             String::new(),
-            "If LocalDevVPN is connected and its tunnel address is still".to_string(),
-            format!("{DEFAULT_DEVICE_IP}, this is lockdownd refusing a network client rather"),
-            "than a configuration problem.".to_string(),
+            "That is the more tractable of the two outcomes: the message is something".to_string(),
+            "that can be changed. Send the lines above.".to_string(),
         ]
         .join("\n")
     };
@@ -261,58 +275,118 @@ async fn connects(host: &str, port: u16) -> bool {
     )
 }
 
-/// Send one lockdown `QueryType` by hand and describe exactly what came back.
-///
-/// Hand-rolled rather than reusing `Idevice`, because the interesting part is
-/// the part `idevice` abstracts away: whether the write lands, whether the
-/// length prefix arrives, and whether the peer resets or simply closes.
-async fn exchange(host: &str, port: u16) -> std::result::Result<String, String> {
-    let mut stream = timeout(Duration::from_secs(5), TcpStream::connect((host, port)))
-        .await
-        .map_err(|_| "connect timed out".to_string())?
-        .map_err(|e| format!("connect failed: {e}"))?;
+enum Silence {
+    /// The peer hung up on its own, this long after the connection opened.
+    ClosedBy(Duration),
+    StayedOpen,
+    Failed(String),
+}
+
+impl std::fmt::Display for Silence {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Silence::ClosedBy(d) => write!(f, "it closed after {d:?} without us writing a byte"),
+            Silence::StayedOpen => write!(f, "it stayed open, waiting for input"),
+            Silence::Failed(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+/// Connect and read without ever writing.
+async fn listen_only(host: &str, port: u16) -> Silence {
+    let mut stream = match timeout(Duration::from_secs(5), TcpStream::connect((host, port))).await {
+        Ok(Ok(s)) => s,
+        Ok(Err(e)) => return Silence::Failed(format!("connect failed: {e}")),
+        Err(_) => return Silence::Failed("connect timed out".into()),
+    };
+    let started = std::time::Instant::now();
+    let mut buf = [0u8; 64];
+    match timeout(Duration::from_secs(5), stream.read(&mut buf)).await {
+        // A clean EOF, or a reset, both mean the peer ended it unprompted.
+        Ok(Ok(0)) => Silence::ClosedBy(started.elapsed()),
+        Ok(Ok(n)) => Silence::Failed(format!("it spoke first, sending {n} bytes")),
+        // A reset is the peer ending it too, just less politely.
+        Ok(Err(e)) if e.kind() == std::io::ErrorKind::ConnectionReset => {
+            Silence::ClosedBy(started.elapsed())
+        }
+        Ok(Err(e)) => Silence::Failed(format!("read failed: {e}")),
+        Err(_) => Silence::StayedOpen,
+    }
+}
+
+enum Framing {
+    /// Length prefix and body in a single write.
+    XmlOneWrite,
+    /// Prefix, then body — what `Idevice::send_plist` does.
+    XmlTwoWrites,
+    /// Same request, serialised as a binary plist. lockdownd accepts both, so a
+    /// difference here would point at the XML rather than the protocol.
+    Binary,
+}
+
+async fn write_then_read(host: &str, port: u16, framing: Framing) -> String {
+    let mut stream = match timeout(Duration::from_secs(5), TcpStream::connect((host, port))).await {
+        Ok(Ok(s)) => s,
+        Ok(Err(e)) => return format!("connect failed: {e}"),
+        Err(_) => return "connect timed out".into(),
+    };
     let _ = stream.set_nodelay(true);
 
-    let body = query_type_plist();
-    let mut frame = (body.len() as u32).to_be_bytes().to_vec();
-    frame.extend_from_slice(&body);
+    let body = match framing {
+        Framing::Binary => query_type_plist(true),
+        _ => query_type_plist(false),
+    };
+    let prefix = (body.len() as u32).to_be_bytes();
 
-    if let Err(e) = stream.write_all(&frame).await {
-        return Ok(format!("write of {} bytes failed: {e}", frame.len()));
-    }
-    if let Err(e) = stream.flush().await {
-        return Ok(format!("flush failed: {e}"));
-    }
-
-    let mut prefix = [0u8; 4];
-    match timeout(Duration::from_secs(10), stream.read_exact(&mut prefix)).await {
-        Err(_) => Ok(format!("wrote {} bytes, then no reply within 10s", frame.len())),
-        Ok(Err(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-            Ok(format!("wrote {} bytes, then the peer closed without replying", frame.len()))
+    let write = async {
+        match framing {
+            Framing::XmlTwoWrites => {
+                stream.write_all(&prefix).await?;
+                stream.write_all(&body).await?;
+            }
+            _ => {
+                let mut frame = prefix.to_vec();
+                frame.extend_from_slice(&body);
+                stream.write_all(&frame).await?;
+            }
         }
-        Ok(Err(e)) => Ok(format!("wrote {} bytes, then the read failed: {e}", frame.len())),
+        stream.flush().await
+    };
+    if let Err(e) = write.await {
+        return format!("write of {} bytes failed: {e}", 4 + body.len());
+    }
+
+    let mut got = [0u8; 4];
+    match timeout(Duration::from_secs(10), stream.read_exact(&mut got)).await {
+        Err(_) => format!("wrote {} bytes, then silence for 10s", 4 + body.len()),
+        Ok(Err(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+            format!("wrote {} bytes, then it closed cleanly", 4 + body.len())
+        }
+        Ok(Err(e)) => format!("wrote {} bytes, then the read failed: {e}", 4 + body.len()),
         Ok(Ok(_)) => {
-            let len = u32::from_be_bytes(prefix);
-            let mut buf = vec![0u8; len.min(512) as usize];
+            let len = u32::from_be_bytes(got);
+            let mut buf = vec![0u8; (len as usize).min(400)];
             match timeout(Duration::from_secs(10), stream.read_exact(&mut buf)).await {
-                Ok(Ok(_)) => Ok(format!(
-                    "replied with a {len}-byte message starting {:?}",
-                    String::from_utf8_lossy(&buf[..buf.len().min(60)])
-                )),
-                _ => Ok(format!("announced {len} bytes but did not send them")),
+                Ok(Ok(_)) => format!(
+                    "REPLIED with {len} bytes: {}",
+                    String::from_utf8_lossy(&buf[..buf.len().min(200)])
+                ),
+                _ => format!("announced {len} bytes but sent none"),
             }
         }
     }
 }
 
-fn query_type_plist() -> Vec<u8> {
+fn query_type_plist(binary: bool) -> Vec<u8> {
     let mut dict = plist::Dictionary::new();
     dict.insert("Label".into(), plist::Value::String(crate::LABEL.into()));
     dict.insert("Request".into(), plist::Value::String("QueryType".into()));
+    let value = plist::Value::Dictionary(dict);
     let mut out = Vec::new();
-    // Matches what `Idevice::send_plist` writes: XML, length-prefixed.
-    plist::Value::Dictionary(dict)
-        .to_writer_xml(&mut out)
-        .expect("serialising a two-key plist cannot fail");
+    if binary {
+        value.to_writer_binary(&mut out).expect("serialising two keys cannot fail");
+    } else {
+        value.to_writer_xml(&mut out).expect("serialising two keys cannot fail");
+    }
     out
 }
