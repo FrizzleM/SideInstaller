@@ -1,0 +1,104 @@
+[package]
+name = "siboot"
+version = "0.1.0"
+edition = "2021"
+description = "PC-free, certificate-free bootstrap that installs SideInstaller from inside iSH"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "siboot"
+path = "src/main.rs"
+
+# Own workspace: this crate cross-compiles to i686-unknown-linux-musl and must
+# not share `rust-core`'s lockfile, whose tree is pinned around aws-lc and the
+# Apple targets.
+[workspace]
+
+[dependencies]
+# The device half. Referenced by path at `rust-core/vendor/idevice` (NOT edited —
+# see ../rust-core/vendor/idevice/README.md for the OPACK patch it already
+# carries). Feature set is the CoreDeviceProxy pipeline only:
+#   tcp                the TcpProvider that reaches lockdownd over the VPN peer
+#   pair               classic lockdown `Pair` — how the record gets minted
+#   core_device_proxy  the tunnel that needs no inbound listener
+#   tunnel_tcp_stack   in-process software TCP stack (the Adapter)
+#   rsd / xpc          RemoteServiceDiscovery handshake over the tunnel
+#   afc                /PublicStaging upload
+#   installation_proxy the install itself
+#   house_arrest       seeding the pairing file into the installed container
+#   heartbeat          keeps the lockdown session alive through a slow sign
+# `remote_pairing` is deliberately absent: iSH has no NSNetService, so the
+# RPPairing host role is impossible here, and dropping it also drops
+# ed25519-dalek/srp/chacha20poly1305 from the binary.
+idevice = { path = "../rust-core/vendor/idevice", default-features = false, features = [
+  "ring",
+  "tcp",
+  "pair",
+  "rsd",
+  "xpc",
+  "core_device_proxy",
+  "tunnel_tcp_stack",
+  "afc",
+  "installation_proxy",
+  "house_arrest",
+  "heartbeat",
+] }
+
+# The account half. Forked into this crate's own vendor/ because the only way
+# off aws-lc-sys is editing isideload's manifest — see vendor/isideload/README.md.
+# `install` is off: isideload's installer would pull a second, duplicate idevice
+# (0.1.61 from crates.io) that we never call, since the install runs over our own
+# RSD tunnel exactly as the iOS app's does.
+isideload = { path = "vendor/isideload", default-features = false, features = [
+  "fs-storage",
+] }
+
+# Selects the process-wide rustls CryptoProvider. reqwest is built with
+# `rustls-no-provider`, so *something* has to install one before the first TLS
+# handshake; siboot does it on the first line of main.
+rustls = { version = "0.23", default-features = false, features = [
+  "ring",
+  "std",
+  "tls12",
+] }
+
+reqwest = { version = "0.13", default-features = false, features = [
+  "json",
+  "gzip",
+  "http2",
+  "charset",
+  "system-proxy",
+  "rustls-no-provider",
+] }
+
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "net",
+  "macros",
+  "fs",
+  "io-util",
+  "time",
+] }
+
+plist = "1.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+# No-echo password read. Pure Rust over termios; no C, no curses.
+rpassword = "7"
+ring = "0.17"
+
+# Tuned for a binary that is downloaded over a phone connection and executed
+# under emulation, so size is worth real build time.
+#
+# `lto = "fat"` across ~380 crates on one codegen unit is the memory-hungry
+# part. If the CI build is ever killed rather than failed, that is the first
+# thing to relax — "thin" gives back most of the size for a fraction of the
+# peak.
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

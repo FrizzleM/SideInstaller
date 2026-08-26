@@ -290,6 +290,66 @@ let italianStrings: [String: String] = [
     "The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that.":
         "Il dispositivo non ha un profilo di provisioning per questo App ID. L'app potrebbe già aver smesso di avviarsi: installala di nuovo per risolvere.",
 
+    // MARK: - Side by Side tool
+
+    // The tool's name is left in English everywhere, as SideStore's is.
+    "Side by Side": "Side by Side",
+    "Pair with their iPhone": "Abbinarsi al loro iPhone",
+    "Sign in to their Apple ID": "Accedere al loro Apple ID",
+    "Download SideInstaller": "Scaricare SideInstaller",
+    "Install on their iPhone": "Installare sul loro iPhone",
+    "Enter the other iPhone's IP address. It's in Settings › Wi-Fi, next to the network it's on.":
+        "Inserisci l'indirizzo IP dell'altro iPhone. Lo trovi in Impostazioni › Wi-Fi, accanto alla rete a cui è connesso.",
+    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
+        "“%@” non è un indirizzo IPv4. Deve avere questa forma: 192.168.1.42.",
+    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
+        "%@ è un indirizzo che questo iPhone già possiede. Side by Side installa sull'iPhone di un'altra persona: usa il suo. Per installare su questo, usa la scheda Installa.",
+    "Enter the Apple ID to sign with, and its password.":
+        "Inserisci l'Apple ID con cui firmare e la sua password.",
+    "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
+        "Il Wi-Fi è spento. Entrambi gli iPhone devono essere sulla stessa rete Wi-Fi perché funzioni.",
+    "The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute.":
+        "Il download della release non era un IPA. GitHub potrebbe restituire una pagina di errore: riprova tra un minuto.",
+    "Couldn't download the latest SideInstaller release: %@":
+        "Impossibile scaricare l'ultima release di SideInstaller: %@",
+    "No SideInstaller IPA downloaded.": "Nessun IPA di SideInstaller scaricato.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first — with the Certificates tool if this is the Apple ID saved in Settings › Account, and at developer.apple.com signed in as it otherwise.":
+        "Apple non rilascia un certificato di firma per questo Apple ID: segnala che ne esiste già uno (errore 7460). Bisogna prima revocarne uno — con lo strumento Certificati se questo è l'Apple ID salvato in Impostazioni › Account, altrimenti su developer.apple.com effettuando l'accesso con quell'account.",
+    "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
+        "Apple non ha registrato il loro iPhone nel team di sviluppo di questo Apple ID, quindi non rilascerà un profilo di provisioning. %@",
+    "No pair record for their iPhone.": "Nessun record di abbinamento per il loro iPhone.",
+    "The link to their iPhone dropped — start again.":
+        "Il collegamento con il loro iPhone è caduto: ricomincia.",
+    "Set up someone else's iPhone": "Configura l'iPhone di un'altra persona",
+    "Same Wi-Fi network": "Stessa rete Wi-Fi",
+    "How it works": "Come funziona",
+    "This installs SideInstaller onto another iPhone on the same Wi-Fi network — no computer and no cable. Their iPhone will ask them to trust this one; they have to be holding it, unlocked, when you tap Install.":
+        "Installa SideInstaller su un altro iPhone connesso alla stessa rete Wi-Fi: niente computer e niente cavo. Il loro iPhone chiederà di autorizzare questo; devono averlo in mano, sbloccato, quando tocchi Installa.",
+    "Their iPhone": "Il loro iPhone",
+    "IP address (e.g. 192.168.1.42)": "Indirizzo IP (es. 192.168.1.42)",
+    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
+        "Sul loro iPhone: Impostazioni › Wi-Fi › ⓘ accanto alla rete, poi “Indirizzo IP”.",
+    "This iPhone is %@, so theirs will look similar.":
+        "Questo iPhone è %@, quindi il loro sarà simile.",
+    "Apple ID to sign with": "Apple ID con cui firmare",
+    "Usually theirs, so the app is signed to their account and their free developer slots. Held only until this page is closed — never saved to this iPhone, and the password is never sent anywhere but Apple.":
+        "Di solito il loro, così l'app è firmata con il loro account e i loro slot da sviluppatore gratuiti. Conservato solo finché questa pagina resta aperta: mai salvato su questo iPhone, e la password non viene inviata a nessuno tranne Apple.",
+    "Use my saved Apple ID instead": "Usa invece il mio Apple ID salvato",
+    "Steps": "Passaggi",
+    "Waiting for them to tap Trust…": "In attesa che tocchino Autorizza…",
+    "%d%% downloaded": "%d%% scaricato",
+    "%d%% uploaded": "%d%% caricato",
+    "Start the install": "Avvia l'installazione",
+    "Install again": "Installa di nuovo",
+    "Clear their details": "Cancella i loro dati",
+    "Last step: they trust %@": "Ultimo passaggio: autorizzano %@",
+    "On their iPhone: Settings › General › VPN & Device Management.":
+        "Sul loro iPhone: Impostazioni › Generali › VPN e gestione dispositivi.",
+    "Tap the Apple ID under “Developer App”, then tap Trust.":
+        "Tocca l'Apple ID sotto “App dello sviluppatore”, poi tocca Autorizza.",
+    "Open it from their Home Screen — they're set up.":
+        "Aprila dalla loro schermata Home: è tutto pronto.",
+
     // MARK: - Settings
 
     "Settings": "Impostazioni",
