@@ -44,16 +44,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Use current stable Rust
-        # The image pins whatever toolchain it shipped with. `idevice` and
-        # `isideload` are both edition 2024, which needs 1.85 or newer, so the
-        # pin is refreshed rather than trusted.
+      - name: Check the toolchain is new enough
+        # `idevice` and `isideload` are both edition 2024, which needs 1.85 or
+        # newer. Checked rather than updated: this image ships a damaged
+        # component manifest, and `rustup update stable` dies trying to remove
+        # the old clippy —
+        #   error: failure removing component 'clippy-preview-...',
+        #   directory does not exist: 'share/doc/clippy/README.md'
+        # — then rolls the whole update back. Adding a target does not touch
+        # components, so it stays safe.
         run: |
-          rustup update stable
-          rustup default stable
-          rustup target add i686-unknown-linux-musl
+          set -eu
+          rustc --version
+
+          MIN_MINOR=85
+          have=$(rustc --version | sed -n 's/^rustc 1\.\([0-9][0-9]*\).*/\1/p')
+          if [ -z "$have" ] || [ "$have" -lt "$MIN_MINOR" ]; then
+            echo "::warning::rustc is older than 1.$MIN_MINOR; replacing the toolchain"
+            # Uninstall-then-install rather than update: removing the whole
+            # toolchain directory avoids the per-component path the bug is in.
+            rustup toolchain uninstall stable || true
+            rustup toolchain install stable --profile minimal
+            rustup default stable
+          fi
+
+          if ! rustup target list --installed | grep -qx i686-unknown-linux-musl; then
+            rustup target add i686-unknown-linux-musl
+          fi
+
           rustc --version
           cargo --version
+          rustup target list --installed
 
       - name: Cache cargo registry and build
         uses: actions/cache@v4
