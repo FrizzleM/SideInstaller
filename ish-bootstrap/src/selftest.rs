@@ -23,6 +23,7 @@
 use std::net::{SocketAddr, TcpStream, UdpSocket};
 use std::time::{Duration, Instant};
 
+use crate::fail::{Fail, Result};
 use crate::ui;
 
 /// The loopback VPN's peer address. Measured on device: lockdownd and RSD both
@@ -35,7 +36,7 @@ pub const RSD_PORT: u16 = 49152;
 const TOTAL: usize = 5;
 
 /// Returns whether the device's own services were reachable.
-pub fn run(offline: bool) -> Result<bool, (String, String)> {
+pub fn run(offline: bool) -> Result<bool> {
     platform();
     runtime()?;
     crypto()?;
@@ -44,7 +45,20 @@ pub fn run(offline: bool) -> Result<bool, (String, String)> {
     } else {
         tls()?;
     }
-    Ok(network())
+    let reachable = network();
+
+    println!();
+    ui::ok("toolchain checks passed");
+    if reachable {
+        ui::ok("this iPhone's own services are reachable — the approach holds here");
+    } else {
+        ui::warn(
+            "the device checks did not run: LocalDevVPN was not connected. The toolchain \
+             result above still stands.",
+        );
+    }
+    println!();
+    Ok(reachable)
 }
 
 fn platform() {
@@ -69,17 +83,16 @@ fn platform() {
 
 /// Spinning up the multi-threaded runtime exercises thread creation and the
 /// futex/mmap paths musl uses — the parts of libc iSH emulates least completely.
-fn runtime() -> Result<(), (String, String)> {
+fn runtime() -> Result<()> {
     ui::stage(2, TOTAL, "Async runtime (threads, timers)");
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
         .build()
         .map_err(|e| {
-            (
+            Fail::new(
                 "This build could not start its thread pool inside iSH. Nothing here can \
-                 work around that — please report it with the line below."
-                    .to_string(),
+                 work around that — please report it with the line below.",
                 format!("tokio runtime build failed: {e}"),
             )
         })?;
@@ -96,17 +109,16 @@ fn runtime() -> Result<(), (String, String)> {
 
 /// A SHA-256 known-answer test. `ring` ships hand-written x86 assembly, so this
 /// is both a "does it run" and a "does it compute the right thing" check.
-fn crypto() -> Result<(), (String, String)> {
+fn crypto() -> Result<()> {
     ui::stage(3, TOTAL, "Crypto backend (ring, x86 assembly)");
     let digest = ring::digest::digest(&ring::digest::SHA256, b"abc");
     let got = hex(digest.as_ref());
     // FIPS 180-4 SHA-256("abc").
     const WANT: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
     if got != WANT {
-        return Err((
+        return Err(Fail::new(
             "This device's CPU emulation computed a wrong SHA-256. Signing would produce \
-             a corrupt bundle, so siboot stops here."
-                .to_string(),
+             a corrupt bundle, so siboot stops here.",
             format!("ring SHA-256(\"abc\") = {got}, expected {WANT}"),
         ));
     }
@@ -137,30 +149,29 @@ fn crypto() -> Result<(), (String, String)> {
 
 /// One real HTTPS request. Proves the runtime-installed `CryptoProvider`, the
 /// rustls handshake and Alpine's trust store all work from inside the sandbox.
-fn tls() -> Result<(), (String, String)> {
+fn tls() -> Result<()> {
     ui::stage(4, TOTAL, "TLS to api.github.com");
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .map_err(|e| ("Could not start a runtime for the network check.".to_string(), e.to_string()))?;
+        .map_err(|e| Fail::new("Could not start a runtime for the network check.", e.to_string()))?;
 
     rt.block_on(async {
         let client = reqwest::Client::builder()
             .user_agent(crate::USER_AGENT)
             .timeout(Duration::from_secs(60))
             .build()
-            .map_err(|e| ("Could not build an HTTPS client.".to_string(), e.to_string()))?;
+            .map_err(|e| Fail::new("Could not build an HTTPS client.", e.to_string()))?;
 
         let resp = client
             .get("https://api.github.com/repos/FrizzleM/SideInstaller/releases/latest")
             .send()
             .await
             .map_err(|e| {
-                (
+                Fail::new(
                     "Could not reach api.github.com over HTTPS. Check that iSH has network \
                      access — if `curl https://api.github.com` also fails, the problem is \
-                     iSH's connection, not siboot."
-                        .to_string(),
+                     iSH's connection, not siboot.",
                     format!("{e:?}"),
                 )
             })?;
@@ -169,11 +180,11 @@ fn tls() -> Result<(), (String, String)> {
         let body: serde_json::Value = resp
             .json()
             .await
-            .map_err(|e| ("GitHub replied with something that was not JSON.".to_string(), e.to_string()))?;
+            .map_err(|e| Fail::new("GitHub replied with something that was not JSON.", e.to_string()))?;
         let tag = body.get("tag_name").and_then(|v| v.as_str()).unwrap_or("<none>");
         ui::detail(&format!("HTTP {status}"));
         ui::ok(&format!("TLS works; latest SideInstaller release is {tag}"));
-        Ok::<_, (String, String)>(())
+        Ok::<_, Fail>(())
     })
 }
 
@@ -217,7 +228,7 @@ fn network() -> bool {
     vpn_up
 }
 
-fn probe(host: &str, port: u16) -> Result<Duration, String> {
+fn probe(host: &str, port: u16) -> std::result::Result<Duration, String> {
     let addr: SocketAddr = format!("{host}:{port}").parse().map_err(|e| format!("{e}"))?;
     let started = Instant::now();
     TcpStream::connect_timeout(&addr, Duration::from_secs(5))
