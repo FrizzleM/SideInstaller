@@ -31,6 +31,7 @@ struct RootView: View {
     @StateObject private var locationManager = LocationManager()
     @StateObject private var entitlementsManager = EntitlementsManager()
     @StateObject private var appsManager = SideloadedAppsManager()
+    @StateObject private var sideBySideManager = SideBySideManager()
     @State private var twoFactorCode = ""
     @State private var page: Page = .install
 
@@ -44,7 +45,8 @@ struct RootView: View {
                           certManager: certManager,
                           locationManager: locationManager,
                           entitlementsManager: entitlementsManager,
-                          appsManager: appsManager)
+                          appsManager: appsManager,
+                          sideBySideManager: sideBySideManager)
             }
             Tab(L("About"), systemImage: "info.circle", value: Page.about) {
                 AboutView()
@@ -56,12 +58,15 @@ struct RootView: View {
         .onChange(of: page) { _, page in Backdrop.settle(on: page.wash) }
         // The Install tab's revoke-and-retry runs through this same manager.
         .environmentObject(certManager)
-        // Three separate Apple sessions are cached below; all three belong to
-        // the account that opened them, so none may outlive a switch.
+        // Four separate Apple sessions are cached below; each belongs to the
+        // account that opened it, so none may outlive a switch. Side by Side
+        // signs in as somebody else, which is exactly why it is dropped here
+        // too — its session must never be reused for whoever is active now.
         .onChange(of: accounts.revision) { _, _ in
             engine.forgetAppleSession()
             certManager.signOut()
             entitlementsManager.signOut()
+            sideBySideManager.signOut()
         }
         .tint(Theme.accent)
         .preferredColorScheme(.dark)
@@ -90,6 +95,7 @@ struct ToolsView: View {
     @ObservedObject var locationManager: LocationManager
     @ObservedObject var entitlementsManager: EntitlementsManager
     @ObservedObject var appsManager: SideloadedAppsManager
+    @ObservedObject var sideBySideManager: SideBySideManager
 
     @State private var showSettings = false
 
@@ -98,6 +104,14 @@ struct ToolsView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     header.cascadeItem(0)
+                    NavigationLink {
+                        SideBySideView(manager: sideBySideManager)
+                    } label: {
+                        ToolRow(icon: "iphone.gen3.radiowaves.left.and.right",
+                                title: L("Side by Side"))
+                    }
+                    .buttonStyle(.plain)
+                    .cascadeItem(1)
                     // Everything on the Pairing page is about producing a
                     // pairing file on this iPhone, which only iOS 27 can do —
                     // below it the file is imported on the Install screen
@@ -109,19 +123,12 @@ struct ToolsView: View {
                             ToolRow(image: "PairingLogo", title: L("Pairing"))
                         }
                         .buttonStyle(.plain)
-                        .cascadeItem(1)
+                        .cascadeItem(2)
                     }
                     NavigationLink {
                         CertsView(manager: certManager)
                     } label: {
                         ToolRow(image: "CertsLogo", title: L("Certificates"))
-                    }
-                    .buttonStyle(.plain)
-                    .cascadeItem(rowIndex(1))
-                    NavigationLink {
-                        LocationView(manager: locationManager)
-                    } label: {
-                        ToolRow(image: "LocationLogo", title: L("Location spoofing"))
                     }
                     .buttonStyle(.plain)
                     .cascadeItem(rowIndex(2))
@@ -133,12 +140,19 @@ struct ToolsView: View {
                     .buttonStyle(.plain)
                     .cascadeItem(rowIndex(3))
                     NavigationLink {
+                        LocationView(manager: locationManager)
+                    } label: {
+                        ToolRow(image: "LocationLogo", title: L("Location spoofing"))
+                    }
+                    .buttonStyle(.plain)
+                    .cascadeItem(rowIndex(4))
+                    NavigationLink {
                         AppsView(manager: appsManager)
                     } label: {
                         ToolRow(image: "AppsLogo", title: L("Sideloaded apps"))
                     }
                     .buttonStyle(.plain)
-                    .cascadeItem(rowIndex(4))
+                    .cascadeItem(rowIndex(5))
                 }
                 .padding(20)
             }

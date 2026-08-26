@@ -290,6 +290,66 @@ let vietnameseStrings: [String: String] = [
     "The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that.":
         "Thiết bị không có hồ sơ cấp phép cho App ID này. Ứng dụng có thể đã không mở được nữa — hãy cài lại để khắc phục.",
 
+    // MARK: - Side by Side tool
+
+    // The tool's name is left in English everywhere, as SideStore's is.
+    "Side by Side": "Side by Side",
+    "Pair with their iPhone": "Ghép nối với iPhone của họ",
+    "Sign in to their Apple ID": "Đăng nhập Apple ID của họ",
+    "Download SideInstaller": "Tải SideInstaller",
+    "Install on their iPhone": "Cài lên iPhone của họ",
+    "Enter the other iPhone's IP address. It's in Settings › Wi-Fi, next to the network it's on.":
+        "Nhập địa chỉ IP của chiếc iPhone kia. Nó nằm trong Cài đặt › Wi-Fi, ngay cạnh mạng mà máy đang kết nối.",
+    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
+        "“%@” không phải là địa chỉ IPv4. Nó phải có dạng 192.168.1.42.",
+    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
+        "%@ là địa chỉ mà chính chiếc iPhone này đang dùng. Side by Side cài lên iPhone của người khác — hãy dùng địa chỉ của họ. Để cài lên máy này, hãy dùng tab Cài ứng dụng.",
+    "Enter the Apple ID to sign with, and its password.":
+        "Nhập Apple ID dùng để ký và mật khẩu của nó.",
+    "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
+        "Wi-Fi đang tắt. Cả hai iPhone phải cùng một mạng Wi-Fi thì mới hoạt động.",
+    "The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute.":
+        "Bản tải về không phải là tệp IPA. Có thể GitHub đang trả về trang lỗi — hãy thử lại sau một phút.",
+    "Couldn't download the latest SideInstaller release: %@":
+        "Không tải được bản phát hành SideInstaller mới nhất: %@",
+    "No SideInstaller IPA downloaded.": "Chưa tải IPA của SideInstaller.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first — with the Certificates tool if this is the Apple ID saved in Settings › Account, and at developer.apple.com signed in as it otherwise.":
+        "Apple không cấp chứng chỉ ký cho Apple ID này: nó báo rằng đã có một chứng chỉ (lỗi 7460). Phải thu hồi bớt một chứng chỉ trước — bằng công cụ Chứng chỉ nếu đây là Apple ID đã lưu trong Cài đặt › Tài khoản, còn không thì vào developer.apple.com và đăng nhập bằng tài khoản đó.",
+    "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
+        "Apple không đăng ký được iPhone của họ với nhóm nhà phát triển của Apple ID này, nên sẽ không cấp hồ sơ provisioning. %@",
+    "No pair record for their iPhone.": "Không có bản ghi ghép nối cho iPhone của họ.",
+    "The link to their iPhone dropped — start again.":
+        "Kết nối tới iPhone của họ đã rớt — hãy bắt đầu lại.",
+    "Set up someone else's iPhone": "Thiết lập iPhone cho người khác",
+    "Same Wi-Fi network": "Cùng một mạng Wi-Fi",
+    "How it works": "Cách hoạt động",
+    "This installs SideInstaller onto another iPhone on the same Wi-Fi network — no computer and no cable. Their iPhone will ask them to trust this one; they have to be holding it, unlocked, when you tap Install.":
+        "Cài SideInstaller lên một chiếc iPhone khác trong cùng mạng Wi-Fi — không cần máy tính, không cần cáp. iPhone của họ sẽ hỏi có tin cậy máy này không; họ phải cầm máy, đã mở khóa, khi bạn chạm Cài ứng dụng.",
+    "Their iPhone": "iPhone của họ",
+    "IP address (e.g. 192.168.1.42)": "Địa chỉ IP (ví dụ 192.168.1.42)",
+    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
+        "Trên iPhone của họ: Cài đặt › Wi-Fi › ⓘ cạnh tên mạng, rồi xem “Địa chỉ IP”.",
+    "This iPhone is %@, so theirs will look similar.":
+        "iPhone này là %@, nên địa chỉ của họ sẽ tương tự.",
+    "Apple ID to sign with": "Apple ID dùng để ký",
+    "Usually theirs, so the app is signed to their account and their free developer slots. Held only until this page is closed — never saved to this iPhone, and the password is never sent anywhere but Apple.":
+        "Thường là của họ, để ứng dụng được ký bằng tài khoản và các suất nhà phát triển miễn phí của họ. Chỉ giữ đến khi bạn đóng trang này — không bao giờ lưu vào iPhone này, và mật khẩu chỉ được gửi tới Apple.",
+    "Use my saved Apple ID instead": "Dùng Apple ID đã lưu của tôi",
+    "Steps": "Các bước",
+    "Waiting for them to tap Trust…": "Đang đợi họ chạm Tin cậy…",
+    "%d%% downloaded": "Đã tải %d%%",
+    "%d%% uploaded": "Đã tải lên %d%%",
+    "Start the install": "Bắt đầu cài đặt",
+    "Install again": "Cài lại",
+    "Clear their details": "Xóa thông tin của họ",
+    "Last step: they trust %@": "Bước cuối: họ tin cậy %@",
+    "On their iPhone: Settings › General › VPN & Device Management.":
+        "Trên iPhone của họ: Cài đặt › Cài đặt chung › VPN & Quản lý thiết bị.",
+    "Tap the Apple ID under “Developer App”, then tap Trust.":
+        "Chạm vào Apple ID trong mục “Ứng dụng nhà phát triển”, rồi chạm vào Tin cậy.",
+    "Open it from their Home Screen — they're set up.":
+        "Mở ứng dụng từ màn hình chính của họ — vậy là xong.",
+
     // MARK: - Settings
 
     "Settings": "Cài đặt",

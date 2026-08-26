@@ -284,6 +284,62 @@ let chineseStrings: [String: String] = [
     "The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that.":
         "设备上没有这个 App ID 的描述文件。该应用可能已经无法启动——重新安装一次即可解决。",
 
+    // MARK: - Side by Side tool
+
+    // The tool's name is left in English everywhere, as SideStore's is.
+    "Side by Side": "Side by Side",
+    "Pair with their iPhone": "与对方的 iPhone 配对",
+    "Sign in to their Apple ID": "登录对方的 Apple ID",
+    "Download SideInstaller": "下载 SideInstaller",
+    "Install on their iPhone": "安装到对方的 iPhone",
+    "Enter the other iPhone's IP address. It's in Settings › Wi-Fi, next to the network it's on.":
+        "输入另一台 iPhone 的 IP 地址。在 设置 › 无线局域网 中，所连网络旁边可以找到。",
+    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
+        "“%@”不是 IPv4 地址。它应该形如 192.168.1.42。",
+    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
+        "%@ 是这台 iPhone 自己的地址。Side by Side 用于安装到别人的 iPhone 上，请填对方的地址。要安装到这台设备，请使用“安装”标签页。",
+    "Enter the Apple ID to sign with, and its password.": "请输入用于签名的 Apple ID 及其密码。",
+    "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
+        "无线局域网已关闭。两台 iPhone 必须连接同一个 Wi-Fi 网络才能使用。",
+    "The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute.":
+        "下载到的发行版不是 IPA 文件。GitHub 可能返回了错误页面——请过一分钟再试。",
+    "Couldn't download the latest SideInstaller release: %@":
+        "无法下载最新的 SideInstaller 发行版：%@",
+    "No SideInstaller IPA downloaded.": "尚未下载 SideInstaller 的 IPA。",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first — with the Certificates tool if this is the Apple ID saved in Settings › Account, and at developer.apple.com signed in as it otherwise.":
+        "Apple 不会为此 Apple ID 签发签名证书：它报告已经存在一个（错误 7460）。必须先吊销一个——如果这就是“设置 › 账户”中保存的 Apple ID，可用“证书”工具；否则请用该账户登录 developer.apple.com 吊销。",
+    "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
+        "Apple 未能将对方的 iPhone 注册到此 Apple ID 的开发团队，因此不会签发描述文件。%@",
+    "No pair record for their iPhone.": "没有对方 iPhone 的配对记录。",
+    "The link to their iPhone dropped — start again.": "与对方 iPhone 的连接已断开——请重新开始。",
+    "Set up someone else's iPhone": "为别人的 iPhone 完成设置",
+    "Same Wi-Fi network": "同一个 Wi-Fi 网络",
+    "How it works": "工作原理",
+    "This installs SideInstaller onto another iPhone on the same Wi-Fi network — no computer and no cable. Their iPhone will ask them to trust this one; they have to be holding it, unlocked, when you tap Install.":
+        "把 SideInstaller 安装到同一 Wi-Fi 网络下的另一台 iPhone 上——不需要电脑，也不需要数据线。对方的 iPhone 会请求信任这台设备；你轻点“安装”时，他们需要拿着已解锁的手机。",
+    "Their iPhone": "对方的 iPhone",
+    "IP address (e.g. 192.168.1.42)": "IP 地址（例如 192.168.1.42）",
+    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
+        "在对方的 iPhone 上：设置 › 无线局域网 › 网络旁的 ⓘ，然后查看“IP 地址”。",
+    "This iPhone is %@, so theirs will look similar.": "这台 iPhone 是 %@，对方的地址会与之相近。",
+    "Apple ID to sign with": "用于签名的 Apple ID",
+    "Usually theirs, so the app is signed to their account and their free developer slots. Held only until this page is closed — never saved to this iPhone, and the password is never sent anywhere but Apple.":
+        "通常填对方的，这样 App 就用他们的账户和免费开发者名额签名。仅在此页面打开期间保留——绝不会保存到这台 iPhone，密码也只会发送给 Apple。",
+    "Use my saved Apple ID instead": "改用我保存的 Apple ID",
+    "Steps": "步骤",
+    "Waiting for them to tap Trust…": "等待对方轻点“信任”…",
+    "%d%% downloaded": "已下载 %d%%",
+    "%d%% uploaded": "已上传 %d%%",
+    "Start the install": "开始安装",
+    "Install again": "再次安装",
+    "Clear their details": "清除对方的信息",
+    "Last step: they trust %@": "最后一步：让对方信任 %@",
+    "On their iPhone: Settings › General › VPN & Device Management.":
+        "在对方的 iPhone 上：设置 › 通用 › VPN 与设备管理。",
+    "Tap the Apple ID under “Developer App”, then tap Trust.":
+        "在“开发者 App”下轻点该 Apple ID，然后轻点“信任”。",
+    "Open it from their Home Screen — they're set up.": "从他们的主屏幕打开它——设置完成。",
+
     // MARK: - Settings
 
     "Settings": "设置",

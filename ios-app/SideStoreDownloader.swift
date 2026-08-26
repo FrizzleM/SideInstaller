@@ -649,6 +649,23 @@ enum PrivateStore {
         directory.appendingPathComponent("combined_pairing_file.plist")
     }
 
+    /// A lockdown pair record minted for *another* device over the LAN, one file
+    /// per address. Kept apart from `lockdownPairRecord`, which is this iPhone's
+    /// own and would be overwritten by the first Side by Side run otherwise.
+    ///
+    /// Filed under the address because that is all Side by Side knows before it
+    /// connects — the UDID only arrives afterwards. A record that stops working
+    /// (a different iPhone on that address, a reset, a revoked trust) is minted
+    /// again, so a stale one costs a Trust tap rather than a dead end.
+    static func peerPairRecord(host: String) -> URL {
+        let dir = directory.appendingPathComponent("peer-pairings", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // Dots are fine in a filename, but anything else in a typed address is
+        // not: keep the digits and dots and drop the rest.
+        let key = host.filter { $0.isNumber || $0 == "." }
+        return dir.appendingPathComponent("lockdown-\(key.isEmpty ? "unknown" : key).plist")
+    }
+
     /// isideload's `FsStorage` root, created on demand as isideload expects.
     static var isideload: URL {
         let url = resolve(private: directory.appendingPathComponent("isideload", isDirectory: true),
