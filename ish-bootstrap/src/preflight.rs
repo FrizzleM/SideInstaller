@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use idevice::rsd::RsdHandshake;
 use idevice::xpc::RemoteXpcClient;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
 
@@ -163,6 +164,19 @@ async fn diagnose_rsd(host: &str, raw: String) -> Fail {
         },
     }
 
+    // Does this device send us *anything*? Every step above only writes —
+    // `Http2Client::new`, `do_handshake` and `send_device_handshake` are all
+    // write-only, so the first read in the whole sequence is `recv_root`, and
+    // an "ok" from them means nothing more than "the local socket accepted it".
+    //
+    // In HTTP/2 the server sends its SETTINGS frame straight after the client
+    // preface, unprompted. So writing the 24-byte magic and then reading
+    // separates the two possibilities cleanly: bytes back means the device is
+    // willing to talk to this process and the fault is in what we send later;
+    // a reset means it is refusing us from the start, whatever we send.
+    println!();
+    ui::info(&format!("49152, HTTP/2 preface then read — {}", preface_only(host, RSD_PORT).await));
+
     // The other flow in tunnel_provider.rs. `tunnel_create_rppairing` talks to
     // the *tunnel service* with new -> do_handshake -> recv_root and no
     // `send_device_handshake`; only `RsdHandshake::new` sends that. If 49152 is
@@ -188,6 +202,37 @@ async fn diagnose_rsd(host: &str, raw: String) -> Fail {
     .join("\n");
 
     Fail::new(advice, raw)
+}
+
+/// Write only the HTTP/2 connection preface, then read.
+///
+/// A conforming HTTP/2 server answers with SETTINGS before it is asked for
+/// anything, so this needs no protocol support from us beyond 24 bytes.
+async fn preface_only(host: &str, port: u16) -> String {
+    const HTTP2_MAGIC: &[u8] = b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
+
+    let mut stream = match connect(host, port).await {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+    if let Err(e) = stream.write_all(HTTP2_MAGIC).await {
+        return format!("writing the preface failed: {e}");
+    }
+    if let Err(e) = stream.flush().await {
+        return format!("flushing the preface failed: {e}");
+    }
+
+    let mut buf = [0u8; 64];
+    match timeout(Duration::from_secs(10), stream.read(&mut buf)).await {
+        Err(_) => "silence for 10s — no SETTINGS frame".into(),
+        Ok(Err(e)) => format!("reset before sending anything: {e}"),
+        Ok(Ok(0)) => "closed without sending anything".into(),
+        Ok(Ok(n)) => {
+            // Frame header: 3-byte length, 1-byte type (0x04 = SETTINGS).
+            let kind = if n >= 4 && buf[3] == 0x04 { "SETTINGS" } else { "something else" };
+            format!("RECEIVED {n} bytes ({kind}) — the device does talk to this process")
+        }
+    }
 }
 
 /// `new` → `do_handshake` → `recv_root`, with no device handshake.
