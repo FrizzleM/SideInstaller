@@ -552,6 +552,7 @@ let chineseStrings: [String: String] = [
         "感谢 idevice——SideInstaller 正是通过这个库与你的 iPhone 通信的。没有它，这一切都不会存在。",
     "For the support, and for spotting the bugs that got fixed because of it.":
         "感谢一路以来的支持，以及发现了那些因此得到修复的问题。",
+    "For the Japanese translation.": "感谢提供日语翻译。",
 
     "Built with": "基于以下项目",
     "The open source work this app is built on:": "这个应用所依赖的开源成果：",

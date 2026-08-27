@@ -570,6 +570,7 @@ let frenchStrings: [String: String] = [
         "Pour idevice, la bibliothèque avec laquelle SideInstaller communique avec votre iPhone. Rien de tout cela n’existerait sans elle.",
     "For the support, and for spotting the bugs that got fixed because of it.":
         "Pour le soutien et pour avoir repéré les bugs qui ont ensuite été corrigés.",
+    "For the Japanese translation.": "Pour la traduction japonaise.",
 
     "Built with": "Construit avec",
     "The open source work this app is built on:":
