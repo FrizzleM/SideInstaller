@@ -28,11 +28,15 @@ path = "src/main.rs"
 #   installation_proxy the install itself
 #   house_arrest       seeding the pairing file into the installed container
 #   heartbeat          keeps the lockdown session alive through a slow sign
-# `remote_pairing` is deliberately absent: iSH has no NSNetService, so the
-# RPPairing host role is impossible here, and dropping it also drops
-# ed25519-dalek/srp/chacha20poly1305 from the binary.
+# What is absent is the RPPairing *host* role (mdns advertising): iSH has no
+# NSNetService and no multicast entitlement. The *client* role needs neither.
 idevice = { path = "../rust-core/vendor/idevice", default-features = false, features = [
   "ring",
+  # The RPPairing *client* role. Note this is not the host role rust-core
+  # disables: no advertising is involved, so no NSNetService and no multicast
+  # entitlement. `RemotePairingClient` dials the device's own
+  # `untrusted.tunnelservice`, which is what makes pairing possible from iSH.
+  "remote_pairing",
   "tcp",
   "pair",
   "rsd",

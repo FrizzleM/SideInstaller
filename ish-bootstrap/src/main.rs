@@ -5,7 +5,7 @@
 //! record, open a CoreDeviceProxy tunnel, sign the IPA with the user's own free
 //! Apple account, then install it over AFC + installation_proxy.
 //!
-//! **Checkpoint 2 of 5.** Steps 1 of 7 is wired up; the rest stop with a note.
+//! **Checkpoint 3 of 5.** Steps 1-2 of 7 are wired up; the rest stop with a note.
 //! Checkpoint 1 — the toolchain proof — passed on device and now lives behind
 //! `--self-test`.
 //!
@@ -14,10 +14,12 @@
 //! step 4; the promise is recorded here because it is the project's central one.
 
 mod fail;
+mod pairing;
 mod preflight;
 mod selftest;
 mod ui;
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use fail::Result;
@@ -39,6 +41,15 @@ struct Args {
     self_test: bool,
     help: bool,
     device_ip: String,
+    pairing_file: Option<PathBuf>,
+}
+
+/// Where the pairing record lives unless `--pairing-file` says otherwise.
+/// Under `$HOME`, so it survives siboot being re-downloaded into a fresh
+/// working directory — which is how the install instructions have people run it.
+fn default_pairing_path() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home).join(".siboot").join("rp_pairing_file.plist")
 }
 
 fn parse_args() -> std::result::Result<Args, String> {
@@ -48,6 +59,7 @@ fn parse_args() -> std::result::Result<Args, String> {
         self_test: false,
         help: false,
         device_ip: preflight::DEFAULT_DEVICE_IP.to_string(),
+        pairing_file: None,
     };
     let mut argv = std::env::args().skip(1);
     while let Some(arg) = argv.next() {
@@ -58,6 +70,10 @@ fn parse_args() -> std::result::Result<Args, String> {
             "-h" | "--help" => args.help = true,
             "--device-ip" => {
                 args.device_ip = argv.next().ok_or("--device-ip needs an address")?;
+            }
+            "--pairing-file" => {
+                args.pairing_file =
+                    Some(PathBuf::from(argv.next().ok_or("--pairing-file needs a path")?));
             }
             other => return Err(format!("unrecognised option `{other}`")),
         }
@@ -76,6 +92,9 @@ USAGE
 OPTIONS
     -v, --verbose       Show the underlying protocol and library errors.
         --device-ip IP  The loopback VPN's peer address (default {default}).
+        --pairing-file PATH
+                        Where to keep the pairing record, or an existing one to
+                        use. Default ~/.siboot/rp_pairing_file.plist.
         --self-test     Run the toolchain checks instead of the pipeline.
         --offline       With --self-test, skip the checks needing internet.
     -h, --help          Show this message.
@@ -152,17 +171,22 @@ fn main() -> ExitCode {
 }
 
 async fn pipeline(args: &Args) -> Result<()> {
-    ui::stage(1, STAGES, "Preflight — is this iPhone's lockdownd reachable?");
-    let greeting = preflight::run(&args.device_ip).await?;
+    ui::stage(1, STAGES, "Preflight — finding this iPhone's services");
+    let discovery = preflight::run(&args.device_ip).await?;
+
+    let pairing_path = args.pairing_file.clone().unwrap_or_else(default_pairing_path);
+    ui::stage(2, STAGES, "Pairing — trusting this iPhone from itself");
+    let paired = pairing::run(&args.device_ip, discovery.tunnel_service_port, &pairing_path).await?;
 
     println!();
-    ui::ok("preflight passed");
-    if let Some(udid) = greeting.value("UniqueDeviceID") {
-        ui::info(&format!("this device's UDID is readable without pairing: {udid}"));
+    if paired.freshly_paired {
+        ui::ok("paired — no computer involved");
+    } else {
+        ui::ok("the stored pairing record still works");
     }
     println!();
-    ui::info("This build stops here by design — it is checkpoint 2 of 5. Pairing,");
-    ui::info("the tunnel, signing and the install are not written yet.");
+    ui::info("This build stops here by design — it is checkpoint 3 of 5. The tunnel,");
+    ui::info("signing and the install are not written yet.");
     println!();
     Ok(())
 }
