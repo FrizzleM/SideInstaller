@@ -163,6 +163,16 @@ async fn diagnose_rsd(host: &str, raw: String) -> Fail {
         },
     }
 
+    // The other flow in tunnel_provider.rs. `tunnel_create_rppairing` talks to
+    // the *tunnel service* with new -> do_handshake -> recv_root and no
+    // `send_device_handshake`; only `RsdHandshake::new` sends that. If 49152 is
+    // the tunnel service rather than RSD, our extra message is the thing being
+    // reset, and this flow will get a reply where the other one did not.
+    println!();
+    ui::info("trying the tunnel-service flow instead (no device handshake) …");
+    let as_tunnel_service = tunnel_service_flow(host, RSD_PORT).await;
+    ui::info(&format!("49152, tunnel-service flow — {as_tunnel_service}"));
+
     let advice = [
         format!("This iPhone reset the RemoteXPC connection to {host}:{RSD_PORT}."),
         format!("The last step that completed was: {reached}."),
@@ -178,4 +188,41 @@ async fn diagnose_rsd(host: &str, raw: String) -> Fail {
     .join("\n");
 
     Fail::new(advice, raw)
+}
+
+/// `new` → `do_handshake` → `recv_root`, with no device handshake.
+///
+/// This is verbatim what `tunnel_create_rppairing` does once it has resolved a
+/// service port, so a reply here means the port is a RemoteXPC *service* rather
+/// than RSD — and that pairing can start from it directly.
+async fn tunnel_service_flow(host: &str, port: u16) -> String {
+    let stream = match connect(host, port).await {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+    let mut client = match timeout(Duration::from_secs(20), RemoteXpcClient::new(stream)).await {
+        Err(_) => return "RemoteXpcClient::new timed out".into(),
+        Ok(Err(e)) => return format!("RemoteXpcClient::new: {}", chain(&e)),
+        Ok(Ok(c)) => c,
+    };
+    match timeout(Duration::from_secs(20), client.do_handshake()).await {
+        Err(_) => return "do_handshake timed out".into(),
+        Ok(Err(e)) => return format!("do_handshake: {}", chain(&e)),
+        Ok(Ok(())) => {}
+    }
+    match timeout(Duration::from_secs(20), client.recv_root()).await {
+        Err(_) => "no root message within 20s".into(),
+        Ok(Err(e)) => format!("recv_root: {}", chain(&e)),
+        Ok(Ok(value)) => {
+            let shape = match value.as_dictionary() {
+                Some(d) => {
+                    let mut keys: Vec<&str> = d.keys().map(|k| k.as_str()).collect();
+                    keys.sort_unstable();
+                    format!("a dictionary with keys: {}", keys.join(", "))
+                }
+                None => format!("{value:?}"),
+            };
+            format!("ANSWERED — {shape}")
+        }
+    }
 }
