@@ -237,6 +237,11 @@ async fn diagnose(host: &str, raw: String) -> Fail {
 
     ui::info(&format!("49152, saying nothing  — {}", listen_only(host, RSD_PORT).await));
 
+    // The one door observed open. RSD is how iOS 17+ advertises its services,
+    // and unlike lockdownd it did not hang up on us — so it is worth asking
+    // whether it will complete a handshake with no pairing record at all.
+    ui::info(&format!("49152, RSD handshake   — {}", rsd_probe(host).await));
+
     let advice = if closes_unprompted {
         [
             format!("lockdownd is listening at {host}:{LOCKDOWN_PORT}, but it hangs up before"),
@@ -389,4 +394,33 @@ fn query_type_plist(binary: bool) -> Vec<u8> {
         value.to_writer_xml(&mut out).expect("serialising two keys cannot fail");
     }
     out
+}
+
+
+/// Try a RemoteServiceDiscovery handshake with no pairing record.
+///
+/// If this yields a service list, the pairing deadlock stops being the whole
+/// story: services are reachable over RSD without lockdownd, and the route
+/// forward is through here rather than through 62078.
+async fn rsd_probe(host: &str) -> String {
+    let stream = match timeout(Duration::from_secs(10), TcpStream::connect((host, RSD_PORT))).await {
+        Ok(Ok(s)) => s,
+        Ok(Err(e)) => return format!("connect failed: {e}"),
+        Err(_) => return "connect timed out".into(),
+    };
+    let _ = stream.set_nodelay(true);
+
+    match timeout(Duration::from_secs(20), idevice::rsd::RsdHandshake::new(stream)).await {
+        Err(_) => "handshake timed out after 20s".into(),
+        Ok(Err(e)) => format!("refused: {}", chain(&e)),
+        Ok(Ok(handshake)) => {
+            let mut names: Vec<&str> = handshake.services.keys().map(|s| s.as_str()).collect();
+            names.sort_unstable();
+            format!(
+                "ANSWERED with {} services, e.g. {}",
+                names.len(),
+                names.iter().take(6).copied().collect::<Vec<_>>().join(", ")
+            )
+        }
+    }
 }

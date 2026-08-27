@@ -96,6 +96,11 @@ struct AboutView: View {
                          tint: .orange,
                          title: "Vexon",
                          detail: L("For the support, and for spotting the bugs that got fixed because of it."))
+                AboutRow(systemImage: "character.bubble.fill",
+                         tint: Color(red: 0.95, green: 0.35, blue: 0.45),
+                         title: "so-5699",
+                         detail: L("For the Japanese translation."),
+                         urlString: "https://github.com/so-5699")
             }
         }
     }

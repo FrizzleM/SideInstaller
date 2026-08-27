@@ -563,6 +563,7 @@ let vietnameseStrings: [String: String] = [
         "Vì idevice, thư viện mà SideInstaller dùng để giao tiếp với iPhone của bạn. Không có nó thì mọi thứ này đều không tồn tại.",
     "For the support, and for spotting the bugs that got fixed because of it.":
         "Vì đã hỗ trợ và phát hiện những lỗi sau đó được sửa.",
+    "For the Japanese translation.": "Vì bản dịch tiếng Nhật.",
 
     "Built with": "Được xây dựng với",
     "The open source work this app is built on:":

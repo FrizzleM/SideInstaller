@@ -569,6 +569,7 @@ let spanishStrings: [String: String] = [
         "Por idevice, la biblioteca con la que SideInstaller se comunica con tu iPhone. Sin ella nada de esto existiría.",
     "For the support, and for spotting the bugs that got fixed because of it.":
         "Por el apoyo y por detectar los fallos que se corrigieron gracias a ello.",
+    "For the Japanese translation.": "Por la traducción al japonés.",
 
     "Built with": "Creado con",
     "The open source work this app is built on:":

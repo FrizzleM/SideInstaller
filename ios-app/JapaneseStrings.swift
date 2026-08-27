@@ -480,6 +480,61 @@ let japaneseStrings: [String: String] = [
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
         "Wi-Fi ネットワークに接続してください。この iPhone のペアリングには、SideInstaller がローカルネットワーク上で見つけられる状態である必要があります。",
 
+    // MARK: - Side by Side tool
+
+    // The tool's name is left in English everywhere, as SideStore's is.
+    "Side by Side": "Side by Side",
+    "Set up someone else's iPhone": "他の人の iPhone をセットアップ",
+    "This installs SideInstaller onto another iPhone on the same Wi-Fi network — no computer and no cable. Their iPhone will ask them to trust this one; they have to be holding it, unlocked, when you tap Install.":
+        "同じ Wi-Fi ネットワーク上にある別の iPhone に、パソコンもケーブルも使わずに SideInstaller をインストールします。相手の iPhone にはこの iPhone を信頼するか確認が表示されるため、インストールをタップするときは、相手がロックを解除した状態で端末を持っている必要があります。",
+    "How it works": "仕組み",
+    "Steps": "手順",
+    "Same Wi-Fi network": "同じ Wi-Fi ネットワーク",
+    "Their iPhone": "相手の iPhone",
+    "This iPhone is %@, so theirs will look similar.": "この iPhone は %@ です。相手のアドレスもこれに近い形になります。",
+    "IP address (e.g. 192.168.1.42)": "IP アドレス（例：192.168.1.42）",
+    "Enter the other iPhone's IP address. It's in Settings › Wi-Fi, next to the network it's on.":
+        "相手の iPhone の IP アドレスを入力してください。「設定」>「Wi-Fi」の、接続中のネットワークの横で確認できます。",
+    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
+        "相手の iPhone で「設定」>「Wi-Fi」>ネットワーク横の ⓘ >「IP アドレス」の順に開きます。",
+    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
+        "「%@」は IPv4 アドレスではありません。192.168.1.42 のような形式で入力してください。",
+    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
+        "%@ はこの iPhone 自身のアドレスです。Side by Side は他の人の iPhone にインストールするための機能なので、相手のアドレスを入力してください。この iPhone にインストールするには「インストール」タブを使用してください。",
+    "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
+        "Wi-Fi がオフになっています。この機能を使うには、両方の iPhone が同じ Wi-Fi ネットワークに接続されている必要があります。",
+    "Pair with their iPhone": "相手の iPhone とペアリング",
+    "No pair record for their iPhone.": "相手の iPhone のペアリングレコードがありません。",
+    "The link to their iPhone dropped — start again.": "相手の iPhone との接続が切断されました。最初からやり直してください。",
+    "Sign in to their Apple ID": "相手の Apple ID でサインイン",
+    "Apple ID to sign with": "署名に使用する Apple ID",
+    "Enter the Apple ID to sign with, and its password.": "署名に使用する Apple ID とそのパスワードを入力してください。",
+    "Usually theirs, so the app is signed to their account and their free developer slots. Held only until this page is closed — never saved to this iPhone, and the password is never sent anywhere but Apple.":
+        "通常は相手の Apple ID を使用します。そうすることで、相手のアカウントと無料の開発者アプリ枠でアプリが署名されます。入力内容はこのページを閉じるまで保持されるだけで、この iPhone に保存されることはなく、パスワードは Apple 以外には送信されません。",
+    "Use my saved Apple ID instead": "保存済みの自分の Apple ID を使用",
+    "Clear their details": "入力した情報を消去",
+    "Download SideInstaller": "SideInstaller をダウンロード",
+    "Couldn't download the latest SideInstaller release: %@": "SideInstaller の最新リリースをダウンロードできませんでした：%@",
+    "The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute.":
+        "ダウンロードされたファイルが IPA ではありませんでした。GitHub がエラーページを返している可能性があります。しばらくしてからもう一度お試しください。",
+    "No SideInstaller IPA downloaded.": "SideInstaller の IPA がダウンロードされていません。",
+    "Start the install": "インストールを開始",
+    "Install on their iPhone": "相手の iPhone にインストール",
+    "Install again": "もう一度インストール",
+    "%d%% downloaded": "%d%% ダウンロード済み",
+    "%d%% uploaded": "%d%% アップロード済み",
+    "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
+        "Apple がこの Apple ID の開発者チームに相手の iPhone を登録できなかったため、プロビジョニングプロファイルが発行されません。%@",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first — with the Certificates tool if this is the Apple ID saved in Settings › Account, and at developer.apple.com signed in as it otherwise.":
+        "Apple がこの Apple ID の署名証明書を発行しません。すでに証明書が存在すると報告されています（エラー 7460）。まず既存の証明書を失効させる必要があります。「設定」>「アカウント」に保存されている Apple ID の場合は「証明書」ツールで、それ以外の場合は developer.apple.com にその Apple ID でサインインして失効させてください。",
+    "Last step: they trust %@": "最後の手順：相手が %@ を信頼します",
+    "Waiting for them to tap Trust…": "相手が「信頼」をタップするのを待っています…",
+    "On their iPhone: Settings › General › VPN & Device Management.":
+        "相手の iPhone で「設定」>「一般」>「VPN とデバイス管理」を開きます。",
+    "Tap the Apple ID under “Developer App”, then tap Trust.":
+        "「デベロッパ App」の下にある Apple ID をタップし、「信頼」をタップします。",
+    "Open it from their Home Screen — they're set up.": "あとはホーム画面から開くだけで、セットアップは完了です。",
+
     // MARK: - About
 
     "About": "このアプリについて",
@@ -496,6 +551,7 @@ let japaneseStrings: [String: String] = [
         "idevice に感謝します。SideInstaller はこのライブラリを通じて iPhone と通信しています。これがなければ何も成り立ちません。",
     "For the support, and for spotting the bugs that got fixed because of it.":
         "これまでのご支援と、そのおかげで発見・修正できたバグに感謝します。",
+    "For the Japanese translation.": "日本語への翻訳に感謝します。",
 
     "Built with": "使用しているオープンソース",
     "The open source work this app is built on:": "このアプリの基盤となっているオープンソースの成果：",
