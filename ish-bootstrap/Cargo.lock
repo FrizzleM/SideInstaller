@@ -1849,11 +1849,18 @@ dependencies = [
 name = "idevice"
 version = "0.1.63"
 dependencies = [
+ "aes 0.8.4",
  "async-stream",
  "async_zip",
  "base64 0.22.1",
+ "cbc 0.1.2",
+ "chacha20poly1305",
  "chrono",
+ "ed25519-dalek",
  "futures",
+ "hkdf",
+ "hmac 0.12.1",
+ "idevice-srp",
  "indexmap",
  "jktcp",
  "libc",
@@ -1864,13 +1871,16 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "sha1 0.10.7",
  "sha2 0.10.9",
+ "siphasher",
  "thiserror 2.0.20",
  "tokio",
  "tokio-rustls",
  "tracing",
  "uuid",
  "web-time",
+ "x25519-dalek",
  "x509-cert 0.2.5",
 ]
 
