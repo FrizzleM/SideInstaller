@@ -31,6 +31,11 @@
 > app repo, or mirror, no matter how official it looks. Redistributing my builds without explicit consent is also prohibited by
 > the [license](LICENSE.md).
 
+> [!CAUTION]
+> **The website “sideinstaller.com” is NOT official.**
+> 
+> There is a fake site called “sideinstaller.com”. This site is **not legit**, and is likely providing malware. Please make sure
+> you only download from the **official sources** listed above.
 ---
 
 ## What it is
