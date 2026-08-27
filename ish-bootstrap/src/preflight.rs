@@ -16,6 +16,7 @@
 use std::time::Duration;
 
 use idevice::rsd::RsdHandshake;
+use idevice::xpc::RemoteXpcClient;
 use tokio::net::TcpStream;
 use tokio::time::timeout;
 
@@ -57,45 +58,14 @@ fn vpn_advice(host: &str) -> String {
 pub async fn run(host: &str) -> Result<Discovery> {
     ui::info(&format!("connecting to {host}:{RSD_PORT} …"));
 
-    let stream = timeout(Duration::from_secs(15), TcpStream::connect((host, RSD_PORT)))
-        .await
-        .map_err(|_| Fail::new(vpn_advice(host), "connect timed out after 15s"))?
-        .map_err(|e| Fail::new(vpn_advice(host), format!("connect: {e}")))?;
-    let _ = stream.set_nodelay(true);
+    let stream = connect(host, RSD_PORT).await.map_err(|e| Fail::new(vpn_advice(host), e))?;
     ui::detail("TCP connected; starting the RemoteXPC handshake");
 
-    let handshake = timeout(Duration::from_secs(30), RsdHandshake::new(stream))
-        .await
-        .map_err(|_| {
-            Fail::new(
-                [
-                    format!("{host}:{RSD_PORT} accepted the connection but never completed"),
-                    "the RemoteServiceDiscovery handshake.".to_string(),
-                    String::new(),
-                    "Try again with iSH in the foreground the whole time — iOS suspends it".to_string(),
-                    "within a second or two of leaving, and the handshake stalls rather than".to_string(),
-                    "failing.".to_string(),
-                ]
-                .join("\n"),
-                "RSD handshake timed out after 30s",
-            )
-        })?
-        .map_err(|e| {
-            Fail::new(
-                [
-                    format!("{host}:{RSD_PORT} refused the RemoteServiceDiscovery handshake."),
-                    String::new(),
-                    "If this iPhone is older than iOS 17, there is no RSD to talk to and".to_string(),
-                    "siboot cannot work here at all.".to_string(),
-                    String::new(),
-                    "Otherwise the likeliest cause is another client already holding the".to_string(),
-                    "RSD connection — StikDebug, or a previous siboot run that did not exit".to_string(),
-                    "cleanly. Force-quit those and try again.".to_string(),
-                ]
-                .join("\n"),
-                format!("RsdHandshake: {}", chain(&e)),
-            )
-        })?;
+    let handshake = match timeout(Duration::from_secs(30), RsdHandshake::new(stream)).await {
+        Ok(Ok(h)) => h,
+        Ok(Err(e)) => return Err(diagnose_rsd(host, chain(&e)).await),
+        Err(_) => return Err(diagnose_rsd(host, "RSD handshake timed out after 30s".into()).await),
+    };
 
     let service_count = handshake.services.len();
     ui::ok(&format!("RSD answered — {service_count} services advertised"));
@@ -112,7 +82,7 @@ pub async fn run(host: &str) -> Result<Discovery> {
         Fail::new(
             [
                 "This iPhone's RemoteServiceDiscovery does not advertise the untrusted".to_string(),
-                "tunnel service, which is the one siboot pairs over.".to_string(),
+                "tunnel service, which is the one pairing runs over.".to_string(),
                 String::new(),
                 "Run with --verbose to see what it does advertise.".to_string(),
             ]
@@ -123,4 +93,89 @@ pub async fn run(host: &str) -> Result<Discovery> {
 
     ui::ok(&format!("untrusted tunnel service is on port {}", service.port));
     Ok(Discovery { tunnel_service_port: service.port, service_count })
+}
+
+async fn connect(host: &str, port: u16) -> std::result::Result<TcpStream, String> {
+    let stream = timeout(Duration::from_secs(15), TcpStream::connect((host, port)))
+        .await
+        .map_err(|_| format!("connecting to {host}:{port} timed out after 15s"))?
+        .map_err(|e| format!("connect to {host}:{port}: {e}"))?;
+    let _ = stream.set_nodelay(true);
+    Ok(stream)
+}
+
+/// Find which step of the RemoteXPC handshake the device rejects.
+///
+/// `RsdHandshake::new` is four operations in a trench coat — `RemoteXpcClient::new`,
+/// `do_handshake`, `send_device_handshake`, `recv_root` — and it reports one
+/// error for all four, so on its own it cannot say whether the device dislikes
+/// the HTTP/2 preface, the XPC handshake, or the request that follows.
+///
+/// The second experiment matters as much as the first: connecting to a service
+/// port the way `tunnel_create_rppairing` does — `do_handshake` then straight to
+/// `recv_root`, with **no** `send_device_handshake` — tells us whether it is
+/// RemoteXPC as such that this device refuses from here, or only the RSD
+/// request on top of it.
+async fn diagnose_rsd(host: &str, raw: String) -> Fail {
+    println!();
+    ui::info("finding which step it rejects …");
+
+    let mut reached = "nothing";
+
+    match connect(host, RSD_PORT).await {
+        Err(e) => ui::info(&format!("reconnect — {e}")),
+        Ok(stream) => match timeout(Duration::from_secs(20), RemoteXpcClient::new(stream)).await {
+            Err(_) => ui::info("RemoteXpcClient::new — timed out"),
+            Ok(Err(e)) => ui::info(&format!("RemoteXpcClient::new — {}", chain(&e))),
+            Ok(Ok(mut client)) => {
+                reached = "RemoteXpcClient::new";
+                ui::info("RemoteXpcClient::new     — ok");
+                match timeout(Duration::from_secs(20), client.do_handshake()).await {
+                    Err(_) => ui::info("do_handshake            — timed out"),
+                    Ok(Err(e)) => ui::info(&format!("do_handshake            — {}", chain(&e))),
+                    Ok(Ok(())) => {
+                        reached = "do_handshake";
+                        ui::info("do_handshake            — ok");
+                        match timeout(Duration::from_secs(20), client.send_device_handshake()).await
+                        {
+                            Err(_) => ui::info("send_device_handshake   — timed out"),
+                            Ok(Err(e)) => {
+                                ui::info(&format!("send_device_handshake   — {}", chain(&e)))
+                            }
+                            Ok(Ok(())) => {
+                                reached = "send_device_handshake";
+                                ui::info("send_device_handshake   — ok");
+                                match timeout(Duration::from_secs(20), client.recv_root()).await {
+                                    Err(_) => ui::info("recv_root               — timed out"),
+                                    Ok(Err(e)) => {
+                                        ui::info(&format!("recv_root               — {}", chain(&e)))
+                                    }
+                                    Ok(Ok(_)) => {
+                                        reached = "recv_root";
+                                        ui::info("recv_root               — ok (!)");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+    let advice = [
+        format!("This iPhone reset the RemoteXPC connection to {host}:{RSD_PORT}."),
+        format!("The last step that completed was: {reached}."),
+        String::new(),
+        "SideInstaller reaches the same port from the same iPhone, so this is not".to_string(),
+        "the device refusing the protocol — it is refusing this process. The".to_string(),
+        "difference to look at is that SideInstaller is a native app holding iOS".to_string(),
+        "Local Network permission, and iSH is not.".to_string(),
+        String::new(),
+        "Send these lines — which step it reached is the thing that decides what".to_string(),
+        "to try next.".to_string(),
+    ]
+    .join("\n");
+
+    Fail::new(advice, raw)
 }
