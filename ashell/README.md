@@ -103,38 +103,48 @@ intact from 1 byte to 8 KB. So LocalDevVPN carries data faithfully, its rewrite
 really does target this device, and the 11-byte cutoff on 49152 is that
 service's own behaviour.
 
-**10 bytes is CDTunnel's header.** `rust-core/vendor/idevice/src/tunnel.rs:53`:
-the handshake is `b"CDTunnel"` + a 2-byte big-endian length + a JSON body — an
-**8+2 = 10-byte header**. A parser that reads that header and then judges it
-behaves exactly as measured: it holds while the header is incomplete and
-rejects the moment it is complete. `core_device_proxy.rs:5` adds that over the
-network this same protocol runs over TLS-PSK. So 49152 through the loopback VPN
-is very likely the **CoreDevice tunnel listener, not RemoteServiceDiscovery** —
-which `preflight.rs` had already wondered aloud about.
+**~~10 bytes is CDTunnel's header.~~ Withdrawn — off by one.** CDTunnel is
+`b"CDTunnel"` + 2 = **10** (`tunnel.rs:14`), and the cutoff was **11**.
 
-This also exposed a flaw in the earlier content tests: the TLS ClientHello and
-the lockdown plist were both far longer than 11 bytes, so they died on the
-length rule before anything read them. **Content had never been tested fairly.**
-v0.7 varies content *at the same length* — zeros against the CDTunnel magic
-against the HTTP/2 magic, at 9 to 55 bytes — and then sends the real handshake,
-plain and inside TLS. If the magic survives where zeros die, the magic is being
-read, and the reply carries the tunnel's own client address, server address,
-MTU and inner RSD port. Step 3 would start there.
+**11 bytes is RPPairing's header, and 49152 is the RPPairing listener.**
+`rust-core/vendor/idevice/src/remote_pairing/socket.rs:69` frames every message
+as `b"RPPairing"` (9 bytes) + a 2-byte big-endian length + JSON — a **9+2 =
+11-byte header** — and `recv_plain` in that same file reads those 11 bytes
+before it looks at anything. A peer that finds the wrong magic there resets at
+exactly 11 bytes received, identically for zeros, random bytes, the HTTP/2
+magic, a TLS ClientHello and a lockdown plist. That is the whole battery below,
+explained.
 
-**49152 was the wrong port all along.** The full 65535-port map (v0.8) found
-four ports listening on the device, and only one of them tolerates a real
-payload:
+`tunnel_create_rppairing_multihost`
+(`rust-core/vendor/idevice-ffi/src/tunnel_provider.rs:871`) opens a plain
+`TcpStream` to that address and wraps it in `RpPairingSocket::new` — "Connect
+directly and use raw RPPairing protocol" — and that is the call
+`DeviceConnection.connectRemotePairing` makes, at `rsdPort = 49152`. So
+shipping SideInstaller speaks **RPPairing** on 49152: not RSD, not RemoteXPC,
+not HTTP/2, not CDTunnel. Every probe recorded above spoke the wrong protocol
+to a service that was answering correctly. Nothing about a-Shell, the sandbox,
+Local Network permission or Developer Mode was ever involved.
+
+`ashell/rppairing_probe.py` sends the real first message in the real framing,
+with a wrong-magic control that reproduces the cutoff on purpose.
+
+**The port map.** The full 65535-port map (v0.8) found four ports listening on
+the device. Its *readings* stand; the conclusion drawn from them does not:
 
 | port | behaviour |
 |---|---|
 | 8443 | speaks first — answers plaintext with a TLS fatal alert (`level 2, protocol_version`) |
 | 49152 | holds, then resets at 11 bytes; a real listener holds the port |
 | **61779** | **holds and tolerates 64 bytes — no cutoff** |
-| 62078 | lockdownd; hangs up unasked, exactly as `preflight.rs` measured |
+| 62078 | lockdownd; classified from a read with **nothing sent** — see below |
 
-61779 is ephemeral, and on iOS 17+ RSD is handed a port per boot. So no protocol
-ever fitted 49152 because there was none to find — the HTTP/2 preface, TLS and
-CDTunnel were all being tried against a service that was never RSD.
+Two rows were misread. **49152** was the right port with the wrong protocol, not
+the wrong port: it is the RPPairing listener, and 11 bytes is its header.
+**62078** was never actually asked anything — `classify_port` calls `recv()`
+first and sends nothing, and lockdownd never speaks first; it waits for a
+request. So "hangs up unasked" describes our probe, not the service.
+`ashell/lockdown_probe.py` sends real requests, and what it returns decides the
+size of this project.
 
 **v0.9 stopped probing and implemented RemoteXPC**, ported from
 `rust-core/vendor/idevice/src/xpc` rather than guessed: HTTP/2 without TLS, DATA
@@ -167,18 +177,17 @@ certificate for the same reason.
 
 ## Why the host changed
 
-The Rust build in [`../ish-bootstrap`](../ish-bootstrap) stopped at step 2 of 7,
-and not because of a bug. iSH holds no iOS **Local Network** permission, so its
-connections to this iPhone's own services are dropped before they are answered.
-`preflight.rs` had already narrowed it to exactly that: the device answers
-SideInstaller on the same port from the same phone, so it is not refusing the
-protocol — it is refusing that process.
+**The reason recorded here was wrong, in both directions.** The Rust build in
+[`../ish-bootstrap`](../ish-bootstrap) stopped because it spoke HTTP/2 to a port
+that speaks RPPairing — not because iSH lacked **Local Network** permission.
+iSH's own Info.plist declares `NSLocalNetworkUsageDescription`, so it was never
+missing it; and granting it in a-Shell changed nothing, which the a-Shell run
+recorded above and then explained away. `preflight.rs`'s hypothesis is
+falsified, and so is the inference that replaced it.
 
-a-Shell is expected to be allowed through. Its own listing advertises
-"multiple network utilities: nslookup, ping, whois, ifconfig", and `ping` to a
-LAN address cannot work without `NSLocalNetworkUsageDescription` — so the app
-has to declare it. That is an inference, not a measurement; proving it is the
-entire point of checkpoint 1.
+a-Shell is still the better host — native arm64 Python 3.13 with a full stdlib
+beats an emulated x86 Alpine — so the pivot stands on its own merits. It just
+did not fix what it was chosen to fix, because there was nothing there to fix.
 
 ## What a-Shell is, and what it forces
 
@@ -219,7 +228,7 @@ thing at every checkpoint.
 
 | # | Stage | Notes |
 |---|---|---|
-| 1 | Preflight — reach RemoteServiceDiscovery on `:49152` | The step iSH could not take. |
+| 1 | Preflight — reach a device service that answers | **Rewritten.** 49152 is not RSD; it is the RPPairing listener. Which service this step targets depends on the route (below), and `lockdown_probe.py` / `rppairing_probe.py` choose it. |
 | 2 | Pair — `RemotePairingClient` against `untrusted.tunnelservice` | Client role, so nothing is advertised and no Bonjour is involved. Puts a PIN on screen. |
 | 3 | Tunnel — reach the services behind RSD | **The open design question.** See below. |
 | 4 | Apple ID — GrandSlam SRP + anisette + the developer portal | Mostly portable from [`../ish/sideinstaller.py`](../ish/sideinstaller.py), which already does this in stdlib Python and was checked against live services. |
@@ -236,9 +245,12 @@ The Rust build never reached it, so nothing about it is decided. What is known:
   to itself — it completes the TLS-PSK handshake and hangs up with
   `close_notify` before reading the request. Three fresh listeners, same result.
   (`../NOTES.md`.)
-* **lockdownd on 62078 is not a way round it.** It hangs up on network clients
-  within ~250 µs, measured on device. So the classic pair record cannot be
-  minted here, which is what `CoreDeviceProxy` would need.
+* **~~lockdownd on 62078 is not a way round it.~~ Withdrawn — never tested.**
+  The "~250 µs" traces to `ish-bootstrap/src/selftest.rs:231`, where `probe()`
+  does a bare `TcpStream::connect_timeout` and drops the stream: it never reads
+  and never writes, and the duration it reports is the connect latency of an
+  **open** port. a-Shell's own reading came from a `recv()` with nothing sent.
+  lockdownd waits for a request, so neither probe is evidence either way.
 
 That leaves the in-band tunnel — the one that rides the connection to
 `untrusted.tunnelservice` that pairing already opened, needing no inbound
@@ -263,9 +275,8 @@ Wi-Fi on, and keep a-Shell in the foreground. The first run should raise the
 Local Network prompt — allow it. If it was dismissed, it is at
 **Settings → Privacy & Security → Local Network → a-Shell**.
 
-Turn **Developer Mode** on too (Settings → Privacy & Security → Developer Mode;
-it needs a reboot). It is the cheapest remaining explanation for the accept-then-
-drop on 49152 and has not yet been ruled out.
+Developer Mode is **not** the explanation for the accept-then-drop on 49152 —
+the 11-byte header is — so it is no longer part of the instructions here.
 
 `--scan` sweeps for other ports that accept, and reports which of them hold the
 connection open rather than dropping it — a port that stays open is a lead that
