@@ -2,10 +2,10 @@
 # Written by the last full run and compared before the next one; the run
 # is skipped when this file would come out identical. Delete to force.
 channel	beta
-ipa_url	https://ts.buzzheavier.com/d/3zx2s10t1nrc?v=2z41A65Mg8dFKZlrXiKtNkGsJG4FTQ70NzNbnD895h8kAqy6UYlvPe4HhAafh_pVzXhU9F5lltiUo390ERgamT83_khegoaM9YU3IxPVVzsd3qaRF6bSpmQPfhTHS62UVmN8Z4sJ8rIWjvIAyn4NihhPik5Hrg-5EfzsVbsleTJ2qtuPvxQMLCJQ-0LzmHtapoxQVOtz0SRM9PeYk1FWXCVAWevKw-Di0Naadw
-ipa_size	8965820
+ipa_url	https://ts.buzzheavier.com/d/yth2d3x7paac?v=oI0K2xNZohknKGSx3yOGGtzUleXBch73y0S9fbmEiJ3i6ptagiuZqZq7XEl6mn8iFfp_QJSBZzdmuiNOe36KnMC1Q0-wDL76NAjWEYIXWNn0gDD9QVrDqUistfOy4JCYvroM8w-lTDuMzabJR0_lJRgg6JCY_ZofEViionI9Mob8T-h4HzOESg1dxJh_rg
+ipa_size	9036902
 output_base_url	https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output-beta
-inputs_sha256	6ac45347a56479a6eb9434a9c7e16907a870ac866a5b2a9e81bff57614235d21
+inputs_sha256	4e454720a57348dcbb3518c5dc80b40ad08a23d53492f36afbcf2dd0f252f51e
 cert	Aramco-Services-Company	7E5CF3F26B293474757B449DF5FBFFAF0816D2F7	2026-09-24	revoked
 cert	BOC-International-China-Limited-qi-ye-weixin-app-id-huiyi-kuozhan	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
 cert	BOC-International-China-Limited-qi-ye-weixin-app-id-kuozhan	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
