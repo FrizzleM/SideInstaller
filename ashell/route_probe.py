@@ -38,6 +38,7 @@ Usage (a-Shell):
     python3 route_probe.py 10.7.0.1 10.7.0.0    # only these
 """
 
+import base64
 import json
 import os
 import plistlib
@@ -330,9 +331,160 @@ def probe_lockdown(host):
 
 
 # --------------------------------------------------------------------------
+# --consent: one step past the handshake, to ask the device WHY
+# --------------------------------------------------------------------------
+#
+# The handshake reply carries `deviceOptions.allowsPairSetup: false`. idevice
+# never reads that flag -- `RemotePairingClient` only logs deviceOptions
+# (remote_pairing/mod.rs:335) and `connect()` calls `pair()` regardless -- so
+# shipping SideInstaller would walk straight into whatever refusal follows.
+#
+# `request_pair_consent` (mod.rs:379) is the message that finds out. Its reply
+# is one of three things, and all three are worth more than a guess:
+#
+#   pairingRejectedWithError  -> wrappedError.userInfo.NSLocalizedDescription,
+#                                the device's own words for why
+#   awaitingUserConsent       -> a PIN is on screen; Route B is fully open
+#   pairingData               -> the PIN came back inline (Apple TV shape)
+#
+# This sends exactly one message past the handshake and then stops. SRP is
+# never started, so nothing pairs and no record is written either side.
+
+# TLV8 from mod.rs:386 -- Method(0x00)=0x00, State(0x06)=0x01. Values from
+# remote_pairing/tlv.rs:9-16; the serializer is type|len|data (tlv.rs:65).
+CONSENT_TLV = bytes([0x00, 0x01, 0x00, 0x06, 0x01, 0x01])
+
+# `sendingHost` is our identity to the device. The shipping app sends
+# "SideInstaller" (DeviceConnection.swift:151); this deliberately does not, so
+# a probe cannot disturb an existing SideInstaller pairing record.
+SENDING_HOST = "siboot"
+
+
+class RpConn:
+    """A framed RPPairing connection. send_plain/recv_plain per socket.rs."""
+
+    def __init__(self, host, port=RPPAIRING_PORT, timeout=15.0):
+        self.sock = socket.create_connection((host, port), CONNECT_TIMEOUT)
+        self.sock.settimeout(timeout)
+        self.seq = 0
+
+    def send_plain(self, value):
+        """socket.rs:85 -- the plain envelope, with our sequence number."""
+        env = {"message": {"plain": {"_0": value}},
+               "originatedBy": "host",
+               "sequenceNumber": self.seq}
+        body = json.dumps(env, separators=(",", ":")).encode()
+        self.sock.sendall(MAGIC + struct.pack(">H", len(body)) + body)
+        self.seq += 1
+
+    def recv_plain(self):
+        head = self._exact(11)
+        if head[:9] != MAGIC:
+            raise ValueError("reply not RPPairing framed: %r" % head)
+        return json.loads(self._exact(struct.unpack(">H", head[9:11])[0]))
+
+    def _exact(self, n):
+        buf = b""
+        while len(buf) < n:
+            chunk = self.sock.recv(n - len(buf))
+            if not chunk:
+                raise EOFError("peer closed after %d of %d bytes" % (len(buf), n))
+            buf += chunk
+        return buf
+
+    def close(self):
+        try:
+            self.sock.close()
+        except OSError:
+            pass
+
+
+def _dig(obj, *keys):
+    for k in keys:
+        if not isinstance(obj, dict) or k not in obj:
+            return None
+        obj = obj[k]
+    return obj
+
+
+def probe_consent(host):
+    print(_c("1;36", "%s:%d  pair-setup consent" % (host, RPPAIRING_PORT)))
+    print("")
+    try:
+        conn = RpConn(host)
+    except OSError as e:
+        print(_c("1;31", "  connect failed: %s" % errno_name(e)))
+        return 1
+
+    try:
+        # 1. handshake, exactly as before
+        conn.send_plain({"request": {"_0": {"handshake": {"_0": {
+            "hostOptions": {"attemptPairVerify": True},
+            "wireProtocolVersion": WIRE_PROTOCOL_VERSION,
+        }}}}})
+        reply = conn.recv_plain()
+        hs = _dig(reply, "message", "plain", "_0", "response", "_1", "handshake", "_0")
+        if hs is None:
+            print(_c("1;31", "  no handshake in reply: %s" % json.dumps(reply)[:400]))
+            return 1
+        opts = hs.get("deviceOptions", {})
+        print("  handshake ok -- wireProtocolVersion %s, minimum %s"
+              % (hs.get("wireProtocolVersion"), hs.get("minimumSupportedWireProtocolVersion")))
+        for k in sorted(opts):
+            flag = opts[k]
+            print("    %-46s %s" % (k, _c("1;32" if flag else "1;33", flag)))
+        print("")
+
+        # 2. one step further: ask for pair-setup consent
+        print("  -> setupManualPairing (mod.rs:397)")
+        conn.send_plain({"event": {"_0": {"pairingData": {"_0": {
+            "data": base64.b64encode(CONSENT_TLV).decode(),
+            "kind": "setupManualPairing",
+            "sendingHost": SENDING_HOST,
+            "startNewSession": True,
+        }}}}})
+        try:
+            reply = conn.recv_plain()
+        except (EOFError, OSError, ValueError) as e:
+            print(_c("1;31", "  no reply: %s" % e))
+            print("  The device closed rather than answering. With allowsPairSetup")
+            print("  false, that is a refusal without an explanation.")
+            return 1
+
+        print("")
+        print(json.dumps(reply, indent=2)[:3000])
+        print("")
+
+        event = _dig(reply, "message", "plain", "_0", "event", "_0") or {}
+        rejected = event.get("pairingRejectedWithError")
+        if rejected is not None:
+            why = _dig(rejected, "wrappedError", "userInfo", "NSLocalizedDescription")
+            print(_c("1;31", "  REJECTED: %s" % (why or "no NSLocalizedDescription given")))
+            print("  That is the device's own reason. Route B's pair-setup is shut")
+            print("  until this is addressed -- it is not a bug in the framing.")
+            return 1
+        if "awaitingUserConsent" in event:
+            print(_c("1;32", "  A PIN IS ON SCREEN. Route B is fully open."))
+            print("  allowsPairSetup:false did not block setup. Nothing has been")
+            print("  paired -- SRP was never started. Dismiss the prompt.")
+            return 0
+        if _dig(event, "pairingData", "_0", "data") is not None:
+            print(_c("1;32", "  Pairing data returned inline. Route B is open."))
+            return 0
+        print(_c("1;33", "  Unrecognised reply shape -- report the JSON above verbatim."))
+        return 1
+    finally:
+        conn.close()
+
+
+# --------------------------------------------------------------------------
 
 def main(argv):
-    hosts = [(a, "given on the command line") for a in argv[1:]] or addresses()
+    args = [a for a in argv[1:] if not a.startswith("--")]
+    if "--consent" in argv:
+        return probe_consent(args[0] if args else "10.7.0.1")
+
+    hosts = [(a, "given on the command line") for a in args] or addresses()
 
     print(_c("1", "route_probe -- which door opens on this iPhone"))
     print("")
