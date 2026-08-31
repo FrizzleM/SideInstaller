@@ -11,15 +11,15 @@
           <key>kind</key>
           <string>software-package</string>
           <key>url</key>
-          <string>https://raw.githubusercontent.com/NovaDev404/SideInstaller/main/output/sideinstaller-Beijing-Xibei-Longzhimeng-Restaurant-Management-Co.-Ltd.ipa</string>
+          <string>https://raw.githubusercontent.com/NovaDev404/SideInstaller/main/output/sideinstaller-HSBC.ipa</string>
         </dict>
       </array>
       <key>metadata</key>
       <dict>
         <key>bundle-identifier</key>
-        <string>com.xibei.xbkds</string>
+        <string>hk.com.hsbc.enterprise.hsbchkrewards.local2</string>
         <key>bundle-version</key>
-        <string>0.6.5</string>
+        <string>0.9.0</string>
         <key>kind</key>
         <string>software</string>
         <key>title</key>
