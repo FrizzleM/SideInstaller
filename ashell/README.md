@@ -8,8 +8,11 @@ from the App Store instead of iSH.
 at 386 MB instead of 2 GB. So does Terminus (`com.a.terminal.app.ATerminal`),
 which is a repackage of a-Shell and credits it in its own Settings screen.
 
-**Status: checkpoint 1 of 5 — the runtime proof.** Only `--self-test` is
-implemented. It asks for no password and touches no Apple account.
+**Status: checkpoint 1 of 5 done — the route is chosen.** The device answers
+RPPairing on `10.7.0.1:49152`, so this is **Route B**: pair-setup, TLS-PSK,
+CDTunnel, a software TCP stack, then RSD. `siboot.py --self-test` and
+`route_probe.py` are what exist; neither asks for a password or touches an
+Apple account.
 
 ### What the first device run settled (iPhone 17,3, iOS 27.0, a-Shell, 2026-08-27)
 
@@ -142,9 +145,51 @@ Two rows were misread. **49152** was the right port with the wrong protocol, not
 the wrong port: it is the RPPairing listener, and 11 bytes is its header.
 **62078** was never actually asked anything — `classify_port` calls `recv()`
 first and sends nothing, and lockdownd never speaks first; it waits for a
-request. So "hangs up unasked" describes our probe, not the service.
-`ashell/lockdown_probe.py` sends real requests, and what it returns decides the
-size of this project.
+request. (The reading was right anyway: asked properly on 2026-08-31, lockdownd
+*does* hang up unasked. Right answer, no evidence for it until then — see
+below.)
+
+### The route is settled (iPhone, a-Shell, 2026-08-31, `route_probe.py`)
+
+**The device speaks RPPairing on `10.7.0.1:49152`, and Finding 1 is confirmed
+on hardware.** The header-split test is unambiguous:
+
+| sent | result |
+|---|---|
+| nothing | held open, silent for 3 s |
+| 11 bytes, **correct** magic | **held** — it read the magic and wants the body |
+| 11 bytes, **wrong** magic | closed after 19 ms |
+| full `attemptPairVerify` | **423 bytes of RPPairing-framed JSON** |
+
+The reply lands in exactly the shape `attempt_pair_verify` parses
+(`response._1.handshake._0`, mod.rs:342): `wireProtocolVersion` 26,
+`minimumSupportedWireProtocolVersion` 8 — so our 19 is inside the window.
+
+**Route A is closed, and now for a measured reason.** `10.7.0.1:62078` accepts
+the connection and closes it after 5 ms *having been sent nothing*, with a
+1-byte cutoff if you do write. Every other address is `EPERM` or times out.
+That matches what `NOTES.md:307` predicted: lockdownd answers over USB only
+until `EnableWifiDebugging` is set, and setting it needs a session, which needs
+a record. The deadlock is real.
+
+**The complication is in the handshake reply.** `deviceOptions` says:
+
+```
+allowsIncomingTunnelConnections          true
+allowsSharingSensitiveInfo               true
+allowsPairSetup                          false
+allowsFreePairing                        false
+allowsPinlessPairing                     false
+allowsPromptlessAutomationPairingUpgrade false
+```
+
+`allowsPairSetup: false` is the one that matters, and **idevice never reads it**
+— `RemotePairingClient` only logs `deviceOptions` (mod.rs:335) and `connect()`
+calls `pair()` regardless (mod.rs:108). So the shipping app would walk into the
+refusal that follows without knowing why. `route_probe.py --consent` sends the
+one message that asks (`setupManualPairing`, mod.rs:397) and prints the device's
+own `NSLocalizedDescription` if it is refused. Nothing pairs: SRP is never
+started.
 
 **v0.9 stopped probing and implemented RemoteXPC**, ported from
 `rust-core/vendor/idevice/src/xpc` rather than guessed: HTTP/2 without TLS, DATA
@@ -228,9 +273,9 @@ thing at every checkpoint.
 
 | # | Stage | Notes |
 |---|---|---|
-| 1 | Preflight — reach a device service that answers | **Rewritten.** 49152 is not RSD; it is the RPPairing listener. Which service this step targets depends on the route (below), and `lockdown_probe.py` / `rppairing_probe.py` choose it. |
-| 2 | Pair — `RemotePairingClient` against `untrusted.tunnelservice` | Client role, so nothing is advertised and no Bonjour is involved. Puts a PIN on screen. |
-| 3 | Tunnel — reach the services behind RSD | **The open design question.** See below. |
+| 1 | Preflight — RPPairing handshake on `10.7.0.1:49152` | **Done.** 49152 is the RPPairing listener, not RSD. The device answers `attemptPairVerify` in framing. |
+| 2 | Pair — RPPairing pair-setup, PIN on screen | **Blocked pending `--consent`.** The device advertises `allowsPairSetup: false`; whether that is a refusal or just a flag is the next measurement. |
+| 3 | Tunnel — TLS-PSK → CDTunnel → software TCP stack → RSD | The largest single risk. RSD and the RemoteXPC codec live *inside* here, after pairing. |
 | 4 | Apple ID — GrandSlam SRP + anisette + the developer portal | Mostly portable from [`../ish/sideinstaller.py`](../ish/sideinstaller.py), which already does this in stdlib Python and was checked against live services. |
 | 5 | Sign | Pure-Python code signer. Nothing to reuse. |
 | 6 | Install — AFC + `installation_proxy` | Replaces the iSH build's `itms-services://` handoff, and with it the three untested premises that route carried. |
@@ -238,19 +283,19 @@ thing at every checkpoint.
 
 ### Step 3 is not settled
 
-The Rust build never reached it, so nothing about it is decided. What is known:
+Step 1 now is. Step 3 is not, and the Rust build never reached it. What is known:
 
 * **RPPairing's `createListener` route cannot work on-device.** The device opens
   that listener on its Wi-Fi interface only, and then refuses to build a tunnel
   to itself — it completes the TLS-PSK handshake and hangs up with
   `close_notify` before reading the request. Three fresh listeners, same result.
   (`../NOTES.md`.)
-* **~~lockdownd on 62078 is not a way round it.~~ Withdrawn — never tested.**
-  The "~250 µs" traces to `ish-bootstrap/src/selftest.rs:231`, where `probe()`
-  does a bare `TcpStream::connect_timeout` and drops the stream: it never reads
-  and never writes, and the duration it reports is the connect latency of an
-  **open** port. a-Shell's own reading came from a `recv()` with nothing sent.
-  lockdownd waits for a request, so neither probe is evidence either way.
+* **lockdownd on 62078 is not a way round it — now measured.** The old "~250 µs"
+  was never evidence: `ish-bootstrap/src/selftest.rs:231` does a bare
+  `TcpStream::connect_timeout` and drops the stream, never reading and never
+  writing, and reports the connect latency of an **open** port. Asked properly
+  on 2026-08-31 it closes 5 ms after accept, unprompted, on the only address
+  that reaches it. So the conclusion stands and now has a measurement under it.
 
 That leaves the in-band tunnel — the one that rides the connection to
 `untrusted.tunnelservice` that pairing already opened, needing no inbound
