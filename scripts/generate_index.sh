@@ -115,19 +115,18 @@ pill_for() {  # days -> "class<TAB>label"
 # IPA still sitting in the output folder after its certificate left the pool.
 no_metadata() { ! [[ "$1" =~ ^-?[0-9]+$ ]] || (( $1 <= -999999 )); }
 
-# The headline verdict on a card: whether installing it is worth the reader's
-# time. Revocation outranks everything — Apple kills these certificates far
-# faster than they expire, and a revoked one installs perfectly and then refuses
-# to launch, which is the single most confusing failure this page can hand out.
-# An expired certificate is just as dead, so it collapses into the same answer.
-status_pill_for() {  # revocation, days -> "class<TAB>label"
+# The headline verdict on a card, and now only the good news: a green pill on
+# the certificates Apple still honours. Everything else — revoked, expired, or
+# never checked — carries no pill at all, so the badge reads as a positive
+# signal rather than a wall of red. The countdown in the meta line still says
+# when a certificate died, and the sort order still buries the dead ones.
+status_pill_for() {  # revocation, days -> "class<TAB>label", empty for no pill
   local revocation="$1" d="$2"
-  if [[ "$revocation" == "revoked" ]]; then printf 'bad\tRevoked'; return; fi
-  if ! no_metadata "$d" && (( d < 0 )); then printf 'bad\tExpired'; return; fi
+  if [[ "$revocation" == "revoked" ]]; then printf '\t'; return; fi
+  if ! no_metadata "$d" && (( d < 0 )); then printf '\t'; return; fi
   case "$revocation" in
     valid) printf 'good\tValid' ;;
-    *)     if no_metadata "$d"; then printf 'unknown\tUnknown'
-           else printf 'unknown\tUnverified'; fi ;;
+    *)     printf '\t' ;;
   esac
 }
 
@@ -166,6 +165,10 @@ if [[ ${#PLISTS[@]} -gt 0 ]]; then
     expires_at="$(certificate_expires_at "$name")"
     revocation="$(certificate_revocation "$name")"
     IFS=$'\t' read -r pill_class pill_label <<< "$(status_pill_for "$revocation" "$days_left")"
+    pill_html=""
+    if [[ -n "$pill_label" ]]; then
+      pill_html="<span class=\"pill $pill_class\">$pill_label</span>"
+    fi
     IFS=$'\t' read -r days_class days_label <<< "$(pill_for "$days_left")"
 
     name_esc="$(printf '%s' "$name" | html_escape)"
@@ -188,7 +191,7 @@ if [[ ${#PLISTS[@]} -gt 0 ]]; then
     <article class="cert-card" data-name="$name_esc" data-days="$days_left" data-rank="$rank" data-status="$revocation">
       <div class="cert-head">
         <h3 class="cert-name">$name_esc</h3>
-        <span class="pill $pill_class">$pill_label</span>
+        $pill_html
       </div>
       $meta_line
       <a class="install-btn" href="$install_url">$INSTALL_ICON Install</a>
