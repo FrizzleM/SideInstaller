@@ -135,20 +135,41 @@ previously placed file keeps working.
 `si_pairing_run_host` gained a parameter, so `rust-core/include/sideinstaller.h`
 had to be hand-edited alongside it — there is no cbindgen for that header.
 
-**LocalDevVPN's actual shape** (read from its source, `TunnelProv/PacketTunnelProvider.swift`):
-`NEIPv4Settings(addresses: [TunnelDeviceIP])` puts **10.7.0.0** on the `utun`, with
-`includedRoutes` = that subnet only and `excludedRoutes = [.default()]`. We connect to
-the peer **10.7.0.1** (`TunnelFakeIP`), which is on no interface — the provider rewrites
-`dst == fakeIP → deviceIP` inbound and `src == deviceIP → fakeIP` outbound. Three
-consequences for us:
+**LocalDevVPN's actual shape** (read from its source, `TunnelProv/PacketTunnelProvider.swift`).
+`NEIPv4Settings(addresses: [ifaceIP])` puts the tunnel's own end on the `utun`, with
+`includedRoutes` = the peer's route only and `excludedRoutes = [.default()]`. We connect
+to the peer, which is on no interface — the provider swaps source and destination on every
+packet it reads, so anything sent to the peer comes back to the tunnel's own address.
+
+**Its 2026-08 rewrite changed the address model, and broke our tunnel detection.** Before
+it, `TunnelDeviceIP` = **10.7.0.0** with a separate user-editable subnet mask (/24) and
+`TunnelFakeIP` = **10.7.0.1**. After it, the mask field is gone — addresses are CIDR now,
+validated by a new `TunnelProv/CIDRValidator.swift` — and the defaults are
+`TunnelIfaceIP` = **10.7.1.1/32**, `TunnelPeerIP` = **10.7.0.1/32**. The keys were renamed
+with no migration, so upgrading users silently land on those defaults. Two things follow:
+
+- A **/32 on the `utun` can never contain the peer**, so "is `deviceIP` inside a tunnel
+  interface's subnet" — which is all `NetworkStatus` used to ask — reads a perfectly
+  healthy point-to-point tunnel as "no tunnel". This is not a LocalDevVPN bug; a /32
+  interface plus a host route is the correct shape for a P2P tunnel. `NetworkStatus`
+  therefore asks the **routing table** first (`tunnelCarriesRoute`, a UDP `connect` that
+  sends nothing and only resolves a source address), and keeps the subnet test as a
+  fallback so wider tunnels still answer. The user workaround going round the community —
+  setting the tunnel IP to `10.7.0.2/30` so its mask reaches the peer — only widens the
+  mask far enough to satisfy the old test, and is unnecessary once the route test lands.
+- LocalDevVPN now **prints its addresses with the prefix attached** (`10.7.0.1/32`), so a
+  Device IP copied out of it arrives here as a CIDR string. `Engine.deviceHost` strips the
+  suffix. Untreated, that string failed `ipv4Value`, fell through to the broad
+  tunnel-name check — which iOS's own always-up `utun` satisfies — and reported a tunnel
+  that wasn't there, before failing much later in `inet_pton`.
+
+Two further consequences of the shape itself:
 
 - The tunnel routes nothing off-device, so it needs **no Wi-Fi**. Only pairing does
   (Bonjour on the local network). `Engine.needsFreshPairing` is what gates the Wi-Fi
   requirement now.
-- All three of tunnel IP, device IP and subnet mask are **user-editable** in LocalDevVPN,
-  so `NetworkStatus` reads the interface's real netmask instead of assuming /24.
 - Its config sets `isOnDemandEnabled = true` with `NEEvaluateConnectionRule(matchDomains:
-  ["10.7.0.0", "10.7.0.1"])`, and never disables it. Those are **DNS domain** matches and
+  [tunnelIfaceIP, tunnelPeerIP])`, and never disables it. Those are **DNS domain** matches and
   we connect by raw IP, so they can never fire for our traffic — iOS is left free to tear
   the tunnel down whenever it likes. That is the mechanism behind the 0.6.5 "adapter
   closed (NetworkUnreachable)" failures. **Never trust `DeviceConnection.isConnected` to

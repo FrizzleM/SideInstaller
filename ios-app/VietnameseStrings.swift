@@ -322,9 +322,6 @@ let vietnameseStrings: [String: String] = [
         "Kết nối tới iPhone của họ đã rớt — hãy bắt đầu lại.",
     "Set up someone else's iPhone": "Thiết lập iPhone cho người khác",
     "Same Wi-Fi network": "Cùng một mạng Wi-Fi",
-    "How it works": "Cách hoạt động",
-    "This installs SideInstaller onto another iPhone on the same Wi-Fi network — no computer and no cable. Their iPhone will ask them to trust this one; they have to be holding it, unlocked, when you tap Install.":
-        "Cài SideInstaller lên một chiếc iPhone khác trong cùng mạng Wi-Fi — không cần máy tính, không cần cáp. iPhone của họ sẽ hỏi có tin cậy máy này không; họ phải cầm máy, đã mở khóa, khi bạn chạm Cài ứng dụng.",
     "Their iPhone": "iPhone của họ",
     "IP address (e.g. 192.168.1.42)": "Địa chỉ IP (ví dụ 192.168.1.42)",
     "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
@@ -332,8 +329,8 @@ let vietnameseStrings: [String: String] = [
     "This iPhone is %@, so theirs will look similar.":
         "iPhone này là %@, nên địa chỉ của họ sẽ tương tự.",
     "Apple ID to sign with": "Apple ID dùng để ký",
-    "Usually theirs, so the app is signed to their account and their free developer slots. Held only until this page is closed — never saved to this iPhone, and the password is never sent anywhere but Apple.":
-        "Thường là của họ, để ứng dụng được ký bằng tài khoản và các suất nhà phát triển miễn phí của họ. Chỉ giữ đến khi bạn đóng trang này — không bao giờ lưu vào iPhone này, và mật khẩu chỉ được gửi tới Apple.",
+    "Tip: Use the iPhone/iPad owner's Apple account credentials":
+        "Mẹo: Hãy dùng thông tin đăng nhập tài khoản Apple của chủ nhân iPhone/iPad",
     "Use my saved Apple ID instead": "Dùng Apple ID đã lưu của tôi",
     "Steps": "Các bước",
     "Waiting for them to tap Trust…": "Đang đợi họ chạm Tin cậy…",
@@ -540,8 +537,8 @@ let vietnameseStrings: [String: String] = [
         "Địa chỉ trong Cài đặt › Nâng cao › IP thiết bị là địa chỉ mà iPhone này đã có, nên không có gì ở đầu bên kia để kết nối.",
     "Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end.":
         "Đặt lại thành 10.7.0.1, giá trị mặc định. Trong LocalDevVPN đó là giá trị ở Cài đặt › Device IP — không phải địa chỉ trên màn hình chính, vốn là đầu của chính đường hầm.",
-    "If you changed LocalDevVPN's addresses, put its Device IP here, and make sure its Tunnel IP and subnet mask cover it.":
-        "Nếu bạn đã đổi địa chỉ của LocalDevVPN, hãy nhập Device IP của nó vào đây và đảm bảo Tunnel IP cùng mặt nạ mạng con của nó bao phủ địa chỉ đó.",
+    "If you changed LocalDevVPN's addresses, copy its Device IP here — including the /32, if it shows one.":
+        "Nếu bạn đã đổi địa chỉ của LocalDevVPN, hãy sao chép Device IP của nó vào đây — kể cả phần /32, nếu có hiển thị.",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "Việc ghép nối iPhone này cần đến nó: SideInstaller quảng bá chính mình trên mạng nội bộ để Cài đặt tìm thấy.",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":

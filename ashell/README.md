@@ -191,6 +191,44 @@ one message that asks (`setupManualPairing`, mod.rs:397) and prints the device's
 own `NSLocalizedDescription` if it is refused. Nothing pairs: SRP is never
 started.
 
+### The direction was the blocker all along (2026-08-31)
+
+`--consent` got no error, just a close: **the device hung up on
+`setupManualPairing` without sending `pairingRejectedWithError`.** Taken with
+`allowsPairSetup: false`, that is remoted saying it does not accept an inbound
+request to *create* a pairing at all.
+
+**SideInstaller never asks it to.** It runs the pairing the other way round:
+
+| | who listens | who dials | can it create a pairing? |
+|---|---|---|---|
+| SideInstaller | **SideInstaller** advertises `_remotepairing-pairable-host._tcp` | **the device**, via Settings › Developer Mode | **yes** — it is the accessory, and advertises `allowsPairSetup: true` (responder.rs:227) |
+| siboot so far | the device, on 49152 | siboot | **no** — remoted answers `allowsPairSetup: false` |
+
+So SideInstaller uses *both* roles, and the split is the whole answer:
+`PairingController.swift:217` **creates** the record as a Bonjour-advertised
+pairable host; `DeviceConnection.connectRemotePairing` then **uses** it as a
+client, reading it with `rp_pairing_file_read`. The client role pair-*verifies*
+an existing record. It cannot pair-*setup* a new one — for anybody. The Rust
+build would hit this identical wall, so this, not Local Network permission, is
+why `ish-bootstrap` stopped at step 2.
+
+**`ish-bootstrap/src/pairing.rs:17` is therefore falsified.** It argued that the
+original brief was wrong to rule RPPairing out over `NSNetService`, because "that
+reasoning holds only for the *host* role … `RemotePairingClient` is the *client*
+role … so nothing is ever advertised and no multicast entitlement is needed."
+The premise is right and the conclusion is backwards: nothing is advertised,
+and that is exactly why it cannot pair. The original brief had it right.
+
+**What it costs.** siboot needs the responder role: a listener (free in Python),
+Bonjour advertising, and a port of `responder.rs` — the SRP-6a *accessory* side,
+M1–M6 — rather than the client side of `mod.rs`. Bonjour looked like the
+blocker and probably is not: registration goes through the system
+`mDNSResponder`, which does the multicasting, so it should not need
+`com.apple.developer.networking.multicast`. `route_probe.py --bonjour` reaches
+`DNSServiceRegister` through `ctypes` and checks. It registers correctly on
+macOS; whether iOS applies a policy refusal is the open question.
+
 **v0.9 stopped probing and implemented RemoteXPC**, ported from
 `rust-core/vendor/idevice/src/xpc` rather than guessed: HTTP/2 without TLS, DATA
 frames per stream, an XPC wrapper (magic `0x29b00b92`, flags, u64 length, u64
@@ -274,7 +312,7 @@ thing at every checkpoint.
 | # | Stage | Notes |
 |---|---|---|
 | 1 | Preflight — RPPairing handshake on `10.7.0.1:49152` | **Done.** 49152 is the RPPairing listener, not RSD. The device answers `attemptPairVerify` in framing. |
-| 2 | Pair — RPPairing pair-setup, PIN on screen | **Blocked pending `--consent`.** The device advertises `allowsPairSetup: false`; whether that is a refusal or just a flag is the next measurement. |
+| 2 | Pair — as a **pairable host**: advertise over Bonjour, let Settings dial in | **Redirected.** The client role cannot pair-setup; the device closes on it. This is the responder role (`responder.rs`), which is what SideInstaller uses. |
 | 3 | Tunnel — TLS-PSK → CDTunnel → software TCP stack → RSD | The largest single risk. RSD and the RemoteXPC codec live *inside* here, after pairing. |
 | 4 | Apple ID — GrandSlam SRP + anisette + the developer portal | Mostly portable from [`../ish/sideinstaller.py`](../ish/sideinstaller.py), which already does this in stdlib Python and was checked against live services. |
 | 5 | Sign | Pure-Python code signer. Nothing to reuse. |

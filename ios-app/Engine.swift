@@ -92,6 +92,10 @@ final class Engine: ObservableObject {
     @Published private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
     // The loopback VPN's device-side IP; configurable in Advanced.
     @Published var deviceIP: String = "10.7.0.1"
+    /// `deviceIP` as an address to dial, kept apart from the field's own text so
+    /// that a pasted `10.7.0.1/32` — which is how LocalDevVPN prints it now —
+    /// still resolves instead of failing in `inet_pton` several layers down.
+    var deviceHost: String { NetworkStatus.host(deviceIP) }
     // Which build to install (SideStore, or LiveContainer + SideStore).
     @Published var installSource: InstallSource = .sideStore
     // Which release track to pull that build from (stable or nightly).
@@ -424,9 +428,9 @@ final class Engine: ObservableObject {
             return
         }
         // A tunnel pointed at this iPhone's own address can never connect.
-        if NetworkStatus.isOwnAddress(deviceIP) {
+        if NetworkStatus.isOwnAddress(deviceHost) {
             setGuide(Guides.deviceIPMismatch)
-            log("⛔️ Device IP \(deviceIP) is an address this iPhone already holds — that's the tunnel's own end, not the one to connect to. Check Settings › Advanced › Device IP (the default is 10.7.0.1).")
+            log("⛔️ Device IP \(deviceHost) is an address this iPhone already holds — that's the tunnel's own end, not the one to connect to. Check Settings › Advanced › Device IP (the default is 10.7.0.1).")
             return
         }
         resetRun()
@@ -479,7 +483,7 @@ final class Engine: ObservableObject {
         var announced: String?
         while true {
             try Task.checkCancellation()
-            let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceIP)
+            let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceHost)
             publishNetwork(vpn: vpn, wifi: wifi, vpnText: vpn ? "tunnel up" : "no tunnel")
             // Only a run that pairs needs Wi-Fi; the tunnel is always required.
             let wifiSatisfied = wifi || !needsFreshPairing
@@ -589,7 +593,7 @@ final class Engine: ObservableObject {
     private func connect() async throws {
         setStep(.connect, .active)
         setGuide(nil)
-        let ip = deviceIP
+        let ip = deviceHost
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         let device = try await onDeviceQueue { try self.performConnect(ip: ip, pairingPath: path) }
         deviceSummary = device.summary
@@ -1107,7 +1111,7 @@ final class Engine: ObservableObject {
         guard let bundle = signedAppPath else { throw EngineError.message(L("No signed bundle to install.")) }
         setStep(.install, .active)
         installProgress = 0
-        let ip = deviceIP
+        let ip = deviceHost
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         try await onDeviceQueue {
             // iOS tears down the tunnel while it sits idle through sign-in and
@@ -1340,12 +1344,12 @@ final class Engine: ObservableObject {
     // their own failures instead of raising a stopped step and guide.
 
     func checkVPNAndWifi() {
-        let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceIP)
+        let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceHost)
         publishNetwork(vpn: vpn, wifi: wifi,
                        vpnText: vpn ? "tunnel up" : "no tunnel (start a loopback VPN)")
         log("Network: \(detail)")
-        log("VPN(loopback)=\(vpnStatus), Wi-Fi=\(wifiStatus). RSD target \(deviceIP):\(DeviceConnection.rsdPort).")
-        if !vpn { log("⚠️ No tunnel on \(deviceIP)'s subnet — connect a loopback VPN (LocalDevVPN, ClashMi, …).") }
+        log("VPN(loopback)=\(vpnStatus), Wi-Fi=\(wifiStatus). RSD target \(deviceHost):\(DeviceConnection.rsdPort).")
+        if !vpn { log("⚠️ No tunnel on \(deviceHost)'s subnet — connect a loopback VPN (LocalDevVPN, ClashMi, …).") }
     }
 
     /// Poll the interface list so the readouts track the tunnel while the app is
@@ -1361,7 +1365,7 @@ final class Engine: ObservableObject {
 
     /// One quiet re-scan of the tunnel and Wi-Fi state.
     func refreshNetworkStatus() {
-        let (vpn, wifi, _) = NetworkStatus.summarize(deviceIP: deviceIP)
+        let (vpn, wifi, _) = NetworkStatus.summarize(deviceIP: deviceHost)
         publishNetwork(vpn: vpn, wifi: wifi,
                        vpnText: vpn ? "tunnel up" : "no tunnel (start a loopback VPN)")
     }
@@ -1603,7 +1607,7 @@ final class Engine: ObservableObject {
                 : L("No pairing file yet — tap “Import pairing file” first."))
         }
         pairingFilePath = path
-        let ip = deviceIP
+        let ip = deviceHost
         let device = try await onDeviceQueue { try self.performConnect(ip: ip, pairingPath: path) }
         deviceSummary = device.summary
         deviceUDID = device.udid
@@ -1904,7 +1908,7 @@ enum Guides {
             steps: [
                 L("The address in Settings › Advanced › Device IP is one this iPhone already holds, so there's nothing at the other end to connect to."),
                 L("Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end."),
-                L("If you changed LocalDevVPN's addresses, put its Device IP here, and make sure its Tunnel IP and subnet mask cover it."),
+                L("If you changed LocalDevVPN's addresses, copy its Device IP here — including the /32, if it shows one."),
             ],
             actionLabel: nil, actionURLString: nil)
     }

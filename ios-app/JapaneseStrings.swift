@@ -473,8 +473,8 @@ let japaneseStrings: [String: String] = [
         "「設定 › 詳細設定 › デバイス IP」に入力されているアドレスは、この iPhone が既に持っているものです。そのため、接続先が存在しません。",
     "Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end.":
         "初期値の 10.7.0.1 に戻してください。LocalDevVPN では、これは「Settings › Device IP」にある値です。メイン画面に表示されているアドレス（トンネル自身の端点）とは異なります。",
-    "If you changed LocalDevVPN's addresses, put its Device IP here, and make sure its Tunnel IP and subnet mask cover it.":
-        "LocalDevVPN のアドレスを変更している場合は、その Device IP をここに入力し、Tunnel IP とサブネットマスクがそれをカバーしていることを確認してください。",
+    "If you changed LocalDevVPN's addresses, copy its Device IP here — including the /32, if it shows one.":
+        "LocalDevVPN のアドレスを変更している場合は、その Device IP をここにコピーしてください。末尾に /32 が付いていれば、そのまま含めて構いません。",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "この iPhone のペアリングには Wi-Fi が必要です。SideInstaller は「設定」アプリから見つけてもらうために、ローカルネットワーク上で自身をアドバタイズします。",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
@@ -485,9 +485,6 @@ let japaneseStrings: [String: String] = [
     // The tool's name is left in English everywhere, as SideStore's is.
     "Side by Side": "Side by Side",
     "Set up someone else's iPhone": "他の人の iPhone をセットアップ",
-    "This installs SideInstaller onto another iPhone on the same Wi-Fi network — no computer and no cable. Their iPhone will ask them to trust this one; they have to be holding it, unlocked, when you tap Install.":
-        "同じ Wi-Fi ネットワーク上にある別の iPhone に、パソコンもケーブルも使わずに SideInstaller をインストールします。相手の iPhone にはこの iPhone を信頼するか確認が表示されるため、インストールをタップするときは、相手がロックを解除した状態で端末を持っている必要があります。",
-    "How it works": "仕組み",
     "Steps": "手順",
     "Same Wi-Fi network": "同じ Wi-Fi ネットワーク",
     "Their iPhone": "相手の iPhone",
@@ -509,8 +506,8 @@ let japaneseStrings: [String: String] = [
     "Sign in to their Apple ID": "相手の Apple ID でサインイン",
     "Apple ID to sign with": "署名に使用する Apple ID",
     "Enter the Apple ID to sign with, and its password.": "署名に使用する Apple ID とそのパスワードを入力してください。",
-    "Usually theirs, so the app is signed to their account and their free developer slots. Held only until this page is closed — never saved to this iPhone, and the password is never sent anywhere but Apple.":
-        "通常は相手の Apple ID を使用します。そうすることで、相手のアカウントと無料の開発者アプリ枠でアプリが署名されます。入力内容はこのページを閉じるまで保持されるだけで、この iPhone に保存されることはなく、パスワードは Apple 以外には送信されません。",
+    "Tip: Use the iPhone/iPad owner's Apple account credentials":
+        "ヒント：その iPhone/iPad の持ち主の Apple アカウントの認証情報を使ってください",
     "Use my saved Apple ID instead": "保存済みの自分の Apple ID を使用",
     "Clear their details": "入力した情報を消去",
     "Download SideInstaller": "SideInstaller をダウンロード",

@@ -322,9 +322,6 @@ let italianStrings: [String: String] = [
         "Il collegamento con il loro iPhone è caduto: ricomincia.",
     "Set up someone else's iPhone": "Configura l'iPhone di un'altra persona",
     "Same Wi-Fi network": "Stessa rete Wi-Fi",
-    "How it works": "Come funziona",
-    "This installs SideInstaller onto another iPhone on the same Wi-Fi network — no computer and no cable. Their iPhone will ask them to trust this one; they have to be holding it, unlocked, when you tap Install.":
-        "Installa SideInstaller su un altro iPhone connesso alla stessa rete Wi-Fi: niente computer e niente cavo. Il loro iPhone chiederà di autorizzare questo; devono averlo in mano, sbloccato, quando tocchi Installa.",
     "Their iPhone": "Il loro iPhone",
     "IP address (e.g. 192.168.1.42)": "Indirizzo IP (es. 192.168.1.42)",
     "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
@@ -332,8 +329,8 @@ let italianStrings: [String: String] = [
     "This iPhone is %@, so theirs will look similar.":
         "Questo iPhone è %@, quindi il loro sarà simile.",
     "Apple ID to sign with": "Apple ID con cui firmare",
-    "Usually theirs, so the app is signed to their account and their free developer slots. Held only until this page is closed — never saved to this iPhone, and the password is never sent anywhere but Apple.":
-        "Di solito il loro, così l'app è firmata con il loro account e i loro slot da sviluppatore gratuiti. Conservato solo finché questa pagina resta aperta: mai salvato su questo iPhone, e la password non viene inviata a nessuno tranne Apple.",
+    "Tip: Use the iPhone/iPad owner's Apple account credentials":
+        "Suggerimento: usa le credenziali dell'account Apple del proprietario dell'iPhone/iPad",
     "Use my saved Apple ID instead": "Usa invece il mio Apple ID salvato",
     "Steps": "Passaggi",
     "Waiting for them to tap Trust…": "In attesa che tocchino Autorizza…",
@@ -543,8 +540,8 @@ let italianStrings: [String: String] = [
         "L’indirizzo in Impostazioni › Avanzate › IP del dispositivo è uno che questo iPhone possiede già, quindi non c’è nulla all’altro capo a cui connettersi.",
     "Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end.":
         "Reimpostalo su 10.7.0.1, il valore predefinito. In LocalDevVPN è il valore in Impostazioni › Device IP, non l’indirizzo nella schermata principale, che è il capo del tunnel stesso.",
-    "If you changed LocalDevVPN's addresses, put its Device IP here, and make sure its Tunnel IP and subnet mask cover it.":
-        "Se hai cambiato gli indirizzi di LocalDevVPN, inserisci qui il suo Device IP e verifica che il suo Tunnel IP e la maschera di sottorete lo comprendano.",
+    "If you changed LocalDevVPN's addresses, copy its Device IP here — including the /32, if it shows one.":
+        "Se hai cambiato gli indirizzi di LocalDevVPN, copia qui il suo Device IP — compreso il /32, se lo mostra.",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "L’associazione di questo iPhone lo richiede: SideInstaller si annuncia sulla rete locale perché Impostazioni lo trovi.",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
