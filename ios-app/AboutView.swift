@@ -21,8 +21,8 @@ struct AboutView: View {
                 }
                 .padding(20)
             }
-            // The heaviest of the three washes, `Backdrop.darkest`, set by the
-            // tab switch so the tabs read as a descent: Install, Tools, then this.
+            // `Backdrop.bright`, the same wash the Install tab wears, so moving
+            // between the two front pages leaves the backdrop where it is.
             .background(AppBackground())
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
             .sheet(isPresented: $showSettings) { SettingsView() }

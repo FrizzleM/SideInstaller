@@ -38,36 +38,49 @@ enum Theme {
 /// than two crossing.
 @MainActor
 enum Backdrop {
-    /// The wash each tab settles on, as black laid over the mesh. The tabs are a
-    /// descent: Install bright, Tools dark, About darkest.
-    enum Level: Double {
-        case bright  = 0
-        case dark    = 0.55
-        case darkest = 0.75
+    /// The wash each tab settles on, as black laid over the mesh. Install and
+    /// About share the bright one — they are the two pages that read as the
+    /// front of the app — and Tools, with everything pushed inside it, is dark.
+    enum Level: Double, CaseIterable {
+        case bright = 0
+        case dark   = 0.55
     }
 
-    /// Long enough to read as the room changing brightness, short enough to be
-    /// over before the incoming page has finished its entrance cascade.
-    private static let duration: TimeInterval = 0.55
+    /// What the longest move is given: long enough to read as the room changing
+    /// brightness, short enough to be over before the incoming page has
+    /// finished its entrance cascade.
+    private static let fullTravel: TimeInterval = 0.55
+
+    /// The widest gap between two levels, so a shorter move can be given
+    /// proportionally less time and every transition runs at the same speed.
+    private static let span = (Level.allCases.map(\.rawValue).max() ?? 1)
+                            - (Level.allCases.map(\.rawValue).min() ?? 0)
 
     private static var origin = Level.bright.rawValue
     private static var target = Level.bright.rawValue
     /// Far enough in the past that the first frame is at rest on `bright`.
     private static var departed = -Double.greatestFiniteMagnitude
+    /// What the move under way was given, scaled to how far it actually goes.
+    private static var travel = fullTravel
 
     /// Start the move to `level` from wherever the wash is right now, so a tab
     /// switch made mid-transition turns around smoothly instead of jumping.
+    /// Switching between two tabs that share a level does nothing at all.
     static func settle(on level: Level) {
         guard target != level.rawValue else { return }
         let now = Date.timeIntervalSinceReferenceDate
         origin = wash(at: now)
         target = level.rawValue
         departed = now
+        // A turnaround has less ground to cover than a move begun at rest, and
+        // giving it the full duration is what made one read as a crawl.
+        travel = fullTravel * min(1, abs(target - origin) / span)
     }
 
     /// The wash at `t`, on a smoothstep so it both leaves and arrives at rest.
     static func wash(at t: TimeInterval) -> Double {
-        let p = min(max((t - departed) / duration, 0), 1)
+        guard travel > 0 else { return target }
+        let p = min(max((t - departed) / travel, 0), 1)
         return origin + (target - origin) * (p * p * (3 - 2 * p))
     }
 }

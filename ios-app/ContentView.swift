@@ -52,10 +52,12 @@ struct ContentView: View {
                             vpnRequirement.cascadeItem(cascade(2))
                         }
                     }
-                    installButton.cascadeItem(cascade(3))
+                    // Above the button, so a run in flight reads top-down —
+                    // what it is doing, then the Cancel that stops it.
                     if showProgress {
                         progressCard.transition(.cardAppear)
                     }
+                    installButton.cascadeItem(cascade(3))
                     if let pin = engine.pairingPIN {
                         pinCallout(pin).transition(.cardAppear)
                     }
