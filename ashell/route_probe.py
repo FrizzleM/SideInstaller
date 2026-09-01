@@ -478,11 +478,142 @@ def probe_consent(host):
 
 
 # --------------------------------------------------------------------------
+# --bonjour: can this process advertise a pairable host at all?
+# --------------------------------------------------------------------------
+#
+# The device answers `allowsPairSetup: false` and closes on setupManualPairing,
+# because iOS's remoted does not accept an inbound request to create a pairing.
+# SideInstaller never asks it to: it goes the other way round, advertising
+# `_remotepairing-pairable-host._tcp` over Bonjour
+# (ios-app/PairingController.swift:217) so that Settings discovers it and the
+# *device* connects in. In that role idevice advertises allowsPairSetup **true**
+# (remote_pairing/responder.rs:227).
+#
+# So siboot needs the same role, and the open question is Bonjour. NSNetService
+# is a Foundation API, but registration goes through the system mDNSResponder
+# daemon -- the daemon multicasts, not us -- so it should not need
+# `com.apple.developer.networking.multicast`, which is for sockets doing their
+# own multicast. If ctypes can reach DNSServiceRegister, the role is available
+# here.
+#
+# ish-bootstrap/src/pairing.rs:17 argued the opposite: that the client role
+# "needs no multicast entitlement" and therefore sidesteps all of this. The
+# handshake reply falsifies that. The client role pair-*verifies*; it cannot
+# pair-*setup*.
+
+BONJOUR_TYPE = "_remotepairing-pairable-host._tcp"
+BONJOUR_NAME = "siboot-probe"
+
+
+def probe_bonjour():
+    try:
+        import ctypes
+    except ImportError:
+        print(_c("1;31", "  no ctypes -- Bonjour is unreachable from Python here."))
+        return 1
+    print("  ctypes           available")
+
+    lib = None
+    for path in (None, "/usr/lib/libSystem.dylib", "/usr/lib/libsystem_dnssd.dylib"):
+        try:
+            cand = ctypes.CDLL(path)
+            cand.DNSServiceRegister
+            lib, which = cand, path or "the main image"
+            break
+        except (OSError, AttributeError):
+            continue
+    if lib is None:
+        print(_c("1;31", "  DNSServiceRegister not found in any image."))
+        print("  Without it there is no way to advertise a pairable host from")
+        print("  Python here, and pairing needs a different host entirely.")
+        return 1
+    print("  DNSServiceRegister found in %s" % which)
+
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.bind(("0.0.0.0", 0))
+    srv.listen(1)
+    port = srv.getsockname()[1]
+    print("  listener         bound on port %d" % port)
+
+    # DNSServiceRegisterReply: (sdRef, flags, errorCode, name, regtype, domain, ctx)
+    reply_t = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int32,
+                               ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p,
+                               ctypes.c_void_p)
+    seen = {}
+
+    def on_reply(sd, flags, err, name, regtype, domain, ctx):
+        seen["err"] = err
+        seen["name"] = name.decode() if name else ""
+        seen["domain"] = domain.decode() if domain else ""
+
+    cb = reply_t(on_reply)
+
+    lib.DNSServiceRegister.restype = ctypes.c_int32
+    lib.DNSServiceRegister.argtypes = [
+        ctypes.POINTER(ctypes.c_void_p), ctypes.c_uint32, ctypes.c_uint32,
+        ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p,
+        ctypes.c_uint16, ctypes.c_uint16, ctypes.c_void_p, reply_t, ctypes.c_void_p]
+    lib.DNSServiceRefSockFD.restype = ctypes.c_int
+    lib.DNSServiceRefSockFD.argtypes = [ctypes.c_void_p]
+    lib.DNSServiceProcessResult.restype = ctypes.c_int32
+    lib.DNSServiceProcessResult.argtypes = [ctypes.c_void_p]
+    lib.DNSServiceRefDeallocate.restype = None
+    lib.DNSServiceRefDeallocate.argtypes = [ctypes.c_void_p]
+
+    sd = ctypes.c_void_p()
+    # port is passed in network byte order; empty TXT -- this probe only asks
+    # whether registration is permitted, not whether the record is complete.
+    err = lib.DNSServiceRegister(ctypes.byref(sd), 0, 0,
+                                 BONJOUR_NAME.encode(), BONJOUR_TYPE.encode(),
+                                 None, None, socket.htons(port), 0, None, cb, None)
+    if err != 0:
+        print(_c("1;31", "  DNSServiceRegister failed: error %d" % err))
+        print("  -65555 is a policy refusal; -65537 an unknown/bad parameter.")
+        srv.close()
+        return 1
+    print("  DNSServiceRegister accepted -- waiting for the daemon's callback")
+
+    import select
+    fd = lib.DNSServiceRefSockFD(sd)
+    rc = 1
+    try:
+        ready, _, _ = select.select([fd], [], [], 8.0)
+        if ready:
+            lib.DNSServiceProcessResult(sd)
+        if seen.get("err") == 0:
+            print("")
+            print(_c("1;32", "  REGISTERED as %r in %r" % (seen.get("name"), seen.get("domain"))))
+            print("  Bonjour works from Python here, so the pairable-host role is")
+            print("  available and pair-setup can be done the way SideInstaller")
+            print("  does it. Next: port responder.rs, not the client side.")
+            print("")
+            print("  Check now, while this is still running:")
+            print("  Settings > Privacy & Security > Developer Mode. If %r is" % BONJOUR_NAME)
+            print("  listed as pairable, the whole approach is proven end to end.")
+            print("")
+            input("  press return when you have looked ... ")
+            rc = 0
+        elif "err" in seen:
+            print(_c("1;31", "  the daemon refused it: error %d" % seen["err"]))
+        else:
+            print(_c("1;33", "  no callback in 8s -- registration neither confirmed nor refused."))
+    finally:
+        lib.DNSServiceRefDeallocate(sd)
+        srv.close()
+    return rc
+
+
+# --------------------------------------------------------------------------
 
 def main(argv):
     args = [a for a in argv[1:] if not a.startswith("--")]
     if "--consent" in argv:
         return probe_consent(args[0] if args else "10.7.0.1")
+    if "--bonjour" in argv:
+        print(_c("1;36", "can this process advertise a pairable host?"))
+        print("")
+        return probe_bonjour()
 
     hosts = [(a, "given on the command line") for a in args] or addresses()
 

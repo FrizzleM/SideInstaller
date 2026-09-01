@@ -647,11 +647,10 @@ struct SideBySideView: View {
         ScrollView {
             VStack(spacing: 18) {
                 header.cascadeItem(0)
-                explainer.cascadeItem(1)
-                targetCard.cascadeItem(2)
-                accountCard.cascadeItem(3)
-                stepsCard.cascadeItem(4)
-                actionButton.cascadeItem(5)
+                targetCard.cascadeItem(1)
+                accountCard.cascadeItem(2)
+                stepsCard.cascadeItem(3)
+                actionButton.cascadeItem(4)
                 if let error = manager.lastError {
                     errorCallout(error).transition(.cardAppear)
                 }
@@ -675,7 +674,9 @@ struct SideBySideView: View {
 
     private var header: some View {
         BrandHeader(icon: "iphone.gen3.radiowaves.left.and.right",
+                    image: "SideBySideLogo",
                     title: L("Side by Side"),
+                    beta: true,
                     subtitle: L("Set up someone else's iPhone"),
                     animateIcon: manager.isRunning) {
             if let summary = manager.targetSummary {
@@ -683,20 +684,6 @@ struct SideBySideView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
             } else {
                 StatusPill(text: L("Same Wi-Fi network"), systemImage: "wifi", color: .secondary, glass: true)
-            }
-        }
-    }
-
-    // MARK: What this does
-
-    private var explainer: some View {
-        PanelCard {
-            VStack(alignment: .leading, spacing: 10) {
-                sectionTitle(L("How it works"), systemImage: "info.circle")
-                Text(L("This installs SideInstaller onto another iPhone on the same Wi-Fi network — no computer and no cable. Their iPhone will ask them to trust this one; they have to be holding it, unlocked, when you tap Install."))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -756,7 +743,7 @@ struct SideBySideView: View {
                     .focused($focus, equals: .password)
                     .disabled(manager.isRunning)
                     .fieldBackground()
-                Text(L("Usually theirs, so the app is signed to their account and their free developer slots. Held only until this page is closed — never saved to this iPhone, and the password is never sent anywhere but Apple."))
+                Text(L("Tip: Use the iPhone/iPad owner's Apple account credentials"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

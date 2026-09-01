@@ -107,8 +107,9 @@ struct ToolsView: View {
                     NavigationLink {
                         SideBySideView(manager: sideBySideManager)
                     } label: {
-                        ToolRow(icon: "iphone.gen3.radiowaves.left.and.right",
-                                title: L("Side by Side"))
+                        ToolRow(image: "SideBySideLogo",
+                                title: L("Side by Side"),
+                                beta: true)
                     }
                     .buttonStyle(.plain)
                     .cascadeItem(1)
@@ -187,6 +188,8 @@ private struct ToolRow: View {
     var image: String? = nil
     var icon: String? = nil
     var title: String
+    /// Tags the row, for a tool whose page isn't proven yet.
+    var beta: Bool = false
 
     var body: some View {
         PanelCard {
@@ -196,6 +199,7 @@ private struct ToolRow: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 Text(title)
                     .font(.headline)
+                if beta { BetaBadge() }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.subheadline.weight(.semibold))

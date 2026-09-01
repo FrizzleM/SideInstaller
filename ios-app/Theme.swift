@@ -193,6 +193,20 @@ struct StatusPill: View {
     }
 }
 
+/// Marks a feature that ships before it is proven. Sized to sit beside a title
+/// without pushing it around, so the same tag works on a row and on a header.
+struct BetaBadge: View {
+    var body: some View {
+        Text(L("Beta").uppercased())
+            .font(.caption2.weight(.heavy))
+            .foregroundStyle(Theme.accent2)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(Theme.accent2.opacity(0.16)))
+            .fixedSize()
+    }
+}
+
 /// The hero at the top of each screen: a glyph, the title, and an accessory.
 struct BrandHeader<Accessory: View>: View {
     var icon: String
@@ -200,6 +214,8 @@ struct BrandHeader<Accessory: View>: View {
     /// Install screen does to wear its home-screen identity.
     var image: String? = nil
     var title: String
+    /// Tags the title, for a screen whose feature isn't proven yet.
+    var beta: Bool = false
     /// A line tucked under the title, close enough to read as one block.
     var subtitle: String? = nil
     var animateIcon: Bool = false
@@ -211,8 +227,11 @@ struct BrandHeader<Accessory: View>: View {
                 .frame(width: 86, height: 86)
                 .shadow(color: Theme.glow, radius: 20, x: 0, y: 12)
             VStack(spacing: 4) {
-                Text(title)
-                    .font(.largeTitle.weight(.bold))
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(title)
+                        .font(.largeTitle.weight(.bold))
+                    if beta { BetaBadge() }
+                }
                 if let subtitle {
                     Text(subtitle)
                         .font(.subheadline.weight(.semibold))

@@ -314,17 +314,14 @@ let chineseStrings: [String: String] = [
     "The link to their iPhone dropped — start again.": "与对方 iPhone 的连接已断开——请重新开始。",
     "Set up someone else's iPhone": "为别人的 iPhone 完成设置",
     "Same Wi-Fi network": "同一个 Wi-Fi 网络",
-    "How it works": "工作原理",
-    "This installs SideInstaller onto another iPhone on the same Wi-Fi network — no computer and no cable. Their iPhone will ask them to trust this one; they have to be holding it, unlocked, when you tap Install.":
-        "把 SideInstaller 安装到同一 Wi-Fi 网络下的另一台 iPhone 上——不需要电脑，也不需要数据线。对方的 iPhone 会请求信任这台设备；你轻点“安装”时，他们需要拿着已解锁的手机。",
     "Their iPhone": "对方的 iPhone",
     "IP address (e.g. 192.168.1.42)": "IP 地址（例如 192.168.1.42）",
     "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
         "在对方的 iPhone 上：设置 › 无线局域网 › 网络旁的 ⓘ，然后查看“IP 地址”。",
     "This iPhone is %@, so theirs will look similar.": "这台 iPhone 是 %@，对方的地址会与之相近。",
     "Apple ID to sign with": "用于签名的 Apple ID",
-    "Usually theirs, so the app is signed to their account and their free developer slots. Held only until this page is closed — never saved to this iPhone, and the password is never sent anywhere but Apple.":
-        "通常填对方的，这样 App 就用他们的账户和免费开发者名额签名。仅在此页面打开期间保留——绝不会保存到这台 iPhone，密码也只会发送给 Apple。",
+    "Tip: Use the iPhone/iPad owner's Apple account credentials":
+        "提示：请使用该 iPhone/iPad 机主的 Apple 账户凭据",
     "Use my saved Apple ID instead": "改用我保存的 Apple ID",
     "Steps": "步骤",
     "Waiting for them to tap Trust…": "等待对方轻点“信任”…",
@@ -529,8 +526,8 @@ let chineseStrings: [String: String] = [
         "“设置 › 高级 › 设备 IP”中填的地址是本机已有的地址，另一端没有可连接的对象。",
     "Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end.":
         "改回默认值 10.7.0.1。在 LocalDevVPN 中，它是“设置 › Device IP”里的值，而不是主界面上显示的地址——那是隧道自己的一端。",
-    "If you changed LocalDevVPN's addresses, put its Device IP here, and make sure its Tunnel IP and subnet mask cover it.":
-        "若你改过 LocalDevVPN 的地址，请在此填入它的 Device IP，并确认它的 Tunnel IP 与子网掩码覆盖该地址。",
+    "If you changed LocalDevVPN's addresses, copy its Device IP here — including the /32, if it shows one.":
+        "若你改过 LocalDevVPN 的地址，请把它的 Device IP 复制到这里——如果末尾带 /32，一并保留即可。",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "配对这台 iPhone 需要它：SideInstaller 会在本地网络上广播自己，供“设置”发现。",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
