@@ -10,6 +10,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case french
     case chinese
     case japanese // ← 追加
+    case portuguese
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .french:     return "Français"
         case .chinese:    return "简体中文"
         case .japanese:   return "日本語" // ← 追加
+        case .portuguese: return "Português"
         }
     }
 
@@ -40,6 +42,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         // Only Simplified is translated, but it beats English for every variant.
         case "zh": return .chinese
         case "ja": return .japanese // ← 追加
+        // Brazilian copy, but it beats English for European Portuguese too.
+        case "pt": return .portuguese
         default:   return .english
         }
     }
@@ -53,6 +57,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .french:         return frenchStrings
         case .chinese:        return chineseStrings
         case .japanese:       return japaneseStrings // ← 追加
+        case .portuguese:     return portugueseStrings
         case .auto, .english: return nil
         }
     }
@@ -105,6 +110,7 @@ extension Localizer {
         case .french:     return Locale(identifier: "fr_FR")
         case .chinese:    return Locale(identifier: "zh_Hans_CN")
         case .japanese:   return Locale(identifier: "ja_JP") // ← 追加
+        case .portuguese: return Locale(identifier: "pt_BR")
         }
     }
 }
