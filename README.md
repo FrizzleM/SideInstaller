@@ -90,9 +90,9 @@ anyone can inspect exactly what it does.
 
 > [!WARNING]
 > All of the above is true of **this** repository and the builds published from it. It is **not** a guarantee
-> that applies to forks, re-signed IPAs, or copies you find elsewhere — those can be modified to steal the
+> that applies to forks, re-signed IPAs, or copies you find elsewhere, those can be modified to steal the
 > Apple ID you type into them. If you didn't get it from
-> [frizzlem.github.io/SideInstaller](https://frizzlem.github.io/SideInstaller/), don't trust it with your
+> https://sideinstaller.net/, don't trust it with your
 > credentials.
 
 ## Project layout
