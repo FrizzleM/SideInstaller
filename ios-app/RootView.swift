@@ -15,7 +15,9 @@ struct RootView: View {
             switch self {
             case .install: .bright
             case .tools:   .dark
-            case .about:   .darkest
+            // The same wash as Install: switching between the two leaves the
+            // backdrop alone rather than moving it and moving it back.
+            case .about:   .bright
             }
         }
     }
