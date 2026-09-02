@@ -543,6 +543,43 @@ or `<base>.<teamID>` match), falling back to the signed bundle's id only if the
 lookup finds nothing. The installation_proxy is the source of truth for what's
 actually on the device.
 
+#### Fix: LiveContainer nightly stopped shipping `LiveContainer+SideStore.ipa`
+
+Checked 2026-09-02 against the live releases. Three of the four derived download
+URLs answer 200; `releases/download/nightly/LiveContainer+SideStore.ipa` answers
+**404**. LiveContainer's rolling `nightly` release now carries only
+`LiveContainer.ipa` (4.7 MB) and `apps_nightly.json`, and that plain IPA has no
+`Frameworks/SideStoreApp.framework` — verified by unzipping it — so it cannot
+stand in. Its own `apps_nightly.json` advertises only the plain build, and
+`apps_ss_lc.json` (release tag `1.0`) still points at 3.6.1, so upstream doesn't
+treat a nightly combined build as a shipped product. The CI *artifact*
+`LiveContainer+SideStore.ipa` (34 MB) does exist on the 2026-08-30 run, and every
+step of that run reported success — it just never reaches the release.
+
+`selectAsset` was already safe here: its loose fallback needs `"sidestore"` in
+the asset name, so it does **not** silently pick the SideStore-less
+`LiveContainer.ipa`. The run failed with `noIPAAsset` instead.
+
+Fix: `SideStoreDownloader.fetchViaReleaseScan` — a third rung under the derived
+URL and the `releaseAPI` lookup. On `noIPAAsset`/`noRelease` only (never a rate
+limit, an outage or an undecodable body — see `DownloadError.isChannelEmpty`) it
+reads `/releases?per_page=20` and takes the newest release whose assets
+`selectAsset` matches. A `stable` request skips pre-releases, so asking for
+stable is never answered with a nightly; a `nightly` request takes whatever is
+newest. The file is filed under the *served* release's track (`Fetched.channel`),
+so a tagged build is never listed in Downloads as a nightly.
+
+Verified against the live API by compiling the real file with a test `main`
+(there is no test target): LC nightly → release 3.8.0 →
+`LiveContainer+SideStore.ipa` → filed as `LiveContainer+SideStore.ipa`; LC stable
+→ 3.8.0; SideStore nightly → the `nightly` prerelease; SideStore stable → 0.6.3,
+skipping the prerelease. Full `downloadLatest` run for LC nightly downloads 35.4
+MB from 3.8.0 and logs each rung.
+
+The fallback is a good one, not just a survivable one: 3.8.0's guest SideStore is
+`0.6.4-20260714`, whose binary has **no** `acctFileChecksum`, so the certificate
+hand-off still lands silently there — better than the nightly would have been.
+
 ## Running on a device (what you do)
 
 1. Install LocalDevVPN (App Store id 6755608044), connect it, keep Wi-Fi on.
