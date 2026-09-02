@@ -165,6 +165,10 @@ enum SideStoreDownloader {
     struct GHRelease: Decodable {
         let tag_name: String
         let assets: [GHAsset]
+        /// Absent from the two single-release endpoints this app also decodes,
+        /// so optional; only the list endpoint needs it, to keep a stable
+        /// request from being answered with a nightly.
+        let prerelease: Bool?
     }
 
     enum DownloadError: Error, CustomStringConvertible {
@@ -241,6 +245,19 @@ enum SideStoreDownloader {
             return false
         }
 
+        /// The channel's own release publishes nothing this app can install —
+        /// or isn't there at all. Both are worth looking past to the repo's
+        /// other releases; a rate limit, an outage or a tampered answer is not.
+        var isChannelEmpty: Bool {
+            switch self {
+            case .noIPAAsset, .noRelease:
+                return true
+            case .badURL, .notDownloadable, .badStatus, .unreachable,
+                 .badRelease, .notAnIPA, .linkStatus:
+                return false
+            }
+        }
+
         /// "in 12 minutes", in the language of the surrounding sentence.
         private static func relative(_ date: Date) -> String {
             let formatter = RelativeDateTimeFormatter()
@@ -255,6 +272,11 @@ enum SideStoreDownloader {
         let file: URL
         /// The asset name GitHub gave it, which may differ from the one asked for.
         let name: String
+        /// The channel the release it came from belongs to, which is the one
+        /// asked for unless `fetchViaReleaseScan` had to look elsewhere. The
+        /// file is filed under this, so the Downloads list never calls a tagged
+        /// stable build a nightly.
+        let channel: ReleaseChannel
     }
 
     /// Returns the local path of the downloaded IPA. `log` receives progress.
@@ -267,10 +289,14 @@ enum SideStoreDownloader {
 
         let fetched: Fetched
         do {
-            fetched = try await fetch(direct, named: assetName, log: log)
+            fetched = try await fetch(direct, named: assetName, from: channel, log: log)
         } catch let error as DownloadError where error.isAssetMissing {
             log("No \(assetName) on that release — asking GitHub's API what the asset is called now.")
-            fetched = try await fetchViaAPI(source: source, channel: channel, log: log)
+            do {
+                fetched = try await fetchViaAPI(source: source, channel: channel, log: log)
+            } catch let error as DownloadError where error.isChannelEmpty {
+                fetched = try await fetchViaReleaseScan(source: source, channel: channel, log: log)
+            }
         }
 
         // An answer isn't proof of an IPA: a block page or a stopped transfer
@@ -280,7 +306,7 @@ enum SideStoreDownloader {
             throw DownloadError.notAnIPA(fetched.name)
         }
 
-        let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
+        let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(fetched.channel))
         try? FileManager.default.removeItem(at: dest)
         try FileManager.default.moveItem(at: fetched.file, to: dest)
         // Claim the file, so a later run knows this copy is safe to replace.
@@ -289,7 +315,7 @@ enum SideStoreDownloader {
     }
 
     /// Download one URL to a temporary file, if the response isn't a refusal.
-    private static func fetch(_ url: URL, named name: String,
+    private static func fetch(_ url: URL, named name: String, from channel: ReleaseChannel,
                               log: @escaping (String) -> Void) async throws -> Fetched {
         var req = URLRequest(url: url)
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
@@ -309,7 +335,7 @@ enum SideStoreDownloader {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         let tag = redirects.tag.map { ", release \($0)" } ?? ""
         log("HTTP \(status) for \(name) — \(response.expectedContentLength) bytes\(tag)")
-        return Fetched(file: file, name: name)
+        return Fetched(file: file, name: name, channel: channel)
     }
 
     /// Download a link the user pasted, into a temporary directory of its own so
@@ -395,7 +421,57 @@ enum SideStoreDownloader {
         guard let assetURL = URL(string: asset.browser_download_url) else {
             throw DownloadError.badURL
         }
-        return try await fetch(assetURL, named: asset.name, log: log)
+        return try await fetch(assetURL, named: asset.name, from: channel, log: log)
+    }
+
+    /// Look through the repo's recent releases for the newest one that still
+    /// publishes this build, once the channel's own release doesn't.
+    ///
+    /// LiveContainer is why. Its CI still builds `LiveContainer+SideStore.ipa`
+    /// on every nightly run, but the rolling `nightly` release it attaches to
+    /// carries the plain `LiveContainer.ipa` alone — verified 2026-09-02, and
+    /// LiveContainer's own nightly source JSON lists only the plain build — so
+    /// the derived URL 404s, the API sees a release with no IPA of ours in it,
+    /// and the newest combined build on offer is the latest tagged one.
+    ///
+    /// A `stable` request never falls back to a pre-release: being handed a
+    /// nightly after asking for stable would be worse than the error this is
+    /// recovering from. A nightly request takes whatever is newest, since the
+    /// alternative is nothing at all.
+    private static func fetchViaReleaseScan(source: InstallSource,
+                                            channel: ReleaseChannel,
+                                            log: @escaping (String) -> Void) async throws -> Fetched {
+        guard let repo = source.repo,
+              let api = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=20")
+        else { throw DownloadError.notDownloadable }
+
+        log("That release has no \(source.displayName) IPA — looking through \(repo)'s other releases for one.")
+        var req = URLRequest(url: api)
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await perform { try await URLSession.shared.data(for: req) }
+        try check(response, body: data)
+
+        let releases: [GHRelease]
+        do {
+            releases = try JSONDecoder().decode([GHRelease].self, from: data)
+        } catch {
+            throw DownloadError.badRelease(String(describing: error))
+        }
+
+        // Newest first, which is the order GitHub answers in.
+        for release in releases {
+            if channel == .stable, release.prerelease == true { continue }
+            guard let asset = source.selectAsset(from: release.assets),
+                  let assetURL = URL(string: asset.browser_download_url) else { continue }
+            // Filed under the track the release it came from belongs to, not
+            // the one asked for, so a tagged build is never listed as a nightly.
+            let served: ReleaseChannel = release.prerelease == true ? .nightly : .stable
+            log("\(source.displayName) isn't published on the \(channel.displayName.lowercased()) release — taking \(asset.name) from release \(release.tag_name) instead.")
+            return try await fetch(assetURL, named: asset.name, from: served, log: log)
+        }
+        throw DownloadError.noIPAAsset(source.displayName, channel)
     }
 
     /// Run a URLSession call, typing its failures: a `URLError` is the only one

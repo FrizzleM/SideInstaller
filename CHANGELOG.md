@@ -15,6 +15,13 @@ All notable changes to SideInstaller are documented here.
   stable, and LiveContainer + SideStore stable — are unaffected and keep the certificate as before.
   On the builds that ask, SideStore offers to resign itself on first sign-in instead, which is the
   normal flow and takes one tap.
+- **LiveContainer + SideStore installs again on the Nightly setting.** LiveContainer's nightly
+  release stopped carrying the combined `LiveContainer+SideStore.ipa` — it now publishes the plain
+  LiveContainer build alone, which has no SideStore inside it — so picking Nightly for that app
+  simply failed to download. SideInstaller now looks through LiveContainer's other releases, takes
+  the newest one that still has the combined build, and says in the log which release it used.
+  Asking for Stable is never answered with a nightly. This also covers SideStore if its releases
+  ever move the same way.
 - SideStore, LiveContainer + SideStore and Feather now accept the pairing file SideInstaller puts in
   them, instead of asking you for one as though nothing had been placed.
 - SideInstaller now switches on the setting those apps need to reach your iPhone over your local
