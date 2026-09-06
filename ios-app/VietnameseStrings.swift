@@ -260,6 +260,41 @@ let vietnameseStrings: [String: String] = [
 
     "Sideloaded apps": "Ứng dụng sideload",
     "Reading the device": "Đang đọc thiết bị",
+
+    // Refresh all: signing the installed apps again.
+    "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
+        "iOS %@ không được hỗ trợ — SideInstaller cần iOS %@ trở lên.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.":
+        "Apple không cấp chứng chỉ ký cho Apple ID này: nó báo rằng đã có một chứng chỉ (lỗi 7460). Hãy thu hồi trong Công cụ › Chứng chỉ, rồi gia hạn lại.",
+    "An install is already running. Wait for it to finish, then refresh.":
+        "Đang có một lượt cài đặt chạy. Hãy đợi xong rồi gia hạn.",
+    "Getting ready": "Đang chuẩn bị",
+    "Stopping after this app": "Sẽ dừng sau ứng dụng này",
+    "Refreshing %@": "Đang gia hạn %@",
+    "Signed by team %@, not the one you're signed in as — refreshing it here would install a second copy.":
+        "Được ký bởi nhóm %@, không phải nhóm bạn đang đăng nhập — gia hạn ở đây sẽ cài thêm một bản thứ hai.",
+    "Refreshed. Its seven days start again now.":
+        "Đã gia hạn. Bảy ngày bắt đầu lại từ bây giờ.",
+    "Nothing was refreshed.": "Không có ứng dụng nào được gia hạn.",
+    "Refreshed %d of %d apps.": "Đã gia hạn %d trong %d ứng dụng.",
+    "Refresh all apps?": "Gia hạn tất cả ứng dụng?",
+    "Refresh all": "Gia hạn tất cả",
+    "%@ will be signed again with your Apple ID and installed over the copy on this device. It keeps its data, and its seven days start over.":
+        "%@ sẽ được ký lại bằng Apple ID của bạn và cài đè lên bản đang có trên thiết bị này. Ứng dụng giữ nguyên dữ liệu, và bảy ngày bắt đầu lại.",
+    "%d apps will be signed again with your Apple ID and installed over the copies on this device. They keep their data, and their seven days start over.":
+        "%d ứng dụng sẽ được ký lại bằng Apple ID của bạn và cài đè lên các bản đang có trên thiết bị này. Chúng giữ nguyên dữ liệu, và bảy ngày bắt đầu lại.",
+    "%d app can be signed again from an IPA already on this iPhone.":
+        "%d ứng dụng có thể được ký lại từ một tệp IPA đã có trên iPhone này.",
+    "%d apps can be signed again from IPAs already on this iPhone.":
+        "%d ứng dụng có thể được ký lại từ các tệp IPA đã có trên iPhone này.",
+    "Reload": "Tải lại",
+    "Waiting": "Đang chờ",
+    "In progress": "Đang chạy",
+    "Failed": "Thất bại",
+    "%d app here has no IPA in SideInstaller, so it can't be refreshed from this page. Refresh it in whatever installed it, or import its .ipa first.":
+        "%d ứng dụng ở đây không có tệp IPA trong SideInstaller nên không thể gia hạn từ trang này. Hãy gia hạn trong ứng dụng đã cài nó, hoặc nhập tệp .ipa của nó trước.",
+    "%d apps here have no IPA in SideInstaller, so they can't be refreshed from this page. Refresh them in whatever installed them, or import their .ipa first.":
+        "%d ứng dụng ở đây không có tệp IPA trong SideInstaller nên không thể gia hạn từ trang này. Hãy gia hạn trong ứng dụng đã cài chúng, hoặc nhập các tệp .ipa của chúng trước.",
     "%d app": "%d ứng dụng",
     "%d apps": "%d ứng dụng",
     "%d app needs refreshing": "%d ứng dụng cần gia hạn",
@@ -322,6 +357,8 @@ let vietnameseStrings: [String: String] = [
         "Kết nối tới iPhone của họ đã rớt — hãy bắt đầu lại.",
     "Set up someone else's iPhone": "Thiết lập iPhone cho người khác",
     "Same Wi-Fi network": "Cùng một mạng Wi-Fi",
+    "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
+        "iPhone của họ cần iOS %@: sau khi cài, SideInstaller tự ghép nối, còn các phiên bản cũ hơn thì không thể.",
     "Their iPhone": "iPhone của họ",
     "IP address (e.g. 192.168.1.42)": "Địa chỉ IP (ví dụ 192.168.1.42)",
     "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
@@ -354,6 +391,15 @@ let vietnameseStrings: [String: String] = [
     "Language": "Ngôn ngữ",
     "App language": "Ngôn ngữ ứng dụng",
     "Auto": "Tự động",
+    // The Tunnel section: starting LocalDevVPN from here.
+    "Tunnel": "Đường hầm",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
+        "Có thứ gì đó ở %@:%d đã từ chối kết nối, nghĩa là đường hầm vẫn thông — chỉ là thiết bị không lắng nghe trên cổng ghép nối của nó. Cổng đó chỉ mở khi bật Chế độ nhà phát triển, và iOS hỏi lại sau mỗi lần khởi động lại: hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển rồi thử lại. Nếu đã bật, hãy ghép nối lại iPhone này trong “Tệp ghép nối”.",
+    "Start LocalDevVPN on launch": "Khởi động LocalDevVPN khi mở app",
+    "Start LocalDevVPN now": "Khởi động LocalDevVPN ngay",
+    "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
+        "Chưa cài LocalDevVPN. Hãy tải từ App Store, rồi SideInstaller có thể khởi động giúp bạn.",
+
     "Downloaded IPAs": "Tệp IPA đã tải",
     "%@ used": "Đã dùng %@",
     "imported": "đã nhập",

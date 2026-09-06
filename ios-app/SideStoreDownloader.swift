@@ -1,3 +1,4 @@
+import Compression
 import Foundation
 
 /// Which release track to pull the IPA from.
@@ -700,6 +701,175 @@ enum IPALibrary {
     static func unrecognized() -> [String] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: documentsDir.path)) ?? []
         return names.filter { $0.lowercased().hasSuffix(".ipa") && classify($0) == nil }.sorted()
+    }
+}
+
+// MARK: - What an IPA will install
+
+/// Reading `Payload/<name>.app/Info.plist` straight out of the archive, so the
+/// Sideloaded apps page can tell which installed app each IPA on disk would
+/// replace. An IPA is a plain zip, and the central directory at its end says
+/// where that one file sits — which is the whole reason this is worth doing by
+/// hand: it reads a few hundred bytes out of a hundred-megabyte file instead of
+/// unpacking it. ZIP64 is not handled; nothing this app installs is near 4 GB.
+extension IPALibrary {
+
+    /// What an `.ipa` says it will put on the device.
+    struct AppInfo: Equatable {
+        /// The bundle id as published. What the device ends up carrying is this
+        /// with the team id appended — isideload rewrites every bundle id it
+        /// signs — so a match against an installed app has to allow for that.
+        let bundleID: String
+        let name: String
+        let version: String?
+    }
+
+    /// Every IPA on disk paired with the app it installs, newest first and one
+    /// per bundle id: the same build routinely sits in Documents twice, once as
+    /// a download and once as an import, and either copy refreshes it.
+    static func installable() -> [(entry: Entry, info: AppInfo)] {
+        var seen = Set<String>()
+        return scan().compactMap { entry in
+            guard let info = appInfo(at: entry.url),
+                  seen.insert(info.bundleID).inserted else { return nil }
+            return (entry, info)
+        }
+    }
+
+    /// Read one IPA's main `Info.plist`. Nil for anything this can't walk, which
+    /// is reason enough to leave the file out of the refresh list.
+    static func appInfo(at url: URL) -> AppInfo? {
+        guard let raw = infoPlist(inIPA: url),
+              let plist = try? PropertyListSerialization.propertyList(from: raw, format: nil),
+              let dict = plist as? [String: Any],
+              let bundleID = dict["CFBundleIdentifier"] as? String, !bundleID.isEmpty
+        else { return nil }
+        let display = dict["CFBundleDisplayName"] as? String
+        let bundleName = dict["CFBundleName"] as? String
+        let name = display?.isEmpty == false ? display!
+            : (bundleName?.isEmpty == false ? bundleName! : bundleID)
+        return AppInfo(bundleID: bundleID, name: name,
+                       version: dict["CFBundleShortVersionString"] as? String)
+    }
+
+    /// One entry of the archive's central directory.
+    private struct ZipEntry {
+        let name: String
+        let method: Int
+        let compressedSize: Int
+        let uncompressedSize: Int
+        let localHeaderOffset: Int
+    }
+
+    private static func infoPlist(inIPA url: URL) -> Data? {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size),
+              let entry = mainInfoPlist(in: directory) else { return nil }
+        return contents(of: entry, handle)
+    }
+
+    /// The central directory, found through the end-of-central-directory record
+    /// in the archive's last 64 KB.
+    private static func centralDirectory(_ handle: FileHandle, fileSize: Int) -> [ZipEntry]? {
+        let tailLength = min(fileSize, 65_557)      // the record plus a full comment
+        guard (try? handle.seek(toOffset: UInt64(fileSize - tailLength))) != nil,
+              let tail = try? handle.readToEnd(),
+              let found = tail.range(of: Data([0x50, 0x4B, 0x05, 0x06]), options: .backwards)
+        else { return nil }
+        let record = tail[found.lowerBound...]
+        guard record.count >= 22 else { return nil }
+        let offset = u32(record, 16)
+        let length = u32(record, 12)
+        // 0xFFFFFFFF puts the real numbers in a ZIP64 record this doesn't read.
+        guard offset != 0xFFFF_FFFF, length > 0, offset + length <= fileSize,
+              (try? handle.seek(toOffset: UInt64(offset))) != nil,
+              let raw = try? handle.read(upToCount: length), raw.count == length
+        else { return nil }
+        return entries(in: raw)
+    }
+
+    private static func entries(in directory: Data) -> [ZipEntry] {
+        var out: [ZipEntry] = []
+        var cursor = 0
+        while cursor + 46 <= directory.count {
+            let header = directory[(directory.startIndex + cursor)...]
+            guard u32(header, 0) == 0x0201_4B50 else { break }      // "PK\u{01}\u{02}"
+            let nameLength = u16(header, 28)
+            let total = 46 + nameLength + u16(header, 30) + u16(header, 32)
+            guard cursor + total <= directory.count else { break }
+            let start = header.startIndex + 46
+            if let name = String(data: header[start..<(start + nameLength)], encoding: .utf8) {
+                out.append(ZipEntry(name: name,
+                                    method: u16(header, 10),
+                                    compressedSize: u32(header, 20),
+                                    uncompressedSize: u32(header, 24),
+                                    localHeaderOffset: u32(header, 42)))
+            }
+            cursor += total
+        }
+        return out
+    }
+
+    /// The one app's own `Info.plist`: exactly `Payload/<name>.app/Info.plist`,
+    /// which leaves out the ones inside nested extensions and frameworks.
+    private static func mainInfoPlist(in entries: [ZipEntry]) -> ZipEntry? {
+        entries.first { entry in
+            let parts = entry.name.split(separator: "/", omittingEmptySubsequences: false)
+            return parts.count == 3 && parts[0] == "Payload"
+                && parts[1].hasSuffix(".app") && parts[2] == "Info.plist"
+        }
+    }
+
+    private static func contents(of entry: ZipEntry, _ handle: FileHandle) -> Data? {
+        // A sanity bound, not a real limit: an Info.plist is kilobytes, and this
+        // number is what the inflate below allocates.
+        guard entry.uncompressedSize > 0, entry.uncompressedSize < 4 << 20,
+              entry.compressedSize > 0,
+              (try? handle.seek(toOffset: UInt64(entry.localHeaderOffset))) != nil,
+              let header = try? handle.read(upToCount: 30), header.count == 30,
+              u32(header, 0) == 0x0403_4B50                        // "PK\u{03}\u{04}"
+        else { return nil }
+        // The local header repeats the name and carries its own extra field,
+        // whose length routinely differs from the central directory's.
+        let dataOffset = entry.localHeaderOffset + 30 + u16(header, 26) + u16(header, 28)
+        guard (try? handle.seek(toOffset: UInt64(dataOffset))) != nil,
+              let raw = try? handle.read(upToCount: entry.compressedSize),
+              raw.count == entry.compressedSize else { return nil }
+        switch entry.method {
+        case 0: return raw                                          // stored
+        case 8: return inflate(raw, to: entry.uncompressedSize)      // deflated
+        default: return nil
+        }
+    }
+
+    /// `COMPRESSION_ZLIB` is raw DEFLATE with no zlib wrapper, which is exactly
+    /// what a zip member holds.
+    private static func inflate(_ data: Data, to size: Int) -> Data? {
+        var out = Data(count: size)
+        let written = out.withUnsafeMutableBytes { dst -> Int in
+            guard let target = dst.bindMemory(to: UInt8.self).baseAddress else { return 0 }
+            return data.withUnsafeBytes { src -> Int in
+                guard let source = src.bindMemory(to: UInt8.self).baseAddress else { return 0 }
+                return compression_decode_buffer(target, size, source, data.count, nil,
+                                                 COMPRESSION_ZLIB)
+            }
+        }
+        return written == size ? out : nil
+    }
+
+    /// Little-endian reads relative to a slice's own start, which is where every
+    /// offset in the format above is measured from.
+    private static func u16(_ data: Data, _ at: Int) -> Int {
+        let i = data.startIndex + at
+        guard i >= data.startIndex, i + 1 < data.endIndex else { return 0 }
+        return Int(data[i]) | Int(data[i + 1]) << 8
+    }
+
+    private static func u32(_ data: Data, _ at: Int) -> Int {
+        u16(data, at) | u16(data, at + 2) << 16
     }
 }
 

@@ -315,14 +315,50 @@ enum ProfileMatcher {
     private static func expiry(_ profile: ProvisioningProfile) -> Date {
         profile.expirationDate ?? .distantPast
     }
+
+    /// Does the app the device reports come from the IPA whose own bundle id is
+    /// `ipaBundleID`? It is never a plain comparison: isideload signs every app
+    /// under `<bundle id>.<team id>`, so what is installed always carries the
+    /// signing team's id on the end. `teamID` — the one on the profile the app
+    /// is living on — settles it when it is known; without it, the shape of a
+    /// team id is what's left to go on.
+    static func installed(_ bundleID: String, isBuiltFrom ipaBundleID: String,
+                          teamID: String?) -> Bool {
+        if bundleID == ipaBundleID { return true }        // signed by something else
+        if let teamID, !teamID.isEmpty { return bundleID == "\(ipaBundleID).\(teamID)" }
+        guard bundleID.hasPrefix(ipaBundleID + ".") else { return false }
+        let suffix = bundleID.dropFirst(ipaBundleID.count + 1)
+        // A team id is ten characters, upper-case letters and digits only.
+        return suffix.count == 10 && suffix.allSatisfy { $0.isUppercase || $0.isNumber }
+    }
+}
+
+/// One app a refresh will act on: what is installed, and the IPA on disk it
+/// will be signed again from.
+struct RefreshJob: Identifiable, Equatable {
+
+    enum State: Equatable {
+        case pending, working, done
+        case failed(String)
+    }
+
+    /// The bundle id as installed — team id and all.
+    let bundleID: String
+    let name: String
+    let ipa: URL
+    /// The team the app is signed under now, from the profile it's living on.
+    let teamID: String?
+    var state: State = .pending
+
+    var id: String { bundleID }
 }
 
 // MARK: - Manager
 
 /// Drives the Sideloaded apps page: one trip to the device for what's installed
-/// and what profiles it holds, then the matching above. Nothing is written, so
-/// unlike the other device pages this one has no failure worth recovering from —
-/// a load either works or says why.
+/// and what profiles it holds, then the matching above. Reading is the whole of
+/// a load, so it either works or says why; the refresh below is the one thing
+/// here that writes, and it goes back through the install pipeline to do it.
 @MainActor
 final class SideloadedAppsManager: ObservableObject {
 
@@ -334,11 +370,28 @@ final class SideloadedAppsManager: ObservableObject {
     @Published private(set) var lastRefreshed: Date?
     @Published var lastError: String?
 
+    /// The apps a refresh can act on: an installed app whose IPA is still in
+    /// Documents. Rebuilt on every load.
+    @Published private(set) var refreshable: [RefreshJob] = []
+    /// Apps on the page with no IPA to sign again from, for the note that says
+    /// why they aren't included.
+    @Published private(set) var unrefreshable = 0
+    /// The run in progress, or the last one's results until another starts.
+    @Published private(set) var jobs: [RefreshJob] = []
+    @Published private(set) var isRefreshing = false
+    /// What the refresh is doing right now, shown on the button.
+    @Published private(set) var refreshStatus: String?
+    /// How the last finished run went, e.g. "Refreshed 2 of 3 apps."
+    @Published private(set) var refreshSummary: String?
+
     private var engine: Engine { Engine.shared }
 
     /// Keeps `autoLoad` to a single attempt, so a page opened before the tunnel
     /// is up doesn't retry on every visit.
     private var didAutoLoad = false
+
+    /// The refresh in flight, kept so it can be called off between apps.
+    private var refreshTask: Task<Void, Never>?
 
     /// The apps that need re-signing within a day, which is what the header
     /// pill counts.
@@ -362,7 +415,7 @@ final class SideloadedAppsManager: ObservableObject {
 
     /// Ask the device what it has. `quiet` logs failures instead of showing them.
     func load(quiet: Bool = false) {
-        guard !isWorking else { return }
+        guard !isWorking, !isRefreshing else { return }
         isWorking = true
         lastError = nil
         if !quiet { engine.log("=== Sideloaded apps: reading the device ===") }
@@ -374,6 +427,7 @@ final class SideloadedAppsManager: ObservableObject {
                 let matched = ProfileMatcher.match(apps: apps, profiles: profiles)
                 entries = matched.entries
                 unmatched = matched.unmatched
+                await rebuildRefreshable()
                 hasLoaded = true
                 lastRefreshed = Date()
                 engine.log("Sideloaded apps: \(apps.count) sideloaded, \(profiles.count) profile(s) decoded.")
@@ -389,6 +443,137 @@ final class SideloadedAppsManager: ObservableObject {
             isWorking = false
         }
     }
+
+    // MARK: - Refresh all
+
+    /// Sign every refreshable app again and install it over itself, which is
+    /// what puts seven fresh days on each one. Strictly one at a time: they
+    /// share a single device link and a single signing queue, and Apple's
+    /// developer API is rate-limited hard enough that overlapping them would
+    /// cost more than it saved.
+    func refreshAll() {
+        guard !isRefreshing, !isWorking, !refreshable.isEmpty else { return }
+        guard !engine.isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then refresh.")
+            return
+        }
+        jobs = refreshable
+        isRefreshing = true
+        lastError = nil
+        refreshSummary = nil
+        refreshStatus = L("Getting ready")
+        engine.log("=== Refresh all: \(jobs.count) app(s) ===")
+
+        refreshTask = Task {
+            defer {
+                isRefreshing = false
+                refreshStatus = nil
+                refreshTask = nil
+            }
+            do {
+                try await engine.prepareRefresh()
+            } catch {
+                let message = Self.text(for: error)
+                lastError = message
+                engine.log("⛔️ Refresh all: \(message)")
+                jobs = []
+                return
+            }
+
+            var refreshed = 0
+            for index in jobs.indices {
+                // Between apps is the only place a run can stop: signing and
+                // installing are blocking calls in the Rust core, and nothing
+                // interrupts one of those halfway.
+                if Task.isCancelled { break }
+                let job = jobs[index]
+                // Signing rewrites the bundle id as `<bundle id>.<team id>`, so
+                // an app signed by a different team would install beside the one
+                // on screen instead of replacing it. Leave it alone and say so.
+                if let team = engine.signingTeamID, let installed = job.teamID, installed != team {
+                    jobs[index].state = .failed(
+                        L("Signed by team %@, not the one you're signed in as — refreshing it here would install a second copy.", installed))
+                    continue
+                }
+                jobs[index].state = .working
+                refreshStatus = L("Refreshing %@", job.name)
+                do {
+                    try await engine.refreshInstalledApp(named: job.name, ipaPath: job.ipa.path)
+                    jobs[index].state = .done
+                    refreshed += 1
+                } catch {
+                    let message = Self.text(for: error)
+                    jobs[index].state = .failed(message)
+                    engine.log("⛔️ Refresh \(job.name): \(message)")
+                }
+            }
+
+            refreshSummary = jobs.count == 1
+                ? (refreshed == 1 ? L("Refreshed. Its seven days start again now.")
+                                  : L("Nothing was refreshed."))
+                : L("Refreshed %d of %d apps.", refreshed, jobs.count)
+            engine.log("Refresh all finished: \(refreshed)/\(jobs.count) refreshed.")
+            // Read the device again, so the days on screen are the new ones.
+            if refreshed > 0 {
+                isRefreshing = false        // `load` won't run while a refresh holds the link
+                load(quiet: true)
+            }
+        }
+    }
+
+    /// Stop the run once the app being refreshed now is finished with. The
+    /// apps after it are left as they were, still on their old profiles.
+    func cancelRefresh() {
+        guard isRefreshing, refreshTask != nil else { return }
+        refreshTask?.cancel()
+        refreshStatus = L("Stopping after this app")
+        engine.log("Refresh all: stopping after the current app.")
+    }
+
+    /// A thrown error as the page should print it.
+    private static func text(for error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+    }
+
+    /// Work out which apps on the page can be signed again from an IPA already
+    /// in Documents. Reading those archives is file work, so it happens off the
+    /// main thread — the page's own models never leave it.
+    private func rebuildRefreshable() async {
+        let installed = entries.map {
+            InstalledRef(bundleID: $0.app.bundleID, name: $0.app.name,
+                         teamID: $0.current?.teamIdentifier)
+        }
+        let matched = await Task.detached(priority: .userInitiated) {
+            SideloadedAppsManager.pair(installed, with: IPALibrary.installable())
+        }.value
+        refreshable = matched
+        unrefreshable = max(0, entries.count - matched.count)
+        engine.log("Sideloaded apps: \(matched.count) of \(entries.count) can be refreshed from an IPA on disk.")
+    }
+
+    /// A page entry cut down to what the matching needs, so that work can be
+    /// handed off the main actor.
+    private struct InstalledRef: Sendable {
+        let bundleID: String
+        let name: String
+        let teamID: String?
+    }
+
+    /// One job per installed app that an IPA on disk would reinstall, in the
+    /// page's own order.
+    private nonisolated static func pair(
+        _ installed: [InstalledRef],
+        with library: [(entry: IPALibrary.Entry, info: IPALibrary.AppInfo)]
+    ) -> [RefreshJob] {
+        installed.compactMap { app in
+            guard let match = library.first(where: {
+                ProfileMatcher.installed(app.bundleID, isBuiltFrom: $0.info.bundleID,
+                                         teamID: app.teamID)
+            }) else { return nil }
+            return RefreshJob(bundleID: app.bundleID, name: app.name,
+                              ipa: match.entry.url, teamID: app.teamID)
+        }
+    }
 }
 
 // MARK: - View
@@ -400,30 +585,50 @@ final class SideloadedAppsManager: ObservableObject {
 struct AppsView: View {
     /// Declared so every label on this screen redraws when the language changes.
     @EnvironmentObject private var loc: Localizer
+    /// Observed for the install bar alone: a refresh installs through the same
+    /// pipeline, and `installProgress` is where that progress comes out.
+    @EnvironmentObject private var engine: Engine
     @ObservedObject var manager: SideloadedAppsManager
 
     @State private var showSettings = false
+    /// Raised by "Refresh all", until the run is confirmed or called off.
+    @State private var confirmRefresh = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
                 header.cascadeItem(0)
-                loadButton.cascadeItem(1)
+                refreshAllButton
+                loadButton
+                refreshRunCard
                 if let error = manager.lastError {
                     errorCallout(error).transition(.cardAppear)
                 }
                 appList
+                refreshNote
                 unmatchedSection
             }
             .padding(20)
             .animation(.smooth(duration: 0.35), value: manager.lastError)
             .animation(.smooth(duration: 0.35), value: manager.entries)
             .animation(.smooth(duration: 0.3), value: manager.isWorking)
+            .animation(.smooth(duration: 0.35), value: manager.jobs)
+            .animation(.smooth(duration: 0.35), value: manager.refreshable)
         }
         .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .onAppear { manager.autoLoad() }
+        .alert(L("Refresh all apps?"), isPresented: $confirmRefresh) {
+            Button(L("Refresh all")) { manager.refreshAll() }
+            Button(L("Cancel"), role: .cancel) { }
+        } message: {
+            Text(manager.refreshable.count == 1
+                 ? L("%@ will be signed again with your Apple ID and installed over the copy on this device. It keeps its data, and its seven days start over.",
+                     manager.refreshable.first?.name ?? "")
+                 : L("%d apps will be signed again with your Apple ID and installed over the copies on this device. They keep their data, and their seven days start over.",
+                     manager.refreshable.count))
+        }
     }
 
     // MARK: Header
@@ -446,21 +651,184 @@ struct AppsView: View {
 
     // MARK: Primary action
 
-    private var loadButton: some View {
-        Button { manager.load() } label: {
-            HStack(spacing: 10) {
-                if manager.isWorking {
-                    ProgressView().tint(.white)
-                    Text(L("Reading the device"))
-                } else {
-                    Image(systemName: manager.hasLoaded ? "arrow.clockwise" : "iphone.and.arrow.forward")
-                        .contentTransition(.symbolEffect(.replace))
-                    Text(manager.hasLoaded ? L("Refresh") : L("Load apps"))
+    /// The page's headline action once there is something to act on: sign every
+    /// app it has the IPA for again, and install each over itself. That is the
+    /// whole of a refresh — seven days is all a free profile is ever given, and
+    /// only a new one resets the count.
+    @ViewBuilder
+    private var refreshAllButton: some View {
+        if manager.hasLoaded && !manager.refreshable.isEmpty {
+            VStack(spacing: 8) {
+                Button { confirmRefresh = true } label: {
+                    HStack(spacing: 10) {
+                        if manager.isRefreshing {
+                            ProgressView().tint(.white)
+                            Text(manager.refreshStatus ?? L("Getting ready"))
+                                .lineLimit(1)
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Text(L("Refresh all"))
+                        }
+                    }
                 }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(manager.isRefreshing || manager.isWorking)
+                // The install itself is the long part, and it's the one step
+                // that reports how far along it is.
+                if manager.isRefreshing, engine.installProgress > 0, engine.installProgress < 1 {
+                    ProgressView(value: engine.installProgress)
+                        .tint(Theme.accent2)
+                }
+                Text(manager.refreshable.count == 1
+                     ? L("%d app can be signed again from an IPA already on this iPhone.",
+                         manager.refreshable.count)
+                     : L("%d apps can be signed again from IPAs already on this iPhone.",
+                         manager.refreshable.count))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+            }
+            .transition(.cardAppear)
+            .cascadeItem(1)
+        }
+    }
+
+    /// Reading the device. The primary action while it is the only thing to do
+    /// on this page, and demoted the moment a refresh is on offer above it.
+    @ViewBuilder
+    private var loadButton: some View {
+        if manager.isRefreshing {
+            Button(role: .cancel) { manager.cancelRefresh() } label: {
+                Text(L("Cancel")).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .tint(Theme.accent)
+            .cascadeItem(2)
+        } else if manager.hasLoaded && !manager.refreshable.isEmpty {
+            Button { manager.load() } label: {
+                loadLabel(spinner: Theme.accent).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .tint(Theme.accent)
+            .disabled(manager.isWorking || manager.isRefreshing)
+            .cascadeItem(2)
+        } else {
+            Button { manager.load() } label: { loadLabel(spinner: .white) }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(manager.isWorking || manager.isRefreshing)
+                .cascadeItem(2)
+        }
+    }
+
+    private func loadLabel(spinner: Color) -> some View {
+        HStack(spacing: 10) {
+            if manager.isWorking {
+                ProgressView().tint(spinner)
+                Text(L("Reading the device"))
+            } else {
+                Image(systemName: manager.hasLoaded ? "arrow.clockwise" : "iphone.and.arrow.forward")
+                    .contentTransition(.symbolEffect(.replace))
+                Text(manager.hasLoaded ? L("Reload") : L("Load apps"))
             }
         }
-        .buttonStyle(PrimaryButtonStyle())
-        .disabled(manager.isWorking)
+    }
+
+    // MARK: Refresh run
+
+    /// What the refresh is doing, app by app, and how it went. Kept on screen
+    /// after the run so a failure can be read at leisure.
+    @ViewBuilder
+    private var refreshRunCard: some View {
+        if !manager.jobs.isEmpty {
+            PanelCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(L("Refresh all"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    // Enumerated, so a language switch mid-run redraws these
+                    // rows rather than leaving them in the old copy.
+                    ForEach(Array(manager.jobs.enumerated()), id: \.element.id) { _, job in
+                        jobRow(job)
+                    }
+                    if let summary = manager.refreshSummary {
+                        Text(summary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .transition(.cardAppear)
+            .cascadeItem(3)
+        }
+    }
+
+    private func jobRow(_ job: RefreshJob) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 8) {
+                jobIcon(job.state)
+                Text(job.name)
+                    .font(.caption.weight(.semibold))
+                Spacer(minLength: 6)
+                Text(Self.stateText(job.state))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Self.stateColor(job.state))
+            }
+            if case let .failed(message) = job.state {
+                Text(message)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func jobIcon(_ state: RefreshJob.State) -> some View {
+        switch state {
+        case .pending:  Image(systemName: "clock").foregroundStyle(.tertiary)
+        case .working:  ProgressView().controlSize(.small)
+        case .done:     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        case .failed:   Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+        }
+    }
+
+    private static func stateText(_ state: RefreshJob.State) -> String {
+        switch state {
+        case .pending: return L("Waiting")
+        case .working: return L("In progress")
+        case .done:    return L("Done")
+        case .failed:  return L("Failed")
+        }
+    }
+
+    private static func stateColor(_ state: RefreshJob.State) -> Color {
+        switch state {
+        case .pending, .working: return .secondary
+        case .done:              return .green
+        case .failed:            return .red
+        }
+    }
+
+    /// Why some of the apps above aren't part of a refresh: this app can only
+    /// sign what it has the IPA for, and most of the page usually came from
+    /// somewhere else.
+    @ViewBuilder
+    private var refreshNote: some View {
+        if manager.hasLoaded && manager.unrefreshable > 0 && !manager.entries.isEmpty {
+            Text(manager.unrefreshable == 1
+                 ? L("%d app here has no IPA in SideInstaller, so it can't be refreshed from this page. Refresh it in whatever installed it, or import its .ipa first.",
+                     manager.unrefreshable)
+                 : L("%d apps here have no IPA in SideInstaller, so they can't be refreshed from this page. Refresh them in whatever installed them, or import their .ipa first.",
+                     manager.unrefreshable))
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cascadeItem(5 + manager.entries.count)
+        }
     }
 
     // MARK: App list
@@ -485,7 +853,7 @@ struct AppsView: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
-                .cascadeItem(2)
+                .cascadeItem(4)
                 ForEach(Array(manager.entries.enumerated()), id: \.element.id) { idx, status in
                     NavigationLink {
                         AppProfileDetail(status: status)
@@ -493,7 +861,7 @@ struct AppsView: View {
                         appRow(status)
                     }
                     .buttonStyle(.plain)
-                    .cascadeItem(3 + idx)
+                    .cascadeItem(5 + idx)
                 }
             }
         }
@@ -594,10 +962,10 @@ struct AppsView: View {
                                 .foregroundStyle(ExpiryUrgency.of(profile).color)
                         }
                     }
-                    .cascadeItem(4 + manager.entries.count + idx)
+                    .cascadeItem(7 + manager.entries.count + idx)
                 }
             }
-            .cascadeItem(3 + manager.entries.count)
+            .cascadeItem(6 + manager.entries.count)
         }
     }
 

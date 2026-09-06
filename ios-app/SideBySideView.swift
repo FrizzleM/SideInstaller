@@ -694,6 +694,20 @@ struct SideBySideView: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 sectionTitle(L("Their iPhone"), systemImage: "iphone")
+                // The one precondition this tool can't check before it runs, and
+                // the one that decides whether running it is worth anything: the
+                // copy that lands over there has to be able to pair itself.
+                // Said next to the address field, since that names whose iPhone
+                // it is about — the requirement is on theirs, not on this one.
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(L("Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.",
+                           Engine.minimumOSText))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.caption)
                 TextField(L("IP address (e.g. 192.168.1.42)"), text: $manager.targetIP)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
