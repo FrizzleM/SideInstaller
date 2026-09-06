@@ -1,8 +1,10 @@
 name: build-siboot
 
-# Cross-compiles `ish-bootstrap/` to a static i686-unknown-linux-musl binary and
-# attaches it to a release as `siboot-i686` — the file the install instructions
-# tell people to curl onto their phone.
+# Cross-compiles `ish-bootstrap/` to a static i686-unknown-linux-musl binary as
+# a build check. The binary is NOT distributed: it is kept only as a workflow
+# artifact on the run page and is never attached to a release. See
+# `terminus-is-the-host` — the host moved to a-Shell, where no binary can run,
+# so `siboot-i686` stopped being a thing anyone should download.
 #
 # Why a container rather than `cross`: siboot depends on
 # `rust-core/vendor/idevice` by path, which sits outside its own cargo
@@ -18,21 +20,13 @@ name: build-siboot
 
 on:
   workflow_dispatch:
-    inputs:
-      attach_to_release:
-        description: "Upload siboot-i686 to the latest release"
-        required: false
-        type: boolean
-        default: false
   push:
     paths:
       - "ish-bootstrap/**"
       - ".github/workflows/build-siboot.yml"
-  release:
-    types: [published]
 
 permissions:
-  contents: write # attach the binary to the release
+  contents: read
 
 jobs:
   build:
@@ -126,42 +120,3 @@ jobs:
           name: siboot-i686
           path: ish-bootstrap/siboot-i686
           if-no-files-found: error
-
-      - name: Resolve the release tag
-        # A push to the default branch attaches too, not just a published
-        # release. The install instructions hardcode
-        # `releases/latest/download/siboot-i686`, so that asset *is* the
-        # distribution — leaving it to a manual tick means every change ships
-        # only if someone remembers to tick it. Branch pushes and pull requests
-        # still build without touching any release.
-        id: tag
-        if: >-
-          github.event_name == 'release' ||
-          inputs.attach_to_release ||
-          (github.event_name == 'push' &&
-           github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ github.event.release.tag_name }}"
-          if [ -z "$TAG" ]; then
-            # Manual run: aim at the latest published release, the same one the
-            # install instructions point at.
-            TAG=$(curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
-                    "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
-                  | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
-          fi
-          if [ -z "$TAG" ]; then
-            echo "::error::no release to attach to"; exit 1
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "attaching to $TAG" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Attach to release
-        if: steps.tag.outputs.tag != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ish-bootstrap/siboot-i686
-          tag_name: ${{ steps.tag.outputs.tag }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
