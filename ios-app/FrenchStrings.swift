@@ -263,6 +263,41 @@ let frenchStrings: [String: String] = [
 
     "Sideloaded apps": "Apps sideloadées",
     "Reading the device": "Lecture de l'appareil",
+
+    // Refresh all: signing the installed apps again.
+    "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
+        "iOS %@ n'est pas pris en charge : SideInstaller nécessite iOS %@ ou une version ultérieure.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.":
+        "Apple ne délivre pas de certificat de signature pour cet Apple ID : elle indique qu'il en existe déjà un (erreur 7460). Révoquez-le dans Outils › Certificats, puis renouvelez à nouveau.",
+    "An install is already running. Wait for it to finish, then refresh.":
+        "Une installation est déjà en cours. Attendez qu'elle se termine, puis renouvelez.",
+    "Getting ready": "Préparation",
+    "Stopping after this app": "Arrêt après cette app",
+    "Refreshing %@": "Renouvellement de %@",
+    "Signed by team %@, not the one you're signed in as — refreshing it here would install a second copy.":
+        "Signée par l'équipe %@, pas celle avec laquelle vous êtes connecté : la renouveler ici installerait une deuxième copie.",
+    "Refreshed. Its seven days start again now.":
+        "Renouvelée. Ses sept jours repartent maintenant.",
+    "Nothing was refreshed.": "Rien n'a été renouvelé.",
+    "Refreshed %d of %d apps.": "%d app sur %d renouvelées.",
+    "Refresh all apps?": "Renouveler toutes les apps ?",
+    "Refresh all": "Tout renouveler",
+    "%@ will be signed again with your Apple ID and installed over the copy on this device. It keeps its data, and its seven days start over.":
+        "%@ sera signée à nouveau avec votre Apple ID et installée par-dessus la copie présente sur cet appareil. Elle conserve ses données et ses sept jours repartent de zéro.",
+    "%d apps will be signed again with your Apple ID and installed over the copies on this device. They keep their data, and their seven days start over.":
+        "%d apps seront signées à nouveau avec votre Apple ID et installées par-dessus les copies présentes sur cet appareil. Elles conservent leurs données et leurs sept jours repartent de zéro.",
+    "%d app can be signed again from an IPA already on this iPhone.":
+        "%d app peut être signée à nouveau depuis un IPA déjà présent sur cet iPhone.",
+    "%d apps can be signed again from IPAs already on this iPhone.":
+        "%d apps peuvent être signées à nouveau depuis des IPA déjà présents sur cet iPhone.",
+    "Reload": "Recharger",
+    "Waiting": "En attente",
+    "In progress": "En cours",
+    "Failed": "Échec",
+    "%d app here has no IPA in SideInstaller, so it can't be refreshed from this page. Refresh it in whatever installed it, or import its .ipa first.":
+        "%d app ici n'a pas d'IPA dans SideInstaller : elle ne peut pas être renouvelée depuis cette page. Renouvelez-la dans l'app qui l'a installée, ou importez d'abord son .ipa.",
+    "%d apps here have no IPA in SideInstaller, so they can't be refreshed from this page. Refresh them in whatever installed them, or import their .ipa first.":
+        "%d apps ici n'ont pas d'IPA dans SideInstaller : elles ne peuvent pas être renouvelées depuis cette page. Renouvelez-les dans l'app qui les a installées, ou importez d'abord leurs .ipa.",
     "%d app": "%d app",
     "%d apps": "%d apps",
     "%d app needs refreshing": "%d app à renouveler",
@@ -326,6 +361,8 @@ let frenchStrings: [String: String] = [
         "La liaison avec leur iPhone a été perdue — recommencez.",
     "Set up someone else's iPhone": "Configurer l'iPhone de quelqu'un d'autre",
     "Same Wi-Fi network": "Même réseau Wi-Fi",
+    "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
+        "Leur iPhone doit être sous iOS %@ : une fois installé, SideInstaller se jumelle tout seul, ce que les versions antérieures ne peuvent pas faire.",
     "Their iPhone": "Leur iPhone",
     "IP address (e.g. 192.168.1.42)": "Adresse IP (par ex. 192.168.1.42)",
     "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
@@ -358,6 +395,15 @@ let frenchStrings: [String: String] = [
     "Language": "Langue",
     "App language": "Langue de l'app",
     "Auto": "Automatique",
+    // The Tunnel section: starting LocalDevVPN from here.
+    "Tunnel": "Tunnel",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
+        "Quelque chose sur %@:%d a refusé la connexion : le tunnel fonctionne donc, c'est l'appareil qui n'écoute pas sur son port de jumelage. Ce port ne s'ouvre qu'avec le mode développeur activé, et iOS le redemande après chaque redémarrage : activez-le dans Réglages › Confidentialité et sécurité › Mode développeur, puis réessayez. S'il est déjà activé, jumelez de nouveau cet iPhone depuis « Fichier de jumelage ».",
+    "Start LocalDevVPN on launch": "Lancer LocalDevVPN au démarrage",
+    "Start LocalDevVPN now": "Lancer LocalDevVPN maintenant",
+    "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
+        "LocalDevVPN n'est pas installé. Téléchargez-le sur l'App Store et SideInstaller pourra le lancer pour vous.",
+
     "Downloaded IPAs": "IPA téléchargés",
     "%@ used": "%@ utilisés",
     "imported": "importé",

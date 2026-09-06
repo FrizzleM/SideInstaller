@@ -16,6 +16,10 @@ struct SideInstallerApp: App {
     /// account or by deferring it. Set once, so emptying the account list in
     /// Settings never drops the user back onto setup.
     @AppStorage("hasCompletedAccountSetup") private var hasCompletedAccountSetup = false
+    /// Watched so the LocalDevVPN handover fires whenever the app comes forward,
+    /// not only on a cold start — iOS resumes this app far more often than it
+    /// launches it.
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -50,11 +54,19 @@ struct SideInstallerApp: App {
             }
             .animation(.smooth(duration: 0.5), value: hasAcceptedTOS)
             .animation(.smooth(duration: 0.5), value: hasCompletedAccountSetup)
+            // Whichever way the app came forward, offer to bring the tunnel up
+            // with it. Every guard the setting needs is inside.
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { engine.autoStartVPNIfWanted() }
+            }
             // A file handed over from the Files share sheet, from “Open with”,
             // or from another app. The import route that doesn't go through the
             // document picker — the one to reach for where the picker won't
             // hand a file over.
             .onOpenURL { url in
+                // `sideinstaller://` is LocalDevVPN handing the screen back
+                // after starting its tunnel: bringing the app forward is all it
+                // was for, so there is nothing else to do with it.
                 guard url.isFileURL else { return }
                 // A pairing file is told apart by its extension, as everywhere
                 // else; anything else that arrives is meant to be an IPA.

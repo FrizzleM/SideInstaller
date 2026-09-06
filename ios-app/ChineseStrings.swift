@@ -254,6 +254,40 @@ let chineseStrings: [String: String] = [
 
     "Sideloaded apps": "侧载应用",
     "Reading the device": "正在读取设备",
+
+    // Refresh all: signing the installed apps again.
+    "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
+        "不支持 iOS %@：SideInstaller 需要 iOS %@ 或更高版本。",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.":
+        "Apple 不会为此 Apple ID 签发签名证书：它报告已经存在一个（错误 7460）。请在“工具 › 证书”中吊销它，然后重新续签。",
+    "An install is already running. Wait for it to finish, then refresh.":
+        "已有安装正在进行。请等它完成后再续签。",
+    "Getting ready": "正在准备",
+    "Stopping after this app": "将在这个应用之后停止",
+    "Refreshing %@": "正在续签 %@",
+    "Signed by team %@, not the one you're signed in as — refreshing it here would install a second copy.":
+        "由团队 %@ 签名，与你登录的团队不同：在这里续签会另外安装一个副本。",
+    "Refreshed. Its seven days start again now.": "已续签。七天从现在重新开始。",
+    "Nothing was refreshed.": "没有续签任何应用。",
+    "Refreshed %d of %d apps.": "已续签 %d 个应用，共 %d 个。",
+    "Refresh all apps?": "续签所有应用？",
+    "Refresh all": "全部续签",
+    "%@ will be signed again with your Apple ID and installed over the copy on this device. It keeps its data, and its seven days start over.":
+        "%@ 将用你的 Apple ID 重新签名，并覆盖安装到本设备上的副本。数据会保留，七天重新开始计算。",
+    "%d apps will be signed again with your Apple ID and installed over the copies on this device. They keep their data, and their seven days start over.":
+        "%d 个应用将用你的 Apple ID 重新签名，并覆盖安装到本设备上的副本。数据会保留，七天重新开始计算。",
+    "%d app can be signed again from an IPA already on this iPhone.":
+        "有 %d 个应用可以用这台 iPhone 上已有的 IPA 重新签名。",
+    "%d apps can be signed again from IPAs already on this iPhone.":
+        "有 %d 个应用可以用这台 iPhone 上已有的 IPA 重新签名。",
+    "Reload": "重新读取",
+    "Waiting": "等待中",
+    "In progress": "进行中",
+    "Failed": "失败",
+    "%d app here has no IPA in SideInstaller, so it can't be refreshed from this page. Refresh it in whatever installed it, or import its .ipa first.":
+        "这里有 %d 个应用在 SideInstaller 中没有对应的 IPA，因此无法从本页续签。请在安装它的应用里续签，或先导入它的 .ipa。",
+    "%d apps here have no IPA in SideInstaller, so they can't be refreshed from this page. Refresh them in whatever installed them, or import their .ipa first.":
+        "这里有 %d 个应用在 SideInstaller 中没有对应的 IPA，因此无法从本页续签。请在安装它们的应用里续签，或先导入它们的 .ipa。",
     "%d app": "%d 个应用",
     "%d apps": "%d 个应用",
     "%d app needs refreshing": "%d 个应用需要续签",
@@ -314,6 +348,8 @@ let chineseStrings: [String: String] = [
     "The link to their iPhone dropped — start again.": "与对方 iPhone 的连接已断开——请重新开始。",
     "Set up someone else's iPhone": "为别人的 iPhone 完成设置",
     "Same Wi-Fi network": "同一个 Wi-Fi 网络",
+    "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
+        "对方的 iPhone 需要 iOS %@：装好之后 SideInstaller 会自己配对，更早的版本做不到。",
     "Their iPhone": "对方的 iPhone",
     "IP address (e.g. 192.168.1.42)": "IP 地址（例如 192.168.1.42）",
     "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
@@ -344,6 +380,15 @@ let chineseStrings: [String: String] = [
     "Language": "语言",
     "App language": "应用语言",
     "Auto": "自动",
+    // The Tunnel section: starting LocalDevVPN from here.
+    "Tunnel": "隧道",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
+        "%@:%d 上有东西拒绝了连接，说明隧道是通的，只是设备没有在它的配对端口上监听。该端口只有在开启开发者模式时才会打开，而且每次重启后 iOS 都会再次要求确认：请在 设置 › 隐私与安全性 › 开发者模式 中打开它，然后重试。如果已经打开，请在“配对文件”中重新配对这台 iPhone。",
+    "Start LocalDevVPN on launch": "启动时打开 LocalDevVPN",
+    "Start LocalDevVPN now": "立即启动 LocalDevVPN",
+    "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
+        "未安装 LocalDevVPN。请从 App Store 获取，SideInstaller 就能为你启动它。",
+
     "Downloaded IPAs": "已下载的 IPA",
     "%@ used": "已用 %@",
     "imported": "已导入",

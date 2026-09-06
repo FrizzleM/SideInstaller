@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import SideInstallerFFI
 
 /// One ordered step of the one-click install.
@@ -90,6 +91,24 @@ final class Engine: ObservableObject {
     @Published var anisetteURL: String = AnisetteServer.fallback.address
     /// Servers for the picker; a bundled snapshot until the live list loads.
     @Published private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
+    /// "Start LocalDevVPN when SideInstaller opens". On unless it has been
+    /// turned off: every page here needs the tunnel, so opening the app without
+    /// one is never what somebody meant. Persisted here rather than with
+    /// `@AppStorage`, so the launch hook and the Settings toggle read the one
+    /// value.
+    @Published var autoStartVPN: Bool =
+        (UserDefaults.standard.object(forKey: Engine.autoStartVPNKey) as? Bool) ?? true {
+        didSet {
+            guard autoStartVPN != oldValue else { return }
+            UserDefaults.standard.set(autoStartVPN, forKey: Engine.autoStartVPNKey)
+            log(autoStartVPN
+                ? "LocalDevVPN will be started when SideInstaller opens."
+                : "LocalDevVPN will no longer be started when SideInstaller opens.")
+        }
+    }
+
+    static let autoStartVPNKey = "autoStartLocalDevVPN"
+
     // The loopback VPN's device-side IP; configurable in Advanced.
     @Published var deviceIP: String = "10.7.0.1"
     /// `deviceIP` as an address to dial, kept apart from the field's own text so
@@ -244,6 +263,10 @@ final class Engine: ObservableObject {
     // Apple ID sign-in and signing (isideload), serialized on signQueue.
     private let signQueue = DispatchQueue(label: "sideinstaller.sign")
     private var signSession: OpaquePointer?          // SignSession*
+    /// The team the signer is working under, read off the sign-in summary. An
+    /// app has to already be signed under this team for a refresh to land on it
+    /// rather than install a second copy beside it.
+    @Published private(set) var signingTeamID: String?
     @Published var downloadedIPAPath: String?
     // Source and channel the current download corresponds to.
     private var downloadedSource: InstallSource?
@@ -655,22 +678,28 @@ final class Engine: ObservableObject {
             guard let self, let session = self.signSession else { return }
             si_sign_session_free(session)
             self.signSession = nil
-            self.setMain { self.signInStatus = "signed out" }
+            self.setMain {
+                self.signInStatus = "signed out"
+                self.signingTeamID = nil
+            }
             self.log("Apple ID changed — signed out of the previous account.")
         }
     }
 
+    /// `updatingChecklist` is false for the refresh flow on the Sideloaded apps
+    /// page, which reuses this sign-in but has no business moving the Install
+    /// tab's checklist — a failure there would leave that step spinning forever.
     @MainActor
-    private func signIn() async throws {
+    private func signIn(updatingChecklist: Bool = true) async throws {
         if signSession != nil {
             log("Already signed in this session — skipping.")
-            setStep(.signIn, .done)
+            if updatingChecklist { setStep(.signIn, .done) }
             return
         }
         guard !normalizedAppleID.isEmpty, !applePassword.isEmpty else {
             throw EngineError.message(L("No Apple ID saved. Add one in Settings › Account."))
         }
-        setStep(.signIn, .active)
+        if updatingChecklist { setStep(.signIn, .active) }
 
         // Anisette servers go down often, so try each one before giving up.
         let servers = anisetteCandidates()
@@ -694,7 +723,7 @@ final class Engine: ObservableObject {
                 // Stick with the server that worked.
                 anisetteURL = ani
                 signInStatus = "signed in (\(summary))"
-                setStep(.signIn, .done)
+                if updatingChecklist { setStep(.signIn, .done) }
                 return
             } catch let error as EngineError {
                 lastError = error.errorDescription ?? "sign-in failed"
@@ -737,6 +766,8 @@ final class Engine: ObservableObject {
             self.signSession = session
             let s = summary.map { String(cString: $0) } ?? ""
             summary.map { si_string_free($0) }
+            let team = Self.teamID(inSummary: s)
+            setMain { self.signingTeamID = team }
             log("Sign-in OK. \(s)")
             return s
         } else {
@@ -744,6 +775,17 @@ final class Engine: ObservableObject {
             error.map { si_string_free($0) }
             throw EngineError.message(msg)
         }
+    }
+
+    /// The team id out of a sign-in summary, which reads "team: Name (ABCDE12345)".
+    /// Nil rather than a guess when it doesn't: the refresh flow only uses this
+    /// to *skip* apps, so an unreadable summary must not exclude anything.
+    static func teamID(inSummary summary: String) -> String? {
+        guard let open = summary.lastIndex(of: "("),
+              let close = summary.lastIndex(of: ")"), open < close else { return nil }
+        let id = summary[summary.index(after: open)..<close]
+        guard id.count == 10, id.allSatisfy({ $0.isLetter || $0.isNumber }) else { return nil }
+        return String(id)
     }
 
     /// Squeeze a value onto one line, since the console renders one per entry.
@@ -1379,6 +1421,69 @@ final class Engine: ObservableObject {
         if wifiStatus != wifiText { wifiStatus = wifiText }
     }
 
+    // MARK: - Starting LocalDevVPN
+    //
+    // Nothing here starts a tunnel itself: a VPN configuration belongs to the
+    // app that created it, and no app can switch on another's. What LocalDevVPN
+    // does offer is a URL scheme — `localdevvpn://enable?scheme=<ours>` connects
+    // its tunnel and, a second later, opens `<ours>://` to hand the screen
+    // straight back. That round trip is the whole mechanism.
+
+    private static let localDevVPNScheme = "localdevvpn"
+    /// The scheme LocalDevVPN is asked to return to, registered in Info.plist.
+    private static let callbackScheme = "sideinstaller"
+
+    /// True when LocalDevVPN is installed. Only answerable because Info.plist
+    /// lists its scheme under `LSApplicationQueriesSchemes`.
+    var localDevVPNInstalled: Bool {
+        guard let url = URL(string: "\(Self.localDevVPNScheme)://") else { return false }
+        return UIApplication.shared.canOpenURL(url)
+    }
+
+    /// When the last handover fired, so the trip back can't set off another.
+    private var lastVPNStartAttempt: Date?
+
+    /// Hand over to LocalDevVPN, asking it to connect and come back. False means
+    /// it isn't installed — the only outcome this app can see, since everything
+    /// after the handover happens over there.
+    @MainActor
+    @discardableResult
+    func startLocalDevVPN() -> Bool {
+        guard localDevVPNInstalled,
+              let url = URL(string: "\(Self.localDevVPNScheme)://enable?scheme=\(Self.callbackScheme)")
+        else {
+            log("⛔️ LocalDevVPN isn't installed — nothing to start.")
+            return false
+        }
+        lastVPNStartAttempt = Date()
+        log("Handing over to LocalDevVPN to connect the tunnel …")
+        UIApplication.shared.open(url)
+        return true
+    }
+
+    /// The launch hook behind the setting. Runs on every activation, not just a
+    /// cold start: iOS resumes this app far more often than it launches it, and
+    /// a tunnel dropped while it was away is exactly the case worth catching.
+    @MainActor
+    func autoStartVPNIfWanted() {
+        guard autoStartVPN else { return }
+        // The setting is on by default, so a first run would otherwise be
+        // yanked into another app before the terms have even been read.
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: "hasAcceptedTOS"),
+              defaults.bool(forKey: "hasCompletedAccountSetup") else { return }
+        // Covers the handover and the seconds the tunnel needs to come up, so
+        // LocalDevVPN's own trip back can't bounce the user straight out again.
+        if let last = lastVPNStartAttempt, Date().timeIntervalSince(last) < 30 { return }
+        refreshNetworkStatus()
+        guard !vpnConnected else { return }
+        guard localDevVPNInstalled else {
+            log("⚠️ “Start LocalDevVPN on launch” is on, but LocalDevVPN isn't installed.")
+            return
+        }
+        startLocalDevVPN()
+    }
+
     /// Start the RPPairing host; it reports back through the shared engine.
     func generatePairingFile() {
         Task { @MainActor in PairingController.shared.start() }
@@ -1650,6 +1755,84 @@ final class Engine: ObservableObject {
         let profiles = try await onDeviceQueue { try self.connection.provisioningProfiles() }
         log("Apps: \(apps.count) installed, \(profiles.count) provisioning profile(s) on the device.")
         return (apps, profiles)
+    }
+
+    // MARK: Refreshing what's already installed
+    //
+    // A free provisioning profile lasts seven days, and the only way to put
+    // seven back on the clock is to sign the app again and install it over
+    // itself — which is what SideStore's "Refresh" does. Nothing below is new
+    // work: it is the install pipeline's sign and install steps, run per app and
+    // kept off the one-click checklist.
+
+    /// Everything a refresh needs before the first app is signed: the loopback
+    /// tunnel up, the device link open — which is also where the UDID the signer
+    /// registers comes from — and the Apple ID signed in.
+    @MainActor
+    func prepareRefresh() async throws {
+        guard osSupported else {
+            throw EngineError.message(L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
+                                        osVersionText, Engine.minimumTunnelOSText))
+        }
+        guard !normalizedAppleID.isEmpty, !applePassword.isEmpty else {
+            throw EngineError.message(L("No Apple ID saved. Add one in Settings › Account."))
+        }
+        try await ensurePairingConnection()
+        try await signIn(updatingChecklist: false)
+    }
+
+    /// Sign `ipaPath` again and install it over the copy already on the device.
+    /// Signing issues a new provisioning profile, and installing is what puts it
+    /// on the app — neither half is a refresh on its own. The bundle id, team
+    /// and certificate are unchanged, so installd treats this as an upgrade and
+    /// the app keeps its data.
+    @MainActor
+    func refreshInstalledApp(named name: String, ipaPath: String) async throws {
+        guard let session = signSession else { throw EngineError.message(L("Not signed in.")) }
+        let udid = deviceUDID ?? ""
+        let device = deviceName ?? ""
+        log("=== Refreshing \(name) from \((ipaPath as NSString).lastPathComponent) ===")
+        let signed: String
+        do {
+            signed = try await onSignQueue {
+                try self.performSign(session: session, ipa: ipaPath, udid: udid, deviceName: device)
+            }
+        } catch EngineError.certExists {
+            // Not `certConflict`: that raises the Install tab's revoke-and-retry
+            // card, whose retry runs a whole install of whatever that tab has
+            // selected. Point at the Certificates page instead, which revokes
+            // without starting anything.
+            throw EngineError.message(L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again."))
+        }
+        defer { Self.discardSignedBundle(at: signed) }
+        installProgress = 0
+        let ip = deviceHost
+        let path = pairingFilePath ?? PairingController.pairingFilePath()
+        try await onDeviceQueue {
+            // Signing takes long enough for iOS to tear the tunnel down, and
+            // `isConnected` can't see that — rebuild the link, as install does.
+            try self.connection.connect(deviceIP: ip, pairingFilePath: path)
+            guard self.connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
+            try self.connection.installSignedApp(bundlePath: signed)
+        }
+        installProgress = 1
+        log("\(name) refreshed — its seven days start again now.")
+    }
+
+    /// Delete a signed bundle once it is on the device. Refreshing a page full
+    /// of apps unpacks one of these per app, at a few hundred megabytes each;
+    /// the one-click install leaves its single copy for the OS to reap.
+    private static func discardSignedBundle(at path: String) {
+        // isideload unpacks into <temp>/<ipa file name>_extracted/Payload/X.app,
+        // so the extraction directory is what's worth taking away. Anything not
+        // shaped like that is left alone.
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).standardizedFileURL
+        let extraction = URL(fileURLWithPath: path).standardizedFileURL
+            .deletingLastPathComponent()        // Payload
+            .deletingLastPathComponent()        // <ipa file name>_extracted
+        guard extraction.deletingLastPathComponent().path == temp.path,
+              extraction.lastPathComponent.hasSuffix("_extracted") else { return }
+        try? FileManager.default.removeItem(at: extraction)
     }
 
     // MARK: - Location tab

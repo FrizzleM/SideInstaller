@@ -28,6 +28,7 @@ struct SettingsView: View {
             Form {
                 accountSection
                 languageSection
+                tunnelSection
                 downloadsSection
                 anisetteSection
                 advancedSection
@@ -165,6 +166,33 @@ struct SettingsView: View {
             }
         } header: {
             Text(L("Language"))
+        }
+    }
+
+    // MARK: Tunnel
+
+    /// Everything here runs over a loopback tunnel, and starting one is a trip
+    /// to another app every single time. LocalDevVPN takes `localdevvpn://enable`
+    /// as "connect, then hand the screen back", so this turns that trip into
+    /// something the app makes for itself.
+    @ViewBuilder
+    private var tunnelSection: some View {
+        Section {
+            Toggle(L("Start LocalDevVPN on launch"), isOn: $engine.autoStartVPN)
+            Button {
+                engine.startLocalDevVPN()
+            } label: {
+                Label(L("Start LocalDevVPN now"), systemImage: "bolt.horizontal.circle")
+            }
+            .disabled(!engine.localDevVPNInstalled)
+        } header: {
+            Text(L("Tunnel"))
+        } footer: {
+            // No explainer under the toggle — the label says it. The one line
+            // left is the one that isn't obvious: why the button is dead.
+            if !engine.localDevVPNInstalled {
+                Text(L("LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you."))
+            }
         }
     }
 

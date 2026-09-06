@@ -254,6 +254,40 @@ let japaneseStrings: [String: String] = [
 
     "Sideloaded apps": "サイドロード済みアプリ",
     "Reading the device": "デバイスを読み取り中",
+
+    // Refresh all: signing the installed apps again.
+    "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
+        "iOS %@ はサポートされていません。SideInstaller には iOS %@ 以降が必要です。",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.":
+        "Apple はこの Apple ID に署名証明書を発行しません。すでに存在すると報告されています（エラー 7460）。「ツール › 証明書」で失効させてから、もう一度更新してください。",
+    "An install is already running. Wait for it to finish, then refresh.":
+        "インストールがすでに実行中です。終わるまで待ってから更新してください。",
+    "Getting ready": "準備中",
+    "Stopping after this app": "このアプリの後で停止します",
+    "Refreshing %@": "%@ を更新中",
+    "Signed by team %@, not the one you're signed in as — refreshing it here would install a second copy.":
+        "チーム %@ で署名されています。ログイン中のチームとは違うため、ここで更新すると2つ目のコピーがインストールされます。",
+    "Refreshed. Its seven days start again now.": "更新しました。7日間が今から数え直されます。",
+    "Nothing was refreshed.": "何も更新されませんでした。",
+    "Refreshed %d of %d apps.": "%d／%d 個のアプリを更新しました。",
+    "Refresh all apps?": "すべてのアプリを更新しますか？",
+    "Refresh all": "すべて更新",
+    "%@ will be signed again with your Apple ID and installed over the copy on this device. It keeps its data, and its seven days start over.":
+        "%@ をあなたの Apple ID で署名し直し、この端末にあるコピーに上書きインストールします。データはそのまま残り、7日間が数え直されます。",
+    "%d apps will be signed again with your Apple ID and installed over the copies on this device. They keep their data, and their seven days start over.":
+        "%d 個のアプリをあなたの Apple ID で署名し直し、この端末にあるコピーに上書きインストールします。データはそのまま残り、7日間が数え直されます。",
+    "%d app can be signed again from an IPA already on this iPhone.":
+        "この iPhone にある IPA から %d 個のアプリを署名し直せます。",
+    "%d apps can be signed again from IPAs already on this iPhone.":
+        "この iPhone にある IPA から %d 個のアプリを署名し直せます。",
+    "Reload": "再読み込み",
+    "Waiting": "待機中",
+    "In progress": "実行中",
+    "Failed": "失敗",
+    "%d app here has no IPA in SideInstaller, so it can't be refreshed from this page. Refresh it in whatever installed it, or import its .ipa first.":
+        "ここにある %d 個のアプリは SideInstaller に IPA がないため、このページからは更新できません。インストール元のアプリで更新するか、先に .ipa を読み込んでください。",
+    "%d apps here have no IPA in SideInstaller, so they can't be refreshed from this page. Refresh them in whatever installed them, or import their .ipa first.":
+        "ここにある %d 個のアプリは SideInstaller に IPA がないため、このページからは更新できません。インストール元のアプリで更新するか、先に .ipa を読み込んでください。",
     "%d app": "アプリ %d 個",
     "%d apps": "アプリ %d 個",
     "%d app needs refreshing": "%d 個のアプリに更新が必要です",
@@ -291,6 +325,15 @@ let japaneseStrings: [String: String] = [
     "Language": "言語",
     "App language": "アプリの言語",
     "Auto": "自動",
+    // The Tunnel section: starting LocalDevVPN from here.
+    "Tunnel": "トンネル",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
+        "%@:%d で接続が拒否されました。トンネルは通っていて、デバイスがペアリング用のポートで待ち受けていないだけです。このポートはデベロッパモードが有効なときだけ開き、再起動のたびに iOS が確認を求めます。「設定 › プライバシーとセキュリティ › デベロッパモード」で有効にしてから、もう一度お試しください。すでに有効な場合は、「ペアリングファイル」からこの iPhone をペアリングし直してください。",
+    "Start LocalDevVPN on launch": "起動時に LocalDevVPN を開始",
+    "Start LocalDevVPN now": "今すぐ LocalDevVPN を開始",
+    "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
+        "LocalDevVPN がインストールされていません。App Store から入手すると、SideInstaller が起動できるようになります。",
+
     "Downloaded IPAs": "ダウンロード済みの IPA",
     "%@ used": "%@ を使用中",
     "imported": "インポート済み",
@@ -487,6 +530,8 @@ let japaneseStrings: [String: String] = [
     "Set up someone else's iPhone": "他の人の iPhone をセットアップ",
     "Steps": "手順",
     "Same Wi-Fi network": "同じ Wi-Fi ネットワーク",
+    "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
+        "相手の iPhone には iOS %@ が必要です。インストール後、SideInstaller は自分でペアリングしますが、それより古いバージョンではできません。",
     "Their iPhone": "相手の iPhone",
     "This iPhone is %@, so theirs will look similar.": "この iPhone は %@ です。相手のアドレスもこれに近い形になります。",
     "IP address (e.g. 192.168.1.42)": "IP アドレス（例：192.168.1.42）",

@@ -82,7 +82,8 @@ final class DeviceConnection {
     /// this string is presented.
     private func tunnelAdvice(kind: TunnelFailureKind,
                               deviceIP: String,
-                              candidates: [String]) -> String {
+                              candidates: [String],
+                              raw: FFIError?) -> String {
         let tried = ([deviceIP, "127.0.0.1"] + candidates).joined(separator: ", ")
         switch kind {
         case TunnelFailureHostsRefused:
@@ -116,6 +117,15 @@ final class DeviceConnection {
                 turned off). Pair with this iPhone again to get a fresh file.
                 """
         case TunnelFailureRsdUnreachable:
+            // ECONNREFUSED means the packet arrived and was turned away, so the
+            // tunnel is carrying traffic and the address is right — the device
+            // simply has nothing listening on the pairing port. Blaming the VPN
+            // there sends people to check the one thing that is demonstrably
+            // working, which is what the old copy did.
+            if Self.wasRefused(raw) {
+                return L("Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.",
+                         deviceIP, Int(Self.rsdPort))
+            }
             return """
                 Couldn't reach the device at \(deviceIP):\(Self.rsdPort) at all. The \
                 loopback VPN is most likely off, or is handing out a different address \
@@ -127,6 +137,14 @@ final class DeviceConnection {
                 The raw error is in the log.
                 """
         }
+    }
+
+    /// Did the dial end in a refusal rather than silence? The classifier folds
+    /// both into `RsdUnreachable`, but only the errno tells them apart, and they
+    /// mean opposite things — so it is read back out of the raw message.
+    static func wasRefused(_ raw: FFIError?) -> Bool {
+        guard let message = raw?.message.lowercased() else { return false }
+        return message.contains("connection refused") || message.contains("os error 61")
     }
 
     // MARK: Connect / disconnect
@@ -259,7 +277,8 @@ final class DeviceConnection {
             throw TunnelError(kind: failureKind,
                               advice: tunnelAdvice(kind: failureKind,
                                                    deviceIP: deviceIP,
-                                                   candidates: candidates),
+                                                   candidates: candidates,
+                                                   raw: raw),
                               underlying: raw)
         }
         guard newAdapter != nil, newHandshake != nil else {
