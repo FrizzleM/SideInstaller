@@ -221,6 +221,7 @@ final class EntitlementsManager: ObservableObject {
         let dir = storageDir
         engine.twoFactorWasCancelled = false
         var lastError = "no anisette servers configured"
+        var appleRefusals = 0
 
         for (idx, ani) in servers.enumerated() {
             do {
@@ -240,6 +241,14 @@ final class EntitlementsManager: ObservableObject {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
                 engine.log("Entitlements: anisette \(idx + 1)/\(servers.count) failed: \(lastError)")
+                // Apple refusing the request fails the same on every server.
+                if Engine.isAppleServiceRefusal(lastError) {
+                    appleRefusals += 1
+                    if appleRefusals >= 2 {
+                        engine.log("Entitlements: Apple's sign-in server refused \(appleRefusals) attempts with HTTP 503 — stopping.")
+                        throw EngineError.message(Engine.appleServiceRefusalMessage)
+                    }
+                }
             }
         }
         let tried = servers.count == 1
@@ -249,6 +258,7 @@ final class EntitlementsManager: ObservableObject {
     }
 
     private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {
+        defer { engine.endTwoFactor() }
         var newSession: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
@@ -339,9 +349,8 @@ final class EntitlementsManager: ObservableObject {
 }
 
 /// Bridges a 2FA request during entitlement sign-in to the engine's prompt.
-private let entitlementsTwoFactorCallback: SITwoFactorCb = { _, outBuf, bufLen in
-    guard let outBuf = outBuf else { return 0 }
-    return Engine.shared.provideTwoFactorCode(outBuf, Int(bufLen))
+private let entitlementsTwoFactorCallback: SITwoFactorCb = { _, request, outBuf, bufLen in
+    Engine.shared.answerTwoFactor(request: request, outBuf: outBuf, len: Int(bufLen))
 }
 
 // MARK: - View

@@ -78,6 +78,44 @@ let vietnameseStrings: [String: String] = [
     "Submit": "Gửi",
     "Enter the code Apple just sent to your trusted device.":
         "Nhập mã mà Apple vừa gửi đến thiết bị tin cậy của bạn.",
+    "Enter the code Apple texted to %@.":
+        "Nhập mã Apple đã nhắn tin đến %@.",
+    "Enter the code Apple texted to your phone.":
+        "Nhập mã Apple đã nhắn tin đến điện thoại của bạn.",
+    "Apple is calling %@. Enter the code you hear.":
+        "Apple đang gọi đến %@. Hãy nhập mã bạn nghe được.",
+    "Apple is calling your phone. Enter the code you hear.":
+        "Apple đang gọi đến điện thoại của bạn. Hãy nhập mã bạn nghe được.",
+    "Choose how Apple should send your verification code.":
+        "Chọn cách Apple gửi mã xác minh cho bạn.",
+    "Choose How to Get a Code":
+        "Chọn cách nhận mã",
+    "Verify":
+        "Xác minh",
+    "Didn't get it?":
+        "Không nhận được?",
+    "Send a new code to my devices":
+        "Gửi mã mới đến thiết bị của tôi",
+    "Text me a new code":
+        "Nhắn tin cho tôi mã mới",
+    "Call me again":
+        "Gọi lại cho tôi",
+    "Send a code to my Apple devices":
+        "Gửi mã đến thiết bị Apple của tôi",
+    "Text %@":
+        "Nhắn tin đến %@",
+    "Call %@":
+        "Gọi %@",
+    "Checking the code…":
+        "Đang kiểm tra mã…",
+    "Requesting a new code…":
+        "Đang yêu cầu mã mới…",
+    "Sending a code to your devices…":
+        "Đang gửi mã đến thiết bị của bạn…",
+    "Texting a code to %@…":
+        "Đang nhắn mã đến %@…",
+    "Calling %@…":
+        "Đang gọi %@…",
 
     // MARK: - Install tab
 
@@ -447,6 +485,8 @@ let vietnameseStrings: [String: String] = [
         "Apple ID hoặc mật khẩu không đúng. Hãy kiểm tra lại email và mật khẩu Apple Account của bạn rồi thử lại.",
     "Apple ID sign-in failed on %@. Last error: %@":
         "Đăng nhập Apple ID thất bại trên %@. Lỗi cuối cùng: %@",
+    "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
+        "Máy chủ đăng nhập của Apple đã từ chối yêu cầu (HTTP 503). Lỗi không phải do mật khẩu hay máy chủ anisette, nên thử thêm máy chủ khác cũng không giúp được. Hãy thử lại sau hoặc cập nhật SideInstaller.",
     "the anisette server": "máy chủ anisette",
     "all %d anisette servers": "tất cả %d máy chủ anisette",
     "Not signed in.": "Chưa đăng nhập.",

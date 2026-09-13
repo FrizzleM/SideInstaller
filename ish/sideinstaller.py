@@ -638,8 +638,12 @@ class WebSocket:
 # mints headers from the stored blob; v1 just returns a header set per request.
 # ----------------------------------------------------------------------------
 
-V1_USER_AGENT = "akd/1.0 CFNetwork/808.1.4 Darwin/16.1.0"
-V1_CLIENT_INFO = "<MacBookPro13,2> <Mac OS X;10.12.1;16B2657> <com.apple.AuthKit/1 (com.apple.dt.Xcode/3594.4.19)>"
+# What we tell GrandSlam we are, whatever the anisette server suggests. Public
+# servers still hand out a com.apple.dt.Xcode client info, and since September
+# 2026 Apple's GSA edge answers any request carrying one with HTTP 503 before
+# reading the rest. isideload, AltStore and SideSign all switched to akd.
+GSA_CLIENT_INFO = "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+GSA_USER_AGENT = "akd/1.0 CFNetwork/808.1.4"
 
 
 class Anisette:
@@ -647,8 +651,8 @@ class Anisette:
         self.url = url.rstrip("/")
         self.state_path = state_path
         self.version = None
-        self.client_info = None
-        self.user_agent = None
+        self.client_info = GSA_CLIENT_INFO
+        self.user_agent = GSA_USER_AGENT
         self.routing_info = "0"
         self.identifier = None
         self.adi_pb = None
@@ -699,12 +703,12 @@ class Anisette:
         if status == 200:
             try:
                 payload = json.loads(body)
-                self.client_info = payload["client_info"]
-                self.user_agent = payload["user_agent"]
+            except ValueError:
+                payload = {}
+            # Only the shape identifies a v3 server; its values are not sent.
+            if isinstance(payload, dict) and "client_info" in payload and "user_agent" in payload:
                 self.version = 3
                 return 3
-            except (ValueError, KeyError):
-                pass
 
         status, _, body = request("GET", self.url + "/")
         if status == 200:
@@ -713,8 +717,6 @@ class Anisette:
             except ValueError:
                 payload = {}
             if "X-Apple-I-MD" in payload:
-                self.client_info = payload.get("X-Mme-Client-Info", V1_CLIENT_INFO)
-                self.user_agent = V1_USER_AGENT
                 self.version = 1
                 return 1
 

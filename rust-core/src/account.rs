@@ -5,14 +5,14 @@
 //! returns an opaque `SignSession`. `si_sign_ipa` then signs an IPA with it,
 //! registering the App ID, profile and certificate along the way.
 
-use std::ffi::{c_char, c_void, CStr};
+use std::ffi::{c_char, c_void, CStr, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
 
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use isideload::{
     anisette::remote_v3::{state::AnisetteState, RemoteV3AnisetteProvider},
-    auth::apple_account::AppleAccount,
+    auth::apple_account::{AppleAccount, TwoFactorCallbackParams, TwoFactorCallbackResponse},
     dev::{developer_session::DeveloperSession, devices::DevicesApi},
     sideload::{
         builder::MaxCertsBehavior, cert_identity::CertificateIdentity, sideloader::Sideloader,
@@ -21,12 +21,98 @@ use isideload::{
     util::{fs_storage::FsStorage, storage::SideloadingStorage},
 };
 
+use rootcause::Report;
+use serde::{Deserialize, Serialize};
+
 use crate::ffi_util::cstr;
 
-/// `int (*)(void *ctx, char *out_buf, size_t buf_len)` — fills `out_buf` with a
-/// NUL-terminated 2FA code and returns 1, or returns 0 if the user cancelled.
-pub type TwoFactorCb =
-    Option<extern "C" fn(ctx: *mut c_void, out_buf: *mut c_char, buf_len: usize) -> i32>;
+/// `int (*)(void *ctx, const char *request_json, char *out_buf, size_t buf_len)`.
+///
+/// `request_json` is a [`TwoFactorRequest`]: what Apple is waiting for. Swift
+/// writes a NUL-terminated [`TwoFactorAnswer`] as JSON into `out_buf` and
+/// returns 1, or returns 0 if the user cancelled.
+pub type TwoFactorCb = Option<
+    extern "C" fn(
+        ctx: *mut c_void,
+        request_json: *const c_char,
+        out_buf: *mut c_char,
+        buf_len: usize,
+    ) -> i32,
+>;
+
+/// What the 2FA prompt is being asked for.
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TwoFactorRequest {
+    /// Where the pending code went: `device`, `sms` or `voice`. `choose` when
+    /// the last method failed and nothing is pending.
+    method: &'static str,
+    selected_number_id: Option<u32>,
+    last_error: Option<String>,
+    numbers: Vec<TwoFactorNumber>,
+}
+
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TwoFactorNumber {
+    id: u32,
+    /// Masked by Apple, as in `+39 ••• ••• ••89`.
+    number: String,
+    /// `sms` or `voice`, or empty when Apple doesn't say. A `voice` number
+    /// can't take a text.
+    push_mode: String,
+}
+
+impl From<&TwoFactorCallbackParams> for TwoFactorRequest {
+    fn from(params: &TwoFactorCallbackParams) -> Self {
+        let method = if params.unknown {
+            "choose"
+        } else if params.voice {
+            "voice"
+        } else if params.sms {
+            "sms"
+        } else {
+            "device"
+        };
+        TwoFactorRequest {
+            method,
+            selected_number_id: params.selected_number_id,
+            last_error: params.last_error.clone(),
+            numbers: params
+                .numbers
+                .iter()
+                .map(|n| TwoFactorNumber {
+                    id: n.id,
+                    number: n.number_with_dial_code.clone(),
+                    push_mode: n.push_mode.clone(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// The user's reply, as Swift sends it.
+#[derive(Deserialize, Debug, PartialEq)]
+#[serde(tag = "action", rename_all = "lowercase")]
+pub(crate) enum TwoFactorAnswer {
+    Code { code: String },
+    Sms { id: u32 },
+    Voice { id: u32 },
+    Devices,
+    Resend,
+}
+
+impl From<TwoFactorAnswer> for TwoFactorCallbackResponse {
+    fn from(answer: TwoFactorAnswer) -> Self {
+        match answer {
+            TwoFactorAnswer::Code { code } => Self::SubmitCode(code.trim().to_string()),
+            TwoFactorAnswer::Sms { id } => Self::SendSms(id),
+            TwoFactorAnswer::Voice { id } => Self::CallNumber(id),
+            TwoFactorAnswer::Devices => Self::SendToDevices,
+            TwoFactorAnswer::Resend => Self::ResendCode,
+        }
+    }
+}
 
 /// Opaque handle owning the tokio runtime and the built Sideloader.
 pub struct SignSession {
@@ -53,22 +139,48 @@ unsafe fn opt(p: *const c_char, default: &str) -> String {
     CStr::from_ptr(p).to_str().unwrap_or(default).to_string()
 }
 
-/// Build the 2FA closure that bridges to Swift, shared with `certs.rs`.
-pub(crate) fn make_2fa(cb: TwoFactorCb, ctx: TwoFaCtx) -> impl Fn() -> Option<String> {
-    move || {
-        let cb = cb?;
-        let mut buf = vec![0u8; 128];
-        let rc = cb(ctx.0, buf.as_mut_ptr() as *mut c_char, buf.len());
-        if rc == 0 {
-            return None;
-        }
-        // Read the NUL-terminated code Swift wrote into the buffer.
-        let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
-        let s = String::from_utf8_lossy(&buf[..end]).trim().to_string();
-        if s.is_empty() {
-            None
-        } else {
-            Some(s)
+/// Build the 2FA closure that bridges to Swift, shared with `certs.rs`. The
+/// callback blocks until the user answers, so the future is already resolved.
+pub(crate) fn make_2fa(
+    cb: TwoFactorCb,
+    ctx: TwoFaCtx,
+) -> impl Fn(TwoFactorCallbackParams) -> std::future::Ready<Result<TwoFactorCallbackResponse, Report>>
+       + Send
+       + Sync {
+    move |params| std::future::ready(Ok(ask_swift(cb, &ctx, &params)))
+}
+
+fn ask_swift(
+    cb: TwoFactorCb,
+    ctx: &TwoFaCtx,
+    params: &TwoFactorCallbackParams,
+) -> TwoFactorCallbackResponse {
+    let Some(cb) = cb else {
+        return TwoFactorCallbackResponse::Abort;
+    };
+    let request = serde_json::to_string(&TwoFactorRequest::from(params))
+        .ok()
+        .and_then(|json| CString::new(json).ok());
+    let Some(request) = request else {
+        tracing::error!("2FA: couldn't encode the prompt for Swift; aborting");
+        return TwoFactorCallbackResponse::Abort;
+    };
+    let mut buf = vec![0u8; 512];
+    let rc = cb(ctx.0, request.as_ptr(), buf.as_mut_ptr() as *mut c_char, buf.len());
+    if rc == 0 {
+        return TwoFactorCallbackResponse::Abort;
+    }
+    // Read the NUL-terminated answer Swift wrote into the buffer.
+    let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+    parse_answer(&buf[..end])
+}
+
+fn parse_answer(bytes: &[u8]) -> TwoFactorCallbackResponse {
+    match serde_json::from_slice::<TwoFactorAnswer>(bytes) {
+        Ok(answer) => answer.into(),
+        Err(e) => {
+            tracing::error!("2FA: unreadable answer from Swift ({e}); aborting");
+            TwoFactorCallbackResponse::Abort
         }
     }
 }
@@ -383,5 +495,116 @@ pub unsafe fn account_config(
 pub unsafe fn sign_session_free(session: *mut SignSession) {
     if !session.is_null() {
         drop(Box::from_raw(session));
+    }
+}
+
+#[cfg(test)]
+mod two_factor_bridge_tests {
+    use super::*;
+    use isideload::auth::apple_account::TrustedNumber;
+
+    fn numbers() -> Vec<TrustedNumber> {
+        serde_json::from_str(
+            r#"[{"numberWithDialCode":"+39 ••• ••• ••89","lastTwoDigits":"89","pushMode":"sms","id":1},
+                {"numberWithDialCode":"+39 ••• ••• ••12","lastTwoDigits":"12","pushMode":"voice","id":4}]"#,
+        )
+        .unwrap()
+    }
+
+    fn params(unknown: bool, sms: bool, voice: bool, selected: Option<u32>) -> TwoFactorCallbackParams {
+        TwoFactorCallbackParams {
+            last_error: None,
+            unknown,
+            sms,
+            voice,
+            numbers: numbers(),
+            selected_number_id: selected,
+        }
+    }
+
+    fn request_json(p: &TwoFactorCallbackParams) -> serde_json::Value {
+        serde_json::to_value(TwoFactorRequest::from(p)).unwrap()
+    }
+
+    #[test]
+    fn device_prompt_lists_the_numbers_without_selecting_one() {
+        let json = request_json(&params(false, false, false, None));
+        assert_eq!(json["method"], "device");
+        assert_eq!(json["selectedNumberId"], serde_json::Value::Null);
+        assert_eq!(json["numbers"][1]["number"], "+39 ••• ••• ••12");
+        assert_eq!(json["numbers"][1]["pushMode"], "voice");
+    }
+
+    #[test]
+    fn phone_prompts_name_the_method_and_the_number() {
+        let sms = request_json(&params(false, true, false, Some(1)));
+        assert_eq!(sms["method"], "sms");
+        assert_eq!(sms["selectedNumberId"], 1);
+        let call = request_json(&params(false, true, true, Some(4)));
+        assert_eq!(call["method"], "voice");
+    }
+
+    #[test]
+    fn a_failed_method_asks_the_user_to_choose() {
+        let mut p = params(true, false, false, None);
+        p.last_error = Some("Unknown 2FA method - try another".into());
+        let json = request_json(&p);
+        assert_eq!(json["method"], "choose");
+        assert_eq!(json["lastError"], "Unknown 2FA method - try another");
+    }
+
+    #[test]
+    fn answers_map_onto_isideload_responses() {
+        use TwoFactorCallbackResponse as R;
+        assert!(matches!(parse_answer(br#"{"action":"code","code":" 123456 "}"#), R::SubmitCode(c) if c == "123456"));
+        assert!(matches!(parse_answer(br#"{"action":"sms","id":1}"#), R::SendSms(1)));
+        assert!(matches!(parse_answer(br#"{"action":"voice","id":4}"#), R::CallNumber(4)));
+        assert!(matches!(parse_answer(br#"{"action":"devices"}"#), R::SendToDevices));
+        assert!(matches!(parse_answer(br#"{"action":"resend"}"#), R::ResendCode));
+        // Swift's JSONEncoder puts the tag last, byte for byte like this.
+        assert!(matches!(parse_answer(br#"{"id":4,"action":"voice"}"#), R::CallNumber(4)));
+        assert!(matches!(parse_answer(br#"{"code":"123456","action":"code"}"#), R::SubmitCode(c) if c == "123456"));
+    }
+
+    #[test]
+    fn an_unreadable_answer_aborts() {
+        use TwoFactorCallbackResponse as R;
+        assert!(matches!(parse_answer(b"123456"), R::Abort));
+        assert!(matches!(parse_answer(br#"{"action":"sms"}"#), R::Abort));
+        assert!(matches!(parse_answer(b""), R::Abort));
+    }
+
+    extern "C" fn texting_callback(
+        _ctx: *mut c_void,
+        request_json: *const c_char,
+        out_buf: *mut c_char,
+        buf_len: usize,
+    ) -> i32 {
+        let request = unsafe { CStr::from_ptr(request_json) }.to_str().unwrap();
+        let json: serde_json::Value = serde_json::from_str(request).unwrap();
+        assert_eq!(json["method"], "device");
+        let answer = b"{\"action\":\"sms\",\"id\":1}\0";
+        assert!(answer.len() <= buf_len);
+        unsafe { std::ptr::copy_nonoverlapping(answer.as_ptr(), out_buf as *mut u8, answer.len()) };
+        1
+    }
+
+    extern "C" fn cancelling_callback(
+        _ctx: *mut c_void,
+        _request_json: *const c_char,
+        _out_buf: *mut c_char,
+        _buf_len: usize,
+    ) -> i32 {
+        0
+    }
+
+    #[test]
+    fn round_trips_through_a_c_callback() {
+        use TwoFactorCallbackResponse as R;
+        let p = params(false, false, false, None);
+        let ctx = TwoFaCtx(std::ptr::null_mut());
+        assert!(matches!(ask_swift(Some(texting_callback), &ctx, &p), R::SendSms(1)));
+        assert!(matches!(ask_swift(Some(cancelling_callback), &ctx, &p), R::Abort));
+        assert!(matches!(ask_swift(None, &ctx, &p), R::Abort));
     }
 }

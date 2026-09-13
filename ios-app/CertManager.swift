@@ -194,6 +194,7 @@ final class CertManager: ObservableObject {
         let dir = storageDir
         engine.twoFactorWasCancelled = false
         var lastError = "no anisette servers configured"
+        var appleRefusals = 0
 
         for (idx, ani) in servers.enumerated() {
             do {
@@ -216,6 +217,14 @@ final class CertManager: ObservableObject {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
                 engine.log("Certificates: anisette \(idx + 1)/\(servers.count) failed: \(lastError)")
+                // Apple refusing the request fails the same on every server.
+                if Engine.isAppleServiceRefusal(lastError) {
+                    appleRefusals += 1
+                    if appleRefusals >= 2 {
+                        engine.log("Certificates: Apple's sign-in server refused \(appleRefusals) attempts with HTTP 503 — stopping.")
+                        throw EngineError.message(Engine.appleServiceRefusalMessage)
+                    }
+                }
             }
         }
         let tried = servers.count == 1
@@ -226,6 +235,7 @@ final class CertManager: ObservableObject {
 
     /// One sign-in attempt against a specific anisette server.
     private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {
+        defer { engine.endTwoFactor() }
         var newSession: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
@@ -314,7 +324,6 @@ final class CertManager: ObservableObject {
 // MARK: - C 2FA callback
 
 /// Bridges a 2FA request during cert sign-in to the engine's shared prompt.
-private let certTwoFactorCallback: SITwoFactorCb = { _, outBuf, bufLen in
-    guard let outBuf = outBuf else { return 0 }
-    return Engine.shared.provideTwoFactorCode(outBuf, Int(bufLen))
+private let certTwoFactorCallback: SITwoFactorCb = { _, request, outBuf, bufLen in
+    Engine.shared.answerTwoFactor(request: request, outBuf: outBuf, len: Int(bufLen))
 }

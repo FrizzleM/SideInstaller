@@ -91,6 +91,10 @@ serde_json = "1"
 plist = "1.8"
 base64 = "0.22.1"
 
+# Named in the 2FA bridge's signature: isideload's login callback returns a
+# `rootcause::Report`. Already in the tree via isideload (same 0.12 line).
+rootcause = "0.12"
+
 # Logging spine: forward idevice's `tracing` events (and any `log` records via
 # the tracing-log compat layer, enabled by default) through the FFI callback.
 tracing = "0.1"

@@ -76,6 +76,44 @@ let chineseStrings: [String: String] = [
     "Submit": "提交",
     "Enter the code Apple just sent to your trusted device.":
         "请输入 Apple 刚刚发送到你受信任设备的验证码。",
+    "Enter the code Apple texted to %@.":
+        "输入 Apple 通过短信发送到 %@ 的验证码。",
+    "Enter the code Apple texted to your phone.":
+        "输入 Apple 通过短信发送到你手机的验证码。",
+    "Apple is calling %@. Enter the code you hear.":
+        "Apple 正在拨打 %@。请输入你听到的验证码。",
+    "Apple is calling your phone. Enter the code you hear.":
+        "Apple 正在拨打你的电话。请输入你听到的验证码。",
+    "Choose how Apple should send your verification code.":
+        "选择 Apple 发送验证码的方式。",
+    "Choose How to Get a Code":
+        "选择获取验证码的方式",
+    "Verify":
+        "验证",
+    "Didn't get it?":
+        "没有收到？",
+    "Send a new code to my devices":
+        "向我的设备发送新验证码",
+    "Text me a new code":
+        "通过短信给我发送新验证码",
+    "Call me again":
+        "再次给我打电话",
+    "Send a code to my Apple devices":
+        "向我的 Apple 设备发送验证码",
+    "Text %@":
+        "发短信到 %@",
+    "Call %@":
+        "拨打 %@",
+    "Checking the code…":
+        "正在验证验证码…",
+    "Requesting a new code…":
+        "正在请求新验证码…",
+    "Sending a code to your devices…":
+        "正在向你的设备发送验证码…",
+    "Texting a code to %@…":
+        "正在通过短信将验证码发送到 %@…",
+    "Calling %@…":
+        "正在拨打 %@…",
 
     // MARK: - Install tab
 
@@ -436,6 +474,8 @@ let chineseStrings: [String: String] = [
         "Apple ID 或密码不正确。请检查你的 Apple 账户电子邮件和密码，然后重试。",
     "Apple ID sign-in failed on %@. Last error: %@":
         "在 %@ 上登录 Apple ID 失败。最后的错误：%@",
+    "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
+        "Apple 登录服务器拒绝了请求（HTTP 503）。这不是你的密码或 anisette 服务器的问题，换用其他服务器也无济于事。请稍后重试，或更新 SideInstaller。",
     "the anisette server": "anisette 服务器",
     "all %d anisette servers": "全部 %d 个 anisette 服务器",
     "Not signed in.": "尚未登录。",

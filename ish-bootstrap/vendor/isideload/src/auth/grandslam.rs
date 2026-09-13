@@ -180,6 +180,9 @@ impl GrandSlam {
             .http1_title_case_headers()
             .danger_accept_invalid_certs(debug)
             .connection_verbose(debug)
+            // A fresh connection per request. SideSign (35993d7) found GSA
+            // answering reused connections with 5xx; upstream f6a4d5d does this.
+            .pool_max_idle_per_host(0)
             .build()?;
 
         Ok(client)

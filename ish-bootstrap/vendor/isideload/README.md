@@ -51,9 +51,15 @@ install runs over its own RSD tunnel. The four sites are all install-only:
 Each is now behind the same gate. With `install` off the tree resolves to a
 single `idevice`, and `cargo check` is clean.
 
-## Inherited change
+## Inherited changes
 
-**One file: `src/sideload/sideloader.rs` — write `embedded.mobileprovision` into
+**akd client info and no GrandSlam connection reuse** (`src/anisette/`,
+`src/auth/grandslam.rs`), applied identically to both copies on 2026-09-13.
+Apple's GSA edge answers HTTP 503 to an Xcode `X-Mme-Client-Info`, which this
+crate used to take from the anisette server; see change 2 in
+`rust-core/vendor/isideload/README.md` for the evidence and the upstream commits.
+
+**`src/sideload/sideloader.rs` — write `embedded.mobileprovision` into
 each app extension.**
 
 `sign_app` downloaded a single provisioning profile (for `main_app_id`) and wrote

@@ -283,9 +283,13 @@ final class Engine: ObservableObject {
     @Published private(set) var importProgress: Double?
 
     // 2FA bridge: the FFI callback blocks on this semaphore until the UI answers.
-    @Published var pendingTwoFactor = false
+    /// What the two-factor sheet shows; nil while no sign-in is asking.
+    @Published private(set) var twoFactor: TwoFactorPhase?
     private let twoFactorSem = DispatchSemaphore(value: 0)
-    private var twoFactorResult: String?
+    /// Guards the answer handed from the main thread to the waiting Rust worker.
+    private let twoFactorLock = NSLock()
+    private var twoFactorAnswer: TwoFactorAnswer?
+    private var awaitingTwoFactor = false
     /// Set when the user cancels the 2FA prompt, so sign-in stops re-prompting.
     var twoFactorWasCancelled = false
 
@@ -706,6 +710,7 @@ final class Engine: ObservableObject {
         let id = normalizedAppleID, pw = applePassword, dir = storageDir
         twoFactorWasCancelled = false
         var lastError = "no anisette servers configured"
+        var appleRefusals = 0
 
         for (idx, ani) in servers.enumerated() {
             try Task.checkCancellation()
@@ -741,6 +746,16 @@ final class Engine: ObservableObject {
                     throw EngineError.message(Self.credentialErrorMessage)
                 }
                 log("Anisette \(name) failed: \(lastError)")
+                // Apple refusing the request looks the same through every
+                // anisette server, so a second refusal ends the loop.
+                if Self.isAppleServiceRefusal(lastError) {
+                    appleRefusals += 1
+                    if appleRefusals >= 2 {
+                        signInStatus = "sign-in failed"
+                        log("Apple's sign-in server refused \(appleRefusals) attempts with HTTP 503 — not trying more anisette servers.")
+                        throw EngineError.message(Self.appleServiceRefusalMessage)
+                    }
+                }
                 if idx < servers.count - 1 { log("Trying the next anisette server…") }
             }
         }
@@ -754,6 +769,7 @@ final class Engine: ObservableObject {
 
     /// One sign-in attempt against a specific anisette server.
     private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {
+        defer { endTwoFactor() }
         log("Apple ID sign-in for \(Self.oneLine(id)) via anisette \(Self.oneLine(ani)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
@@ -833,6 +849,19 @@ final class Engine: ObservableObject {
             || m.contains("incorrect apple id")
             || m.contains("correct password")
             || (m.contains("password") && m.contains("incorrect"))
+    }
+
+    /// What the user sees when Apple's sign-in server refuses the request itself.
+    static var appleServiceRefusalMessage: String {
+        L("Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.")
+    }
+
+    /// Detect GSA answering HTTP 503. Apple's edge sends it before looking at the
+    /// anisette data — since September 2026 it's the reply to an Xcode client
+    /// info — so the next anisette server would be refused the same way.
+    static func isAppleServiceRefusal(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("gsa.apple.com") && m.contains("503")
     }
 
     // MARK: Step 5 — download SideStore
@@ -1964,18 +1993,31 @@ final class Engine: ObservableObject {
 
     // MARK: 2FA bridge
 
-    /// Called from a Rust worker thread; blocks until the UI submits/cancels.
-    func provideTwoFactorCode(_ outBuf: UnsafeMutablePointer<CChar>, _ len: Int) -> Int32 {
+    /// Called from a Rust worker thread with isideload's request as JSON; blocks
+    /// until the sheet answers. Writes the JSON answer into `outBuf` and returns
+    /// 1, or returns 0 to cancel.
+    func answerTwoFactor(request: UnsafePointer<CChar>?, outBuf: UnsafeMutablePointer<CChar>?, len: Int) -> Int32 {
+        guard let outBuf, len > 1 else { return 0 }
+        let prompt = request.flatMap { TwoFactorPrompt(json: String(cString: $0)) } ?? .deviceOnly
+        twoFactorLock.lock()
+        twoFactorAnswer = nil
+        awaitingTwoFactor = true
+        twoFactorLock.unlock()
         setMain {
-            self.pendingTwoFactor = true
-            self.log("2FA required — enter the code from your trusted device.")
+            // A cancel can land between the lock above and this block running.
+            self.twoFactorLock.lock()
+            let stillWaiting = self.awaitingTwoFactor
+            self.twoFactorLock.unlock()
+            guard stillWaiting else { return }
+            self.twoFactor = .asking(prompt)
+            self.log(prompt.logLine)
         }
         twoFactorSem.wait()
-        let code = twoFactorResult
-        twoFactorResult = nil
-        setMain { self.pendingTwoFactor = false }
-        guard let code, !code.isEmpty, len > 1 else { return 0 }
-        let bytes = Array(code.utf8.prefix(len - 1))
+        twoFactorLock.lock()
+        let answer = twoFactorAnswer
+        twoFactorAnswer = nil
+        twoFactorLock.unlock()
+        guard let bytes = answer?.json.map({ Array($0.utf8) }), bytes.count < len else { return 0 }
         outBuf.withMemoryRebound(to: UInt8.self, capacity: len) { dst in
             for (i, b) in bytes.enumerated() { dst[i] = b }
             dst[bytes.count] = 0
@@ -1983,18 +2025,44 @@ final class Engine: ObservableObject {
         return 1
     }
 
-    func submitTwoFactor(_ code: String) {
+    /// Hand the sheet's choice to the waiting sign-in. The sheet stays up showing
+    /// progress until the next prompt arrives or the sign-in returns.
+    func answerTwoFactor(_ answer: TwoFactorAnswer) {
+        twoFactorLock.lock()
+        guard awaitingTwoFactor else {
+            twoFactorLock.unlock()
+            return
+        }
+        awaitingTwoFactor = false
+        twoFactorAnswer = answer
+        twoFactorLock.unlock()
         twoFactorWasCancelled = false
-        twoFactorResult = code
+        if case .asking(let prompt) = twoFactor { twoFactor = .working(prompt, answer) }
+        log(answer.logLine)
         twoFactorSem.signal()
     }
 
+    /// Close the sheet. While Apple waits on the user this cancels the sign-in;
+    /// mid-request it only hides, and a further prompt brings it back.
     func cancelTwoFactor() {
+        // Already closed because the sign-in returned: nothing to cancel.
+        guard twoFactor != nil else { return }
+        twoFactor = nil
+        twoFactorLock.lock()
+        let waiting = awaitingTwoFactor
+        awaitingTwoFactor = false
+        twoFactorAnswer = nil
+        twoFactorLock.unlock()
+        guard waiting else { return }
         twoFactorWasCancelled = true
-        twoFactorResult = nil
         twoFactorSem.signal()
     }
 
+    /// Close the sheet once a sign-in attempt returns, however it went. Safe from
+    /// any thread.
+    func endTwoFactor() {
+        setMain { self.twoFactor = nil }
+    }
     // MARK: - Storage
 
     /// isideload's storage, kept out of the file-sharing-visible Documents.
@@ -2229,7 +2297,116 @@ private let siLogCallback: SILogCallback = { _, msg in
 }
 
 /// Bridges isideload's 2FA request to the engine's blocking prompt.
-private let twoFactorCallback: SITwoFactorCb = { _, outBuf, bufLen in
-    guard let outBuf = outBuf else { return 0 }
-    return Engine.shared.provideTwoFactorCode(outBuf, Int(bufLen))
+private let twoFactorCallback: SITwoFactorCb = { _, request, outBuf, bufLen in
+    Engine.shared.answerTwoFactor(request: request, outBuf: outBuf, len: Int(bufLen))
+}
+
+// MARK: - Two-factor prompt
+
+/// What a sign-in is waiting for, decoded from the request Rust hands the 2FA
+/// callback. `SITwoFactorCb` in sideinstaller.h documents the JSON.
+struct TwoFactorPrompt: Decodable, Equatable {
+    enum Method: String, Decodable {
+        /// A code went to the account's trusted Apple devices.
+        case device
+        /// A code was texted to the selected number.
+        case sms
+        /// Apple is calling the selected number to read a code out.
+        case voice
+        /// The last method failed and nothing is pending, so the user picks one.
+        case choose
+    }
+
+    struct Number: Decodable, Equatable, Identifiable {
+        let id: UInt32
+        /// Masked by Apple, as in "+39 ••• ••• ••89".
+        let number: String
+        /// "sms" or "voice", or empty when Apple doesn't say. A voice-only
+        /// number, such as a landline, can't take a text.
+        let pushMode: String
+
+        var takesTexts: Bool { pushMode != "voice" }
+    }
+
+    let method: Method
+    let selectedNumberId: UInt32?
+    let lastError: String?
+    let numbers: [Number]
+
+    /// For a request that can't be read: the one prompt that always makes sense.
+    static let deviceOnly = TwoFactorPrompt(method: .device, selectedNumberId: nil, lastError: nil, numbers: [])
+
+    var selectedNumber: Number? { numbers.first { $0.id == selectedNumberId } }
+
+    /// Whether a code is on its way, so the sheet should ask for it.
+    var expectsCode: Bool { method != .choose }
+
+    var logLine: String {
+        let what = switch method {
+        case .device: "2FA required — a code was sent to your trusted devices."
+        case .sms:    "2FA: a code was texted to \(selectedNumber?.number ?? "your phone")."
+        case .voice:  "2FA: Apple is calling \(selectedNumber?.number ?? "your phone") with a code."
+        case .choose: "2FA: that method didn't work — choose another."
+        }
+        return lastError.map { "\(what) Apple said: \($0)" } ?? what
+    }
+}
+
+extension TwoFactorPrompt {
+    init?(json: String) {
+        guard let prompt = try? JSONDecoder().decode(TwoFactorPrompt.self, from: Data(json.utf8)) else {
+            return nil
+        }
+        self = prompt
+    }
+}
+
+/// The sheet's reply, encoded as the JSON Rust's `TwoFactorAnswer` reads.
+enum TwoFactorAnswer: Equatable {
+    case code(String)
+    case sms(UInt32)
+    case voice(UInt32)
+    case devices
+    case resend
+
+    var json: String? {
+        struct Wire: Encodable {
+            let action: String
+            var code: String?
+            var id: UInt32?
+        }
+        let wire = switch self {
+        case .code(let code): Wire(action: "code", code: code)
+        case .sms(let id):    Wire(action: "sms", id: id)
+        case .voice(let id):  Wire(action: "voice", id: id)
+        case .devices:        Wire(action: "devices")
+        case .resend:         Wire(action: "resend")
+        }
+        return (try? JSONEncoder().encode(wire)).flatMap { String(data: $0, encoding: .utf8) }
+    }
+
+    /// For the console, which must never carry the code itself.
+    var logLine: String {
+        switch self {
+        case .code:    "2FA: checking the code…"
+        case .sms:     "2FA: asking Apple to text a code…"
+        case .voice:   "2FA: asking Apple to call with a code…"
+        case .devices: "2FA: asking Apple to send a code to your devices…"
+        case .resend:  "2FA: asking Apple for a new code…"
+        }
+    }
+}
+
+/// The two-factor sheet's state.
+enum TwoFactorPhase: Equatable {
+    /// Apple is waiting on the user.
+    case asking(TwoFactorPrompt)
+    /// The user answered and the sign-in is acting on it.
+    case working(TwoFactorPrompt, TwoFactorAnswer)
+
+    var prompt: TwoFactorPrompt {
+        switch self {
+        case .asking(let prompt), .working(let prompt, _): prompt
+        }
+    }
 }

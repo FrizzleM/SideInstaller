@@ -3,7 +3,7 @@ import SwiftUI
 /// The tab container for Install and Tools. Each page paints `AppBackground`
 /// itself, since a `TabView`'s opaque containers would hide one behind them,
 /// and they stay in sync because it animates off the wall clock.
-/// The 2FA alert lives here so it presents whichever tab is active.
+/// The 2FA sheet lives here so it presents whichever tab is active.
 struct RootView: View {
     /// The tabs in the order they appear, each with the backdrop it wears. The
     /// selection is tracked only so a switch can hand `Backdrop` the level to
@@ -34,7 +34,9 @@ struct RootView: View {
     @StateObject private var entitlementsManager = EntitlementsManager()
     @StateObject private var appsManager = SideloadedAppsManager()
     @StateObject private var sideBySideManager = SideBySideManager()
-    @State private var twoFactorCode = ""
+    /// The last two-factor prompt shown, so the sheet keeps its content while it
+    /// slides away after the sign-in clears it.
+    @State private var shownTwoFactor: TwoFactorPhase?
     @State private var page: Page = .install
 
     var body: some View {
@@ -72,13 +74,159 @@ struct RootView: View {
         }
         .tint(Theme.accent)
         .preferredColorScheme(.dark)
-        .alert(L("Two-Factor Code"), isPresented: $engine.pendingTwoFactor) {
-            TextField(L("6-digit code"), text: $twoFactorCode)
-                .keyboardType(.numberPad)
-            Button(L("Submit")) { engine.submitTwoFactor(twoFactorCode); twoFactorCode = "" }
-            Button(L("Cancel"), role: .cancel) { engine.cancelTwoFactor(); twoFactorCode = "" }
-        } message: {
-            Text(L("Enter the code Apple just sent to your trusted device."))
+        // A swipe down is a cancel; the sign-in closing it is not.
+        .sheet(isPresented: Binding(
+            get: { engine.twoFactor != nil },
+            set: { if !$0 { engine.cancelTwoFactor() } }
+        )) {
+            if let phase = engine.twoFactor ?? shownTwoFactor {
+                TwoFactorSheet(phase: phase)
+            }
+        }
+        .onChange(of: engine.twoFactor) { _, phase in
+            if let phase { shownTwoFactor = phase }
+        }    }
+}
+
+// MARK: - Two-factor sheet
+
+/// Two-factor sign-in: the code Apple sent, and every other way to get one — the
+/// trusted devices again, or a text or a call to any trusted number. It stays up
+/// through a wrong code or a resend; the sign-in closes it when it returns.
+struct TwoFactorSheet: View {
+    @EnvironmentObject private var engine: Engine
+    /// Declared so every label redraws when the language changes.
+    @EnvironmentObject private var loc: Localizer
+
+    let phase: TwoFactorPhase
+
+    @State private var code = ""
+    @FocusState private var codeFocused: Bool
+
+    private var prompt: TwoFactorPrompt { phase.prompt }
+
+    /// The answer the sign-in is acting on, while it does.
+    private var pending: TwoFactorAnswer? {
+        if case .working(_, let answer) = phase { answer } else { nil }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let error = prompt.lastError {
+                    Section {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
+                }
+                Section {
+                    Text(instructions)
+                        .foregroundStyle(.secondary)
+                    if prompt.expectsCode {
+                        TextField(L("6-digit code"), text: $code)
+                            .keyboardType(.numberPad)
+                            // Lets a texted code fill itself in from Messages.
+                            .textContentType(.oneTimeCode)
+                            .font(.title2.monospacedDigit())
+                            .focused($codeFocused)
+                            .disabled(pending != nil)
+                            .onChange(of: code) { _, typed in
+                                let digits = String(typed.filter(\.isNumber).prefix(6))
+                                if digits != typed { code = digits }
+                            }
+                    }
+                    if let pending {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text(status(for: pending))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Section {
+                    options
+                } header: {
+                    if prompt.expectsCode { Text(L("Didn't get it?")) }
+                }
+                .disabled(pending != nil)
+            }
+            .navigationTitle(prompt.expectsCode ? L("Two-Factor Code") : L("Choose How to Get a Code"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(L("Cancel")) { engine.cancelTwoFactor() }
+                }
+                if prompt.expectsCode {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(L("Verify")) { engine.answerTwoFactor(.code(code)) }
+                            .disabled(pending != nil || code.count != 6)
+                    }
+                }
+            }
+        }
+        .onAppear { codeFocused = prompt.expectsCode }
+        .onChange(of: phase) { _, phase in
+            // A fresh prompt — after a wrong code, or with a new code on its way —
+            // starts from an empty field.
+            guard case .asking(let prompt) = phase else { return }
+            code = ""
+            codeFocused = prompt.expectsCode
+        }
+    }
+
+    /// Every other route to a code, leaving out the one already in use.
+    @ViewBuilder
+    private var options: some View {
+        switch prompt.method {
+        case .device: option(L("Send a new code to my devices"), "arrow.clockwise", .resend)
+        case .sms:    option(L("Text me a new code"), "arrow.clockwise", .resend)
+        case .voice:  option(L("Call me again"), "arrow.clockwise", .resend)
+        case .choose: EmptyView()
+        }
+        if prompt.method != .device {
+            option(L("Send a code to my Apple devices"), "laptopcomputer.and.iphone", .devices)
+        }
+        // Enumerated, so a language switch relabels every row.
+        ForEach(Array(prompt.numbers.enumerated()), id: \.element.id) { _, number in
+            let inUse = number.id == prompt.selectedNumberId
+            if number.takesTexts && !(inUse && prompt.method == .sms) {
+                option(L("Text %@", number.number), "message", .sms(number.id))
+            }
+            if !(inUse && prompt.method == .voice) {
+                option(L("Call %@", number.number), "phone", .voice(number.id))
+            }
+        }
+    }
+
+    private func option(_ title: String, _ systemImage: String, _ answer: TwoFactorAnswer) -> some View {
+        Button { engine.answerTwoFactor(answer) } label: {
+            Label(title, systemImage: systemImage)
+        }
+    }
+
+    private var instructions: String {
+        switch prompt.method {
+        case .device:
+            L("Enter the code Apple just sent to your trusted device.")
+        case .sms:
+            prompt.selectedNumber.map { L("Enter the code Apple texted to %@.", $0.number) }
+                ?? L("Enter the code Apple texted to your phone.")
+        case .voice:
+            prompt.selectedNumber.map { L("Apple is calling %@. Enter the code you hear.", $0.number) }
+                ?? L("Apple is calling your phone. Enter the code you hear.")
+        case .choose:
+            L("Choose how Apple should send your verification code.")
+        }
+    }
+
+    private func status(for answer: TwoFactorAnswer) -> String {
+        let number = { (id: UInt32) in prompt.numbers.first { $0.id == id }?.number ?? "" }
+        return switch answer {
+        case .code:          L("Checking the code…")
+        case .resend:        L("Requesting a new code…")
+        case .devices:       L("Sending a code to your devices…")
+        case .sms(let id):   L("Texting a code to %@…", number(id))
+        case .voice(let id): L("Calling %@…", number(id))
         }
     }
 }

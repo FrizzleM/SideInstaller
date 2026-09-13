@@ -104,7 +104,7 @@ impl AnisetteData {
 pub trait AnisetteProvider {
     async fn get_anisette_data(&self) -> Result<AnisetteData, Report>;
 
-    async fn get_client_info(&mut self) -> Result<AnisetteClientInfo, Report>;
+    async fn get_client_info(&self) -> Result<AnisetteClientInfo, Report>;
 
     async fn provision(&mut self, gs: Arc<GrandSlam>) -> Result<(), Report>;
 
@@ -158,7 +158,7 @@ impl AnisetteDataGenerator {
     }
 
     pub async fn get_client_info(&self) -> Result<AnisetteClientInfo, Report> {
-        let mut provider = self.provider.write().await;
+        let provider = self.provider.read().await;
         provider.get_client_info().await
     }
 }

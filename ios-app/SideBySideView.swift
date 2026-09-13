@@ -376,6 +376,7 @@ final class SideBySideManager: ObservableObject {
         let dir = PrivateStore.isideload.path
         engine.twoFactorWasCancelled = false
         var lastFailure = "no anisette servers configured"
+        var appleRefusals = 0
 
         for (index, anisette) in servers.enumerated() {
             try Task.checkCancellation()
@@ -400,6 +401,14 @@ final class SideBySideManager: ObservableObject {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
                 engine.log("Side by Side: anisette \(index + 1)/\(servers.count) failed: \(lastFailure)")
+                // Apple refusing the request fails the same on every server.
+                if Engine.isAppleServiceRefusal(lastFailure) {
+                    appleRefusals += 1
+                    if appleRefusals >= 2 {
+                        engine.log("Side by Side: Apple's sign-in server refused \(appleRefusals) attempts with HTTP 503 — stopping.")
+                        throw EngineError.message(Engine.appleServiceRefusalMessage)
+                    }
+                }
             }
         }
         let tried = servers.count == 1
@@ -412,6 +421,7 @@ final class SideBySideManager: ObservableObject {
     /// is `SideInstaller` here as everywhere else, or the certificate this
     /// account already has wouldn't be recognised as reusable.
     private func performSignIn(id: String, pw: String, anisette: String, dir: String) throws -> String {
+        defer { engine.endTwoFactor() }
         engine.log("Apple ID sign-in for \(Engine.oneLine(id)) via anisette \(Engine.oneLine(anisette)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
@@ -620,9 +630,8 @@ final class SideBySideManager: ObservableObject {
 
 /// Bridges a 2FA request during a Side by Side sign-in to the engine's shared
 /// prompt, which `RootView` presents over whichever tab is showing.
-private let sideBySideTwoFactorCallback: SITwoFactorCb = { _, outBuf, bufLen in
-    guard let outBuf = outBuf else { return 0 }
-    return Engine.shared.provideTwoFactorCode(outBuf, Int(bufLen))
+private let sideBySideTwoFactorCallback: SITwoFactorCb = { _, request, outBuf, bufLen in
+    Engine.shared.answerTwoFactor(request: request, outBuf: outBuf, len: Int(bufLen))
 }
 
 // MARK: - View

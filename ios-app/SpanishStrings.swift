@@ -79,6 +79,44 @@ let spanishStrings: [String: String] = [
     "Submit": "Enviar",
     "Enter the code Apple just sent to your trusted device.":
         "Introduce el código que Apple acaba de enviar a tu dispositivo de confianza.",
+    "Enter the code Apple texted to %@.":
+        "Introduce el código que Apple ha enviado por SMS al %@.",
+    "Enter the code Apple texted to your phone.":
+        "Introduce el código que Apple ha enviado por SMS a tu teléfono.",
+    "Apple is calling %@. Enter the code you hear.":
+        "Apple está llamando al %@. Introduce el código que oigas.",
+    "Apple is calling your phone. Enter the code you hear.":
+        "Apple está llamando a tu teléfono. Introduce el código que oigas.",
+    "Choose how Apple should send your verification code.":
+        "Elige cómo quieres que Apple te envíe el código de verificación.",
+    "Choose How to Get a Code":
+        "Elige cómo recibir el código",
+    "Verify":
+        "Verificar",
+    "Didn't get it?":
+        "¿No lo has recibido?",
+    "Send a new code to my devices":
+        "Enviar un código nuevo a mis dispositivos",
+    "Text me a new code":
+        "Enviarme un código nuevo por SMS",
+    "Call me again":
+        "Volver a llamarme",
+    "Send a code to my Apple devices":
+        "Enviar un código a mis dispositivos Apple",
+    "Text %@":
+        "SMS al %@",
+    "Call %@":
+        "Llamar al %@",
+    "Checking the code…":
+        "Comprobando el código…",
+    "Requesting a new code…":
+        "Solicitando un código nuevo…",
+    "Sending a code to your devices…":
+        "Enviando un código a tus dispositivos…",
+    "Texting a code to %@…":
+        "Enviando un código por SMS al %@…",
+    "Calling %@…":
+        "Llamando al %@…",
 
     // MARK: - Install tab
 
@@ -451,6 +489,8 @@ let spanishStrings: [String: String] = [
         "Apple ID o contraseña incorrectos. Comprueba el correo y la contraseña de tu Apple Account y vuelve a intentarlo.",
     "Apple ID sign-in failed on %@. Last error: %@":
         "No se ha podido iniciar sesión con el Apple ID en %@. Último error: %@",
+    "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
+        "El servidor de inicio de sesión de Apple ha rechazado la solicitud (HTTP 503). No es tu contraseña ni el servidor anisette, así que probar más servidores no servirá de nada. Vuelve a intentarlo más tarde o actualiza SideInstaller.",
     "the anisette server": "el servidor anisette",
     "all %d anisette servers": "los %d servidores anisette",
     "Not signed in.": "No has iniciado sesión.",

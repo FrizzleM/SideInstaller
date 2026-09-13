@@ -4128,6 +4128,7 @@ dependencies = [
  "idevice-ffi",
  "isideload",
  "plist",
+ "rootcause",
  "serde",
  "serde_json",
  "tokio",

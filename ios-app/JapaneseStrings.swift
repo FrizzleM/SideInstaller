@@ -76,6 +76,44 @@ let japaneseStrings: [String: String] = [
     "Submit": "送信",
     "Enter the code Apple just sent to your trusted device.":
         "信頼できるデバイスに Apple から送信されたコードを入力してください。",
+    "Enter the code Apple texted to %@.":
+        "Apple が SMS で %@ に送信したコードを入力してください。",
+    "Enter the code Apple texted to your phone.":
+        "Apple が SMS でお使いの電話に送信したコードを入力してください。",
+    "Apple is calling %@. Enter the code you hear.":
+        "Apple が %@ に電話をかけています。聞こえたコードを入力してください。",
+    "Apple is calling your phone. Enter the code you hear.":
+        "Apple がお使いの電話に電話をかけています。聞こえたコードを入力してください。",
+    "Choose how Apple should send your verification code.":
+        "Apple から確認コードを受け取る方法を選んでください。",
+    "Choose How to Get a Code":
+        "コードの受け取り方法",
+    "Verify":
+        "確認",
+    "Didn't get it?":
+        "届きませんか？",
+    "Send a new code to my devices":
+        "デバイスに新しいコードを送信",
+    "Text me a new code":
+        "SMS で新しいコードを受け取る",
+    "Call me again":
+        "もう一度電話を受ける",
+    "Send a code to my Apple devices":
+        "Apple デバイスにコードを送信",
+    "Text %@":
+        "%@ に SMS を送信",
+    "Call %@":
+        "%@ に電話",
+    "Checking the code…":
+        "コードを確認しています…",
+    "Requesting a new code…":
+        "新しいコードをリクエストしています…",
+    "Sending a code to your devices…":
+        "デバイスにコードを送信しています…",
+    "Texting a code to %@…":
+        "%@ に SMS でコードを送信しています…",
+    "Calling %@…":
+        "%@ に電話をかけています…",
 
     // MARK: - Install tab
 
@@ -381,6 +419,8 @@ let japaneseStrings: [String: String] = [
         "Apple ID またはパスワードが正しくありません。Apple アカウントのメールアドレスとパスワードを確認してから、再度お試しください。",
     "Apple ID sign-in failed on %@. Last error: %@":
         "%@ での Apple ID サインインに失敗しました。直近のエラー：%@",
+    "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
+        "Apple のサインインサーバーがリクエストを拒否しました（HTTP 503）。パスワードや anisette サーバーの問題ではないため、別のサーバーを試しても解決しません。しばらくしてから再度お試しいただくか、SideInstaller をアップデートしてください。",
     "the anisette server": "anisette サーバー",
     "all %d anisette servers": "%d 個すべての anisette サーバー",
     "Not signed in.": "サインインしていません。",

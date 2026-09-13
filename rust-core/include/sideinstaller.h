@@ -89,9 +89,20 @@ void si_pairing_result_free(SIPairResult *r);
 // Opaque sign-session handle.
 typedef struct SignSession SignSession;
 
-// Invoked when a 2FA code is required: write a NUL-terminated code into
-// `out_buf` (capacity `buf_len`) and return 1, or return 0 to cancel.
-typedef int32_t (*SITwoFactorCb)(void *ctx, char *out_buf, size_t buf_len);
+// Invoked whenever Apple is waiting on the user during sign-in. `request_json`
+// says for what:
+//   {"method": "device" | "sms" | "voice" | "choose",
+//    "selectedNumberId": 3 | null, "lastError": "…" | null,
+//    "numbers": [{"id": 3, "number": "+39 ••• ••• ••89", "pushMode": "sms"}]}
+// "device"/"sms"/"voice" name where the pending code went (the number is
+// selectedNumberId); "choose" means the last method failed and nothing is
+// pending. Write a NUL-terminated JSON answer into `out_buf` (capacity
+// `buf_len`) and return 1:
+//   {"action": "code", "code": "123456"} | {"action": "sms", "id": 3} |
+//   {"action": "voice", "id": 3} | {"action": "devices"} | {"action": "resend"}
+// or return 0 to cancel the sign-in.
+typedef int32_t (*SITwoFactorCb)(void *ctx, const char *request_json,
+                                 char *out_buf, size_t buf_len);
 
 // Log in + open developer session + build the signer. BLOCKS — call off the
 // main thread. Returns 0 on success (*out_session + *out_summary set), non-zero

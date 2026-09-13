@@ -30,7 +30,6 @@ pub struct RemoteV3AnisetteProvider {
     url: String,
     storage: Box<dyn SideloadingStorage>,
     serial_number: String,
-    client_info: Option<AnisetteClientInfo>,
     client: reqwest::Client,
 }
 
@@ -51,7 +50,6 @@ impl RemoteV3AnisetteProvider {
             url: url.to_string(),
             storage,
             serial_number,
-            client_info: None,
             client: reqwest::ClientBuilder::new()
                 .build()
                 .context("Failed to build HTTP client")?,
@@ -93,10 +91,7 @@ impl AnisetteProvider for RemoteV3AnisetteProvider {
             .adi_pb
             .as_ref()
             .ok_or(SideloadError::AnisetteNotProvisioned)?;
-        let client_info = self
-            .client_info
-            .as_ref()
-            .ok_or(SideloadError::AnisetteNotProvisioned)?;
+        let client_info = self.get_client_info().await?;
 
         let headers = self
             .client
@@ -139,35 +134,26 @@ impl AnisetteProvider for RemoteV3AnisetteProvider {
         }
     }
 
-    async fn get_client_info(&mut self) -> Result<AnisetteClientInfo, Report> {
-        match self.client_info {
-            Some(ref info) => Ok(info.clone()),
-            None => {
-                let resp = self
-                    .client
-                    .get(format!("{}/v3/client_info", self.url))
-                    .send()
-                    .await?
-                    .error_for_status()?
-                    .json::<AnisetteClientInfo>()
-                    .await?;
-
-                self.client_info = Some(resp.clone());
-                Ok(resp)
-            }
-        }
+    /// Hardcoded, not fetched from the server's `/v3/client_info`: public anisette
+    /// servers still answer with a `com.apple.dt.Xcode` client, and since
+    /// September 2026 Apple's GSA edge returns HTTP 503 to any request carrying
+    /// one. Reporting akd matches upstream a19f5f0, AltStore #1790 and SideSign.
+    async fn get_client_info(&self) -> Result<AnisetteClientInfo, Report> {
+        Ok(AnisetteClientInfo {
+            client_info: "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>".to_string(),
+            user_agent: "akd/1.0 CFNetwork/808.1.4".to_string(),
+        })
     }
 
     fn needs_provisioning(&self) -> Result<bool, Report> {
         if let Some(state) = &self.state {
-            Ok(!state.is_provisioned() || self.client_info.is_none())
+            Ok(!state.is_provisioned())
         } else {
             Ok(true)
         }
     }
 
     async fn provision(&mut self, gs: Arc<GrandSlam>) -> Result<(), Report> {
-        self.get_client_info().await?;
         self.get_state(gs).await?;
         Ok(())
     }
