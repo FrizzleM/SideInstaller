@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import SideInstallerFFI
 
 /// One saved Apple ID. Only the email is kept in the struct: the password lives
 /// in the keychain filed under `id`, so it never reaches a plist or an
@@ -106,6 +107,11 @@ final class AccountStore: ObservableObject {
 
         let account: SavedAccount
         if let target, let idx = accounts.firstIndex(where: { $0.id == target.id }) {
+            // A new password or address retires the Apple session saved for the
+            // old one; re-entering the same pair keeps it.
+            if password != self.password(for: target) || email != target.normalized {
+                Self.forgetAppleSession(for: target.normalized)
+            }
             accounts[idx].appleID = email
             account = accounts[idx]
         } else {
@@ -125,6 +131,7 @@ final class AccountStore: ObservableObject {
         accounts.removeAll { $0.id == account.id }
         volatilePasswords[account.id] = nil
         Self.keychainDelete(account.id)
+        Self.forgetAppleSession(for: account.normalized)
         if activeID == account.id {
             activeID = accounts.first?.id
             revision += 1
@@ -138,6 +145,12 @@ final class AccountStore: ObservableObject {
         activeID = account.id
         persist()
         revision += 1
+    }
+
+    /// Delete the developer session the Rust core saved for `appleID`, so its
+    /// next sign-in logs in to Apple again instead of reusing the token.
+    private static func forgetAppleSession(for appleID: String) {
+        _ = si_forget_apple_session(PrivateStore.isideload.path, appleID)
     }
 
     // MARK: - Persistence

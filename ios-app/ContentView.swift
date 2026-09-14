@@ -683,7 +683,11 @@ struct ContentView: View {
         }
         // Fixed, so the card doesn't breathe as one row replaces another.
         .frame(height: 46)
+        // Clip only vertically (for the push transition); the active node's
+        // halo grows past the row's leading edge and must not be cut.
+        .padding(.horizontal, 10)
         .clipped()
+        .padding(.horizontal, -10)
         .contentShape(Rectangle())
         .onTapGesture { stepsExpanded = true }
         .animation(.smooth(duration: 0.35), value: step)

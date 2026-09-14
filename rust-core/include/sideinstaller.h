@@ -104,15 +104,20 @@ typedef struct SignSession SignSession;
 typedef int32_t (*SITwoFactorCb)(void *ctx, const char *request_json,
                                  char *out_buf, size_t buf_len);
 
-// Log in + open developer session + build the signer. BLOCKS — call off the
-// main thread. Returns 0 on success (*out_session + *out_summary set), non-zero
-// on error (*out_error set). Free strings with si_string_free, the session with
-// si_sign_session_free.
+// Open a developer session + build the signer. BLOCKS — call off the main
+// thread. With `remember_session` non-zero, the developer session an earlier
+// sign-in of this Apple ID saved in `storage_dir` is reused while Apple still
+// accepts it — no password, no 2FA, no GrandSlam sign-in — and a fresh
+// sign-in's session is saved. Pass 0 for an Apple ID that isn't this iPhone
+// owner's (Side by Side): nothing is read or kept. Returns 0 on success
+// (*out_session + *out_summary set), non-zero on error (*out_error set). Free
+// strings with si_string_free, the session with si_sign_session_free.
 int32_t si_apple_signin(const char *apple_id,
                         const char *password,
                         const char *anisette_url,
                         const char *machine_name,
                         const char *storage_dir,
+                        int32_t remember_session,
                         SITwoFactorCb twofa_cb,
                         void *ctx,
                         SignSession **out_session,
@@ -147,6 +152,11 @@ int32_t si_account_config(SignSession *session,
 
 // Free a sign session.
 void si_sign_session_free(SignSession *session);
+
+// Forget the developer session saved for `apple_id` in `storage_dir`, so its
+// next sign-in logs in to Apple again. Call when the account is removed or its
+// password changes. Returns 1 if one was saved, 0 otherwise.
+int32_t si_forget_apple_session(const char *storage_dir, const char *apple_id);
 
 // ---------------------------------------------------------------------------
 // Certificate management — list + revoke iOS development certificates

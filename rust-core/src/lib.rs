@@ -8,6 +8,7 @@
 extern crate idevice_ffi as _;
 
 mod account;
+mod apple_session;
 mod certs;
 mod entitlements;
 mod ffi_util;
@@ -100,8 +101,10 @@ pub unsafe extern "C" fn si_pairing_result_free(r: *mut PairResult) {
 // Account — Apple ID sign-in and signing
 // ---------------------------------------------------------------------------
 
-/// Log in, open a developer session, and build a signer. Blocks; `twofa_cb`
-/// is invoked when a 2FA code is needed.
+/// Open a developer session and build a signer. Blocks; `twofa_cb` is invoked
+/// when a 2FA code is needed. With `remember_session` non-zero, a developer
+/// session saved by an earlier sign-in is reused while Apple accepts it, and a
+/// fresh sign-in's is saved; see `apple_session`.
 ///
 /// # Safety
 /// See `account::apple_signin`.
@@ -113,6 +116,7 @@ pub unsafe extern "C" fn si_apple_signin(
     anisette_url: *const c_char,
     machine_name: *const c_char,
     storage_dir: *const c_char,
+    remember_session: i32,
     twofa_cb: TwoFactorCb,
     ctx: *mut c_void,
     out_session: *mut *mut SignSession,
@@ -120,8 +124,8 @@ pub unsafe extern "C" fn si_apple_signin(
     out_error: *mut *mut c_char,
 ) -> i32 {
     account::apple_signin(
-        apple_id, password, anisette_url, machine_name, storage_dir, twofa_cb, ctx,
-        out_session, out_summary, out_error,
+        apple_id, password, anisette_url, machine_name, storage_dir, remember_session, twofa_cb,
+        ctx, out_session, out_summary, out_error,
     )
 }
 
@@ -163,6 +167,22 @@ pub unsafe extern "C" fn si_account_config(
 #[no_mangle]
 pub unsafe extern "C" fn si_sign_session_free(session: *mut SignSession) {
     account::sign_session_free(session)
+}
+
+/// Forget the developer session saved for `apple_id`, so its next sign-in logs
+/// in to Apple again. Returns 1 if one was saved, 0 otherwise.
+///
+/// # Safety
+/// Both arguments must be null or valid C strings.
+#[no_mangle]
+pub unsafe extern "C" fn si_forget_apple_session(
+    storage_dir: *const c_char,
+    apple_id: *const c_char,
+) -> i32 {
+    match (ffi_util::req_str(storage_dir), ffi_util::req_str(apple_id)) {
+        (Some(dir), Some(id)) => apple_session::forget(std::path::Path::new(&dir), &id) as i32,
+        _ => 0,
+    }
 }
 
 // ---------------------------------------------------------------------------

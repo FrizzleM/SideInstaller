@@ -401,6 +401,10 @@ final class SideBySideManager: ObservableObject {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
                 engine.log("Side by Side: anisette \(index + 1)/\(servers.count) failed: \(lastFailure)")
+                if Engine.isAppleRateLimit(lastFailure) {
+                    engine.log("Side by Side: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
+                    throw EngineError.message(Engine.appleRateLimitMessage)
+                }
                 // Apple refusing the request fails the same on every server.
                 if Engine.isAppleServiceRefusal(lastFailure) {
                     appleRefusals += 1
@@ -426,7 +430,9 @@ final class SideBySideManager: ObservableObject {
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        let rc = si_apple_signin(id, pw, anisette, "SideInstaller", dir,
+        // 0: somebody else's Apple ID, whose developer token must not stay on
+        // this iPhone.
+        let rc = si_apple_signin(id, pw, anisette, "SideInstaller", dir, 0,
                                  sideBySideTwoFactorCallback, nil,
                                  &session, &summary, &error)
         if rc == 0 {

@@ -88,7 +88,17 @@ final class Engine: ObservableObject {
     /// Account. Views observe the store, so these need no `@Published`.
     var appleID: String { AccountStore.shared.activeAppleID }
     var applePassword: String { AccountStore.shared.activePassword }
-    @Published var anisetteURL: String = AnisetteServer.fallback.address
+    /// The anisette server in use, persisted so a relaunch keeps the user's pick
+    /// (or whichever server a sign-in last fell back to successfully).
+    @Published var anisetteURL: String =
+        UserDefaults.standard.string(forKey: Engine.anisetteURLKey) ?? AnisetteServer.fallback.address {
+        didSet {
+            guard anisetteURL != oldValue else { return }
+            UserDefaults.standard.set(anisetteURL, forKey: Engine.anisetteURLKey)
+        }
+    }
+
+    static let anisetteURLKey = "anisetteServerURL"
     /// Servers for the picker; a bundled snapshot until the live list loads.
     @Published private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
     /// "Start LocalDevVPN when SideInstaller opens". On unless it has been
@@ -746,6 +756,11 @@ final class Engine: ObservableObject {
                     throw EngineError.message(Self.credentialErrorMessage)
                 }
                 log("Anisette \(name) failed: \(lastError)")
+                if Self.isAppleRateLimit(lastError) {
+                    signInStatus = "sign-in failed"
+                    log("Apple is rate-limiting sign-in (HTTP 429) — not trying more anisette servers.")
+                    throw EngineError.message(Self.appleRateLimitMessage)
+                }
                 // Apple refusing the request looks the same through every
                 // anisette server, so a second refusal ends the loop.
                 if Self.isAppleServiceRefusal(lastError) {
@@ -774,7 +789,9 @@ final class Engine: ObservableObject {
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        let rc = si_apple_signin(id, pw, ani, "SideInstaller", dir,
+        // 1: the active account's developer session is saved and reused, so a
+        // repeat sign-in costs Apple nothing until the token expires.
+        let rc = si_apple_signin(id, pw, ani, "SideInstaller", dir, 1,
                                  twoFactorCallback, nil,
                                  &session, &summary, &error)
         if rc == 0 {
@@ -833,9 +850,27 @@ final class Engine: ObservableObject {
         "-22406",   // "Enter the correct password for this Apple Account."
     ]
 
-    /// What the user sees when Apple rejects the credentials.
+    /// What the user sees when Apple rejects the credentials. Apple also answers a
+    /// correct password with -22406 while it is throttling sign-ins — seen between
+    /// 429s on 2026-09-13, with the password that Install signs in with — hence the hint.
     static var credentialErrorMessage: String {
         L("Incorrect Apple ID or password. Check your Apple Account email and password, then try again.")
+            + " " + L("If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.")
+    }
+
+    /// What the user sees when Apple is throttling sign-ins.
+    static var appleRateLimitMessage: String {
+        L("Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.")
+    }
+
+    /// Detect Apple answering HTTP 429 — GrandSlam, or the developer portal a
+    /// saved session goes to first. Every anisette server presents the same
+    /// stored device identity from the same network, so trying the next one only
+    /// adds attempts to the limit: stop at the first. Anisette servers' own 429s
+    /// never name apple.com, so those still move on.
+    static func isAppleRateLimit(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("apple.com") && m.contains("429 too many requests")
     }
 
     /// Detect a credential failure, which no anisette server can fix.

@@ -4124,6 +4124,7 @@ name = "sideinstaller_ffi"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "hex",
  "idevice 0.1.63",
  "idevice-ffi",
  "isideload",
@@ -4131,6 +4132,7 @@ dependencies = [
  "rootcause",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "tokio",
  "tracing",
  "tracing-subscriber",

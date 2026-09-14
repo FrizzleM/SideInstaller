@@ -7,13 +7,13 @@
 
 use std::ffi::{c_char, c_void, CStr, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use isideload::{
-    anisette::remote_v3::{state::AnisetteState, RemoteV3AnisetteProvider},
-    auth::apple_account::{AppleAccount, TwoFactorCallbackParams, TwoFactorCallbackResponse},
-    dev::{developer_session::DeveloperSession, devices::DevicesApi},
+    anisette::remote_v3::state::AnisetteState,
+    auth::apple_account::{TwoFactorCallbackParams, TwoFactorCallbackResponse},
+    dev::devices::DevicesApi,
     sideload::{
         builder::MaxCertsBehavior, cert_identity::CertificateIdentity, sideloader::Sideloader,
         SideloaderBuilder, TeamSelection,
@@ -24,6 +24,7 @@ use isideload::{
 use rootcause::Report;
 use serde::{Deserialize, Serialize};
 
+use crate::apple_session;
 use crate::ffi_util::cstr;
 
 /// `int (*)(void *ctx, const char *request_json, char *out_buf, size_t buf_len)`.
@@ -198,6 +199,7 @@ pub unsafe fn apple_signin(
     anisette_url: *const c_char,
     machine_name: *const c_char,
     storage_dir: *const c_char,
+    remember_session: i32,
     twofa_cb: TwoFactorCb,
     ctx: *mut c_void,
     out_session: *mut *mut SignSession,
@@ -218,25 +220,16 @@ pub unsafe fn apple_signin(
             .map_err(|e| format!("failed to start runtime: {e}"))?;
 
         let sideloader = rt.block_on(async {
-            tracing::info!("Apple ID: building anisette provider ({anisette_url})");
-            let anisette = RemoteV3AnisetteProvider::new(
+            let (dev_session, _teams) = apple_session::open(
+                &apple_id,
+                &password,
                 &anisette_url,
-                Box::new(FsStorage::new(PathBuf::from(&storage_dir))),
-                "0".to_string(),
+                Path::new(&storage_dir),
+                remember_session != 0,
+                twofa,
+                "Apple ID",
             )
-            .map_err(|e| format!("anisette provider: {e}"))?;
-
-            tracing::info!("Apple ID: logging in {apple_id}");
-            let mut account = AppleAccount::builder(&apple_id)
-                .anisette_provider(anisette)
-                .login(&password, twofa)
-                .await
-                .map_err(|e| format!("login failed: {e}"))?;
-            tracing::info!("Apple ID: login OK; opening developer session");
-
-            let dev_session = DeveloperSession::from_account(&mut account)
-                .await
-                .map_err(|e| format!("developer session: {e}"))?;
+            .await?;
             tracing::info!("Developer session OK; building sideloader (first team)");
 
             let mut sideloader = SideloaderBuilder::new(dev_session, apple_id.clone())

@@ -488,6 +488,10 @@ let italianStrings: [String: String] = [
         "Accesso con l'Apple ID non riuscito su %@. Ultimo errore: %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Il server di accesso di Apple ha rifiutato la richiesta (HTTP 503). Non dipende dalla password né dal server anisette, quindi provare altri server non serve. Riprova più tardi o aggiorna SideInstaller.",
+    "Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.":
+        "Apple sta limitando temporaneamente gli accessi per questo Apple ID o questa rete (HTTP 429). Provare altri server non serve e ogni tentativo può allungare l'attesa, quindi lascia passare un po' di tempo prima di accedere di nuovo.",
+    "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
+        "Se sei sicuro che la password sia corretta, Apple potrebbe star limitando i tentativi di accesso: aspetta un po' prima di riprovare.",
     "the anisette server": "il server anisette",
     "all %d anisette servers": "tutti e %d i server anisette",
     "Not signed in.": "Accesso non effettuato.",

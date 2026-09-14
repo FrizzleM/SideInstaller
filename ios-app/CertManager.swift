@@ -217,6 +217,10 @@ final class CertManager: ObservableObject {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
                 engine.log("Certificates: anisette \(idx + 1)/\(servers.count) failed: \(lastError)")
+                if Engine.isAppleRateLimit(lastError) {
+                    engine.log("Certificates: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
+                    throw EngineError.message(Engine.appleRateLimitMessage)
+                }
                 // Apple refusing the request fails the same on every server.
                 if Engine.isAppleServiceRefusal(lastError) {
                     appleRefusals += 1

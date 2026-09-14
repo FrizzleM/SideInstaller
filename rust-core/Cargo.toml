@@ -95,6 +95,12 @@ base64 = "0.22.1"
 # `rootcause::Report`. Already in the tree via isideload (same 0.12 line).
 rootcause = "0.12"
 
+# Hash the Apple ID into the same `<sha256(email)>/` directory isideload keeps
+# the signing key in, for the saved developer session. Both already in the tree
+# via isideload at these versions.
+sha2 = "0.11"
+hex = "0.4"
+
 # Logging spine: forward idevice's `tracing` events (and any `log` records via
 # the tracing-log compat layer, enabled by default) through the FFI callback.
 tracing = "0.1"

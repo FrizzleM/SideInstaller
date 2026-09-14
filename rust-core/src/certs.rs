@@ -6,22 +6,18 @@
 
 use std::ffi::{c_char, c_void};
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::path::PathBuf;
+use std::path::Path;
 
-use isideload::{
-    anisette::remote_v3::RemoteV3AnisetteProvider,
-    auth::apple_account::AppleAccount,
-    dev::{
-        certificates::{CertificatesApi, DevelopmentCertificate},
-        developer_session::DeveloperSession,
-        device_type::DeveloperDeviceType,
-        teams::{DeveloperTeam, TeamsApi},
-    },
-    util::fs_storage::FsStorage,
+use isideload::dev::{
+    certificates::{CertificatesApi, DevelopmentCertificate},
+    developer_session::DeveloperSession,
+    device_type::DeveloperDeviceType,
+    teams::DeveloperTeam,
 };
 use serde::Serialize;
 
 use crate::account::{make_2fa, TwoFactorCb, TwoFaCtx};
+use crate::apple_session;
 use crate::ffi_util::{cstr, opt_str};
 
 /// Opaque handle owning the runtime, developer session and selected team.
@@ -105,30 +101,17 @@ pub unsafe fn cert_signin(
             .map_err(|e| format!("failed to start runtime: {e}"))?;
 
         let (dev, team, summary) = rt.block_on(async {
-            tracing::info!("Certs: building anisette provider ({anisette_url})");
-            let anisette = RemoteV3AnisetteProvider::new(
+            // The active account's, so its session is saved and reused.
+            let (dev, teams) = apple_session::open(
+                &apple_id,
+                &password,
                 &anisette_url,
-                Box::new(FsStorage::new(PathBuf::from(&storage_dir))),
-                "0".to_string(),
+                Path::new(&storage_dir),
+                true,
+                twofa,
+                "Certs",
             )
-            .map_err(|e| format!("anisette provider: {e}"))?;
-
-            tracing::info!("Certs: logging in {apple_id}");
-            let mut account = AppleAccount::builder(&apple_id)
-                .anisette_provider(anisette)
-                .login(&password, twofa)
-                .await
-                .map_err(|e| format!("login failed: {e}"))?;
-            tracing::info!("Certs: login OK; opening developer session");
-
-            let mut dev = DeveloperSession::from_account(&mut account)
-                .await
-                .map_err(|e| format!("developer session: {e}"))?;
-
-            let teams = dev
-                .list_teams()
-                .await
-                .map_err(|e| format!("list teams: {e}"))?;
+            .await?;
             let team = teams
                 .into_iter()
                 .next()
