@@ -2,10 +2,10 @@
 # Written by the last full run and compared before the next one; the run
 # is skipped when this file would come out identical. Delete to force.
 channel	stable
-ipa_url	https://github.com/FrizzleM/SideInstaller/releases/download/v0.9.0/SideInstaller.ipa
-ipa_size	7908297
+ipa_url	https://github.com/FrizzleM/SideInstaller/releases/download/v1.0.0/SideInstaller.ipa
+ipa_size	9243749
 output_base_url	https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output
-inputs_sha256	4e454720a57348dcbb3518c5dc80b40ad08a23d53492f36afbcf2dd0f252f51e
+inputs_sha256	448e4579241719660ef7ff30fec0adc3dc1eb2c1ab6ccca63cd8e851543181fa
 cert	Aramco-Services-Company	7E5CF3F26B293474757B449DF5FBFFAF0816D2F7	2026-09-24	revoked
 cert	BOC-International-China-Limited-qi-ye-weixin-app-id-huiyi-kuozhan	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
 cert	BOC-International-China-Limited-qi-ye-weixin-app-id-kuozhan	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
