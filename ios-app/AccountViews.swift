@@ -34,7 +34,14 @@ struct AccountSetupView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .preferredColorScheme(.dark)
-        .onAppear { focus = .email }
+        // Focus once the card has faded in. AutoFill works out the login form
+        // when the email field takes the keyboard, and a password field that's
+        // still transparent is left out of it, so iCloud Passwords filled the
+        // email alone and had to be picked again for the password.
+        .task {
+            guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
+            focus = .email
+        }
     }
 
     private var header: some View {
@@ -177,6 +184,11 @@ struct AccountEditor: View {
         }
         .onAppear {
             if let account = target.account { email = account.appleID }
+        }
+        // Focus after the sheet has slid up, so both fields are on screen when
+        // AutoFill works out the login form and iCloud Passwords fills them in one go.
+        .task {
+            guard (try? await Task.sleep(for: .milliseconds(500))) != nil else { return }
             focus = target.account == nil ? .email : .password
         }
     }
