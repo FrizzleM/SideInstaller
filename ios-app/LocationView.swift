@@ -223,8 +223,11 @@ final class LocationManager: ObservableObject {
     /// would otherwise keep claiming the location is still being held.
     private func startResending() {
         stopResending()
-        resendTimer = Timer.scheduledTimer(withTimeInterval: Self.resendInterval, repeats: true) { _ in
-            Task { @MainActor [weak self] in
+        // The timer holds its closure until invalidated, so the capture has to be
+        // weak out here too — a `[weak self]` only on the inner Task still leaves
+        // the closure owning the manager, and nothing invalidates on deinit.
+        resendTimer = Timer.scheduledTimer(withTimeInterval: Self.resendInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
                 guard let self, let simulated = self.simulated else { return }
                 guard self.engine.connection.isSimulatingLocation else {
                     self.sessionClosed()
