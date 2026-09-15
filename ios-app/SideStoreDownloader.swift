@@ -273,6 +273,8 @@ enum SideStoreDownloader {
         /// Channel of the release the file actually came from (can differ from
         /// the requested one after `fetchViaReleaseScan`). Used for the filename.
         let channel: ReleaseChannel
+        /// GitHub's ETag for the file, so a later run can tell it hasn't changed.
+        let etag: String?
     }
 
     /// Returns the local path of the downloaded IPA. `log` receives progress.
@@ -281,6 +283,12 @@ enum SideStoreDownloader {
                                log: @escaping (String) -> Void) async throws -> String {
         guard let direct = source.downloadURL(channel), let assetName = source.assetFileName else {
             throw DownloadError.notDownloadable
+        }
+
+        // Tens of megabytes aren't fetched again while the copy from an earlier
+        // run is still the file GitHub serves.
+        if let current = await unchangedDownload(source: source, channel: channel, at: direct, log: log) {
+            return current.path
         }
 
         let fetched: Fetched
@@ -305,9 +313,41 @@ enum SideStoreDownloader {
         let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(fetched.channel))
         try? FileManager.default.removeItem(at: dest)
         try FileManager.default.moveItem(at: fetched.file, to: dest)
-        // Mark as app-downloaded, so later runs may replace it.
-        DownloadLedger.record(dest)
+        // Mark as app-downloaded, so later runs may replace it, or reuse it while
+        // GitHub still serves the same file.
+        DownloadLedger.record(dest, etag: fetched.etag)
         return dest.path
+    }
+
+    /// The IPA an earlier run downloaded for this build, if GitHub still serves
+    /// that exact file at `url`.
+    ///
+    /// Only the headers are fetched (a HEAD request). The file must be one this
+    /// app downloaded and nothing has touched since, its recorded ETag must match
+    /// GitHub's current one, and its size the Content-Length. Anything else,
+    /// including a failed request, returns nil so the caller downloads as usual.
+    private static func unchangedDownload(source: InstallSource, channel: ReleaseChannel,
+                                          at url: URL,
+                                          log: @escaping (String) -> Void) async -> URL? {
+        let file = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
+        guard let recorded = DownloadLedger.etag(for: file),
+              let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size]) as? Int
+        else { return nil }
+
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        req.httpMethod = "HEAD"
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        let redirects = ReleaseTagRecorder()
+        guard let result = try? await URLSession.shared.data(for: req, delegate: redirects),
+              let http = result.1 as? HTTPURLResponse, http.statusCode == 200,
+              http.value(forHTTPHeaderField: "ETag") == recorded,
+              http.value(forHTTPHeaderField: "Content-Length").flatMap(Int.init) == size,
+              IPALibrary.looksLikeIPA(file)
+        else { return nil }
+
+        let tag = redirects.tag.map { " (release \($0))" } ?? ""
+        log("\(file.lastPathComponent) is already the file GitHub serves\(tag) — skipping the download.")
+        return file
     }
 
     /// Download one URL to a temporary file, if the response isn't a refusal.
@@ -331,7 +371,8 @@ enum SideStoreDownloader {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         let tag = redirects.tag.map { ", release \($0)" } ?? ""
         log("HTTP \(status) for \(name) — \(response.expectedContentLength) bytes\(tag)")
-        return Fetched(file: file, name: name, channel: channel)
+        return Fetched(file: file, name: name, channel: channel,
+                       etag: (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "ETag"))
     }
 
     /// Downloads a pasted link into its own temp directory, saved as `name`.
@@ -516,7 +557,15 @@ private final class ReleaseTagRecorder: NSObject, URLSessionTaskDelegate {
                     newRequest request: URLRequest,
                     completionHandler: @escaping (URLRequest?) -> Void) {
         if let found = Self.tag(in: request.url) { tag = found }
-        completionHandler(request)          // follow it, unchanged
+        guard task.originalRequest?.httpMethod == "HEAD" else {
+            completionHandler(request)      // follow it, unchanged
+            return
+        }
+        // A HEAD stays a HEAD all the way down, so checking a file never downloads it.
+        var head = request
+        head.httpMethod = "HEAD"
+        head.cachePolicy = .reloadIgnoringLocalCacheData
+        completionHandler(head)
     }
 
     /// The `<tag>` in `…/releases/download/<tag>/<asset>`, or nil for any other
@@ -977,6 +1026,7 @@ enum PrivateStore {
 enum DownloadLedger {
 
     private static let defaultsKey = "managedIPAs"
+    private static let etagsKey = "managedIPAETags"
 
     /// Size and modification time, so a file replaced under the same name stops
     /// matching. Assumes nothing downstream rewrites the IPA in place.
@@ -1007,16 +1057,38 @@ enum DownloadLedger {
         return table[key(url)] == fp
     }
 
-    static func record(_ url: URL) {
+    /// ETags by ledger key, each stored as "<fingerprint>|<etag>" so it only ever
+    /// describes the exact file it was recorded with.
+    private static var etags: [String: String] {
+        get { UserDefaults.standard.dictionary(forKey: etagsKey) as? [String: String] ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: etagsKey) }
+    }
+
+    static func record(_ url: URL, etag: String? = nil) {
         guard let fp = fingerprint(url) else { return }
         var t = table
         t[key(url)] = fp
         table = t
+        // Replaced, or dropped when this download came without one.
+        var e = etags
+        e[key(url)] = etag.map { "\(fp)|\($0)" }
+        etags = e
+    }
+
+    /// The ETag GitHub served `url` with, while the file is still exactly the one
+    /// that was downloaded.
+    static func etag(for url: URL) -> String? {
+        guard let fp = fingerprint(url), table[key(url)] == fp,
+              let entry = etags[key(url)], entry.hasPrefix(fp + "|") else { return nil }
+        return String(entry.dropFirst(fp.count + 1))
     }
 
     static func forget(_ url: URL) {
         var t = table
         t.removeValue(forKey: key(url))
         table = t
+        var e = etags
+        e.removeValue(forKey: key(url))
+        etags = e
     }
 }

@@ -2,6 +2,23 @@
 
 All notable changes to SideInstaller are documented here.
 
+## Unreleased
+
+### Changed
+- **Installing SideStore or LiveContainer + SideStore is faster.** The download now starts as soon
+  as the network is up and runs while your iPhone pairs, connects and signs in to your Apple ID,
+  instead of waiting for all of that to finish first.
+- Signing in to your Apple ID now happens while SideInstaller opens its link to your iPhone, rather
+  than after it.
+- An IPA downloaded on an earlier run is reused when GitHub still serves that exact file, so trying
+  again after a failed install, or installing the same build later, skips the download.
+- SideStore's certificate hand-off is prepared while the app installs, and finding the installed app
+  afterwards only asks your iPhone about the apps you installed, not every system app.
+
+### Fixed
+- Tapping Stop while the IPA downloads now stops the install, instead of carrying on with an older
+  copy of the IPA left in Documents.
+
 ## 0.9.0
 
 ### Fixed

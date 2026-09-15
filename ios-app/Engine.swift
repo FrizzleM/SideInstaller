@@ -227,6 +227,12 @@ final class Engine: ObservableObject {
     private var askedLocalNetwork = false
 
     private var pipelineTask: Task<Void, Never>?
+    /// The IPA download a run starts as soon as the network is up, so it runs
+    /// alongside pairing and sign-in instead of after them.
+    private var prefetch: (source: InstallSource, channel: ReleaseChannel, task: Task<String, Error>)?
+    /// The Apple ID sign-in a run starts once pairing is settled, so it runs
+    /// while the device link opens.
+    private var backgroundSignIn: Task<Void, Error>?
     /// Poll that keeps `vpnConnected` live; NWPathMonitor never fires for a
     /// loopback tunnel, which carries no default route.
     private var statusTimer: Timer?
@@ -468,12 +474,18 @@ final class Engine: ObservableObject {
         pipelineTask = Task { @MainActor in
             do {
                 try await ensureNetwork()
+                // The download needs neither the device nor the Apple ID, so it
+                // starts now and runs while those steps do.
+                startPrefetch()
                 try await pairAndConnect()
-                try await signIn()
+                try await signInStep()
                 try await download()
                 try await signApp()
+                // The certificate hand-off is built on the sign queue, which the
+                // install doesn't use, so it's ready once the install is done.
+                let accountConfig = startAccountConfig()
                 try await install()
-                try await writePairing()
+                try await writePairing(accountConfig: accountConfig)
                 finishSuccess()
             } catch is CancellationError {
                 log("Install cancelled.")
@@ -485,6 +497,7 @@ final class Engine: ObservableObject {
                 log("⛔️ Stopped: \(msg)")
                 failActiveStep(to: .failed)
             }
+            stopBackgroundWork()
             isRunning = false
             pairingPIN = nil
         }
@@ -494,7 +507,17 @@ final class Engine: ObservableObject {
     @MainActor
     func cancelOneClick() {
         pipelineTask?.cancel()
+        prefetch?.task.cancel()                 // stop the download now, not at its step
         PairingController.shared.softCancel()   // unblock a pending pairing wait
+    }
+
+    /// Cancel whatever the run started early and never got to use.
+    @MainActor
+    private func stopBackgroundWork() {
+        prefetch?.task.cancel()
+        prefetch = nil
+        backgroundSignIn?.cancel()
+        backgroundSignIn = nil
     }
 
     // MARK: Step 1 — network (waits for the loopback tunnel)
@@ -558,6 +581,9 @@ final class Engine: ObservableObject {
 
         await ensureLocalNetworkForImportedPairing()
 
+        // Pairing is settled, so sign in while the link opens.
+        startBackgroundSignIn()
+
         do {
             try await connect()
         } catch {
@@ -571,6 +597,10 @@ final class Engine: ObservableObject {
                 throw error
             }
             log("Saved pairing didn't work (\(short(error))). Pairing fresh…")
+            // Pairing has the user type a code into Settings. Let a sign-in that
+            // may be asking for a 2FA code finish first, so the two never overlap.
+            if let signingIn = backgroundSignIn { _ = await signingIn.result }
+            try Task.checkCancellation()
             try await pair()
             try await connect()
         }
@@ -686,6 +716,33 @@ final class Engine: ObservableObject {
                 self.signingTeamID = nil
             }
             self.log("Apple ID changed — signed out of the previous account.")
+        }
+    }
+
+    /// The checklist's sign-in step: waits for the sign-in started alongside the
+    /// device link, or signs in now when none was.
+    @MainActor
+    private func signInStep() async throws {
+        guard let started = backgroundSignIn else { return try await signIn() }
+        backgroundSignIn = nil
+        try Task.checkCancellation()
+        setStep(.signIn, .active)
+        try await withTaskCancellationHandler {
+            try await started.value
+        } onCancel: {
+            started.cancel()
+        }
+        setStep(.signIn, .done)
+    }
+
+    /// Starts the Apple ID sign-in without touching the checklist, unless this
+    /// session is already signed in. It runs on the sign queue, apart from the
+    /// device link.
+    @MainActor
+    private func startBackgroundSignIn() {
+        guard backgroundSignIn == nil, signSession == nil else { return }
+        backgroundSignIn = Task { @MainActor in
+            try await self.signIn(updatingChecklist: false)
         }
     }
 
@@ -916,15 +973,14 @@ final class Engine: ObservableObject {
             return
         }
 
-        log("Fetching \(channel.displayName.lowercased()) \(src.displayName) release…")
         do {
-            let path = try await SideStoreDownloader.downloadLatest(source: src, channel: channel) { line in
-                self.log(line)
-            }
+            let path = try await fetchLatest(source: src, channel: channel)
             adopt(URL(fileURLWithPath: path), source: src, channel: channel)
             log("\(src.displayName) IPA ready at \(path)")
             setStep(.download, .done)
         } catch {
+            // Stopping the install isn't a failed download: no cached copy stands in.
+            if Task.isCancelled { throw CancellationError() }
             // Offline or blocked: fall back to a copy an earlier run left behind.
             if let cached = onDisk {
                 log("⚠️ Download failed (\(short(error))) — using \(cached.url.lastPathComponent) already in Documents instead.")
@@ -934,6 +990,51 @@ final class Engine: ObservableObject {
             }
             logImportHint(for: error, source: src, channel: channel)
             throw error
+        }
+    }
+
+    /// Starts downloading the selected build when the download step would fetch
+    /// it from GitHub, so the transfer overlaps pairing and sign-in. A build
+    /// already at hand (this session's download, an imported or custom IPA) is
+    /// left to the download step, exactly as before.
+    @MainActor
+    private func startPrefetch() {
+        prefetch?.task.cancel()
+        prefetch = nil
+        let src = installSource
+        let channel = releaseChannel
+        guard src != .custom else { return }
+        if let p = downloadedIPAPath, downloadedSource == src, downloadedChannel == channel,
+           FileManager.default.fileExists(atPath: p) {
+            return
+        }
+        if let onDisk = IPALibrary.entry(source: src, channel: channel), onDisk.isImported { return }
+
+        log("Fetching \(channel.displayName.lowercased()) \(src.displayName) release in the background…")
+        let task = Task {
+            try await SideStoreDownloader.downloadLatest(source: src, channel: channel) { line in
+                self.log(line)
+            }
+        }
+        prefetch = (src, channel, task)
+    }
+
+    /// The selected build's download: the one this run started early when there
+    /// is one, otherwise a new one. Cancelling the caller cancels either.
+    @MainActor
+    private func fetchLatest(source: InstallSource, channel: ReleaseChannel) async throws -> String {
+        guard let started = prefetch, started.source == source, started.channel == channel else {
+            log("Fetching \(channel.displayName.lowercased()) \(source.displayName) release…")
+            return try await SideStoreDownloader.downloadLatest(source: source, channel: channel) { line in
+                self.log(line)
+            }
+        }
+        prefetch = nil
+        let task = started.task
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
         }
     }
 
@@ -1212,14 +1313,19 @@ final class Engine: ObservableObject {
     // MARK: Step 8 — write the pairing file into SideStore
 
     @MainActor
-    private func writePairing() async throws {
+    private func writePairing(accountConfig handOff: Task<String?, Never>? = nil) async throws {
         setStep(.writePairing, .active)
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         // The installed build decides the host app and where the file lands.
         let source = downloadedSource ?? installSource
         // Built on the sign queue, where all isideload calls run, before the
-        // device-queue write below.
-        let accountConfig = await accountConfigJSON(source: source)
+        // device-queue write below; a run starts it during the install.
+        let accountConfig: String?
+        if let handOff {
+            accountConfig = await handOff.value
+        } else {
+            accountConfig = await accountConfigJSON(source: source)
+        }
         let udid = deviceUDID
         do {
             try await onDeviceQueue {
@@ -1282,6 +1388,13 @@ final class Engine: ObservableObject {
                 log("⚠️ Couldn't hand \(appName) the signing certificate (\(short(error))). It's installed and ready, but it will ask to resign itself on first sign-in.")
             }
         }
+    }
+
+    /// Starts building the certificate hand-off for the build just signed.
+    @MainActor
+    private func startAccountConfig() -> Task<String?, Never> {
+        let source = downloadedSource ?? installSource
+        return Task { @MainActor in await self.accountConfigJSON(source: source) }
     }
 
     /// The `Account.sideconf` JSON for this install, or nil to skip the

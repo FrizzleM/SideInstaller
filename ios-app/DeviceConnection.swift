@@ -695,7 +695,9 @@ final class DeviceConnection {
 
         var result: UnsafeMutableRawPointer?
         var count = 0
-        try check(installation_proxy_get_apps(client, nil, nil, 0, &result, &count),
+        // The host app is sideloaded, so it's a user app. Leaving system apps out
+        // keeps installd's reply a fraction of the size.
+        try check("User".withCString { installation_proxy_get_apps(client, $0, nil, 0, &result, &count) },
                   "installation_proxy_get_apps failed")
         guard let result, count > 0 else { return nil }
 
