@@ -83,13 +83,12 @@ final class Engine: ObservableObject {
 
     // MARK: Inputs
 
-    /// The credentials in use, owned by `AccountStore` rather than typed on each
-    /// screen: they are entered once during setup and switched in Settings ›
-    /// Account. Views observe the store, so these need no `@Published`.
+    /// Active Apple ID credentials, read from `AccountStore` (entered during
+    /// setup, switched in Settings › Account). Views observe the store directly.
     var appleID: String { AccountStore.shared.activeAppleID }
     var applePassword: String { AccountStore.shared.activePassword }
-    /// The anisette server in use, persisted so a relaunch keeps the user's pick
-    /// (or whichever server a sign-in last fell back to successfully).
+    /// Anisette server in use. Persisted, and updated to whichever server the
+    /// last successful sign-in used.
     @Published var anisetteURL: String =
         UserDefaults.standard.string(forKey: Engine.anisetteURLKey) ?? AnisetteServer.fallback.address {
         didSet {
@@ -101,11 +100,9 @@ final class Engine: ObservableObject {
     static let anisetteURLKey = "anisetteServerURL"
     /// Servers for the picker; a bundled snapshot until the live list loads.
     @Published private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
-    /// "Start LocalDevVPN when SideInstaller opens". On unless it has been
-    /// turned off: every page here needs the tunnel, so opening the app without
-    /// one is never what somebody meant. Persisted here rather than with
-    /// `@AppStorage`, so the launch hook and the Settings toggle read the one
-    /// value.
+    /// "Start LocalDevVPN when SideInstaller opens" setting. On by default, since
+    /// every page needs the tunnel. Stored here (not `@AppStorage`) so the launch
+    /// hook and the Settings toggle share one value.
     @Published var autoStartVPN: Bool =
         (UserDefaults.standard.object(forKey: Engine.autoStartVPNKey) as? Bool) ?? true {
         didSet {
@@ -121,9 +118,7 @@ final class Engine: ObservableObject {
 
     // The loopback VPN's device-side IP; configurable in Advanced.
     @Published var deviceIP: String = "10.7.0.1"
-    /// `deviceIP` as an address to dial, kept apart from the field's own text so
-    /// that a pasted `10.7.0.1/32` — which is how LocalDevVPN prints it now —
-    /// still resolves instead of failing in `inet_pton` several layers down.
+    /// `deviceIP` normalized to a dialable host, e.g. `10.7.0.1/32` → `10.7.0.1`.
     var deviceHost: String { NetworkStatus.host(deviceIP) }
     // Which build to install (SideStore, or LiveContainer + SideStore).
     @Published var installSource: InstallSource = .sideStore
@@ -139,21 +134,19 @@ final class Engine: ObservableObject {
     @Published var vpnStatus: String = "unknown"
     @Published var wifiStatus: String = "unknown"
 
-    /// Lowest iOS that can produce its own pairing file: the RPPairing host and
-    /// the Settings prompt that answers it are iOS 27 features.
+    /// Minimum iOS that can create its own pairing file (RPPairing host and the
+    /// Settings pairing prompt).
     static let minimumOSMajorVersion = 27
     /// The same number as text, for UI copy.
     static var minimumOSText: String { "\(minimumOSMajorVersion)" }
 
-    /// Lowest iOS the rest of the pipeline works on. Everything after pairing
-    /// runs over an RSD tunnel, which needs CoreDeviceProxy — iOS 17 and later —
-    /// and this build's interface needs 18.
+    /// Minimum iOS for everything after pairing. The RSD tunnel needs iOS 17+
+    /// (CoreDeviceProxy); the UI needs 18.
     static let minimumTunnelOSMajorVersion = 18
     static var minimumTunnelOSText: String { "\(minimumTunnelOSMajorVersion)" }
 
-    /// True when this iPhone can pair with itself, so no pairing file has to be
-    /// brought in from a computer. Static as well, for the non-isolated callers
-    /// that pick a tunnel route.
+    /// True when this iPhone can pair with itself, so no computer-made pairing
+    /// file is needed. Static so non-isolated code can read it.
     static var deviceCanSelfPair: Bool {
         ProcessInfo.processInfo.isOperatingSystemAtLeast(
             OperatingSystemVersion(majorVersion: minimumOSMajorVersion,
@@ -162,8 +155,8 @@ final class Engine: ObservableObject {
 
     var canSelfPair: Bool { Engine.deviceCanSelfPair }
 
-    /// False when this iPhone is too old for the tunnel the install runs over,
-    /// where an imported pairing file wouldn't help either.
+    /// False when iOS is too old for the install tunnel, even with an imported
+    /// pairing file.
     var osSupported: Bool {
         ProcessInfo.processInfo.isOperatingSystemAtLeast(
             OperatingSystemVersion(majorVersion: Engine.minimumTunnelOSMajorVersion,
@@ -181,8 +174,8 @@ final class Engine: ObservableObject {
         return "\(v.majorVersion).\(v.minorVersion)"
     }
 
-    /// Filename of the pairing file the user imported, when the one on disk came
-    /// in that way. Persisted, so it survives a relaunch like the file does.
+    /// Filename of the imported pairing file, if the one on disk was imported.
+    /// Persisted across launches.
     @Published private(set) var importedPairingName: String? =
         UserDefaults.standard.string(forKey: Engine.importedPairingNameKey)
     /// True while a picked pairing file is being read in.
@@ -192,7 +185,7 @@ final class Engine: ObservableObject {
     @Published var pairingStatus: String = L("not paired")
     @Published var signInStatus: String = "signed out"
 
-    // Path to the pairing file produced by RPPairing.
+    // Path to the pairing file in use (generated by RPPairing or imported).
     @Published var pairingFilePath: String?
 
     // MARK: One-click orchestration state
@@ -273,9 +266,8 @@ final class Engine: ObservableObject {
     // Apple ID sign-in and signing (isideload), serialized on signQueue.
     private let signQueue = DispatchQueue(label: "sideinstaller.sign")
     private var signSession: OpaquePointer?          // SignSession*
-    /// The team the signer is working under, read off the sign-in summary. An
-    /// app has to already be signed under this team for a refresh to land on it
-    /// rather than install a second copy beside it.
+    /// Team ID of the signed-in account, parsed from the sign-in summary. Only
+    /// apps signed by this team can be refreshed in place.
     @Published private(set) var signingTeamID: String?
     @Published var downloadedIPAPath: String?
     // Source and channel the current download corresponds to.
@@ -288,8 +280,7 @@ final class Engine: ObservableObject {
     @Published private(set) var customIPAName: String?
     /// True while a picked IPA is being copied in.
     @Published private(set) var isImportingIPA = false
-    /// How much of a link import has arrived (0…1). Nil for a file import,
-    /// where the copy reports nothing to show.
+    /// Download progress of a link import (0…1); nil for file imports.
     @Published private(set) var importProgress: Double?
 
     // 2FA bridge: the FFI callback blocks on this semaphore until the UI answers.
@@ -570,13 +561,11 @@ final class Engine: ObservableObject {
         do {
             try await connect()
         } catch {
-            // A reused pairing file can be stale: pair fresh once, then retry.
-            // Only iOS 27 can, though — below it there's nothing to fall back on
-            // but the user importing a fresh file.
+            // A reused pairing file may be stale: re-pair once and retry.
+            // Only possible when this iPhone can self-pair (iOS 27+).
             guard reused, canSelfPair else { throw error }
-            // A route that never reached the device says nothing about the
-            // pairing file, and re-pairing it costs the user a PIN to fail the
-            // same way a second time.
+            // Don't re-pair if the tunnel never reached the device: the pairing
+            // file isn't the problem, and a new PIN wouldn't fix it.
             if let tunnel = error as? DeviceConnection.TunnelError,
                !tunnel.repairingCouldHelp {
                 throw error
@@ -605,13 +594,13 @@ final class Engine: ObservableObject {
         setGuide(nil)
     }
 
-    /// Raise the Local Network prompt on the imported-pairing-file path.
+    /// Triggers the Local Network permission prompt when an imported pairing
+    /// file is used (below iOS 27).
     ///
-    /// Reaching lockdownd at the tunnel's far end counts as a local-network
-    /// connection, and iOS refuses it silently until the permission is granted.
-    /// On iOS 27 the RPPairing host asks for it as a matter of course; below 27
-    /// nothing does, so a first run would fail with an unexplained socket error.
-    /// Best-effort: a denial still lets the connection attempt speak for itself.
+    /// Connecting to lockdownd over the tunnel counts as local-network access,
+    /// which iOS silently blocks until granted. On iOS 27 the RPPairing host
+    /// already triggers the prompt. Best-effort: if denied, the connect still
+    /// runs and reports its own error.
     @MainActor
     private func ensureLocalNetworkForImportedPairing() async {
         guard !canSelfPair, !askedLocalNetwork else { return }
@@ -684,9 +673,9 @@ final class Engine: ObservableObject {
         appleID.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Drop the cached sign-in, so the next run authenticates as whichever
-    /// account is active now. Called when the credentials change under it.
-    /// Freed on `signQueue`, the only queue that touches `signSession`.
+    /// Frees the cached sign-in session so the next run signs in as the active
+    /// account. Called when credentials change. Runs on `signQueue`, which owns
+    /// `signSession`.
     func forgetAppleSession() {
         signQueue.async { [weak self] in
             guard let self, let session = self.signSession else { return }
@@ -700,9 +689,9 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// `updatingChecklist` is false for the refresh flow on the Sideloaded apps
-    /// page, which reuses this sign-in but has no business moving the Install
-    /// tab's checklist — a failure there would leave that step spinning forever.
+    /// Signs in to the Apple ID, trying each anisette server in turn.
+    /// Pass `updatingChecklist: false` from flows outside the Install tab (e.g.
+    /// app refresh) so they don't change its checklist.
     @MainActor
     private func signIn(updatingChecklist: Bool = true) async throws {
         if signSession != nil {
@@ -789,8 +778,8 @@ final class Engine: ObservableObject {
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        // 1: the active account's developer session is saved and reused, so a
-        // repeat sign-in costs Apple nothing until the token expires.
+        // 1 = save and reuse the developer session, so repeat sign-ins skip
+        // Apple authentication until the token expires.
         let rc = si_apple_signin(id, pw, ani, "SideInstaller", dir, 1,
                                  twoFactorCallback, nil,
                                  &session, &summary, &error)
@@ -810,9 +799,8 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// The team id out of a sign-in summary, which reads "team: Name (ABCDE12345)".
-    /// Nil rather than a guess when it doesn't: the refresh flow only uses this
-    /// to *skip* apps, so an unreadable summary must not exclude anything.
+    /// Parses the 10-character team ID from a summary like "team: Name (ABCDE12345)".
+    /// Returns nil if it can't be read, so the refresh flow doesn't skip any apps.
     static func teamID(inSummary summary: String) -> String? {
         guard let open = summary.lastIndex(of: "("),
               let close = summary.lastIndex(of: ")"), open < close else { return nil }
@@ -850,9 +838,8 @@ final class Engine: ObservableObject {
         "-22406",   // "Enter the correct password for this Apple Account."
     ]
 
-    /// What the user sees when Apple rejects the credentials. Apple also answers a
-    /// correct password with -22406 while it is throttling sign-ins — seen between
-    /// 429s on 2026-09-13, with the password that Install signs in with — hence the hint.
+    /// Shown when Apple rejects the credentials. Includes a rate-limit hint because
+    /// Apple can also return -22406 for a correct password while throttling.
     static var credentialErrorMessage: String {
         L("Incorrect Apple ID or password. Check your Apple Account email and password, then try again.")
             + " " + L("If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.")
@@ -863,11 +850,9 @@ final class Engine: ObservableObject {
         L("Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.")
     }
 
-    /// Detect Apple answering HTTP 429 — GrandSlam, or the developer portal a
-    /// saved session goes to first. Every anisette server presents the same
-    /// stored device identity from the same network, so trying the next one only
-    /// adds attempts to the limit: stop at the first. Anisette servers' own 429s
-    /// never name apple.com, so those still move on.
+    /// Detects an HTTP 429 from Apple (GrandSlam or the developer portal).
+    /// Switching anisette servers doesn't avoid Apple's limit, so sign-in stops.
+    /// 429s from anisette servers don't mention apple.com and still fall through.
     static func isAppleRateLimit(_ raw: String) -> Bool {
         let m = raw.lowercased()
         return m.contains("apple.com") && m.contains("429 too many requests")
@@ -891,15 +876,14 @@ final class Engine: ObservableObject {
         L("Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.")
     }
 
-    /// Detect GSA answering HTTP 503. Apple's edge sends it before looking at the
-    /// anisette data — since September 2026 it's the reply to an Xcode client
-    /// info — so the next anisette server would be refused the same way.
+    /// Detects an HTTP 503 from gsa.apple.com. Apple rejects the request before
+    /// checking anisette data, so other anisette servers would fail the same way.
     static func isAppleServiceRefusal(_ raw: String) -> Bool {
         let m = raw.lowercased()
         return m.contains("gsa.apple.com") && m.contains("503")
     }
 
-    // MARK: Step 5 — download SideStore
+    // MARK: Step 5 — download the IPA
 
     @MainActor
     private func download() async throws {
@@ -981,36 +965,33 @@ final class Engine: ObservableObject {
     func importCustomIPA(from url: URL) async {
         guard !isImportingIPA else { return }
         isImportingIPA = true
-        // The picker copies the file into this app's Inbox before handing it
-        // over; once it's imported, that copy is dead weight.
+        // Delete the picker's temporary copy once the import is done.
         defer { isImportingIPA = false; Self.discardInboxCopy(url) }
         lastError = nil
         log("Importing \(url.lastPathComponent) …")
         do {
             let dest = try await Self.copyImport(from: url)
             customIPAName = dest.lastPathComponent
-            // A new file invalidates whatever the previous run resolved.
+            // Clear the cached path so the next run uses the new file.
             if downloadedSource == .custom { downloadedIPAPath = nil }
             setGuide(nil)
             log("Imported \(dest.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(dest.path)), countStyle: .file))).")
         } catch IPALibrary.ImportError.notAnIPA {
-            // The picker accepts any file, so a wrong pick is caught here. The
-            // check runs on a staged copy, leaving any previous import intact.
+            // The picker accepts any file. Validation runs on a staged copy, so
+            // the previous import is kept.
             refreshCustomIPA()
             lastError = L("%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.",
                           url.lastPathComponent)
             log("⛔️ Import: \(lastError ?? "")")
         } catch {
-            // Re-read from disk for what the button should now say.
+            // Re-read the import from disk to update the button label.
             refreshCustomIPA()
             lastError = L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
             log("⛔️ Import: \(lastError ?? "")")
         }
     }
 
-    /// Fetch an IPA from a link the user pasted and adopt it as the custom
-    /// import. The way in for a build that isn't on GitHub, and the one that
-    /// needs no second device to download it on.
+    /// Downloads an IPA from a pasted link and stores it as the custom import.
     @MainActor
     func importCustomIPA(fromLink text: String) async {
         guard !isImportingIPA else { return }
@@ -1029,11 +1010,11 @@ final class Engine: ObservableObject {
                 url, named: Self.importFileName(for: url)) { fraction in
                     Task { @MainActor in self.importProgress = fraction }
                 }
-            // Its own staging directory, so removing it takes the file too.
+            // The download lives in its own staging directory; remove all of it.
             defer { try? FileManager.default.removeItem(at: downloaded.deletingLastPathComponent()) }
             let dest = try await Self.copyImport(from: downloaded)
             customIPAName = dest.lastPathComponent
-            // A new file invalidates whatever the previous run resolved.
+            // Clear the cached path so the next run uses the new file.
             if downloadedSource == .custom { downloadedIPAPath = nil }
             setGuide(nil)
             log("Imported \(dest.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(dest.path)), countStyle: .file))).")
@@ -1051,10 +1032,8 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// A pasted address, tidied into something downloadable: whitespace off, and
-    /// a missing scheme filled in, since an address copied out of a message
-    /// often arrives bare. Anything that isn't http(s) is refused rather than
-    /// repaired — a `file://` or an app scheme is a different mistake.
+    /// Turns pasted text into a download URL: trims whitespace and adds `https://`
+    /// when no scheme is given. Returns nil for non-http(s) schemes.
     static func downloadLink(_ text: String) -> URL? {
         var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -1065,17 +1044,15 @@ final class Engine: ObservableObject {
             trimmed = "https://" + trimmed
         }
         guard let url = URL(string: trimmed), let host = url.host, !host.isEmpty else { return nil }
-        // A dot is what separates a hostname from a sentence, but only worth
-        // insisting on where the scheme was inferred: `http://nas/App.ipa` is a
-        // deliberate address, and typing one is saying so.
+        // Without an explicit scheme, require a dotted hostname to reject plain
+        // text. With one, allow bare hosts like `http://nas/App.ipa`.
         guard hadScheme || (host.contains(".") && !host.hasPrefix(".") && !host.hasSuffix("."))
         else { return nil }
         return url
     }
 
-    /// What to call what a link points at. Its own last path component when that
-    /// names a file, and the host otherwise — a link ending in `/download` still
-    /// has to land somewhere with a name on it.
+    /// Filename for a linked IPA: the URL's last path component (without its
+    /// extension) plus `.ipa`, or the host name when that component is empty.
     static func importFileName(for url: URL) -> String {
         let base = url.deletingPathExtension().lastPathComponent
             .replacingOccurrences(of: "/", with: "-")
@@ -1085,16 +1062,15 @@ final class Engine: ObservableObject {
         return name + ".ipa"
     }
 
-    /// Delete a copy the picker left in this app's own temporary directory.
-    /// Guarded on the path, so a file picked where it lives — or one handed
-    /// over in place from the share sheet — is never touched.
+    /// Deletes a picked file only if it's in this app's temp directory (the
+    /// picker's copy). Files opened in place are left alone.
     private static func discardInboxCopy(_ url: URL) {
         let tmp = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path
         guard url.resolvingSymlinksInPath().path.hasPrefix(tmp + "/") else { return }
         try? FileManager.default.removeItem(at: url)
     }
 
-    /// The blocking half of an import, on a background queue.
+    /// Copies a picked IPA into the custom import slot on a background queue.
     private static func copyImport(from url: URL) async throws -> URL {
         try await withCheckedThrowingContinuation { cont in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -1145,7 +1121,7 @@ final class Engine: ObservableObject {
                 try self.performSign(session: session, ipa: ipa, udid: udid, deviceName: name)
             }
             signedAppPath = path
-            // The first point at which an imported IPA says what it is.
+            // Read the app's name from the signed bundle (imported IPAs have none before this).
             signedDisplayName = signedAppName()
             setStep(.sign, .done)
         } catch {
@@ -1220,8 +1196,8 @@ final class Engine: ObservableObject {
         let ip = deviceHost
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         try await onDeviceQueue {
-            // iOS tears down the tunnel while it sits idle through sign-in and
-            // signing, and `isConnected` can't see that, so rebuild it here.
+            // iOS drops the idle tunnel during sign-in and signing, and
+            // `isConnected` doesn't detect it, so reconnect first.
             self.log("Refreshing device link before install (tunnel was idle during sign-in/download/sign) …")
             try self.connection.connect(deviceIP: ip, pairingFilePath: path)
             guard self.connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
@@ -1241,8 +1217,8 @@ final class Engine: ObservableObject {
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         // The installed build decides the host app and where the file lands.
         let source = downloadedSource ?? installSource
-        // Built here, on the sign queue every other isideload call is
-        // serialized on, rather than inside the device-queue write below.
+        // Built on the sign queue, where all isideload calls run, before the
+        // device-queue write below.
         let accountConfig = await accountConfigJSON(source: source)
         let udid = deviceUDID
         do {
@@ -1266,7 +1242,7 @@ final class Engine: ObservableObject {
         guard FileManager.default.fileExists(atPath: path), size > 0 else {
             throw EngineError.message(L("Pairing file missing — pairing must run first."))
         }
-        // AltStore-family apps can't read the RPPairing record on its own.
+        // Add a lockdown record so AltStore-family apps can read the file.
         let placement = placementPairingFile(rpPairingPath: path, udid: udid)
 
         // Resolve the host app's bundle id from installation_proxy, by display
@@ -1294,9 +1270,8 @@ final class Engine: ObservableObject {
                                                        pairingFilePath: placement)
         log("Pairing file written into \(appName) and read-back VERIFIED (\(written) bytes).")
 
-        // Hand SideStore the certificate it was signed with, so its first
-        // sign-in doesn't revoke ours, mint its own, and put up "Resign
-        // SideStore". Never fails the run: the install is complete either way.
+        // Give SideStore the signing certificate so its first sign-in reuses it
+        // instead of creating a new one and asking to resign. Failures only log.
         if let accountConfig, let remoteRel = accountConfigRemoteRelativePath(source: source) {
             do {
                 let handed = try connection.writeFile(intoBundleID: bundleID,
@@ -1309,9 +1284,8 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// The `Account.sideconf` payload for this install, or nil when there's
-    /// nothing to hand over. Never throws — a failure here costs the automatic
-    /// hand-off, not the install.
+    /// The `Account.sideconf` JSON for this install, or nil to skip the
+    /// certificate hand-off. Errors are logged, never thrown.
     @MainActor
     private func accountConfigJSON(source: InstallSource) async -> String? {
         guard accountConfigRemoteRelativePath(source: source) != nil else { return nil }
@@ -1335,29 +1309,21 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// Marker for SideStore's password-prompting account importer: the
-    /// `UserDefaults.acctFileChecksum` key added in the same change, present in
-    /// the binary as both a `#function` literal and an `@objc` accessor name.
+    /// String found only in SideStore binaries whose account importer prompts
+    /// for a password (the `UserDefaults.acctFileChecksum` key).
     private static let promptingImporterMarker = Data("acctFileChecksum".utf8)
 
     /// Whether the SideStore build being installed imports `Account.sideconf`
-    /// without asking anything.
+    /// silently.
     ///
-    /// Builds up to 2026-08 read the file, adopt the certificate and delete it
-    /// on first launch. From `ImportAccountAlertController` (2026-08-10) on,
-    /// `detectAndImportAccountFile` instead puts up an "Import Account" alert
-    /// asking for a file password, only accepts the AES-GCM format
-    /// `ImportExport.exportAccount` writes, and never deletes the file — and it
-    /// records the file's checksum only once a decryption succeeds. Our
-    /// plaintext JSON can never decrypt, so handing it to such a build means
-    /// that alert on *every* launch, forever. iLoader never writes the file at
-    /// all, which is why it never shows the alert; when we can't hand over
-    /// silently we don't hand over either.
+    /// Silent builds read the file, adopt the certificate, and delete it on first
+    /// launch. Builds with `ImportAccountAlertController` instead ask for a file
+    /// password, accept only their own encrypted format, and keep the file, so
+    /// our plaintext JSON would trigger that alert on every launch. Those builds
+    /// get no file (same as iLoader).
     ///
-    /// Read off the binary rather than the version, because the two don't track
-    /// each other: LiveContainer's stable IPA bundles SideStore
-    /// 0.6.4-20260714, which still imports silently, while its nightly bundles
-    /// 0.6.4-20260816, which doesn't.
+    /// Detected by scanning the binary for `promptingImporterMarker`, because
+    /// version numbers don't reliably tell the two apart.
     private func importsAccountConfigSilently() -> Bool {
         guard let exec = sideStoreExecutablePath() else {
             log("Couldn't find SideStore's binary in the signed bundle to check how it imports Account.sideconf.")
@@ -1370,12 +1336,10 @@ final class Engine: ObservableObject {
         return binary.range(of: Engine.promptingImporterMarker) == nil
     }
 
-    /// The SideStore executable inside the signed bundle. Under LiveContainer
-    /// that is the guest copy, moved into `Frameworks/SideStoreApp.framework`
-    /// and dylibified by LiveContainer's `build_github.sh`; otherwise it is the
-    /// signed .app itself. Either way the bundle has to really be SideStore, so
-    /// a build that isn't can't be mistaken for one that imports silently —
-    /// isideload only ever suffixes the id with ".<teamID>", so the prefix holds.
+    /// Path to the SideStore executable in the signed bundle: the
+    /// `Frameworks/SideStoreApp.framework` copy under LiveContainer, otherwise the
+    /// .app itself. Nil unless the bundle ID starts with `com.SideStore.SideStore`
+    /// (isideload only appends ".<teamID>").
     private func sideStoreExecutablePath() -> String? {
         guard let app = signedAppPath else { return nil }
         let framework = (app as NSString).appendingPathComponent("Frameworks/SideStoreApp.framework")
@@ -1392,10 +1356,9 @@ final class Engine: ObservableObject {
         return FileManager.default.fileExists(atPath: exec) ? exec : nil
     }
 
-    /// Where `Account.sideconf` goes, or nil if this install isn't SideStore.
-    /// Under LiveContainer, SideStore is a guest with a nested Documents folder;
-    /// a custom IPA qualifies only when it really is a SideStore build — its
-    /// bundle id is the signed one, which isideload suffixes with ".<teamID>".
+    /// Container-relative path for `Account.sideconf`, or nil if the install isn't
+    /// SideStore. LiveContainer nests SideStore's Documents folder; a custom IPA
+    /// counts only if its signed bundle ID starts with `com.SideStore.SideStore`.
     private func accountConfigRemoteRelativePath(source: InstallSource) -> String? {
         switch source {
         case .sideStore:     return "Account.sideconf"
@@ -1430,7 +1393,7 @@ final class Engine: ObservableObject {
         log("✅ Done — \(installedSourceName) is installed. One trust step left (see the card).")
     }
 
-    // MARK: - STEP 1: liveness
+    // MARK: - FFI liveness check
 
     func ping() {
         runInBackground("ping") {
@@ -1446,8 +1409,8 @@ final class Engine: ObservableObject {
 
     // MARK: - Advanced section: individual steps
     //
-    // Wrappers around the same async core the one-click flow runs, logging
-    // their own failures instead of raising a stopped step and guide.
+    // Run single pipeline steps on demand. Errors are logged instead of stopping
+    // a run or showing a guide.
 
     func checkVPNAndWifi() {
         let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceHost)
@@ -1487,11 +1450,9 @@ final class Engine: ObservableObject {
 
     // MARK: - Starting LocalDevVPN
     //
-    // Nothing here starts a tunnel itself: a VPN configuration belongs to the
-    // app that created it, and no app can switch on another's. What LocalDevVPN
-    // does offer is a URL scheme — `localdevvpn://enable?scheme=<ours>` connects
-    // its tunnel and, a second later, opens `<ours>://` to hand the screen
-    // straight back. That round trip is the whole mechanism.
+    // An app can't enable another app's VPN. Instead we open
+    // `localdevvpn://enable?scheme=sideinstaller`; LocalDevVPN connects its tunnel
+    // and then opens `sideinstaller://` to return here.
 
     private static let localDevVPNScheme = "localdevvpn"
     /// The scheme LocalDevVPN is asked to return to, registered in Info.plist.
@@ -1504,12 +1465,11 @@ final class Engine: ObservableObject {
         return UIApplication.shared.canOpenURL(url)
     }
 
-    /// When the last handover fired, so the trip back can't set off another.
+    /// Time of the last handover, so returning from LocalDevVPN doesn't trigger another.
     private var lastVPNStartAttempt: Date?
 
-    /// Hand over to LocalDevVPN, asking it to connect and come back. False means
-    /// it isn't installed — the only outcome this app can see, since everything
-    /// after the handover happens over there.
+    /// Opens LocalDevVPN to connect its tunnel and return. Returns false if it
+    /// isn't installed; whether the tunnel connects isn't visible from here.
     @MainActor
     @discardableResult
     func startLocalDevVPN() -> Bool {
@@ -1525,19 +1485,17 @@ final class Engine: ObservableObject {
         return true
     }
 
-    /// The launch hook behind the setting. Runs on every activation, not just a
-    /// cold start: iOS resumes this app far more often than it launches it, and
-    /// a tunnel dropped while it was away is exactly the case worth catching.
+    /// Starts LocalDevVPN when the setting is on and no tunnel is up. Called on
+    /// every app activation, so a tunnel dropped while backgrounded is caught too.
     @MainActor
     func autoStartVPNIfWanted() {
         guard autoStartVPN else { return }
-        // The setting is on by default, so a first run would otherwise be
-        // yanked into another app before the terms have even been read.
+        // Wait until onboarding (terms and account setup) is finished.
         let defaults = UserDefaults.standard
         guard defaults.bool(forKey: "hasAcceptedTOS"),
               defaults.bool(forKey: "hasCompletedAccountSetup") else { return }
-        // Covers the handover and the seconds the tunnel needs to come up, so
-        // LocalDevVPN's own trip back can't bounce the user straight out again.
+        // Skip for 30s after a handover, so returning from LocalDevVPN doesn't
+        // immediately open it again.
         if let last = lastVPNStartAttempt, Date().timeIntervalSince(last) < 30 { return }
         refreshNetworkStatus()
         guard !vpnConnected else { return }
@@ -1638,20 +1596,16 @@ final class Engine: ObservableObject {
 
     // MARK: - Pairing tab
     //
-    // Standalone pairing-file management, independent of the one-click install:
-    // the same RPPairing host produces the file, which is then written into a
-    // chosen installed app over the tunnel via house_arrest/AFC.
+    // Pairing-file management outside the one-click install: generate or import
+    // the file, then write it into installed apps via house_arrest/AFC.
 
-    /// Adopt a pairing file the user made elsewhere, replacing whatever is on
-    /// disk. The way in for an iPhone older than iOS 27, which can't pair with
-    /// itself: the file comes from jitterbugpair, pymobiledevice3, idevicepair
-    /// or another app that already holds one for this device.
+    /// Imports a pairing file made elsewhere (jitterbugpair, pymobiledevice3,
+    /// idevicepair, …), replacing the one on disk. Required below iOS 27.
     @MainActor
     func importPairingFile(from url: URL) async {
         guard !isImportingPairing else { return }
         isImportingPairing = true
-        // The picker copies the file into this app's Inbox before handing it
-        // over; once it's read, that copy is dead weight.
+        // Delete the picker's temporary copy once the import is done.
         defer { isImportingPairing = false; Self.discardInboxCopy(url) }
         lastError = nil
         log("Importing pairing file \(url.lastPathComponent) …")
@@ -1665,7 +1619,7 @@ final class Engine: ObservableObject {
                 return
             }
             try data.write(to: PrivateStore.pairingFile, options: .atomic)
-            // The merged file was built from the record this just replaced.
+            // Drop the cached merged file; it was built from the old record.
             CompositePairingFile.invalidateMerged()
             pairingFilePath = PrivateStore.pairingFile.path
             importedPairingName = url.lastPathComponent
@@ -1695,8 +1649,7 @@ final class Engine: ObservableObject {
         UserDefaults.standard.removeObject(forKey: Engine.importedPairingNameKey)
     }
 
-    /// Read a picked file off the main thread, taking the security-scoped handle
-    /// an "Open with" hand-off comes with.
+    /// Reads a picked file while holding its security-scoped access.
     private static func readImport(from url: URL) throws -> Data {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
@@ -1809,9 +1762,8 @@ final class Engine: ObservableObject {
 
     // MARK: - Sideloaded apps tab
 
-    /// What the device says is installed, and every provisioning profile it
-    /// holds. Two round trips over the one tunnel, since matching an app to the
-    /// profile that signed it can only be done with both in hand.
+    /// Installed apps and all provisioning profiles on the device, fetched
+    /// together so the caller can match each app to its profile.
     @MainActor
     func sideloadedAppInventory() async throws -> (apps: [[String: Any]], profiles: [Data]) {
         try await ensurePairingConnection()
@@ -1823,15 +1775,12 @@ final class Engine: ObservableObject {
 
     // MARK: Refreshing what's already installed
     //
-    // A free provisioning profile lasts seven days, and the only way to put
-    // seven back on the clock is to sign the app again and install it over
-    // itself — which is what SideStore's "Refresh" does. Nothing below is new
-    // work: it is the install pipeline's sign and install steps, run per app and
-    // kept off the one-click checklist.
+    // Free provisioning profiles expire after seven days. A refresh re-signs the
+    // app and installs it over itself, reusing the pipeline's sign and install
+    // steps without touching the one-click checklist.
 
-    /// Everything a refresh needs before the first app is signed: the loopback
-    /// tunnel up, the device link open — which is also where the UDID the signer
-    /// registers comes from — and the Apple ID signed in.
+    /// Prepares for a refresh: checks iOS and credentials, opens the device link
+    /// (which provides the UDID for signing), and signs in.
     @MainActor
     func prepareRefresh() async throws {
         guard osSupported else {
@@ -1845,11 +1794,9 @@ final class Engine: ObservableObject {
         try await signIn(updatingChecklist: false)
     }
 
-    /// Sign `ipaPath` again and install it over the copy already on the device.
-    /// Signing issues a new provisioning profile, and installing is what puts it
-    /// on the app — neither half is a refresh on its own. The bundle id, team
-    /// and certificate are unchanged, so installd treats this as an upgrade and
-    /// the app keeps its data.
+    /// Re-signs `ipaPath` (issuing a new provisioning profile) and installs it
+    /// over the existing copy. Bundle ID, team and certificate are unchanged, so
+    /// installd treats it as an upgrade and app data is kept.
     @MainActor
     func refreshInstalledApp(named name: String, ipaPath: String) async throws {
         guard let session = signSession else { throw EngineError.message(L("Not signed in.")) }
@@ -1862,10 +1809,8 @@ final class Engine: ObservableObject {
                 try self.performSign(session: session, ipa: ipaPath, udid: udid, deviceName: device)
             }
         } catch EngineError.certExists {
-            // Not `certConflict`: that raises the Install tab's revoke-and-retry
-            // card, whose retry runs a whole install of whatever that tab has
-            // selected. Point at the Certificates page instead, which revokes
-            // without starting anything.
+            // Don't set `certConflict`: its retry button starts a full install
+            // from the Install tab. Point to the Certificates page instead.
             throw EngineError.message(L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again."))
         }
         defer { Self.discardSignedBundle(at: signed) }
@@ -1873,8 +1818,8 @@ final class Engine: ObservableObject {
         let ip = deviceHost
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         try await onDeviceQueue {
-            // Signing takes long enough for iOS to tear the tunnel down, and
-            // `isConnected` can't see that — rebuild the link, as install does.
+            // iOS may drop the tunnel during signing and `isConnected` doesn't
+            // detect it, so reconnect first (same as install).
             try self.connection.connect(deviceIP: ip, pairingFilePath: path)
             guard self.connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
             try self.connection.installSignedApp(bundlePath: signed)
@@ -1883,13 +1828,11 @@ final class Engine: ObservableObject {
         log("\(name) refreshed — its seven days start again now.")
     }
 
-    /// Delete a signed bundle once it is on the device. Refreshing a page full
-    /// of apps unpacks one of these per app, at a few hundred megabytes each;
-    /// the one-click install leaves its single copy for the OS to reap.
+    /// Deletes a signed bundle after it's installed. A refresh extracts one
+    /// bundle per app, so each is removed right away to save space.
     private static func discardSignedBundle(at path: String) {
-        // isideload unpacks into <temp>/<ipa file name>_extracted/Payload/X.app,
-        // so the extraction directory is what's worth taking away. Anything not
-        // shaped like that is left alone.
+        // isideload extracts to <temp>/<ipa file name>_extracted/Payload/X.app.
+        // Remove that `_extracted` directory; leave any other path alone.
         let temp = URL(fileURLWithPath: NSTemporaryDirectory()).standardizedFileURL
         let extraction = URL(fileURLWithPath: path).standardizedFileURL
             .deletingLastPathComponent()        // Payload
@@ -1901,10 +1844,9 @@ final class Engine: ObservableObject {
 
     // MARK: - Location tab
     //
-    // Location simulation is a DVT service, so it needs two things the install
-    // flow never sets up: a mounted developer disk image, and a session held
-    // open for as long as the fake location should stick. Both follow
-    // StikDebug's path, over the same RPPairing tunnel used everywhere else.
+    // Location simulation is a DVT service. It needs a mounted developer disk
+    // image and a session kept open while the location is simulated. Same
+    // approach as StikDebug, over the RPPairing tunnel.
 
     /// Connect, and mount the developer disk image unless the device already has
     /// one. Returns true when a mount actually ran, so the UI can say so.
@@ -1958,27 +1900,21 @@ final class Engine: ObservableObject {
 
     // MARK: The file other apps actually read
 
-    /// The pairing file to hand to another app: the RPPairing record merged with
-    /// a classic lockdown one, falling back to the RPPairing record alone.
+    /// Returns the path of the pairing file to write into other apps.
     ///
-    /// SideInstaller's own tunnel runs on RPPairing, but that's the only record
-    /// it produces, and minimuxer — SideStore, LiveContainer + SideStore — and
-    /// Feather all parse a classic lockdown record instead. iLoader's pairing
-    /// file carries both; this mints the missing half over the tunnel that's
-    /// already open and merges the two, exactly as iLoader does.
+    /// SideInstaller pairs via RPPairing, but minimuxer (SideStore, LiveContainer)
+    /// and Feather need a classic lockdown record. This creates one over the open
+    /// tunnel and merges both records into one file, as iLoader does.
     ///
-    /// Must run on `deviceQueue`: it talks to the device. Never throws — a
-    /// failure costs the classic half, not the write, and the RPPairing record
-    /// alone is what shipped before and still serves StikDebug's sideloaded
-    /// build.
+    /// Runs on `deviceQueue`. Never throws: on failure it returns the RPPairing
+    /// file alone, which StikDebug can still use.
     private func placementPairingFile(rpPairingPath: String, udid: String?) -> String {
-        // An imported file is usually a classic record already — exactly what
-        // those apps parse — so hand it over as it stands rather than spending
-        // a pairing slot and a Trust prompt minting a second one.
+        // Imported files usually already contain a lockdown record: use them
+        // as-is instead of pairing again.
         let kind = PairingFileKind.of(path: rpPairingPath)
         if kind.hasLockdown {
-            // Unless it names no device: pymobiledevice3 and idevicepair leave
-            // UDID out, and minimuxer wants it.
+            // pymobiledevice3 and idevicepair omit the UDID, which minimuxer
+            // needs, so add it when known.
             guard kind.udid == nil, let udid, !udid.isEmpty else {
                 log("Pairing file already carries a lockdown record — handing it over as it is.")
                 return rpPairingPath
@@ -2153,7 +2089,7 @@ final class Engine: ObservableObject {
 
 // MARK: - Predefined instruction cards
 
-/// Computed so the copy is translated when read, picking up a language change.
+/// Computed so text is localized when read and follows language changes.
 enum Guides {
     /// Shown only for a run that has to pair, the one step needing Wi-Fi.
     static var wifi: Guide {
@@ -2168,9 +2104,8 @@ enum Guides {
             actionLabel: nil, actionURLString: nil)
     }
 
-    /// Shown when no tunnel is up. The copy names LocalDevVPN, since offering a
-    /// choice sent people looking for the "right" one; any VPN app on the device
-    /// subnet still works, and `vpnConnected` never checks which one it is.
+    /// Shown when no tunnel is up. Recommends LocalDevVPN, but any VPN on the
+    /// device subnet works.
     static var vpn: Guide {
         Guide(
             title: L("Connect LocalDevVPN"),
@@ -2199,8 +2134,7 @@ enum Guides {
             actionLabel: nil, actionURLString: nil)
     }
 
-    /// Shown when no Apple ID is saved. Since the credential fields left this
-    /// screen, the empty state has to be spelt out rather than shown as a gap.
+    /// Shown when no Apple ID is saved; points to Settings › Account.
     static var account: Guide {
         Guide(
             title: L("Add your Apple ID"),

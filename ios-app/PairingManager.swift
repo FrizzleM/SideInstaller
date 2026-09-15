@@ -6,7 +6,7 @@ import Foundation
 @MainActor
 final class PairingManager: ObservableObject {
 
-    // Pairing file on disk, behind the status line and the Export button.
+    // Pairing file state, for the status pill and the Export button.
     @Published private(set) var pairingFileExists = false
     @Published private(set) var pairingFileSize = 0
     @Published private(set) var pairingFileDate: Date?
@@ -28,17 +28,15 @@ final class PairingManager: ObservableObject {
 
     private var engine: Engine { Engine.shared }
 
-    /// True once a scan has been started without being asked, for the current
-    /// pairing file. Keeps `autoScan` to one attempt, so re-opening the page
-    /// keeps what the last one found and a failed one doesn't retry on a loop.
+    /// Limits `autoScan` to one attempt per pairing file, so reopening the page
+    /// doesn't rescan or retry a failed scan.
     private var didAutoScan = false
 
     /// Any operation in flight, which disables the controls.
     var isBusy: Bool { isGenerating || isScanning || isInstallingAll || installingTargetID != nil }
 
-    /// The pairing file to hand to a share sheet, when one exists on disk.
-    /// Prefers the merged record, which is the one every supported app can read;
-    /// it only exists once a write has built it.
+    /// File for the Export share sheet. Prefers the merged file (readable by all
+    /// supported apps), which exists only after a write has built it.
     var exportURL: URL? {
         guard pairingFileExists else { return nil }
         if let merged = CompositePairingFile.existingPath() {
@@ -72,7 +70,7 @@ final class PairingManager: ObservableObject {
                 engine.connection.disconnect()
                 targets = []
                 hasScanned = false
-                // A new pairing file earns a fresh look next time it opens.
+                // Allow an auto-scan again for the new pairing file.
                 didAutoScan = false
                 lastSuccess = L("Pairing file ready. You can export it or install it into an app below.")
             } catch is CancellationError {
@@ -85,12 +83,10 @@ final class PairingManager: ObservableObject {
         }
     }
 
-    /// Scan without being asked, for a page that opens with the tunnel already
-    /// up and a file to write. Silent about every case it can't run in — the
-    /// card explains those, and the button is still there.
+    /// Scans automatically when the tunnel is up and a pairing file exists.
+    /// Does nothing otherwise.
     func autoScan() {
-        // The poll only runs every couple of seconds; a stale `false` here
-        // would skip the scan for a tunnel that is actually up.
+        // Refresh first, since the status poll only runs every 2 seconds.
         engine.refreshNetworkStatus()
         guard !didAutoScan, !hasScanned, !isBusy, !engine.isRunning,
               engine.vpnConnected, pairingFileExists else { return }

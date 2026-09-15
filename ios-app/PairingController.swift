@@ -19,20 +19,14 @@ final class PairingController {
 
     private var running = false
 
-    /// This host's `altIRK`, kept across pairings.
+    /// This host's `altIRK`, persisted across pairings.
     ///
-    /// The `authTag` advertised over Bonjour is derived from it, and that is how
-    /// an iPhone that has paired with SideInstaller before recognises it. The
-    /// Rust side hands one out on every successful pairing; storing it and
-    /// passing it back is what makes it an identity rather than a fresh random
-    /// value each run. StikPair, which this pairing path is forked from, returns
-    /// the same value and drops it — its own comment says a production app
-    /// shouldn't.
-    /// `nonisolated` because the run that produces a new one finishes on a
-    /// background queue, and this class is `@MainActor`: without it, storing the
-    /// value is a main-actor mutation from a `Sendable` closure. There is no
-    /// actor state to protect — the value lives in `UserDefaults`, which is
-    /// thread-safe, and this is the only writer.
+    /// The Bonjour `authTag` is derived from it, which lets a previously paired
+    /// iPhone recognize this host. The Rust side returns it after each
+    /// successful pairing, and it's passed back in on the next run.
+    ///
+    /// `nonisolated` so the background completion can store it; it only touches
+    /// `UserDefaults`, which is thread-safe.
     private nonisolated static let altIRKKey = "rpPairingHostAltIRK"
     private nonisolated static var storedAltIRK: String {
         get { UserDefaults.standard.string(forKey: altIRKKey) ?? "" }
@@ -122,11 +116,9 @@ final class PairingController {
         let model = hostModel
         let outPath = Self.pairingFilePath()
         let altIRK = Self.storedAltIRK
-        // Retained for the C callbacks' ctx, and released after the run.
-        //
-        // `nonisolated(unsafe)` because a raw pointer isn't `Sendable` and the
-        // closure below is: the compiler can't see that this one is uniquely
-        // owned by that closure, handed straight to C, and released there once.
+        // Retained as the C callbacks' `ctx`, released after the run.
+        // `nonisolated(unsafe)`: the raw pointer isn't `Sendable`, but only the
+        // closure below uses it, and it's released once.
         nonisolated(unsafe) let ctx = UnsafeMutableRawPointer(Unmanaged.passRetained(self).toOpaque())
 
         engine.log("RPPairing: invoking si_pairing_run_host (out=\(outPath))")
@@ -149,9 +141,7 @@ final class PairingController {
 
             let outcome: PairOutcome
             if rc == 0 {
-                // Whatever identity the run settled on — the stored one, or a
-                // fresh one when there wasn't a usable stored one — is what the
-                // device now knows this host by, so keep it.
+                // Save the altIRK the run used (stored or newly generated).
                 let issued = cStr(result.host_alt_irk_hex)
                 if !issued.isEmpty { Self.storedAltIRK = issued }
                 outcome = .success(
@@ -194,12 +184,10 @@ final class PairingController {
                 resolve(.failure(PairingError.zeroBytes))
             } else {
                 engine.pairingFilePath = path
-                // This record has replaced whatever was imported before it.
+                // The new pairing file replaces any imported one.
                 engine.clearImportedPairingMark()
                 engine.pairingStatus = L("paired: %@ (%dB)", name, size)
-                // A new RPPairing record makes half of the merged file stale;
-                // the cached lockdown record stays, since re-minting that one is
-                // interactive and spends a pairing slot on the device.
+                // The merged file is now stale; the cached lockdown record is kept.
                 CompositePairingFile.invalidateMerged()
                 resolve(.success(path))
             }
@@ -229,7 +217,7 @@ final class PairingController {
     fileprivate func presentPin(_ pin: String) {
         engine.log("RPPairing: PIN = \(pin) — confirm it on this device (Settings → Developer Mode → Pair with SideInstaller).")
         engine.pairingStatus = L("enter PIN %@ in Settings", pin)
-        // Shown as a card on the Install screen.
+        // Displayed as a PIN card in the UI.
         engine.pairingPIN = pin
     }
 

@@ -9,7 +9,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case vietnamese
     case french
     case chinese
-    case japanese // ← 追加
+    case japanese
     case portuguese
 
     var id: String { rawValue }
@@ -24,7 +24,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .vietnamese: return "Tiếng Việt"
         case .french:     return "Français"
         case .chinese:    return "简体中文"
-        case .japanese:   return "日本語" // ← 追加
+        case .japanese:   return "日本語"
         case .portuguese: return "Português"
         }
     }
@@ -39,10 +39,10 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "it": return .italian
         case "vi": return .vietnamese
         case "fr": return .french
-        // Only Simplified is translated, but it beats English for every variant.
+        // All Chinese variants use the Simplified Chinese translation.
         case "zh": return .chinese
-        case "ja": return .japanese // ← 追加
-        // Brazilian copy, but it beats English for European Portuguese too.
+        case "ja": return .japanese
+        // All Portuguese variants use the Brazilian Portuguese translation.
         case "pt": return .portuguese
         default:   return .english
         }
@@ -56,7 +56,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .vietnamese:     return vietnameseStrings
         case .french:         return frenchStrings
         case .chinese:        return chineseStrings
-        case .japanese:       return japaneseStrings // ← 追加
+        case .japanese:       return japaneseStrings
         case .portuguese:     return portugueseStrings
         case .auto, .english: return nil
         }
@@ -84,8 +84,8 @@ final class Localizer: ObservableObject {
     /// thread. Nil until the singleton has been built.
     fileprivate static var effective: AppLanguage?
 
-    /// What `L(_:)` translates into, reading `shared` because the engine
-    /// localizes a status line before this object exists.
+    /// Language used by `L(_:)`. Falls back to `shared` (creating it) when `L`
+    /// is called before the singleton exists.
     fileprivate static var effectiveLanguage: AppLanguage {
         effective ?? shared.language.resolved
     }
@@ -93,7 +93,7 @@ final class Localizer: ObservableObject {
     private init() {
         let stored = UserDefaults.standard.string(forKey: Self.defaultsKey)
             .flatMap(AppLanguage.init(rawValue:)) ?? .auto
-        language = stored                       // no didSet during init — by design
+        language = stored                       // didSet doesn't run in init, so set `effective` below
         Localizer.effective = stored.resolved
     }
 }
@@ -109,7 +109,7 @@ extension Localizer {
         case .vietnamese: return Locale(identifier: "vi_VN")
         case .french:     return Locale(identifier: "fr_FR")
         case .chinese:    return Locale(identifier: "zh_Hans_CN")
-        case .japanese:   return Locale(identifier: "ja_JP") // ← 追加
+        case .japanese:   return Locale(identifier: "ja_JP")
         case .portuguese: return Locale(identifier: "pt_BR")
         }
     }

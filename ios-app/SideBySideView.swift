@@ -3,11 +3,11 @@ import SideInstallerFFI
 
 // MARK: - Steps
 
-/// One ordered step of a Side by Side install, in the order they run.
+/// Steps of a Side by Side install, in run order.
 ///
-/// Deliberately shorter than the Install tab's `Step`: there is no loopback VPN
-/// to wait for — the tunnel is built straight over Wi-Fi — and nothing is
-/// written into the installed app afterwards, since SideInstaller pairs itself.
+/// Fewer than the Install tab's `Step`: the tunnel goes directly over Wi-Fi (no
+/// VPN), and no pairing file is written afterwards since SideInstaller pairs
+/// itself.
 enum SideBySideStep: Int, CaseIterable, Identifiable {
     case connect, signIn, download, sign, install
 
@@ -28,24 +28,20 @@ enum SideBySideStep: Int, CaseIterable, Identifiable {
 
 /// Installs SideInstaller onto *another* iPhone on the same Wi-Fi network.
 ///
-/// Everything the Install tab does over the loopback VPN, this does over the LAN
-/// instead, against an address typed in rather than the tunnel's own peer:
+/// Same flow as the Install tab, but over the LAN to a typed-in IP address:
 ///
-/// 1. **Pair.** lockdownd answers on its own port at the far end, so the classic
-///    `Pair` handshake runs straight against `<their IP>:62078`. Their iPhone
-///    puts up its Trust prompt, and what comes back is a lockdown pair record —
-///    the record `tunnel_create_usb` (CoreDeviceProxy) needs, which is what makes
-///    this work back to iOS 17 with no pairing file from a computer.
-/// 2. **Sign in, sign, install** exactly as the one-click flow does, with the
-///    credentials typed on this page and the *target's* UDID.
+/// 1. **Pair.** Run the lockdown `Pair` handshake directly against
+///    `<their IP>:62078`. Their iPhone shows a Trust prompt and returns a
+///    lockdown pair record, which CoreDeviceProxy (`tunnel_create_usb`) uses to
+///    open the tunnel. Works on iOS 17+ without a computer.
+/// 2. **Sign in, sign, install** as in the one-click flow, using the credentials
+///    entered on this page and the target's UDID.
 ///
-/// The credentials are held in memory for the length of a run and never reach
-/// `AccountStore` or the keychain: they are somebody else's, and this iPhone is
-/// not where they belong.
+/// Credentials are kept in memory only, never saved to `AccountStore` or the
+/// keychain.
 final class SideBySideManager: ObservableObject {
 
-    /// The unsigned build to install: this repo's newest published release, so
-    /// the tool can never hand over something older than the copy running it.
+    /// Unsigned IPA from SideInstaller's latest GitHub release.
     static let releaseIPA = URL(string:
         "https://github.com/FrizzleM/SideInstaller/releases/latest/download/SideInstaller.ipa")!
 
@@ -111,8 +107,7 @@ final class SideBySideManager: ObservableObject {
         !Self.tidy(targetIP).isEmpty && !Self.tidy(appleID).isEmpty && !password.isEmpty
     }
 
-    /// This iPhone's own Wi-Fi address, shown as a hint: theirs is a neighbour
-    /// of it, which is most of the work of finding it.
+    /// This iPhone's Wi-Fi address, shown as an example of what theirs looks like.
     var ownWiFiAddress: String? {
         NetworkStatus.interfaces().first { $0.name == "en0" }?.ipv4
     }
@@ -188,29 +183,23 @@ final class SideBySideManager: ObservableObject {
         }
     }
 
-    /// Stop the run at the next step boundary.
-    ///
-    /// Not instant: each step's FFI call blocks a queue and none of them take a
-    /// cancellation token, so a cancel tapped while the far iPhone is still
-    /// showing its Trust prompt lands once that call returns. The checks between
-    /// steps are what make it land at all.
+    /// Cancels the run at the next step boundary. Blocking FFI calls (e.g.
+    /// waiting on the Trust prompt) can't be interrupted, so it takes effect once
+    /// the current call returns.
     @MainActor
     func cancel() {
         task?.cancel()
     }
 
-    /// Forget the Apple ID session, so the next run authenticates again. Called
-    /// when the account changes under it, and by the Clear button — the password
-    /// is somebody else's, and nothing here should outlive their visit.
+    /// Frees the Apple ID session so the next run signs in again. Called when
+    /// the Apple ID changes and by Clear, so another person's session isn't kept.
     ///
-    /// Not main-actor isolated, as `Engine.forgetAppleSession` isn't: the whole
-    /// body runs on `signQueue`, and hopping there out of an actor would be
-    /// carrying a non-`Sendable` session across it.
+    /// Not main-actor isolated: the work runs on `signQueue`, and the session
+    /// pointer isn't `Sendable`.
     func signOut() {
         signedInAs = nil
-        // Freed on `signQueue`, the only queue that touches `signSession` —
-        // which is also why the next sign-in, dispatched to the same serial
-        // queue, can never race this into a double free.
+        // Freed on `signQueue`, which owns `signSession`. It's serial, so this
+        // can't race the next sign-in.
         signQueue.async { [weak self] in
             guard let self, let session = self.signSession else { return }
             si_sign_session_free(session)
@@ -218,8 +207,8 @@ final class SideBySideManager: ObservableObject {
         }
     }
 
-    /// Tear the tunnel down on `deviceQueue`, the only queue that may touch the
-    /// connection. Non-isolated for the same reason `signOut` is.
+    /// Disconnects on `deviceQueue`, which owns the connection. Not main-actor
+    /// isolated, like `signOut`.
     private func closeLink() {
         deviceQueue.async { [weak self] in self?.connection.disconnect() }
     }
@@ -271,9 +260,8 @@ final class SideBySideManager: ObservableObject {
 
     // MARK: - Step 0: Local Network permission
 
-    /// Reaching lockdownd on another device is a local-network connection, and
-    /// iOS refuses it *silently* until the permission is granted — so ask before
-    /// the first connect rather than letting it surface as a socket error.
+    /// Triggers the Local Network prompt before the first connect. iOS silently
+    /// blocks local-network connections until it's granted.
     @MainActor
     private func ensureLocalNetwork() async {
         guard !askedLocalNetwork else { return }
@@ -310,8 +298,8 @@ final class SideBySideManager: ObservableObject {
         let record = PrivateStore.peerPairRecord(host: ip)
         pairRecordPath = record.path
 
-        // A record minted on an earlier visit is tried first: pairing is
-        // interactive and spends one of their device's pairing slots.
+        // Try a record saved by an earlier run first: pairing needs a Trust tap
+        // and uses one of their device's pairing slots.
         if fileSize(record.path) > 0 {
             do {
                 engine.log("Trying the pair record already minted for \(ip) …")
@@ -342,12 +330,11 @@ final class SideBySideManager: ObservableObject {
                                name: values["DeviceName"])
     }
 
-    /// Run the classic lockdown `Pair` handshake against the far end and keep
-    /// what it returns, then build the tunnel on top of it.
+    /// Pairs with the target via lockdown, saves the record, then opens the
+    /// tunnel.
     ///
-    /// This blocks while their iPhone shows its Trust prompt — idevice retries
-    /// `Pair` until somebody answers — which is why the step sits in `.waiting`
-    /// rather than `.active`: what it is waiting for is a person, not a wire.
+    /// Blocks until the Trust prompt on their iPhone is answered, which is why
+    /// the connect step shows as `.waiting`.
     private func mintPairRecord(ip: String, into record: URL) throws {
         engine.log("Asking \(ip) to pair — their iPhone has to be unlocked, and they have to tap Trust …")
         let data = try connection.lockdownPairRecordDirect(
@@ -421,17 +408,15 @@ final class SideBySideManager: ObservableObject {
         throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, lastFailure))
     }
 
-    /// One sign-in attempt against a specific anisette server. The machine name
-    /// is `SideInstaller` here as everywhere else, or the certificate this
-    /// account already has wouldn't be recognised as reusable.
+    /// One sign-in attempt against a specific anisette server. Uses the machine
+    /// name `SideInstaller`, so an existing certificate is recognized as reusable.
     private func performSignIn(id: String, pw: String, anisette: String, dir: String) throws -> String {
         defer { engine.endTwoFactor() }
         engine.log("Apple ID sign-in for \(Engine.oneLine(id)) via anisette \(Engine.oneLine(anisette)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        // 0: somebody else's Apple ID, whose developer token must not stay on
-        // this iPhone.
+        // 0 = don't save the session: it's someone else's Apple ID.
         let rc = si_apple_signin(id, pw, anisette, "SideInstaller", dir, 0,
                                  sideBySideTwoFactorCallback, nil,
                                  &session, &summary, &error)
@@ -466,8 +451,8 @@ final class SideBySideManager: ObservableObject {
                 Self.releaseIPA, named: Self.ipaFileName) { fraction in
                     Task { @MainActor in self.downloadProgress = fraction }
                 }
-            // An answer isn't proof of an IPA: a block page or a transfer that
-            // stopped partway would otherwise surface as an opaque sign failure.
+            // Validate now, so an error page or truncated download doesn't fail
+            // later during signing.
             guard IPALibrary.looksLikeIPA(file) else {
                 try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
                 throw EngineError.message(L("The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute."))
@@ -526,8 +511,8 @@ final class SideBySideManager: ObservableObject {
             let message = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
             engine.log("Sign FAILED: \(message)")
-            // The same two Apple refusals the Install tab explains, said in
-            // terms of whose account and whose iPhone this run is using.
+            // Same errors as the Install tab, worded for another person's
+            // account and iPhone.
             if Engine.isCertExistsError(message) {
                 throw EngineError.message(L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first — with the Certificates tool if this is the Apple ID saved in Settings › Account, and at developer.apple.com signed in as it otherwise."))
             }
@@ -538,9 +523,8 @@ final class SideBySideManager: ObservableObject {
         }
     }
 
-    /// `CFBundleDisplayName` off a signed `.app`, which is what their Home
-    /// Screen will call it — isideload rewrites the bundle, so it is read back
-    /// rather than assumed.
+    /// Home-screen name read from the signed `.app` (display name, else bundle
+    /// name).
     private static func displayName(ofBundleAt path: String) -> String? {
         let plist = (path as NSString).appendingPathComponent("Info.plist")
         guard let data = FileManager.default.contents(atPath: plist),
@@ -563,8 +547,8 @@ final class SideBySideManager: ObservableObject {
         setStep(.install, .active)
         engine.installProgress = 0
         try await onDeviceQueue {
-            // iOS tears the tunnel down while it sits idle through sign-in and
-            // signing, and `isConnected` can't see that, so rebuild it here.
+            // iOS drops the idle tunnel during sign-in and signing, and
+            // `isConnected` doesn't detect it, so reconnect first.
             self.engine.log("Refreshing the link to \(ip) before installing …")
             try self.connection.connect(deviceIP: ip, pairingFilePath: record)
             guard self.connection.isConnected else {
@@ -595,8 +579,7 @@ final class SideBySideManager: ObservableObject {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// A dotted quad, checked here so a hostname or a typo is refused with
-    /// something readable instead of `inet_pton` failing three layers down.
+    /// True for a dotted-quad IPv4 address. Checked early for a clear error.
     private static func isIPv4(_ value: String) -> Bool {
         let octets = value.split(separator: ".", omittingEmptySubsequences: false)
         guard octets.count == 4 else { return false }
@@ -645,7 +628,7 @@ private let sideBySideTwoFactorCallback: SITwoFactorCb = { _, request, outBuf, b
 /// Installs SideInstaller onto somebody else's iPhone across the Wi-Fi network.
 /// Pushed from Tools, whose `NavigationStack` this relies on.
 struct SideBySideView: View {
-    /// Declared so every label on this screen redraws when the language changes.
+    /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     /// Read for the install step's progress, which installd reports globally.
     @EnvironmentObject private var engine: Engine
@@ -709,11 +692,8 @@ struct SideBySideView: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 sectionTitle(L("Their iPhone"), systemImage: "iphone")
-                // The one precondition this tool can't check before it runs, and
-                // the one that decides whether running it is worth anything: the
-                // copy that lands over there has to be able to pair itself.
-                // Said next to the address field, since that names whose iPhone
-                // it is about — the requirement is on theirs, not on this one.
+                // Their iPhone needs iOS 27+ so the installed app can pair itself.
+                // This can't be checked before the run.
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
@@ -739,8 +719,7 @@ struct SideBySideView: View {
         }
     }
 
-    /// Where to find the address, anchored on this iPhone's own so the shape of
-    /// the answer is on screen next to the field asking for it.
+    /// How to find their IP, plus this iPhone's address as an example.
     private var hint: String {
         let route = L("On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.")
         guard let own = manager.ownWiFiAddress else { return route }
@@ -757,9 +736,9 @@ struct SideBySideView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.emailAddress)
-                    // No `.username`/`.password` content types anywhere on this
-                    // card: these are somebody else's credentials, and offering
-                    // to save them to this iPhone's keychain is the wrong offer.
+                    // No `.username`/`.password` content types on this card:
+                    // these are someone else's credentials, so don't offer to
+                    // save them to the keychain.
                     .textFieldStyle(.plain)
                     .submitLabel(.next)
                     .focused($focus, equals: .email)

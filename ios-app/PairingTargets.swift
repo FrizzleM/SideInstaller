@@ -98,23 +98,21 @@ enum PairingTargets {
     }
 }
 
-/// Which of the two records a pairing file on disk actually carries.
-///
-/// It decides both how the tunnel to the device can be built — RPPairing's
-/// TLS-PSK listener, or CoreDeviceProxy over classic lockdown — and whether the
-/// file can be handed to an AltStore-family app as it stands.
+/// Which records a pairing file contains. Determines the tunnel route
+/// (RPPairing, or CoreDeviceProxy over lockdown) and whether AltStore-family
+/// apps can read the file as-is.
 struct PairingFileKind {
 
-    /// `public_key` + `private_key` + `identifier`: what `RpPairingFile` parses,
-    /// and what `tunnel_create_rppairing` needs. Only iOS 27's on-device pairing
-    /// produces one, so an imported file rarely has it.
+    /// RPPairing record (`public_key`, `private_key`, `identifier`), used by
+    /// `tunnel_create_rppairing`. Created by on-device pairing (iOS 27+), so
+    /// imported files rarely have it.
     let hasRemotePairing: Bool
-    /// `HostCertificate` + `HostPrivateKey` + `DeviceCertificate`: the record
-    /// jitterbugpair, pymobiledevice3 and idevicepair write, which reaches the
-    /// device through lockdownd + CoreDeviceProxy instead. minimuxer (SideStore,
-    /// LiveContainer) and Feather read this half.
+    /// Lockdown record (`HostCertificate`, `HostPrivateKey`, `DeviceCertificate`),
+    /// as written by jitterbugpair, pymobiledevice3 and idevicepair. Used by the
+    /// CoreDeviceProxy route, and read by minimuxer (SideStore, LiveContainer)
+    /// and Feather.
     let hasLockdown: Bool
-    /// The device the record was minted for, when the file names one.
+    /// The device's UDID, if the file includes one.
     let udid: String?
 
     /// True when at least one record is there to connect with.
@@ -153,23 +151,19 @@ struct PairingFileKind {
     }
 }
 
-/// The pairing file handed to other apps, which is two records in one plist.
+/// The pairing file given to other apps: RPPairing and lockdown records merged
+/// into one plist.
 ///
-/// SideInstaller pairs with this iPhone over RPPairing, and that record —
-/// `public_key`, `private_key`, `identifier`, `alt_irk` — is all its own RSD
-/// tunnel needs, and all StikDebug's sideloaded build reads. Every other
-/// supported app reads a *classic* lockdown record instead: minimuxer (SideStore
-/// and LiveContainer + SideStore) and Feather want HostID, SystemBUID, the
-/// host/root/device certificates and keys, the escrow bag and the UDID.
+/// SideInstaller's tunnel and StikDebug (sideloaded) use the RPPairing keys
+/// (`public_key`, `private_key`, `identifier`, `alt_irk`). minimuxer (SideStore,
+/// LiveContainer) and Feather use the lockdown record (HostID, SystemBUID,
+/// certificates and keys, escrow bag, UDID).
 ///
-/// iLoader ships both halves in one plist, and each reader ignores what it
-/// doesn't know — idevice's RPPairing parser takes its four keys and drops the
-/// rest, and the classic parser is a serde struct that skips unknown fields.
-/// This builds the same merged file.
+/// As in iLoader, both go in one plist; each parser ignores keys it doesn't use.
 enum CompositePairingFile {
 
-    /// The UDID the cached lockdown record was minted for, so another device
-    /// (or a wiped one) re-pairs instead of reusing a record it would reject.
+    /// UDID the cached lockdown record belongs to, so a different (or wiped)
+    /// device pairs again instead of reusing it.
     private static let udidKey = "lockdownPairRecordUDID"
     private static let hostIDKey = "lockdownHostID"
     private static let systemBUIDKey = "lockdownSystemBUID"
@@ -187,9 +181,9 @@ enum CompositePairingFile {
 
     // MARK: Host identity
 
-    /// This host's lockdown identity, generated once and kept, so a re-pair
-    /// replaces the device's record for us rather than orphaning it and
-    /// spending another slot. usbmuxd writes both as uppercase UUIDs.
+    /// This host's lockdown HostID and SystemBUID, generated once and persisted
+    /// so re-pairing replaces the device's record instead of using another slot.
+    /// Uppercase UUIDs, as usbmuxd uses.
     static var hostID: String { persistentUUID(forKey: hostIDKey) }
     static var systemBUID: String { persistentUUID(forKey: systemBUIDKey) }
 
@@ -204,9 +198,8 @@ enum CompositePairingFile {
 
     // MARK: The cached classic half
 
-    /// The stored lockdown record, if one was minted for this same device.
-    /// Pairing is the interactive, slot-consuming step, so only it is cached;
-    /// the merge below is cheap enough to redo every time.
+    /// The stored lockdown record, if it belongs to `udid`. Only the record is
+    /// cached (pairing needs a Trust tap); merging is cheap and redone each time.
     static func cachedLockdownRecord(forUDID udid: String?) -> Data? {
         guard let udid, !udid.isEmpty,
               UserDefaults.standard.string(forKey: udidKey) == udid,
@@ -242,16 +235,13 @@ enum CompositePairingFile {
                                                   options: 0)
     }
 
-    /// Put a UDID into a record that doesn't name one, leaving it alone if it
-    /// does. The classic `Pair` response omits it, and so does some of what the
-    /// desktop pairing tools write — but minimuxer needs it to know which device
-    /// the record is for.
+    /// Adds `udid` to a record that has no UDID (minimuxer needs it). Returns the
+    /// data unchanged if a UDID is already present.
     static func stampingUDID(_ udid: String, into data: Data) throws -> Data {
         var dict = try dictionary(from: data, describing: "pairing")
         guard (dict["UDID"] as? String)?.isEmpty != false else { return data }
         dict["UDID"] = udid
-        // XML for the same reason `merge` writes XML: SideStore reads the file
-        // as a UTF-8 string and hands that string to minimuxer.
+        // XML, for the same reason as in `merge`.
         return try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
     }
 
@@ -271,17 +261,15 @@ enum CompositePairingFile {
         return PrivateStore.combinedPairingFile.path
     }
 
-    /// The merged file already on disk, when there is a non-empty one. Behind
-    /// the Export button, which should hand over the file that works everywhere.
+    /// Path of the merged file, if it exists and isn't empty. Used by Export.
     static func existingPath() -> String? {
         let url = PrivateStore.combinedPairingFile
         let size = ((try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int) ?? 0
         return size > 0 ? url.path : nil
     }
 
-    /// Drop the merged file. Called when a fresh RPPairing record makes the
-    /// half of it that came from the old one wrong; the cached lockdown record
-    /// stays, since re-pairing that way is interactive and costs a device slot.
+    /// Deletes the merged file (e.g. after a new RPPairing record). The cached
+    /// lockdown record is kept.
     static func invalidateMerged() {
         try? FileManager.default.removeItem(at: PrivateStore.combinedPairingFile)
     }

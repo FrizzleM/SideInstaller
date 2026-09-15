@@ -12,13 +12,11 @@ struct SideInstallerApp: App {
     @StateObject private var accounts = AccountStore.shared
     /// False until the TOS is accepted, after which the welcome page is gone.
     @AppStorage("hasAcceptedTOS") private var hasAcceptedTOS = false
-    /// False until the Apple ID setup page has been answered — by saving an
-    /// account or by deferring it. Set once, so emptying the account list in
-    /// Settings never drops the user back onto setup.
+    /// False until account setup is completed or skipped. Never reset, even if
+    /// all accounts are removed later.
     @AppStorage("hasCompletedAccountSetup") private var hasCompletedAccountSetup = false
-    /// Watched so the LocalDevVPN handover fires whenever the app comes forward,
-    /// not only on a cold start — iOS resumes this app far more often than it
-    /// launches it.
+    /// Observed to run the LocalDevVPN auto-start each time the app becomes
+    /// active.
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -39,8 +37,8 @@ struct SideInstallerApp: App {
                         .transition(.asymmetric(
                             insertion: .identity,
                             removal: .opacity.combined(with: .scale(scale: 1.06))))
-                        // Between the welcome page and the app, so each zooms
-                        // away over whatever it hands off to.
+                        // Layered between the welcome page and the app, so each
+                        // zooms out over the next screen.
                         .zIndex(0.5)
                 } else {
                     WelcomeView()
@@ -54,22 +52,19 @@ struct SideInstallerApp: App {
             }
             .animation(.smooth(duration: 0.5), value: hasAcceptedTOS)
             .animation(.smooth(duration: 0.5), value: hasCompletedAccountSetup)
-            // Whichever way the app came forward, offer to bring the tunnel up
-            // with it. Every guard the setting needs is inside.
+            // Auto-start LocalDevVPN on activation; `autoStartVPNIfWanted`
+            // checks the setting and other conditions.
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { engine.autoStartVPNIfWanted() }
             }
-            // A file handed over from the Files share sheet, from “Open with”,
-            // or from another app. The import route that doesn't go through the
-            // document picker — the one to reach for where the picker won't
-            // hand a file over.
+            // Files opened in the app (share sheet, "Open with", other apps), as
+            // an alternative to the document picker.
             .onOpenURL { url in
-                // `sideinstaller://` is LocalDevVPN handing the screen back
-                // after starting its tunnel: bringing the app forward is all it
-                // was for, so there is nothing else to do with it.
+                // Ignore `sideinstaller://` URLs: LocalDevVPN only uses them to
+                // return to the app.
                 guard url.isFileURL else { return }
-                // A pairing file is told apart by its extension, as everywhere
-                // else; anything else that arrives is meant to be an IPA.
+                // `.mobiledevicepairing`/`.plist` are pairing files; anything else
+                // is treated as an IPA.
                 if ["mobiledevicepairing", "plist"].contains(url.pathExtension.lowercased()) {
                     Task { await engine.importPairingFile(from: url) }
                 } else {

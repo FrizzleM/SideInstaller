@@ -6,21 +6,20 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @EnvironmentObject private var engine: Engine
     @EnvironmentObject private var updateChecker: UpdateChecker
-    /// Declared so every label on this screen redraws when the language changes.
+    /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
-    /// Shared with the Certificates page — see `certConflictCallout`.
+    /// Shared with the Certificates page; used by `certConflictCallout`.
     @EnvironmentObject private var certManager: CertManager
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
     @State private var showImporter = false
     /// True while the pairing-file picker is up, on an iPhone below iOS 27.
     @State private var showPairingImporter = false
-    /// True while the certificate chooser is showing; each certificate there is
-    /// its own destructive button, so nothing is revoked without a choice.
+    /// Shows the dialog for choosing which certificate to revoke.
     @State private var showRevokeChooser = false
-    /// The timeline shows only the step in flight until this is set.
+    /// When false, the timeline shows only the current step.
     @State private var stepsExpanded = false
-    /// The link typed into the import field, kept until it downloads.
+    /// Text in the IPA download-link field.
     @State private var ipaLink = ""
     @FocusState private var linkFieldFocused: Bool
 
@@ -33,9 +32,8 @@ struct ContentView: View {
                         updateBanner.transition(.cardAppear)
                     }
                     appCard.cascadeItem(1)
-                    // Below iOS 27 this iPhone can't pair with itself, so the
-                    // file has to come in from a computer. It sits with the app
-                    // picker because both are things to choose before installing.
+                    // Below iOS 27 a pairing file must be imported, so show the
+                    // import card.
                     if showsPairingCard {
                         pairingFileCard.cascadeItem(2)
                     }
@@ -52,8 +50,7 @@ struct ContentView: View {
                             vpnRequirement.cascadeItem(cascade(2))
                         }
                     }
-                    // Above the button, so a run in flight reads top-down —
-                    // what it is doing, then the Cancel that stops it.
+                    // Progress sits above the Install/Cancel button.
                     if showProgress {
                         progressCard.transition(.cardAppear)
                     }
@@ -61,7 +58,7 @@ struct ContentView: View {
                     if let pin = engine.pairingPIN {
                         pinCallout(pin).transition(.cardAppear)
                     }
-                    // The one-tap version of what the guide below explains.
+                    // Revoke-and-retry shortcut for the certificate-conflict guide.
                     if engine.certConflict, !engine.isRunning {
                         certConflictCallout.transition(.cardAppear)
                     }
@@ -128,8 +125,8 @@ struct ContentView: View {
         engine.osSupported && !engine.canSelfPair
     }
 
-    /// Entrance order for everything below the pairing-file card, so the
-    /// cascade closes up on the iPhones that don't show one.
+    /// Cascade index for items below the pairing-file card, shifted by one when
+    /// that card is shown.
     private func cascade(_ position: Int) -> Int {
         showsPairingCard ? position + 1 : position
     }
@@ -138,13 +135,12 @@ struct ContentView: View {
         engine.lastError != nil && !engine.isRunning
     }
 
-    /// True once a step has stopped the run, which recolours the whole card.
+    /// True once a step has failed; turns the progress card red.
     private var runFailed: Bool {
         engine.stepStates.values.contains(.failed)
     }
 
-    /// The step the run is on: whatever is in flight, or the last one that
-    /// moved once nothing is.
+    /// The active, waiting or failed step; otherwise the last completed one.
     private var currentStep: Step {
         if let live = Step.allCases.first(where: {
             let state = engine.stepStates[$0]
@@ -293,8 +289,7 @@ struct ContentView: View {
         }
     }
 
-    /// Reads the link field as an alternative to the button above it, rather
-    /// than as a second step after it.
+    /// "or" divider between the file picker and the link field.
     private var orDivider: some View {
         HStack(spacing: 10) {
             hairline
@@ -312,8 +307,7 @@ struct ContentView: View {
             .frame(height: 1)
     }
 
-    /// Import button, labelled with the loaded file's name, or with the import's
-    /// progress while one is coming in from iCloud Drive, a USB drive or a link.
+    /// Import button showing the loaded file's name, or progress while importing.
     private var filePickerButton: some View {
         Button {
             linkFieldFocused = false
@@ -354,8 +348,7 @@ struct ContentView: View {
         return L("Downloading… %d%%", Int(fraction * 100))
     }
 
-    /// Paste a direct link instead, for a build that isn't on this iPhone yet
-    /// and can't be brought over on a second device.
+    /// Text field for importing an IPA from a direct download link.
     private var linkField: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
@@ -388,7 +381,7 @@ struct ContentView: View {
                 .disabled(!linkIsUsable)
             }
             .fieldBackground()
-            // Only a link download knows its size, so this is its bar alone.
+            // Progress bar for link downloads (file copies report no progress).
             if engine.isImportingIPA, let fraction = engine.importProgress {
                 ProgressView(value: fraction)
                     .tint(Theme.accent2)
@@ -438,9 +431,7 @@ struct ContentView: View {
 
     // MARK: iOS version requirement
 
-    /// Shown on an iPhone older than the minimum iOS, where nothing can run —
-    /// the tunnel every step after pairing runs over doesn't exist there, so an
-    /// imported pairing file wouldn't help either.
+    /// Shown when iOS is below the minimum supported version.
     private var osRequirement: some View {
         CalloutCard(tint: .red) {
             HStack(alignment: .top, spacing: 14) {
@@ -463,14 +454,12 @@ struct ContentView: View {
 
     // MARK: Pairing file (iOS 26 and below)
 
-    /// SideStore's own write-up of making a pairing file on a computer, which
-    /// covers every host OS and stays current without this app reprinting it.
+    /// SideStore's guide to creating a pairing file on a computer.
     private static let pairingDocsURL =
         "https://docs.sidestore.io/docs/advanced/alternative#pairing"
 
-    /// The way in for an iPhone that can't pair with itself. Everything else on
-    /// this screen works the same once a file is here, so this sits with the
-    /// app picker rather than off in the Pairing tab.
+    /// Pairing-file import card, shown when this iPhone can't pair with itself
+    /// (below iOS 27).
     private var pairingFileCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -555,8 +544,8 @@ struct ContentView: View {
 
     // MARK: Loopback-VPN requirement
 
-    /// Shown while the tunnel the install runs over is off. Named for
-    /// LocalDevVPN, though the engine accepts any loopback VPN.
+    /// Shown while the tunnel is off. Names LocalDevVPN, though any loopback VPN
+    /// works.
     private var vpnRequirement: some View {
         CalloutCard(tint: .red) {
             HStack(alignment: .top, spacing: 14) {
@@ -614,8 +603,8 @@ struct ContentView: View {
         }
     }
 
-    /// Where the run has got to, in colour: red once a step stopped it, green
-    /// when it finished, the brand blue while it is under way.
+    /// Progress color: red on failure, green when finished, brand blue while
+    /// running.
     private var progressTint: Color {
         if runFailed { return .red }
         return engine.finished ? .green : Theme.accent
@@ -626,8 +615,8 @@ struct ContentView: View {
         return engine.finished ? Theme.gradient(.green) : Theme.brand
     }
 
-    /// Opens and closes the full timeline. It lives in the header rather than
-    /// with the steps so it keeps its place whichever way the card is showing.
+    /// Chevron that expands/collapses the step timeline. Placed in the header so
+    /// it stays put in both states.
     private var stepsDisclosure: some View {
         Button {
             stepsExpanded.toggle()
@@ -667,8 +656,8 @@ struct ContentView: View {
         .animation(.smooth(duration: 0.38), value: stepsExpanded)
     }
 
-    /// The one row the timeline collapses to, pushed aside by the next step as
-    /// the run moves on. Tapping it opens the rest.
+    /// Collapsed timeline: the current step, pushed out when the next one starts.
+    /// Tap to expand.
     private var collapsedStepRow: some View {
         let step = currentStep
         return ZStack {
@@ -745,8 +734,8 @@ struct ContentView: View {
 
     // MARK: Certificate conflict (Apple error 7460)
 
-    /// Shown when signing stopped on a certificate that couldn't be reused. The
-    /// button only fetches them; the dialog makes the user name what to revoke.
+    /// Shown on error 7460. The button loads the certificates; the dialog asks
+    /// which one to revoke, then retries the install.
     private var certConflictCallout: some View {
         CalloutCard(tint: .orange) {
             VStack(alignment: .leading, spacing: 14) {
@@ -881,10 +870,9 @@ extension View {
 
 // MARK: - Progress bar
 
-/// The install bar: a gradient fill that glows against the dark card, with a
-/// sheen travelling its length and a light pinned to its head while the run is
-/// under way. Both are read off the clock rather than driven by a repeating
-/// animation, so a fill that moves mid-sweep doesn't drag them out of step.
+/// Install progress bar: a gradient fill with a moving sheen and a glowing head
+/// while running. Both effects are driven by `TimelineView` time rather than a
+/// repeating animation, so progress changes don't disrupt them.
 private struct InstallProgressBar: View {
     let progress: Double
     let tint: Color
@@ -892,15 +880,15 @@ private struct InstallProgressBar: View {
     /// False once the run has finished or stopped, leaving the bar at rest.
     let animating: Bool
 
-    /// Wide enough to read as light crossing the bar rather than a line.
+    /// Width of the moving highlight.
     private let sheenWidth: CGFloat = 96
-    /// Seconds per pass — slow enough to stay calm at the edge of vision.
+    /// Seconds per sheen pass.
     private let sheenPeriod: Double = 1.9
 
     var body: some View {
         GeometryReader { geo in
             let full = geo.size.width
-            // Never quite empty: a sliver says the run has started.
+            // Minimum width so the bar is visible at 0%.
             let filled = max(12, full * min(max(progress, 0), 1))
             ZStack(alignment: .leading) {
                 Capsule()
@@ -922,9 +910,8 @@ private struct InstallProgressBar: View {
                 // A lit top edge, which gives the pill some depth.
                 .overlay(Capsule().fill(LinearGradient(colors: [.white.opacity(0.28), .clear],
                                                        startPoint: .top, endPoint: .bottom)))
-                // Overlays rather than stacked siblings: the sheen is wider than
-                // the fill early in a run, and as a sibling its width would set
-                // the fill's own and hang it off the end of the track.
+                // Overlays, not siblings: the sheen can be wider than the fill,
+                // and as a sibling it would stretch the fill past the track.
                 .overlay(alignment: .leading) { if animating { sheen(at: t, across: full) } }
                 .overlay(alignment: .trailing) { if animating { head(at: t) } }
                 // Keeps the sheen's blend inside the fill instead of over the card.
@@ -934,9 +921,8 @@ private struct InstallProgressBar: View {
         .shadow(color: tint.opacity(0.5), radius: 9)
     }
 
-    /// The highlight that runs the length of the bar. It travels the whole
-    /// track, not just the filled part, so its pace doesn't change with the
-    /// progress; the capsule clips whatever has run past the head.
+    /// Highlight that moves across the full track width, so its speed doesn't
+    /// depend on progress. The capsule clips it to the filled part.
     private func sheen(at t: TimeInterval, across full: CGFloat) -> some View {
         let phase = t.truncatingRemainder(dividingBy: sheenPeriod) / sheenPeriod
         return Rectangle()
@@ -1034,8 +1020,8 @@ private struct CurrentStepRow: View {
 
 // MARK: - Step parts
 
-/// The status dot a step wears, in either timeline. The active one sits under
-/// a halo that swells and fades, so the eye lands on the step in flight.
+/// Status circle for a step, used by both timelines. The active step gets a
+/// pulsing halo.
 private struct StepNode: View {
     let state: StepState
 
@@ -1049,7 +1035,7 @@ private struct StepNode: View {
         .frame(width: 28, height: 28)
     }
 
-    /// Off the clock, so it restarts cleanly every time a step becomes active.
+    /// Driven by clock time rather than a repeating animation.
     private var halo: some View {
         TimelineView(.animation) { timeline in
             let p = timeline.date.timeIntervalSinceReferenceDate
@@ -1148,14 +1134,12 @@ private struct StepBadge: View {
 // MARK: - File picker
 
 extension UTType {
-    /// The type this app exports for `.ipa` in its Info.plist, which is what
-    /// makes the extension resolve to something a picker can match. Without a
-    /// declaration iOS mints a dynamic type per device, and files typed that
-    /// way are the ones the picker shows but won't let you tap.
+    /// The `.ipa` type exported in Info.plist. Without that declaration the
+    /// picker shows .ipa files but won't let them be selected.
     static let ipa: UTType = UTType(filenameExtension: "ipa") ?? .data
 
-    /// The same arrangement for `.mobiledevicepairing`, which jitterbugpair
-    /// writes and no system type covers.
+    /// The `.mobiledevicepairing` type written by jitterbugpair, declared the
+    /// same way.
     static let mobileDevicePairing: UTType = UTType(filenameExtension: "mobiledevicepairing") ?? .data
 
     /// What the pairing-file picker accepts: jitterbugpair's extension, and the
@@ -1163,12 +1147,12 @@ extension UTType {
     static var pairingFileTypes: [UTType] { [mobileDevicePairing, .propertyList, .xml] }
 }
 
-/// The system document picker behind a representable, shown as a sheet — the
-/// arrangement Feather uses, ported here after SwiftUI's own `.fileImporter`
-/// left rows inert on iOS 27.
+/// `UIDocumentPickerViewController` wrapped for SwiftUI and shown as a sheet
+/// (as Feather does). Used instead of `.fileImporter`, whose rows can't be
+/// tapped on iOS 27.
 ///
-/// `asCopy: true` has iOS copy the chosen file into this app's Inbox and hand
-/// that over, rather than vend a security-scoped handle on the original.
+/// `asCopy: true` makes iOS hand over a temporary copy of the file instead of a
+/// security-scoped URL to the original.
 struct FileImporterRepresentableView: UIViewControllerRepresentable {
     var allowedContentTypes: [UTType]
     var allowsMultipleSelection = false

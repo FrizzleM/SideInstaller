@@ -20,12 +20,10 @@ struct SavedAccount: Identifiable, Codable, Equatable {
     }
 }
 
-/// The Apple IDs saved on this iPhone, and which one every credential-taking
-/// action signs in as. Entered once during setup, managed afterwards from
-/// Settings › Account.
+/// Saved Apple IDs and which one is active for sign-ins. Added during setup and
+/// managed in Settings › Account.
 ///
-/// A singleton because `Engine` — itself one, reachable from C callbacks —
-/// reads the active credentials straight off it.
+/// A singleton so `Engine` can read the active credentials directly.
 final class AccountStore: ObservableObject {
 
     static let shared = AccountStore()
@@ -36,12 +34,12 @@ final class AccountStore: ObservableObject {
     /// The account every sign-in uses. Nil only while `accounts` is empty.
     @Published private(set) var activeID: UUID?
 
-    /// Bumped whenever the active credentials change — a different account, or
-    /// a new password on the one in use. Cached Apple sessions key off this.
+    /// Incremented when the active credentials change (different account or new
+    /// password). Cached Apple sessions are dropped when it changes.
     @Published private(set) var revision: Int = 0
 
-    /// Set when the keychain refused a write, so the UI can say why a password
-    /// won't survive a relaunch. Nil in the normal case.
+    /// Set when the keychain refused a write (the password won't survive a
+    /// relaunch). Nil normally.
     @Published private(set) var keychainWarning: String?
 
     private static let accountsKey = "savedAppleAccounts"
@@ -49,8 +47,7 @@ final class AccountStore: ObservableObject {
     /// Keychain service every saved password is filed under.
     private static let service = "com.frizzle.SideInstaller.appleID"
 
-    /// Passwords the keychain wouldn't take, kept for this launch only so a
-    /// keychain-less build still signs in rather than failing silently.
+    /// Passwords the keychain rejected, kept in memory for this launch only.
     private var volatilePasswords: [UUID: String] = [:]
 
     private init() {
@@ -95,10 +92,9 @@ final class AccountStore: ObservableObject {
 
     // MARK: - Mutations
 
-    /// Add an Apple ID, or update one — `replacing` when the user edited a row,
-    /// and otherwise any existing entry with the same email, so re-entering an
-    /// address after a password change updates it instead of duplicating it.
-    /// The saved account becomes the active one.
+    /// Adds or updates an Apple ID and makes it active. Updates `existing` if
+    /// given, otherwise any account with the same email (so a new password
+    /// doesn't create a duplicate).
     @discardableResult
     func save(appleID: String, password: String, replacing existing: SavedAccount? = nil) -> SavedAccount {
         let email = appleID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -107,8 +103,7 @@ final class AccountStore: ObservableObject {
 
         let account: SavedAccount
         if let target, let idx = accounts.firstIndex(where: { $0.id == target.id }) {
-            // A new password or address retires the Apple session saved for the
-            // old one; re-entering the same pair keeps it.
+            // A changed password or email invalidates the saved Apple session.
             if password != self.password(for: target) || email != target.normalized {
                 Self.forgetAppleSession(for: target.normalized)
             }
@@ -125,8 +120,8 @@ final class AccountStore: ObservableObject {
         return account
     }
 
-    /// Forget an Apple ID and delete its password. Removing the active one
-    /// promotes whichever account is left.
+    /// Removes an Apple ID and its password. If it was active, the first
+    /// remaining account becomes active.
     func remove(_ account: SavedAccount) {
         accounts.removeAll { $0.id == account.id }
         volatilePasswords[account.id] = nil
@@ -163,9 +158,8 @@ final class AccountStore: ObservableObject {
         defaults.set(activeID?.uuidString, forKey: Self.activeKey)
     }
 
-    /// Write to the keychain, falling back to memory if it refuses — a build
-    /// signed without a keychain-access group would otherwise lose the password
-    /// on every launch with nothing on screen to explain it.
+    /// Saves the password to the keychain, or to memory with a warning if the
+    /// keychain refuses.
     private func store(password: String, for id: UUID) {
         if let status = Self.keychainWrite(password, for: id) {
             volatilePasswords[id] = password
@@ -204,8 +198,8 @@ final class AccountStore: ObservableObject {
 
         var add = query(id)
         add[kSecValueData as String] = data
-        // Signing runs unattended after an install starts, so the item has to be
-        // readable without the phone being unlocked right then.
+        // Readable while locked (after first unlock), since signing can run
+        // unattended.
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
         let status = SecItemAdd(add as CFDictionary, nil)
         return status == errSecSuccess ? nil : status

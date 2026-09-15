@@ -4,21 +4,19 @@ import CoreLocation
 
 // MARK: - Developer disk image
 
-/// The three files Apple's personalized developer disk image is made of, and
-/// where they live on disk. Mounting one is what makes the DVT services — the
-/// location simulation among them — reachable at all, so this is downloaded on
-/// first use rather than shipped in the app.
+/// The three files of Apple's personalized developer disk image and where they
+/// are stored. Mounting the image enables DVT services such as location
+/// simulation. Downloaded on first use rather than bundled.
 ///
-/// The files come from doronz88/DeveloperDiskImage, the same public mirror
-/// StikDebug pulls them from. They are Apple's, unmodified: the device
-/// personalizes and signs its own copy at mount time against its chip id, so a
-/// mirror can't substitute an image the device would accept.
+/// Source: doronz88/DeveloperDiskImage (the same mirror StikDebug uses). These
+/// are Apple's unmodified files; the device personalizes the image against its
+/// chip ID at mount time.
 enum DeveloperDiskImage {
 
     private static let baseURL =
         "https://github.com/doronz88/DeveloperDiskImage/raw/refs/heads/main/PersonalizedImages/Xcode_iOS_DDI_Personalized"
 
-    /// One downloaded file: its remote name and its local file name.
+    /// Files to download (same name remotely and locally).
     private static let files = [
         "BuildManifest.plist",
         "Image.dmg",
@@ -78,9 +76,8 @@ enum DeveloperDiskImage {
 @MainActor
 final class LocationManager: ObservableObject {
 
-    /// How far along setup is. Internal only — the page never shows it. The
-    /// device link is torn down by anything that re-pairs, so this drops back to
-    /// `.notReady` on any session error.
+    /// Setup progress (not shown in the UI). Resets to `.notReady` on any
+    /// session error, since re-pairing tears down the device link.
     enum Stage: Equatable {
         case notReady
         case downloading
@@ -98,8 +95,8 @@ final class LocationManager: ObservableObject {
     private var engine: Engine { Engine.shared }
     /// Silent audio, so backgrounding the app doesn't close the DVT session.
     private let keepAlive = KeepAlive()
-    /// iOS lets a simulated location lapse; StikDebug re-sends every 4s, so do
-    /// the same rather than discovering the interval the hard way.
+    /// iOS drops a simulated location that isn't refreshed, so it's re-sent
+    /// every 4s (as StikDebug does).
     private var resendTimer: Timer?
     private static let resendInterval: TimeInterval = 4
 
@@ -107,19 +104,13 @@ final class LocationManager: ObservableObject {
 
     // MARK: Setup
 
-    /// Get everything in place without saying so: fetch the disk image, mount it
-    /// unless the device already has one, and open the DVT session. None of that
-    /// is a decision the user can usefully make, so the page never mentions it —
-    /// the only visible consequence is that Set location works.
+    /// Runs setup in the background: downloads the disk image, mounts it if the
+    /// device has none, and opens the DVT session.
     ///
-    /// Called when the page opens, where it does as much as it can and gives up
-    /// quietly on anything it can't (no tunnel yet, most often). Failures are
-    /// logged, not shown: the page hasn't been asked to do anything yet, so
-    /// there is nothing to report. `simulate` runs the same work when the user
-    /// does ask, and surfaces errors then.
+    /// Called when the page opens. Failures (usually no tunnel yet) are only
+    /// logged; `simulate` repeats the setup and shows errors to the user.
     ///
-    /// Runs as its own task rather than the view's, so walking back to Tools
-    /// mid-download doesn't cancel it.
+    /// Uses its own task, so leaving the page doesn't cancel it.
     func prepareQuietly() {
         guard stage != .ready, !isBusy else { return }
         isBusy = true
@@ -141,8 +132,7 @@ final class LocationManager: ObservableObject {
             try await DeveloperDiskImage.downloadMissing { _ in }
         }
         stage = .mounting
-        // Progress goes to the activity log rather than the page — a mount the
-        // user was never told about shouldn't grow a progress bar.
+        // Mount progress goes to the activity log only.
         var lastLogged = -1
         _ = try await engine.prepareLocationSimulation(
             imagePath: DeveloperDiskImage.imagePath,
@@ -158,12 +148,10 @@ final class LocationManager: ObservableObject {
 
     // MARK: Simulating
 
-    /// Tell the device it is at `coordinate`, and keep telling it.
+    /// Sets the device's location to `coordinate` and keeps re-sending it.
     ///
-    /// Does the setup itself if the quiet pass hasn't finished — the tunnel is
-    /// usually the thing that wasn't up yet when the page opened. This is where
-    /// setup failures finally get shown, since now the user has asked for
-    /// something and deserves to know why it didn't happen.
+    /// Runs setup first if it hasn't finished (often the tunnel wasn't up when
+    /// the page opened). Setup errors are shown to the user here.
     func simulate(_ coordinate: CLLocationCoordinate2D) {
         guard !isBusy else { return }
         guard (-90...90).contains(coordinate.latitude),
@@ -216,16 +204,14 @@ final class LocationManager: ObservableObject {
         }
     }
 
-    /// Re-send whatever `simulated` holds on a timer. A failed send is left
-    /// alone — the next tick usually lands, and an alert every 4s would be
-    /// unreadable — but a session that's gone is reported, since anything that
-    /// rebuilds the tunnel (an install, a re-pair) closes this one and the page
-    /// would otherwise keep claiming the location is still being held.
+    /// Re-sends `simulated` on a timer. Individual send failures are ignored
+    /// (the next tick usually works), but a closed session is reported, since
+    /// anything that rebuilds the tunnel (an install, a re-pair) closes it.
     private func startResending() {
         stopResending()
-        // The timer holds its closure until invalidated, so the capture has to be
-        // weak out here too — a `[weak self]` only on the inner Task still leaves
-        // the closure owning the manager, and nothing invalidates on deinit.
+        // Capture `self` weakly in the timer closure: the timer retains the
+        // closure until invalidated, so a strong capture would keep the manager
+        // alive.
         resendTimer = Timer.scheduledTimer(withTimeInterval: Self.resendInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self, let simulated = self.simulated else { return }
@@ -272,7 +258,7 @@ final class LocationManager: ObservableObject {
 /// the device. Pushed from Tools, whose `NavigationStack` this relies on.
 struct LocationView: View {
     @EnvironmentObject private var engine: Engine
-    /// Declared so every label on this screen redraws when the language changes.
+    /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: LocationManager
 
@@ -311,9 +297,8 @@ struct LocationView: View {
         .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
         .sheet(isPresented: $showSettings) { SettingsView() }
-        // Fetch the disk image, mount it and open the session in the background,
-        // so that by the time the user picks a place there is nothing to wait
-        // for. Says nothing either way — see `prepareQuietly`.
+        // Start setup in the background so it's ready when the user picks a
+        // place. See `prepareQuietly`.
         .onAppear { manager.prepareQuietly() }
     }
 
@@ -372,8 +357,8 @@ struct LocationView: View {
                     .onMapCameraChange(frequency: .continuous) { context in
                         target = context.region.center
                     }
-                    // The pin is the map's centre, so panning aims it. A dropped
-                    // annotation would fight the scroll view for the same drag.
+                    // The pin marks the map's center, so panning moves it. A
+                    // draggable annotation would conflict with the scroll view.
                     crosshair
                         .allowsHitTesting(false)
                 }
@@ -388,9 +373,7 @@ struct LocationView: View {
                     Spacer()
                 }
 
-                // The spinner covers the setup too, on the first tap of a fresh
-                // install: the user asked for a location, not for a disk image,
-                // so the wait is presented as one thing.
+                // On first use, the spinner also covers disk image setup.
                 Button { manager.simulate(target) } label: {
                     HStack(spacing: 10) {
                         if manager.isBusy {
@@ -463,9 +446,8 @@ struct LocationView: View {
                 return
             }
             manager.lastError = nil
-            // `placemark` is deprecated as of iOS 26; `location` is its
-            // replacement for the coordinate, which is all this needs — and it
-            // only exists from 26, so older releases keep the deprecated one.
+            // `location` replaces the deprecated `placemark` on iOS 26+; older
+            // iOS still uses `placemark`.
             let coordinate: CLLocationCoordinate2D
             if #available(iOS 26.0, *) {
                 coordinate = first.location.coordinate

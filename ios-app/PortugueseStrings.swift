@@ -1,12 +1,10 @@
 import Foundation
 
-/// Portuguese copy, keyed by the English source string passed to `L(_:)`. A
-/// missing key renders as that English. `%@` and `%d` placeholders must survive
-/// translation, and product or third-party UI names stay in English.
+/// Brazilian Portuguese translations, keyed by the English string passed to
+/// `L(_:)`. Missing keys fall back to English. Keep `%@`/`%d` placeholders, and
+/// leave product and third-party UI names in English.
 ///
-/// Written in Brazilian Portuguese: iOS's own labels use the pt-BR terms
-/// (Ajustes, Arquivos, Tela de Início), so the paths in this copy match what a
-/// reader actually sees on the device.
+/// Uses the pt-BR terms iOS shows (Ajustes, Arquivos, Tela de Início).
 
 let portugueseStrings: [String: String] = [
 

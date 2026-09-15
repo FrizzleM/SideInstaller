@@ -40,7 +40,7 @@ final class DownloadsManager: ObservableObject {
     /// `id` of the IPA currently being deleted, if any.
     @Published private(set) var deletingID: String?
     @Published var lastError: String?
-    /// True once `refresh()` has run, so the empty state can tell them apart.
+    /// True once `refresh()` has run (tells "not loaded" apart from "empty").
     @Published private(set) var hasLoaded = false
 
     private var engine: Engine { Engine.shared }
@@ -78,7 +78,7 @@ final class DownloadsManager: ObservableObject {
             if engine.downloadedIPAPath == item.url.path {
                 engine.downloadedIPAPath = nil
             }
-            // The Install tab's button also shows the custom import.
+            // Update the Install tab's custom IPA button.
             if item.source == .custom { engine.refreshCustomIPA() }
             engine.log("Downloads: deleted \(item.fileName) (\(item.sizeText)).")
         } catch {

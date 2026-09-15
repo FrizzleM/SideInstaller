@@ -1,6 +1,6 @@
 import Foundation
 
-/// Italian copy, on the same contract as `spanishStrings`.
+/// Italian translations (same rules as `spanishStrings`).
 
 let italianStrings: [String: String] = [
 

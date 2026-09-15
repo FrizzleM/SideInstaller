@@ -1,8 +1,8 @@
 import Foundation
 
-/// Simplified Chinese copy, on the same contract as `spanishStrings`. Settings
-/// paths and "tap" follow Apple's own zh-Hans wording, prose uses full-width
-/// punctuation, "revoke" is the PKI term 吊销, and the second person is 你.
+/// Simplified Chinese translations (same rules as `spanishStrings`). Uses Apple's
+/// zh-Hans wording for Settings paths and "tap", full-width punctuation, 吊销 for
+/// "revoke", and 你 for "you".
 
 let chineseStrings: [String: String] = [
 

@@ -1,8 +1,8 @@
 import Foundation
 
-/// Vietnamese copy, on the same contract as `spanishStrings`. The Install tab is
-/// "Cài ứng dụng", since "Cài đặt" also means Settings, and nouns don't inflect
-/// for number, so the app-count strings share one wording.
+/// Vietnamese translations (same rules as `spanishStrings`). The Install tab is
+/// "Cài ứng dụng" because "Cài đặt" means Settings. Nouns don't inflect for
+/// number, so singular and plural app-count strings are the same.
 
 let vietnameseStrings: [String: String] = [
 

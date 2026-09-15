@@ -6,7 +6,7 @@ struct AnisetteServer: Identifiable, Hashable, Decodable {
     let name: String
     let address: String
 
-    /// The address is the identity: what sign-in is given, and what rows carry.
+    /// Identified by address.
     var id: String { address }
 }
 

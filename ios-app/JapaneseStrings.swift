@@ -1,8 +1,8 @@
 import Foundation
 
-/// Japanese copy, on the same contract as `spanishStrings`. Settings paths
-/// and "tap" follow Apple's own ja wording, "revoke" is 失効, and the second
-/// person is left implicit wherever natural (no お客様/あなた unless needed).
+/// Japanese translations (same rules as `spanishStrings`). Uses Apple's ja
+/// wording for Settings paths and "tap", 失効 for "revoke", and omits "you"
+/// where natural (no お客様/あなた unless needed).
 
 let japaneseStrings: [String: String] = [
 

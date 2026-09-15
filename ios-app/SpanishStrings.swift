@@ -1,8 +1,8 @@
 import Foundation
 
-/// Spanish copy, keyed by the English source string passed to `L(_:)`. A missing
-/// key renders as that English. `%@` and `%d` placeholders must survive
-/// translation, and product or third-party UI names stay in English.
+/// Spanish translations, keyed by the English string passed to `L(_:)`. Missing
+/// keys fall back to English. Keep `%@`/`%d` placeholders, and leave product and
+/// third-party UI names in English.
 
 let spanishStrings: [String: String] = [
 

@@ -1,7 +1,7 @@
 import Foundation
 
-/// French copy, on the same contract as `spanishStrings`. Uses the formal
-/// "vous" and iOS's own French vocabulary for anything on screen.
+/// French translations (same rules as `spanishStrings`). Uses formal "vous" and
+/// iOS's French UI terms.
 
 let frenchStrings: [String: String] = [
 

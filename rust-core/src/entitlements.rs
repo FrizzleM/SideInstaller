@@ -1,22 +1,18 @@
-//! Turns developer-portal capabilities ("entitlements") on for an App ID.
+//! Enables developer-portal capabilities ("entitlements") on an App ID.
 //!
-//! An entitlement like Increased Memory Limit isn't something the signer can
-//! grant itself: Apple has to enable the capability on the App ID first, and
-//! only then does a freshly issued provisioning profile carry it. So this is a
-//! pure developer-portal call — no device, pairing or tunnel — and the app has
-//! to be signed and installed *again* afterwards to pick the change up.
+//! Capabilities like Increased Memory Limit must be enabled on the App ID by
+//! Apple; newly issued provisioning profiles then include them. This is a
+//! developer-portal call only (no device), and the app must be signed and
+//! installed again to pick up the change.
 //!
-//! The route is the JSON:API one on developerservices2 that Xcode uses, as
-//! GetMoreRam and `isideload::dev::app_ids::add_increased_memory_limit` both
-//! do. isideload's version hardcodes INCREASED_MEMORY_LIMIT and pastes the body
-//! together with `format!`; this takes the capability id as an argument and
-//! builds the body with serde_json, so an App ID whose name contains a quote
-//! can't produce a malformed request.
+//! Uses the developerservices2 JSON:API endpoint that Xcode uses (as do
+//! GetMoreRam and `isideload::dev::app_ids::add_increased_memory_limit`).
+//! Unlike isideload's version, the capability ID is a parameter and the body is
+//! built with serde_json, so names containing quotes are escaped correctly.
 //!
-//! Capability ids are not validated here — the list of what's worth offering
-//! lives in Swift, and Apple is the authority on what a given team may enable.
-//! Each id is sent as its own request so that one refusal (most of them, on a
-//! free account) doesn't cost the rest, and every outcome is reported back.
+//! Capability IDs aren't validated here: Swift holds the list, and Apple decides
+//! what a team may enable. Each ID is sent as a separate request, so one refusal
+//! doesn't affect the rest, and every result is returned.
 
 use std::ffi::c_char;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -139,8 +135,8 @@ pub unsafe fn appid_enable(
     let result = catch_unwind(AssertUnwindSafe(|| {
         let (rt, dev, team) = (&session.rt, &mut session.dev, &session.team);
         rt.block_on(async {
-            // Re-listed rather than cached: the App ID's own identifier and name
-            // go into the body, and a stale copy would rename it.
+            // Fetch the App ID fresh: its identifier and name go into the request
+            // body, and stale values would rename it.
             let listing = dev
                 .list_app_ids(team, DeveloperDeviceType::Ios)
                 .await
@@ -184,8 +180,8 @@ pub unsafe fn appid_enable(
                 })
                 .to_string();
 
-                // Fetched per request: the anisette one-time password inside
-                // these headers is exactly that, and a batch can outlive one.
+                // Fetch headers per request: they carry a one-time anisette
+                // password that can expire during a batch.
                 let mut headers = match dev.get_headers().await {
                     Ok(h) => h,
                     Err(e) => {
@@ -197,13 +193,11 @@ pub unsafe fn appid_enable(
                         continue;
                     }
                 };
-                // The JSON:API content type has to go into this map, not onto
-                // the builder afterwards: `RequestBuilder::headers` REPLACES a
-                // same-named header while `RequestBuilder::header` APPENDS one.
-                // `GrandSlam::patch` has already seeded `text/x-xml-plist` for
-                // the plist API, so appending left the request carrying two
-                // conflicting Content-Types and Apple answered every capability
-                // with an empty 400.
+                // Set the JSON:API content type in this map, not on the builder.
+                // `GrandSlam::patch` already sets `text/x-xml-plist`;
+                // `RequestBuilder::headers` replaces same-named headers, while
+                // `RequestBuilder::header` would add a second Content-Type, which
+                // Apple rejects with an empty 400.
                 for (name, value) in [("Content-Type", JSON_API), ("Accept", JSON_API)] {
                     match value.parse() {
                         Ok(v) => {
@@ -306,7 +300,7 @@ fn summarize_apple_error(status: u16, body: &str) -> String {
     if trimmed.is_empty() {
         format!("Apple returned HTTP {status}.")
     } else {
-        // Long HTML error pages are worse than useless in a table cell.
+        // Truncate long bodies such as HTML error pages.
         let short: String = trimmed.chars().take(200).collect();
         format!("HTTP {status}: {short}")
     }

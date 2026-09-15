@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Lists and revokes the Apple ID's development certificates, which is what
-/// unblocks an install stopped on error 7460. Pushed from Tools, whose
-/// `NavigationStack` this relies on.
+/// Lists and revokes the Apple ID's development certificates (e.g. to fix error
+/// 7460). Pushed from Tools (relies on its `NavigationStack`).
 struct CertsView: View {
-    /// Declared so every label on this screen redraws when the language changes.
+    /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: CertManager
 
@@ -89,7 +88,7 @@ struct CertsView: View {
         } else if !manager.certs.isEmpty {
             VStack(spacing: 14) {
                 HStack {
-                    // Just the count: Apple never reports the account's ceiling.
+                    // Count only; Apple doesn't report the account's limit.
                     Text(L("%d certificate(s)", manager.certs.count))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)

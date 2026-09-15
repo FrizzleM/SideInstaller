@@ -3,8 +3,8 @@
 //! No panic crosses the boundary, and every fallible call returns an error code
 //! plus a message the caller frees with `si_string_free`.
 
-// Force-link idevice's C-FFI crate so Swift can call its `#[no_mangle]`
-// symbols. Aliased to `_`: only the exports are wanted, never the crate itself.
+// Link idevice's C FFI crate so its `#[no_mangle]` symbols are exported to
+// Swift. Aliased to `_` because only the exports are used.
 extern crate idevice_ffi as _;
 
 mod account;
@@ -101,10 +101,10 @@ pub unsafe extern "C" fn si_pairing_result_free(r: *mut PairResult) {
 // Account — Apple ID sign-in and signing
 // ---------------------------------------------------------------------------
 
-/// Open a developer session and build a signer. Blocks; `twofa_cb` is invoked
-/// when a 2FA code is needed. With `remember_session` non-zero, a developer
-/// session saved by an earlier sign-in is reused while Apple accepts it, and a
-/// fresh sign-in's is saved; see `apple_session`.
+/// Sign in, open a developer session and build a signer. Blocks; `twofa_cb` is
+/// called when a 2FA code is needed. If `remember_session` is non-zero, a saved
+/// developer session is reused while valid and new ones are saved (see
+/// `apple_session`).
 ///
 /// # Safety
 /// See `account::apple_signin`.

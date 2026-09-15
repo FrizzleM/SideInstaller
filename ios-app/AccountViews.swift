@@ -2,14 +2,13 @@ import SwiftUI
 
 // MARK: - First-run setup
 
-/// The setup page shown once, after the TOS gate: the Apple ID is typed here and
-/// saved, and every screen that needs credentials uses it from then on. Leaving
-/// it empty is allowed — the Pairing tool needs no Apple ID — and Settings ›
-/// Account is where it can be filled in later.
+/// First-run Apple ID setup, shown once after the TOS screen. The saved account
+/// is used by every screen that signs in. Can be skipped and set later in
+/// Settings › Account.
 struct AccountSetupView: View {
     @AppStorage("hasCompletedAccountSetup") private var hasCompletedAccountSetup = false
     @EnvironmentObject private var accounts: AccountStore
-    /// Declared so the page redraws if the language changes underneath it.
+    /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
 
     @State private var email = ""
@@ -121,8 +120,8 @@ enum AccountEditorTarget: Identifiable {
     }
 }
 
-/// Adds an Apple ID or replaces the password on one. Saving makes it the account
-/// in use, since that is what a user who just typed a password expects.
+/// Sheet to add an Apple ID or update a saved one. Saving makes it the active
+/// account.
 struct AccountEditor: View {
     @EnvironmentObject private var accounts: AccountStore
     @EnvironmentObject private var loc: Localizer
@@ -154,8 +153,8 @@ struct AccountEditor: View {
                         .textContentType(.password)
                         .focused($focus, equals: .password)
                 } footer: {
-                    // The password is never shown back, so an edit always asks
-                    // for it again rather than pretending to hold the old one.
+                    // Saved passwords aren't displayed, so editing requires
+                    // entering the password again.
                     Text(target.account == nil
                          ? L("Saved in this iPhone's keychain, and sent only to Apple when signing in.")
                          : L("Enter the password again to save this Apple ID."))

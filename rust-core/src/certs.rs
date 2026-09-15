@@ -1,8 +1,7 @@
-//! Lists and revokes iOS development certificates through `isideload`'s
-//! `DeveloperSession`. A pure developer-portal API call, so no device, pairing
-//! or tunnel is involved: `si_cert_signin` opens a session on the first team,
-//! `si_cert_list` returns its certificates as JSON, and `si_cert_revoke`
-//! revokes one by serial number.
+//! Lists and revokes iOS development certificates via `isideload`'s
+//! `DeveloperSession` (developer portal only, no device). `si_cert_signin` opens
+//! a session on the first team, `si_cert_list` returns its certificates as JSON,
+//! and `si_cert_revoke` revokes one by serial number.
 
 use std::ffi::{c_char, c_void};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -22,9 +21,8 @@ use crate::ffi_util::{cstr, opt_str};
 
 /// Opaque handle owning the runtime, developer session and selected team.
 pub struct CertSession {
-    // `pub(crate)` so `entitlements` can reuse this session: the App ID
-    // capability calls need the same developer session and team, and signing in
-    // twice would mean a second 2FA prompt for the same account.
+    // `pub(crate)` so `entitlements` can reuse this session and team instead of
+    // signing in (and prompting for 2FA) again.
     pub(crate) rt: tokio::runtime::Runtime,
     pub(crate) dev: DeveloperSession,
     pub(crate) team: DeveloperTeam,
@@ -79,7 +77,7 @@ pub unsafe fn cert_signin(
     apple_id: *const c_char,
     password: *const c_char,
     anisette_url: *const c_char,
-    // Taken for parity with `si_apple_signin`; unused here.
+    // Unused; matches `si_apple_signin`'s signature.
     _machine_name: *const c_char,
     storage_dir: *const c_char,
     twofa_cb: TwoFactorCb,
@@ -101,7 +99,7 @@ pub unsafe fn cert_signin(
             .map_err(|e| format!("failed to start runtime: {e}"))?;
 
         let (dev, team, summary) = rt.block_on(async {
-            // The active account's, so its session is saved and reused.
+            // Always the active account, so the session is saved and reused.
             let (dev, teams) = apple_session::open(
                 &apple_id,
                 &password,

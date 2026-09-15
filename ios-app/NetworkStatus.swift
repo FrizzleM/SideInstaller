@@ -2,7 +2,8 @@ import Foundation
 import Darwin
 
 /// Detects the loopback tunnel (a `utun*` interface) and Wi-Fi (`en0`) by
-/// scanning the active interfaces. A readout only; connecting is the real proof.
+/// scanning the active interfaces. For status display only; a successful connect
+/// is the real test.
 enum NetworkStatus {
 
     struct Interface {
@@ -62,30 +63,24 @@ enum NetworkStatus {
         }
         // The routing table is the authority; ask it first.
         if tunnelCarriesRoute(to: deviceIP, in: ifs) == true { return true }
-        // Then the subnet test, which still answers for tunnels wide enough to
-        // hold their peer. Both, since iOS keeps system `utun` interfaces up
-        // with no VPN, and a home LAN can share the tunnel's range.
+        // Fall back to a subnet check on tunnel interfaces only: iOS keeps system
+        // `utun`s up without a VPN, and a home LAN can overlap the tunnel's range.
         return ifs.contains { isTunnelInterface($0.name) && subnet($0, contains: target) }
     }
 
-    /// Whether traffic to `deviceIP` would leave through a tunnel interface by
-    /// a route of its own. Nil when the routing table can't answer — no route,
-    /// or a source address belonging to no interface we can see.
+    /// Whether traffic to `deviceIP` goes through a tunnel interface via its own
+    /// (non-default) route. Nil when the routing table can't tell.
     ///
-    /// This, not the interface mask, is the reliable test. A point-to-point
-    /// tunnel gives its own end a /32 and reaches the peer over a host route,
-    /// so no interface's subnet contains the peer even while the tunnel carries
-    /// it perfectly well. LocalDevVPN's 2026-08 rewrite moved to exactly that
-    /// shape — `10.7.1.1/32` on the `utun`, peer `10.7.0.1/32` — which the
-    /// subnet test alone reads as "no tunnel".
+    /// More reliable than a subnet check: point-to-point tunnels (e.g.
+    /// LocalDevVPN's `10.7.1.1/32` with peer `10.7.0.1/32`) reach the peer over a
+    /// host route, so no interface's subnet contains it.
     private static func tunnelCarriesRoute(to deviceIP: String, in ifs: [Interface]) -> Bool? {
         guard let source = routeSource(to: deviceIP),
               let iface = ifs.first(where: { $0.ipv4 == source })
         else { return nil }
         guard isTunnelInterface(iface.name) else { return false }
-        // A full-tunnel VPN swallows every address, `deviceIP` included, and so
-        // says nothing about a loopback tunnel being up. Only a route more
-        // specific than the default one counts.
+        // A full-tunnel VPN routes every address, so only count it when
+        // `deviceIP` uses a different route than the default.
         return routeSource(to: defaultRouteProbe) != source
     }
 
@@ -134,14 +129,9 @@ enum NetworkStatus {
         interfaces().contains { $0.ipv4 == deviceIP }
     }
 
-    /// Local addresses worth dialling when the device opens a tunnel listener
-    /// and names a port but no host. Wi-Fi first: the remote-pairing session
-    /// itself is established over `en0`, so the listener is reachable there
-    /// even when the VPN's subnet forwards the RSD port and nothing else.
-    ///
-    /// Loopback is left out — the Rust side already tries `127.0.0.1` — and so
-    /// are the tunnel interfaces, whose peer address is the one being dialled
-    /// first anyway.
+    /// Extra local addresses to try when the device's tunnel listener gives a
+    /// port but no host. Wi-Fi (`en0`) first, since remote pairing runs over it.
+    /// Loopback and tunnel interfaces are excluded; they're already tried.
     static func tunnelHostCandidates() -> [String] {
         let ifs = interfaces().filter {
             !isTunnelInterface($0.name) && !$0.ipv4.hasPrefix("127.")
@@ -164,10 +154,8 @@ enum NetworkStatus {
         return (address & mask) == (target & mask)
     }
 
-    /// The host part of `value`, dropping any CIDR suffix and surrounding
-    /// space. LocalDevVPN has printed its addresses as `10.7.0.1/32` since its
-    /// 2026-08 rewrite, so a Device IP copied out of it arrives with a prefix
-    /// attached; everything here — and `inet_pton` below us — wants a bare host.
+    /// The host part of `value`, without whitespace or a CIDR suffix
+    /// (`10.7.0.1/32` → `10.7.0.1`). LocalDevVPN shows addresses with the suffix.
     static func host(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let slash = trimmed.firstIndex(of: "/") else { return trimmed }

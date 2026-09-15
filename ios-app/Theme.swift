@@ -25,34 +25,26 @@ enum Theme {
 
 // MARK: - Backdrop level
 
-/// How dark the backdrop is, and where it has got to on its way between two
-/// levels.
+/// Shared backdrop darkness level and its animation between tabs.
 ///
-/// Every page paints its own `AppBackground`, so the wash cannot live in any one
-/// of them: two pages overlap for the length of a tab change, and a page built
-/// part-way through one would start from the wrong place — which is what made
-/// switching tabs look arbitrary. It lives here instead, as the level left
-/// behind, the level being travelled to, and the moment the move began. Each
-/// backdrop reads its value off the clock, exactly as the mesh does, so all of
-/// them show the same frame and a switch reads as one backdrop changing rather
-/// than two crossing.
+/// Each page draws its own `AppBackground`, and pages overlap during a tab
+/// change, so the state lives here: start level, target level and start time.
+/// Every backdrop computes its value from the clock, so all copies show the
+/// same frame.
 @MainActor
 enum Backdrop {
-    /// The wash each tab settles on, as black laid over the mesh. Install and
-    /// About share the bright one — they are the two pages that read as the
-    /// front of the app — and Tools, with everything pushed inside it, is dark.
+    /// Opacity of the black overlay on the mesh: bright (Install, About) or
+    /// dark (Tools).
     enum Level: Double, CaseIterable {
         case bright = 0
         case dark   = 0.55
     }
 
-    /// What the longest move is given: long enough to read as the room changing
-    /// brightness, short enough to be over before the incoming page has
-    /// finished its entrance cascade.
+    /// Duration of a full bright ↔ dark transition.
     private static let fullTravel: TimeInterval = 0.55
 
-    /// The widest gap between two levels, so a shorter move can be given
-    /// proportionally less time and every transition runs at the same speed.
+    /// Largest gap between levels. Shorter moves get proportionally less time,
+    /// so all transitions run at the same speed.
     private static let span = (Level.allCases.map(\.rawValue).max() ?? 1)
                             - (Level.allCases.map(\.rawValue).min() ?? 0)
 
@@ -60,20 +52,18 @@ enum Backdrop {
     private static var target = Level.bright.rawValue
     /// Far enough in the past that the first frame is at rest on `bright`.
     private static var departed = -Double.greatestFiniteMagnitude
-    /// What the move under way was given, scaled to how far it actually goes.
+    /// Duration of the current move, scaled to its distance.
     private static var travel = fullTravel
 
-    /// Start the move to `level` from wherever the wash is right now, so a tab
-    /// switch made mid-transition turns around smoothly instead of jumping.
-    /// Switching between two tabs that share a level does nothing at all.
+    /// Starts animating to `level` from the current value, so switching tabs
+    /// mid-transition reverses smoothly. No-op if already heading to `level`.
     static func settle(on level: Level) {
         guard target != level.rawValue else { return }
         let now = Date.timeIntervalSinceReferenceDate
         origin = wash(at: now)
         target = level.rawValue
         departed = now
-        // A turnaround has less ground to cover than a move begun at rest, and
-        // giving it the full duration is what made one read as a crawl.
+        // Scale duration by distance, so a mid-transition reversal isn't slow.
         travel = fullTravel * min(1, abs(target - origin) / span)
     }
 
@@ -196,8 +186,7 @@ struct StatusPill: View {
             .foregroundStyle(color)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-        // Liquid Glass is iOS 26+; older releases get the tinted capsule, which
-        // is what every other pill on the screen already wears.
+        // Liquid Glass needs iOS 26+; fall back to the tinted capsule.
         if glass, #available(iOS 26.0, *) {
             label.glassEffect(.regular, in: Capsule())
         } else {
@@ -206,8 +195,7 @@ struct StatusPill: View {
     }
 }
 
-/// Marks a feature that ships before it is proven. Sized to sit beside a title
-/// without pushing it around, so the same tag works on a row and on a header.
+/// "BETA" tag for unfinished features, sized to sit next to a title.
 struct BetaBadge: View {
     var body: some View {
         Text(L("Beta").uppercased())
@@ -223,11 +211,10 @@ struct BetaBadge: View {
 /// The hero at the top of each screen: a glyph, the title, and an accessory.
 struct BrandHeader<Accessory: View>: View {
     var icon: String
-    /// Shows the real app icon in place of the gradient SF Symbol, as the
-    /// Install screen does to wear its home-screen identity.
+    /// Asset image shown instead of the SF Symbol `icon`.
     var image: String? = nil
     var title: String
-    /// Tags the title, for a screen whose feature isn't proven yet.
+    /// Shows a Beta badge next to the title.
     var beta: Bool = false
     /// A line tucked under the title, close enough to read as one block.
     var subtitle: String? = nil

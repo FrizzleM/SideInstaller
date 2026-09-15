@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// The About page: what this build is, where the project lives, and whose work
-/// it stands on. A tab of its own, so it owns the `NavigationStack` the settings
-/// toolbar hangs from.
+/// About tab: version, project links and credits. Owns its `NavigationStack`
+/// for the settings toolbar.
 struct AboutView: View {
-    /// Declared so every label on this screen redraws when the language changes.
+    /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
 
     @State private var showSettings = false
@@ -21,8 +20,7 @@ struct AboutView: View {
                 }
                 .padding(20)
             }
-            // `Backdrop.bright`, the same wash the Install tab wears, so moving
-            // between the two front pages leaves the backdrop where it is.
+            // Uses the same bright backdrop level as the Install tab.
             .background(AppBackground())
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
             .sheet(isPresented: $showSettings) { SettingsView() }
@@ -38,8 +36,7 @@ struct AboutView: View {
         }
     }
 
-    /// Marketing version with the build number after it, both read from the
-    /// bundle so this line can never drift from what was actually installed.
+    /// Version and build number, read from the app bundle.
     private var versionText: String {
         let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
@@ -158,9 +155,8 @@ struct AboutView: View {
 
 // MARK: - Row
 
-/// One entry on this page: a tinted glyph, a name and — where there is one — a
-/// line about it. Rows carrying a `urlString` open it and wear an arrow; the
-/// rest are plain credits.
+/// A row with a tinted icon, a title and an optional detail line. Rows with a
+/// `urlString` open it and show an arrow.
 private struct AboutRow: View {
     var systemImage: String
     var tint: Color
@@ -173,8 +169,7 @@ private struct AboutRow: View {
     var body: some View {
         if let url = urlString.flatMap(URL.init(string:)) {
             Button { openURL(url) } label: { content(isLink: true) }
-                // Otherwise the whole row is drawn in the accent colour, and
-                // `.secondary` under it resolves to a faded blue.
+                // `.plain` keeps the row from using the accent color.
                 .buttonStyle(.plain)
         } else {
             content(isLink: false)
@@ -186,7 +181,7 @@ private struct AboutRow: View {
             Image(systemName: systemImage)
                 .font(.title3)
                 .foregroundStyle(Theme.gradient(tint))
-                // Fixed, so the column of glyphs lines up whatever their width.
+                // Fixed width so the icons line up.
                 .frame(width: 26, alignment: .leading)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)

@@ -2,13 +2,11 @@ import SwiftUI
 
 // MARK: - Models
 
-/// One provisioning profile, decoded from the CMS blob misagent hands back.
+/// One provisioning profile, decoded from the CMS blob misagent returns.
 ///
-/// The signature is not checked. The device already refused to install anything
-/// whose profile it didn't trust, so re-verifying here would only tell us what
-/// the device has already decided — and the plist inside is what the page needs.
-/// The payload is extracted by scanning for the plist rather than by running the
-/// blob through `CMSDecoder`, which is StikDebug's route too.
+/// The CMS signature isn't verified (the device already trusts installed
+/// profiles). The plist payload is found by scanning the blob, as StikDebug
+/// does, rather than using `CMSDecoder`.
 struct ProvisioningProfile: Identifiable, Equatable {
 
     /// Apple's name for the App ID the profile was issued against, e.g.
@@ -21,20 +19,18 @@ struct ProvisioningProfile: Identifiable, Equatable {
     let uuid: String
     let creationDate: Date?
     let expirationDate: Date?
-    /// The profile's own entitlements, i.e. what an app signed with it is
-    /// allowed to do. Kept as a plist dictionary — the values are of every type.
+    /// Entitlements granted by the profile, as a plist dictionary.
     let entitlements: [String: Any]
 
     var id: String { uuid }
 
-    /// Only the identity matters for equality: the rest is decoded from the same
-    /// bytes, and `[String: Any]` isn't `Equatable` anyway.
+    /// Compares identity only (UUID and expiry); `[String: Any]` isn't `Equatable`.
     static func == (lhs: ProvisioningProfile, rhs: ProvisioningProfile) -> Bool {
         lhs.uuid == rhs.uuid && lhs.expirationDate == rhs.expirationDate
     }
 
-    /// The bundle id with the team prefix stripped, which is what the user
-    /// recognises. `A1B2C3D4E5.com.example.app` → `com.example.app`.
+    /// The bundle ID without the team prefix:
+    /// `A1B2C3D4E5.com.example.app` → `com.example.app`.
     var bundleIdentifier: String {
         guard let dot = applicationIdentifier.firstIndex(of: ".") else {
             return applicationIdentifier
@@ -48,12 +44,10 @@ struct ProvisioningProfile: Identifiable, Equatable {
         return String(applicationIdentifier[..<dot])
     }
 
-    /// True when the App ID is a wildcard, which is what a free Apple ID gets
-    /// for anything it hasn't registered explicitly.
+    /// True when the App ID is a wildcard (ends in `*`).
     var isWildcard: Bool { applicationIdentifier.hasSuffix("*") }
 
-    /// Whole days from today until it lapses; negative once it has. Counted in
-    /// calendar days, so "expires tomorrow" reads as 1 whatever the clock says.
+    /// Calendar days until expiry (1 = tomorrow); negative once expired.
     var daysRemaining: Int? {
         guard let expirationDate else { return nil }
         let calendar = Calendar.current
@@ -67,9 +61,7 @@ struct ProvisioningProfile: Identifiable, Equatable {
         return expirationDate < Date()
     }
 
-    /// The entitlement keys worth showing: every profile carries the same four
-    /// pieces of bookkeeping, and listing those on each app would bury the
-    /// capabilities that actually differ.
+    /// Entitlement keys to display, excluding the four every profile has.
     var capabilityKeys: [String] {
         let boilerplate: Set<String> = [
             "application-identifier",
@@ -80,9 +72,8 @@ struct ProvisioningProfile: Identifiable, Equatable {
         return entitlements.keys.filter { !boilerplate.contains($0) }.sorted()
     }
 
-    /// Decode one `.mobileprovision` payload. Returns nil when the bytes hold no
-    /// readable plist, which is the only failure worth having — a profile that
-    /// won't decode is simply left out of the page.
+    /// Decodes a `.mobileprovision` payload. Returns nil if no readable plist is
+    /// found; such profiles are left off the page.
     init?(data: Data) {
         guard let payload = Self.plistPayload(in: data),
               let plist = try? PropertyListSerialization.propertyList(from: payload, format: nil),
@@ -121,16 +112,14 @@ struct SideloadedApp: Identifiable, Equatable {
     let bundleID: String
     let name: String
     let version: String?
-    /// The `TEAMID.bundle.id` baked into the app's own entitlements at signing.
-    /// Present on everything free-signed; the profile match falls back to the
-    /// bundle id when it isn't.
+    /// `TEAMID.bundle.id` from the app's signed entitlements. When missing,
+    /// profile matching falls back to the bundle ID.
     let applicationIdentifier: String?
 
     var id: String { bundleID }
 
-    /// `ProfileValidated` is installd's own mark that the app was installed
-    /// against a provisioning profile. App Store apps don't carry it, which is
-    /// what makes it the filter for this page.
+    /// Returns nil unless `ProfileValidated` is set. installd sets it only for
+    /// apps installed with a provisioning profile, not App Store apps.
     init?(plist: [String: Any]) {
         guard plist["ProfileValidated"] != nil,
               let bundleID = plist["CFBundleIdentifier"] as? String else { return nil }
@@ -144,9 +133,8 @@ struct SideloadedApp: Identifiable, Equatable {
     }
 }
 
-/// An installed app together with every profile on the device that could have
-/// signed it, newest expiry first. More than one is normal: each re-signing
-/// leaves its profile behind, and the device keeps them all.
+/// An installed app with every profile on the device that could have signed it,
+/// latest expiry first. Multiple profiles are normal: each re-sign leaves one.
 struct SideloadedAppStatus: Identifiable, Equatable {
 
     let app: SideloadedApp
@@ -154,20 +142,18 @@ struct SideloadedAppStatus: Identifiable, Equatable {
 
     var id: String { app.bundleID }
 
-    /// The one the app is actually living on: the profile that lapses last.
+    /// The profile in use: the one that expires last.
     var current: ProvisioningProfile? { profiles.first }
 
     /// Profiles kept only for history, shown on the detail page.
     var superseded: [ProvisioningProfile] { Array(profiles.dropFirst()) }
 
-    /// What to sort on. Apps with no profile at all sort last — they are the
-    /// odd case, and putting them above something expiring today would be wrong.
+    /// Sort key: expiry date. Apps without a profile sort last.
     var sortKey: Date { current?.expirationDate ?? .distantFuture }
 }
 
-/// How urgent an expiry is, and the colour that says so. The bands are
-/// AltStore's, by way of StikDebug: a free profile lasts seven days, so a week
-/// is the whole scale.
+/// Expiry urgency bands and colors (same as AltStore/StikDebug), scaled to a
+/// free profile's seven days.
 enum ExpiryUrgency {
     case expired, critical, soon, later, comfortable, unknown
 
@@ -201,9 +187,8 @@ enum ExpiryUrgency {
         }
     }
 
-    /// The line the whole page turns on: "Expires today", "Expires in 5 days —
-    /// 23 Aug", "Expired 12 Aug". Anything more than a month out gets the date
-    /// alone — a countdown only means something against a seven-day grant.
+    /// Expiry text, e.g. "Expires today", "Expires in 5 days — 23 Aug",
+    /// "Expired 12 Aug". More than 30 days out shows only the date.
     static func text(for profile: ProvisioningProfile?) -> String {
         guard let profile, let expiration = profile.expirationDate else {
             return L("No matching profile")
@@ -222,9 +207,8 @@ enum ExpiryUrgency {
 
 // MARK: - Matching
 
-/// Pairs installed apps with the profiles that signed them. Free of any device
-/// or UI state on purpose: this is the only part with real logic in it, and
-/// keeping it static makes it something that can be exercised on its own.
+/// Matches installed apps to the profiles that signed them. Static functions
+/// with no device or UI state, so the logic can be tested on its own.
 enum ProfileMatcher {
 
     /// Index every profile by the App ID it was issued against, then hand each
@@ -238,9 +222,8 @@ enum ProfileMatcher {
         let wildcards = sorted.filter(\.isWildcard)
         let specific = sorted.filter { !$0.isWildcard }
         let byAppID = Dictionary(grouping: specific, by: \.applicationIdentifier)
-        // Second index, because installation_proxy doesn't always report an
-        // app's `application-identifier` — then the bare bundle id is all there
-        // is to match a profile on.
+        // Also index by bundle ID, for apps that don't report
+        // `application-identifier`.
         let byBundleID = Dictionary(grouping: specific, by: \.bundleIdentifier)
 
         var claimed = Set<String>()
@@ -251,16 +234,14 @@ enum ProfileMatcher {
             return SideloadedAppStatus(app: app, profiles: matched)
         }
 
-        // Left over: profiles for apps that have since been deleted, and
-        // wildcards nothing had to fall back on. Worth showing, because they are
-        // what fills a free account's App ID list up.
+        // Profiles no app matched (deleted apps, unused wildcards). Shown because
+        // they count toward a free account's App ID limit.
         let unmatched = sorted.filter { !claimed.contains($0.uuid) }
 
         return (entries.sorted(by: order), unmatched)
     }
 
-    /// Soonest expiry first: the whole point of the page is spotting what is
-    /// about to stop launching, so that has to be the top of the list.
+    /// Soonest expiry first, then by name.
     private static func order(_ lhs: SideloadedAppStatus, _ rhs: SideloadedAppStatus) -> Bool {
         if lhs.sortKey != rhs.sortKey { return lhs.sortKey < rhs.sortKey }
         return lhs.app.name.localizedCaseInsensitiveCompare(rhs.app.name) == .orderedAscending
@@ -268,11 +249,9 @@ enum ProfileMatcher {
 
     /// The profiles that could have signed `app`, latest expiry first.
     ///
-    /// A profile issued for this bundle id specifically wins outright: it is what
-    /// was embedded in the bundle at signing, so it is what the app is actually
-    /// living on. Only when there is none does a wildcard count — merging the
-    /// two would let the team's long-lived wildcard mask the real expiry date of
-    /// an app whose own profile runs out tomorrow.
+    /// Profiles for this exact App ID or bundle ID take priority. Wildcards are
+    /// used only when there are none, so a long-lived wildcard can't hide an
+    /// app-specific profile's earlier expiry.
     private static func matchingProfiles(for app: SideloadedApp,
                                          byAppID: [String: [ProvisioningProfile]],
                                          byBundleID: [String: [ProvisioningProfile]],
@@ -283,9 +262,8 @@ enum ProfileMatcher {
         return deduplicated(wildcards.filter { covers(pattern: $0.applicationIdentifier, app) })
     }
 
-    /// Does a wildcard App ID cover this app? Tried against the app's own
-    /// identifier first, then — since that may be missing — against the bare
-    /// bundle id, with the pattern's team prefix taken off to match.
+    /// Whether a wildcard App ID covers this app. Checks the app's identifier
+    /// first, then its bundle ID against the pattern without the team prefix.
     static func covers(pattern: String, _ app: SideloadedApp) -> Bool {
         if let identifier = app.applicationIdentifier, matches(pattern: pattern, identifier) {
             return true
@@ -303,8 +281,8 @@ enum ProfileMatcher {
         return value.range(of: "^" + escaped + "$", options: .regularExpression) != nil
     }
 
-    /// One entry per profile, latest expiry first. The two indexes above overlap
-    /// whenever an app reports its identifier, so this runs on every result.
+    /// Removes duplicate profiles (the two indexes overlap) and sorts by latest
+    /// expiry.
     private static func deduplicated(_ profiles: [ProvisioningProfile]) -> [ProvisioningProfile] {
         var seen = Set<String>()
         return profiles
@@ -316,12 +294,9 @@ enum ProfileMatcher {
         profile.expirationDate ?? .distantPast
     }
 
-    /// Does the app the device reports come from the IPA whose own bundle id is
-    /// `ipaBundleID`? It is never a plain comparison: isideload signs every app
-    /// under `<bundle id>.<team id>`, so what is installed always carries the
-    /// signing team's id on the end. `teamID` — the one on the profile the app
-    /// is living on — settles it when it is known; without it, the shape of a
-    /// team id is what's left to go on.
+    /// Whether an installed app was built from the IPA with `ipaBundleID`.
+    /// isideload signs apps as `<bundle id>.<team id>`, so this checks for that
+    /// suffix: `teamID` when known, otherwise any 10-character team ID.
     static func installed(_ bundleID: String, isBuiltFrom ipaBundleID: String,
                           teamID: String?) -> Bool {
         if bundleID == ipaBundleID { return true }        // signed by something else
@@ -346,7 +321,7 @@ struct RefreshJob: Identifiable, Equatable {
     let bundleID: String
     let name: String
     let ipa: URL
-    /// The team the app is signed under now, from the profile it's living on.
+    /// Team ID the app is currently signed under (from its current profile).
     let teamID: String?
     var state: State = .pending
 
@@ -355,10 +330,8 @@ struct RefreshJob: Identifiable, Equatable {
 
 // MARK: - Manager
 
-/// Drives the Sideloaded apps page: one trip to the device for what's installed
-/// and what profiles it holds, then the matching above. Reading is the whole of
-/// a load, so it either works or says why; the refresh below is the one thing
-/// here that writes, and it goes back through the install pipeline to do it.
+/// Drives the Sideloaded apps page: loads installed apps and profiles from the
+/// device, matches them, and runs "Refresh all" through the install pipeline.
 @MainActor
 final class SideloadedAppsManager: ObservableObject {
 
@@ -393,8 +366,7 @@ final class SideloadedAppsManager: ObservableObject {
     /// The refresh in flight, kept so it can be called off between apps.
     private var refreshTask: Task<Void, Never>?
 
-    /// The apps that need re-signing within a day, which is what the header
-    /// pill counts.
+    /// Number of apps expiring within a day (shown in the header pill).
     var expiringSoon: Int {
         entries.filter { status in
             switch ExpiryUrgency.of(status.current) {
@@ -404,9 +376,8 @@ final class SideloadedAppsManager: ObservableObject {
         }.count
     }
 
-    /// Load once when the page opens, quietly. Arriving here before the VPN is
-    /// up shouldn't paint an error nobody asked for — the button below says it
-    /// plainly enough when the user does ask.
+    /// Loads once when the page opens, without showing errors (e.g. when the VPN
+    /// isn't up yet).
     func autoLoad() {
         guard !didAutoLoad, !hasLoaded, !isWorking else { return }
         didAutoLoad = true
@@ -446,11 +417,8 @@ final class SideloadedAppsManager: ObservableObject {
 
     // MARK: - Refresh all
 
-    /// Sign every refreshable app again and install it over itself, which is
-    /// what puts seven fresh days on each one. Strictly one at a time: they
-    /// share a single device link and a single signing queue, and Apple's
-    /// developer API is rate-limited hard enough that overlapping them would
-    /// cost more than it saved.
+    /// Re-signs and reinstalls every refreshable app, one at a time (they share
+    /// one device link and signing queue, and Apple's API is rate-limited).
     func refreshAll() {
         guard !isRefreshing, !isWorking, !refreshable.isEmpty else { return }
         guard !engine.isRunning else {
@@ -482,14 +450,12 @@ final class SideloadedAppsManager: ObservableObject {
 
             var refreshed = 0
             for index in jobs.indices {
-                // Between apps is the only place a run can stop: signing and
-                // installing are blocking calls in the Rust core, and nothing
-                // interrupts one of those halfway.
+                // Cancellation is checked between apps; signing and installing
+                // can't be interrupted midway.
                 if Task.isCancelled { break }
                 let job = jobs[index]
-                // Signing rewrites the bundle id as `<bundle id>.<team id>`, so
-                // an app signed by a different team would install beside the one
-                // on screen instead of replacing it. Leave it alone and say so.
+                // Skip apps signed by a different team: the new bundle ID would
+                // install a second copy instead of replacing the app.
                 if let team = engine.signingTeamID, let installed = job.teamID, installed != team {
                     jobs[index].state = .failed(
                         L("Signed by team %@, not the one you're signed in as — refreshing it here would install a second copy.", installed))
@@ -521,8 +487,8 @@ final class SideloadedAppsManager: ObservableObject {
         }
     }
 
-    /// Stop the run once the app being refreshed now is finished with. The
-    /// apps after it are left as they were, still on their old profiles.
+    /// Stops the run after the current app finishes. Remaining apps are left
+    /// unchanged.
     func cancelRefresh() {
         guard isRefreshing, refreshTask != nil else { return }
         refreshTask?.cancel()
@@ -535,9 +501,8 @@ final class SideloadedAppsManager: ObservableObject {
         (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     }
 
-    /// Work out which apps on the page can be signed again from an IPA already
-    /// in Documents. Reading those archives is file work, so it happens off the
-    /// main thread — the page's own models never leave it.
+    /// Finds which listed apps have a matching IPA in Documents. The IPAs are
+    /// read off the main thread.
     private func rebuildRefreshable() async {
         let installed = entries.map {
             InstalledRef(bundleID: $0.app.bundleID, name: $0.app.name,
@@ -578,20 +543,17 @@ final class SideloadedAppsManager: ObservableObject {
 
 // MARK: - View
 
-/// The Sideloaded apps page: what this device is carrying that SideInstaller (or
-/// anything else signing with a free Apple ID) put there, which App ID each one
-/// runs under, and how long it has left. Pushed from Tools, whose
-/// `NavigationStack` this relies on.
+/// Sideloaded apps page: apps installed with a provisioning profile, their App
+/// ID, and time until expiry. Pushed from Tools (relies on its `NavigationStack`).
 struct AppsView: View {
-    /// Declared so every label on this screen redraws when the language changes.
+    /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
-    /// Observed for the install bar alone: a refresh installs through the same
-    /// pipeline, and `installProgress` is where that progress comes out.
+    /// Observed for `installProgress` during a refresh.
     @EnvironmentObject private var engine: Engine
     @ObservedObject var manager: SideloadedAppsManager
 
     @State private var showSettings = false
-    /// Raised by "Refresh all", until the run is confirmed or called off.
+    /// Shows the "Refresh all" confirmation alert.
     @State private var confirmRefresh = false
 
     var body: some View {
@@ -651,10 +613,7 @@ struct AppsView: View {
 
     // MARK: Primary action
 
-    /// The page's headline action once there is something to act on: sign every
-    /// app it has the IPA for again, and install each over itself. That is the
-    /// whole of a refresh — seven days is all a free profile is ever given, and
-    /// only a new one resets the count.
+    /// "Refresh all" button, shown when at least one app can be refreshed.
     @ViewBuilder
     private var refreshAllButton: some View {
         if manager.hasLoaded && !manager.refreshable.isEmpty {
@@ -673,8 +632,7 @@ struct AppsView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(manager.isRefreshing || manager.isWorking)
-                // The install itself is the long part, and it's the one step
-                // that reports how far along it is.
+                // Only the install step reports progress.
                 if manager.isRefreshing, engine.installProgress > 0, engine.installProgress < 1 {
                     ProgressView(value: engine.installProgress)
                         .tint(Theme.accent2)
@@ -693,8 +651,8 @@ struct AppsView: View {
         }
     }
 
-    /// Reading the device. The primary action while it is the only thing to do
-    /// on this page, and demoted the moment a refresh is on offer above it.
+    /// Load/Reload button: primary style until "Refresh all" is available, then
+    /// secondary. Becomes Cancel during a refresh.
     @ViewBuilder
     private var loadButton: some View {
         if manager.isRefreshing {
@@ -737,8 +695,8 @@ struct AppsView: View {
 
     // MARK: Refresh run
 
-    /// What the refresh is doing, app by app, and how it went. Kept on screen
-    /// after the run so a failure can be read at leisure.
+    /// Per-app refresh progress and results. Stays visible after the run so
+    /// failures can be read.
     @ViewBuilder
     private var refreshRunCard: some View {
         if !manager.jobs.isEmpty {
@@ -747,8 +705,7 @@ struct AppsView: View {
                     Text(L("Refresh all"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    // Enumerated, so a language switch mid-run redraws these
-                    // rows rather than leaving them in the old copy.
+                    // Enumerated so rows redraw on a language change.
                     ForEach(Array(manager.jobs.enumerated()), id: \.element.id) { _, job in
                         jobRow(job)
                     }
@@ -812,9 +769,8 @@ struct AppsView: View {
         }
     }
 
-    /// Why some of the apps above aren't part of a refresh: this app can only
-    /// sign what it has the IPA for, and most of the page usually came from
-    /// somewhere else.
+    /// Note explaining that apps without an IPA in SideInstaller can't be
+    /// refreshed.
     @ViewBuilder
     private var refreshNote: some View {
         if manager.hasLoaded && manager.unrefreshable > 0 && !manager.entries.isEmpty {
@@ -927,10 +883,8 @@ struct AppsView: View {
 
     // MARK: Leftover profiles
 
-    /// Profiles nothing on the device is running on: leftovers from apps that
-    /// have been deleted, and App IDs nothing is signed with right now. A free
-    /// Apple ID is capped at ten App IDs a week, so knowing what is taking up
-    /// the room is genuinely useful.
+    /// Profiles not used by any installed app (e.g. from deleted apps). Useful
+    /// because a free Apple ID is limited to ten App IDs a week.
     @ViewBuilder
     private var unmatchedSection: some View {
         if !manager.unmatched.isEmpty {
@@ -944,9 +898,8 @@ struct AppsView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                // Enumerated, like the list above: a `ForEach` straight over an
-                // `Equatable` array lets SwiftUI skip re-evaluating these rows,
-                // and a language switch then leaves them in the old copy.
+                // Enumerated so rows redraw on a language change (a plain
+                // `ForEach` over an `Equatable` array may skip re-rendering).
                 ForEach(Array(manager.unmatched.enumerated()), id: \.element.id) { idx, profile in
                     PanelCard {
                         VStack(alignment: .leading, spacing: 4) {
@@ -1124,8 +1077,7 @@ private struct AppProfileDetail: View {
         }
     }
 
-    /// One labelled, selectable line. The identifiers here are things people
-    /// copy into bug reports, so they are worth being able to select.
+    /// A labelled value with selectable text, so identifiers can be copied.
     private func field(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)

@@ -61,8 +61,9 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Releases API endpoint for a channel, asked only when an asset has been
-    /// renamed; `/releases/latest` skips pre-releases, hence the nightly tag.
+    /// GitHub Releases API URL for a channel, used only when the direct download
+    /// 404s. Nightly uses the `nightly` tag since `/releases/latest` skips
+    /// pre-releases.
     func releaseAPI(_ channel: ReleaseChannel) -> URL? {
         guard let repo else { return nil }
         let base = "https://api.github.com/repos/\(repo)/releases"
@@ -72,7 +73,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The `.ipa` this build publishes, letting the URL be derived not looked up.
+    /// Published `.ipa` asset name, used to build the direct download URL.
     var assetFileName: String? {
         switch self {
         case .sideStore:     return "SideStore.ipa"
@@ -81,8 +82,8 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Direct download off github.com, which the API's per-IP rate limit — often
-    /// already spent by strangers behind carrier-grade NAT — doesn't meter.
+    /// Direct github.com download URL. Preferred over the API, which has a
+    /// per-IP rate limit.
     func downloadURL(_ channel: ReleaseChannel) -> URL? {
         guard let repo, let assetFileName else { return nil }
         let base = "https://github.com/\(repo)/releases"
@@ -106,8 +107,8 @@ enum InstallSource: String, CaseIterable, Identifiable {
 
     // MARK: Pairing-file placement
     //
-    // After install, the pairing file goes into the host app's container. Which
-    // app and which path differ per build, as in iLoader's PAIRING_APPS table.
+    // After install, the pairing file is written into the host app's container.
+    // The app and path depend on the build (like iLoader's PAIRING_APPS table).
 
     /// Display name of the host app receiving the file, as installation_proxy
     /// reports it; isideload rewrites bundle ids, so names are matched instead.
@@ -166,9 +167,8 @@ enum SideStoreDownloader {
     struct GHRelease: Decodable {
         let tag_name: String
         let assets: [GHAsset]
-        /// Absent from the two single-release endpoints this app also decodes,
-        /// so optional; only the list endpoint needs it, to keep a stable
-        /// request from being answered with a nightly.
+        /// Optional so decoding doesn't depend on it. Used by the release scan to
+        /// keep stable requests off pre-releases.
         let prerelease: Bool?
     }
 
@@ -187,8 +187,8 @@ enum SideStoreDownloader {
         case badRelease(String)
         /// The bytes arrived and aren't an IPA.
         case notAnIPA(String)
-        /// A pasted link answered with a status instead of a file. Separate from
-        /// `badStatus` because nothing about GitHub applies to a link.
+        /// A pasted link returned a non-2xx status (kept separate from the
+        /// GitHub-specific `badStatus`).
         case linkStatus(Int)
 
         var description: String {
@@ -204,8 +204,7 @@ enum SideStoreDownloader {
             case .notDownloadable:
                 return L("there's nothing to download for a custom IPA — import one first")
             case let .badStatus(status, detail, retryAfter):
-                // GitHub's rate-limit text names the public IP it counted and
-                // suggests authenticating, so say the actionable part instead.
+                // Replace GitHub's rate-limit text with when to retry.
                 if let retryAfter {
                     return L("GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.",
                              Self.relative(retryAfter))
@@ -220,15 +219,14 @@ enum SideStoreDownloader {
                 return L("what downloaded as %@ isn't an IPA — something on this network returned a page instead, or the transfer stopped partway.",
                          name)
             case let .linkStatus(status):
-                // 401/403 is the common one: a link behind a sign-in, which the
-                // app can't answer, rather than a link that has gone.
+                // Usually 401/403: the link requires signing in.
                 return L("that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.",
                          status)
             }
         }
 
-        /// True when fetching the IPA elsewhere is really the way past this: the
-        /// network interfering, not a rate limit or a release that isn't there.
+        /// True when downloading the IPA another way would help (network
+        /// interference), not for rate limits or missing releases.
         var manualSideloadHelps: Bool {
             switch self {
             case .unreachable, .badRelease, .notAnIPA:
@@ -246,9 +244,8 @@ enum SideStoreDownloader {
             return false
         }
 
-        /// The channel's own release publishes nothing this app can install —
-        /// or isn't there at all. Both are worth looking past to the repo's
-        /// other releases; a rate limit, an outage or a tampered answer is not.
+        /// True when the channel's release is missing or has no usable IPA, so
+        /// the repo's other releases should be scanned.
         var isChannelEmpty: Bool {
             switch self {
             case .noIPAAsset, .noRelease:
@@ -273,10 +270,8 @@ enum SideStoreDownloader {
         let file: URL
         /// The asset name GitHub gave it, which may differ from the one asked for.
         let name: String
-        /// The channel the release it came from belongs to, which is the one
-        /// asked for unless `fetchViaReleaseScan` had to look elsewhere. The
-        /// file is filed under this, so the Downloads list never calls a tagged
-        /// stable build a nightly.
+        /// Channel of the release the file actually came from (can differ from
+        /// the requested one after `fetchViaReleaseScan`). Used for the filename.
         let channel: ReleaseChannel
     }
 
@@ -300,8 +295,8 @@ enum SideStoreDownloader {
             }
         }
 
-        // An answer isn't proof of an IPA: a block page or a stopped transfer
-        // would otherwise surface later as an opaque signing failure.
+        // Validate now, so an error page or truncated download doesn't fail
+        // later during signing.
         guard IPALibrary.looksLikeIPA(fetched.file) else {
             try? FileManager.default.removeItem(at: fetched.file)
             throw DownloadError.notAnIPA(fetched.name)
@@ -310,7 +305,7 @@ enum SideStoreDownloader {
         let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(fetched.channel))
         try? FileManager.default.removeItem(at: dest)
         try FileManager.default.moveItem(at: fetched.file, to: dest)
-        // Claim the file, so a later run knows this copy is safe to replace.
+        // Mark as app-downloaded, so later runs may replace it.
         DownloadLedger.record(dest)
         return dest.path
     }
@@ -339,12 +334,11 @@ enum SideStoreDownloader {
         return Fetched(file: file, name: name, channel: channel)
     }
 
-    /// Download a link the user pasted, into a temporary directory of its own so
-    /// the file keeps the name the link gave it. `progress` is called on an
-    /// arbitrary queue as the bytes arrive.
+    /// Downloads a pasted link into its own temp directory, saved as `name`.
+    /// `progress` is called on an arbitrary queue.
     ///
-    /// Kept apart from `fetch`: there is no release behind a pasted link, no tag
-    /// to record, and its failures have to name the link rather than GitHub.
+    /// Separate from `fetch`: there's no release tag to record, and errors refer
+    /// to the link rather than GitHub.
     static func fetchDirect(_ url: URL,
                             named name: String,
                             progress: @escaping (Double) -> Void) async throws -> URL {
@@ -357,10 +351,8 @@ enum SideStoreDownloader {
         let dest = staging.appendingPathComponent(name)
 
         return try await withCheckedThrowingContinuation { cont in
-            // Progress comes off the task's own `Progress` rather than a
-            // `URLSessionDownloadDelegate`: the delegate's completion callback
-            // and the async `download(for:)` both claim the downloaded file,
-            // and KVO leaves no object to keep alive by hand.
+            // Progress is observed via KVO on the task's `Progress` instead of
+            // a download delegate, which would conflict over the downloaded file.
             var observation: NSKeyValueObservation?
             let task = URLSession.shared.downloadTask(with: req) { file, response, error in
                 observation?.invalidate()
@@ -372,8 +364,8 @@ enum SideStoreDownloader {
                     guard (200...299).contains(http.statusCode) else {
                         throw DownloadError.linkStatus(http.statusCode)
                     }
-                    // This handler's file is deleted the moment it returns, so
-                    // the move belongs here rather than at the call site.
+                    // The temp file is deleted when this handler returns, so
+                    // move it now.
                     try FileManager.default.moveItem(at: file, to: dest)
                     cont.resume(returning: dest)
                 } catch let urlError as URLError {
@@ -410,8 +402,7 @@ enum SideStoreDownloader {
         do {
             release = try JSONDecoder().decode(GHRelease.self, from: data)
         } catch {
-            // The status is already ruled out, so a 2xx that won't decode is
-            // exactly that, not a refusal in disguise.
+            // The status was 2xx, so this is a real decode failure.
             throw DownloadError.badRelease(String(describing: error))
         }
         log("\(channel.displayName) \(source.displayName) release: \(release.tag_name) with \(release.assets.count) assets")
@@ -425,20 +416,15 @@ enum SideStoreDownloader {
         return try await fetch(assetURL, named: asset.name, from: channel, log: log)
     }
 
-    /// Look through the repo's recent releases for the newest one that still
-    /// publishes this build, once the channel's own release doesn't.
+    /// Scans the repo's recent releases for the newest one that has this build,
+    /// used when the channel's own release doesn't.
     ///
-    /// LiveContainer is why. Its CI still builds `LiveContainer+SideStore.ipa`
-    /// on every nightly run, but the rolling `nightly` release it attaches to
-    /// carries the plain `LiveContainer.ipa` alone — verified 2026-09-02, and
-    /// LiveContainer's own nightly source JSON lists only the plain build — so
-    /// the derived URL 404s, the API sees a release with no IPA of ours in it,
-    /// and the newest combined build on offer is the latest tagged one.
+    /// Needed for LiveContainer: its rolling `nightly` release can carry only
+    /// `LiveContainer.ipa`, so the newest `LiveContainer+SideStore.ipa` is on a
+    /// tagged release.
     ///
-    /// A `stable` request never falls back to a pre-release: being handed a
-    /// nightly after asking for stable would be worse than the error this is
-    /// recovering from. A nightly request takes whatever is newest, since the
-    /// alternative is nothing at all.
+    /// Stable requests never fall back to a pre-release. Nightly requests take
+    /// the newest release of either kind.
     private static func fetchViaReleaseScan(source: InstallSource,
                                             channel: ReleaseChannel,
                                             log: @escaping (String) -> Void) async throws -> Fetched {
@@ -466,8 +452,7 @@ enum SideStoreDownloader {
             if channel == .stable, release.prerelease == true { continue }
             guard let asset = source.selectAsset(from: release.assets),
                   let assetURL = URL(string: asset.browser_download_url) else { continue }
-            // Filed under the track the release it came from belongs to, not
-            // the one asked for, so a tagged build is never listed as a nightly.
+            // Save under the release's actual channel, not the requested one.
             let served: ReleaseChannel = release.prerelease == true ? .nightly : .stable
             log("\(source.displayName) isn't published on the \(channel.displayName.lowercased()) release — taking \(asset.name) from release \(release.tag_name) instead.")
             return try await fetch(assetURL, named: asset.name, from: served, log: log)
@@ -475,8 +460,8 @@ enum SideStoreDownloader {
         throw DownloadError.noIPAAsset(source.displayName, channel)
     }
 
-    /// Run a URLSession call, typing its failures: a `URLError` is the only one
-    /// that means GitHub was out of reach.
+    /// Runs a URLSession call, mapping `URLError` to `.unreachable` (or to
+    /// `CancellationError` when cancelled).
     private static func perform<T>(_ work: () async throws -> T) async throws -> T {
         do {
             return try await work()
@@ -487,8 +472,7 @@ enum SideStoreDownloader {
         }
     }
 
-    /// Reject anything that isn't a 2xx before its body is trusted, so a refusal
-    /// reads as itself rather than as a decode failure.
+    /// Throws `badStatus` for a non-2xx response, before the body is decoded.
     private static func check(_ response: URLResponse, body: Data? = nil) throws {
         guard let http = response as? HTTPURLResponse else { return }
         guard (200...299).contains(http.statusCode) else {
@@ -498,8 +482,8 @@ enum SideStoreDownloader {
         }
     }
 
-    /// When GitHub will answer again, if this refusal is a rate limit: seconds
-    /// for the secondary limits, a Unix timestamp for the spent hourly quota.
+    /// Retry time for a GitHub rate limit: from `retry-after` (seconds), or from
+    /// `x-ratelimit-reset` (Unix time) when the hourly quota is used up.
     private static func retryAfter(_ http: HTTPURLResponse) -> Date? {
         if let seconds = http.value(forHTTPHeaderField: "retry-after").flatMap(Double.init) {
             return Date().addingTimeInterval(seconds)
@@ -510,7 +494,7 @@ enum SideStoreDownloader {
         return Date(timeIntervalSince1970: reset)
     }
 
-    /// The readable half of GitHub's error envelope.
+    /// The `message` field of GitHub's JSON error body.
     private static func errorMessage(in data: Data) -> String? {
         struct Envelope: Decodable { let message: String }
         guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
@@ -549,8 +533,8 @@ private final class ReleaseTagRecorder: NSObject, URLSessionTaskDelegate {
 
 // MARK: - IPAs already on disk
 
-/// The IPAs in the app's Documents directory, however they got there. Copying
-/// one in through the Files app is how to install where GitHub is unreachable.
+/// IPAs in the app's Documents directory, whether downloaded, imported, or
+/// copied in with the Files app.
 enum IPALibrary {
 
     /// Where both the downloader and the Files app write.
@@ -558,8 +542,8 @@ enum IPALibrary {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
-    /// Where an imported IPA is kept: its own folder, so it keeps its name even
-    /// when that name is one a download also uses.
+    /// Folder for the imported custom IPA, separate so its name can't clash with
+    /// a download.
     static var customDir: URL {
         documentsDir.appendingPathComponent("Custom", isDirectory: true)
     }
@@ -638,14 +622,14 @@ enum IPALibrary {
             .min { rank($0) < rank($1) }
     }
 
-    /// A wrong pick, kept apart from the file-system errors a copy can throw.
+    /// Thrown when the picked file isn't an IPA.
     enum ImportError: Error {
         case notAnIPA
     }
 
-    /// Replace the custom import with `url`, forcing the `.ipa` extension.
-    /// Blocking, and staged in a temporary directory so only a complete, valid
-    /// IPA replaces the previous one. The caller handles security-scoped access.
+    /// Replaces the custom import with `url`, forcing a `.ipa` extension.
+    /// Blocking. Copies to a staging directory first, so only a complete, valid
+    /// IPA replaces the old one. The caller handles security-scoped access.
     static func replaceCustomImport(with url: URL) throws -> URL {
         let fm = FileManager.default
         let name = url.deletingPathExtension().lastPathComponent
@@ -706,27 +690,22 @@ enum IPALibrary {
 
 // MARK: - What an IPA will install
 
-/// Reading `Payload/<name>.app/Info.plist` straight out of the archive, so the
-/// Sideloaded apps page can tell which installed app each IPA on disk would
-/// replace. An IPA is a plain zip, and the central directory at its end says
-/// where that one file sits — which is the whole reason this is worth doing by
-/// hand: it reads a few hundred bytes out of a hundred-megabyte file instead of
-/// unpacking it. ZIP64 is not handled; nothing this app installs is near 4 GB.
+/// Reads `Payload/<name>.app/Info.plist` directly from an IPA using the zip
+/// central directory, without unpacking the archive. The Sideloaded apps page
+/// uses this to match IPAs on disk to installed apps. ZIP64 isn't supported.
 extension IPALibrary {
 
     /// What an `.ipa` says it will put on the device.
     struct AppInfo: Equatable {
-        /// The bundle id as published. What the device ends up carrying is this
-        /// with the team id appended — isideload rewrites every bundle id it
-        /// signs — so a match against an installed app has to allow for that.
+        /// Bundle ID as published. After isideload signs it, the installed app's
+        /// ID has `.<teamID>` appended, so matching must allow for that.
         let bundleID: String
         let name: String
         let version: String?
     }
 
-    /// Every IPA on disk paired with the app it installs, newest first and one
-    /// per bundle id: the same build routinely sits in Documents twice, once as
-    /// a download and once as an import, and either copy refreshes it.
+    /// IPAs on disk with their app info, newest first, one per bundle ID (the
+    /// same build can exist as both a download and an import).
     static func installable() -> [(entry: Entry, info: AppInfo)] {
         var seen = Set<String>()
         return scan().compactMap { entry in
@@ -736,8 +715,8 @@ extension IPALibrary {
         }
     }
 
-    /// Read one IPA's main `Info.plist`. Nil for anything this can't walk, which
-    /// is reason enough to leave the file out of the refresh list.
+    /// Reads an IPA's main `Info.plist`. Nil if it can't be read; such files are
+    /// left out of the refresh list.
     static func appInfo(at url: URL) -> AppInfo? {
         guard let raw = infoPlist(inIPA: url),
               let plist = try? PropertyListSerialization.propertyList(from: raw, format: nil),
@@ -824,8 +803,8 @@ extension IPALibrary {
     }
 
     private static func contents(of entry: ZipEntry, _ handle: FileHandle) -> Data? {
-        // A sanity bound, not a real limit: an Info.plist is kilobytes, and this
-        // number is what the inflate below allocates.
+        // Sanity limit: an Info.plist is only kilobytes, and the inflate below
+        // allocates this size.
         guard entry.uncompressedSize > 0, entry.uncompressedSize < 4 << 20,
               entry.compressedSize > 0,
               (try? handle.seek(toOffset: UInt64(entry.localHeaderOffset))) != nil,
@@ -877,7 +856,7 @@ extension IPALibrary {
 /// Documents: the device pairing record, and isideload's certificate store.
 enum PrivateStore {
 
-    /// The device pairing file produced by the RPPairing host.
+    /// The device pairing file (from the RPPairing host, or imported).
     static var pairingFile: URL {
         resolve(private: directory.appendingPathComponent("rp_pairing_file.plist"),
                 legacy: IPALibrary.documentsDir.appendingPathComponent("rp_pairing_file.plist"))
@@ -895,19 +874,16 @@ enum PrivateStore {
         directory.appendingPathComponent("combined_pairing_file.plist")
     }
 
-    /// A lockdown pair record minted for *another* device over the LAN, one file
-    /// per address. Kept apart from `lockdownPairRecord`, which is this iPhone's
-    /// own and would be overwritten by the first Side by Side run otherwise.
+    /// Lockdown pair record for another device on the LAN (Side by Side), one
+    /// file per IP address. Separate from `lockdownPairRecord`, which belongs to
+    /// this iPhone.
     ///
-    /// Filed under the address because that is all Side by Side knows before it
-    /// connects — the UDID only arrives afterwards. A record that stops working
-    /// (a different iPhone on that address, a reset, a revoked trust) is minted
-    /// again, so a stale one costs a Trust tap rather than a dead end.
+    /// Keyed by address because the UDID isn't known before connecting. A record
+    /// that stops working is created again.
     static func peerPairRecord(host: String) -> URL {
         let dir = directory.appendingPathComponent("peer-pairings", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        // Dots are fine in a filename, but anything else in a typed address is
-        // not: keep the digits and dots and drop the rest.
+        // Keep only digits and dots for a safe filename.
         let key = host.filter { $0.isNumber || $0 == "." }
         return dir.appendingPathComponent("lockdown-\(key.isEmpty ? "unknown" : key).plist")
     }
@@ -927,8 +903,8 @@ enum PrivateStore {
         return url
     }
 
-    /// The private location, falling back to a copy the migration left in
-    /// Documents rather than costing a re-pair or a certificate slot.
+    /// The private location, or the old Documents copy if migration left one
+    /// there.
     private static func resolve(private url: URL, legacy: URL) -> URL {
         _ = migrated
         let fm = FileManager.default
@@ -940,7 +916,7 @@ enum PrivateStore {
     /// Runs `migrate()` once per launch, before the first path is handed out.
     private static let migrated: Void = migrate()
 
-    /// Bring older versions' files across from Documents.
+    /// Moves files that were stored in Documents into Application Support.
     private static func migrate() {
         let docs = IPALibrary.documentsDir
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -1011,9 +987,8 @@ enum DownloadLedger {
         return "\(size)@\(Int(modified))"
     }
 
-    /// A file's entry key: its path relative to Documents. Relative because the
-    /// container UUID changes on update, and a path because an import can share
-    /// a filename with a download.
+    /// Ledger key: the path relative to Documents (the container path changes on
+    /// app updates, and an import can share a filename with a download).
     private static func key(_ url: URL) -> String {
         let docs = IPALibrary.documentsDir.standardizedFileURL.path
         let path = url.standardizedFileURL.path

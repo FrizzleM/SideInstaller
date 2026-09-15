@@ -4,7 +4,7 @@ import SwiftUI
 /// is ticked, then sets `hasAcceptedTOS` and the page never returns.
 struct WelcomeView: View {
     @AppStorage("hasAcceptedTOS") private var hasAcceptedTOS = false
-    /// Declared so the page redraws if the language changes underneath it.
+    /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @State private var accepted = false
 
@@ -28,9 +28,8 @@ struct WelcomeView: View {
                 Spacer()
 
                 VStack(spacing: 20) {
-                    // Said before anything is agreed to: on this iPhone the
-                    // pairing file has to come from a computer, and that's worth
-                    // knowing before the first install run asks for one.
+                    // Below iOS 27, say up front that a pairing file made on a
+                    // computer is needed.
                     if !Engine.deviceCanSelfPair {
                         pairingFileNotice
                             .welcomeItem(2)
@@ -51,9 +50,7 @@ struct WelcomeView: View {
         .preferredColorScheme(.dark)
     }
 
-    /// What an iPhone below iOS 27 will be asked for. Everything else about the
-    /// install is the same, so this says what the extra step is rather than
-    /// reading as an unsupported-device warning.
+    /// Notice for iOS below 27, explaining the extra pairing-file step.
     private var pairingFileNotice: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "lock.doc.fill")

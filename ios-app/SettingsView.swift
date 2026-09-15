@@ -5,13 +5,13 @@ import UIKit
 /// of the main flow.
 struct SettingsView: View {
     @EnvironmentObject private var engine: Engine
-    /// The language setting lives here, so this sheet drives it and redraws.
+    /// Observed for the language picker, and to redraw on language change.
     @EnvironmentObject private var loc: Localizer
     /// The saved Apple IDs the Account section manages.
     @EnvironmentObject private var accounts: AccountStore
     @Environment(\.dismiss) private var dismiss
 
-    /// Owned here rather than injected: a fresh instance just re-scans the disk.
+    /// Owned here; a new instance just rescans the disk.
     @StateObject private var downloadsManager = DownloadsManager()
     /// The IPA the user swiped to delete, pending confirmation.
     @State private var pendingDelete: DownloadedIPA?
@@ -35,8 +35,8 @@ struct SettingsView: View {
                 logSection
             }
             .sheet(item: $editorTarget) { AccountEditor(target: $0) }
-            // On the Form rather than beside the download alert below, so the
-            // two never contend for the same presentation.
+            // Attached to the Form, apart from the download alert below, so the
+            // two alerts don't conflict.
             .alert(L("Remove this Apple ID?"),
                    isPresented: Binding(get: { pendingRemove != nil },
                                         set: { if !$0 { pendingRemove = nil } })) {
@@ -81,14 +81,13 @@ struct SettingsView: View {
 
     // MARK: Account
 
-    /// The saved Apple IDs: which one signs in, and how to add, edit or remove
-    /// them. First on the page, since everything else here is rarer.
+    /// Saved Apple IDs: tap to make one active, swipe to edit or remove, or add
+    /// a new one.
     private var accountSection: some View {
         Section {
             ForEach(accounts.accounts) { account in
                 Button { accounts.activate(account) } label: { accountRow(account) }
-                    // Otherwise the row's text is drawn in the accent colour,
-                    // and `.secondary` under it resolves to a faded blue.
+                    // `.plain` keeps the row text from using the accent color.
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
@@ -96,8 +95,8 @@ struct SettingsView: View {
                         } label: {
                             Label(L("Remove"), systemImage: "trash")
                         }
-                        // Spelt out: the row's `.plain` style above reaches the
-                        // swipe buttons and drops the destructive role's red.
+                        // Set explicitly: the row's `.plain` style removes the
+                        // destructive red.
                         .tint(.red)
                         Button {
                             editorTarget = .existing(account)
@@ -171,10 +170,8 @@ struct SettingsView: View {
 
     // MARK: Tunnel
 
-    /// Everything here runs over a loopback tunnel, and starting one is a trip
-    /// to another app every single time. LocalDevVPN takes `localdevvpn://enable`
-    /// as "connect, then hand the screen back", so this turns that trip into
-    /// something the app makes for itself.
+    /// LocalDevVPN controls: start on launch, or start now. Uses LocalDevVPN's
+    /// `localdevvpn://enable` URL, which connects and then returns to this app.
     @ViewBuilder
     private var tunnelSection: some View {
         Section {
@@ -188,8 +185,7 @@ struct SettingsView: View {
         } header: {
             Text(L("Tunnel"))
         } footer: {
-            // No explainer under the toggle — the label says it. The one line
-            // left is the one that isn't obvious: why the button is dead.
+            // Explain why the button is disabled.
             if !engine.localDevVPNInstalled {
                 Text(L("LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you."))
             }

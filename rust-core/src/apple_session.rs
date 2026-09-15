@@ -1,14 +1,11 @@
-//! Keeps the developer-portal session between sign-ins, the way SideStore does.
+//! Saves and reuses the developer-portal session between sign-ins, like
+//! SideStore's `AuthManager`.
 //!
-//! A full Apple ID sign-in costs two GrandSlam SRP requests plus an `apptokens`
-//! request, all over again after 2FA, and Apple answers HTTP 429 to an account
-//! or network that repeats that too often. The portal itself only needs the
-//! account's `adsid` and its `com.apple.gs.xcode.auth` token, which Apple issues
-//! with an expiry. SideStore's `AuthManager` keeps exactly those two and builds
-//! every portal session from them; iLoader keeps one logged-in session for the
-//! app's lifetime. This saves them beside the account's signing key and reuses
-//! them in every feature and across launches, signing in again only when the
-//! token has expired or Apple stops accepting it.
+//! A full sign-in (GrandSlam SRP requests, 2FA, `apptokens`) is rate-limited by
+//! Apple (HTTP 429). The portal only needs the account's `adsid` and its
+//! `com.apple.gs.xcode.auth` token, which has an expiry. Both are saved next to
+//! the account's signing key and reused across features and launches; a full
+//! sign-in happens only when the token expires or is rejected.
 
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -56,9 +53,9 @@ impl SavedSession {
         }
     }
 
-    /// Unix seconds the token stops working, when that can be told. Apple
-    /// doesn't document the unit, so milliseconds and seconds are both read; a
-    /// token with neither is tried anyway, and the portal says if it's stale.
+    /// Unix time (seconds) when the token expires, if known. Apple doesn't
+    /// document the unit, so both milliseconds and seconds are handled. A token
+    /// without an expiry is tried anyway.
     fn expires_at(&self) -> Option<u64> {
         match self.expiry {
             e if e >= 100_000_000_000 => Some(e / 1000),
@@ -102,8 +99,8 @@ impl SavedSession {
     }
 }
 
-/// Where an account's session lives: beside isideload's `<sha256(email)>/key`,
-/// hashed the same way, so both sit in that Apple ID's directory.
+/// Path of an account's saved session: `<sha256(email)>/developer_session.json`,
+/// next to isideload's `<sha256(email)>/key`.
 fn session_path(storage_dir: &Path, apple_id: &str) -> PathBuf {
     let hash = hex::encode(Sha256::digest(apple_id.as_bytes()));
     storage_dir.join(hash).join("developer_session.json")
@@ -114,8 +111,8 @@ fn load(storage_dir: &Path, apple_id: &str) -> Option<SavedSession> {
     serde_json::from_slice(&bytes).ok()
 }
 
-/// Written to a temporary file and renamed, so a concurrent sign-in never reads
-/// half a session.
+/// Writes to a temp file and renames it, so a concurrent reader never sees a
+/// partial file.
 fn store(storage_dir: &Path, session: &SavedSession) -> std::io::Result<()> {
     let path = session_path(storage_dir, &session.apple_id);
     if let Some(parent) = path.parent() {
@@ -131,10 +128,9 @@ pub(crate) fn forget(storage_dir: &Path, apple_id: &str) -> bool {
     std::fs::remove_file(session_path(storage_dir, apple_id)).is_ok()
 }
 
-/// Whether a failure to use the saved session says nothing about the token —
-/// the network, the anisette server, or Apple being busy. Those go back to the
-/// caller's retry as they are. Anything else, such as a portal error or a 401,
-/// means Apple no longer takes the token, which costs a fresh sign-in.
+/// True for errors unrelated to the token (network, anisette server, Apple
+/// busy); these are returned to the caller as-is. Other errors (portal error,
+/// 401) mean the token was rejected, so a full sign-in follows.
 fn is_transient(error: &str) -> bool {
     let e = error.to_lowercase();
     e.contains("anisette")
@@ -158,9 +154,9 @@ fn unix_now() -> u64 {
         .unwrap_or(0)
 }
 
-/// A developer session for `apple_id`, with its teams. With `remember`, the
-/// saved token is tried first and a fresh sign-in's token is saved; without it
-/// (Side by Side, which signs in as someone else) nothing is read or kept.
+/// Opens a developer session for `apple_id` and lists its teams. With
+/// `remember`, the saved token is tried first and a new one is saved; without
+/// it (Side by Side, which uses someone else's account) nothing is read or saved.
 pub(crate) async fn open<C, Fut>(
     apple_id: &str,
     password: &str,
@@ -182,7 +178,7 @@ where
     )
     .map_err(|e| format!("anisette provider: {e}"))?;
 
-    // Client info and the URL bag only: nothing here signs in.
+    // Only fetches client info and the URL bag; doesn't sign in.
     let mut account = AppleAccount::builder(apple_id)
         .anisette_provider(anisette)
         .build()

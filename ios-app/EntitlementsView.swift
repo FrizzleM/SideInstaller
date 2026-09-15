@@ -3,18 +3,16 @@ import SideInstallerFFI
 
 // MARK: - Catalogue
 
-/// One developer-portal capability, as Apple's JSON:API names it.
-///
-/// The names are Apple's own feature names and stay in English, like every
-/// other product name in this app — only the chrome around them is translated.
+/// A developer-portal capability. Names are Apple's feature names and aren't
+/// translated.
 struct Entitlement: Identifiable, Hashable {
     /// Apple's capability id, e.g. `INCREASED_MEMORY_LIMIT`.
     let id: String
     let name: String
     /// Which section of the list it sits in.
     let group: Group
-    /// Selected by default: the ones sideloaded apps actually want, and the
-    /// only ones a free Apple ID is known to be granted.
+    /// Selected by default: capabilities sideloaded apps usually want and free
+    /// Apple IDs are known to get.
     let recommended: Bool
 
     enum Group: String, CaseIterable, Identifiable {
@@ -29,25 +27,19 @@ struct Entitlement: Identifiable, Hashable {
         }
     }
 
-    /// What a **free** Apple ID can actually be granted. A paid membership
-    /// unlocks far more (Push Notifications, iCloud, Associated Domains, Apple
-    /// Pay, SiriKit, Network Extensions and the rest), but offering those here
-    /// would just be a list of things Apple refuses — the accounts sideloading
-    /// runs on are free ones.
+    /// Capabilities a **free** Apple ID can be granted. Paid-only ones (Push,
+    /// iCloud, Associated Domains, etc.) are left out.
     ///
-    /// Increased Memory Limit is the proven case: it is what GetMoreRam exists
-    /// to turn on for free-signed apps. App Groups is the other certain one —
-    /// AltStore and SideStore both rely on it while free-signed. The remainder
-    /// are the capabilities Apple's free provisioning has historically allowed;
-    /// each is still sent as its own request, so anything that turns out to need
-    /// a paid account fails alone and says why.
+    /// Increased Memory Limit and App Groups are confirmed to work on free
+    /// accounts. The rest have historically been allowed; each is requested
+    /// separately, so any that need a paid account fail on their own.
     static let all: [Entitlement] = [
-        // Why this tool exists: the memory family, selected by default.
+        // Memory capabilities, selected by default.
         .init(id: "INCREASED_MEMORY_LIMIT", name: "Increased Memory Limit", group: .memory, recommended: true),
         .init(id: "EXTENDED_VIRTUAL_ADDRESSING", name: "Extended Virtual Addressing", group: .memory, recommended: true),
         .init(id: "INCREASED_DEBUGGING_MEMORY_LIMIT", name: "Increased Debugging Memory Limit", group: .memory, recommended: true),
 
-        // The rest of what a free account can hold.
+        // Other capabilities available to free accounts.
         .init(id: "APP_GROUPS", name: "App Groups", group: .other, recommended: false),
         .init(id: "GAME_CENTER", name: "Game Center", group: .other, recommended: false),
         .init(id: "IN_APP_PURCHASE", name: "In-App Purchase", group: .other, recommended: false),
@@ -103,9 +95,8 @@ struct EntitlementOutcome: Identifiable, Decodable, Equatable {
 
 // MARK: - Manager
 
-/// Lists the team's App IDs and turns developer-portal capabilities on for one.
-/// Same shape as `CertManager`, and the same underlying session type — this is
-/// a developer-portal call, so no device, pairing or tunnel is involved.
+/// Lists the team's App IDs and enables capabilities on one. Uses the same
+/// developer-portal session type as `CertManager`; no device connection needed.
 final class EntitlementsManager: ObservableObject {
 
     @Published private(set) var apps: [AppIdentifier] = []
@@ -123,9 +114,8 @@ final class EntitlementsManager: ObservableObject {
 
     private var engine: Engine { Engine.shared }
 
-    /// True once the page has loaded on its own. Keeps `autoLoad` to a single
-    /// attempt, so a sign-in that failed — or a 2FA prompt the user dismissed —
-    /// isn't put back in front of them every time the page opens.
+    /// Limits `autoLoad` to one attempt, so a failed sign-in or dismissed 2FA
+    /// prompt doesn't come back every time the page opens.
     private var didAutoLoad = false
 
     deinit {
@@ -136,9 +126,7 @@ final class EntitlementsManager: ObservableObject {
 
     // MARK: Actions
 
-    /// Load the App IDs on the page's own when it opens. Quiet when there's no
-    /// Apple ID saved: arriving on the page shouldn't paint an error nobody
-    /// asked for, and the button below says it plainly enough.
+    /// Loads App IDs when the page opens. Does nothing if no Apple ID is saved.
     @MainActor
     func autoLoad() {
         guard !didAutoLoad, !hasLoaded, !isBusy else { return }
@@ -197,8 +185,8 @@ final class EntitlementsManager: ObservableObject {
         }
     }
 
-    /// Forget the session, to switch Apple ID. A no-op when nothing was signed
-    /// in, so switching account doesn't log a phantom.
+    /// Frees the session and clears the page (e.g. when the Apple ID changes).
+    /// No-op if not signed in.
     @MainActor
     func signOut() {
         guard let session else { return }
@@ -364,7 +352,7 @@ private let entitlementsTwoFactorCallback: SITwoFactorCb = { _, request, outBuf,
 /// relies on.
 struct EntitlementsView: View {
     @EnvironmentObject private var engine: Engine
-    /// Declared so every label on this screen redraws when the language changes.
+    /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: EntitlementsManager
 
@@ -579,9 +567,8 @@ private struct EntitlementPicker: View {
                 HStack(spacing: 8) {
                     Text(group.title)
                         .font(.headline)
-                    // Only the memory family is proven on a free account; the
-                    // rest are Apple's historical free-provisioning set and
-                    // haven't been confirmed one by one.
+                    // Only the memory capabilities are confirmed on free
+                    // accounts, so the rest are marked Beta.
                     if group == .other {
                         Text(L("Beta"))
                             .font(.caption.weight(.bold))

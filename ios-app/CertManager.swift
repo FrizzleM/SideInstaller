@@ -51,9 +51,9 @@ struct DevCert: Identifiable, Decodable, Equatable {
     }
 }
 
-/// Lists and revokes the Apple ID's development certificates, reusing the
-/// engine's credentials and 2FA prompt. Purely a developer-portal API call, so
-/// no device or tunnel is involved, and the blocking FFI runs off the main queue.
+/// Lists and revokes the Apple ID's development certificates, using the engine's
+/// credentials and 2FA prompt. Developer-portal only (no device); blocking FFI
+/// calls run on a background queue.
 final class CertManager: ObservableObject {
 
     @Published private(set) var certs: [DevCert] = []
@@ -64,7 +64,7 @@ final class CertManager: ObservableObject {
     /// `id` of the certificate currently being revoked, if any.
     @Published private(set) var revokingID: String?
     @Published var lastError: String?
-    /// True once a list has been fetched, so the empty state can tell them apart.
+    /// True once a list has been fetched (tells "not loaded" apart from "empty").
     @Published private(set) var hasLoaded = false
 
     private var session: OpaquePointer?            // CertSession*
@@ -72,9 +72,8 @@ final class CertManager: ObservableObject {
 
     private var engine: Engine { Engine.shared }
 
-    /// True once the page has loaded on its own. Keeps `autoLoad` to a single
-    /// attempt, so a sign-in that failed — or a 2FA prompt the user dismissed —
-    /// isn't put back in front of them every time the page opens.
+    /// Limits `autoLoad` to one attempt, so a failed sign-in or dismissed 2FA
+    /// prompt doesn't come back every time the page opens.
     private var didAutoLoad = false
 
     deinit {
@@ -83,9 +82,8 @@ final class CertManager: ObservableObject {
 
     // MARK: - Public actions
 
-    /// Load the list on the page's own when it opens. Quiet when there's nothing
-    /// to load with: an Apple ID that hasn't been entered yet isn't an error
-    /// worth painting on arrival, and the button says the same thing calmly.
+    /// Loads certificates when the page opens. Does nothing if no Apple ID is
+    /// saved.
     @MainActor
     func autoLoad() {
         guard !didAutoLoad, !hasLoaded, !isWorking, revokingID == nil else { return }
@@ -117,7 +115,7 @@ final class CertManager: ObservableObject {
                 then?()
                 return
             } catch is CancellationError {
-                // not cancellable today, but keep parity with Engine
+                // Not currently cancellable; handled for consistency with Engine.
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Certificates: \(lastError ?? "failed")")
@@ -126,8 +124,8 @@ final class CertManager: ObservableObject {
         }
     }
 
-    /// Revoke one certificate and refresh the list. `onSuccess` — which resumes
-    /// a stopped install — runs only once Apple has accepted the revocation.
+    /// Revokes a certificate and refreshes the list. `onSuccess` (e.g. retrying
+    /// the install) runs only if Apple accepted the revocation.
     @MainActor
     func revoke(_ cert: DevCert, onSuccess: (() -> Void)? = nil) {
         guard session != nil, revokingID == nil, !isWorking else { return }
@@ -152,13 +150,13 @@ final class CertManager: ObservableObject {
                 engine.log("⛔️ Revoke failed: \(lastError ?? "")")
             }
             revokingID = nil
-            // The refresh can fail on its own; the revoke is what's awaited.
+            // Run `onSuccess` if the revoke succeeded, even if the refresh failed.
             if revoked { onSuccess?() }
         }
     }
 
-    /// Load the list if that hasn't happened yet, then run `then` — for the
-    /// Install screen, which must name a certificate before revoking it.
+    /// Loads the list if needed, then runs `then`. Used by the Install screen's
+    /// revoke chooser.
     @MainActor
     func ensureLoaded(then: @escaping () -> Void) {
         guard !isWorking, revokingID == nil else { return }
@@ -169,8 +167,8 @@ final class CertManager: ObservableObject {
         loadCerts(then: then)
     }
 
-    /// Forget the session and clear the list, to switch Apple ID. A no-op when
-    /// nothing was signed in, so switching account doesn't log a phantom.
+    /// Frees the session and clears the list (e.g. when the Apple ID changes).
+    /// No-op if not signed in.
     @MainActor
     func signOut() {
         guard let session else { return }
@@ -305,7 +303,7 @@ final class CertManager: ObservableObject {
         return out
     }
 
-    /// The install flow's storage, so provisioning isn't re-bootstrapped.
+    /// Same isideload storage as the install flow.
     private var storageDir: String {
         PrivateStore.isideload.path
     }

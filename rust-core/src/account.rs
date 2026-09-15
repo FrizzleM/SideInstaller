@@ -1,5 +1,5 @@
-//! Apple ID sign-in and IPA signing through `isideload`, using only its
-//! sign-only path, since the install runs over our own RSD tunnel.
+//! Apple ID sign-in and IPA signing via `isideload`. Only its signing path is
+//! used; installing happens over the app's own RSD tunnel.
 //!
 //! `si_apple_signin` logs in, opens a developer session on the first team, and
 //! returns an opaque `SignSession`. `si_sign_ipa` then signs an IPA with it,
@@ -119,8 +119,8 @@ impl From<TwoFactorAnswer> for TwoFactorCallbackResponse {
 pub struct SignSession {
     rt: tokio::runtime::Runtime,
     sideloader: Sideloader,
-    /// Kept because `Sideloader` exposes neither, and `export_p12` needs both to
-    /// look the signing identity up the same way `sign_app` does.
+    /// Stored because `Sideloader` doesn't expose them; `account_config` needs
+    /// both to look up the signing identity the same way `sign_app` does.
     machine_name: String,
     storage_dir: PathBuf,
 }
@@ -305,8 +305,9 @@ pub unsafe fn sign_ipa(
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         session.rt.block_on(async {
-            // The profile needs a device to bind to, and `sign_app` never
-            // registers one; only isideload's unused `install_app` does.
+            // The provisioning profile needs a registered device, and `sign_app`
+            // doesn't register one (only isideload's `install_app` does, which
+            // isn't used here).
             if udid.is_empty() {
                 tracing::warn!(
                     "No device UDID provided; skipping registration — provisioning \
@@ -360,22 +361,20 @@ pub unsafe fn sign_ipa(
     }
 }
 
-/// Build the `Account.sideconf` payload SideStore imports on launch, setting
+/// Build the `Account.sideconf` JSON that SideStore imports on launch, setting
 /// `*out_json` to it.
 ///
-/// SideStore only signs with a certificate it holds the private key for, so an
-/// install signed by us is revoked and resigned on its first sign-in unless it
-/// is given ours. `LaunchViewController.detectAndImportAccountFile` reads this
-/// file from SideStore's Documents, adopts the certificate, and deletes it —
-/// which is what Swift then writes over the tunnel.
+/// SideStore can only sign with a certificate whose private key it has; without
+/// this file it revokes our certificate and re-signs itself on first sign-in.
+/// `LaunchViewController.detectAndImportAccountFile` reads the file from
+/// SideStore's Documents, imports the certificate and deletes the file. Swift
+/// writes it there over the tunnel.
 ///
-/// The Apple ID password is deliberately **not** included. It isn't needed to
-/// keep the certificate (SideStore prompts for it as usual), and the payload
-/// travels as plaintext JSON through a directory the Files app can see until
-/// SideStore consumes it.
+/// The Apple ID password is **not** included: SideStore asks for it anyway, and
+/// the file sits as plaintext in a Files-visible folder until it's imported.
 ///
-/// The certificate must already exist on the portal — this never mints one, so
-/// it cannot revoke anything as a side effect; sign an IPA first if it doesn't.
+/// Only looks up an existing certificate (never creates or revokes one), so an
+/// IPA must have been signed first.
 ///
 /// # Safety
 /// `session` must be a valid pointer from `apple_signin`; out pointers valid.

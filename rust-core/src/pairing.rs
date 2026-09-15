@@ -1,9 +1,9 @@
 //! RPPairing host: generates a pairing file in-process, as StikPair does.
 //!
-//! mDNS advertising lives on the Swift side to avoid the iOS multicast
-//! entitlement, so just before `accept()` the service identifier, port and TXT
-//! records go out through a `ready` callback for Swift to publish over Bonjour.
-//! Only Local Network and Developer Mode are needed here, not the tunnel.
+//! mDNS advertising is done in Swift, which avoids needing the iOS multicast
+//! entitlement: before `accept()`, the service ID, port and TXT records are
+//! passed to Swift through the `ready` callback. Needs Local Network permission
+//! and Developer Mode, not the tunnel.
 
 use std::ffi::{c_char, c_void, CString};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -143,26 +143,19 @@ async fn run(
         .port();
     tracing::info!("RPPairing: listening on port {port}");
 
-    // Host identity, carried across pairings rather than minted afresh each
-    // time. StikPair — which this file is a fork of — regenerates both and says
-    // in a comment that a production app shouldn't; two things here depend on
-    // it not being regenerated:
+    // Reuse the host identity (key pair and altIRK) across pairings:
     //
-    // - The `authTag` advertised in the Bonjour TXT record is derived from
-    //   `alt_irk`, so a new one every run means an already-paired device can
-    //   never recognise this host and offers a fresh pairing instead.
-    // - The Ed25519 key pair is what every pairing file this app has already
-    //   written into SideStore, Feather and StikDebug was signed with. Rotating
-    //   it on a re-pair silently invalidates all of those copies — a cost
-    //   StikPair doesn't carry, because it only ever exports once by hand.
+    // - The Bonjour `authTag` is derived from `alt_irk`; a new one each run
+    //   means an already-paired device won't recognize this host.
+    // - Pairing files already written into other apps (SideStore, Feather,
+    //   StikDebug) use this Ed25519 key pair. A new key would invalidate them.
     //
-    // A re-pair is a full pair-setup either way, so re-presenting the same key
-    // is what a real Mac does; the device replaces its record for this
-    // identifier and every previously placed file keeps working.
+    // Re-pairing with the same key works like a Mac re-pairing: the device
+    // replaces its record for this identifier, and existing files stay valid.
     let mut pairing_file = match RpPairingFile::read_from_file(&out_path).await {
         Ok(mut existing) => {
-            // The device's altIRK, learned in the last pairing. Cleared so a
-            // pairing with a *different* iPhone can't inherit it.
+            // Clear the previous device's altIRK so pairing with a different
+            // iPhone doesn't inherit it.
             existing.alt_irk = None;
             tracing::info!(
                 "RPPairing: reusing the host key pair from {out_path} — files already placed in other apps stay valid"
@@ -238,9 +231,9 @@ async fn run(
     })
 }
 
-/// Read back the 32-character hex `run_host` handed out last time. Anything
-/// that isn't exactly 16 bytes of hex is ignored rather than rejected: a fresh
-/// `alt_irk` costs recognition, not correctness.
+/// Parse the 32-character hex altIRK returned by a previous `run_host`. Invalid
+/// input returns None, and a new altIRK is generated (the device just won't
+/// recognize this host).
 fn parse_alt_irk(hex: &str) -> Option<[u8; 16]> {
     if hex.len() != 32 {
         return None;

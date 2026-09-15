@@ -6,7 +6,7 @@ import UIKit
 /// Tools, whose `NavigationStack` this relies on.
 struct PairingView: View {
     @EnvironmentObject private var engine: Engine
-    /// Declared so every label on this screen redraws when the language changes.
+    /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: PairingManager
 
@@ -51,9 +51,8 @@ struct PairingView: View {
             manager.refresh()
             manager.autoScan()
         }
-        // Connecting the tunnel means leaving the app, so the page is usually
-        // already open when it comes up — scan then rather than making the user
-        // come back and tap.
+        // Auto-scan when the tunnel connects (the user usually returns to this
+        // page from the VPN app).
         .onChange(of: engine.vpnConnected) { _, connected in
             if connected { manager.autoScan() }
         }
@@ -92,9 +91,8 @@ struct PairingView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle(L("Pairing file"), systemImage: "lock.doc.fill")
 
-                // Only reachable on iOS 27: the Tools row that pushes this page
-                // is hidden below it, where the pairing file is imported on the
-                // Install screen instead of being made here.
+                // This page is only reachable on iOS 27+; the Tools row is hidden
+                // on older iOS.
                 Button { manager.generate() } label: {
                     HStack(spacing: 10) {
                         if manager.isGenerating {
@@ -159,8 +157,7 @@ struct PairingView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle(L("Install into an app"), systemImage: "tray.and.arrow.down.fill")
 
-                // Only the tunnel matters: scanning and writing both run over
-                // it, and it's a loopback with no Wi-Fi in the path.
+                // Scanning and writing only need the tunnel, not Wi-Fi.
                 if !engine.vpnConnected {
                     vpnNote
                 }

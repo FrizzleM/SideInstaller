@@ -1,13 +1,12 @@
 import SwiftUI
 
-/// The tab container for Install and Tools. Each page paints `AppBackground`
-/// itself, since a `TabView`'s opaque containers would hide one behind them,
-/// and they stay in sync because it animates off the wall clock.
-/// The 2FA sheet lives here so it presents whichever tab is active.
+/// Tab container (Install, Tools, About). Each page draws its own
+/// `AppBackground`, since `TabView` would hide a shared one; they stay in sync
+/// because the background animates off the clock. Also hosts the 2FA sheet so
+/// it shows over any tab.
 struct RootView: View {
-    /// The tabs in the order they appear, each with the backdrop it wears. The
-    /// selection is tracked only so a switch can hand `Backdrop` the level to
-    /// travel to; every page then draws that same wash for as long as it shows.
+    /// The tabs and their backdrop level. The selection is tracked so a tab
+    /// switch can animate `Backdrop` to the new level.
     private enum Page: Hashable {
         case install, tools, about
 
@@ -15,8 +14,7 @@ struct RootView: View {
             switch self {
             case .install: .bright
             case .tools:   .dark
-            // The same wash as Install: switching between the two leaves the
-            // backdrop alone rather than moving it and moving it back.
+            // Same as Install, so switching between them doesn't change the backdrop.
             case .about:   .bright
             }
         }
@@ -56,16 +54,12 @@ struct RootView: View {
                 AboutView()
             }
         }
-        // The one place the backdrop is told to move. Whichever pair of tabs a
-        // switch runs between, the wash travels the distance between their two
-        // levels — never resetting through bright on the way.
+        // Animate the backdrop to the new tab's level.
         .onChange(of: page) { _, page in Backdrop.settle(on: page.wash) }
         // The Install tab's revoke-and-retry runs through this same manager.
         .environmentObject(certManager)
-        // Four separate Apple sessions are cached below; each belongs to the
-        // account that opened it, so none may outlive a switch. Side by Side
-        // signs in as somebody else, which is exactly why it is dropped here
-        // too — its session must never be reused for whoever is active now.
+        // When the active Apple ID changes, drop all four cached Apple sessions
+        // (Side by Side's included) so none is reused for the new account.
         .onChange(of: accounts.revision) { _, _ in
             engine.forgetAppleSession()
             certManager.signOut()
@@ -90,9 +84,9 @@ struct RootView: View {
 
 // MARK: - Two-factor sheet
 
-/// Two-factor sign-in: the code Apple sent, and every other way to get one — the
-/// trusted devices again, or a text or a call to any trusted number. It stays up
-/// through a wrong code or a resend; the sign-in closes it when it returns.
+/// Two-factor sign-in sheet: enter the code, or request one another way (trusted
+/// devices, text or call). Stays open through wrong codes and resends; closes
+/// when the sign-in returns.
 struct TwoFactorSheet: View {
     @EnvironmentObject private var engine: Engine
     /// Declared so every label redraws when the language changes.
@@ -233,13 +227,12 @@ struct TwoFactorSheet: View {
 
 // MARK: - Tools
 
-/// The Tools tab: a menu of the utilities that each used to be a tab of their
-/// own. It owns the navigation stack they are pushed onto, which is why
-/// neither `PairingView` nor `CertsView` declares one.
+/// The Tools tab: a menu of utility pages. Owns the `NavigationStack` they're
+/// pushed onto, so those pages don't declare their own.
 struct ToolsView: View {
-    /// Declared so every label on this screen redraws when the language changes.
+    /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
-    /// Passed in rather than owned, so both pages keep their state across tabs.
+    /// Passed in (owned by `RootView`) so pages keep their state across tabs.
     @ObservedObject var pairingManager: PairingManager
     @ObservedObject var certManager: CertManager
     @ObservedObject var locationManager: LocationManager
@@ -263,10 +256,8 @@ struct ToolsView: View {
                     }
                     .buttonStyle(.plain)
                     .cascadeItem(1)
-                    // Everything on the Pairing page is about producing a
-                    // pairing file on this iPhone, which only iOS 27 can do —
-                    // below it the file is imported on the Install screen
-                    // instead, so the row would lead nowhere useful.
+                    // The Pairing page generates a pairing file on-device, which
+                    // needs iOS 27+. Older iOS imports it on the Install screen.
                     if Engine.deviceCanSelfPair {
                         NavigationLink {
                             PairingView(manager: pairingManager)
@@ -307,17 +298,15 @@ struct ToolsView: View {
                 }
                 .padding(20)
             }
-            // The wash this page reads darker under is `Backdrop.dark`, set by
-            // the tab switch rather than by this page appearing, so the pages
-            // pushed on top of it stay at the same level.
+            // The darker backdrop is set by the tab switch, not by this page
+            // appearing, so pushed pages keep the same level.
             .background(AppBackground())
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
             .sheet(isPresented: $showSettings) { SettingsView() }
         }
     }
 
-    /// Entrance order for the rows below Pairing, so they close the gap when it
-    /// isn't there rather than cascading in with a beat missing.
+    /// Cascade index for rows below Pairing, shifted by one when that row is shown.
     private func rowIndex(_ position: Int) -> Int {
         Engine.deviceCanSelfPair ? position + 1 : position
     }
@@ -331,14 +320,13 @@ struct ToolsView: View {
     }
 }
 
-/// One row of the Tools menu: the page's own logo, its name, and a chevron.
-/// Pages without logo art pass an SF Symbol, drawn on the brand gradient at the
-/// same size so the column of icons still lines up.
+/// One Tools menu row: logo, name and chevron. Pages without logo art pass an
+/// SF Symbol, drawn on the brand gradient at the same size.
 private struct ToolRow: View {
     var image: String? = nil
     var icon: String? = nil
     var title: String
-    /// Tags the row, for a tool whose page isn't proven yet.
+    /// Shows a Beta badge.
     var beta: Bool = false
 
     var body: some View {

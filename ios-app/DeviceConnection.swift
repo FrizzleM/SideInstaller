@@ -2,10 +2,10 @@ import Foundation
 import SideInstallerFFI
 import Darwin
 
-/// Wraps idevice's C-FFI to reach the device over the loopback tunnel and talk
-/// lockdown and installation_proxy across it, following StikDebug's path. The
-/// adapter and handshake are created once and reused; every call blocks, so
-/// none of this may run on the main thread.
+/// Wraps idevice's C FFI to talk to the device over the loopback tunnel
+/// (lockdown, installation_proxy, AFC, etc.), like StikDebug does. The tunnel
+/// adapter and RSD handshake are created once and reused. Every call blocks, so
+/// never call these on the main thread.
 final class DeviceConnection {
 
     // idevice opaque handles import as OpaquePointer.
@@ -15,8 +15,8 @@ final class DeviceConnection {
     /// RemoteServiceDiscovery port reached over the VPN loopback.
     static let rsdPort: UInt16 = 49152
 
-    /// lockdownd's own port. Fixed, unlike the ephemeral port `createListener`
-    /// opens, so a route that forwards only well-known ports still reaches it.
+    /// lockdownd's fixed port (unlike the ephemeral tunnel port `createListener`
+    /// opens).
     static let lockdownPort: UInt16 = 62078
 
     var isConnected: Bool { adapter != nil && handshake != nil }
@@ -28,15 +28,11 @@ final class DeviceConnection {
         var description: String { "idevice FFI error code=\(code) sub=\(subCode): \(message)" }
     }
 
-    /// A tunnel failure said in terms of what the user can change, with the raw
-    /// FFI error kept alongside it for the log.
+    /// A tunnel failure with user-facing advice, plus the raw FFI error for logs.
     ///
-    /// The FFI's own text — `code=16 sub=0: InternalError("TLS tunnel:
-    /// Connection refused (os error 61)")` — names the errno of whichever
-    /// attempt happened to be last, which is the same string for a VPN that
-    /// forwards one port, a device that never opened the listener, and a
-    /// pairing file that no longer matches. The Rust side classifies which of
-    /// those it was; this turns that into a sentence.
+    /// The raw FFI message only shows the last attempt's errno, which looks the
+    /// same for very different causes (port-filtering VPN, no listener, stale
+    /// pairing file). The Rust side classifies the cause into `kind`.
     struct TunnelError: Error, CustomStringConvertible, LocalizedError {
         let kind: TunnelFailureKind
         let advice: String
@@ -45,11 +41,8 @@ final class DeviceConnection {
         var description: String { advice }
         var errorDescription: String? { advice }
 
-        /// Whether pairing again could plausibly change the outcome.
-        ///
-        /// False when the route to the device is what failed: the pairing file
-        /// is fine, and re-pairing walks the user through a PIN for nothing —
-        /// then fails identically, which is exactly what a nightly tester hit.
+        /// Whether re-pairing might fix this failure. False for route/network
+        /// failures, where the pairing file isn't the problem.
         var repairingCouldHelp: Bool {
             kind != TunnelFailureHostsRefused
                 && kind != TunnelFailureTimeout
@@ -77,9 +70,8 @@ final class DeviceConnection {
         FFIError(code: -1, subCode: 0, message: message)
     }
 
-    /// What to tell the user for each way the tunnel dial can end, given the
-    /// candidate hosts that were tried. The raw error goes to the log; only
-    /// this string is presented.
+    /// User-facing advice for each tunnel failure kind, listing the hosts that
+    /// were tried.
     private func tunnelAdvice(kind: TunnelFailureKind,
                               deviceIP: String,
                               candidates: [String],
@@ -117,11 +109,9 @@ final class DeviceConnection {
                 turned off). Pair with this iPhone again to get a fresh file.
                 """
         case TunnelFailureRsdUnreachable:
-            // ECONNREFUSED means the packet arrived and was turned away, so the
-            // tunnel is carrying traffic and the address is right — the device
-            // simply has nothing listening on the pairing port. Blaming the VPN
-            // there sends people to check the one thing that is demonstrably
-            // working, which is what the old copy did.
+            // ECONNREFUSED means the tunnel works and the address is right, but
+            // nothing is listening on the pairing port (usually Developer Mode
+            // is off), so don't blame the VPN.
             if Self.wasRefused(raw) {
                 return L("Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.",
                          deviceIP, Int(Self.rsdPort))
@@ -139,9 +129,8 @@ final class DeviceConnection {
         }
     }
 
-    /// Did the dial end in a refusal rather than silence? The classifier folds
-    /// both into `RsdUnreachable`, but only the errno tells them apart, and they
-    /// mean opposite things — so it is read back out of the raw message.
+    /// True if the connection was refused rather than timed out. Both are
+    /// classified as `RsdUnreachable`, so this checks the raw message.
     static func wasRefused(_ raw: FFIError?) -> Bool {
         guard let message = raw?.message.lowercased() else { return false }
         return message.contains("connection refused") || message.contains("os error 61")
@@ -149,38 +138,34 @@ final class DeviceConnection {
 
     // MARK: Connect / disconnect
 
-    /// Establish the loopback tunnel and RSD handshake, by whichever route the
-    /// pairing file supports.
+    /// Opens the loopback tunnel and RSD handshake using the routes the pairing
+    /// file supports. Both routes produce the same adapter + handshake:
     ///
-    /// Two routes end in the same adapter + RSD handshake, so everything below
-    /// this is identical either way:
+    /// - **RPPairing** (`tunnel_create_rppairing`): connects to the device's
+    ///   remote-pairing listener with the Ed25519 record from on-device pairing
+    ///   (iOS 27+).
+    /// - **CoreDeviceProxy** (`tunnel_create_usb`): opens a lockdown session with
+    ///   a classic pair record and starts CoreDeviceProxy. Works on iOS 17+ and
+    ///   is the only route for pairing files made on a computer.
     ///
-    /// - **RPPairing** (`tunnel_create_rppairing`): talks straight to the
-    ///   device's remote-pairing listener with the Ed25519 record iOS 27's
-    ///   on-device pairing produces. The route SideInstaller has always taken.
-    /// - **CoreDeviceProxy** (`tunnel_create_usb`): opens a lockdown session
-    ///   with a *classic* pair record and starts
-    ///   `com.apple.internal.devicecompute.CoreDeviceProxy`, which vends the
-    ///   same tunnel. Works back to iOS 17, and is the only route open to a
-    ///   pairing file made on a computer — the pre-27 path, and StikDebug's.
-    ///
-    /// A file carrying both records tries the route its OS is likeliest to
-    /// answer on first, then the other.
+    /// With both records, the route most likely to work on this iOS goes first.
+    /// With only an RPPairing record, a lockdown record is created as a last
+    /// resort and CoreDeviceProxy is tried.
     func connect(deviceIP: String, pairingFilePath: String, hostname: String = "SideInstaller") throws {
         let kind = PairingFileKind.of(path: pairingFilePath)
         guard kind.isUsable else {
             throw fail("\((pairingFilePath as NSString).lastPathComponent) isn't a pairing file: it carries neither a remote-pairing key pair nor a lockdown pair record.")
         }
-        // iOS 27 answers on the remote-pairing listener; anything older only has
-        // lockdownd. With one record there's no choice to make.
+        // Prefer RPPairing on iOS 27+, lockdown otherwise. With one record, use
+        // its route only.
         let remoteFirst = Engine.deviceCanSelfPair
         let routes: [Bool] = (kind.hasRemotePairing && kind.hasLockdown)
             ? (remoteFirst ? [true, false] : [false, true])
             : [kind.hasRemotePairing]
 
         var firstFailure: Error?
-        // A file with only the RPPairing half still has one route left after
-        // its own are spent: mint the classic half here. See below.
+        // An RPPairing-only file can still fall back to creating a lockdown
+        // record (see below).
         let canMintLockdownRecord = !kind.hasLockdown
         for (index, useRemotePairing) in routes.enumerated() {
             do {
@@ -203,20 +188,11 @@ final class DeviceConnection {
             }
         }
 
-        // Every route the pairing file itself supports is spent — but on this
-        // iPhone the RPPairing one can fail for a reason no pairing file fixes.
-        // It needs the device to accept an inbound connection on the port
-        // `createListener` opens, and that listener is bound to the local
-        // network interface alone: loopback refuses it and the loopback VPN's
-        // address never answers, so the only address that reaches it is this
-        // iPhone's own Wi-Fi address — where the device is being asked to build
-        // a tunnel to itself, and closes the connection cleanly instead
-        // (`close_notify`, right after a TLS handshake it completed happily).
-        //
-        // CoreDeviceProxy needs no inbound listener at all: it rides the
-        // lockdown connection that is already working. The only thing it wants
-        // is the classic pair record this file doesn't carry — and lockdownd
-        // mints one on its own port, with no tunnel in front of it.
+        // RPPairing can fail on-device regardless of the pairing file: its
+        // tunnel listener only binds to the Wi-Fi interface, and the device
+        // closes a tunnel to itself right after the TLS handshake.
+        // CoreDeviceProxy needs no inbound listener, only a classic pair record,
+        // which lockdownd can create directly on its own port.
         if canMintLockdownRecord {
             do {
                 try connectByMintingLockdownRecord(deviceIP: deviceIP, hostname: hostname)
@@ -245,11 +221,9 @@ final class DeviceConnection {
             throw fail("invalid device IP: \(deviceIP)")
         }
 
-        // createListener names a port but no host, so the Rust side sweeps
-        // candidates: the RSD address, loopback, then these — the local
-        // addresses of the interfaces the pairing session runs over. The whole
-        // sweep shares one wall-clock budget, so the extra hosts don't lengthen
-        // a run that was going to fail.
+        // createListener returns a port but no host, so the Rust side tries the
+        // RSD address, loopback, then these local interface addresses, all
+        // within one shared timeout.
         let candidates = NetworkStatus.tunnelHostCandidates()
         let cHosts: [UnsafePointer<CChar>?] = candidates.map { UnsafePointer(strdup($0)) }
         defer { for p in cHosts { free(UnsafeMutablePointer(mutating: p)) } }
@@ -272,7 +246,7 @@ final class DeviceConnection {
             }
         }
         if let raw = ffiError(err, "tunnel_create_rppairing failed (is a loopback VPN connected, Wi-Fi on, device IP \(deviceIP)?)") {
-            // The unclassified error stays in the log; only what's thrown changes.
+            // Log the raw error; throw the classified one.
             Engine.shared.log("tunnel dial failed — raw error: \(raw)")
             throw TunnelError(kind: failureKind,
                               advice: tunnelAdvice(kind: failureKind,
@@ -289,13 +263,11 @@ final class DeviceConnection {
         handshake = newHandshake
     }
 
-    /// The CoreDeviceProxy route, for a classic lockdown pair record.
+    /// The CoreDeviceProxy route, using a classic lockdown pair record.
     ///
-    /// `tunnel_create_usb` is named for the transport idevice built it against;
-    /// what it actually does is start CoreDeviceProxy through whatever provider
-    /// it's handed, and a `TcpProvider` reaches lockdownd over the loopback
-    /// tunnel exactly as the USB one reaches it over usbmuxd. No RPPairing
-    /// record is involved, which is what makes an imported pairing file work.
+    /// Despite its name, `tunnel_create_usb` works with any provider; here a
+    /// `TcpProvider` reaches lockdownd over the loopback tunnel. No RPPairing
+    /// record is needed, so imported pairing files work.
     private func connectCoreDeviceProxy(deviceIP: String, pairingFilePath: String,
                                         hostname: String) throws {
         var pf: OpaquePointer?
@@ -324,8 +296,7 @@ final class DeviceConnection {
                 }
             }
         }
-        // The provider takes ownership of the pairing file, but only once it
-        // gets far enough to build one — an early argument error leaves it ours.
+        // On success the provider owns the pairing file; on error we free it.
         if providerError == nil { pairingFileOwned = false }
         try check(providerError, "idevice_tcp_provider_new failed")
         guard let provider else { throw fail("lockdown provider was null") }
@@ -343,14 +314,12 @@ final class DeviceConnection {
         handshake = newHandshake
     }
 
-    /// Take the CoreDeviceProxy route with a lockdown pair record minted here,
-    /// for a pairing file that carries only the RPPairing half.
+    /// CoreDeviceProxy route for an RPPairing-only file, using a lockdown pair
+    /// record created by this app.
     ///
-    /// The record is kept once made: minting one is interactive (the device puts
-    /// up a Trust prompt) and spends one of the device's pairing slots. A stored
-    /// one is tried first and re-minted only when it no longer opens a tunnel,
-    /// which is what a reset, a restore, or a record from another iPhone looks
-    /// like from here.
+    /// The record is stored and reused, because creating one shows a Trust
+    /// prompt and uses a pairing slot. A new one is created only when the stored
+    /// record no longer opens a tunnel (e.g. after a reset or restore).
     private func connectByMintingLockdownRecord(deviceIP: String, hostname: String) throws {
         let stored = PrivateStore.lockdownPairRecord
         let storedSize = ((try? FileManager.default.attributesOfItem(atPath: stored.path)[.size]) as? Int) ?? 0
@@ -378,18 +347,11 @@ final class DeviceConnection {
                                    hostname: hostname)
     }
 
-    /// Run the classic lockdown `Pair` handshake straight against lockdownd,
-    /// with no tunnel in front of it.
+    /// Runs the lockdown `Pair` handshake directly on lockdownd's port, with no
+    /// tunnel (unlike `lockdownPairRecord`, which needs one).
     ///
-    /// `lockdownPairRecord` runs the same handshake *inside* the RSD tunnel, so
-    /// it can never be what produces the record a missing tunnel needs. This one
-    /// talks to lockdownd's own port instead. Blocks while the device shows its
-    /// Trust prompt: idevice retries `Pair` until the user answers.
-    ///
-    /// Each host is tried in turn, because which address reaches lockdownd from
-    /// on-device is exactly what isn't known: the loopback VPN's peer is what
-    /// every other lockdown client here uses, and plain loopback is the one that
-    /// needs no VPN at all.
+    /// Blocks while the device shows the Trust prompt. Tries each host in order
+    /// (e.g. the VPN peer, then 127.0.0.1) and returns the first record created.
     func lockdownPairRecordDirect(hosts: [String], hostID: String, systemBUID: String,
                                   hostName: String) throws -> Data {
         var lastError: Error?
@@ -426,8 +388,7 @@ final class DeviceConnection {
         try check(connectError, "couldn't reach lockdownd at \(host):\(Self.lockdownPort)")
         guard let device else { throw fail("lockdown socket handle was null") }
 
-        // `lockdownd_new` consumes the socket and can only fail on a null
-        // argument, so there is no path back where it is still ours to free.
+        // `lockdownd_new` takes ownership of the socket, so it's never freed here.
         var client: OpaquePointer?
         try check(lockdownd_new(device, &client), "lockdownd_new failed")
         guard let client else { throw fail("lockdown client was null") }
@@ -456,7 +417,7 @@ final class DeviceConnection {
     }
 
     func disconnect() {
-        // Before the tunnel they run over: both hold the adapter's connections.
+        // End location simulation first; its handles use the tunnel.
         endLocationSimulation()
         if let handshake { rsd_handshake_free(handshake); self.handshake = nil }
         if let adapter { adapter_free(adapter); self.adapter = nil }
@@ -507,21 +468,18 @@ final class DeviceConnection {
     struct LockdownPairRecord {
         /// The record as XML plist bytes.
         let data: Data
-        /// nil when `EnableWifiDebugging` was set, the failure otherwise. Every
-        /// app that reads this record reaches lockdownd over a loopback, so a
-        /// failure here usually means the record won't work — it's still
-        /// returned, since the setting may already be on from an earlier pairing.
+        /// Nil if `EnableWifiDebugging` was set, otherwise the error. Apps using
+        /// the record need it enabled, but the record is still returned since
+        /// the setting may already be on.
         let wirelessLockdownError: String?
     }
 
-    /// Run the classic lockdown `Pair` handshake over the RSD tunnel, then turn
-    /// on wireless lockdown, as iLoader does while building its pairing file.
+    /// Runs the lockdown `Pair` handshake over the RSD tunnel, then enables
+    /// wireless lockdown (as iLoader does).
     ///
-    /// This is the half SideInstaller's RPPairing record doesn't carry: minimuxer
-    /// (SideStore, LiveContainer + SideStore) and Feather parse a classic record
-    /// — host/root/device certificates, HostID, SystemBUID, escrow bag — and
-    /// can't read RPPairing's key pair. Blocks while the device shows its Trust
-    /// prompt: idevice retries `Pair` until the user answers.
+    /// Produces the classic record (certificates, HostID, SystemBUID, escrow bag)
+    /// that minimuxer and Feather need. Blocks while the device shows the Trust
+    /// prompt.
     func lockdownPairRecord(hostID: String,
                             systemBUID: String,
                             hostName: String = "SideInstaller") throws -> LockdownPairRecord {
@@ -560,15 +518,12 @@ final class DeviceConnection {
         return LockdownPairRecord(data: record, wirelessLockdownError: wirelessError)
     }
 
-    /// Set `EnableWifiDebugging`, without which lockdownd answers over USB only —
-    /// and every app reading this record reaches it over a network loopback.
+    /// Sets `EnableWifiDebugging` so lockdownd accepts network connections, not
+    /// just USB.
     ///
-    /// Tried without a session first. Over USB, iLoader's route, setting a value
-    /// in that domain needs `StartSession`; over RSD the stream is already inside
-    /// the RPPairing tunnel and the endpoint is the *trusted* one, so the plain
-    /// request usually stands — and `StartSession` there wants to negotiate a
-    /// second TLS session inside the first, which it can't. The session is still
-    /// worth one attempt if the plain request is refused.
+    /// Tries without `StartSession` first: over RSD the connection is already
+    /// trusted, and a session would nest TLS inside TLS. Falls back to a session
+    /// if the plain request is refused.
     private func enableWirelessLockdown(pairRecord: OpaquePointer) throws {
         do {
             try setWirelessLockdown(startingSessionWith: nil)
@@ -576,14 +531,14 @@ final class DeviceConnection {
             do {
                 try setWirelessLockdown(startingSessionWith: pairRecord)
             } catch {
-                // Both ways, so the log says which door was shut.
+                // Report both errors.
                 throw fail("without a session: \(sessionless); with one: \(error)")
             }
         }
     }
 
-    /// One `SetValue` attempt on a fresh lockdown client — `Pair`, and a failed
-    /// request, both leave the client that ran them mid-protocol.
+    /// One `SetValue` attempt on a new lockdown client (a client that ran `Pair`
+    /// or a failed request can't be reused).
     private func setWirelessLockdown(startingSessionWith pairRecord: OpaquePointer?) throws {
         guard let adapter, let handshake else { throw fail("not connected") }
 
@@ -610,7 +565,7 @@ final class DeviceConnection {
 
     // MARK: Installed apps (installation_proxy over RSD)
 
-    /// Proves installation_proxy is reachable. `applicationType` nil = all.
+    /// Installed apps as log lines. `applicationType` nil = all.
     func listApps(applicationType: String? = nil) throws -> [String] {
         guard let adapter, let handshake else { throw fail("not connected") }
         var client: OpaquePointer?
@@ -685,15 +640,11 @@ final class DeviceConnection {
         return out
     }
 
-    /// Every installed app as its whole installation_proxy plist, rather than
-    /// the two fields `installedApps` picks out. `Entitlements` and
-    /// `ProfileValidated` only exist here, and they are what tells a sideloaded
-    /// app from an App Store one.
+    /// Every installed app's full installation_proxy plist, including
+    /// `Entitlements` and `ProfileValidated`, which identify sideloaded apps.
     ///
-    /// Each app plist is re-serialized to binary and read back through
-    /// `PropertyListSerialization`, which is StikDebug's route too: walking a
-    /// nested `Entitlements` dictionary through the plist C API by hand would be
-    /// a lot of code for a structure Foundation already decodes.
+    /// Each plist is converted to binary and decoded with
+    /// `PropertyListSerialization` rather than walked with the plist C API.
     func installedAppPlists() throws -> [[String: Any]] {
         guard let adapter, let handshake else { throw fail("not connected") }
         var client: OpaquePointer?
@@ -880,12 +831,8 @@ final class DeviceConnection {
 
     // MARK: Write pairing file into another app's container (house_arrest)
 
-    /// Write `pairingFilePath` into `bundleID`'s Documents, then read it back to
-    /// prove the write committed, returning the verified byte count.
-    ///
-    /// `house_arrest_vend_documents` consumes the HouseArrestClient on success
-    /// and failure alike, so `ha` must never be freed; `afc_file_close` and
-    /// `afc_client_free` likewise consume their handle exactly once.
+    /// Writes the file at `pairingFilePath` into `bundleID`'s Documents and
+    /// returns the verified byte count. See `writeFile`.
     @discardableResult
     func writePairingFile(intoBundleID bundleID: String,
                           remoteRelativePath: String,
@@ -897,10 +844,12 @@ final class DeviceConnection {
                              data: data)
     }
 
-    /// Write `data` into `bundleID`'s Documents at `remoteRelativePath`, then
-    /// read it back to prove the write committed, returning the verified byte
-    /// count. The pairing file is one caller; SideStore's `Account.sideconf`
-    /// hand-off is the other.
+    /// Writes `data` into `bundleID`'s Documents at `remoteRelativePath`, reads
+    /// it back to verify, and returns the byte count.
+    ///
+    /// `house_arrest_vend_documents` consumes the HouseArrestClient on success
+    /// and failure, so `ha` is never freed. `afc_file_close` and
+    /// `afc_client_free` each consume their handle once.
     @discardableResult
     func writeFile(intoBundleID bundleID: String,
                    remoteRelativePath: String,
@@ -994,10 +943,9 @@ final class DeviceConnection {
         return count
     }
 
-    /// Mount the personalized developer disk image, the way StikDebug does:
-    /// lockdownd for the device's UniqueChipID, then image_mounter over the same
-    /// RSD tunnel. Apple personalizes the image per chip, so the manifest and
-    /// the chip id both go to the device and it signs its own copy.
+    /// Mounts the personalized developer disk image (same as StikDebug): reads
+    /// the UniqueChipID from lockdownd, then sends the image, trust cache,
+    /// manifest and chip ID to image_mounter over the RSD tunnel.
     func mountPersonalizedDeveloperImage(imagePath: String,
                                          trustcachePath: String,
                                          manifestPath: String,

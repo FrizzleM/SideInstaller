@@ -2,8 +2,9 @@ import AVFAudio
 import CoreLocation
 import Foundation
 
-/// Keeps the app running on silent audio and background location, so the
-/// RPPairing listener survives the trip to Settings to approve the PIN.
+/// Keeps the app running in the background with silent audio (and optionally
+/// background location), e.g. while the user approves the pairing PIN in
+/// Settings or while a location is being simulated.
 @MainActor
 final class KeepAlive: NSObject {
 
