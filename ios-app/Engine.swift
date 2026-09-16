@@ -318,6 +318,17 @@ final class Engine: ObservableObject {
         loadAnisetteServers()
         // Reflect an IPA imported in an earlier run.
         customIPAName = IPALibrary.customImport()?.url.lastPathComponent
+        // TEMPORARY, for timing on a device: SIDEINSTALLER_AUTORUN=stable|nightly
+        // starts a SideStore install a few seconds after launch.
+        if let channel = ProcessInfo.processInfo.environment["SIDEINSTALLER_AUTORUN"]
+            .flatMap(ReleaseChannel.init(rawValue:)) {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                self.installSource = .sideStore
+                self.releaseChannel = channel
+                self.runOneClick()
+            }
+        }
     }
 
     // MARK: - Anisette servers
@@ -360,8 +371,18 @@ final class Engine: ObservableObject {
     /// How many log lines to keep; the oldest are dropped first.
     private static let maxLogLines = 2000
 
+    /// True when launched with `SIDEINSTALLER_LOG_STDOUT` set, which mirrors every
+    /// line to stdout so a run on an iPhone can be followed and timed from a Mac
+    /// (`xcrun devicectl device process launch --console`).
+    private static let mirrorsLogToStdout =
+        ProcessInfo.processInfo.environment["SIDEINSTALLER_LOG_STDOUT"] != nil
+
     private func appendLine(_ message: String) {
         let stamp = dateFormatter.string(from: Date())
+        if Self.mirrorsLogToStdout {
+            fputs("\(stamp)  \(message)\n", stdout)
+            fflush(stdout)
+        }
         let entry = LogEntry(stamp: stamp, text: message)
         if Thread.isMainThread {
             store(entry)
