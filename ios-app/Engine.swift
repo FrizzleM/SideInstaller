@@ -318,17 +318,6 @@ final class Engine: ObservableObject {
         loadAnisetteServers()
         // Reflect an IPA imported in an earlier run.
         customIPAName = IPALibrary.customImport()?.url.lastPathComponent
-        // TEMPORARY, for timing on a device: SIDEINSTALLER_AUTORUN=stable|nightly
-        // starts a SideStore install a few seconds after launch.
-        if let channel = ProcessInfo.processInfo.environment["SIDEINSTALLER_AUTORUN"]
-            .flatMap(ReleaseChannel.init(rawValue:)) {
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                self.installSource = .sideStore
-                self.releaseChannel = channel
-                self.runOneClick()
-            }
-        }
     }
 
     // MARK: - Anisette servers

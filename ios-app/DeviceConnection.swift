@@ -1,7 +1,6 @@
 import Foundation
 import SideInstallerFFI
 import Darwin
-import zlib
 
 /// Wraps idevice's C FFI to talk to the device over the loopback tunnel
 /// (lockdown, installation_proxy, AFC, etc.), like StikDebug does. The tunnel
@@ -756,20 +755,12 @@ final class DeviceConnection {
     func installSignedApp(bundlePath: String) throws {
         guard let adapter, let handshake else { throw fail("not connected") }
 
-        let mode = UploadMode.current
+        let remoteRoot = "/PublicStaging/\((bundlePath as NSString).lastPathComponent)"
         let uploadStart = Date()
-        let staged: StagedPackage
-        switch mode {
-        case .files:
-            staged = try stageSequentially(bundlePath)
-        case let .parallel(connections):
-            staged = try stageInParallel(bundlePath, connections: connections)
-        case let .archive(level):
-            staged = try stageAsArchive(bundlePath, level: level)
-        }
-        Engine.shared.log(String(format: "Uploaded %d files (%.1f MB sent) in %.2f s [%@].",
-                                 staged.totals.files, Double(staged.totals.bytes) / 1_048_576,
-                                 Date().timeIntervalSince(uploadStart), mode.description))
+        let uploaded = try uploadBundle(bundlePath, to: remoteRoot)
+        Engine.shared.log(String(format: "Uploaded %d files (%.1f MB) in %.2f s.",
+                                 uploaded.files, Double(uploaded.bytes) / 1_048_576,
+                                 Date().timeIntervalSince(uploadStart)))
 
         var ip: OpaquePointer?
         try check(installation_proxy_connect_rsd(adapter, handshake, &ip),
@@ -777,13 +768,13 @@ final class DeviceConnection {
         guard let ip else { throw fail("installation_proxy client was null") }
         defer { installation_proxy_client_free(ip) }
 
-        guard let options = installOptions(for: staged) else {
+        guard let options = developerInstallOptions() else {
             throw fail("couldn't build install ClientOptions")
         }
         defer { plist_free(options) }
 
         let installStart = Date()
-        try staged.remotePath.withCString { p in
+        try remoteRoot.withCString { p in
             try check(installation_proxy_install_with_callback(ip, p, options, installProgressCb, nil),
                       "installation_proxy install failed")
         }
@@ -796,63 +787,28 @@ final class DeviceConnection {
         var bytes = 0
     }
 
-    /// A bundle waiting in /PublicStaging for installation_proxy.
-    private struct StagedPackage {
-        let remotePath: String
-        let totals: UploadTotals
-        let isArchive: Bool
-        let bundleID: String?
-    }
-
-    /// TEMPORARY, for timing on a device: how a bundle reaches /PublicStaging,
-    /// read from SIDEINSTALLER_UPLOAD (files | parallel:N | archive:LEVEL).
-    private enum UploadMode: CustomStringConvertible {
-        case files
-        case parallel(Int)
-        case archive(Int32)
-
-        static var current: UploadMode {
-            let raw = ProcessInfo.processInfo.environment["SIDEINSTALLER_UPLOAD"] ?? "files"
-            let parts = raw.split(separator: ":").map(String.init)
-            switch parts.first {
-            case "parallel": return .parallel(max(1, Int(parts.last ?? "") ?? 4))
-            case "archive":  return .archive(Int32(parts.last ?? "") ?? 0)
-            default:         return .files
-            }
-        }
-
-        var description: String {
-            switch self {
-            case .files:              return "files"
-            case let .parallel(n):    return "parallel:\(n)"
-            case let .archive(level): return "archive:\(level)"
-            }
-        }
-    }
-
     /// installation_proxy options for a developer-signed bundle. Without
     /// `PackageType: Developer`, installd never reads the embedded profile and
-    /// rejects a directory upload with 0xe8008015 at VerifyingApplication.
-    private func installOptions(for staged: StagedPackage) -> plist_t? {
+    /// rejects the upload with 0xe8008015 at VerifyingApplication.
+    private func developerInstallOptions() -> plist_t? {
         guard let options: plist_t = plist_new_dict() else { return nil }
-        // TEMPORARY: which options an archive gets, from SIDEINSTALLER_IPA_OPTIONS.
-        let archiveOptions = ProcessInfo.processInfo.environment["SIDEINSTALLER_IPA_OPTIONS"] ?? "developer"
         // The dict takes ownership of the value node, so freeing it is enough.
-        if !staged.isArchive || archiveOptions.contains("developer") {
-            plist_dict_set_item(options, "PackageType", plist_new_string("Developer"))
-        }
-        if staged.isArchive, archiveOptions.contains("bundle"), let id = staged.bundleID {
-            plist_dict_set_item(options, "CFBundleIdentifier", plist_new_string(id))
-        }
+        plist_dict_set_item(options, "PackageType", plist_new_string("Developer"))
         return options
     }
+
+    /// AFC clients sharing an upload. On an iPhone 16, four took SideStore
+    /// (160 files, 47 MB) from about 2.0 s to 1.6 s: they overlap the per-file
+    /// round trips, and the tunnel itself tops out near 33 MB/s, so more add
+    /// little. A single zipped IPA uploads faster still, but installd spends
+    /// the difference unpacking it (measured in this file's history).
+    private static let uploadConnections = 4
 
     /// One file or directory inside a bundle, relative to its root.
     private struct BundleEntry {
         let relativePath: String
         let isDirectory: Bool
         let size: Int
-        let permissions: UInt16
     }
 
     /// Every directory and file under `root`, parents before their contents.
@@ -864,42 +820,18 @@ final class DeviceConnection {
             let path = (root as NSString).appendingPathComponent(relative)
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: path, isDirectory: &isDir) else { continue }
-            let attrs = try fm.attributesOfItem(atPath: (path as NSString).resolvingSymlinksInPath)
-            let fallback = isDir.boolValue ? 0o755 : 0o644
-            entries.append(BundleEntry(relativePath: relative,
-                                       isDirectory: isDir.boolValue,
-                                       size: isDir.boolValue ? 0 : ((attrs[.size] as? Int) ?? 0),
-                                       permissions: UInt16((attrs[.posixPermissions] as? Int) ?? fallback)))
+            let size = isDir.boolValue ? 0
+                : ((try? fm.attributesOfItem(atPath: (path as NSString).resolvingSymlinksInPath)[.size]) as? Int) ?? 0
+            entries.append(BundleEntry(relativePath: relative, isDirectory: isDir.boolValue, size: size))
         }
         return entries
     }
 
-    private func bundleIdentifier(_ bundlePath: String) -> String? {
-        let url = URL(fileURLWithPath: bundlePath).appendingPathComponent("Info.plist")
-        guard let data = try? Data(contentsOf: url),
-              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
-        else { return nil }
-        return plist["CFBundleIdentifier"] as? String
-    }
-
-    /// The bundle as a directory tree, one file after another on one AFC client.
-    private func stageSequentially(_ bundlePath: String) throws -> StagedPackage {
+    /// Mirrors the bundle's directory tree into `remoteRoot`, with its files
+    /// spread over several AFC clients.
+    private func uploadBundle(_ bundlePath: String, to remoteRoot: String) throws -> UploadTotals {
         guard let adapter, let handshake else { throw fail("not connected") }
-        var afc: OpaquePointer?
-        try check(afc_client_connect_rsd(adapter, handshake, &afc), "afc_client_connect_rsd failed")
-        guard let afc else { throw fail("AFC client was null") }
-        defer { afc_client_free(afc) }
-
-        let remoteRoot = "/PublicStaging/\((bundlePath as NSString).lastPathComponent)"
-        var totals = UploadTotals()
-        try uploadDirectory(afc, localDir: bundlePath, remoteDir: remoteRoot, totals: &totals)
-        return StagedPackage(remotePath: remoteRoot, totals: totals, isArchive: false, bundleID: nil)
-    }
-
-    /// The bundle as a directory tree, its files spread over several AFC clients.
-    private func stageInParallel(_ bundlePath: String, connections: Int) throws -> StagedPackage {
-        guard let adapter, let handshake else { throw fail("not connected") }
-        let remoteRoot = "/PublicStaging/\((bundlePath as NSString).lastPathComponent)"
+        let connections = Self.uploadConnections
         let entries = try bundleEntries(bundlePath)
 
         // Opened one at a time: the FFI takes the adapter exclusively while it
@@ -954,73 +886,7 @@ final class DeviceConnection {
             }
         }
         if let firstError { throw firstError }
-        return StagedPackage(remotePath: remoteRoot, totals: totals, isArchive: false, bundleID: nil)
-    }
-
-    /// The bundle as one zip archive, built while it's written into a single
-    /// AFC file, so nothing is copied to disk first.
-    private func stageAsArchive(_ bundlePath: String, level: Int32) throws -> StagedPackage {
-        guard let adapter, let handshake else { throw fail("not connected") }
-        var afc: OpaquePointer?
-        try check(afc_client_connect_rsd(adapter, handshake, &afc), "afc_client_connect_rsd failed")
-        guard let afc else { throw fail("AFC client was null") }
-        defer { afc_client_free(afc) }
-
-        let appName = (bundlePath as NSString).lastPathComponent
-        let remotePath = "/PublicStaging/\((appName as NSString).deletingPathExtension).ipa"
-        _ = "/PublicStaging".withCString { afc_make_directory(afc, $0) }
-        var opened: OpaquePointer?
-        try check(remotePath.withCString { afc_file_open(afc, $0, AfcWrOnly, &opened) },
-                  "afc_file_open \(remotePath) failed")
-        guard let handle = opened else { throw fail("AFC file handle was null") }
-        // afc_file_close consumes the handle, so it's closed exactly once.
-        var closed = false
-        defer { if !closed { _ = afc_file_close(handle) } }
-
-        let zip = ZipStream { chunk in
-            guard let base = chunk.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-            try self.check(afc_file_write(handle, base, chunk.count), "afc_file_write failed")
-        }
-        try zip.addDirectory("Payload/")
-        try zip.addDirectory("Payload/\(appName)/")
-        var totals = UploadTotals()
-        for entry in try bundleEntries(bundlePath) {
-            let name = "Payload/\(appName)/\(entry.relativePath)"
-            if entry.isDirectory {
-                try zip.addDirectory(name + "/", permissions: entry.permissions)
-            } else {
-                let url = URL(fileURLWithPath: (bundlePath as NSString).appendingPathComponent(entry.relativePath))
-                // Mapped, not read: a tens-of-megabytes binary on the heap risks a jetsam.
-                let data = try Data(contentsOf: url, options: .mappedIfSafe)
-                try zip.addFile(name, data: data, permissions: entry.permissions, level: level)
-                totals.files += 1
-            }
-        }
-        totals.bytes = try zip.finish()
-        closed = true
-        try check(afc_file_close(handle), "afc_file_close failed (archive not committed)")
-        return StagedPackage(remotePath: remotePath, totals: totals, isArchive: true,
-                             bundleID: bundleIdentifier(bundlePath))
-    }
-
-    /// Recursively upload a local directory tree to AFC.
-    private func uploadDirectory(_ afc: OpaquePointer, localDir: String, remoteDir: String,
-                                 totals: inout UploadTotals) throws {
-        _ = remoteDir.withCString { afc_make_directory(afc, $0) }  // ok if exists
-        let fm = FileManager.default
-        let entries = try fm.contentsOfDirectory(atPath: localDir)
-        for entry in entries {
-            let localPath = (localDir as NSString).appendingPathComponent(entry)
-            let remotePath = "\(remoteDir)/\(entry)"
-            var isDir: ObjCBool = false
-            fm.fileExists(atPath: localPath, isDirectory: &isDir)
-            if isDir.boolValue {
-                try uploadDirectory(afc, localDir: localPath, remoteDir: remotePath, totals: &totals)
-            } else {
-                totals.bytes += try uploadFile(afc, localPath: localPath, remotePath: remotePath)
-                totals.files += 1
-            }
-        }
+        return totals
     }
 
     /// Returns the number of bytes written.
@@ -1314,193 +1180,5 @@ private let installProgressCb: @convention(c) (UInt64, UnsafeMutableRawPointer?)
         guard Engine.shared.installProgress != fraction else { return }
         Engine.shared.installProgress = fraction
         Engine.shared.log("install progress: \(progress)%")
-    }
-}
-
-// MARK: - Streaming zip
-
-/// Builds a zip archive as it goes and hands it out in 1 MiB pieces, so a
-/// bundle can be written straight into one AFC file. Entries are stored, or
-/// deflated when that's smaller. No ZIP64: an app bundle stays far below 4 GB.
-private final class ZipStream {
-    enum Failure: Error { case tooLarge }
-
-    private static let chunkSize = 1 << 20
-    private static let utf8Names: UInt16 = 0x0800
-    private static let dosTime: UInt16 = 0
-    private static let dosDate: UInt16 = (46 << 9) | (1 << 5) | 1     // 2026-01-01
-    private static let madeByUnix: UInt16 = (3 << 8) | 20
-
-    private let emit: (UnsafeRawBufferPointer) throws -> Void
-    private var pending = Data()
-    private var written = 0
-    private var centralDirectory = Data()
-    private var entryCount = 0
-
-    init(emit: @escaping (UnsafeRawBufferPointer) throws -> Void) {
-        self.emit = emit
-        pending.reserveCapacity(Self.chunkSize)
-    }
-
-    func addDirectory(_ name: String, permissions: UInt16 = 0o755) throws {
-        let attributes = (UInt32(0o040000) | UInt32(permissions)) << 16 | 0x10
-        try addEntry(name: name, method: 0, crc: 0, compressedSize: 0, size: 0,
-                     externalAttributes: attributes, body: nil)
-    }
-
-    func addFile(_ name: String, data: Data, permissions: UInt16, level: Int32) throws {
-        let attributes = (UInt32(0o100000) | UInt32(permissions)) << 16
-        try data.withUnsafeBytes { raw in
-            let crc = Self.checksum(raw)
-            if level > 0, let packed = Self.deflated(raw, level: level), packed.count < raw.count {
-                try packed.withUnsafeBytes { body in
-                    try addEntry(name: name, method: 8, crc: crc, compressedSize: body.count,
-                                 size: raw.count, externalAttributes: attributes, body: body)
-                }
-            } else {
-                try addEntry(name: name, method: 0, crc: crc, compressedSize: raw.count,
-                             size: raw.count, externalAttributes: attributes, body: raw)
-            }
-        }
-    }
-
-    /// Writes the central directory and returns the archive's size in bytes.
-    func finish() throws -> Int {
-        let directoryOffset = written
-        let directorySize = centralDirectory.count
-        guard directoryOffset + directorySize < Int(UInt32.max), entryCount < Int(UInt16.max) else {
-            throw Failure.tooLarge
-        }
-        try write(centralDirectory)
-        var end = Data()
-        end.appendLE(UInt32(0x0605_4B50))
-        end.appendLE(UInt16(0))
-        end.appendLE(UInt16(0))
-        end.appendLE(UInt16(entryCount))
-        end.appendLE(UInt16(entryCount))
-        end.appendLE(UInt32(directorySize))
-        end.appendLE(UInt32(directoryOffset))
-        end.appendLE(UInt16(0))
-        try write(end)
-        if !pending.isEmpty {
-            try pending.withUnsafeBytes { try emit($0) }
-            pending.removeAll()
-        }
-        return written
-    }
-
-    private func addEntry(name: String, method: UInt16, crc: UInt32, compressedSize: Int, size: Int,
-                          externalAttributes: UInt32, body: UnsafeRawBufferPointer?) throws {
-        let nameBytes = Data(name.utf8)
-        guard written + 30 + nameBytes.count + compressedSize < Int(UInt32.max),
-              size < Int(UInt32.max), nameBytes.count < Int(UInt16.max) else {
-            throw Failure.tooLarge
-        }
-        let offset = UInt32(written)
-
-        var local = Data()
-        local.appendLE(UInt32(0x0403_4B50))
-        local.appendLE(UInt16(20))
-        local.appendLE(Self.utf8Names)
-        local.appendLE(method)
-        local.appendLE(Self.dosTime)
-        local.appendLE(Self.dosDate)
-        local.appendLE(crc)
-        local.appendLE(UInt32(compressedSize))
-        local.appendLE(UInt32(size))
-        local.appendLE(UInt16(nameBytes.count))
-        local.appendLE(UInt16(0))
-        local.append(nameBytes)
-        try write(local)
-        if let body { try write(body) }
-
-        centralDirectory.appendLE(UInt32(0x0201_4B50))
-        centralDirectory.appendLE(Self.madeByUnix)
-        centralDirectory.appendLE(UInt16(20))
-        centralDirectory.appendLE(Self.utf8Names)
-        centralDirectory.appendLE(method)
-        centralDirectory.appendLE(Self.dosTime)
-        centralDirectory.appendLE(Self.dosDate)
-        centralDirectory.appendLE(crc)
-        centralDirectory.appendLE(UInt32(compressedSize))
-        centralDirectory.appendLE(UInt32(size))
-        centralDirectory.appendLE(UInt16(nameBytes.count))
-        centralDirectory.appendLE(UInt16(0))                // extra field
-        centralDirectory.appendLE(UInt16(0))                // comment
-        centralDirectory.appendLE(UInt16(0))                // disk number
-        centralDirectory.appendLE(UInt16(0))                // internal attributes
-        centralDirectory.appendLE(externalAttributes)
-        centralDirectory.appendLE(offset)
-        centralDirectory.append(nameBytes)
-        entryCount += 1
-    }
-
-    private func write(_ data: Data) throws {
-        try data.withUnsafeBytes { try write($0) }
-    }
-
-    /// Emits whole chunks straight from `bytes` where it can, so a large file
-    /// isn't copied into `pending` first.
-    private func write(_ bytes: UnsafeRawBufferPointer) throws {
-        guard bytes.count > 0 else { return }
-        written += bytes.count
-        var rest = bytes[...]
-        if !pending.isEmpty {
-            let take = min(Self.chunkSize - pending.count, rest.count)
-            pending.append(contentsOf: UnsafeRawBufferPointer(rebasing: rest.prefix(take)))
-            rest = rest.dropFirst(take)
-            guard pending.count == Self.chunkSize else { return }
-            try pending.withUnsafeBytes { try emit($0) }
-            pending.removeAll(keepingCapacity: true)
-        }
-        while rest.count >= Self.chunkSize {
-            try emit(UnsafeRawBufferPointer(rebasing: rest.prefix(Self.chunkSize)))
-            rest = rest.dropFirst(Self.chunkSize)
-        }
-        if !rest.isEmpty {
-            pending.append(contentsOf: UnsafeRawBufferPointer(rebasing: rest))
-        }
-    }
-
-    private static func checksum(_ bytes: UnsafeRawBufferPointer) -> UInt32 {
-        var crc = zlib.crc32(0, nil, 0)
-        guard let base = bytes.baseAddress?.assumingMemoryBound(to: Bytef.self) else {
-            return UInt32(truncatingIfNeeded: crc)
-        }
-        var offset = 0
-        while offset < bytes.count {
-            let n = min(bytes.count - offset, Int(Int32.max))
-            crc = zlib.crc32(crc, base + offset, uInt(n))
-            offset += n
-        }
-        return UInt32(truncatingIfNeeded: crc)
-    }
-
-    /// Raw DEFLATE, the form a zip entry holds, or nil if zlib refuses.
-    private static func deflated(_ bytes: UnsafeRawBufferPointer, level: Int32) -> Data? {
-        guard let base = bytes.baseAddress?.assumingMemoryBound(to: Bytef.self),
-              bytes.count < Int(UInt32.max) else { return nil }
-        var stream = z_stream()
-        guard deflateInit2_(&stream, level, Z_DEFLATED, -MAX_WBITS, 8, Z_DEFAULT_STRATEGY,
-                            ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size)) == Z_OK else { return nil }
-        defer { deflateEnd(&stream) }
-        let bound = Int(deflateBound(&stream, uLong(bytes.count)))
-        var out = Data(count: bound)
-        let status: Int32 = out.withUnsafeMutableBytes { dst in
-            stream.next_in = UnsafeMutablePointer(mutating: base)
-            stream.avail_in = uInt(bytes.count)
-            stream.next_out = dst.baseAddress?.assumingMemoryBound(to: Bytef.self)
-            stream.avail_out = uInt(bound)
-            return deflate(&stream, Z_FINISH)
-        }
-        guard status == Z_STREAM_END else { return nil }
-        out.count = Int(stream.total_out)
-        return out
-    }
-}
-
-private extension Data {
-    mutating func appendLE<T: FixedWidthInteger>(_ value: T) {
-        Swift.withUnsafeBytes(of: value.littleEndian) { append(contentsOf: $0) }
     }
 }

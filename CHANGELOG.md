@@ -14,6 +14,13 @@ All notable changes to SideInstaller are documented here.
   again after a failed install, or installing the same build later, skips the download.
 - SideStore's certificate hand-off is prepared while the app installs, and finding the installed app
   afterwards only asks your iPhone about the apps you installed, not every system app.
+- **Signing asks Apple for everything it needs at once.** Registering your iPhone, finding the
+  certificate, and setting up the App IDs and app group now go out together instead of one after
+  another, so signing SideStore takes under 3 seconds instead of over 6.
+- Signing in with a saved Apple ID session makes two fewer requests to Apple.
+- The signed app reaches your iPhone over several connections at once, which shaves a little more
+  off the install. Together, a SideStore install on an iPhone 16 went from about 18.5 seconds to
+  about 11.
 
 ### Fixed
 - Tapping Stop while the IPA downloads now stops the install, instead of carrying on with an older
