@@ -9,12 +9,14 @@
 
 use std::future::Future;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use isideload::{
-    anisette::remote_v3::RemoteV3AnisetteProvider,
-    auth::apple_account::{
-        AppToken, AppleAccount, TwoFactorCallbackParams, TwoFactorCallbackResponse,
+    anisette::{remote_v3::RemoteV3AnisetteProvider, AnisetteDataGenerator, AnisetteProvider},
+    auth::{
+        apple_account::{AppToken, AppleAccount, TwoFactorCallbackParams, TwoFactorCallbackResponse},
+        grandslam::GrandSlam,
     },
     dev::{
         developer_session::DeveloperSession,
@@ -25,6 +27,7 @@ use isideload::{
 use rootcause::Report;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tokio::sync::RwLock;
 
 /// Sign in again this long before Apple's stated expiry rather than race it.
 const EXPIRY_MARGIN_SECS: u64 = 10 * 60;
@@ -170,6 +173,28 @@ where
     C: Fn(TwoFactorCallbackParams) -> Fut + Send + Sync,
     Fut: Future<Output = Result<TwoFactorCallbackResponse, Report>> + Send,
 {
+    let now = unix_now();
+    let saved = if remember { load(storage_dir, apple_id) } else { None };
+
+    // Reusing a saved session only talks to the developer portal, which needs no
+    // GrandSlam URL bag, so that's tried first without fetching one. If anything
+    // goes wrong there, the path below checks the session again as it always has.
+    if let Some(saved) = saved.as_ref().filter(|s| s.usable_for(apple_id, now)) {
+        match reuse_without_url_bag(saved, anisette_url, storage_dir).await {
+            Ok(opened) => {
+                tracing::info!(
+                    "{label}: reused the saved developer session, so no Apple ID sign-in{}",
+                    saved.describe_lifetime(now)
+                );
+                return Ok(opened);
+            }
+            Err(e) => tracing::info!(
+                "{label}: couldn't reuse the saved session straight away ({}); checking it with a full sign-in client",
+                first_line(&e)
+            ),
+        }
+    }
+
     tracing::info!("{label}: building anisette provider ({anisette_url})");
     let anisette = RemoteV3AnisetteProvider::new(
         anisette_url,
@@ -185,8 +210,6 @@ where
         .await
         .map_err(|e| format!("login failed: {e}"))?;
 
-    let now = unix_now();
-    let saved = if remember { load(storage_dir, apple_id) } else { None };
     if let Some(saved) = saved {
         if saved.usable_for(apple_id, now) {
             let mut dev = DeveloperSession::new(
@@ -263,6 +286,37 @@ where
         .list_teams()
         .await
         .map_err(|e| format!("list teams: {e}"))?;
+    Ok((dev, teams))
+}
+
+/// Opens a saved session on a GrandSlam client that skipped the URL bag, and
+/// lists its teams. Anisette state already on disk is used as it is; state that
+/// still needs provisioning (which reads the bag) makes this fail, and the
+/// caller then takes the full path.
+async fn reuse_without_url_bag(
+    saved: &SavedSession,
+    anisette_url: &str,
+    storage_dir: &Path,
+) -> Result<(DeveloperSession, Vec<DeveloperTeam>), String> {
+    let anisette = RemoteV3AnisetteProvider::new(
+        anisette_url,
+        Box::new(FsStorage::new(storage_dir.to_path_buf())),
+        "0".to_string(),
+    )
+    .map_err(|e| format!("anisette provider: {e}"))?;
+    let client_info = anisette
+        .get_client_info()
+        .await
+        .map_err(|e| format!("anisette client info: {e}"))?;
+    let client = GrandSlam::without_url_bag(client_info, false)
+        .map_err(|e| format!("GrandSlam client: {e}"))?;
+    let mut dev = DeveloperSession::new(
+        saved.app_token(),
+        saved.adsid.clone(),
+        Arc::new(client),
+        AnisetteDataGenerator::new(Arc::new(RwLock::new(anisette))),
+    );
+    let teams = dev.list_teams().await.map_err(|e| format!("{e}"))?;
     Ok((dev, teams))
 }
 

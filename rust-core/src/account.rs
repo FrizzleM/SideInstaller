@@ -13,7 +13,6 @@ use base64::{prelude::BASE64_STANDARD, Engine as _};
 use isideload::{
     anisette::remote_v3::state::AnisetteState,
     auth::apple_account::{TwoFactorCallbackParams, TwoFactorCallbackResponse},
-    dev::devices::DevicesApi,
     sideload::{
         builder::MaxCertsBehavior, cert_identity::CertificateIdentity, sideloader::Sideloader,
         SideloaderBuilder, TeamSelection,
@@ -220,7 +219,7 @@ pub unsafe fn apple_signin(
             .map_err(|e| format!("failed to start runtime: {e}"))?;
 
         let sideloader = rt.block_on(async {
-            let (dev_session, _teams) = apple_session::open(
+            let (dev_session, teams) = apple_session::open(
                 &apple_id,
                 &password,
                 &anisette_url,
@@ -238,6 +237,11 @@ pub unsafe fn apple_signin(
                 .storage(Box::new(FsStorage::new(PathBuf::from(&storage_dir))))
                 .machine_name(machine_name.clone())
                 .build();
+            // `open` has just listed the teams, and TeamSelection::First takes
+            // the first of them, so it's handed over rather than listed again.
+            if let Some(first) = teams.into_iter().next() {
+                sideloader.set_team(first);
+            }
 
             // Surface the selected team for the summary.
             let team = sideloader
@@ -305,41 +309,39 @@ pub unsafe fn sign_ipa(
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         session.rt.block_on(async {
-            // The provisioning profile needs a registered device, and `sign_app`
-            // doesn't register one (only isideload's `install_app` does, which
-            // isn't used here).
-            if udid.is_empty() {
+            // The provisioning profile needs a registered device; `sign_app`
+            // registers it alongside its other requests to Apple.
+            let name = if device_name.is_empty() {
+                "iPhone"
+            } else {
+                device_name.as_str()
+            };
+            let device = if udid.is_empty() {
                 tracing::warn!(
                     "No device UDID provided; skipping registration — provisioning \
                      profile download may fail with developer error 8220."
                 );
+                None
             } else {
-                let team = session
-                    .sideloader
-                    .get_team()
-                    .await
-                    .map_err(|e| format!("device registration failed for UDID {udid}: {e}"))?;
-                let name = if device_name.is_empty() {
-                    "iPhone"
-                } else {
-                    device_name.as_str()
-                };
-                tracing::info!("Ensuring device {udid} ({name}) is registered on team {}", team.team_id);
-                session
-                    .sideloader
-                    .get_dev_session()
-                    .ensure_device_registered(&team, name, &udid, None)
-                    .await
-                    .map_err(|e| format!("device registration failed for UDID {udid}: {e}"))?;
-                tracing::info!("Device {udid} is registered on the team");
-            }
+                tracing::info!("Registering device {udid} ({name}) with the team while signing");
+                Some((name, udid.as_str()))
+            };
 
             tracing::info!("Signing IPA at {ipa_path}");
             let (signed, _special) = session
                 .sideloader
-                .sign_app(PathBuf::from(&ipa_path), None, false)
+                .sign_app(PathBuf::from(&ipa_path), None, false, device)
                 .await
-                .map_err(|e| format!("sign_app failed: {e}"))?;
+                .map_err(|e| {
+                    // Left unprefixed so the app still recognises a failed
+                    // registration and shows its guide.
+                    let message = e.to_string();
+                    if message.starts_with("device registration failed") {
+                        message
+                    } else {
+                        format!("sign_app failed: {message}")
+                    }
+                })?;
             Ok::<_, String>(signed.to_string_lossy().to_string())
         })
     }));

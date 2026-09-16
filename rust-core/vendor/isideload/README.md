@@ -106,6 +106,34 @@ On top of the port, all local:
 `rust-core/src/account.rs` bridges this callback to Swift as JSON; the shapes
 are documented on `SITwoFactorCb` in `rust-core/include/sideinstaller.h`.
 
+**4. `src/sideload/sideloader.rs`, `application.rs` — send `sign_app`'s
+requests to Apple concurrently.**
+
+`sign_app` ran every developer-portal request one after another on a single
+`DeveloperSession`: the certificate lookup, `listAppIds` twice, the app group,
+one feature check and one group assignment per App ID, then the profile. On an
+iPhone 16 that was about 5.5 s of a SideStore install spent waiting on Apple.
+
+It now takes a device `(name, UDID)` to register and sends what doesn't depend
+on anything else at once, each on a clone of the session (anisette headers are
+fetched first, so the clones share them rather than each asking the server):
+
+1. device registration, the certificate lookup, and — once the archive is
+   extracted on a blocking thread — the App IDs and the app group together, then
+   every App ID's feature check and group assignment side by side;
+2. the provisioning profile, which needs all of that, while the certificate is
+   written into the bundle.
+
+`register_app_ids` also skips its second `listAppIds` when nothing new was
+registered, since the first listing is already current. `install_app` passes
+its device through instead of registering it separately first.
+
+Two additions serve `rust-core`'s sign-in, which cost another 1.5 s:
+`Sideloader::set_team` takes a team the caller has already listed (so
+`get_team` doesn't list them a second time), and `GrandSlam::without_url_bag`
+builds a client that skips the URL-bag fetch, for reusing a saved developer
+session — portal requests use fixed URLs and never read the bag.
+
 ## Re-vendoring
 
 Upstream had not fixed change 1 as of the pinned revision. Re-copying the crate

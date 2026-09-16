@@ -18,6 +18,7 @@ use crate::{
 
 use std::path::PathBuf;
 
+use futures_util::future::{try_join, try_join3, try_join_all};
 use idevice::provider::IdeviceProvider;
 use rootcause::{option_ext::OptionExt, prelude::*};
 use tracing::info;
@@ -62,97 +63,145 @@ impl Sideloader {
     }
 
     /// Sign the app at the provided path and return the path to the signed app bundle (in a temp dir). To sign and install, see [`Self::install_app`].
+    ///
+    /// `register_device` is a device's (name, UDID) to register with the team
+    /// first, since the provisioning profile only covers registered devices.
     pub async fn sign_app(
         &mut self,
         app_path: PathBuf,
         team: Option<DeveloperTeam>,
         // this will be replaced with proper entitlement handling later
         increased_memory_limit: bool,
+        register_device: Option<(&str, &str)>,
     ) -> Result<(PathBuf, Option<SpecialApp>), Report> {
         let team = match team {
             Some(t) => t,
             None => self.get_team().await?,
         };
-        let cert_identity = CertificateIdentity::retrieve(
-            &self.machine_name,
-            &self.apple_email,
-            &mut self.dev_session,
-            &team,
-            self.storage.as_ref(),
-            &self.max_certs_behavior,
-        )
-        .await
-        .context("Failed to retrieve certificate identity")?;
 
-        let mut app = Application::new(app_path)?;
-        let special = app.get_special_app();
+        // Requests that don't depend on each other go out together, each on its
+        // own copy of the developer session. Anisette headers are fetched once
+        // first, so every copy reuses them instead of asking the server again.
+        self.dev_session
+            .get_headers()
+            .await
+            .context("Failed to get anisette headers")?;
+        let mut device_session = self.dev_session.clone();
+        let mut cert_session = self.dev_session.clone();
+        let mut app_id_session = self.dev_session.clone();
+        let mut group_session = self.dev_session.clone();
 
-        let main_bundle_id = app.main_bundle_id()?;
-        let main_app_name = app.main_app_name()?;
-        let main_app_id_str = format!("{}.{}", main_bundle_id, team.team_id);
-        app.update_bundle_id(&main_bundle_id, &main_app_id_str)?;
-        let mut app_ids = app
-            .register_app_ids(
-                /*&self.extensions_behavior, */ &mut self.dev_session,
-                &team,
+        let registration = async {
+            if let Some((name, udid)) = register_device
+                && let Err(e) = device_session
+                    .ensure_device_registered(&team, name, udid, None)
+                    .await
+            {
+                bail!("device registration failed for UDID {udid}: {e}");
+            }
+            Ok::<(), Report>(())
+        };
+
+        let certificate = async {
+            Ok::<_, Report>(
+                CertificateIdentity::retrieve(
+                    &self.machine_name,
+                    &self.apple_email,
+                    &mut cert_session,
+                    &team,
+                    self.storage.as_ref(),
+                    &self.max_certs_behavior,
+                )
+                .await
+                .context("Failed to retrieve certificate identity")?,
+            )
+        };
+
+        // Extracting the archive is blocking work, so it runs off this task and
+        // the requests above keep moving meanwhile.
+        let bundle = async {
+            let mut app = tokio::task::spawn_blocking(move || Application::new(app_path))
+                .await
+                .map_err(|e| report!("Failed to open application archive: {e}"))??;
+            let special = app.get_special_app();
+
+            let main_bundle_id = app.main_bundle_id()?;
+            let main_app_name = app.main_app_name()?;
+            let main_app_id_str = format!("{}.{}", main_bundle_id, team.team_id);
+            app.update_bundle_id(&main_bundle_id, &main_app_id_str)?;
+
+            let group_identifier = format!(
+                "group.{}",
+                if Some(SpecialApp::SideStoreLc) == special {
+                    format!("com.SideStore.SideStore.{}", team.team_id)
+                } else {
+                    main_app_id_str.clone()
+                }
+            );
+
+            let (mut app_ids, app_group) = try_join(
+                app.register_app_ids(
+                    /*&self.extensions_behavior, */ &mut app_id_session,
+                    &team,
+                ),
+                group_session.ensure_app_group(&team, &main_app_name, &group_identifier, None),
             )
             .await?;
-        let main_app_id = match app_ids
-            .iter()
-            .find(|app_id| app_id.identifier == main_app_id_str)
-        {
-            Some(id) => id,
-            None => {
-                bail!(
-                    "Main app ID {} not found in registered app IDs",
-                    main_app_id_str
-                );
-            }
-        }
-        .clone();
 
-        let group_identifier = format!(
-            "group.{}",
-            if Some(SpecialApp::SideStoreLc) == special {
-                format!("com.SideStore.SideStore.{}", team.team_id)
-            } else {
-                main_app_id_str.clone()
-            }
-        );
+            let main_app_id = app_ids
+                .iter()
+                .find(|app_id| app_id.identifier == main_app_id_str)
+                .cloned()
+                .ok_or_else(|| {
+                    report!(
+                        "Main app ID {} not found in registered app IDs",
+                        main_app_id_str
+                    )
+                })?;
 
-        let app_group = self
-            .dev_session
-            .ensure_app_group(&team, &main_app_name, &group_identifier, None)
+            // Each App ID is configured on its own session, all at once.
+            try_join_all(app_ids.iter_mut().map(|app_id| {
+                let mut session = app_id_session.clone();
+                let (team, app_group) = (&team, &app_group);
+                async move {
+                    app_id.ensure_group_feature(&mut session, team).await?;
+                    session
+                        .assign_app_group(team, app_group, app_id, None)
+                        .await?;
+                    if increased_memory_limit {
+                        session.add_increased_memory_limit(team, app_id).await?;
+                    }
+                    Ok::<(), Report>(())
+                }
+            }))
             .await?;
 
-        for app_id in app_ids.iter_mut() {
-            app_id
-                .ensure_group_feature(&mut self.dev_session, &team)
-                .await?;
+            info!("App IDs configured");
+            Ok::<_, Report>((app, special, group_identifier, main_app_id))
+        };
 
-            self.dev_session
-                .assign_app_group(&team, &app_group, app_id, None)
-                .await?;
+        let ((), cert_identity, (mut app, special, group_identifier, main_app_id)) =
+            try_join3(registration, certificate, bundle).await?;
 
-            if increased_memory_limit {
-                self.dev_session
-                    .add_increased_memory_limit(&team, app_id)
+        // The profile has to come after the device and App IDs are set up; the
+        // certificate goes into the bundle meanwhile.
+        let dev_session = &mut self.dev_session;
+        let ((), provisioning_profile) = try_join(
+            async {
+                app.apply_special_app_behavior(&special, &group_identifier, &cert_identity)
+                    .await
+                    .context("Failed to modify app bundle")?;
+                Ok::<(), Report>(())
+            },
+            async {
+                let profile = dev_session
+                    .download_team_provisioning_profile(&team, &main_app_id, None)
                     .await?;
-            }
-        }
-
-        info!("App IDs configured");
-
-        app.apply_special_app_behavior(&special, &group_identifier, &cert_identity)
-            .await
-            .context("Failed to modify app bundle")?;
-
-        let provisioning_profile = self
-            .dev_session
-            .download_team_provisioning_profile(&team, &main_app_id, None)
-            .await?;
-
-        info!("Acquired provisioning profile");
+                info!("Acquired provisioning profile");
+                Ok::<_, Report>(profile)
+            },
+        )
+        .await?;
 
         app.bundle.write_info()?;
         for ext in app.bundle.app_extensions_mut() {
@@ -207,12 +256,13 @@ impl Sideloader {
         let device_info = IdeviceInfo::from_device(device_provider).await?;
 
         let team = self.get_team().await?;
-        self.dev_session
-            .ensure_device_registered(&team, &device_info.name, &device_info.udid, None)
-            .await?;
-
         let (signed_app_path, special_app) = self
-            .sign_app(app_path, Some(team), increased_memory_limit)
+            .sign_app(
+                app_path,
+                Some(team),
+                increased_memory_limit,
+                Some((&device_info.name, &device_info.udid)),
+            )
             .await?;
 
         info!("Transferring App...");
@@ -266,6 +316,12 @@ impl Sideloader {
             self.team = Some(team.clone());
         }
         Ok(team)
+    }
+
+    /// Use `team` without asking Apple, for a caller that has already listed the
+    /// teams and picked one as the team selection would.
+    pub fn set_team(&mut self, team: DeveloperTeam) {
+        self.team = Some(team);
     }
 
     pub fn get_dev_session(&mut self) -> &mut DeveloperSession {

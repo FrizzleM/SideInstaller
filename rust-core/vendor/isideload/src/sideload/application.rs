@@ -198,14 +198,18 @@ impl Application {
             );
         }
 
-        for bundle in app_ids_to_register {
-            let id = bundle.bundle_identifier().unwrap_or("");
-            let name = bundle.bundle_name().unwrap_or("");
-            dev_session.add_app_id(team, name, id, None).await?;
-        }
-        let list_app_id_response = dev_session.list_app_ids(team, None).await?;
-        let app_ids: Vec<_> = list_app_id_response
-            .app_ids
+        // With nothing new to register, the first listing is already current.
+        let listed = if app_ids_to_register.is_empty() {
+            list_app_ids_response.app_ids
+        } else {
+            for bundle in app_ids_to_register {
+                let id = bundle.bundle_identifier().unwrap_or("");
+                let name = bundle.bundle_name().unwrap_or("");
+                dev_session.add_app_id(team, name, id, None).await?;
+            }
+            dev_session.list_app_ids(team, None).await?.app_ids
+        };
+        let app_ids: Vec<_> = listed
             .into_iter()
             .filter(|app_id| {
                 bundles_with_app_id

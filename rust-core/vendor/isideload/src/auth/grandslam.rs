@@ -35,6 +35,18 @@ impl GrandSlam {
         })
     }
 
+    /// A client that skips fetching the URL bag, for callers that only make
+    /// developer-portal requests (which use fixed URLs). `get_url` on it fails,
+    /// so it can't log in or provision anisette.
+    pub fn without_url_bag(client_info: AnisetteClientInfo, debug: bool) -> Result<Self, Report> {
+        let client = Self::build_reqwest_client(debug).context("Failed to build HTTP client")?;
+        Ok(Self {
+            client,
+            client_info,
+            url_bag: Dictionary::new(),
+        })
+    }
+
     /// Fetch the URL bag from GrandSlam and cache it
     pub async fn fetch_url_bag(
         client: &reqwest::Client,
