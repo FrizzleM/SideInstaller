@@ -6,7 +6,7 @@
 
 **Install SideStore and LiveContainer directly on your iPhone. No PC required.**
 
-[![Install](https://img.shields.io/badge/Install-SideInstaller-2ea44f?style=for-the-badge)](https://frizzlem.github.io/SideInstaller/)
+[![Install](https://img.shields.io/badge/Install-SideInstaller-2ea44f?style=for-the-badge)](https://sideinstaller.net/)
 [![Version](https://img.shields.io/badge/version-0.9.0-blue?style=for-the-badge)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-iOS-lightgrey?style=for-the-badge&logo=apple)](#requirements)
 [![License](https://img.shields.io/badge/license-Custom-orange?style=for-the-badge)](LICENSE.md)
@@ -24,7 +24,7 @@
 > name and icon. A malicious fork looks identical to the real app from the outside.
 >
 > The **only** builds I publish are:
-> - **Website:** https://frizzlem.github.io/SideInstaller/
+> - **Website:** https://sideinstaller.net/
 > - **Repository:** https://github.com/FrizzleM/SideInstaller
 >
 > Do not install SideInstaller from any other site, AltStore source, Telegram channel, Discord server,
