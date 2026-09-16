@@ -1,6 +1,7 @@
 import Foundation
 import SideInstallerFFI
 import Darwin
+import zlib
 
 /// Wraps idevice's C FFI to talk to the device over the loopback tunnel
 /// (lockdown, installation_proxy, AFC, etc.), like StikDebug does. The tunnel
@@ -336,6 +337,9 @@ final class DeviceConnection {
         }
 
         Engine.shared.log("Asking lockdownd for a pair record — unlock this iPhone and tap Trust if it asks …")
+        // A Trust prompt may appear: a 2FA sheet waits for it.
+        Engine.shared.attention.begin()
+        defer { Engine.shared.attention.end() }
         let record = try lockdownPairRecordDirect(hosts: [deviceIP, "127.0.0.1"],
                                                   hostID: CompositePairingFile.hostID,
                                                   systemBUID: CompositePairingFile.systemBUID,
@@ -683,6 +687,37 @@ final class DeviceConnection {
         return out
     }
 
+    /// Whether the app with exactly this bundle ID is installed, asking installd
+    /// about that one app only.
+    func isInstalled(bundleID: String) throws -> Bool {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var client: OpaquePointer?
+        try check(installation_proxy_connect_rsd(adapter, handshake, &client),
+                  "installation_proxy_connect_rsd failed")
+        guard let client else { throw fail("installation_proxy client was null") }
+        defer { installation_proxy_client_free(client) }
+
+        var result: UnsafeMutableRawPointer?
+        var count = 0
+        let err = bundleID.withCString { id in
+            [UnsafePointer<CChar>?(id)].withUnsafeBufferPointer { ids in
+                "User".withCString { type in
+                    installation_proxy_get_apps(client, type, ids.baseAddress, 1, &result, &count)
+                }
+            }
+        }
+        try check(err, "installation_proxy_get_apps failed")
+        guard let result, count > 0 else { return false }
+
+        let apps = result.assumingMemoryBound(to: plist_t?.self)
+        defer {
+            for i in 0..<count { plist_free(apps[i]) }
+            idevice_data_free(result.assumingMemoryBound(to: UInt8.self),
+                              UInt(count * MemoryLayout<plist_t?>.stride))
+        }
+        return (0..<count).contains { plistString(apps[$0], "CFBundleIdentifier") == bundleID }
+    }
+
     /// The host app's exact bundle id for the pairing write, matched on display
     /// name first — isideload rewrites bundle ids — then on "<base>[.<teamID>]".
     func resolveInstalledBundleID(displayName: String, bundleIDBase: String) throws -> String? {
@@ -752,15 +787,33 @@ final class DeviceConnection {
     // MARK: Install (AFC upload to /PublicStaging + installation_proxy)
 
     /// Upload a signed `.app` bundle to /PublicStaging and install it over RSD.
-    func installSignedApp(bundlePath: String) throws {
+    ///
+    /// With `prestaged`, the files signing left unchanged are already there and
+    /// only the rest is sent. Should that install fail for any reason, the whole
+    /// bundle is uploaded and installed once more.
+    func installSignedApp(bundlePath: String, prestaged: PrestagedBundle? = nil) throws {
+        let remoteRoot = "/PublicStaging/\((bundlePath as NSString).lastPathComponent)"
+        guard let prestaged, prestaged.remoteRoot == remoteRoot else {
+            return try uploadAndInstall(bundlePath, to: remoteRoot, prestaged: nil)
+        }
+        do {
+            try uploadAndInstall(bundlePath, to: remoteRoot, prestaged: prestaged)
+        } catch {
+            Engine.shared.log("⚠️ Install with the files staged ahead of signing failed (\(error)). Uploading the whole app and installing again …")
+            try uploadAndInstall(bundlePath, to: remoteRoot, prestaged: nil)
+        }
+    }
+
+    private func uploadAndInstall(_ bundlePath: String, to remoteRoot: String,
+                                  prestaged: PrestagedBundle?) throws {
         guard let adapter, let handshake else { throw fail("not connected") }
 
-        let remoteRoot = "/PublicStaging/\((bundlePath as NSString).lastPathComponent)"
         let uploadStart = Date()
-        let uploaded = try uploadBundle(bundlePath, to: remoteRoot)
-        Engine.shared.log(String(format: "Uploaded %d files (%.1f MB) in %.2f s.",
+        let uploaded = try uploadBundle(bundlePath, to: remoteRoot, prestaged: prestaged)
+        let reusedNote = prestaged == nil ? "" : String(format: "; %d unchanged files were staged ahead", uploaded.reused)
+        Engine.shared.log(String(format: "Uploaded %d files (%.1f MB) in %.2f s%@.",
                                  uploaded.files, Double(uploaded.bytes) / 1_048_576,
-                                 Date().timeIntervalSince(uploadStart)))
+                                 Date().timeIntervalSince(uploadStart), reusedNote))
 
         var ip: OpaquePointer?
         try check(installation_proxy_connect_rsd(adapter, handshake, &ip),
@@ -785,6 +838,19 @@ final class DeviceConnection {
     private struct UploadTotals {
         var files = 0
         var bytes = 0
+        /// Files left as they were staged ahead of signing.
+        var reused = 0
+    }
+
+    /// Files of an app already copied to /PublicStaging from its unsigned IPA,
+    /// while signing ran.
+    struct PrestagedBundle {
+        /// e.g. "/PublicStaging/SideStore.app"
+        let remoteRoot: String
+        /// Size and CRC-32 of each copied file, by path inside the bundle.
+        let files: [String: (size: Int, crc: UInt32)]
+        /// Directories created, by path inside the bundle.
+        let directories: Set<String>
     }
 
     /// installation_proxy options for a developer-signed bundle. Without
@@ -827,52 +893,211 @@ final class DeviceConnection {
         return entries
     }
 
-    /// Mirrors the bundle's directory tree into `remoteRoot`, with its files
-    /// spread over several AFC clients.
-    private func uploadBundle(_ bundlePath: String, to remoteRoot: String) throws -> UploadTotals {
-        guard let adapter, let handshake else { throw fail("not connected") }
-        let connections = Self.uploadConnections
-        let entries = try bundleEntries(bundlePath)
+    /// Mirrors the bundle's directory tree into `remoteRoot`. With `prestaged`,
+    /// a staged file whose size and CRC-32 match the signed one is kept, a staged
+    /// file the signed bundle doesn't have is removed, and the rest is sent.
+    private func uploadBundle(_ bundlePath: String, to remoteRoot: String,
+                              prestaged: PrestagedBundle?) throws -> UploadTotals {
+        var directories = prestaged == nil ? [remoteRoot] : []
+        var items: [UploadItem] = []
+        var kept: [(relative: String, size: Int)] = []
+        var dropped = Set(prestaged.map { Array($0.files.keys) } ?? [])
+        func item(_ relative: String, size: Int) -> UploadItem {
+            let local = (bundlePath as NSString).appendingPathComponent(relative)
+            return UploadItem(remotePath: "\(remoteRoot)/\(relative)", size: size) {
+                // Mapped, not read: a tens-of-megabytes binary on the heap risks a jetsam.
+                try Data(contentsOf: URL(fileURLWithPath: local), options: .mappedIfSafe)
+            }
+        }
+        for entry in try bundleEntries(bundlePath) {
+            if entry.isDirectory {
+                if prestaged?.directories.contains(entry.relativePath) != true {
+                    directories.append("\(remoteRoot)/\(entry.relativePath)")
+                }
+                continue
+            }
+            dropped.remove(entry.relativePath)
+            let local = (bundlePath as NSString).appendingPathComponent(entry.relativePath)
+            if let staged = prestaged?.files[entry.relativePath], staged.size == entry.size,
+               try Self.checksum(ofFileAt: local) == staged.crc {
+                kept.append((entry.relativePath, entry.size))
+            } else {
+                items.append(item(entry.relativePath, size: entry.size))
+            }
+        }
 
-        // Opened one at a time: the FFI takes the adapter exclusively while it
-        // connects a stream. Once open, each client is independent.
+        // Staged files are checked on clients of their own, alongside the upload.
+        let checkers = kept.isEmpty ? 0 : Self.uploadConnections
+        return try withUploadClients(extra: checkers) { clients -> UploadTotals in
+            let uploaders = Array(clients.prefix(Self.uploadConnections))
+            if prestaged == nil {
+                // A staging folder left by an earlier run would be installed too.
+                _ = ffiError(remoteRoot.withCString { afc_remove_path_and_contents(uploaders[0], $0) }, "")
+            }
+            for relative in dropped {
+                _ = ffiError("\(remoteRoot)/\(relative)".withCString { afc_remove_path(uploaders[0], $0) }, "")
+            }
+
+            // installd accepts a bundle with a staged file missing — it was tried —
+            // so each one being kept is confirmed to still be there at its size.
+            var missing: [String] = []
+            let checking = DispatchGroup()
+            DispatchQueue.global(qos: .userInitiated).async(group: checking) {
+                missing = self.missingStagedFiles(kept, root: remoteRoot,
+                                                  clients: Array(clients.dropFirst(Self.uploadConnections)))
+            }
+            let uploaded = Result { try self.upload(items, directories: directories, clients: uploaders) }
+            checking.wait()
+            var totals = try uploaded.get()
+
+            if !missing.isEmpty {
+                Engine.shared.log("⚠️ \(missing.count) file(s) staged ahead of signing weren't on the device any more; sending them again.")
+                let sizes = Dictionary(kept.map { ($0.relative, $0.size) }, uniquingKeysWith: { first, _ in first })
+                let resent = try upload(missing.map { item($0, size: sizes[$0] ?? 0) }, directories: [], clients: uploaders)
+                totals.files += resent.files
+                totals.bytes += resent.bytes
+            }
+            totals.reused = kept.count - missing.count
+            return totals
+        }
+    }
+
+    /// The staged files not found at `root` with their expected size.
+    private func missingStagedFiles(_ files: [(relative: String, size: Int)], root: String,
+                                    clients: [OpaquePointer]) -> [String] {
+        guard !files.isEmpty, !clients.isEmpty else { return [] }
+        let lock = NSLock()
+        var missing: [String] = []
+        // Each lane blocks on the device, so they run as separate work items rather
+        // than through concurrentPerform, which the upload is already using.
+        let lanes = DispatchGroup()
+        for lane in clients.indices {
+            DispatchQueue.global(qos: .userInitiated).async(group: lanes) {
+                for (index, file) in files.enumerated() where index % clients.count == lane {
+                    var info = AfcFileInfo()
+                    let error = "\(root)/\(file.relative)".withCString { afc_get_file_info(clients[lane], $0, &info) }
+                    let present: Bool
+                    if self.ffiError(error, "") != nil {
+                        present = false
+                    } else {
+                        present = Int(info.size) == file.size
+                        afc_file_info_free(&info)
+                    }
+                    if !present {
+                        lock.lock()
+                        missing.append(file.relative)
+                        lock.unlock()
+                    }
+                }
+            }
+        }
+        lanes.wait()
+        return missing
+    }
+
+    /// Copies the files of the unsigned IPA at `ipaPath` that signing leaves as
+    /// they are into /PublicStaging, so it can run while signing does. Info.plists,
+    /// executables, code signatures and profiles are left out: signing rewrites
+    /// or adds those. The install checks every staged file against the signed
+    /// bundle, so a wrong guess here costs time, never a broken install.
+    func prestageUnsignedBundle(ipaPath: String) throws -> PrestagedBundle {
+        let url = URL(fileURLWithPath: ipaPath)
+        guard let archive = IPALibrary.archiveFiles(at: url) else {
+            throw fail("couldn't read \(url.lastPathComponent) as a zip archive")
+        }
+        let appNames = Set(archive.compactMap { file -> String? in
+            let parts = file.path.split(separator: "/", maxSplits: 2, omittingEmptySubsequences: false)
+            guard parts.count == 3, parts[0] == "Payload", parts[1].hasSuffix(".app") else { return nil }
+            return String(parts[1])
+        })
+        guard appNames.count == 1, let appName = appNames.first else {
+            throw fail("\(url.lastPathComponent) doesn't hold exactly one app")
+        }
+        let prefix = "Payload/\(appName)/"
+        let remoteRoot = "/PublicStaging/\(appName)"
+
+        var items: [UploadItem] = []
+        var files: [String: (size: Int, crc: UInt32)] = [:]
+        var directories = Set<String>()
+        for file in archive where file.path.hasPrefix(prefix) && file.size > 0 {
+            let relative = String(file.path.dropFirst(prefix.count))
+            let name = (relative as NSString).lastPathComponent
+            guard !file.isExecutable, name != "Info.plist", name != "embedded.mobileprovision",
+                  !name.hasSuffix(".dylib"), !relative.contains("_CodeSignature/") else { continue }
+            var parent = (relative as NSString).deletingLastPathComponent
+            while !parent.isEmpty, directories.insert(parent).inserted {
+                parent = (parent as NSString).deletingLastPathComponent
+            }
+            files[relative] = (file.size, file.crc)
+            items.append(UploadItem(remotePath: "\(remoteRoot)/\(relative)", size: file.size) {
+                guard let data = IPALibrary.contents(of: file, in: url) else {
+                    throw self.fail("couldn't read \(relative) from \(url.lastPathComponent)")
+                }
+                return data
+            })
+        }
+
+        try withUploadClients { clients -> Void in
+            // Anything an earlier run left staged here would be installed too.
+            _ = ffiError(remoteRoot.withCString { afc_remove_path_and_contents(clients[0], $0) }, "")
+            // Sorted, a parent comes before everything inside it.
+            let remoteDirectories = [remoteRoot] + directories.sorted().map { "\(remoteRoot)/\($0)" }
+            _ = try upload(items, directories: remoteDirectories, clients: clients)
+        }
+        return PrestagedBundle(remoteRoot: remoteRoot, files: files, directories: directories)
+    }
+
+    /// A file to upload: where it goes, its size, and how to read it.
+    private struct UploadItem {
+        let remotePath: String
+        let size: Int
+        let read: () throws -> Data
+    }
+
+    /// Opens the upload's AFC clients, plus `extra` more, for `body` and frees
+    /// them afterwards. They open one at a time, since the FFI takes the adapter
+    /// exclusively while it connects a stream; once open, each is independent.
+    private func withUploadClients<T>(extra: Int = 0, _ body: ([OpaquePointer]) throws -> T) throws -> T {
+        guard let adapter, let handshake else { throw fail("not connected") }
         var clients: [OpaquePointer] = []
         defer { clients.forEach { afc_client_free($0) } }
-        for _ in 0..<connections {
+        for _ in 0..<(Self.uploadConnections + extra) {
             var afc: OpaquePointer?
             try check(afc_client_connect_rsd(adapter, handshake, &afc), "afc_client_connect_rsd failed")
             guard let afc else { throw fail("AFC client was null") }
             clients.append(afc)
         }
+        return try body(clients)
+    }
 
+    /// Creates `directories` in order, then sends `items` spread over `clients`.
+    private func upload(_ items: [UploadItem], directories: [String],
+                        clients: [OpaquePointer]) throws -> UploadTotals {
         // Every directory exists before any file lands in it.
-        _ = remoteRoot.withCString { afc_make_directory(clients[0], $0) }
-        for entry in entries where entry.isDirectory {
-            _ = "\(remoteRoot)/\(entry.relativePath)".withCString { afc_make_directory(clients[0], $0) }
+        for directory in directories {
+            _ = ffiError(directory.withCString { afc_make_directory(clients[0], $0) }, "")   // ok if it exists
         }
 
         // Biggest files first, each to the lane carrying the least so far.
-        var lanes = Array(repeating: [BundleEntry](), count: clients.count)
+        var lanes = Array(repeating: [UploadItem](), count: clients.count)
         var load = Array(repeating: 0, count: clients.count)
-        for file in entries.filter({ !$0.isDirectory }).sorted(by: { $0.size > $1.size }) {
+        for item in items.sorted(by: { $0.size > $1.size }) {
             let lane = load.indices.min { load[$0] < load[$1] } ?? 0
-            lanes[lane].append(file)
-            load[lane] += file.size
+            lanes[lane].append(item)
+            load[lane] += item.size
         }
 
         let lock = NSLock()
         var totals = UploadTotals()
         var firstError: Error?
         DispatchQueue.concurrentPerform(iterations: clients.count) { lane in
-            for file in lanes[lane] {
+            for item in lanes[lane] {
                 lock.lock()
                 let stop = firstError != nil
                 lock.unlock()
                 if stop { return }
                 do {
-                    let bytes = try uploadFile(clients[lane],
-                                               localPath: (bundlePath as NSString).appendingPathComponent(file.relativePath),
-                                               remotePath: "\(remoteRoot)/\(file.relativePath)")
+                    let bytes = try write(clients[lane], data: item.read(), to: item.remotePath)
                     lock.lock()
                     totals.files += 1
                     totals.bytes += bytes
@@ -889,10 +1114,26 @@ final class DeviceConnection {
         return totals
     }
 
-    /// Returns the number of bytes written.
-    private func uploadFile(_ afc: OpaquePointer, localPath: String, remotePath: String) throws -> Int {
-        // Mapped, not read: a tens-of-megabytes binary on the heap risks a jetsam.
-        let data = try Data(contentsOf: URL(fileURLWithPath: localPath), options: .mappedIfSafe)
+    /// CRC-32 of a local file, as a zip entry records it.
+    private static func checksum(ofFileAt path: String) throws -> UInt32 {
+        let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
+        return data.withUnsafeBytes { raw in
+            var crc = zlib.crc32(0, nil, 0)
+            guard let base = raw.baseAddress?.assumingMemoryBound(to: Bytef.self) else {
+                return UInt32(truncatingIfNeeded: crc)
+            }
+            var offset = 0
+            while offset < raw.count {
+                let n = min(raw.count - offset, Int(Int32.max))
+                crc = zlib.crc32(crc, base + offset, uInt(n))
+                offset += n
+            }
+            return UInt32(truncatingIfNeeded: crc)
+        }
+    }
+
+    /// Writes `data` to `remotePath` over AFC, returning the byte count.
+    private func write(_ afc: OpaquePointer, data: Data, to remotePath: String) throws -> Int {
         var file: OpaquePointer?
         try check(remotePath.withCString { afc_file_open(afc, $0, AfcWrOnly, &file) },
                   "afc_file_open \(remotePath) failed")

@@ -780,12 +780,50 @@ extension IPALibrary {
                        version: dict["CFBundleShortVersionString"] as? String)
     }
 
+    /// One file inside an IPA, for copying it out without unpacking the rest.
+    struct ArchiveFile {
+        /// Path inside the archive, e.g. "Payload/SideStore.app/Assets.car".
+        let path: String
+        let size: Int
+        let crc: UInt32
+        /// Has an executable Unix mode: a Mach-O, which signing always rewrites.
+        let isExecutable: Bool
+        fileprivate let entry: ZipEntry
+    }
+
+    /// The regular files in the IPA at `url`, or nil if its central directory
+    /// can't be read.
+    static func archiveFiles(at url: URL) -> [ArchiveFile]? {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size) else { return nil }
+        return directory.compactMap { entry in
+            let mode = entry.externalAttributes >> 16
+            // Directories and symlinks aren't regular files.
+            guard !entry.name.hasSuffix("/"), mode & 0o170000 != 0o120000 else { return nil }
+            return ArchiveFile(path: entry.name, size: entry.uncompressedSize, crc: entry.crc,
+                               isExecutable: mode & 0o111 != 0, entry: entry)
+        }
+    }
+
+    /// A file's uncompressed bytes, or nil if they can't be read.
+    static func contents(of file: ArchiveFile, in url: URL) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        return contents(of: file.entry, handle, maxSize: 1 << 30)
+    }
+
     /// One entry of the archive's central directory.
-    private struct ZipEntry {
+    fileprivate struct ZipEntry {
         let name: String
         let method: Int
+        let crc: UInt32
         let compressedSize: Int
         let uncompressedSize: Int
+        /// The Unix mode sits in the high 16 bits for an archive made on Unix.
+        let externalAttributes: UInt32
         let localHeaderOffset: Int
     }
 
@@ -832,8 +870,10 @@ extension IPALibrary {
             if let name = String(data: header[start..<(start + nameLength)], encoding: .utf8) {
                 out.append(ZipEntry(name: name,
                                     method: u16(header, 10),
+                                    crc: UInt32(truncatingIfNeeded: u32(header, 16)),
                                     compressedSize: u32(header, 20),
                                     uncompressedSize: u32(header, 24),
+                                    externalAttributes: UInt32(truncatingIfNeeded: u32(header, 38)),
                                     localHeaderOffset: u32(header, 42)))
             }
             cursor += total
@@ -851,10 +891,10 @@ extension IPALibrary {
         }
     }
 
-    private static func contents(of entry: ZipEntry, _ handle: FileHandle) -> Data? {
+    private static func contents(of entry: ZipEntry, _ handle: FileHandle, maxSize: Int = 4 << 20) -> Data? {
         // Sanity limit: an Info.plist is only kilobytes, and the inflate below
         // allocates this size.
-        guard entry.uncompressedSize > 0, entry.uncompressedSize < 4 << 20,
+        guard entry.uncompressedSize > 0, entry.uncompressedSize < maxSize,
               entry.compressedSize > 0,
               (try? handle.seek(toOffset: UInt64(entry.localHeaderOffset))) != nil,
               let header = try? handle.read(upToCount: 30), header.count == 30,
