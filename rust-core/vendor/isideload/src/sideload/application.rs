@@ -12,7 +12,7 @@ use rootcause::prelude::*;
 use std::fs::File;
 use std::path::PathBuf;
 use tokio::io::AsyncWriteExt;
-use tracing::info;
+use tracing::{info, warn};
 use zip::ZipArchive;
 
 pub struct Application {
@@ -188,14 +188,24 @@ impl Application {
             })
             .collect::<Vec<_>>();
 
-        if let Some(available) = list_app_ids_response.available_quantity
-            && app_ids_to_register.len() > available.try_into()?
-        {
-            bail!(
-                "Not enough available app IDs. {} are required, but only {} are available.",
-                app_ids_to_register.len(),
-                available
-            );
+        // Apple can report a negative quota. Skip the check then (upstream 769e386):
+        // add_app_id still fails with Apple's own error if IDs really run out.
+        if let Some(available) = list_app_ids_response.available_quantity {
+            match usize::try_from(available) {
+                Ok(available) if app_ids_to_register.len() > available => {
+                    bail!(
+                        "Not enough available app IDs. {} are required, but only {} are available.",
+                        app_ids_to_register.len(),
+                        available
+                    );
+                }
+                Ok(_) => {}
+                Err(_) => warn!(
+                    "Apple reports {} available app IDs; skipping the quota check ({} to register)",
+                    available,
+                    app_ids_to_register.len()
+                ),
+            }
         }
 
         // With nothing new to register, the first listing is already current.
