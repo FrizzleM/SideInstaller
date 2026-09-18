@@ -68,6 +68,8 @@ final class SideBySideManager: ObservableObject {
     @Published private(set) var downloadProgress: Double = 0
     /// Home-screen name of what landed on their iPhone.
     @Published private(set) var installedAppName: String?
+    /// Six-digit code produced by iOS 27 Remote Pairing, while it is waiting.
+    @Published private(set) var remotePairingPIN: String?
     @Published var lastError: String?
 
     private var task: Task<Void, Never>?
@@ -236,6 +238,7 @@ final class SideBySideManager: ObservableObject {
         downloadProgress = 0
         lastError = nil
         finished = false
+        remotePairingPIN = nil
     }
 
     @MainActor
@@ -281,7 +284,35 @@ final class SideBySideManager: ObservableObject {
     private func connectToTarget(ip: String) async throws {
         try Task.checkCancellation()
         setStep(.connect, .waiting)
-        let target = try await onDeviceQueue { try self.performConnect(ip: ip) }
+        let target: ConnectedTarget
+        do {
+            target = try await onDeviceQueue { try self.performConnect(ip: ip) }
+        } catch {
+            let message = self.short(error).lowercased()
+            let isIOS27LockdownReset =
+                message.contains("connection reset") ||
+                message.contains("os error 54") ||
+                message.contains("devicepublickey")
+            guard isIOS27LockdownReset else { throw error }
+
+            engine.log("Classic Side by Side pairing was reset by the target. Falling back to iOS 27 Remote Pairing…")
+
+            let pinMirror = Task { @MainActor [weak self] in
+                while !Task.isCancelled {
+                    self?.remotePairingPIN = Engine.shared.pairingPIN
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+            }
+            defer {
+                pinMirror.cancel()
+                remotePairingPIN = nil
+            }
+
+            let remotePairPath = try await PairingController.shared.startAndWait()
+            target = try await onDeviceQueue {
+                try self.performConnectWithRemotePairing(ip: ip, pairingFilePath: remotePairPath)
+            }
+        }
         targetSummary = target.summary
         targetUDID = target.udid
         targetName = target.name
@@ -323,6 +354,30 @@ final class SideBySideManager: ObservableObject {
             engine.log("Device info:")
             for (key, value) in info { values[key] = value; engine.log("  \(key) = \(value)") }
         }
+        let name = values["DeviceName"] ?? L("device")
+        let summary = values["ProductVersion"].map { "\(name) · iOS \($0)" } ?? name
+        return ConnectedTarget(summary: summary,
+                               udid: values["UniqueDeviceID"],
+                               name: values["DeviceName"])
+    }
+
+    /// Opens Side by Side with a Remote Pairing record minted by the target.
+    /// iOS 27 may reset classic lockdownd before it can show the Trust prompt.
+    private func performConnectWithRemotePairing(ip: String, pairingFilePath: String) throws -> ConnectedTarget {
+        let record = PrivateStore.peerPairRecord(host: ip)
+        pairRecordPath = record.path
+
+        let data = try Data(contentsOf: URL(fileURLWithPath: pairingFilePath))
+        try data.write(to: record, options: .atomic)
+        engine.log("Remote Pairing complete. Opening the iOS 27 tunnel to \(ip) …")
+        try connection.connect(deviceIP: ip, pairingFilePath: record.path)
+
+        engine.log("Tunnel + RSD handshake established with \(ip).")
+        engine.log(try connection.rsdSummary())
+
+        var values: [String: String] = [:]
+        let info = try connection.deviceInfo()
+        for (key, value) in info { values[key] = value }
         let name = values["DeviceName"] ?? L("device")
         let summary = values["ProductVersion"].map { "\(name) · iOS \($0)" } ?? name
         return ConnectedTarget(summary: summary,
@@ -775,6 +830,22 @@ struct SideBySideView: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle(L("Steps"), systemImage: "list.bullet")
+                if let pin = manager.remotePairingPIN {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(L("Pairing code"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(pin)
+                            .font(.system(size: 34, weight: .bold, design: .monospaced))
+                            .textSelection(.enabled)
+                        Text(L("Enter this 6-digit code on their iPhone."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                }
                 ForEach(SideBySideStep.allCases) { step in
                     SideBySideStepRow(title: step.title,
                                       state: manager.stepStates[step] ?? .pending,
