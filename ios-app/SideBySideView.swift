@@ -30,10 +30,16 @@ enum SideBySideStep: Int, CaseIterable, Identifiable {
 ///
 /// Same flow as the Install tab, but over the LAN to a typed-in IP address:
 ///
-/// 1. **Pair.** Run the lockdown `Pair` handshake directly against
-///    `<their IP>:62078`. Their iPhone shows a Trust prompt and returns a
-///    lockdown pair record, which CoreDeviceProxy (`tunnel_create_usb`) uses to
-///    open the tunnel. Works on iOS 17+ without a computer.
+/// 1. **Pair.** A record saved by an earlier run goes first. Otherwise run the
+///    lockdown `Pair` handshake directly against `<their IP>:62078`: their
+///    iPhone shows a Trust prompt and returns a lockdown pair record, which
+///    CoreDeviceProxy (`tunnel_create_usb`) uses to open the tunnel. iOS 27's
+///    lockdownd won't pair over Wi-Fi — it resets the connection at the first
+///    request, before any Trust prompt — so when lockdownd answers but won't
+///    pair, their iPhone pairs from its own Settings instead (Remote Pairing):
+///    this iPhone advertises a pairing host, they pick it under Developer Mode
+///    and type the code shown here, and the RPPairing file that produces opens
+///    the tunnel (`tunnel_create_rppairing`).
 /// 2. **Sign in, sign, install** as in the one-click flow, using the credentials
 ///    entered on this page and the target's UDID.
 ///
@@ -68,6 +74,11 @@ final class SideBySideManager: ObservableObject {
     @Published private(set) var downloadProgress: Double = 0
     /// Home-screen name of what landed on their iPhone.
     @Published private(set) var installedAppName: String?
+    /// True while their iPhone has to pair from its own Settings, which it
+    /// never prompts for by itself.
+    @Published private(set) var pairingInSettings = false
+    /// The code to type into their iPhone, once it has asked for one.
+    @Published private(set) var pairingPIN: String?
     @Published var lastError: String?
 
     private var task: Task<Void, Never>?
@@ -81,7 +92,8 @@ final class SideBySideManager: ObservableObject {
     private var signSession: OpaquePointer?          // SignSession*
     /// The Apple ID `signSession` belongs to, so editing the field signs out.
     private var signedInAs: String?
-    /// Where the pair record for the current target lives.
+    /// Where the pair record for the current target lives: a lockdown record,
+    /// or an RPPairing file from Remote Pairing.
     private var pairRecordPath: String?
     /// The downloaded IPA, kept between runs so a retry after a signing failure
     /// doesn't fetch it again. Its staging directory is ours to delete.
@@ -185,7 +197,8 @@ final class SideBySideManager: ObservableObject {
 
     /// Cancels the run at the next step boundary. Blocking FFI calls (e.g.
     /// waiting on the Trust prompt) can't be interrupted, so it takes effect once
-    /// the current call returns.
+    /// the current call returns. Waiting for them to pair from Settings stops
+    /// straight away.
     @MainActor
     func cancel() {
         task?.cancel()
@@ -236,6 +249,8 @@ final class SideBySideManager: ObservableObject {
         downloadProgress = 0
         lastError = nil
         finished = false
+        pairingInSettings = false
+        pairingPIN = nil
     }
 
     @MainActor
@@ -281,7 +296,13 @@ final class SideBySideManager: ObservableObject {
     private func connectToTarget(ip: String) async throws {
         try Task.checkCancellation()
         setStep(.connect, .waiting)
-        let target = try await onDeviceQueue { try self.performConnect(ip: ip) }
+        let target: ConnectedTarget
+        switch try await onDeviceQueue({ try self.performConnect(ip: ip) }) {
+        case let .connected(connected):
+            target = connected
+        case .needsRemotePairing:
+            target = try await connectByRemotePairing(ip: ip)
+        }
         targetSummary = target.summary
         targetUDID = target.udid
         targetName = target.name
@@ -294,24 +315,121 @@ final class SideBySideManager: ObservableObject {
         let name: String?
     }
 
-    private func performConnect(ip: String) throws -> ConnectedTarget {
-        let record = PrivateStore.peerPairRecord(host: ip)
-        pairRecordPath = record.path
+    /// How far connecting got without their iPhone's Settings.
+    private enum ConnectOutcome {
+        case connected(ConnectedTarget)
+        /// lockdownd answered but won't pair over Wi-Fi, so their iPhone has to
+        /// pair from its own Settings.
+        case needsRemotePairing
+    }
 
-        // Try a record saved by an earlier run first: pairing needs a Trust tap
-        // and uses one of their device's pairing slots.
-        if fileSize(record.path) > 0 {
-            do {
-                engine.log("Trying the pair record already minted for \(ip) …")
-                try connection.connect(deviceIP: ip, pairingFilePath: record.path)
-            } catch {
-                engine.log("That record didn't open a link (\(error)). Pairing again…")
-                try mintPairRecord(ip: ip, into: record)
-            }
-        } else {
-            try mintPairRecord(ip: ip, into: record)
+    /// Opens the link with a record saved by an earlier run, or by pairing over
+    /// lockdown. Runs on `deviceQueue`.
+    private func performConnect(ip: String) throws -> ConnectOutcome {
+        // Records saved by an earlier run first: pairing needs them at their
+        // iPhone, and uses one of its pairing slots.
+        if try connectWithSavedRecord(PrivateStore.peerRemotePairing(host: ip), ip: ip) {
+            return .connected(try describeTarget(ip: ip))
+        }
+        let record = PrivateStore.peerPairRecord(host: ip)
+        if try connectWithSavedRecord(record, ip: ip) {
+            return .connected(try describeTarget(ip: ip))
         }
 
+        engine.log("Asking \(ip) to pair — their iPhone has to be unlocked, and they have to tap Trust …")
+        let data: Data
+        do {
+            data = try connection.lockdownPairRecordDirect(
+                hosts: [ip],
+                hostID: CompositePairingFile.hostID,
+                systemBUID: CompositePairingFile.systemBUID,
+                hostName: "SideInstaller")
+        } catch let error as DeviceConnection.LockdownPairError {
+            if error.userDeclined {
+                throw EngineError.message(L("They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust."))
+            }
+            // No answer at all is the address or the network, which pairing
+            // another way can't get past. A refusal comes from their iPhone:
+            // it's there, and lockdownd just isn't listening on Wi-Fi.
+            if error.stage == .connect, !DeviceConnection.wasRefused(error.underlying) {
+                throw EngineError.message(Self.unreachableAdvice(ip: ip))
+            }
+            engine.log("lockdownd on \(ip) won't pair over Wi-Fi (\(error)) — iOS 27 only pairs over a network from its own Settings. Switching to Remote Pairing.")
+            return .needsRemotePairing
+        }
+        try data.write(to: record, options: .atomic)
+        engine.log("Paired with \(ip) (\(data.count)-byte record). Opening the tunnel over CoreDeviceProxy …")
+        try connection.connect(deviceIP: ip, pairingFilePath: record.path, allowLockdownMinting: false)
+        pairRecordPath = record.path
+        return .connected(try describeTarget(ip: ip))
+    }
+
+    /// Opens the link with `record`, saved by an earlier run. False when there
+    /// is none, or it didn't open a link and pairing again might.
+    private func connectWithSavedRecord(_ record: URL, ip: String) throws -> Bool {
+        guard fileSize(record.path) > 0 else { return false }
+        engine.log("Trying the pair record already saved for \(ip) (\(record.lastPathComponent)) …")
+        do {
+            try connection.connect(deviceIP: ip, pairingFilePath: record.path, allowLockdownMinting: false)
+        } catch let error as DeviceConnection.TunnelError where !error.repairingCouldHelp {
+            // The link never reached their iPhone, so pairing again won't either.
+            throw EngineError.message(Self.tunnelAdvice(error, ip: ip))
+        } catch {
+            engine.log("That record didn't open a link (\(error)). Pairing again…")
+            return false
+        }
+        pairRecordPath = record.path
+        return true
+    }
+
+    /// Has their iPhone pair from its own Settings — the way iOS 27 pairs over
+    /// a network — then opens the link with the RPPairing file that produces.
+    @MainActor
+    private func connectByRemotePairing(ip: String) async throws -> ConnectedTarget {
+        let paired = try await pairFromSettings(record: PrivateStore.peerRemotePairing(host: ip))
+        setStep(.connect, .active)
+        engine.log("Paired with \(paired.deviceName) (\(paired.deviceModel)). Opening the tunnel to \(ip) over Remote Pairing …")
+        return try await onDeviceQueue {
+            do {
+                try self.connection.connect(deviceIP: ip, pairingFilePath: paired.path,
+                                            allowLockdownMinting: false)
+            } catch let error as DeviceConnection.TunnelError {
+                throw EngineError.message(Self.tunnelAdvice(error, ip: ip))
+            }
+            self.pairRecordPath = paired.path
+            return try self.describeTarget(ip: ip)
+        }
+    }
+
+    /// Advertises this iPhone as a pairing host and waits until their iPhone
+    /// has paired with it from Settings, showing the code it asks for. The
+    /// instructions stay up until then; Cancel stops the wait.
+    @MainActor
+    private func pairFromSettings(record: URL) async throws -> PairingController.PairedDevice {
+        try Task.checkCancellation()
+        pairingInSettings = true
+        defer {
+            pairingInSettings = false
+            pairingPIN = nil
+        }
+        engine.log("Waiting for them to pair: on their iPhone, Settings › Privacy & Security › Developer Mode › “Pair with \(PairingController.peerHostName)”, then the code shown here.")
+        do {
+            return try await withTaskCancellationHandler {
+                try await PairingController.shared.pairPeer(outPath: record.path) { [weak self] pin in
+                    self?.pairingPIN = pin
+                }
+            } onCancel: {
+                Task { @MainActor in PairingController.shared.cancelPeer() }
+            }
+        } catch PairingController.PairingError.busy {
+            throw EngineError.message(L("SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again."))
+        } catch let PairingController.PairingError.failed(message) {
+            throw EngineError.message(L("Pairing with their iPhone didn't finish: %@", message))
+        }
+    }
+
+    /// Their iPhone's name, iOS version and UDID, read over the open link.
+    private func describeTarget(ip: String) throws -> ConnectedTarget {
         engine.log("Tunnel + RSD handshake established with \(ip).")
         engine.log(try connection.rsdSummary())
 
@@ -330,21 +448,22 @@ final class SideBySideManager: ObservableObject {
                                name: values["DeviceName"])
     }
 
-    /// Pairs with the target via lockdown, saves the record, then opens the
-    /// tunnel.
-    ///
-    /// Blocks until the Trust prompt on their iPhone is answered, which is why
-    /// the connect step shows as `.waiting`.
-    private func mintPairRecord(ip: String, into record: URL) throws {
-        engine.log("Asking \(ip) to pair — their iPhone has to be unlocked, and they have to tap Trust …")
-        let data = try connection.lockdownPairRecordDirect(
-            hosts: [ip],
-            hostID: CompositePairingFile.hostID,
-            systemBUID: CompositePairingFile.systemBUID,
-            hostName: "SideInstaller")
-        try data.write(to: record, options: .atomic)
-        engine.log("Paired with \(ip) (\(data.count)-byte record). Opening the tunnel over CoreDeviceProxy …")
-        try connection.connect(deviceIP: ip, pairingFilePath: record.path)
+    /// What to say when the Remote Pairing tunnel to their iPhone didn't come
+    /// up. The error's own advice is about the Install tab's loopback VPN,
+    /// which Side by Side doesn't use.
+    private static func tunnelAdvice(_ error: DeviceConnection.TunnelError, ip: String) -> String {
+        switch error.kind {
+        case TunnelFailureRsdUnreachable where DeviceConnection.wasRefused(error.underlying):
+            return L("Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.", ip)
+        case TunnelFailureRsdUnreachable:
+            return unreachableAdvice(ip: ip)
+        default:
+            return L("The link to their iPhone didn't come up: %@", error.underlying.description)
+        }
+    }
+
+    private static func unreachableAdvice(ip: String) -> String {
+        L("Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.", ip)
     }
 
     // MARK: - Step 2: Apple ID sign-in
@@ -550,7 +669,12 @@ final class SideBySideManager: ObservableObject {
             // iOS drops the idle tunnel during sign-in and signing, and
             // `isConnected` doesn't detect it, so reconnect first.
             self.engine.log("Refreshing the link to \(ip) before installing …")
-            try self.connection.connect(deviceIP: ip, pairingFilePath: record)
+            do {
+                try self.connection.connect(deviceIP: ip, pairingFilePath: record,
+                                            allowLockdownMinting: false)
+            } catch let error as DeviceConnection.TunnelError {
+                throw EngineError.message(Self.tunnelAdvice(error, ip: ip))
+            }
             guard self.connection.isConnected else {
                 throw EngineError.message(L("The link to their iPhone dropped — start again."))
             }
@@ -641,26 +765,49 @@ struct SideBySideView: View {
 
     private enum Field: Hashable { case address, email, password }
 
+    /// Scroll target for the pairing instructions, which appear below the fold.
+    private static let pairInSettingsID = "pairInSettings"
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                header.cascadeItem(0)
-                targetCard.cascadeItem(1)
-                accountCard.cascadeItem(2)
-                stepsCard.cascadeItem(3)
-                actionButton.cascadeItem(4)
-                if let error = manager.lastError {
-                    errorCallout(error).transition(.cardAppear)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 18) {
+                    header.cascadeItem(0)
+                    targetCard.cascadeItem(1)
+                    accountCard.cascadeItem(2)
+                    stepsCard.cascadeItem(3)
+                    actionButton.cascadeItem(4)
+                    if let pin = manager.pairingPIN {
+                        pinCallout(pin).transition(.cardAppear)
+                    }
+                    if manager.pairingInSettings {
+                        pairInSettingsCallout
+                            .id(Self.pairInSettingsID)
+                            .transition(.cardAppear)
+                    }
+                    if let error = manager.lastError {
+                        errorCallout(error).transition(.cardAppear)
+                    }
+                    if manager.finished {
+                        successCallout.transition(.cardAppear)
+                    }
                 }
-                if manager.finished {
-                    successCallout.transition(.cardAppear)
-                }
+                .padding(20)
+                .animation(.smooth(duration: 0.35), value: manager.pairingPIN)
+                .animation(.smooth(duration: 0.35), value: manager.pairingInSettings)
+                .animation(.smooth(duration: 0.35), value: manager.lastError)
+                .animation(.smooth(duration: 0.35), value: manager.targetSummary)
+                .animation(.smooth(duration: 0.3), value: manager.isRunning)
+                .animation(.smooth(duration: 0.4, extraBounce: 0.12), value: manager.finished)
             }
-            .padding(20)
-            .animation(.smooth(duration: 0.35), value: manager.lastError)
-            .animation(.smooth(duration: 0.35), value: manager.targetSummary)
-            .animation(.smooth(duration: 0.3), value: manager.isRunning)
-            .animation(.smooth(duration: 0.4, extraBounce: 0.12), value: manager.finished)
+            // Their iPhone shows nothing until someone follows these steps, so
+            // bring them, and the code above them, into view.
+            .onChange(of: manager.pairingInSettings) { _, showing in
+                if showing { reveal(Self.pairInSettingsID, with: proxy) }
+            }
+            .onChange(of: manager.pairingPIN) { _, pin in
+                if pin != nil { reveal(Self.pairInSettingsID, with: proxy) }
+            }
         }
         .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
@@ -794,7 +941,10 @@ struct SideBySideView: View {
         guard state == .active || state == .waiting else { return nil }
         switch step {
         case .connect:
-            return L("Waiting for them to tap Trust…")
+            if manager.pairingPIN != nil { return L("Waiting for them to enter the code…") }
+            if manager.pairingInSettings { return L("Waiting for them to pair in Settings…") }
+            // `.active` is the tunnel opening once they've paired.
+            return state == .waiting ? L("Waiting for them to tap Trust…") : nil
         case .download:
             return L("%d%% downloaded", Int(manager.downloadProgress * 100))
         case .install:
@@ -845,6 +995,67 @@ struct SideBySideView: View {
     }
 
     // MARK: Callouts
+
+    private func pinCallout(_ pin: String) -> some View {
+        CalloutCard(tint: .orange) {
+            VStack(spacing: 12) {
+                sectionTitle(L("Pairing code"), systemImage: "lock.iphone")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(pin)
+                    .font(.system(size: 46, weight: .bold, design: .rounded))
+                    .tracking(8)
+                    .frame(maxWidth: .infinity)
+                Text(L("Type this into the prompt on their iPhone."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// What to do on their iPhone while it has to pair from Settings. Nothing
+    /// appears on it by itself, so without this the run just looks stuck.
+    private var pairInSettingsCallout: some View {
+        CalloutCard(tint: Theme.accent) {
+            VStack(alignment: .leading, spacing: 14) {
+                sectionTitle(L("Pair their iPhone in Settings"), systemImage: "gearshape")
+                Text(L("Their iPhone won't ask by itself — pairing starts from its Settings."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                stepsList([
+                    L("On their iPhone, open Settings › Privacy & Security › Developer Mode."),
+                    L("Tap “Pair with %@”.", PairingController.peerHostName),
+                    L("Enter their iPhone’s passcode if it asks for it."),
+                    L("Type the code that appears here into the prompt on their iPhone."),
+                ])
+            }
+        }
+    }
+
+    /// Scrolls `id` up from the bottom edge. Deferred a turn so a card inserted
+    /// by the same change is laid out first.
+    private func reveal(_ id: String, with proxy: ScrollViewProxy) {
+        DispatchQueue.main.async {
+            withAnimation(.smooth(duration: 0.4)) { proxy.scrollTo(id, anchor: .bottom) }
+        }
+    }
+
+    private func stepsList(_ steps: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(steps.enumerated()), id: \.offset) { idx, step in
+                HStack(alignment: .top, spacing: 12) {
+                    Text("\(idx + 1)")
+                        .font(.caption.weight(.bold).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(Theme.brand))
+                    Text(step)
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
 
     private var successCallout: some View {
         CalloutCard(tint: .green) {

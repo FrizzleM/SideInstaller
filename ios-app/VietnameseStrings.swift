@@ -409,6 +409,36 @@ let vietnameseStrings: [String: String] = [
     "Use my saved Apple ID instead": "Dùng Apple ID đã lưu của tôi",
     "Steps": "Các bước",
     "Waiting for them to tap Trust…": "Đang đợi họ chạm Tin cậy…",
+    "Waiting for them to pair in Settings…":
+        "Đang đợi họ ghép nối trong Cài đặt…",
+    "Waiting for them to enter the code…":
+        "Đang đợi họ nhập mã…",
+    "Pair their iPhone in Settings":
+        "Ghép nối iPhone của họ trong Cài đặt",
+    "Their iPhone won't ask by itself — pairing starts from its Settings.":
+        "iPhone của họ sẽ không tự hỏi — việc ghép nối bắt đầu từ Cài đặt của máy.",
+    "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
+        "Trên iPhone của họ, mở Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển.",
+    "Tap “Pair with %@”.":
+        "Chạm vào “Ghép nối với %@”.",
+    "Enter their iPhone’s passcode if it asks for it.":
+        "Nhập mật mã iPhone của họ nếu được hỏi.",
+    "Type the code that appears here into the prompt on their iPhone.":
+        "Nhập mã hiển thị tại đây vào hộp thoại trên iPhone của họ.",
+    "Type this into the prompt on their iPhone.":
+        "Nhập mã này vào hộp thoại trên iPhone của họ.",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "Họ đã chạm “Không tin cậy” trên iPhone của họ. Hãy bắt đầu lại và nhờ họ chạm Tin cậy.",
+    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+        "SideInstaller đang đợi một iPhone ghép nối với nó — từ thẻ Cài ứng dụng, trang Ghép nối, hoặc một lần thử trước ở đây. Hãy hoàn tất lần ghép nối đó, hoặc đóng rồi mở lại SideInstaller, sau đó thử lại.",
+    "Pairing with their iPhone didn't finish: %@":
+        "Ghép nối với iPhone của họ chưa hoàn tất: %@",
+    "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
+        "iPhone của họ ở %@ đã từ chối kết nối. Máy chỉ chấp nhận khi bật Chế độ nhà phát triển, và iOS yêu cầu xác nhận lại sau mỗi lần khởi động lại: trên iPhone của họ, hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển rồi thử lại.",
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "Không kết nối được tới iPhone của họ ở %@. Hãy kiểm tra địa chỉ (Cài đặt › Wi-Fi › ⓘ trên iPhone của họ), hai iPhone có cùng một mạng Wi-Fi không, và Mạng cục bộ đã được bật cho SideInstaller trong Cài đặt của iPhone này chưa. Mạng khách và mạng công cộng thường ngăn các thiết bị kết nối với nhau.",
+    "The link to their iPhone didn't come up: %@":
+        "Không mở được kết nối tới iPhone của họ: %@",
     "%d%% downloaded": "Đã tải %d%%",
     "%d%% uploaded": "Đã tải lên %d%%",
     "Start the install": "Bắt đầu cài đặt",

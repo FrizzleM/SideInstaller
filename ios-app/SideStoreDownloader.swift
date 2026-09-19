@@ -930,11 +930,23 @@ enum PrivateStore {
     /// Keyed by address because the UDID isn't known before connecting. A record
     /// that stops working is created again.
     static func peerPairRecord(host: String) -> URL {
+        peerPairingsFile(prefix: "lockdown", host: host)
+    }
+
+    /// RPPairing file for another device on the LAN (Side by Side), written when
+    /// it pairs from its own Settings — the only way iOS 27 pairs over Wi-Fi.
+    /// Separate from `pairingFile`, which belongs to this iPhone. Keyed by
+    /// address like `peerPairRecord`.
+    static func peerRemotePairing(host: String) -> URL {
+        peerPairingsFile(prefix: "remote", host: host)
+    }
+
+    private static func peerPairingsFile(prefix: String, host: String) -> URL {
         let dir = directory.appendingPathComponent("peer-pairings", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         // Keep only digits and dots for a safe filename.
         let key = host.filter { $0.isNumber || $0 == "." }
-        return dir.appendingPathComponent("lockdown-\(key.isEmpty ? "unknown" : key).plist")
+        return dir.appendingPathComponent("\(prefix)-\(key.isEmpty ? "unknown" : key).plist")
     }
 
     /// isideload's `FsStorage` root, created on demand as isideload expects.

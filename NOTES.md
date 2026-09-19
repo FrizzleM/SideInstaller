@@ -333,6 +333,54 @@ hosts and tries the VPN peer and plain loopback in turn, logging each. If neithe
 answers, the record can't be minted on-device at all and an imported pairing file
 stays the only way through for this iPhone.
 
+#### Side by Side: iOS 27's lockdownd won't pair over Wi-Fi (issue #52)
+
+Side by Side pairs another iPhone with `lockdownPairRecordDirect` against
+`<their IP>:62078`. On iOS 27 targets that never gets anywhere: lockdownd accepts
+the TCP connection and resets it (`ECONNRESET`, error 54) the moment the first
+request arrives — `GetValue(DevicePublicKey)`, the opening of `lockdownd_pair` —
+so no Trust prompt ever appears. Reproduced on two networks by the reporter. The
+way iOS 27 pairs over a network is the device-initiated one this app already uses
+for itself: the target taps a `_remotepairing-pairable-host._tcp` host under
+Settings › Privacy & Security › Developer Mode and types the PIN that host shows.
+
+So `SideBySideManager` keeps the lockdown attempt (it costs one round trip) and,
+when lockdownd answered but wouldn't pair — any failure of the `Pair` exchange
+except `UserDeniedPairing`, or a refused connection — runs
+`PairingController.pairPeer` instead, shows the instructions and the PIN on the
+Side by Side page, and tunnels with the resulting RPPairing file. A connection that
+never answers at all is the address or the network, and stops there.
+`DeviceConnection.LockdownPairError` carries which stage failed.
+
+Things the peer run must not do, all of which the plain `startAndWait` path does:
+
+- **Write this iPhone's pairing file.** `pairPeer` writes
+  `peer-pairings/remote-<ip>.plist`; the stored `altIRK`, `Engine.pairingStatus`,
+  `pairingPIN`, the imported-file mark and the merged file are left alone. Going
+  through `startAndWait` would have overwritten `rp_pairing_file.plist` with the
+  target's `alt_irk` — and replaced an *imported* file outright, since the Rust
+  side regenerates keys when the file isn't an RPPairing one.
+- **Share the host identifier.** A new file's identifier is
+  `uuid_v3(NAMESPACE_DNS, name)`, and every SideInstaller self-pairs as
+  `SideInstaller` (`d8442cca-…`). Pairing a target under that identifier would
+  replace the record *their* SideInstaller pairs itself with, breaking the files it
+  placed in SideStore and the rest. Side by Side's host is
+  `SideInstaller (Side by Side)` (`cd4b8503-…`) — never rename it.
+- **Mint a lockdown record.** `connect` falls back to minting one for an
+  RPPairing-only file, which stores *this* iPhone's record and dials its own
+  lockdownd on 127.0.0.1. Side by Side passes `allowLockdownMinting: false`.
+
+`cancelPeer` resolves the wait, stops advertising, and connects to the host's own
+listener on 127.0.0.1 and hangs up, so a host still blocked in `accept()` fails its
+handshake and returns — otherwise the next run would find the host busy. A target
+that has already connected keeps the host until it finishes or gives up.
+
+Verified here in the simulator against an address that refuses :62078: the switch
+to Remote Pairing, the advertisement (seen from a Mac with `dns-sd`), the
+instructions, Cancel ending the host, and a second run starting cleanly. The PIN
+exchange and the tunnel need a second iPhone; the reporter ran the same mechanism
+(pairable host → RPPairing tunnel → RSD → install) end to end on two iOS 27 iPhones.
+
 
 ### Step 3 — Apple ID + signing — code complete; device/account steps unverified
 

@@ -615,6 +615,36 @@ let japaneseStrings: [String: String] = [
         "Apple がこの Apple ID の署名証明書を発行しません。すでに証明書が存在すると報告されています（エラー 7460）。まず既存の証明書を失効させる必要があります。「設定」>「アカウント」に保存されている Apple ID の場合は「証明書」ツールで、それ以外の場合は developer.apple.com にその Apple ID でサインインして失効させてください。",
     "Last step: they trust %@": "最後の手順：相手が %@ を信頼します",
     "Waiting for them to tap Trust…": "相手が「信頼」をタップするのを待っています…",
+    "Waiting for them to pair in Settings…":
+        "相手が「設定」でペアリングするのを待っています…",
+    "Waiting for them to enter the code…":
+        "相手がコードを入力するのを待っています…",
+    "Pair their iPhone in Settings":
+        "「設定」で相手の iPhone をペアリング",
+    "Their iPhone won't ask by itself — pairing starts from its Settings.":
+        "相手の iPhone には何も表示されません。ペアリングはその iPhone の「設定」から始めます。",
+    "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
+        "相手の iPhone で「設定 › プライバシーとセキュリティ › デベロッパモード」を開いてください。",
+    "Tap “Pair with %@”.":
+        "「%@ とペアリング」をタップしてください。",
+    "Enter their iPhone’s passcode if it asks for it.":
+        "パスコードの入力を求められた場合は、相手の iPhone のパスコードを入力してください。",
+    "Type the code that appears here into the prompt on their iPhone.":
+        "ここに表示されるコードを、相手の iPhone のダイアログに入力してください。",
+    "Type this into the prompt on their iPhone.":
+        "この番号を相手の iPhone のダイアログに入力してください。",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "相手が iPhone で「信頼しない」をタップしました。最初からやり直し、「信頼」をタップしてもらってください。",
+    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+        "SideInstaller はすでに iPhone とのペアリングを待っています（「インストール」タブ、「ペアリング」画面、またはここでの前回の試行によるもの）。そのペアリングを完了するか、SideInstaller を閉じて開き直してから、もう一度お試しください。",
+    "Pairing with their iPhone didn't finish: %@":
+        "相手の iPhone とのペアリングが完了しませんでした：%@",
+    "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
+        "%@ の相手の iPhone が接続を拒否しました。デベロッパモードが有効なときだけ接続を受け付け、再起動のたびに iOS が確認を求めます。相手の iPhone で「設定 › プライバシーとセキュリティ › デベロッパモード」を有効にしてから、もう一度お試しください。",
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "%@ の相手の iPhone に接続できませんでした。アドレス（相手の iPhone の「設定」>「Wi-Fi」> ⓘ）、両方の iPhone が同じ Wi-Fi ネットワークに接続されていること、この iPhone の「設定」で SideInstaller のローカルネットワークがオンになっていることを確認してください。ゲストネットワークや公共のネットワークでは、デバイス同士の通信が遮断されることがよくあります。",
+    "The link to their iPhone didn't come up: %@":
+        "相手の iPhone との接続を確立できませんでした：%@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "相手の iPhone で「設定」>「一般」>「VPN とデバイス管理」を開きます。",
     "Tap the Apple ID under “Developer App”, then tap Trust.":

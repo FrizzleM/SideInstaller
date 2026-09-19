@@ -413,6 +413,36 @@ let frenchStrings: [String: String] = [
     "Use my saved Apple ID instead": "Utiliser plutôt mon Apple ID enregistré",
     "Steps": "Étapes",
     "Waiting for them to tap Trust…": "En attente qu'ils touchent Faire confiance…",
+    "Waiting for them to pair in Settings…":
+        "En attente qu'ils jumellent l'iPhone dans Réglages…",
+    "Waiting for them to enter the code…":
+        "En attente qu'ils saisissent le code…",
+    "Pair their iPhone in Settings":
+        "Jumelez leur iPhone dans Réglages",
+    "Their iPhone won't ask by itself — pairing starts from its Settings.":
+        "Leur iPhone ne le demandera pas de lui-même : le jumelage se lance depuis ses Réglages.",
+    "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
+        "Sur leur iPhone, ouvrez Réglages › Confidentialité et sécurité › Mode développeur.",
+    "Tap “Pair with %@”.":
+        "Touchez « Jumeler avec %@ ».",
+    "Enter their iPhone’s passcode if it asks for it.":
+        "Saisissez le code de leur iPhone s'il le demande.",
+    "Type the code that appears here into the prompt on their iPhone.":
+        "Saisissez le code qui s'affiche ici dans la demande affichée sur leur iPhone.",
+    "Type this into the prompt on their iPhone.":
+        "Saisissez ce code dans la demande affichée sur leur iPhone.",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "Ils ont touché « Ne pas faire confiance » sur leur iPhone. Recommencez et demandez-leur de toucher Faire confiance.",
+    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+        "SideInstaller attend déjà qu'un iPhone se jumelle avec lui — depuis l'onglet Installer, la page Jumelage ou une tentative précédente ici. Terminez ce jumelage, ou fermez puis rouvrez SideInstaller, puis réessayez.",
+    "Pairing with their iPhone didn't finish: %@":
+        "Le jumelage avec leur iPhone n'a pas abouti : %@",
+    "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
+        "Leur iPhone à l'adresse %@ a refusé la connexion. Il n'en accepte qu'avec le mode développeur activé, et iOS demande de le confirmer de nouveau après chaque redémarrage : sur leur iPhone, activez-le dans Réglages › Confidentialité et sécurité › Mode développeur, puis réessayez.",
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "Impossible de joindre leur iPhone à l'adresse %@. Vérifiez l'adresse (Réglages › Wi-Fi › ⓘ sur leur iPhone), que les deux iPhone sont sur le même réseau Wi-Fi et que Réseau local est activé pour SideInstaller dans les Réglages de cet iPhone. Les réseaux invités et publics empêchent souvent les appareils de communiquer entre eux.",
+    "The link to their iPhone didn't come up: %@":
+        "La liaison avec leur iPhone n'a pas pu s'établir : %@",
     "%d%% downloaded": "%d%% téléchargés",
     "%d%% uploaded": "%d%% envoyés",
     "Start the install": "Lancer l'installation",

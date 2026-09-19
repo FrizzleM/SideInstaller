@@ -50,6 +50,33 @@ final class DeviceConnection {
         }
     }
 
+    /// A failed `lockdownPairRecordDirect`, with how far it got: an address that
+    /// never answered is a different problem from a lockdownd that answered
+    /// and then wouldn't pair.
+    struct LockdownPairError: Error, CustomStringConvertible {
+        enum Stage {
+            /// Opening the TCP connection to lockdownd's port.
+            case connect
+            /// The `Pair` exchange on a connection that was open.
+            case pair
+        }
+
+        let stage: Stage
+        let underlying: FFIError
+        var description: String { underlying.description }
+
+        /// idevice's code for `UserDeniedPairing`, sent when “Don't Trust” is
+        /// tapped (`IdeviceError::code`).
+        private static let userDeniedPairingCode: Int32 = 31
+
+        /// True when they tapped “Don't Trust” on the device. The message is the
+        /// error's debug name, checked too in case idevice renumbers its codes.
+        var userDeclined: Bool {
+            stage == .pair && (underlying.code == Self.userDeniedPairingCode
+                               || underlying.message.contains("UserDeniedPairing"))
+        }
+    }
+
     /// Consume an `IdeviceFfiError*` into an `FFIError` (null == success).
     private func ffiError(_ err: UnsafeMutablePointer<IdeviceFfiError>?,
                           _ fallback: String) -> FFIError? {
@@ -150,8 +177,12 @@ final class DeviceConnection {
     ///
     /// With both records, the route most likely to work on this iOS goes first.
     /// With only an RPPairing record, a lockdown record is created as a last
-    /// resort and CoreDeviceProxy is tried.
-    func connect(deviceIP: String, pairingFilePath: String, hostname: String = "SideInstaller") throws {
+    /// resort and CoreDeviceProxy is tried — unless `allowLockdownMinting` is
+    /// false, as it must be for another iPhone's file (Side by Side): minting
+    /// stores this iPhone's own record and falls back to its own lockdownd on
+    /// 127.0.0.1.
+    func connect(deviceIP: String, pairingFilePath: String, hostname: String = "SideInstaller",
+                 allowLockdownMinting: Bool = true) throws {
         let kind = PairingFileKind.of(path: pairingFilePath)
         guard kind.isUsable else {
             throw fail("\((pairingFilePath as NSString).lastPathComponent) isn't a pairing file: it carries neither a remote-pairing key pair nor a lockdown pair record.")
@@ -166,7 +197,7 @@ final class DeviceConnection {
         var firstFailure: Error?
         // An RPPairing-only file can still fall back to creating a lockdown
         // record (see below).
-        let canMintLockdownRecord = !kind.hasLockdown
+        let canMintLockdownRecord = !kind.hasLockdown && allowLockdownMinting
         for (index, useRemotePairing) in routes.enumerated() {
             do {
                 if useRemotePairing {
@@ -352,6 +383,7 @@ final class DeviceConnection {
     ///
     /// Blocks while the device shows the Trust prompt. Tries each host in order
     /// (e.g. the VPN peer, then 127.0.0.1) and returns the first record created.
+    /// A failure to connect or to pair throws a `LockdownPairError`.
     func lockdownPairRecordDirect(hosts: [String], hostID: String, systemBUID: String,
                                   hostName: String) throws -> Data {
         var lastError: Error?
@@ -385,7 +417,9 @@ final class DeviceConnection {
                 }
             }
         }
-        try check(connectError, "couldn't reach lockdownd at \(host):\(Self.lockdownPort)")
+        if let error = ffiError(connectError, "couldn't reach lockdownd at \(host):\(Self.lockdownPort)") {
+            throw LockdownPairError(stage: .connect, underlying: error)
+        }
         guard let device else { throw fail("lockdown socket handle was null") }
 
         // `lockdownd_new` takes ownership of the socket, so it's never freed here.
@@ -402,7 +436,9 @@ final class DeviceConnection {
                 }
             }
         }
-        try check(pairError, "lockdownd_pair failed")
+        if let error = ffiError(pairError, "lockdownd_pair failed") {
+            throw LockdownPairError(stage: .pair, underlying: error)
+        }
         guard let pf else { throw fail("lockdownd_pair returned no pair record") }
         defer { idevice_pairing_file_free(pf) }
 

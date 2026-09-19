@@ -413,6 +413,36 @@ let spanishStrings: [String: String] = [
     "Use my saved Apple ID instead": "Usar mi Apple ID guardado",
     "Steps": "Pasos",
     "Waiting for them to tap Trust…": "Esperando a que toquen Confiar…",
+    "Waiting for them to pair in Settings…":
+        "Esperando a que emparejen en Ajustes…",
+    "Waiting for them to enter the code…":
+        "Esperando a que introduzcan el código…",
+    "Pair their iPhone in Settings":
+        "Empareja su iPhone en Ajustes",
+    "Their iPhone won't ask by itself — pairing starts from its Settings.":
+        "Su iPhone no lo pedirá por sí solo: el emparejamiento empieza en sus Ajustes.",
+    "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
+        "En su iPhone, abre Ajustes › Privacidad y seguridad › Modo desarrollador.",
+    "Tap “Pair with %@”.":
+        "Toca “Emparejar con %@”.",
+    "Enter their iPhone’s passcode if it asks for it.":
+        "Introduce el código de su iPhone si lo pide.",
+    "Type the code that appears here into the prompt on their iPhone.":
+        "Escribe el código que aparece aquí en el mensaje de su iPhone.",
+    "Type this into the prompt on their iPhone.":
+        "Escribe este código en el mensaje que aparece en su iPhone.",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "Han tocado “No confiar” en su iPhone. Empieza de nuevo y pídeles que toquen Confiar.",
+    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+        "SideInstaller ya está esperando a que un iPhone se empareje con él, desde la pestaña Instalar, la página Emparejamiento o un intento anterior aquí. Termina ese emparejamiento, o cierra y vuelve a abrir SideInstaller, y vuelve a intentarlo.",
+    "Pairing with their iPhone didn't finish: %@":
+        "El emparejamiento con su iPhone no ha terminado: %@",
+    "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
+        "Su iPhone en %@ rechazó la conexión. Solo la acepta con el Modo desarrollador activado, y iOS pide confirmarlo de nuevo tras cada reinicio: en su iPhone, actívalo en Ajustes › Privacidad y seguridad › Modo desarrollador y vuelve a intentarlo.",
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "No se pudo contactar con su iPhone en %@. Comprueba la dirección (Ajustes › Wi-Fi › ⓘ en su iPhone), que ambos iPhone estén en la misma red Wi-Fi y que la red local esté activada para SideInstaller en los Ajustes de este iPhone. Las redes de invitados y las públicas a menudo impiden que los dispositivos se comuniquen entre sí.",
+    "The link to their iPhone didn't come up: %@":
+        "No se pudo abrir el enlace con su iPhone: %@",
     "%d%% downloaded": "%d%% descargado",
     "%d%% uploaded": "%d%% subido",
     "Start the install": "Iniciar la instalación",

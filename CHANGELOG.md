@@ -23,6 +23,15 @@ All notable changes to SideInstaller are documented here.
   about 11.
 
 ### Fixed
+- **Side by Side works with iPhones on iOS 27.** Their iPhone dropped the connection the moment
+  SideInstaller asked it to pair (error 54), before any Trust prompt could appear, so every run
+  stopped at the first step. iOS 27 only pairs over Wi-Fi from its own Settings, so Side by Side now
+  switches to that: it shows what to do on their iPhone — Settings › Privacy & Security › Developer
+  Mode, then “Pair with SideInstaller (Side by Side)” — and the code to type there, and carries on
+  once they have. The pairing is remembered for that address, so installing again doesn't ask for it.
+- Pairing someone else's iPhone this way leaves this iPhone's own pairing file alone, and uses a name
+  of its own, so it can't break the pairing their own SideInstaller sets up for itself.
+- Cancel stops Side by Side straight away while it waits for their iPhone to pair.
 - Tapping Stop while the IPA downloads now stops the install, instead of carrying on with an older
   copy of the IPA left in Documents.
 

@@ -399,6 +399,36 @@ let chineseStrings: [String: String] = [
     "Use my saved Apple ID instead": "改用我保存的 Apple ID",
     "Steps": "步骤",
     "Waiting for them to tap Trust…": "等待对方轻点“信任”…",
+    "Waiting for them to pair in Settings…":
+        "等待对方在 设置 中配对…",
+    "Waiting for them to enter the code…":
+        "等待对方输入验证码…",
+    "Pair their iPhone in Settings":
+        "在 设置 中配对对方的 iPhone",
+    "Their iPhone won't ask by itself — pairing starts from its Settings.":
+        "对方的 iPhone 不会自己弹出提示——配对要从它的 设置 开始。",
+    "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
+        "在对方的 iPhone 上，打开 设置 › 隐私与安全性 › 开发者模式。",
+    "Tap “Pair with %@”.":
+        "轻点“与 %@ 配对”。",
+    "Enter their iPhone’s passcode if it asks for it.":
+        "如果系统要求，请输入对方 iPhone 的密码。",
+    "Type the code that appears here into the prompt on their iPhone.":
+        "把这里显示的验证码输入到对方 iPhone 上的提示框内。",
+    "Type this into the prompt on their iPhone.":
+        "将它输入到对方 iPhone 上的提示框内。",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "对方在 iPhone 上轻点了“不信任”。请重新开始，并让对方轻点“信任”。",
+    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+        "SideInstaller 已在等待某台 iPhone 与它配对——来自“安装”标签页、“配对”页面，或这里之前的一次尝试。请先完成那次配对，或关闭后重新打开 SideInstaller，然后重试。",
+    "Pairing with their iPhone didn't finish: %@":
+        "与对方 iPhone 的配对未完成：%@",
+    "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
+        "对方位于 %@ 的 iPhone 拒绝了连接。只有开启开发者模式时它才接受连接，而且每次重启后 iOS 都会要求再次确认：请在对方 iPhone 的 设置 › 隐私与安全性 › 开发者模式 中打开它，然后重试。",
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "无法连接到位于 %@ 的对方 iPhone。请检查地址（在对方 iPhone 的 设置 › 无线局域网 › ⓘ 中），确认两台 iPhone 连接的是同一个 Wi-Fi 网络，并确认已在这台 iPhone 的 设置 中为 SideInstaller 打开本地网络。访客网络和公共网络通常会阻止设备之间互相连接。",
+    "The link to their iPhone didn't come up: %@":
+        "未能建立与对方 iPhone 的连接：%@",
     "%d%% downloaded": "已下载 %d%%",
     "%d%% uploaded": "已上传 %d%%",
     "Start the install": "开始安装",
