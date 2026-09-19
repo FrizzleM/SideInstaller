@@ -76,6 +76,15 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 7. That's it. No PC and no extra steps required.
 
 
+## Compatibility
+
+| iOS | Is it compatible? |
+| --- | --- |
+| 27 beta 1 - 27.0 | ✅ Yes |
+| 18.0 - 26.7 | ⚠️ Yes, but [a pairing file is needed](https://docs.sidestore.io/docs/advanced/alternative#pairing), and that requires a PC |
+| ≤ iOS 17.7.11 | ❌ No |
+
+
 ## Is SideInstaller safe?
 
 SideInstaller is built with safety and privacy in mind. The app is fully local and open source, which means
