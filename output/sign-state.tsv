@@ -21,12 +21,15 @@ cert	Forever	1D3D1CF7510D64F811A19E199D3A3BDAA064D0D1	2027-02-05	revoked
 cert	Forever	unknown	unknown	[WARN] Certificate Checker could not check ._Forever.mobileprovision
 cert	HSBC	D45C911EC45A3D7DFAA026FF45583E594CF0B8CD	2028-04-29	revoked
 cert	HSBC	unknown	unknown	[WARN] Certificate Checker could not check ._HSBC.mobileprovision
-cert	Jiangsu-Simcere-Pharmaceutical-Co.-Ltd-workone	121FAB5BFCF826AD1FCE426D8BEFB28B72DE32FD	2028-03-06	revoked
 cert	Moving-Increasingly-Interconnected-Technology-Co.-Ltd-com.oa11	7BB04D6421B72EB025C31FE10FB1594B0CFF7E73	2029-06-12	revoked
+cert	NAVECO-Ltd-8OO2dj	F79ED2A626C1740FD0343700D514AD513F8DAFB1	2028-10-10	revoked
 cert	National	20C2DE15CFFB5373DCBE44F59229D623B6FF03C1	2029-01-25	revoked
 cert	National	unknown	unknown	[WARN] Certificate Checker could not check ._National.mobileprovision
+cert	Rubber	0708D9FE769ADE322561D33C080995D9ED186686	2028-10-14	revoked
+cert	Rubber	unknown	unknown	[WARN] Certificate Checker could not check ._Rubbber.mobileprovision
 cert	Rural	27413E49E9017DED9898F07771B057052F33D0DD	2028-11-14	revoked
 cert	Rural	unknown	unknown	[WARN] Certificate Checker could not check ._Rural.mobileprovision
-cert	Viet-Nam-Rubber-Group-Limited	0708D9FE769ADE322561D33C080995D9ED186686	2028-10-14	revoked
+cert	Simcere	121FAB5BFCF826AD1FCE426D8BEFB28B72DE32FD	2028-03-06	revoked
+cert	Simcere	unknown	unknown	[WARN] Certificate Checker could not check ._Simcere.mobileprovision
 cert	XL	DAE4476E22160B0BA19D1B406E8B82D99BC00E00	2029-02-17	revoked
 cert	XL	unknown	unknown	[WARN] Certificate Checker could not check ._XL.mobileprovision
