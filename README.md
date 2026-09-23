@@ -66,10 +66,10 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 
 ## How to use it
 
-1. Connect the device to LocalDevVPN (or any alternative)
-2. Open [the official install page](https://frizzlem.github.io/SideInstaller/) and install the app using any
+1. Open [the official install page](https://frizzlem.github.io/SideInstaller/) and install the app using any
    of the certificates.
-3. Once it's installed, open it.
+2. Once it's installed, open it.
+3. Connect the device to LocalDevVPN (or any alternative)
 4. Log in with your Apple account credentials.
 5. Tap **Install SideStore** or **Install SideStore + LiveContainer**.
 6. Wait while your selection installs.
