@@ -16,7 +16,6 @@ cert	ChinaAcademy	4201B4662173FBEE7B8713990551BC6873211DC0	2028-10-27	revoked
 cert	ChinaAcademy	unknown	unknown	[WARN] Certificate Checker could not check ._ChinaAcademy.mobileprovision
 cert	ChinaPower	06C1A46DACAA1CE46F8B6D9AA215D76630CC74C7	2028-10-21	revoked
 cert	ChinaPower	unknown	unknown	[WARN] Certificate Checker could not check ._ChinaPower.mobileprovision
-cert	Commission-on-Elections-Complaints-Management	42FE6417695C53C61EC253B84FB5F513CDCCDB05	2028-04-27	revoked
 cert	Forever	1D3D1CF7510D64F811A19E199D3A3BDAA064D0D1	2027-02-05	revoked
 cert	Forever	unknown	unknown	[WARN] Certificate Checker could not check ._Forever.mobileprovision
 cert	HSBC	D45C911EC45A3D7DFAA026FF45583E594CF0B8CD	2028-04-29	revoked
