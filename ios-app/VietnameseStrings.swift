@@ -143,6 +143,7 @@ let vietnameseStrings: [String: String] = [
     "Type this into the prompt in Settings.":
         "Nhập mã này vào hộp thoại trong Cài đặt.",
     "Install stopped": "Đã dừng cài đặt",
+    "Close": "Đóng",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ đã được cài đặt. Hoàn tất bước tin cậy ở trên để mở ứng dụng.",
     "Action needed": "Cần thao tác",

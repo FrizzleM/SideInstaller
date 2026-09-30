@@ -8,8 +8,6 @@ struct ContentView: View {
     @EnvironmentObject private var updateChecker: UpdateChecker
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
-    /// Shared with the Certificates page; used by `certConflictCallout`.
-    @EnvironmentObject private var certManager: CertManager
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
     @State private var showImporter = false
@@ -18,8 +16,6 @@ struct ContentView: View {
     /// When false, the Advanced section under the Install button shows only its
     /// title.
     @State private var advancedExpanded = false
-    /// Shows the dialog for choosing which certificate to revoke.
-    @State private var showRevokeChooser = false
     /// When false, the timeline shows only the current step.
     @State private var stepsExpanded = false
     /// Text in the IPA download-link field.
@@ -63,26 +59,8 @@ struct ContentView: View {
                     if showsAdvanced {
                         advancedSection.cascadeItem(cascade(4))
                     }
-                    if let pin = engine.pairingPIN {
-                        pinCallout(pin).transition(.cardAppear)
-                    }
-                    // Revoke-and-retry shortcut for the certificate-conflict guide.
-                    if engine.certConflict, !engine.isRunning {
-                        certConflictCallout.transition(.cardAppear)
-                    }
-                    if let guide = engine.guide {
-                        guideCallout(guide).transition(.cardAppear)
-                    }
-                    if showError, let error = engine.lastError {
-                        errorCallout(error).transition(.cardAppear)
-                    }
-                    if engine.finished {
-                        successCallout.transition(.cardAppear)
-                    }
-                    // LiveContainer still needs SideStore's certificate imported.
-                    if engine.finished, engine.installedIsLiveContainer {
-                        guideCallout(Guides.liveContainerImport).transition(.cardAppear)
-                    }
+                    // Guides, the pairing code, errors and success show as
+                    // `InstallPopup`, which `RootView` lays over the app.
                     footer.cascadeItem(cascade(5))
                 }
                 .padding(20)
@@ -91,11 +69,6 @@ struct ContentView: View {
                 .animation(.smooth(duration: 0.35), value: engine.vpnConnected)
                 .animation(.smooth(duration: 0.35), value: engine.wifiConnected)
                 .animation(.smooth(duration: 0.35), value: showProgress)
-                .animation(.smooth(duration: 0.35), value: engine.pairingPIN)
-                .animation(.smooth(duration: 0.35), value: engine.guide?.title)
-                .animation(.smooth(duration: 0.35), value: engine.certConflict)
-                .animation(.smooth(duration: 0.3), value: certManager.isWorking)
-                .animation(.smooth(duration: 0.35), value: showError)
                 .animation(.smooth(duration: 0.4, extraBounce: 0.12), value: engine.finished)
                 .animation(.smooth(duration: 0.35), value: engine.deviceSummary)
                 .animation(.smooth(duration: 0.3), value: engine.isRunning)
@@ -145,10 +118,6 @@ struct ContentView: View {
     /// that card is shown.
     private func cascade(_ position: Int) -> Int {
         showsPairingCard ? position + 1 : position
-    }
-
-    private var showError: Bool {
-        engine.lastError != nil && !engine.isRunning
     }
 
     /// True once a step has failed; turns the progress card red.
@@ -833,44 +802,75 @@ struct ContentView: View {
         .animation(.smooth(duration: 0.35), value: step)
     }
 
-    // MARK: PIN callout
+    // MARK: Helpers
 
-    private func pinCallout(_ pin: String) -> some View {
-        CalloutCard(tint: .orange) {
-            VStack(spacing: 12) {
-                sectionTitle(L("Pairing code"), systemImage: "lock.iphone")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(pin)
-                    .font(.system(size: 46, weight: .bold, design: .rounded))
-                    .tracking(8)
-                    .frame(maxWidth: .infinity)
-                Text(L("Type this into the prompt in Settings."))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+    private func sectionTitle(_ title: String, systemImage: String) -> some View {
+        Label {
+            Text(title).font(.headline)
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(Theme.brand)
+        }
+    }
+}
+
+// MARK: - Popup
+
+/// One of the Install tab's popups, which `RootView` stacks over the whole app:
+/// what a waiting step needs (Wi-Fi, the tunnel, the pairing code), a guide for
+/// a run that couldn't start, or how the run ended. See `Engine.Popup`.
+struct InstallPopup: View {
+    let popup: Engine.Popup
+
+    @EnvironmentObject private var engine: Engine
+    /// Observed so labels redraw when the language changes.
+    @EnvironmentObject private var loc: Localizer
+    /// Shared with the Certificates page; revoke-and-retry runs through it.
+    @EnvironmentObject private var certManager: CertManager
+    @Environment(\.openURL) private var openURL
+    /// Shows the dialog for choosing which certificate to revoke.
+    @State private var showRevokeChooser = false
+
+    var body: some View {
+        switch popup {
+        case .pairingCode(let pin):
+            PairingCodePopup(pin: pin, caption: L("Type this into the prompt in Settings."),
+                             onClose: close)
+        case .certConflict:
+            certConflictPopup
+        case .guide(let guide):
+            guidePopup(guide)
+        case .error(let message, let stoppedRun):
+            PopupCard(title: stoppedRun ? L("Install stopped") : L("Something went wrong"),
+                      systemImage: "exclamationmark.triangle.fill",
+                      tint: .red,
+                      onClose: close) {
+                Text(message)
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+        case .success(let name):
+            PopupCard(title: L("Installed"), systemImage: "checkmark.seal.fill", tint: .green,
+                      onClose: close) {
+                Text(L("%@ is installed. Finish the trust step above to open it.", name))
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .liveContainerImport:
+            guidePopup(Guides.liveContainerImport)
         }
     }
 
-    // MARK: Guidance callout
+    private func close() { engine.closePopup(popup) }
 
-    private func guideCallout(_ guide: Guide) -> some View {
-        CalloutCard(tint: Theme.accent) {
+    // MARK: Guides
+
+    /// A guide's steps, and its link out when it has one.
+    private func guidePopup(_ guide: Guide) -> some View {
+        PopupCard(title: guide.title, systemImage: guide.systemImage, tint: Theme.accent,
+                  onClose: close) {
             VStack(alignment: .leading, spacing: 14) {
-                sectionTitle(guide.title, systemImage: guide.systemImage)
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(Array(guide.steps.enumerated()), id: \.offset) { idx, step in
-                        HStack(alignment: .top, spacing: 12) {
-                            Text("\(idx + 1)")
-                                .font(.caption.weight(.bold).monospacedDigit())
-                                .foregroundStyle(.white)
-                                .frame(width: 22, height: 22)
-                                .background(Circle().fill(Theme.brand))
-                            Text(step)
-                                .font(.subheadline)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
+                NumberedSteps(steps: guide.steps)
                 if let label = guide.actionLabel, let url = guide.actionURL {
                     Button { openURL(url) } label: {
                         Label(label, systemImage: "arrow.up.right")
@@ -887,22 +887,16 @@ struct ContentView: View {
 
     /// Shown on error 7460. The button loads the certificates; the dialog asks
     /// which one to revoke, then retries the install.
-    private var certConflictCallout: some View {
-        CalloutCard(tint: .orange) {
+    private var certConflictPopup: some View {
+        PopupCard(title: L("A certificate already exists"),
+                  systemImage: "exclamationmark.shield.fill",
+                  tint: .orange,
+                  onClose: close) {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: "exclamationmark.shield.fill")
-                        .font(.title2)
-                        .foregroundStyle(.orange)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L("A certificate already exists"))
-                            .font(.subheadline.weight(.semibold))
-                        Text(L("Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone."))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
+                Text(L("Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Button {
                     // Load first, so the chooser can name the certificates.
                     certManager.ensureLoaded { showRevokeChooser = true }
@@ -922,14 +916,10 @@ struct ContentView: View {
                 .buttonStyle(.bordered)
                 .tint(.orange)
                 .disabled(certManager.isWorking || certManager.revokingID != nil)
-
-                if let error = certManager.lastError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                // A failed load or revoke shows as the Certificates popup, under
+                // this one.
             }
+            .animation(.smooth(duration: 0.3), value: certManager.isWorking)
         }
         .confirmationDialog(L("Which certificate should be revoked?"),
                             isPresented: $showRevokeChooser,
@@ -956,52 +946,6 @@ struct ContentView: View {
         if let machine = cert.machineLabel { label += " — \(machine)" }
         if cert.isExpired { label += L(" (expired)") }
         return label
-    }
-
-    // MARK: Error / success
-
-    private func errorCallout(_ message: String) -> some View {
-        CalloutCard(tint: .red) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.red)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Install stopped"))
-                        .font(.subheadline.weight(.semibold))
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
-
-    private var successCallout: some View {
-        CalloutCard(tint: .green) {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.title)
-                    .foregroundStyle(.green)
-                    .symbolEffect(.bounce, options: .nonRepeating, value: engine.finished)
-                Text(L("%@ is installed. Finish the trust step above to open it.",
-                       engine.installedSourceName))
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    // MARK: Helpers
-
-    private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        Label {
-            Text(title).font(.headline)
-        } icon: {
-            Image(systemName: systemImage)
-                .foregroundStyle(Theme.brand)
-        }
     }
 }
 

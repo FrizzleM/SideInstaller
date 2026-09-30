@@ -16,13 +16,10 @@ struct CertsView: View {
             VStack(spacing: 18) {
                 header.cascadeItem(0)
                 loadButton.cascadeItem(1)
-                if let error = manager.lastError {
-                    errorCallout(error).transition(.cardAppear)
-                }
+                // Errors show as a popup, which `RootView` lays over the app.
                 certList
             }
             .padding(20)
-            .animation(.smooth(duration: 0.35), value: manager.lastError)
             .animation(.smooth(duration: 0.35), value: manager.certs)
             .animation(.smooth(duration: 0.3), value: manager.isWorking)
             .animation(.smooth(duration: 0.35), value: manager.teamSummary)
@@ -185,26 +182,6 @@ struct CertsView: View {
                 .tint(.red)
                 .controlSize(.regular)
                 .disabled(revoking || manager.isWorking || manager.revokingID != nil)
-            }
-        }
-    }
-
-    // MARK: Error
-
-    private func errorCallout(_ message: String) -> some View {
-        CalloutCard(tint: .red) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.red)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Something went wrong"))
-                        .font(.subheadline.weight(.semibold))
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
         }
     }

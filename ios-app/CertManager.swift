@@ -80,6 +80,13 @@ final class CertManager: ObservableObject {
         if let session { si_cert_session_free(session) }
     }
 
+    // MARK: - Popups
+
+    /// What went wrong last, as a popup `RootView` stacks over the app.
+    var popups: [ToolPopup] { lastError.map { [.error($0)] } ?? [] }
+
+    func closePopup(_ popup: ToolPopup) { lastError = nil }
+
     // MARK: - Public actions
 
     /// Loads certificates when the page opens. Does nothing if no Apple ID is

@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Tab container (Install, Tools, About). Each page draws its own
 /// `AppBackground`, since `TabView` would hide a shared one; they stay in sync
-/// because the background animates off the clock. Also hosts the 2FA sheet so
-/// it shows over any tab.
+/// because the background animates off the clock. Also hosts the 2FA sheet and
+/// the pages' popups, so they show over any tab.
 struct RootView: View {
     /// The tabs and their backdrop level. The selection is tracked so a tab
     /// switch can animate `Backdrop` to the new level.
@@ -18,6 +18,17 @@ struct RootView: View {
             case .about:   .bright
             }
         }
+    }
+
+    /// One popup, tagged with the page that raised it.
+    private enum PopupItem: Hashable {
+        case install(Engine.Popup)
+        case sideBySide(SideBySideManager.Popup)
+        case pairing(PairingManager.Popup)
+        case certificates(ToolPopup)
+        case entitlements(EntitlementsManager.Popup)
+        case location(ToolPopup)
+        case apps(ToolPopup)
     }
 
     @EnvironmentObject private var engine: Engine
@@ -56,7 +67,10 @@ struct RootView: View {
         }
         // Animate the backdrop to the new tab's level.
         .onChange(of: page) { _, page in Backdrop.settle(on: page.wash) }
-        // The Install tab's revoke-and-retry runs through this same manager.
+        // Over the tab bar too, so the whole app dims behind the popups.
+        .popupStack(popups, onBackdropTap: backdropTap, attached: attached) { card(for: $0) }
+        // The Install tab's revoke-and-retry runs through this same manager
+        // (declared below the popups, which use it too).
         .environmentObject(certManager)
         // When the active Apple ID changes, drop all four cached Apple sessions
         // (Side by Side's included) so none is reused for the new account.
@@ -79,7 +93,103 @@ struct RootView: View {
         }
         .onChange(of: engine.twoFactor) { _, phase in
             if let phase { shownTwoFactor = phase }
-        }    }
+        }
+    }
+
+    // MARK: Popups
+
+    /// Every popup up, top to bottom: each page's in its own order, and a page
+    /// whose run is waiting on its popups ahead of the others, so those are
+    /// never pushed down out of sight.
+    private var popups: [PopupItem] {
+        let pages = [engine.popups.map(PopupItem.install),
+                     sideBySideManager.popups.map(PopupItem.sideBySide),
+                     pairingManager.popups.map(PopupItem.pairing),
+                     certManager.popups.map(PopupItem.certificates),
+                     entitlementsManager.popups.map(PopupItem.entitlements),
+                     locationManager.popups.map(PopupItem.location),
+                     appsManager.popups.map(PopupItem.apps)]
+        let waiting = pages.filter { $0.contains(where: blocks) }
+        let others = pages.filter { !$0.contains(where: blocks) }
+        return Array((waiting + others).joined())
+    }
+
+    /// Closes every popup that only informs. The ones a run is waiting on stay
+    /// up, so a stray tap can't stop it; with only those up, taps do nothing.
+    private var backdropTap: (() -> Void)? {
+        let closable = popups.filter { !blocks($0) }
+        guard !closable.isEmpty else { return nil }
+        return { closable.forEach(close) }
+    }
+
+    /// True when a run is waiting on the popup, so closing it stops the run.
+    private func blocks(_ item: PopupItem) -> Bool {
+        switch item {
+        case .install(let popup):    engine.blocks(popup)
+        case .sideBySide(let popup): sideBySideManager.blocks(popup)
+        case .pairing(let popup):    pairingManager.blocks(popup)
+        // The Tools pages only report; nothing waits on their popups.
+        case .certificates, .entitlements, .location, .apps: false
+        }
+    }
+
+    /// A page's pairing steps hang under its pairing code, as one piece: no
+    /// gap, and the code's X — which ends the run — closes both.
+    private func attached(_ above: PopupItem, _ below: PopupItem) -> Bool {
+        switch (above, below) {
+        case (.install(.pairingCode(_)), .install(.guide(_))),
+             (.sideBySide(.pairingCode(_)), .sideBySide(.pairInSettings)),
+             (.pairing(.pairingCode(_)), .pairing(.pairInSettings)):
+            true
+        default:
+            false
+        }
+    }
+
+    private func close(_ item: PopupItem) {
+        switch item {
+        case .install(let popup):      engine.closePopup(popup)
+        case .sideBySide(let popup):   sideBySideManager.closePopup(popup)
+        case .pairing(let popup):      pairingManager.closePopup(popup)
+        case .certificates(let popup): certManager.closePopup(popup)
+        case .entitlements(let popup): entitlementsManager.closePopup(popup)
+        case .location(let popup):     locationManager.closePopup(popup)
+        case .apps(let popup):         appsManager.closePopup(popup)
+        }
+    }
+
+    @ViewBuilder
+    private func card(for item: PopupItem) -> some View {
+        switch item {
+        case .install(let popup):
+            InstallPopup(popup: popup)
+        case .sideBySide(let popup):
+            SideBySidePopup(manager: sideBySideManager, popup: popup)
+        case .pairing(let popup):
+            PairingPopup(manager: pairingManager, popup: popup)
+        case .certificates(let popup):
+            toolPopup(popup, successTitle: L("Certificates")) { certManager.closePopup(popup) }
+        case .entitlements(let popup):
+            EntitlementsPopup(manager: entitlementsManager, popup: popup)
+        case .location(let popup):
+            toolPopup(popup, successTitle: L("Location spoofing")) { locationManager.closePopup(popup) }
+        case .apps(let popup):
+            toolPopup(popup, successTitle: L("Sideloaded apps")) { appsManager.closePopup(popup) }
+        }
+    }
+
+    /// A Tools page's report. A success is titled after its page, since it can
+    /// show over any tab.
+    private func toolPopup(_ popup: ToolPopup, successTitle: String,
+                           onClose: @escaping () -> Void) -> some View {
+        switch popup {
+        case .error(let message):
+            MessagePopup(title: L("Something went wrong"), message: message, isError: true,
+                         onClose: onClose)
+        case .success(let message):
+            MessagePopup(title: successTitle, message: message, isError: false, onClose: onClose)
+        }
+    }
 }
 
 // MARK: - Two-factor sheet
@@ -227,6 +337,12 @@ struct TwoFactorSheet: View {
 
 // MARK: - Tools
 
+/// A Tools page's popup, reporting how its last action went.
+enum ToolPopup: Hashable {
+    case error(String)
+    case success(String)
+}
+
 /// The Tools tab: a menu of utility pages. Owns the `NavigationStack` they're
 /// pushed onto, so those pages don't declare their own.
 struct ToolsView: View {
@@ -296,8 +412,12 @@ struct ToolsView: View {
                     .buttonStyle(.plain)
                     .cascadeItem(rowIndex(5))
                 }
-                .padding(20)
+                // No bottom padding: the tab bar's inset already clears the last
+                // row, and the extra 20pt would make a page that fits scroll.
+                .padding([.horizontal, .top], 20)
             }
+            // Still unless the rows don't all fit on the screen.
+            .scrollBounceBehavior(.basedOnSize)
             // The darker backdrop is set by the tab switch, not by this page
             // appearing, so pushed pages keep the same level.
             .background(AppBackground())

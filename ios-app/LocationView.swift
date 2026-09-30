@@ -102,6 +102,20 @@ final class LocationManager: ObservableObject {
 
     var isSimulating: Bool { simulated != nil }
 
+    // MARK: Popups
+
+    /// How the last action went, as popups `RootView` stacks over the app.
+    var popups: [ToolPopup] {
+        [lastError.map(ToolPopup.error), lastSuccess.map(ToolPopup.success)].compactMap { $0 }
+    }
+
+    func closePopup(_ popup: ToolPopup) {
+        switch popup {
+        case .error:   lastError = nil
+        case .success: lastSuccess = nil
+        }
+    }
+
     // MARK: Setup
 
     /// Runs setup in the background: downloads the disk image, mounts it if the
@@ -279,17 +293,11 @@ struct LocationView: View {
                     vpnNote.cascadeItem(1)
                 }
                 mapCard.cascadeItem(2)
-                if let error = manager.lastError {
-                    errorCallout(error).transition(.cardAppear)
-                }
-                if let success = manager.lastSuccess {
-                    successCallout(success).transition(.cardAppear)
-                }
+                // Errors and confirmations show as popups, which `RootView`
+                // lays over the app.
             }
             .padding(20)
             .animation(.smooth(duration: 0.35), value: manager.stage)
-            .animation(.smooth(duration: 0.35), value: manager.lastError)
-            .animation(.smooth(duration: 0.35), value: manager.lastSuccess)
             .animation(.smooth(duration: 0.3), value: manager.isBusy)
             .animation(.smooth(duration: 0.3), value: engine.vpnConnected)
         }
@@ -463,38 +471,7 @@ struct LocationView: View {
         }
     }
 
-    // MARK: Error / success
-
-    private func errorCallout(_ message: String) -> some View {
-        CalloutCard(tint: .red) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.red)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Something went wrong"))
-                        .font(.subheadline.weight(.semibold))
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
-
-    private func successCallout(_ message: String) -> some View {
-        CalloutCard(tint: .green) {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.title)
-                    .foregroundStyle(.green)
-                Text(message)
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
+    // MARK: Helpers
 
     private func sectionTitle(_ title: String, systemImage: String) -> some View {
         Label {

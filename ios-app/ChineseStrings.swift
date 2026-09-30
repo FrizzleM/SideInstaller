@@ -141,6 +141,7 @@ let chineseStrings: [String: String] = [
     "Type this into the prompt in Settings.":
         "将它输入到 设置 中的提示框内。",
     "Install stopped": "安装已停止",
+    "Close": "关闭",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ 已安装。完成上面的信任步骤即可打开。",
     "Action needed": "需要操作",

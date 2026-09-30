@@ -143,6 +143,7 @@ let portugueseStrings: [String: String] = [
     "Type this into the prompt in Settings.":
         "Digite este código no aviso que aparece nos Ajustes.",
     "Install stopped": "Instalação interrompida",
+    "Close": "Fechar",
     "%@ is installed. Finish the trust step above to open it.":
         "O %@ está instalado. Conclua a etapa de confiança acima para abri-lo.",
     "Action needed": "Ação necessária",

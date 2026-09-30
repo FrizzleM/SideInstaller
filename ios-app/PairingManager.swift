@@ -83,6 +83,54 @@ final class PairingManager: ObservableObject {
         }
     }
 
+    // MARK: - Popups
+
+    /// One of this page's popups; they stack in this order. Each carries what
+    /// it shows, so it keeps its content while it closes.
+    enum Popup: Hashable {
+        /// The code Settings asks for while the file is generated.
+        case pairingCode(String)
+        /// How to pair from Settings, while the file is generated.
+        case pairInSettings
+        case error(String)
+        case success(String)
+    }
+
+    /// The popups up now, top to bottom.
+    var popups: [Popup] {
+        var shown: [Popup] = []
+        if isGenerating {
+            if let pin = engine.pairingPIN { shown.append(.pairingCode(pin)) }
+            shown.append(.pairInSettings)
+        }
+        if let lastError { shown.append(.error(lastError)) }
+        if let lastSuccess { shown.append(.success(lastSuccess)) }
+        return shown
+    }
+
+    /// True for a popup generating waits on: closing it stops pairing.
+    func blocks(_ popup: Popup) -> Bool {
+        switch popup {
+        case .pairingCode, .pairInSettings: return isGenerating
+        case .error, .success:              return false
+        }
+    }
+
+    /// Closes one popup. Generating can't go on without the pairing steps or
+    /// the code, so closing either stops it, and both go.
+    func closePopup(_ popup: Popup) {
+        if blocks(popup) {
+            PairingController.shared.softCancel()
+            engine.pairingPIN = nil
+            return
+        }
+        switch popup {
+        case .error:                        lastError = nil
+        case .success:                      lastSuccess = nil
+        case .pairingCode, .pairInSettings: break
+        }
+    }
+
     /// Scans automatically when the tunnel is up and a pairing file exists.
     /// Does nothing otherwise.
     func autoScan() {
