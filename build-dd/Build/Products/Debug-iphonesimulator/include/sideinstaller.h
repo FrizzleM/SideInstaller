@@ -64,11 +64,16 @@ typedef struct {
 // Run the RPPairing host. BLOCKS until a device pairs or an error occurs — run
 // it off the main thread. Returns 0 on success, non-zero on error (with
 // `out->error` set). `port` 0 lets the OS pick a port.
+// `host_alt_irk_hex` is the `host_alt_irk_hex` a previous successful run
+// returned, or NULL/"" the first time. Passing it back keeps this host's
+// identity stable, so a device that has paired before recognises it instead of
+// being offered a brand-new pairing.
 int32_t si_pairing_run_host(const char *bind_addr,
                             uint16_t port,
                             const char *name,
                             const char *model,
                             const char *out_path,
+                            const char *host_alt_irk_hex,
                             SIPairReadyCb ready_cb,
                             SIPairPinCb pin_cb,
                             void *ctx,
@@ -84,19 +89,35 @@ void si_pairing_result_free(SIPairResult *r);
 // Opaque sign-session handle.
 typedef struct SignSession SignSession;
 
-// Invoked when a 2FA code is required: write a NUL-terminated code into
-// `out_buf` (capacity `buf_len`) and return 1, or return 0 to cancel.
-typedef int32_t (*SITwoFactorCb)(void *ctx, char *out_buf, size_t buf_len);
+// Invoked whenever Apple is waiting on the user during sign-in. `request_json`
+// says for what:
+//   {"method": "device" | "sms" | "voice" | "choose",
+//    "selectedNumberId": 3 | null, "lastError": "…" | null,
+//    "numbers": [{"id": 3, "number": "+39 ••• ••• ••89", "pushMode": "sms"}]}
+// "device"/"sms"/"voice" name where the pending code went (the number is
+// selectedNumberId); "choose" means the last method failed and nothing is
+// pending. Write a NUL-terminated JSON answer into `out_buf` (capacity
+// `buf_len`) and return 1:
+//   {"action": "code", "code": "123456"} | {"action": "sms", "id": 3} |
+//   {"action": "voice", "id": 3} | {"action": "devices"} | {"action": "resend"}
+// or return 0 to cancel the sign-in.
+typedef int32_t (*SITwoFactorCb)(void *ctx, const char *request_json,
+                                 char *out_buf, size_t buf_len);
 
-// Log in + open developer session + build the signer. BLOCKS — call off the
-// main thread. Returns 0 on success (*out_session + *out_summary set), non-zero
-// on error (*out_error set). Free strings with si_string_free, the session with
-// si_sign_session_free.
+// Open a developer session + build the signer. BLOCKS — call off the main
+// thread. With `remember_session` non-zero, the developer session an earlier
+// sign-in of this Apple ID saved in `storage_dir` is reused while Apple still
+// accepts it — no password, no 2FA, no GrandSlam sign-in — and a fresh
+// sign-in's session is saved. Pass 0 for an Apple ID that isn't this iPhone
+// owner's (Side by Side): nothing is read or kept. Returns 0 on success
+// (*out_session + *out_summary set), non-zero on error (*out_error set). Free
+// strings with si_string_free, the session with si_sign_session_free.
 int32_t si_apple_signin(const char *apple_id,
                         const char *password,
                         const char *anisette_url,
                         const char *machine_name,
                         const char *storage_dir,
+                        int32_t remember_session,
                         SITwoFactorCb twofa_cb,
                         void *ctx,
                         SignSession **out_session,
@@ -118,8 +139,24 @@ int32_t si_sign_ipa(SignSession *session,
                     char **out_signed_path,
                     char **out_error);
 
+// Build the Account.sideconf payload SideStore imports on launch (Apple ID,
+// signing certificate as an encrypted p12, and the anisette identity). BLOCKS.
+// On success *out_json is that JSON, to be written into SideStore's Documents.
+// The Apple ID password is deliberately omitted. Never mints a certificate (so
+// it can never revoke one): fails if this Apple ID has no SideInstaller
+// certificate yet, or if anisette hasn't been provisioned. Returns 0 on
+// success, non-zero on error (*out_error set). Free strings with si_string_free.
+int32_t si_account_config(SignSession *session,
+                          char **out_json,
+                          char **out_error);
+
 // Free a sign session.
 void si_sign_session_free(SignSession *session);
+
+// Forget the developer session saved for `apple_id` in `storage_dir`, so its
+// next sign-in logs in to Apple again. Call when the account is removed or its
+// password changes. Returns 1 if one was saved, 0 otherwise.
+int32_t si_forget_apple_session(const char *storage_dir, const char *apple_id);
 
 // ---------------------------------------------------------------------------
 // Certificate management — list + revoke iOS development certificates
@@ -159,6 +196,32 @@ int32_t si_cert_revoke(CertSession *session,
 
 // Free a certificate session.
 void si_cert_session_free(CertSession *session);
+
+// ---------------------------------------------------------------------------
+// Entitlements — enable developer-portal capabilities on an App ID
+// ---------------------------------------------------------------------------
+//
+// Reuses the certificate session: same Apple ID, same developer session, same
+// team, so signing in once covers both. Enabling a capability only changes what
+// Apple will put in the NEXT provisioning profile — the app must be signed and
+// installed again for it to take effect.
+
+// List the team's App IDs. BLOCKS. On success *out_json is a heap JSON array of
+// objects: {app_id_id, identifier, name}. Free with si_string_free.
+int32_t si_appid_list(CertSession *session,
+                      char **out_json,
+                      char **out_error);
+
+// Enable each capability id in the comma-separated `capabilities` list on the
+// App ID `app_id_id` (the opaque id from si_appid_list, not the bundle id).
+// BLOCKS. Each id is one request, so a refusal costs only itself; on success
+// *out_json is a heap JSON array of {capability, ok, error}, one per requested
+// id. Returns non-zero only when nothing could be attempted (*out_error set).
+int32_t si_appid_enable(CertSession *session,
+                        const char *app_id_id,
+                        const char *capabilities,
+                        char **out_json,
+                        char **out_error);
 
 #ifdef __cplusplus
 }

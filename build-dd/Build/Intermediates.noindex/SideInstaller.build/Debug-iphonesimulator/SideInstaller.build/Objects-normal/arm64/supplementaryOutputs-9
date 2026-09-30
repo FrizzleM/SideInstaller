@@ -1,0 +1,23 @@
+{
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/SpanishStrings.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/SpanishStrings.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/SpanishStrings.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/SpanishStrings.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/SpanishStrings.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/SpanishStrings.swiftdeps"
+  },
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/Theme.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Theme.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Theme.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Theme.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Theme.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Theme.swiftdeps"
+  },
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/UpdateChecker.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/UpdateChecker.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/UpdateChecker.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/UpdateChecker.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/UpdateChecker.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/UpdateChecker.swiftdeps"
+  }
+}

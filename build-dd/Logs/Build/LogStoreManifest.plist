@@ -3,8 +3,51 @@
 <plist version="1.0">
 <dict>
 	<key>logFormatVersion</key>
-	<integer>12</integer>
+	<integer>13</integer>
 	<key>logs</key>
-	<dict/>
+	<dict>
+		<key>4438718F-7275-420D-A4F0-F8365845A107</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>4438718F-7275-420D-A4F0-F8365845A107.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>S</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>0</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>SideInstaller project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>SideInstaller</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Building project SideInstaller with scheme SideInstaller</string>
+			<key>timeStartedRecording</key>
+			<real>812466534.39087903</real>
+			<key>timeStoppedRecording</key>
+			<real>812466544.00026</real>
+			<key>title</key>
+			<string>Building project SideInstaller with scheme SideInstaller</string>
+			<key>uniqueIdentifier</key>
+			<string>4438718F-7275-420D-A4F0-F8365845A107</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

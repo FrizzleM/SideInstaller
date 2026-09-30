@@ -1,0 +1,30 @@
+{
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/KeepAlive.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/KeepAlive.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/KeepAlive.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/KeepAlive.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/KeepAlive.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/KeepAlive.swiftdeps"
+  },
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/LocalNetworkAuthorization.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/LocalNetworkAuthorization.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/LocalNetworkAuthorization.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/LocalNetworkAuthorization.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/LocalNetworkAuthorization.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/LocalNetworkAuthorization.swiftdeps"
+  },
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/Localization.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Localization.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Localization.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Localization.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Localization.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Localization.swiftdeps"
+  },
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/NetworkStatus.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/NetworkStatus.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/NetworkStatus.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/NetworkStatus.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/NetworkStatus.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/NetworkStatus.swiftdeps"
+  }
+}

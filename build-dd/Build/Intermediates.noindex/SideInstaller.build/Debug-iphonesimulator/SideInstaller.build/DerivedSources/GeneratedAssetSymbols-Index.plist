@@ -20,6 +20,16 @@
 			<key>catalogPath</key>
 			<string>/Users/tommdadd/Desktop/SideInstaller/ios-app/Assets.xcassets</string>
 			<key>objcSymbol</key>
+			<string>ACImageNameAppsLogo</string>
+			<key>relativePath</key>
+			<string>./AppsLogo.imageset</string>
+			<key>swiftSymbol</key>
+			<string>appsLogo</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tommdadd/Desktop/SideInstaller/ios-app/Assets.xcassets</string>
+			<key>objcSymbol</key>
 			<string>ACImageNameCertsLogo</string>
 			<key>relativePath</key>
 			<string>./CertsLogo.imageset</string>
@@ -40,11 +50,41 @@
 			<key>catalogPath</key>
 			<string>/Users/tommdadd/Desktop/SideInstaller/ios-app/Assets.xcassets</string>
 			<key>objcSymbol</key>
+			<string>ACImageNameEntitlementsLogo</string>
+			<key>relativePath</key>
+			<string>./EntitlementsLogo.imageset</string>
+			<key>swiftSymbol</key>
+			<string>entitlementsLogo</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tommdadd/Desktop/SideInstaller/ios-app/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameLocationLogo</string>
+			<key>relativePath</key>
+			<string>./LocationLogo.imageset</string>
+			<key>swiftSymbol</key>
+			<string>locationLogo</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tommdadd/Desktop/SideInstaller/ios-app/Assets.xcassets</string>
+			<key>objcSymbol</key>
 			<string>ACImageNamePairingLogo</string>
 			<key>relativePath</key>
 			<string>./PairingLogo.imageset</string>
 			<key>swiftSymbol</key>
 			<string>pairingLogo</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tommdadd/Desktop/SideInstaller/ios-app/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameSideBySideLogo</string>
+			<key>relativePath</key>
+			<string>./SideBySideLogo.imageset</string>
+			<key>swiftSymbol</key>
+			<string>sideBySideLogo</string>
 		</dict>
 	</array>
 	<key>symbols</key>

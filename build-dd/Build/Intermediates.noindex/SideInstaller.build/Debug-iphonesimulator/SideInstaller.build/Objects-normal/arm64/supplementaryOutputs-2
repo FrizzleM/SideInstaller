@@ -19,5 +19,12 @@
     "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/DownloadsManager.dia",
     "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/DownloadsManager.o",
     "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/DownloadsManager.swiftdeps"
+  },
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/Engine.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Engine.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Engine.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Engine.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Engine.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/Engine.swiftdeps"
   }
 }

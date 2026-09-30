@@ -1,0 +1,30 @@
+{
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/AppsView.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/AppsView.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/AppsView.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/AppsView.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/AppsView.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/AppsView.swiftdeps"
+  },
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/EntitlementsView.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/EntitlementsView.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/EntitlementsView.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/EntitlementsView.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/EntitlementsView.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/EntitlementsView.swiftdeps"
+  },
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/LocationView.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/LocationView.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/LocationView.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/LocationView.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/LocationView.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/LocationView.swiftdeps"
+  },
+  "/Users/tommdadd/Desktop/SideInstaller/ios-app/SideBySideView.swift" : {
+    "const-values" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/SideBySideView.swiftconstvalues",
+    "dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/SideBySideView.d",
+    "diagnostics" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/SideBySideView.dia",
+    "object" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/SideBySideView.o",
+    "swift-dependencies" : "/Users/tommdadd/Desktop/SideInstaller/build-dd/Build/Intermediates.noindex/SideInstaller.build/Debug-iphonesimulator/SideInstaller.build/Objects-normal/arm64/SideBySideView.swiftdeps"
+  }
+}
