@@ -34,7 +34,7 @@ enum StepState {
 }
 
 /// A contextual instruction card shown to the user.
-struct Guide: Equatable {
+struct Guide: Hashable {
     var title: String
     var systemImage: String
     var steps: [String]
@@ -243,6 +243,11 @@ final class Engine: ObservableObject {
     /// Set once the whole pipeline has completed successfully.
     @Published var finished: Bool = false
 
+    /// Set when the success popup, or the LiveContainer certificate popup, is
+    /// closed; a new run brings them back.
+    @Published private var successClosed = false
+    @Published private var liveContainerImportClosed = false
+
     /// True once the Local Network prompt has been raised this launch, so the
     /// imported-pairing path asks at most once.
     private var askedLocalNetwork = false
@@ -441,6 +446,8 @@ final class Engine: ObservableObject {
             self.deviceName = nil
             self.lastError = nil
             self.finished = false
+            self.successClosed = false
+            self.liveContainerImportClosed = false
             self.certConflict = false
         }
     }
@@ -543,6 +550,81 @@ final class Engine: ObservableObject {
         pipelineTask?.cancel()
         prefetch?.task.cancel()                 // stop the download now, not at its step
         PairingController.shared.softCancel()   // unblock a pending pairing wait
+    }
+
+    // MARK: Popups
+
+    /// One of the Install tab's popups. Each was a card under the progress
+    /// before; they stack in this order, which the copy relies on ("Revoke and
+    /// retry above", "see the steps above", "the trust step above"). Each
+    /// carries what it shows, so it keeps its content while it closes.
+    enum Popup: Hashable {
+        /// The code Settings asks for while this iPhone pairs.
+        case pairingCode(String)
+        /// Revoke-and-retry, after Apple error 7460.
+        case certConflict
+        case guide(Guide)
+        case error(String, stoppedRun: Bool)
+        /// The build is on the device, named.
+        case success(String)
+        /// LiveContainer still needs SideStore's certificate imported.
+        case liveContainerImport
+    }
+
+    /// True while the run is held up on the user — joining Wi-Fi, connecting
+    /// the tunnel, or pairing in Settings.
+    var isWaitingOnUser: Bool {
+        isRunning && stepStates.values.contains(.waiting)
+    }
+
+    /// The Install tab's popups up now, top to bottom. While the run goes, only
+    /// what it's waiting on shows; the rest waits for it to end.
+    var popups: [Popup] {
+        if isRunning {
+            guard isWaitingOnUser else { return [] }
+            return [pairingPIN.map(Popup.pairingCode), guide.map(Popup.guide)].compactMap { $0 }
+        }
+        var shown: [Popup] = []
+        if certConflict { shown.append(.certConflict) }
+        if let guide { shown.append(.guide(guide)) }
+        if let lastError {
+            shown.append(.error(lastError, stoppedRun: stepStates.values.contains(.failed)))
+        }
+        if finished, !successClosed { shown.append(.success(installedSourceName)) }
+        if finished, installedIsLiveContainer, !liveContainerImportClosed {
+            shown.append(.liveContainerImport)
+        }
+        return shown
+    }
+
+    /// True for a popup the run is waiting on: closing it cancels the install.
+    func blocks(_ popup: Popup) -> Bool {
+        switch popup {
+        case .pairingCode, .guide: return isWaitingOnUser
+        default:                   return false
+        }
+    }
+
+    /// Closes one of the Install tab's popups. The run can't go on without one
+    /// it's waiting on, so closing that cancels the install, taking the other
+    /// popups it was waiting on along; any other just clears its message.
+    @MainActor
+    func closePopup(_ popup: Popup) {
+        if blocks(popup) {
+            cancelOneClick()
+            pairingPIN = nil
+            guide = nil
+            return
+        }
+        switch popup {
+        // The steps hang under the code and close with it.
+        case .pairingCode:         pairingPIN = nil; guide = nil
+        case .certConflict:        certConflict = false
+        case .guide:               guide = nil
+        case .error:               lastError = nil
+        case .success:             successClosed = true
+        case .liveContainerImport: liveContainerImportClosed = true
+        }
     }
 
     /// Cancel whatever the run started early and never got to use.

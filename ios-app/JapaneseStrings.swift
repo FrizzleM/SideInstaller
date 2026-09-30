@@ -141,6 +141,7 @@ let japaneseStrings: [String: String] = [
     "Type this into the prompt in Settings.":
         "この番号を「設定」のダイアログに入力してください。",
     "Install stopped": "インストールが停止しました",
+    "Close": "閉じる",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ はインストールされています。上記の信頼手順を完了すると開けます。",
     "Action needed": "対応が必要です",

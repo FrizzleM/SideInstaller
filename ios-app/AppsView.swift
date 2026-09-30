@@ -366,6 +366,11 @@ final class SideloadedAppsManager: ObservableObject {
     /// The refresh in flight, kept so it can be called off between apps.
     private var refreshTask: Task<Void, Never>?
 
+    /// What went wrong last, as a popup `RootView` stacks over the app.
+    var popups: [ToolPopup] { lastError.map { [.error($0)] } ?? [] }
+
+    func closePopup(_ popup: ToolPopup) { lastError = nil }
+
     /// Number of apps expiring within a day (shown in the header pill).
     var expiringSoon: Int {
         entries.filter { status in
@@ -563,15 +568,12 @@ struct AppsView: View {
                 refreshAllButton
                 loadButton
                 refreshRunCard
-                if let error = manager.lastError {
-                    errorCallout(error).transition(.cardAppear)
-                }
+                // Errors show as a popup, which `RootView` lays over the app.
                 appList
                 refreshNote
                 unmatchedSection
             }
             .padding(20)
-            .animation(.smooth(duration: 0.35), value: manager.lastError)
             .animation(.smooth(duration: 0.35), value: manager.entries)
             .animation(.smooth(duration: 0.3), value: manager.isWorking)
             .animation(.smooth(duration: 0.35), value: manager.jobs)
@@ -919,26 +921,6 @@ struct AppsView: View {
                 }
             }
             .cascadeItem(6 + manager.entries.count)
-        }
-    }
-
-    // MARK: Error
-
-    private func errorCallout(_ message: String) -> some View {
-        CalloutCard(tint: .red) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.red)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Something went wrong"))
-                        .font(.subheadline.weight(.semibold))
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
         }
     }
 }

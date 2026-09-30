@@ -142,6 +142,7 @@ let italianStrings: [String: String] = [
     "Type this into the prompt in Settings.":
         "Scrivi questo codice nella richiesta che compare in Impostazioni.",
     "Install stopped": "Installazione interrotta",
+    "Close": "Chiudi",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ è installato. Completa il passaggio di autorizzazione qui sopra per aprirlo.",
     "Action needed": "Serve il tuo intervento",

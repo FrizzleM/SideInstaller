@@ -80,6 +80,8 @@ final class SideBySideManager: ObservableObject {
     /// The code to type into their iPhone, once it has asked for one.
     @Published private(set) var pairingPIN: String?
     @Published var lastError: String?
+    /// True from a finished run until its popup is closed.
+    @Published private(set) var showsSuccess = false
 
     private var task: Task<Void, Never>?
 
@@ -130,6 +132,64 @@ final class SideBySideManager: ObservableObject {
         let done = Double(SideBySideStep.allCases.filter { stepStates[$0] == .done }.count)
         let partial = stepStates[.download] == .active ? downloadProgress : 0
         return min(1, (done + partial) / total)
+    }
+
+    // MARK: - Popups
+
+    /// One of this page's popups; they stack in this order. Each carries what
+    /// it shows, so it keeps its content while it closes.
+    enum Popup: Hashable {
+        /// The code their iPhone asks for while it pairs.
+        case pairingCode(String)
+        /// How to pair from their iPhone's Settings.
+        case pairInSettings
+        case error(String)
+        /// The app is on their iPhone, named.
+        case success(String)
+    }
+
+    /// True while the run waits for their iPhone to pair from its Settings,
+    /// whose steps and code it can't go on without.
+    var isWaitingOnUser: Bool {
+        isRunning && (pairingInSettings || pairingPIN != nil)
+    }
+
+    /// The popups up now, top to bottom.
+    var popups: [Popup] {
+        var shown: [Popup] = []
+        if let pairingPIN { shown.append(.pairingCode(pairingPIN)) }
+        if pairingInSettings { shown.append(.pairInSettings) }
+        if let lastError { shown.append(.error(lastError)) }
+        if showsSuccess { shown.append(.success(installedAppName ?? "SideInstaller")) }
+        return shown
+    }
+
+    /// True for a popup the run is waiting on: closing it stops the run.
+    func blocks(_ popup: Popup) -> Bool {
+        switch popup {
+        case .pairingCode, .pairInSettings: return isWaitingOnUser
+        case .error, .success:              return false
+        }
+    }
+
+    /// Closes one popup. The run can't go on without the pairing steps or the
+    /// code, so closing either stops it, and both go.
+    @MainActor
+    func closePopup(_ popup: Popup) {
+        if blocks(popup) {
+            cancel()
+            // Gone now, not once the cancelled wait has unwound.
+            pairingInSettings = false
+            pairingPIN = nil
+            return
+        }
+        switch popup {
+        case .error:          lastError = nil
+        case .success:        showsSuccess = false
+        // The steps hang under the code and close with it.
+        case .pairingCode:    pairingPIN = nil; pairingInSettings = false
+        case .pairInSettings: pairingInSettings = false
+        }
     }
 
     // MARK: - The run
@@ -249,6 +309,7 @@ final class SideBySideManager: ObservableObject {
         downloadProgress = 0
         lastError = nil
         finished = false
+        showsSuccess = false
         pairingInSettings = false
         pairingPIN = nil
     }
@@ -269,6 +330,7 @@ final class SideBySideManager: ObservableObject {
     @MainActor
     private func finishSuccess() {
         finished = true
+        showsSuccess = true
         let name = installedAppName ?? "SideInstaller"
         engine.log("✅ Side by Side done — \(name) is on \(targetName ?? "their iPhone"). One trust step left, on their side.")
     }
@@ -770,49 +832,21 @@ struct SideBySideView: View {
 
     private enum Field: Hashable { case address, email, password }
 
-    /// Scroll target for the pairing instructions, which appear below the fold.
-    private static let pairInSettingsID = "pairInSettings"
-
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(spacing: 18) {
-                    header.cascadeItem(0)
-                    targetCard.cascadeItem(1)
-                    accountCard.cascadeItem(2)
-                    stepsCard.cascadeItem(3)
-                    actionButton.cascadeItem(4)
-                    if let pin = manager.pairingPIN {
-                        pinCallout(pin).transition(.cardAppear)
-                    }
-                    if manager.pairingInSettings {
-                        pairInSettingsCallout
-                            .id(Self.pairInSettingsID)
-                            .transition(.cardAppear)
-                    }
-                    if let error = manager.lastError {
-                        errorCallout(error).transition(.cardAppear)
-                    }
-                    if manager.finished {
-                        successCallout.transition(.cardAppear)
-                    }
-                }
-                .padding(20)
-                .animation(.smooth(duration: 0.35), value: manager.pairingPIN)
-                .animation(.smooth(duration: 0.35), value: manager.pairingInSettings)
-                .animation(.smooth(duration: 0.35), value: manager.lastError)
-                .animation(.smooth(duration: 0.35), value: manager.targetSummary)
-                .animation(.smooth(duration: 0.3), value: manager.isRunning)
-                .animation(.smooth(duration: 0.4, extraBounce: 0.12), value: manager.finished)
+        ScrollView {
+            VStack(spacing: 18) {
+                header.cascadeItem(0)
+                targetCard.cascadeItem(1)
+                accountCard.cascadeItem(2)
+                stepsCard.cascadeItem(3)
+                actionButton.cascadeItem(4)
+                // The pairing steps and code, errors and success show as
+                // `SideBySidePopup`, which `RootView` lays over the app.
             }
-            // Their iPhone shows nothing until someone follows these steps, so
-            // bring them, and the code above them, into view.
-            .onChange(of: manager.pairingInSettings) { _, showing in
-                if showing { reveal(Self.pairInSettingsID, with: proxy) }
-            }
-            .onChange(of: manager.pairingPIN) { _, pin in
-                if pin != nil { reveal(Self.pairInSettingsID, with: proxy) }
-            }
+            .padding(20)
+            .animation(.smooth(duration: 0.35), value: manager.targetSummary)
+            .animation(.smooth(duration: 0.3), value: manager.isRunning)
+            .animation(.smooth(duration: 0.4, extraBounce: 0.12), value: manager.finished)
         }
         .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
@@ -999,105 +1033,7 @@ struct SideBySideView: View {
         }
     }
 
-    // MARK: Callouts
-
-    private func pinCallout(_ pin: String) -> some View {
-        CalloutCard(tint: .orange) {
-            VStack(spacing: 12) {
-                sectionTitle(L("Pairing code"), systemImage: "lock.iphone")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(pin)
-                    .font(.system(size: 46, weight: .bold, design: .rounded))
-                    .tracking(8)
-                    .frame(maxWidth: .infinity)
-                Text(L("Type this into the prompt on their iPhone."))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    /// What to do on their iPhone while it has to pair from Settings. Nothing
-    /// appears on it by itself, so without this the run just looks stuck.
-    private var pairInSettingsCallout: some View {
-        CalloutCard(tint: Theme.accent) {
-            VStack(alignment: .leading, spacing: 14) {
-                sectionTitle(L("Pair their iPhone in Settings"), systemImage: "gearshape")
-                Text(L("Their iPhone won't ask by itself — pairing starts from its Settings."))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                stepsList([
-                    L("On their iPhone, open Settings › Privacy & Security › Developer Mode."),
-                    L("Tap “Pair with %@”.", PairingController.peerHostName),
-                    L("Enter their iPhone’s passcode if it asks for it."),
-                    L("Type the code that appears here into the prompt on their iPhone."),
-                ])
-            }
-        }
-    }
-
-    /// Scrolls `id` up from the bottom edge. Deferred a turn so a card inserted
-    /// by the same change is laid out first.
-    private func reveal(_ id: String, with proxy: ScrollViewProxy) {
-        DispatchQueue.main.async {
-            withAnimation(.smooth(duration: 0.4)) { proxy.scrollTo(id, anchor: .bottom) }
-        }
-    }
-
-    private func stepsList(_ steps: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(steps.enumerated()), id: \.offset) { idx, step in
-                HStack(alignment: .top, spacing: 12) {
-                    Text("\(idx + 1)")
-                        .font(.caption.weight(.bold).monospacedDigit())
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(Circle().fill(Theme.brand))
-                    Text(step)
-                        .font(.subheadline)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
-
-    private var successCallout: some View {
-        CalloutCard(tint: .green) {
-            VStack(alignment: .leading, spacing: 10) {
-                Label(L("Last step: they trust %@", manager.installedAppName ?? "SideInstaller"),
-                      systemImage: "checkmark.seal.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.green)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(L("On their iPhone: Settings › General › VPN & Device Management."))
-                    Text(L("Tap the Apple ID under “Developer App”, then tap Trust."))
-                    Text(L("Open it from their Home Screen — they're set up."))
-                }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private func errorCallout(_ message: String) -> some View {
-        CalloutCard(tint: .red) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.red)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Something went wrong"))
-                        .font(.subheadline.weight(.semibold))
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
+    // MARK: Helpers
 
     private func sectionTitle(_ title: String, systemImage: String) -> some View {
         Label {
@@ -1105,6 +1041,73 @@ struct SideBySideView: View {
         } icon: {
             Image(systemName: systemImage)
                 .foregroundStyle(Theme.brand)
+        }
+    }
+}
+
+// MARK: - Popup
+
+/// One of Side by Side's popups, which `RootView` stacks over the whole app:
+/// how to pair their iPhone from its Settings and the code it asks for, or how
+/// the run ended. See `SideBySideManager.Popup`.
+struct SideBySidePopup: View {
+    @ObservedObject var manager: SideBySideManager
+    let popup: SideBySideManager.Popup
+
+    /// Observed so labels redraw when the language changes.
+    @EnvironmentObject private var loc: Localizer
+
+    var body: some View {
+        switch popup {
+        case .pairingCode(let pin):
+            PairingCodePopup(pin: pin, caption: L("Type this into the prompt on their iPhone."),
+                             onClose: close)
+        case .pairInSettings:
+            pairInSettingsPopup
+        case .error(let message):
+            PopupCard(title: L("Something went wrong"),
+                      systemImage: "exclamationmark.triangle.fill",
+                      tint: .red,
+                      onClose: close) {
+                Text(message)
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .success(let appName):
+            PopupCard(title: L("Last step: they trust %@", appName),
+                      systemImage: "checkmark.seal.fill",
+                      tint: .green,
+                      onClose: close) {
+                NumberedSteps(steps: [
+                    L("On their iPhone: Settings › General › VPN & Device Management."),
+                    L("Tap the Apple ID under “Developer App”, then tap Trust."),
+                    L("Open it from their Home Screen — they're set up."),
+                ])
+            }
+        }
+    }
+
+    private func close() { manager.closePopup(popup) }
+
+    /// What to do on their iPhone while it has to pair from Settings. Nothing
+    /// appears on it by itself, so without this the run just looks stuck.
+    private var pairInSettingsPopup: some View {
+        PopupCard(title: L("Pair their iPhone in Settings"),
+                  systemImage: "gearshape",
+                  tint: Theme.accent,
+                  onClose: close) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(L("Their iPhone won't ask by itself — pairing starts from its Settings."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                NumberedSteps(steps: [
+                    L("On their iPhone, open Settings › Privacy & Security › Developer Mode."),
+                    L("Tap “Pair with %@”.", PairingController.peerHostName),
+                    L("Enter their iPhone’s passcode if it asks for it."),
+                    L("Type the code that appears here into the prompt on their iPhone."),
+                ])
+            }
         }
     }
 }

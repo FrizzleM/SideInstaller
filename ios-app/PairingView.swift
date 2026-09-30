@@ -17,27 +17,13 @@ struct PairingView: View {
             VStack(spacing: 18) {
                 header.cascadeItem(0)
                 pairingFileCard.cascadeItem(1)
-                if let pin = engine.pairingPIN {
-                    pinCard(pin).transition(.cardAppear)
-                }
-                if manager.isGenerating {
-                    generatingSteps.transition(.cardAppear)
-                }
                 installCard.cascadeItem(2)
-                if let error = manager.lastError {
-                    errorCallout(error).transition(.cardAppear)
-                }
-                if let success = manager.lastSuccess {
-                    successCallout(success).transition(.cardAppear)
-                }
+                // The pairing steps and code, errors and success show as
+                // `PairingPopup`, which `RootView` lays over the app.
                 targetList
             }
             .padding(20)
             .animation(.smooth(duration: 0.35), value: manager.pairingFileExists)
-            .animation(.smooth(duration: 0.35), value: engine.pairingPIN)
-            .animation(.smooth(duration: 0.35), value: manager.isGenerating)
-            .animation(.smooth(duration: 0.35), value: manager.lastError)
-            .animation(.smooth(duration: 0.35), value: manager.lastSuccess)
             .animation(.smooth(duration: 0.35), value: manager.targets)
             .animation(.smooth(duration: 0.3), value: engine.deviceSummary)
             .animation(.smooth(duration: 0.3), value: engine.vpnConnected)
@@ -119,33 +105,6 @@ struct PairingView: View {
                     .tint(Theme.accent)
                     .disabled(manager.isBusy)
                 }
-            }
-        }
-    }
-
-    // MARK: Pairing-code callout
-
-    private func pinCard(_ pin: String) -> some View {
-        CalloutCard(tint: .orange) {
-            VStack(spacing: 12) {
-                sectionTitle(L("Pairing code"), systemImage: "lock.iphone")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(pin)
-                    .font(.system(size: 46, weight: .bold, design: .rounded))
-                    .tracking(8)
-                    .frame(maxWidth: .infinity)
-                Text(L("Type this into the prompt in Settings."))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var generatingSteps: some View {
-        CalloutCard(tint: Theme.accent) {
-            VStack(alignment: .leading, spacing: 14) {
-                sectionTitle(L("Pair in Settings"), systemImage: "gearshape")
-                stepsList(Guides.pairing.steps)
             }
         }
     }
@@ -301,39 +260,6 @@ struct PairingView: View {
         }
     }
 
-    // MARK: Error / success
-
-    private func errorCallout(_ message: String) -> some View {
-        CalloutCard(tint: .red) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.red)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Something went wrong"))
-                        .font(.subheadline.weight(.semibold))
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
-
-    private func successCallout(_ message: String) -> some View {
-        CalloutCard(tint: .green) {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.title)
-                    .foregroundStyle(.green)
-                Text(message)
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
     // MARK: Helpers
 
     private func sectionTitle(_ title: String, systemImage: String) -> some View {
@@ -344,21 +270,53 @@ struct PairingView: View {
                 .foregroundStyle(Theme.brand)
         }
     }
+}
 
-    private func stepsList(_ steps: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(steps.enumerated()), id: \.offset) { idx, step in
-                HStack(alignment: .top, spacing: 12) {
-                    Text("\(idx + 1)")
-                        .font(.caption.weight(.bold).monospacedDigit())
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(Circle().fill(Theme.brand))
-                    Text(step)
-                        .font(.subheadline)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+// MARK: - Popup
+
+/// One of the Pairing page's popups, which `RootView` stacks over the whole app:
+/// the steps for pairing in Settings and the code they ask for, or how the last
+/// action went. See `PairingManager.Popup`.
+struct PairingPopup: View {
+    @ObservedObject var manager: PairingManager
+    let popup: PairingManager.Popup
+
+    /// Observed so labels redraw when the language changes.
+    @EnvironmentObject private var loc: Localizer
+
+    var body: some View {
+        switch popup {
+        case .pairingCode(let pin):
+            PairingCodePopup(pin: pin, caption: L("Type this into the prompt in Settings."),
+                             onClose: close)
+        case .pairInSettings:
+            PopupCard(title: L("Pair in Settings"),
+                      systemImage: "gearshape",
+                      tint: Theme.accent,
+                      onClose: close) {
+                NumberedSteps(steps: Guides.pairing.steps)
+            }
+        case .error(let message):
+            PopupCard(title: L("Something went wrong"),
+                      systemImage: "exclamationmark.triangle.fill",
+                      tint: .red,
+                      onClose: close) {
+                Text(message)
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .success(let message):
+            // Titled after the page: this covers a new file and a write alike.
+            PopupCard(title: L("Pairing"),
+                      systemImage: "checkmark.seal.fill",
+                      tint: .green,
+                      onClose: close) {
+                Text(message)
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
+
+    private func close() { manager.closePopup(popup) }
 }

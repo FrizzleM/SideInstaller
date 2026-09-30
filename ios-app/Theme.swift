@@ -169,6 +169,268 @@ struct CalloutCard<Content: View>: View {
     }
 }
 
+// MARK: - Popups
+
+/// A message that floats over the whole app, which dims and softly blurs
+/// behind it (see `popupStack`). Each replaces a callout card that used to sit
+/// under a page's progress; several stack, each closing on its own.
+///
+/// A blocking popup holds what a running step is waiting on, such as the
+/// pairing code: closing it stops the run, so taps on the backdrop leave it
+/// open, and it can't be closed by accident.
+struct PopupCard<Content: View>: View {
+    var title: String
+    var systemImage: String
+    var tint: Color
+    var onClose: () -> Void
+    @ViewBuilder var content: () -> Content
+
+    /// Edges this card shares with a neighbour in the stack; see `popupStack`.
+    @Environment(\.popupJoins) private var joins
+
+    /// Hung under the popup above, whose X closes both, so it has no X of its
+    /// own.
+    private var isAttached: Bool { joins.contains(.top) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            header
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(20)
+        .frame(maxWidth: 460)
+        .background(
+            shape
+                .fill(Color(.secondarySystemBackground))
+                .overlay(shape.fill(tint.opacity(0.1)))
+        )
+        .overlay(shape.strokeBorder(tint.opacity(0.35), lineWidth: 1))
+        // A card with one hung under it leaves the shadow to that one, which
+        // sits beneath it, so no shadow falls across the seam.
+        .shadow(color: .black.opacity(joins.contains(.bottom) ? 0 : 0.45), radius: 30, x: 0, y: 14)
+        .accessibilityElement(children: .contain)
+        .accessibilityAction(.escape, onClose)
+    }
+
+    /// Rounded, except where the card meets a neighbour, so the pair reads as
+    /// one piece with no notches at the seam.
+    private var shape: UnevenRoundedRectangle {
+        let top: CGFloat = joins.contains(.top) ? 0 : 28
+        let bottom: CGFloat = joins.contains(.bottom) ? 0 : 28
+        return UnevenRoundedRectangle(topLeadingRadius: top, bottomLeadingRadius: bottom,
+                                      bottomTrailingRadius: bottom, topTrailingRadius: top,
+                                      style: .continuous)
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(tint.opacity(0.16)))
+            Text(title)
+                .font(.headline)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            if !isAttached {
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .padding(8)
+                        .background(Circle().fill(.white.opacity(0.08)))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L("Close"))
+                .transition(.opacity.combined(with: .scale(scale: 0.6)))
+            }
+        }
+    }
+}
+
+private struct PopupJoinsKey: EnvironmentKey {
+    static let defaultValue: Edge.Set = []
+}
+
+extension EnvironmentValues {
+    /// The edges a popup card shares with its neighbours: `.top` when it hangs
+    /// under the card above, `.bottom` when one hangs under it.
+    var popupJoins: Edge.Set {
+        get { self[PopupJoinsKey.self] }
+        set { self[PopupJoinsKey.self] = newValue }
+    }
+}
+
+/// Lays popups over this view, one above the other and centred as a group:
+/// what's behind darkens and blurs a little, and takes no taps. Closing one
+/// lets the rest glide back to the centre. Applied once, by `RootView`, so the
+/// tab bar goes under too.
+private struct PopupStack<Item: Hashable, Card: View>: ViewModifier {
+    /// The popups up, top to bottom.
+    var items: [Item]
+    /// Runs on a tap outside the cards. Nil leaves the popups up, so a stray
+    /// tap can't stop a run that's waiting on them.
+    var onBackdropTap: (() -> Void)?
+    /// True when the second popup hangs under the first: no gap between them,
+    /// and only the first has an X.
+    var attached: (Item, Item) -> Bool
+    @ViewBuilder var card: (Item) -> Card
+
+    private var isPresented: Bool { !items.isEmpty }
+
+    func body(content: Content) -> some View {
+        content
+            .accessibilityHidden(isPresented)
+            .overlay {
+                ZStack {
+                    if isPresented {
+                        backdrop
+                            .transition(.opacity)
+                        // The first popup to open and the last to close zoom
+                        // with the stack; the rest come and go inside it.
+                        cards
+                            .transition(.popup)
+                    }
+                }
+                .animation(.smooth(duration: 0.35), value: isPresented)
+            }
+    }
+
+    /// The cards, centred while they fit and scrolling once they don't.
+    private var cards: some View {
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(Array(items.enumerated()), id: \.element) { index, item in
+                        let joins = joins(at: index)
+                        card(item)
+                            .environment(\.popupJoins, joins)
+                            .padding(.top, index == 0 || joins.contains(.top) ? 0 : 14)
+                            // Each above the next, so a card hung under another
+                            // tucks its shadow beneath it.
+                            .zIndex(Double(items.count - index))
+                            .transition(.popup)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+                // The gaps around the cards are backdrop too.
+                .background {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { onBackdropTap?() }
+                }
+                .animation(.smooth(duration: 0.4, extraBounce: 0.08), value: items)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+    }
+
+    /// The edges the popup at `index` shares with the ones beside it.
+    private func joins(at index: Int) -> Edge.Set {
+        var joins: Edge.Set = []
+        if index > 0, attached(items[index - 1], items[index]) { joins.insert(.top) }
+        if index + 1 < items.count, attached(items[index], items[index + 1]) { joins.insert(.bottom) }
+        return joins
+    }
+
+    /// A thinned-out material over a dark wash: the app stays recognisable
+    /// behind, just blurred a little. A material rather than `.blur` on the
+    /// content, which would clip at the safe area and leave the status bar
+    /// strip unblurred.
+    private var backdrop: some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial).opacity(0.7)
+            Color.black.opacity(0.35)
+        }
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .onTapGesture { onBackdropTap?() }
+        .accessibilityHidden(true)
+    }
+}
+
+extension View {
+    /// Shows a popup over this view for each of `items`, stacked in order.
+    /// `attached` joins a popup to the one above it; see `PopupStack`.
+    func popupStack<Item: Hashable, Card: View>(_ items: [Item],
+                                                onBackdropTap: (() -> Void)?,
+                                                attached: @escaping (Item, Item) -> Bool,
+                                                @ViewBuilder card: @escaping (Item) -> Card) -> some View {
+        modifier(PopupStack(items: items, onBackdropTap: onBackdropTap, attached: attached, card: card))
+    }
+}
+
+/// A popup that only reports: what went wrong, or what went right.
+struct MessagePopup: View {
+    var title: String
+    var message: String
+    var isError: Bool
+    var onClose: () -> Void
+
+    var body: some View {
+        PopupCard(title: title,
+                  systemImage: isError ? "exclamationmark.triangle.fill" : "checkmark.seal.fill",
+                  tint: isError ? .red : .green,
+                  onClose: onClose) {
+            Text(message)
+                .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// Numbered instructions, as the guides and pairing popups list them.
+struct NumberedSteps: View {
+    var steps: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(steps.enumerated()), id: \.offset) { idx, step in
+                HStack(alignment: .top, spacing: 12) {
+                    Text("\(idx + 1)")
+                        .font(.caption.weight(.bold).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(Theme.brand))
+                    Text(step)
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+}
+
+/// The code an iPhone asks for while it pairs, as a popup of its own: big
+/// enough to read at a glance, with where it goes.
+struct PairingCodePopup: View {
+    var pin: String
+    var caption: String
+    var onClose: () -> Void
+
+    var body: some View {
+        PopupCard(title: L("Pairing code"), systemImage: "lock.iphone", tint: .orange,
+                  onClose: onClose) {
+            VStack(spacing: 10) {
+                Text(pin)
+                    .font(.system(size: 46, weight: .bold, design: .rounded))
+                    .tracking(8)
+                Text(caption)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+}
+
 // MARK: - Small components
 
 /// A compact, colour-coded status capsule shown under the header.
@@ -324,6 +586,11 @@ extension AnyTransition {
                 .combined(with: .offset(y: -10)),
             removal: .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
         )
+    }
+
+    /// A popup card rising into place, and sinking away when it closes.
+    static var popup: AnyTransition {
+        .opacity.combined(with: .scale(scale: 0.92))
     }
 }
 

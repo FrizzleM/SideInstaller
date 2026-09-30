@@ -96,8 +96,8 @@ final class PairingController {
         var continuation: CheckedContinuation<PairedDevice, Error>?
         /// The port the host listens on, once it's known.
         var port: UInt16?
-        /// Set by `cancelPeer`, so the run stops advertising and its end isn't
-        /// reported as a failure.
+        /// Set by `cancelPeer` and `softCancel`, so the run stops advertising
+        /// and its end isn't reported as a failure.
         var cancelled = false
 
         var isThisDevice: Bool { peerPIN == nil }
@@ -127,11 +127,18 @@ final class PairingController {
         return paired.path
     }
 
-    /// Unblock the awaited path; the host thread ends when the FFI call returns.
-    /// Leaves a Side by Side run alone.
+    /// Stop pairing this iPhone: resolve the run as cancelled, stop advertising,
+    /// and end the host if Settings hasn't connected yet, so no code turns up
+    /// after the run that asked for it has gone. Leaves a Side by Side run alone.
+    ///
+    /// A host Settings has already connected to runs until that pairing
+    /// finishes or gives up, since nothing interrupts the FFI call.
     func softCancel() {
-        guard let run = current, run.isThisDevice else { return }
+        guard let run = current, run.isThisDevice, !run.cancelled else { return }
+        run.cancelled = true
         resolve(run, .failure(CancellationError()))
+        stopAdvertising()
+        if let port = run.port { Self.wakeHost(port: port) }
     }
 
     func start() {
@@ -196,7 +203,7 @@ final class PairingController {
                 resolve(run, .failure(PairingError.localNetworkDenied))
                 return
             }
-            // Side by Side may have been cancelled while the prompt was up.
+            // The run may have been cancelled while the prompt was up.
             guard !run.cancelled else {
                 end(run)
                 return
@@ -313,7 +320,8 @@ final class PairingController {
                 resolve(run, .success(PairedDevice(path: path, deviceName: name, deviceModel: model)))
             }
         case let .failure(message):
-            engine.log("RPPairing: FAILED — \(message)")
+            // A cancelled run ends with whatever the woken host failed on.
+            engine.log(run.cancelled ? "RPPairing: stopped." : "RPPairing: FAILED — \(message)")
             engine.pairingStatus = L("failed: %@", message)
             resolve(run, .failure(PairingError.failed(message)))
         }
