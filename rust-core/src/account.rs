@@ -24,6 +24,7 @@ use rootcause::Report;
 use serde::{Deserialize, Serialize};
 
 use crate::apple_session;
+use crate::error_text::report_text;
 use crate::ffi_util::cstr;
 
 /// `int (*)(void *ctx, const char *request_json, char *out_buf, size_t buf_len)`.
@@ -247,7 +248,7 @@ pub unsafe fn apple_signin(
             let team = sideloader
                 .get_team()
                 .await
-                .map_err(|e| format!("get_team: {e}"))?;
+                .map_err(|e| format!("get_team: {}", report_text(&e)))?;
             let summary = format!(
                 "team: {} ({})",
                 team.name.as_deref().unwrap_or("<unnamed>"),
@@ -323,7 +324,7 @@ pub unsafe fn sign_ipa(
                 );
                 None
             } else {
-                tracing::info!("Registering device {udid} ({name}) with the team while signing");
+                tracing::info!("Registering device {udid} with the team while signing");
                 Some((name, udid.as_str()))
             };
 
@@ -335,7 +336,7 @@ pub unsafe fn sign_ipa(
                 .map_err(|e| {
                     // Left unprefixed so the app still recognises a failed
                     // registration and shows its guide.
-                    let message = e.to_string();
+                    let message = report_text(&e);
                     if message.starts_with("device registration failed") {
                         message
                     } else {
@@ -419,7 +420,7 @@ pub unsafe fn account_config(
                 .sideloader
                 .get_team()
                 .await
-                .map_err(|e| format!("get_team: {e}"))?;
+                .map_err(|e| format!("get_team: {}", report_text(&e)))?;
             let email = session.sideloader.get_email().to_string();
 
             tracing::info!("Looking up the '{machine_name}' certificate to hand over");
@@ -431,7 +432,7 @@ pub unsafe fn account_config(
                 &storage,
             )
             .await
-            .map_err(|e| format!("certificate lookup failed: {e}"))?
+            .map_err(|e| format!("certificate lookup failed: {}", report_text(&e)))?
             .ok_or_else(|| {
                 format!(
                     "no '{machine_name}' certificate on this Apple ID yet — install \

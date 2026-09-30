@@ -21,6 +21,7 @@ use isideload::dev::{app_ids::AppIdsApi, device_type::DeveloperDeviceType};
 use serde::Serialize;
 
 use crate::certs::CertSession;
+use crate::error_text::{error_text, report_text};
 use crate::ffi_util::{cstr, opt_str};
 
 /// The content type this route speaks, for both request and response.
@@ -66,7 +67,7 @@ pub unsafe fn appid_list(
             let response = dev
                 .list_app_ids(team, DeveloperDeviceType::Ios)
                 .await
-                .map_err(|e| format!("list app IDs failed: {e}"))?;
+                .map_err(|e| format!("list app IDs failed: {}", report_text(&e)))?;
             tracing::info!("Entitlements: {} App ID(s)", response.app_ids.len());
             let infos: Vec<AppIdInfo> = response
                 .app_ids
@@ -140,7 +141,7 @@ pub unsafe fn appid_enable(
             let listing = dev
                 .list_app_ids(team, DeveloperDeviceType::Ios)
                 .await
-                .map_err(|e| format!("list app IDs failed: {e}"))?;
+                .map_err(|e| format!("list app IDs failed: {}", report_text(&e)))?;
             let app = listing
                 .app_ids
                 .into_iter()
@@ -188,7 +189,7 @@ pub unsafe fn appid_enable(
                         results.push(CapabilityResult {
                             capability: capability.clone(),
                             ok: false,
-                            error: format!("anisette headers: {e}"),
+                            error: format!("anisette headers: {}", report_text(&e)),
                         });
                         continue;
                     }
@@ -217,7 +218,7 @@ pub unsafe fn appid_enable(
                         results.push(CapabilityResult {
                             capability: capability.clone(),
                             ok: false,
-                            error: format!("build request: {e}"),
+                            error: format!("build request: {}", report_text(&e)),
                         });
                         continue;
                     }
@@ -250,7 +251,7 @@ pub unsafe fn appid_enable(
                     Err(e) => results.push(CapabilityResult {
                         capability: capability.clone(),
                         ok: false,
-                        error: format!("request failed: {e}"),
+                        error: format!("request failed: {}", error_text(&e)),
                     }),
                 }
             }

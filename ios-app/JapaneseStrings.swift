@@ -142,6 +142,10 @@ let japaneseStrings: [String: String] = [
         "この番号を「設定」のダイアログに入力してください。",
     "Install stopped": "インストールが停止しました",
     "Close": "閉じる",
+    "Yes": "はい",
+    "No": "いいえ",
+    "Closing this popup will end the process. Are you sure?":
+        "このポップアップを閉じると処理が終了します。よろしいですか？",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ はインストールされています。上記の信頼手順を完了すると開けます。",
     "Action needed": "対応が必要です",
@@ -432,6 +436,16 @@ let japaneseStrings: [String: String] = [
         "%@ での Apple ID サインインに失敗しました。直近のエラー：%@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Apple のサインインサーバーがリクエストを拒否しました（HTTP 503）。パスワードや anisette サーバーの問題ではないため、別のサーバーを試しても解決しません。しばらくしてから再度お試しいただくか、SideInstaller をアップデートしてください。",
+    "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
+        "この iPhone はインターネットに接続されていますが、SideInstaller は Apple のサインインサーバー（gsa.apple.com）に接続できません。ファイアウォール、DNS フィルタや広告ブロッカー、スクリーンタイムのコンテンツ制限、または別の VPN App が接続を妨げています。それをオフにするか別のネットワークを試してから、もう一度お試しください。",
+    "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":
+        "SideInstaller が Apple に接続できません。この App のモバイルデータ通信がオフになっています。「設定 › モバイル通信」で SideInstaller をオンにするか、インターネットに接続できる Wi-Fi に接続してから、もう一度お試しください。",
+    "SideInstaller can't reach Apple: iOS isn't letting it use Wi-Fi. In Settings › Apps › SideInstaller › Wireless Data, choose WLAN & Cellular Data, then try again.":
+        "SideInstaller が Apple に接続できません。iOS がこの App の Wi-Fi 使用を許可していません。「設定 › アプリ › SideInstaller › ワイヤレスデータ」で「WLAN とモバイルデータ通信」を選んでから、もう一度お試しください。",
+    "SideInstaller can't reach Apple: a VPN set to carry all traffic is disconnected, so iOS is holding traffic back. Reconnect it, or turn off its kill switch or Connect On Demand, then try again.":
+        "SideInstaller が Apple に接続できません。すべての通信を経由させる設定の VPN が切断されているため、iOS が通信を止めています。その VPN を再接続するか、キルスイッチやオンデマンド接続をオフにしてから、もう一度お試しください。",
+    "SideInstaller can't reach Apple: this iPhone has no internet connection. Connect to Wi-Fi or turn on cellular data, then try again.":
+        "SideInstaller が Apple に接続できません。この iPhone はインターネットに接続されていません。Wi-Fi に接続するかモバイルデータ通信をオンにしてから、もう一度お試しください。",
     "Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.":
         "Apple がこの Apple ID またはネットワークからのサインインを一時的に制限しています（HTTP 429）。別のサーバーを試しても解決せず、試すたびに待ち時間が延びる可能性があるため、しばらく時間をおいてから再度サインインしてください。",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":

@@ -21,8 +21,18 @@ All notable changes to SideInstaller are documented here.
 - The signed app reaches your iPhone over several connections at once, which shaves a little more
   off the install. Together, a SideStore install on an iPhone 16 went from about 18.5 seconds to
   about 11.
+- **The log is safe to share.** It leaves out your Apple ID, your iPhone's name, serial numbers,
+  IMEI, SIM and subscriber numbers, network hardware addresses, Find My data and pairing keys, and
+  shortens the UDID to its first and last characters. Model, iOS version, errors and connection
+  details stay, and errors now say why a request couldn't be sent (DNS, connection or TLS).
+- Closing a popup that a running install is waiting on, such as the pairing code or the steps to
+  connect LocalDevVPN, now asks first, since it ends the install.
 
 ### Fixed
+- **Sign-in says when SideInstaller can't reach Apple.** It used to try every anisette server and
+  blame them, although none was at fault. It now stops and says why: Cellular Data turned off for
+  SideInstaller, Wi-Fi not allowed for it, no internet connection, a disconnected VPN holding traffic
+  back, or something on the network blocking Apple.
 - **Side by Side works with iPhones on iOS 27.** Their iPhone dropped the connection the moment
   SideInstaller asked it to pair (error 54), before any Trust prompt could appear, so every run
   stopped at the first step. iOS 27 only pairs over Wi-Fi from its own Settings, so Side by Side now

@@ -304,7 +304,7 @@ final class PairingController {
         switch outcome {
         case let .success(name, model, udid, path):
             let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? 0
-            engine.log("RPPairing: SUCCESS — \(name) (\(model)) UDID \(udid)")
+            engine.log("RPPairing: SUCCESS — \(model), UDID \(udid)")
             engine.log("RPPairing: pairing file written to \(path) (\(size) bytes)")
             if size == 0 {
                 engine.log("⚠️ pairing file is zero bytes — Connect will refuse to use it.")
@@ -331,7 +331,7 @@ final class PairingController {
         switch outcome {
         case let .success(name, model, udid, path):
             let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? 0
-            engine.log("RPPairing: SUCCESS — \(name) (\(model)) UDID \(udid)")
+            engine.log("RPPairing: SUCCESS — \(model), UDID \(udid)")
             engine.log("RPPairing: their pairing file written to \(path) (\(size) bytes)")
             if size == 0 {
                 resolve(run, .failure(PairingError.zeroBytes))

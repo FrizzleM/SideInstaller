@@ -332,7 +332,7 @@ final class SideBySideManager: ObservableObject {
         finished = true
         showsSuccess = true
         let name = installedAppName ?? "SideInstaller"
-        engine.log("✅ Side by Side done — \(name) is on \(targetName ?? "their iPhone"). One trust step left, on their side.")
+        engine.log("✅ Side by Side done — \(name) is on their iPhone. One trust step left, on their side.")
     }
 
     // MARK: - Step 0: Local Network permission
@@ -450,7 +450,7 @@ final class SideBySideManager: ObservableObject {
     private func connectByRemotePairing(ip: String) async throws -> ConnectedTarget {
         let paired = try await pairFromSettings(record: PrivateStore.peerRemotePairing(host: ip))
         setStep(.connect, .active)
-        engine.log("Paired with \(paired.deviceName) (\(paired.deviceModel)). Opening the tunnel to \(ip) over Remote Pairing …")
+        engine.log("Paired with their \(paired.deviceModel). Opening the tunnel to \(ip) over Remote Pairing …")
         return try await onDeviceQueue {
             do {
                 try self.connection.connect(deviceIP: ip, pairingFilePath: paired.path,
@@ -533,7 +533,7 @@ final class SideBySideManager: ObservableObject {
     @MainActor
     private func signIn(id: String, pw: String) async throws {
         if signSession != nil, signedInAs?.caseInsensitiveCompare(id) == .orderedSame {
-            engine.log("Already signed in as \(Engine.oneLine(id)) — skipping.")
+            engine.log("Already signed in as \(LogRedactor.maskAppleID(id)) — skipping.")
             setStep(.signIn, .done)
             return
         }
@@ -545,6 +545,7 @@ final class SideBySideManager: ObservableObject {
         engine.twoFactorWasCancelled = false
         var lastFailure = "no anisette servers configured"
         var appleRefusals = 0
+        var appleUnreachable = 0
 
         for (index, anisette) in servers.enumerated() {
             try Task.checkCancellation()
@@ -586,6 +587,17 @@ final class SideBySideManager: ObservableObject {
                         throw EngineError.message(Engine.appleServiceRefusalMessage)
                     }
                 }
+                // Every anisette server starts with the same request to Apple, so
+                // when that can't even be sent, more of them won't help.
+                if Engine.isAppleUnreachable(lastFailure) {
+                    appleUnreachable += 1
+                    if let message = await engine.appleUnreachableStop(
+                        failures: appleUnreachable, logPrefix: "Side by Side: ") {
+                        throw EngineError.message(message)
+                    }
+                } else {
+                    appleUnreachable = 0
+                }
             }
         }
         let tried = servers.count == 1
@@ -598,7 +610,7 @@ final class SideBySideManager: ObservableObject {
     /// name `SideInstaller`, so an existing certificate is recognized as reusable.
     private func performSignIn(id: String, pw: String, anisette: String, dir: String) throws -> String {
         defer { engine.endTwoFactor() }
-        engine.log("Apple ID sign-in for \(Engine.oneLine(id)) via anisette \(Engine.oneLine(anisette)) …")
+        engine.log("Apple ID sign-in for \(LogRedactor.maskAppleID(id)) via anisette \(Engine.oneLine(anisette)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
@@ -684,7 +696,7 @@ final class SideBySideManager: ObservableObject {
 
     private func performSign(session: OpaquePointer, ipa: String,
                              udid: String, deviceName: String) throws -> String {
-        engine.log("Signing \(ipa) for \(deviceName.isEmpty ? udid : deviceName) …")
+        engine.log("Signing \(ipa) for \(udid.isEmpty ? "their iPhone" : udid) …")
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_sign_ipa(session, ipa, udid, deviceName, &signed, &error)

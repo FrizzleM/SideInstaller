@@ -199,11 +199,7 @@ async fn run(
         })
         .await
         .map_err(|e| format!("pairing failed: {e}"))?;
-    tracing::info!(
-        "RPPairing: MILESTONE handshake complete (PIN accepted): {} ({})",
-        peer.name,
-        peer.model
-    );
+    tracing::info!("RPPairing: MILESTONE handshake complete (PIN accepted): {}", peer.model);
 
     pairing_file
         .write_to_file(&out_path)

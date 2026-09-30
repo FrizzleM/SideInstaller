@@ -17,6 +17,7 @@ use serde::Serialize;
 
 use crate::account::{make_2fa, TwoFactorCb, TwoFaCtx};
 use crate::apple_session;
+use crate::error_text::report_text;
 use crate::ffi_util::{cstr, opt_str};
 
 /// Opaque handle owning the runtime, developer session and selected team.
@@ -114,11 +115,7 @@ pub unsafe fn cert_signin(
                 .into_iter()
                 .next()
                 .ok_or_else(|| "no development teams on this Apple ID".to_string())?;
-            tracing::info!(
-                "Certs: using team {} ({})",
-                team.name.as_deref().unwrap_or("<unnamed>"),
-                team.team_id
-            );
+            tracing::info!("Certs: using team {}", team.team_id);
 
             let summary = format!(
                 "team: {} ({})",
@@ -170,7 +167,7 @@ pub unsafe fn cert_list(
                 .dev
                 .list_ios_certs(&session.team)
                 .await
-                .map_err(|e| format!("list certs failed: {e}"))?;
+                .map_err(|e| format!("list certs failed: {}", report_text(&e)))?;
             tracing::info!("Certs: {} iOS development certificate(s)", certs.len());
             let infos: Vec<CertInfo> = certs.iter().map(CertInfo::from).collect();
             serde_json::to_string(&infos).map_err(|e| format!("serialize certs: {e}"))
@@ -221,7 +218,7 @@ pub unsafe fn cert_revoke(
                 .dev
                 .revoke_development_cert(&session.team, &serial, DeveloperDeviceType::Ios)
                 .await
-                .map_err(|e| format!("revoke failed: {e}"))?;
+                .map_err(|e| format!("revoke failed: {}", report_text(&e)))?;
             Ok::<_, String>(())
         })
     }));
