@@ -210,6 +210,10 @@ final class CertManager: ObservableObject {
                     engine.log("Two-factor verification cancelled — stopping.")
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
+                if Engine.isAccountLocked(lastError) {
+                    engine.log("Apple has locked this Apple Account: \(lastError)")
+                    throw EngineError.accountLocked
+                }
                 if Engine.isCredentialError(lastError) {
                     engine.log("Apple ID credentials rejected: \(lastError)")
                     throw EngineError.message(Engine.credentialErrorMessage)

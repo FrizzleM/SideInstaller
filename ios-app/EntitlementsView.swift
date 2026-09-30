@@ -225,6 +225,9 @@ final class EntitlementsManager: ObservableObject {
                 if engine.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
+                if Engine.isAccountLocked(lastError) {
+                    throw EngineError.accountLocked
+                }
                 if Engine.isCredentialError(lastError) {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }

@@ -501,6 +501,11 @@ final class SideBySideManager: ObservableObject {
                 if engine.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
+                // A locked account fails everywhere, and retrying keeps it locked.
+                if Engine.isAccountLocked(lastFailure) {
+                    engine.log("Apple has locked this Apple Account: \(lastFailure)")
+                    throw EngineError.accountLocked
+                }
                 // Bad credentials fail everywhere, and retrying risks a lockout.
                 if Engine.isCredentialError(lastFailure) {
                     engine.log("Apple ID credentials rejected: \(lastFailure)")

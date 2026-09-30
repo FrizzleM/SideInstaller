@@ -198,10 +198,11 @@ let japaneseStrings: [String: String] = [
         "ペアリングファイルの準備ができました。書き出すか、以下のアプリにインストールできます。",
     "Pairing file installed into %@.": "ペアリングファイルを %@ にインストールしました。",
 
-    // Importing a pairing file (iOS 26 and below)
+    // Importing a pairing file (required below iOS 27, under Advanced from 27)
 
     "Import pairing file": "ペアリングファイルをインポート",
     "How do I make one?": "作成方法は？",
+    "(Optional)": "（任意）",
     "imported pairing file": "インポート済みのペアリングファイル",
     "No pairing file yet — tap “Import pairing file” first.": "まだペアリングファイルがありません。先に「ペアリングファイルをインポート」をタップしてください。",
     "Pairing file missing — import it first.": "ペアリングファイルがありません。先にインポートしてください。",
@@ -397,6 +398,15 @@ let japaneseStrings: [String: String] = [
 
     "Stable": "安定版",
     "Nightly": "Nightly",
+
+    // Version picker (Advanced)
+
+    "%@ version": "%@ のバージョン",
+    "Latest": "最新",
+    "Latest (%@)": "最新（%@）",
+    "Couldn't load the other versions: %@": "他のバージョンを読み込めませんでした：%@",
+    "Try again": "再試行",
+
     "couldn't find the IPA in the %@ %@ release":
         "%@ チャンネルの %@ リリースに IPA が見つかりませんでした",
     "%@ has no %@ release right now": "%@ には現在 %@ リリースがありません",
@@ -425,6 +435,8 @@ let japaneseStrings: [String: String] = [
         "Apple がこの Apple ID またはネットワークからのサインインを一時的に制限しています（HTTP 429）。別のサーバーを試しても解決せず、試すたびに待ち時間が延びる可能性があるため、しばらく時間をおいてから再度サインインしてください。",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
         "パスワードが正しいことが確かな場合は、Apple がサインインの試行を制限している可能性があります。しばらく時間をおいてから再度お試しください。",
+    "Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.":
+        "セキュリティ上の理由により、Apple はこの Apple アカウントをロックしました（エラー -20209）。ロックが解除されるまで、サインインはすべて失敗します。iforgot.apple.com でパスワードをリセットしてから、新しいパスワードでもう一度サインインしてください。",
     "the anisette server": "anisette サーバー",
     "all %d anisette servers": "%d 個すべての anisette サーバー",
     "Not signed in.": "サインインしていません。",
@@ -501,6 +513,18 @@ let japaneseStrings: [String: String] = [
         "または、上で別の（もしくは予備の）Apple ID でサインインしてから、もう一度「インストール」をタップしてください。",
 
     // MARK: - Guide cards
+
+    // Guide: reset a locked Apple Account
+
+    "Reset your Apple Account password": "Apple アカウントのパスワードをリセット",
+    "Apple has locked this Apple Account for security reasons, often after too many sign-in attempts. Every sign-in fails until it's unlocked, so tapping Install again won't help yet.":
+        "セキュリティ上の理由により、Apple はこの Apple アカウントをロックしました。多くの場合、サインインの試行回数が多すぎたことが原因です。ロックが解除されるまでサインインはすべて失敗するため、今「インストール」をもう一度タップしても解決しません。",
+    "Open iForgot, enter this Apple Account's email, and follow Apple's steps to unlock it and reset its password.":
+        "iForgot を開き、この Apple アカウントのメールアドレスを入力して、Apple の手順に従ってロックを解除し、パスワードをリセットしてください。",
+    "Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password.":
+        "SideInstaller に戻り、「設定 › アカウント」を開いて、この Apple ID を左にスワイプし、「編集」をタップして新しいパスワードを入力してください。",
+    "Then tap Install again.": "その後、もう一度「インストール」をタップしてください。",
+    "Open iForgot": "iForgot を開く",
 
     // Guide: import a pairing file
 

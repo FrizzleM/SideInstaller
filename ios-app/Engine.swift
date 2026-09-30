@@ -51,11 +51,15 @@ enum EngineError: LocalizedError {
     case certExists
     /// Apple error 8220: the device UDID couldn't be registered with the team.
     case deviceRegistration(udid: String, raw: String)
+    /// GrandSlam error -20209: Apple locked the account until it's reset at iForgot.
+    case accountLocked
 
     var errorDescription: String? {
         switch self {
         case let .message(m):
             return m
+        case .accountLocked:
+            return L("Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.")
         case .certExists:
             return L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists, or that a request for one is still pending (error 7460). SideInstaller couldn't reuse the certificate that's already there, so it stopped instead of replacing it. See the steps above.")
         case let .deviceRegistration(udid, raw):
@@ -124,6 +128,23 @@ final class Engine: ObservableObject {
     @Published var installSource: InstallSource = .sideStore
     // Which release track to pull that build from (stable or nightly).
     @Published var releaseChannel: ReleaseChannel = .stable
+    /// Versions picked under Advanced, per build and channel; a missing entry
+    /// installs the latest release. Not persisted, like the channel.
+    @Published private var pickedVersions: [InstallSource: [ReleaseChannel: ReleaseVersion]] = [:]
+
+    /// The version picked for the selected build and channel; nil installs the
+    /// latest release.
+    var selectedVersion: ReleaseVersion? {
+        get { pickedVersions[installSource]?[releaseChannel] }
+        set { pickedVersions[installSource, default: [:]][releaseChannel] = newValue }
+    }
+
+    /// Each build's releases, listed by the version picker under Advanced.
+    @Published private(set) var releaseCatalogs: [InstallSource: ReleaseCatalog] = [:]
+    /// The build whose releases are being fetched, if any.
+    @Published private(set) var loadingCatalog: InstallSource?
+    /// Why the last fetch of a build's releases failed.
+    @Published private(set) var catalogErrors: [InstallSource: String] = [:]
 
     // MARK: Plain-text status readouts
 
@@ -229,7 +250,8 @@ final class Engine: ObservableObject {
     private var pipelineTask: Task<Void, Never>?
     /// The IPA download a run starts as soon as the network is up, so it runs
     /// alongside pairing and sign-in instead of after them.
-    private var prefetch: (source: InstallSource, channel: ReleaseChannel, task: Task<String, Error>)?
+    private var prefetch: (source: InstallSource, channel: ReleaseChannel, version: String?,
+                           task: Task<String, Error>)?
     /// The Apple ID sign-in a run starts once pairing is settled, so it runs
     /// while the device link opens.
     private var backgroundSignIn: Task<Void, Error>?
@@ -276,9 +298,11 @@ final class Engine: ObservableObject {
     /// apps signed by this team can be refreshed in place.
     @Published private(set) var signingTeamID: String?
     @Published var downloadedIPAPath: String?
-    // Source and channel the current download corresponds to.
+    // Source, channel and picked version (nil: latest) the current download
+    // corresponds to.
     private var downloadedSource: InstallSource?
     private var downloadedChannel: ReleaseChannel?
+    private var downloadedVersion: String?
     @Published var signedAppPath: String?
     /// CFBundleDisplayName read off the signed bundle.
     @Published private(set) var signedDisplayName: String?
@@ -635,15 +659,16 @@ final class Engine: ObservableObject {
     }
 
     /// Triggers the Local Network permission prompt when an imported pairing
-    /// file is used (below iOS 27).
+    /// file is used (always below iOS 27, optionally from 27 on).
     ///
     /// Connecting to lockdownd over the tunnel counts as local-network access,
-    /// which iOS silently blocks until granted. On iOS 27 the RPPairing host
-    /// already triggers the prompt. Best-effort: if denied, the connect still
-    /// runs and reports its own error.
+    /// which iOS silently blocks until granted. When the iPhone pairs itself the
+    /// RPPairing host already triggers the prompt, but an imported file skips
+    /// that step. Best-effort: if denied, the connect still runs and reports its
+    /// own error.
     @MainActor
     private func ensureLocalNetworkForImportedPairing() async {
-        guard !canSelfPair, !askedLocalNetwork else { return }
+        guard !canSelfPair || importedPairingName != nil, !askedLocalNetwork else { return }
         askedLocalNetwork = true
         log("Checking Local Network permission — the device link needs it…")
         // Held only for the call; the browser and listener die with it.
@@ -733,16 +758,24 @@ final class Engine: ObservableObject {
     /// device link, or signs in now when none was.
     @MainActor
     private func signInStep() async throws {
-        guard let started = backgroundSignIn else { return try await signIn() }
-        backgroundSignIn = nil
-        try Task.checkCancellation()
-        setStep(.signIn, .active)
-        try await withTaskCancellationHandler {
-            try await started.value
-        } onCancel: {
-            started.cancel()
+        do {
+            guard let started = backgroundSignIn else { return try await signIn() }
+            backgroundSignIn = nil
+            try Task.checkCancellation()
+            setStep(.signIn, .active)
+            try await withTaskCancellationHandler {
+                try await started.value
+            } onCancel: {
+                started.cancel()
+            }
+            setStep(.signIn, .done)
+        } catch {
+            // Only the account's owner can unlock it, so show them how.
+            if case EngineError.accountLocked = error {
+                setGuide(Guides.accountLocked)
+            }
+            throw error
         }
-        setStep(.signIn, .done)
     }
 
     /// Starts the Apple ID sign-in without touching the checklist, unless this
@@ -804,6 +837,12 @@ final class Engine: ObservableObject {
                     log("Two-factor verification cancelled — stopping.")
                     signInStatus = "signed out"
                     throw EngineError.message(L("Two-factor verification was cancelled."))
+                }
+                // A locked account fails everywhere, and retrying keeps it locked.
+                if Self.isAccountLocked(lastError) {
+                    signInStatus = "sign-in failed"
+                    log("Apple has locked this Apple Account: \(lastError)")
+                    throw EngineError.accountLocked
                 }
                 // Bad credentials fail everywhere, and retrying risks a lockout.
                 if Self.isCredentialError(lastError) {
@@ -925,6 +964,15 @@ final class Engine: ObservableObject {
         return m.contains("apple.com") && m.contains("429 too many requests")
     }
 
+    /// Detects GrandSlam -20209, "This Apple Account has been locked for security
+    /// reasons. Visit iForgot to reset your account". Only a reset unlocks it.
+    static func isAccountLocked(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("-20209")
+            || m.contains("locked for security reasons")
+            || m.contains("iforgot")
+    }
+
     /// Detect a credential failure, which no anisette server can fix.
     static func isCredentialError(_ raw: String) -> Bool {
         let m = raw.lowercased()
@@ -956,16 +1004,20 @@ final class Engine: ObservableObject {
     private func download() async throws {
         let src = installSource
         let channel = releaseChannel
-        // Keyed on source and channel, so changing either re-fetches.
+        // A custom IPA has no versions to pick from.
+        let version = src == .custom ? nil : selectedVersion
+        // Keyed on source, channel and version, so changing any re-fetches.
         if let p = downloadedIPAPath, downloadedSource == src, downloadedChannel == channel,
-           FileManager.default.fileExists(atPath: p) {
-            log("\(channel.displayName) \(src.displayName) IPA already downloaded — skipping.")
+           downloadedVersion == version?.tag, FileManager.default.fileExists(atPath: p) {
+            log("\(buildName(src, channel, version)) IPA already downloaded — skipping.")
             setStep(.download, .done)
             return
         }
         setStep(.download, .active)
 
-        let onDisk = IPALibrary.entry(source: src, channel: channel)
+        // A picked version must be that exact release, so only the latest build
+        // takes a file already in Documents.
+        let onDisk = version == nil ? IPALibrary.entry(source: src, channel: channel) : nil
 
         // A custom install has no fallback: the imported file is the input.
         if src == .custom {
@@ -984,21 +1036,29 @@ final class Engine: ObservableObject {
         }
 
         do {
-            let path = try await fetchLatest(source: src, channel: channel)
-            adopt(URL(fileURLWithPath: path), source: src, channel: channel)
+            let path = try await fetchBuild(source: src, channel: channel, version: version)
+            adopt(URL(fileURLWithPath: path), source: src, channel: channel, version: version?.tag)
             log("\(src.displayName) IPA ready at \(path)")
             setStep(.download, .done)
         } catch {
             // Stopping the install isn't a failed download: no cached copy stands in.
             if Task.isCancelled { throw CancellationError() }
-            // Offline or blocked: fall back to a copy an earlier run left behind.
-            if let cached = onDisk {
-                log("⚠️ Download failed (\(short(error))) — using \(cached.url.lastPathComponent) already in Documents instead.")
-                adopt(cached.url, source: src, channel: channel)
+            // Offline or blocked: fall back to a copy an earlier run left behind,
+            // which for a picked version must be that version.
+            let cached: URL?
+            if let version {
+                cached = IPALibrary.pickedDownload(version.tag, source: src, channel: channel)
+            } else {
+                cached = onDisk?.url
+            }
+            if let cached {
+                log("⚠️ Download failed (\(short(error))) — using \(cached.lastPathComponent) already in Documents instead.")
+                adopt(cached, source: src, channel: channel, version: version?.tag)
                 setStep(.download, .done)
                 return
             }
-            logImportHint(for: error, source: src, channel: channel)
+            // Renaming a file to the build's name helps only the latest build.
+            if version == nil { logImportHint(for: error, source: src, channel: channel) }
             throw error
         }
     }
@@ -1014,30 +1074,28 @@ final class Engine: ObservableObject {
         let src = installSource
         let channel = releaseChannel
         guard src != .custom else { return }
+        let version = selectedVersion
         if let p = downloadedIPAPath, downloadedSource == src, downloadedChannel == channel,
-           FileManager.default.fileExists(atPath: p) {
+           downloadedVersion == version?.tag, FileManager.default.fileExists(atPath: p) {
             return
         }
-        if let onDisk = IPALibrary.entry(source: src, channel: channel), onDisk.isImported { return }
+        if version == nil, let onDisk = IPALibrary.entry(source: src, channel: channel),
+           onDisk.isImported { return }
 
-        log("Fetching \(channel.displayName.lowercased()) \(src.displayName) release in the background…")
-        let task = Task {
-            try await SideStoreDownloader.downloadLatest(source: src, channel: channel) { line in
-                self.log(line)
-            }
-        }
-        prefetch = (src, channel, task)
+        log("Fetching \(buildName(src, channel, version)) release in the background…")
+        let task = Task { try await self.downloadBuild(source: src, channel: channel, version: version) }
+        prefetch = (src, channel, version?.tag, task)
     }
 
     /// The selected build's download: the one this run started early when there
     /// is one, otherwise a new one. Cancelling the caller cancels either.
     @MainActor
-    private func fetchLatest(source: InstallSource, channel: ReleaseChannel) async throws -> String {
-        guard let started = prefetch, started.source == source, started.channel == channel else {
-            log("Fetching \(channel.displayName.lowercased()) \(source.displayName) release…")
-            return try await SideStoreDownloader.downloadLatest(source: source, channel: channel) { line in
-                self.log(line)
-            }
+    private func fetchBuild(source: InstallSource, channel: ReleaseChannel,
+                            version: ReleaseVersion?) async throws -> String {
+        guard let started = prefetch, started.source == source, started.channel == channel,
+              started.version == version?.tag else {
+            log("Fetching \(buildName(source, channel, version)) release…")
+            return try await downloadBuild(source: source, channel: channel, version: version)
         }
         prefetch = nil
         let task = started.task
@@ -1048,12 +1106,58 @@ final class Engine: ObservableObject {
         }
     }
 
+    /// Downloads the picked version, or else the channel's latest release.
+    @MainActor
+    private func downloadBuild(source: InstallSource, channel: ReleaseChannel,
+                               version: ReleaseVersion?) async throws -> String {
+        let log: (String) -> Void = { line in self.log(line) }
+        guard let version else {
+            return try await SideStoreDownloader.downloadLatest(source: source, channel: channel, log: log)
+        }
+        return try await SideStoreDownloader.download(version, source: source, channel: channel, log: log)
+    }
+
+    /// A build as the log names it: "Nightly SideStore", or "SideStore 0.6.3".
+    private func buildName(_ source: InstallSource, _ channel: ReleaseChannel,
+                           _ version: ReleaseVersion?) -> String {
+        guard let version else { return "\(channel.displayName) \(source.displayName)" }
+        return "\(source.displayName) \(version.title)"
+    }
+
     /// Point the rest of the pipeline at an IPA on disk, whatever its origin.
     @MainActor
-    private func adopt(_ url: URL, source: InstallSource, channel: ReleaseChannel) {
+    private func adopt(_ url: URL, source: InstallSource, channel: ReleaseChannel,
+                       version: String? = nil) {
         downloadedIPAPath = url.path
         downloadedSource = source
         downloadedChannel = channel
+        downloadedVersion = version
+    }
+
+    // MARK: Versions to pick from (Advanced)
+
+    /// Lists `source`'s releases for the version picker, unless a list from the
+    /// last 15 minutes is at hand. One GitHub API call, which counts against the
+    /// same hourly limit as the download's fallbacks.
+    @MainActor
+    func loadReleaseCatalog(for source: InstallSource, force: Bool = false) async {
+        guard source != .custom, loadingCatalog != source else { return }
+        if !force, let cached = releaseCatalogs[source],
+           Date().timeIntervalSince(cached.fetched) < 15 * 60 { return }
+        loadingCatalog = source
+        catalogErrors[source] = nil
+        // Checked, since a newer load for another build may have started since.
+        defer { if loadingCatalog == source { loadingCatalog = nil } }
+        do {
+            let catalog = try await SideStoreDownloader.releaseCatalog(source: source)
+            releaseCatalogs[source] = catalog
+            log("Versions: \(source.displayName) has \(catalog.others[.stable]?.count ?? 0) stable and \(catalog.others[.nightly]?.count ?? 0) pre-release builds besides the latest.")
+        } catch is CancellationError {
+            // The picker closed mid-fetch; opening it again retries.
+        } catch {
+            catalogErrors[source] = short(error)
+            log("⚠️ Couldn't list \(source.displayName) releases: \(short(error))")
+        }
     }
 
     /// Take a user-supplied IPA as the download step's result, if it is one.
@@ -1723,7 +1827,8 @@ final class Engine: ObservableObject {
     // the file, then write it into installed apps via house_arrest/AFC.
 
     /// Imports a pairing file made elsewhere (jitterbugpair, pymobiledevice3,
-    /// idevicepair, …), replacing the one on disk. Required below iOS 27.
+    /// idevicepair, …), replacing the one on disk. Required below iOS 27;
+    /// optional (under Advanced) from 27 on.
     @MainActor
     func importPairingFile(from url: URL) async {
         guard !isImportingPairing else { return }
@@ -2255,6 +2360,22 @@ enum Guides {
                 L("If you changed LocalDevVPN's addresses, copy its Device IP here — including the /32, if it shows one."),
             ],
             actionLabel: nil, actionURLString: nil)
+    }
+
+    /// Shown when Apple has locked the Apple Account (GrandSlam -20209), which
+    /// only a password reset at iForgot undoes.
+    static var accountLocked: Guide {
+        Guide(
+            title: L("Reset your Apple Account password"),
+            systemImage: "lock.trianglebadge.exclamationmark",
+            steps: [
+                L("Apple has locked this Apple Account for security reasons, often after too many sign-in attempts. Every sign-in fails until it's unlocked, so tapping Install again won't help yet."),
+                L("Open iForgot, enter this Apple Account's email, and follow Apple's steps to unlock it and reset its password."),
+                L("Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password."),
+                L("Then tap Install again."),
+            ],
+            actionLabel: L("Open iForgot"),
+            actionURLString: "https://iforgot.apple.com")
     }
 
     /// Shown when no Apple ID is saved; points to Settings › Account.

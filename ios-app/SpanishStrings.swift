@@ -203,10 +203,11 @@ let spanishStrings: [String: String] = [
         "Archivo de emparejamiento listo. Puedes exportarlo o instalarlo en una app aquí abajo.",
     "Pairing file installed into %@.": "Archivo de emparejamiento instalado en %@.",
 
-    // Importing a pairing file (iOS 26 and below)
+    // Importing a pairing file (required below iOS 27, under Advanced from 27)
 
     "Import pairing file": "Importar archivo de emparejamiento",
     "How do I make one?": "¿Cómo lo creo?",
+    "(Optional)": "(Opcional)",
     "imported pairing file": "archivo de emparejamiento importado",
     "No pairing file yet — tap “Import pairing file” first.":
         "Aún no hay archivo de emparejamiento: toca primero “Importar archivo de emparejamiento”.",
@@ -497,6 +498,15 @@ let spanishStrings: [String: String] = [
 
     "Stable": "Estable",
     "Nightly": "Nightly",
+
+    // Version picker (Advanced)
+
+    "%@ version": "Versión de %@",
+    "Latest": "Última",
+    "Latest (%@)": "Última (%@)",
+    "Couldn't load the other versions: %@": "No se han podido cargar las demás versiones: %@",
+    "Try again": "Reintentar",
+
     "couldn't find the IPA in the %@ %@ release":
         "no se ha encontrado el IPA en la versión %@ de %@",
     "%@ has no %@ release right now": "%@ no tiene ninguna versión %@ ahora mismo",
@@ -525,6 +535,8 @@ let spanishStrings: [String: String] = [
         "Apple está limitando temporalmente los inicios de sesión de este Apple ID o de esta red (HTTP 429). Probar otros servidores no servirá de nada y cada intento puede alargar la espera, así que deja pasar un rato antes de volver a iniciar sesión.",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
         "Si estás seguro de que la contraseña es correcta, puede que Apple esté limitando los intentos de inicio de sesión: espera un rato antes de volver a intentarlo.",
+    "Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.":
+        "Apple ha bloqueado esta Apple Account por motivos de seguridad (error -20209), así que todos los inicios de sesión fallarán hasta que se desbloquee. Restablece su contraseña en iforgot.apple.com y vuelve a iniciar sesión con la nueva contraseña.",
     "the anisette server": "el servidor anisette",
     "all %d anisette servers": "los %d servidores anisette",
     "Not signed in.": "No has iniciado sesión.",
@@ -603,6 +615,18 @@ let spanishStrings: [String: String] = [
         "Otra opción: inicia sesión arriba con otro Apple ID (o uno de repuesto) y toca Instalar otra vez.",
 
     // MARK: - Guide cards
+
+    // Guide: reset a locked Apple Account
+
+    "Reset your Apple Account password": "Restablece la contraseña de tu Apple Account",
+    "Apple has locked this Apple Account for security reasons, often after too many sign-in attempts. Every sign-in fails until it's unlocked, so tapping Install again won't help yet.":
+        "Apple ha bloqueado esta Apple Account por motivos de seguridad, a menudo tras demasiados intentos de inicio de sesión. Todos los inicios de sesión fallarán hasta que se desbloquee, así que tocar Instalar otra vez aún no servirá de nada.",
+    "Open iForgot, enter this Apple Account's email, and follow Apple's steps to unlock it and reset its password.":
+        "Abre iForgot, introduce el correo de esta Apple Account y sigue los pasos de Apple para desbloquearla y restablecer su contraseña.",
+    "Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password.":
+        "De vuelta en SideInstaller, abre Ajustes › Cuenta, desliza a la izquierda sobre este Apple ID, toca Editar e introduce la nueva contraseña.",
+    "Then tap Install again.": "Después, toca Instalar otra vez.",
+    "Open iForgot": "Abrir iForgot",
 
     // Guide: import a pairing file
 
