@@ -50,18 +50,22 @@ struct ContentView: View {
                         }
                     }
                     // Progress sits above the Install/Cancel button.
+                    // The cascade handles its entrance (including on a tab
+                    // switch mid-run), so the transition only covers removal.
                     if showProgress {
-                        progressCard.transition(.cardAppear)
+                        progressCard
+                            .cascadeItem(cascade(3))
+                            .transition(.asymmetric(insertion: .identity, removal: .cardAppear))
                     }
-                    installButton.cascadeItem(cascade(3))
+                    installButton.cascadeItem(cascade(4))
                     // The build's version, and from iOS 27 (which pairs itself)
                     // the optional pairing-file import, folded away.
                     if showsAdvanced {
-                        advancedSection.cascadeItem(cascade(4))
+                        advancedSection.cascadeItem(cascade(5))
                     }
                     // Guides, the pairing code, errors and success show as
                     // `InstallPopup`, which `RootView` lays over the app.
-                    footer.cascadeItem(cascade(5))
+                    footer.cascadeItem(cascade(6))
                 }
                 .padding(20)
                 // One modifier per piece of state, so only its own card animates.
