@@ -177,7 +177,7 @@ struct CalloutCard<Content: View>: View {
 ///
 /// A blocking popup holds what a running step is waiting on, such as the
 /// pairing code: closing it stops the run, so taps on the backdrop leave it
-/// open, and it can't be closed by accident.
+/// open, and its X asks before closing it.
 struct PopupCard<Content: View>: View {
     var title: String
     var systemImage: String
@@ -187,6 +187,10 @@ struct PopupCard<Content: View>: View {
 
     /// Edges this card shares with a neighbour in the stack; see `popupStack`.
     @Environment(\.popupJoins) private var joins
+    /// True while a run is waiting on this card, so closing it ends the run.
+    @Environment(\.popupEndsProcess) private var endsProcess
+    /// Shows the "are you sure" alert before a blocking card closes.
+    @State private var confirmingClose = false
 
     /// Hung under the popup above, whose X closes both, so it has no X of its
     /// own.
@@ -210,7 +214,21 @@ struct PopupCard<Content: View>: View {
         // sits beneath it, so no shadow falls across the seam.
         .shadow(color: .black.opacity(joins.contains(.bottom) ? 0 : 0.45), radius: 30, x: 0, y: 14)
         .accessibilityElement(children: .contain)
-        .accessibilityAction(.escape, onClose)
+        .accessibilityAction(.escape, requestClose)
+        .alert(L("Closing this popup will end the process. Are you sure?"),
+               isPresented: $confirmingClose) {
+            Button(L("Yes"), role: .destructive, action: onClose)
+            Button(L("No"), role: .cancel) { }
+        }
+    }
+
+    /// Closes the card, asking first when that would end the run.
+    private func requestClose() {
+        if endsProcess {
+            confirmingClose = true
+        } else {
+            onClose()
+        }
     }
 
     /// Rounded, except where the card meets a neighbour, so the pair reads as
@@ -235,7 +253,7 @@ struct PopupCard<Content: View>: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
             if !isAttached {
-                Button(action: onClose) {
+                Button(action: requestClose) {
                     Image(systemName: "xmark")
                         .font(.footnote.weight(.bold))
                         .foregroundStyle(.secondary)
@@ -254,12 +272,23 @@ private struct PopupJoinsKey: EnvironmentKey {
     static let defaultValue: Edge.Set = []
 }
 
+private struct PopupEndsProcessKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
     /// The edges a popup card shares with its neighbours: `.top` when it hangs
     /// under the card above, `.bottom` when one hangs under it.
     var popupJoins: Edge.Set {
         get { self[PopupJoinsKey.self] }
         set { self[PopupJoinsKey.self] = newValue }
+    }
+
+    /// True when a run is waiting on the popup card, so closing it ends the
+    /// run; set by `RootView`, which knows what each page is waiting on.
+    var popupEndsProcess: Bool {
+        get { self[PopupEndsProcessKey.self] }
+        set { self[PopupEndsProcessKey.self] = newValue }
     }
 }
 

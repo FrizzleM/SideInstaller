@@ -242,6 +242,7 @@ final class EntitlementsManager: ObservableObject {
         engine.twoFactorWasCancelled = false
         var lastError = "no anisette servers configured"
         var appleRefusals = 0
+        var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
             do {
@@ -275,6 +276,17 @@ final class EntitlementsManager: ObservableObject {
                         engine.log("Entitlements: Apple's sign-in server refused \(appleRefusals) attempts with HTTP 503 — stopping.")
                         throw EngineError.message(Engine.appleServiceRefusalMessage)
                     }
+                }
+                // Every anisette server starts with the same request to Apple, so
+                // when that can't even be sent, more of them won't help.
+                if Engine.isAppleUnreachable(lastError) {
+                    appleUnreachable += 1
+                    if let message = await engine.appleUnreachableStop(
+                        failures: appleUnreachable, logPrefix: "Entitlements: ") {
+                        throw EngineError.message(message)
+                    }
+                } else {
+                    appleUnreachable = 0
                 }
             }
         }

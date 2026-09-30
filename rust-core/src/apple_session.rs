@@ -27,6 +27,8 @@ use isideload::{
 use rootcause::Report;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+
+use crate::error_text::report_text;
 use tokio::sync::RwLock;
 
 /// Sign in again this long before Apple's stated expiry rather than race it.
@@ -201,14 +203,14 @@ where
         Box::new(FsStorage::new(storage_dir.to_path_buf())),
         "0".to_string(),
     )
-    .map_err(|e| format!("anisette provider: {e}"))?;
+    .map_err(|e| format!("anisette provider: {}", report_text(&e)))?;
 
     // Only fetches client info and the URL bag; doesn't sign in.
     let mut account = AppleAccount::builder(apple_id)
         .anisette_provider(anisette)
         .build()
         .await
-        .map_err(|e| format!("login failed: {e}"))?;
+        .map_err(|e| format!("login failed: {}", report_text(&e)))?;
 
     if let Some(saved) = saved {
         if saved.usable_for(apple_id, now) {
@@ -227,7 +229,7 @@ where
                     return Ok((dev, teams));
                 }
                 Err(e) => {
-                    let text = format!("{e}");
+                    let text = report_text(&e);
                     if is_transient(&text) {
                         return Err(format!("developer session: {text}"));
                     }
@@ -244,17 +246,17 @@ where
         }
     }
 
-    tracing::info!("{label}: logging in {apple_id}");
+    tracing::info!("{label}: logging in");
     account
         .login(password, two_factor)
         .await
-        .map_err(|e| format!("login failed: {e}"))?;
+        .map_err(|e| format!("login failed: {}", report_text(&e)))?;
     tracing::info!("{label}: login OK; opening developer session");
 
     let token = account
         .get_app_token("xcode.auth")
         .await
-        .map_err(|e| format!("developer session: {e}"))?;
+        .map_err(|e| format!("developer session: {}", report_text(&e)))?;
     let adsid = account
         .spd
         .as_ref()
@@ -285,7 +287,7 @@ where
     let teams = dev
         .list_teams()
         .await
-        .map_err(|e| format!("list teams: {e}"))?;
+        .map_err(|e| format!("list teams: {}", report_text(&e)))?;
     Ok((dev, teams))
 }
 
@@ -303,20 +305,20 @@ async fn reuse_without_url_bag(
         Box::new(FsStorage::new(storage_dir.to_path_buf())),
         "0".to_string(),
     )
-    .map_err(|e| format!("anisette provider: {e}"))?;
+    .map_err(|e| format!("anisette provider: {}", report_text(&e)))?;
     let client_info = anisette
         .get_client_info()
         .await
-        .map_err(|e| format!("anisette client info: {e}"))?;
+        .map_err(|e| format!("anisette client info: {}", report_text(&e)))?;
     let client = GrandSlam::without_url_bag(client_info, false)
-        .map_err(|e| format!("GrandSlam client: {e}"))?;
+        .map_err(|e| format!("GrandSlam client: {}", report_text(&e)))?;
     let mut dev = DeveloperSession::new(
         saved.app_token(),
         saved.adsid.clone(),
         Arc::new(client),
         AnisetteDataGenerator::new(Arc::new(RwLock::new(anisette))),
     );
-    let teams = dev.list_teams().await.map_err(|e| format!("{e}"))?;
+    let teams = dev.list_teams().await.map_err(|e| report_text(&e))?;
     Ok((dev, teams))
 }
 

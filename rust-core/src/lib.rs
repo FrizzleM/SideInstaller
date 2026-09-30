@@ -11,6 +11,7 @@ mod account;
 mod apple_session;
 mod certs;
 mod entitlements;
+mod error_text;
 mod ffi_util;
 mod logging;
 mod pairing;

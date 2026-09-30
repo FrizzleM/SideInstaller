@@ -68,7 +68,9 @@ struct RootView: View {
         // Animate the backdrop to the new tab's level.
         .onChange(of: page) { _, page in Backdrop.settle(on: page.wash) }
         // Over the tab bar too, so the whole app dims behind the popups.
-        .popupStack(popups, onBackdropTap: backdropTap, attached: attached) { card(for: $0) }
+        .popupStack(popups, onBackdropTap: backdropTap, attached: attached) { item in
+            card(for: item).environment(\.popupEndsProcess, blocks(item))
+        }
         // The Install tab's revoke-and-retry runs through this same manager
         // (declared below the popups, which use it too).
         .environmentObject(certManager)

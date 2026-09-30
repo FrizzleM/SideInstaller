@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import Network
 
 /// Detects the loopback tunnel (a `utun*` interface) and Wi-Fi (`en0`) by
 /// scanning the active interfaces. For status display only; a successful connect
@@ -160,6 +161,24 @@ enum NetworkStatus {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let slash = trimmed.firstIndex(of: "/") else { return trimmed }
         return String(trimmed[..<slash]).trimmingCharacters(in: .whitespaces)
+    }
+
+    /// This app's internet path as iOS sees it now. It's evaluated per app, so
+    /// it shows what fails every request without the request saying why:
+    /// Cellular Data or Wireless Data switched off for SideInstaller, or a VPN
+    /// holding traffic back while it's down.
+    static func internetPath() async -> NWPath {
+        let monitor = NWPathMonitor()
+        let (paths, continuation) = AsyncStream.makeStream(of: NWPath.self)
+        monitor.pathUpdateHandler = { continuation.yield($0) }
+        monitor.start(queue: DispatchQueue(label: "sideinstaller.internet-path"))
+        defer {
+            monitor.cancel()
+            continuation.finish()
+        }
+        // The monitor reports the current path as soon as it starts.
+        for await path in paths { return path }
+        return monitor.currentPath
     }
 
     /// `"10.7.0.1"` -> `0x0A070001`. Nil if `ip` isn't a dotted quad.

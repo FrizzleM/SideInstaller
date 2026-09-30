@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import UIKit
 import SideInstallerFFI
 
@@ -395,7 +396,9 @@ final class Engine: ObservableObject {
     private static let mirrorsLogToStdout =
         ProcessInfo.processInfo.environment["SIDEINSTALLER_LOG_STDOUT"] != nil
 
-    private func appendLine(_ message: String) {
+    private func appendLine(_ raw: String) {
+        // Before anything keeps it: the console, Copy logs, and the stdout mirror.
+        let message = LogRedactor.redact(raw)
         let stamp = dateFormatter.string(from: Date())
         if Self.mirrorsLogToStdout {
             fputs("\(stamp)  \(message)\n", stdout)
@@ -892,6 +895,7 @@ final class Engine: ObservableObject {
         twoFactorWasCancelled = false
         var lastError = "no anisette servers configured"
         var appleRefusals = 0
+        var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
             try Task.checkCancellation()
@@ -948,6 +952,17 @@ final class Engine: ObservableObject {
                         throw EngineError.message(Self.appleServiceRefusalMessage)
                     }
                 }
+                // Every anisette server starts with the same request to Apple, so
+                // when that can't even be sent, more of them won't help.
+                if Self.isAppleUnreachable(lastError) {
+                    appleUnreachable += 1
+                    if let message = await appleUnreachableStop(failures: appleUnreachable) {
+                        signInStatus = "sign-in failed"
+                        throw EngineError.message(message)
+                    }
+                } else {
+                    appleUnreachable = 0
+                }
                 if idx < servers.count - 1 { log("Trying the next anisette server…") }
             }
         }
@@ -962,7 +977,7 @@ final class Engine: ObservableObject {
     /// One sign-in attempt against a specific anisette server.
     private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {
         defer { endTwoFactor() }
-        log("Apple ID sign-in for \(Self.oneLine(id)) via anisette \(Self.oneLine(ani)) …")
+        log("Apple ID sign-in for \(LogRedactor.maskAppleID(id)) via anisette \(Self.oneLine(ani)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
@@ -1078,6 +1093,50 @@ final class Engine: ObservableObject {
     static func isAppleServiceRefusal(_ raw: String) -> Bool {
         let m = raw.lowercased()
         return m.contains("gsa.apple.com") && m.contains("503")
+    }
+
+    /// Detects a sign-in that never reached Apple: sending GrandSlam's URL-bag
+    /// request to gsa.apple.com failed. It's the first request of a sign-in and
+    /// uses no anisette data, so every anisette server would fail it the same way.
+    static func isAppleUnreachable(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("failed to fetch url bag") && m.contains("error sending request")
+    }
+
+    /// Called after `failures` sign-in attempts in a row that couldn't reach
+    /// Apple. Logs how iOS sees this app's internet access, and returns the
+    /// message to stop the sign-in with, or nil to try once more.
+    @MainActor
+    func appleUnreachableStop(failures: Int, logPrefix: String = "") async -> String? {
+        let path = await NetworkStatus.internetPath()
+        log("\(logPrefix)Couldn't reach Apple's sign-in server (gsa.apple.com). iOS reports this app's internet path as: \(path.debugDescription)")
+        let message = Self.appleUnreachableMessage(
+            satisfied: path.status == .satisfied, reason: path.unsatisfiedReason, failures: failures)
+        if message != nil {
+            log("\(logPrefix)Stopping: the anisette server isn't the problem, so trying more of them won't help.")
+        }
+        return message
+    }
+
+    /// iOS saying this app has no usable internet is conclusive, so that stops
+    /// at the first failure. With internet up, the first failure may be a
+    /// blip; a second means something is blocking Apple.
+    static func appleUnreachableMessage(satisfied: Bool, reason: NWPath.UnsatisfiedReason,
+                                        failures: Int) -> String? {
+        guard !satisfied else {
+            guard failures >= 2 else { return nil }
+            return L("SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.")
+        }
+        switch reason {
+        case .cellularDenied:
+            return L("SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.")
+        case .wifiDenied:
+            return L("SideInstaller can't reach Apple: iOS isn't letting it use Wi-Fi. In Settings › Apps › SideInstaller › Wireless Data, choose WLAN & Cellular Data, then try again.")
+        case .vpnInactive:
+            return L("SideInstaller can't reach Apple: a VPN set to carry all traffic is disconnected, so iOS is holding traffic back. Reconnect it, or turn off its kill switch or Connect On Demand, then try again.")
+        default:
+            return L("SideInstaller can't reach Apple: this iPhone has no internet connection. Connect to Wi-Fi or turn on cellular data, then try again.")
+        }
     }
 
     // MARK: Step 5 — download the IPA

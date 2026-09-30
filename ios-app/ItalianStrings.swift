@@ -143,6 +143,10 @@ let italianStrings: [String: String] = [
         "Scrivi questo codice nella richiesta che compare in Impostazioni.",
     "Install stopped": "Installazione interrotta",
     "Close": "Chiudi",
+    "Yes": "Sì",
+    "No": "No",
+    "Closing this popup will end the process. Are you sure?":
+        "Chiudere questo popup interromperà il processo. Vuoi continuare?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ è installato. Completa il passaggio di autorizzazione qui sopra per aprirlo.",
     "Action needed": "Serve il tuo intervento",
@@ -529,6 +533,16 @@ let italianStrings: [String: String] = [
         "Accesso con l'Apple ID non riuscito su %@. Ultimo errore: %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Il server di accesso di Apple ha rifiutato la richiesta (HTTP 503). Non dipende dalla password né dal server anisette, quindi provare altri server non serve. Riprova più tardi o aggiorna SideInstaller.",
+    "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
+        "SideInstaller non riesce a raggiungere il server di accesso di Apple (gsa.apple.com), anche se questo iPhone è connesso a internet. Qualcosa lo sta bloccando: un firewall, un filtro DNS o un ad blocker, le restrizioni dei contenuti di Tempo di utilizzo o un’altra app VPN. Disattivalo o prova un’altra rete, poi riprova.",
+    "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":
+        "SideInstaller non riesce a raggiungere Apple: i dati cellulare sono disattivati per l’app. Attiva SideInstaller in Impostazioni › Cellulare, oppure connettiti a una rete Wi-Fi con accesso a internet, poi riprova.",
+    "SideInstaller can't reach Apple: iOS isn't letting it use Wi-Fi. In Settings › Apps › SideInstaller › Wireless Data, choose WLAN & Cellular Data, then try again.":
+        "SideInstaller non riesce a raggiungere Apple: iOS non gli permette di usare il Wi-Fi. In Impostazioni › App › SideInstaller › Dati wireless, scegli «WLAN e dati cellulare», poi riprova.",
+    "SideInstaller can't reach Apple: a VPN set to carry all traffic is disconnected, so iOS is holding traffic back. Reconnect it, or turn off its kill switch or Connect On Demand, then try again.":
+        "SideInstaller non riesce a raggiungere Apple: una VPN impostata per far passare tutto il traffico è disconnessa, quindi iOS trattiene il traffico. Riconnettila, oppure disattiva il suo kill switch o la connessione su richiesta, poi riprova.",
+    "SideInstaller can't reach Apple: this iPhone has no internet connection. Connect to Wi-Fi or turn on cellular data, then try again.":
+        "SideInstaller non riesce a raggiungere Apple: questo iPhone non è connesso a internet. Connettiti a una rete Wi-Fi o attiva i dati cellulare, poi riprova.",
     "Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.":
         "Apple sta limitando temporaneamente gli accessi per questo Apple ID o questa rete (HTTP 429). Provare altri server non serve e ogni tentativo può allungare l'attesa, quindi lascia passare un po' di tempo prima di accedere di nuovo.",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":

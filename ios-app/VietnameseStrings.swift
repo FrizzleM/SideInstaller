@@ -144,6 +144,10 @@ let vietnameseStrings: [String: String] = [
         "Nhập mã này vào hộp thoại trong Cài đặt.",
     "Install stopped": "Đã dừng cài đặt",
     "Close": "Đóng",
+    "Yes": "Có",
+    "No": "Không",
+    "Closing this popup will end the process. Are you sure?":
+        "Đóng cửa sổ này sẽ dừng quá trình. Bạn có chắc không?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ đã được cài đặt. Hoàn tất bước tin cậy ở trên để mở ứng dụng.",
     "Action needed": "Cần thao tác",
@@ -528,6 +532,16 @@ let vietnameseStrings: [String: String] = [
         "Đăng nhập Apple ID thất bại trên %@. Lỗi cuối cùng: %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Máy chủ đăng nhập của Apple đã từ chối yêu cầu (HTTP 503). Lỗi không phải do mật khẩu hay máy chủ anisette, nên thử thêm máy chủ khác cũng không giúp được. Hãy thử lại sau hoặc cập nhật SideInstaller.",
+    "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
+        "SideInstaller không kết nối được tới máy chủ đăng nhập của Apple (gsa.apple.com), dù iPhone này vẫn có kết nối internet. Có thứ gì đó đang chặn nó: tường lửa, bộ lọc DNS hoặc trình chặn quảng cáo, giới hạn nội dung trong Thời gian sử dụng, hoặc một ứng dụng VPN khác. Hãy tắt nó hoặc thử mạng khác, rồi thử lại.",
+    "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":
+        "SideInstaller không kết nối được tới Apple: Dữ liệu di động đang bị tắt cho ứng dụng này. Hãy bật SideInstaller trong Cài đặt › Di động, hoặc kết nối Wi-Fi có internet, rồi thử lại.",
+    "SideInstaller can't reach Apple: iOS isn't letting it use Wi-Fi. In Settings › Apps › SideInstaller › Wireless Data, choose WLAN & Cellular Data, then try again.":
+        "SideInstaller không kết nối được tới Apple: iOS không cho phép nó dùng Wi-Fi. Vào Cài đặt › Ứng dụng › SideInstaller › Dữ liệu không dây, chọn WLAN & Dữ liệu di động, rồi thử lại.",
+    "SideInstaller can't reach Apple: a VPN set to carry all traffic is disconnected, so iOS is holding traffic back. Reconnect it, or turn off its kill switch or Connect On Demand, then try again.":
+        "SideInstaller không kết nối được tới Apple: một VPN được đặt để chuyển toàn bộ lưu lượng đang bị ngắt kết nối, nên iOS đang giữ lại lưu lượng. Hãy kết nối lại, hoặc tắt kill switch hay Kết nối theo yêu cầu của nó, rồi thử lại.",
+    "SideInstaller can't reach Apple: this iPhone has no internet connection. Connect to Wi-Fi or turn on cellular data, then try again.":
+        "SideInstaller không kết nối được tới Apple: iPhone này không có kết nối internet. Hãy kết nối Wi-Fi hoặc bật dữ liệu di động, rồi thử lại.",
     "Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.":
         "Apple đang tạm thời giới hạn việc đăng nhập cho Apple ID hoặc mạng này (HTTP 429). Thử máy chủ khác cũng không giúp được, và mỗi lần thử có thể kéo dài thời gian chờ, nên hãy đợi một lúc rồi mới đăng nhập lại.",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
