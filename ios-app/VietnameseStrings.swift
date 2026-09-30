@@ -202,10 +202,11 @@ let vietnameseStrings: [String: String] = [
         "Tệp ghép nối đã sẵn sàng. Bạn có thể xuất tệp hoặc cài vào một ứng dụng bên dưới.",
     "Pairing file installed into %@.": "Đã cài tệp ghép nối vào %@.",
 
-    // Importing a pairing file (iOS 26 and below)
+    // Importing a pairing file (required below iOS 27, under Advanced from 27)
 
     "Import pairing file": "Nhập tệp ghép nối",
     "How do I make one?": "Tạo nó như thế nào?",
+    "(Optional)": "(Không bắt buộc)",
     "imported pairing file": "đã nhập tệp ghép nối",
     "No pairing file yet — tap “Import pairing file” first.":
         "Chưa có tệp ghép nối — hãy chạm “Nhập tệp ghép nối” trước.",
@@ -493,6 +494,15 @@ let vietnameseStrings: [String: String] = [
 
     "Stable": "Ổn định",
     "Nightly": "Nightly",
+
+    // Version picker (Advanced)
+
+    "%@ version": "Phiên bản %@",
+    "Latest": "Mới nhất",
+    "Latest (%@)": "Mới nhất (%@)",
+    "Couldn't load the other versions: %@": "Không thể tải các phiên bản khác: %@",
+    "Try again": "Thử lại",
+
     "couldn't find the IPA in the %@ %@ release":
         "không tìm thấy tệp IPA trong bản phát hành %@ của %@",
     "%@ has no %@ release right now": "%@ hiện không có bản phát hành %@ nào",
@@ -521,6 +531,8 @@ let vietnameseStrings: [String: String] = [
         "Apple đang tạm thời giới hạn việc đăng nhập cho Apple ID hoặc mạng này (HTTP 429). Thử máy chủ khác cũng không giúp được, và mỗi lần thử có thể kéo dài thời gian chờ, nên hãy đợi một lúc rồi mới đăng nhập lại.",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
         "Nếu bạn chắc chắn mật khẩu đúng, có thể Apple đang giới hạn số lần đăng nhập: hãy đợi một lúc rồi thử lại.",
+    "Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.":
+        "Apple đã khóa Apple Account này vì lý do bảo mật (lỗi -20209), nên mọi lần đăng nhập đều thất bại cho đến khi tài khoản được mở khóa. Hãy đặt lại mật khẩu tại iforgot.apple.com, rồi đăng nhập lại bằng mật khẩu mới.",
     "the anisette server": "máy chủ anisette",
     "all %d anisette servers": "tất cả %d máy chủ anisette",
     "Not signed in.": "Chưa đăng nhập.",
@@ -598,6 +610,18 @@ let vietnameseStrings: [String: String] = [
         "Hoặc đăng nhập bằng một Apple ID khác (hoặc tài khoản dự phòng) ở trên, rồi chạm vào Cài đặt lần nữa.",
 
     // MARK: - Guide cards
+
+    // Guide: reset a locked Apple Account
+
+    "Reset your Apple Account password": "Đặt lại mật khẩu Apple Account",
+    "Apple has locked this Apple Account for security reasons, often after too many sign-in attempts. Every sign-in fails until it's unlocked, so tapping Install again won't help yet.":
+        "Apple đã khóa Apple Account này vì lý do bảo mật, thường là sau quá nhiều lần thử đăng nhập. Mọi lần đăng nhập đều thất bại cho đến khi tài khoản được mở khóa, nên lúc này chạm vào Cài ứng dụng lần nữa chưa có tác dụng.",
+    "Open iForgot, enter this Apple Account's email, and follow Apple's steps to unlock it and reset its password.":
+        "Mở iForgot, nhập email của Apple Account này và làm theo các bước của Apple để mở khóa và đặt lại mật khẩu.",
+    "Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password.":
+        "Quay lại SideInstaller, mở Cài đặt › Tài khoản, vuốt sang trái trên Apple ID này, chạm vào Sửa rồi nhập mật khẩu mới.",
+    "Then tap Install again.": "Sau đó chạm vào Cài ứng dụng lần nữa.",
+    "Open iForgot": "Mở iForgot",
 
     // Guide: import a pairing file
 

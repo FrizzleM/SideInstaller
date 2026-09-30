@@ -204,6 +204,7 @@ let portugueseStrings: [String: String] = [
 
     "Import pairing file": "Importar arquivo de pareamento",
     "How do I make one?": "Como faço um?",
+    "(Optional)": "(Opcional)",
     "imported pairing file": "arquivo de pareamento importado",
     "No pairing file yet — tap “Import pairing file” first.":
         "Ainda não há arquivo de pareamento — toque em “Importar arquivo de pareamento” primeiro.",
@@ -494,6 +495,15 @@ let portugueseStrings: [String: String] = [
 
     "Stable": "Estável",
     "Nightly": "Nightly",
+
+    // Version picker (Advanced)
+
+    "%@ version": "Versão do %@",
+    "Latest": "Mais recente",
+    "Latest (%@)": "Mais recente (%@)",
+    "Couldn't load the other versions: %@": "Não foi possível carregar as outras versões: %@",
+    "Try again": "Tentar de novo",
+
     "couldn't find the IPA in the %@ %@ release":
         "não foi possível encontrar o IPA na versão %@ %@",
     "%@ has no %@ release right now": "o %@ não tem nenhuma versão %@ no momento",
@@ -522,6 +532,8 @@ let portugueseStrings: [String: String] = [
         "A Apple está limitando temporariamente os logins deste Apple ID ou desta rede (HTTP 429). Tentar outros servidores não vai adiantar, e cada tentativa pode aumentar a espera, então aguarde um pouco antes de entrar de novo.",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
         "Se você tem certeza de que a senha está correta, a Apple pode estar limitando as tentativas de login: aguarde um pouco antes de tentar de novo.",
+    "Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.":
+        "A Apple bloqueou esta conta Apple por motivos de segurança (erro -20209), então todo login falha até ela ser desbloqueada. Redefina a senha em iforgot.apple.com e entre de novo com a nova senha.",
     "the anisette server": "o servidor anisette",
     "all %d anisette servers": "todos os %d servidores anisette",
     "Not signed in.": "Não conectado.",
@@ -598,6 +610,18 @@ let portugueseStrings: [String: String] = [
         "Como alternativa, entre com outro Apple ID (ou um reserva) acima e toque em Instalar de novo.",
 
     // MARK: - Guide cards
+
+    // Guide: reset a locked Apple Account
+
+    "Reset your Apple Account password": "Redefina a senha da sua conta Apple",
+    "Apple has locked this Apple Account for security reasons, often after too many sign-in attempts. Every sign-in fails until it's unlocked, so tapping Install again won't help yet.":
+        "A Apple bloqueou esta conta Apple por motivos de segurança, geralmente depois de tentativas de login demais. Todo login falha até ela ser desbloqueada, então tocar em Instalar de novo ainda não adianta.",
+    "Open iForgot, enter this Apple Account's email, and follow Apple's steps to unlock it and reset its password.":
+        "Abra o iForgot, digite o e-mail desta conta Apple e siga os passos da Apple para desbloqueá-la e redefinir a senha.",
+    "Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password.":
+        "De volta ao SideInstaller, abra Ajustes › Conta, deslize este Apple ID para a esquerda, toque em Editar e digite a nova senha.",
+    "Then tap Install again.": "Depois, toque em Instalar de novo.",
+    "Open iForgot": "Abrir o iForgot",
 
     "Import a pairing file": "Importe um arquivo de pareamento",
     "iOS %@ is the first version an iPhone can pair with itself on. On this one the pairing file has to be made on a computer.":

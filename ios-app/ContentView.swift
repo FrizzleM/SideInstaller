@@ -13,8 +13,11 @@ struct ContentView: View {
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
     @State private var showImporter = false
-    /// True while the pairing-file picker is up, on an iPhone below iOS 27.
+    /// True while the pairing-file picker is up.
     @State private var showPairingImporter = false
+    /// When false, the Advanced section under the Install button shows only its
+    /// title.
+    @State private var advancedExpanded = false
     /// Shows the dialog for choosing which certificate to revoke.
     @State private var showRevokeChooser = false
     /// When false, the timeline shows only the current step.
@@ -55,6 +58,11 @@ struct ContentView: View {
                         progressCard.transition(.cardAppear)
                     }
                     installButton.cascadeItem(cascade(3))
+                    // The build's version, and from iOS 27 (which pairs itself)
+                    // the optional pairing-file import, folded away.
+                    if showsAdvanced {
+                        advancedSection.cascadeItem(cascade(4))
+                    }
                     if let pin = engine.pairingPIN {
                         pinCallout(pin).transition(.cardAppear)
                     }
@@ -75,7 +83,7 @@ struct ContentView: View {
                     if engine.finished, engine.installedIsLiveContainer {
                         guideCallout(Guides.liveContainerImport).transition(.cardAppear)
                     }
-                    footer.cascadeItem(cascade(4))
+                    footer.cascadeItem(cascade(5))
                 }
                 .padding(20)
                 // One modifier per piece of state, so only its own card animates.
@@ -92,6 +100,8 @@ struct ContentView: View {
                 .animation(.smooth(duration: 0.35), value: engine.deviceSummary)
                 .animation(.smooth(duration: 0.3), value: engine.isRunning)
                 .animation(.smooth(duration: 0.35), value: engine.importedPairingName)
+                .animation(.smooth(duration: 0.35), value: advancedExpanded)
+                .animation(.smooth(duration: 0.35), value: showsAdvanced)
             }
             .background(AppBackground())
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
@@ -123,6 +133,12 @@ struct ContentView: View {
     /// True on an iPhone new enough to install but too old to pair itself.
     private var showsPairingCard: Bool {
         engine.osSupported && !engine.canSelfPair
+    }
+
+    /// True when Advanced has something to hold: a version to pick (not for a
+    /// custom IPA), or the optional pairing file (iOS 27 and above).
+    private var showsAdvanced: Bool {
+        engine.installSource != .custom || engine.canSelfPair
     }
 
     /// Cascade index for items below the pairing-file card, shifted by one when
@@ -415,8 +431,7 @@ struct ContentView: View {
                 } else {
                     Image(systemName: engine.finished ? "arrow.clockwise" : "square.and.arrow.down.fill")
                         .contentTransition(.symbolEffect(.replace))
-                    Text(engine.finished ? L("Reinstall")
-                                         : L("Install %@", engine.installSource.shortName))
+                    Text(engine.finished ? L("Reinstall") : L("Install %@", installTargetName))
                 }
             }
         }
@@ -427,6 +442,12 @@ struct ContentView: View {
                 : Theme.brand,
             glow: engine.isRunning ? .red : Theme.accent))
         .animation(.smooth(duration: 0.3), value: engine.isRunning)
+    }
+
+    /// The build the Install button names, with its version when one is picked.
+    private var installTargetName: String {
+        let name = engine.installSource.shortName
+        return engine.selectedVersion.map { "\(name) \($0.title)" } ?? name
     }
 
     // MARK: iOS version requirement
@@ -452,7 +473,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Pairing file (iOS 26 and below)
+    // MARK: Pairing file
 
     /// SideStore's guide to creating a pairing file on a computer.
     private static let pairingDocsURL =
@@ -473,21 +494,25 @@ struct ContentView: View {
                 }
 
                 pairingImportButton
-
-                Button {
-                    if let url = URL(string: Self.pairingDocsURL) { openURL(url) }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(L("How do I make one?"))
-                        Image(systemName: "arrow.up.right")
-                    }
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Theme.accent2)
-                }
-                .buttonStyle(.plain)
+                pairingDocsLink
             }
         }
         .disabled(engine.isRunning)
+    }
+
+    /// Link to SideStore's guide to making a pairing file.
+    private var pairingDocsLink: some View {
+        Button {
+            if let url = URL(string: Self.pairingDocsURL) { openURL(url) }
+        } label: {
+            HStack(spacing: 4) {
+                Text(L("How do I make one?"))
+                Image(systemName: "arrow.up.right")
+            }
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(Theme.accent2)
+        }
+        .buttonStyle(.plain)
     }
 
     /// Import button, labelled with the imported file's name once one is in.
@@ -518,6 +543,127 @@ struct ContentView: View {
         }
         .buttonStyle(.plain)
         .disabled(engine.isImportingPairing)
+    }
+
+    // MARK: Advanced
+
+    /// Advanced section under the Install button, collapsed until its title is
+    /// tapped. Holds the build's version and, from iOS 27, the optional
+    /// pairing-file import.
+    private var advancedSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button { advancedExpanded.toggle() } label: {
+                HStack(spacing: 8) {
+                    sectionTitle(L("Advanced"), systemImage: "slider.horizontal.3")
+                    Spacer(minLength: 4)
+                    // Collapsed, this is the only sign an imported file is in use.
+                    if engine.canSelfPair, engine.importedPairingName != nil {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundStyle(.green)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                    disclosureChevron(expanded: advancedExpanded)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if advancedExpanded {
+                VStack(alignment: .leading, spacing: 22) {
+                    if engine.installSource != .custom {
+                        versionOption
+                    }
+                    if engine.canSelfPair {
+                        pairingFileOption
+                    }
+                }
+                .disabled(engine.isRunning)
+                .transition(.opacity.combined(with: .offset(y: -6)))
+            }
+        }
+        // No card behind it; inset to line up with the card contents above.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18)
+    }
+
+    /// Which release of the selected build to install. The list follows the
+    /// channel picked above; "Latest" is the default.
+    private var versionOption: some View {
+        let source = engine.installSource
+        let catalog = engine.releaseCatalogs[source]
+        let latest = catalog?.latest[engine.releaseChannel]
+        let shown = engine.selectedVersion ?? latest
+        return VStack(alignment: .leading, spacing: 12) {
+            Label(L("%@ version", source.shortName), systemImage: "clock.arrow.circlepath")
+                .font(.subheadline.weight(.semibold))
+            Menu {
+                Picker(L("Version"), selection: $engine.selectedVersion) {
+                    Text(latestLabel(latest)).tag(ReleaseVersion?.none)
+                    ForEach(catalog?.others[engine.releaseChannel] ?? []) { version in
+                        Text(version.menuTitle).tag(Optional(version))
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(engine.selectedVersion?.title ?? latestLabel(latest))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Spacer()
+                    if engine.loadingCatalog == source {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .fieldBackground()
+                .contentShape(Rectangle())
+            }
+            // A release's title can carry the maintainers' warning ("DO NOT USE").
+            if let shown, shown.hasRemark {
+                Label(shown.menuTitle, systemImage: "info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let error = engine.catalogErrors[source] {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L("Couldn't load the other versions: %@", error))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(L("Try again")) {
+                        Task { await engine.loadReleaseCatalog(for: source, force: true) }
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.accent2)
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        // Fetched when the section opens, and again for another build.
+        .task(id: source) { await engine.loadReleaseCatalog(for: source) }
+    }
+
+    /// "Latest", naming the release it stands for when that has a version.
+    private func latestLabel(_ latest: ReleaseVersion?) -> String {
+        // The nightly tag names no version, so it isn't repeated.
+        guard let latest, latest.tag != "nightly" else { return L("Latest") }
+        return L("Latest (%@)", latest.title)
+    }
+
+    /// The optional pairing-file import (iOS 27 and above).
+    private var pairingFileOption: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(L("Pairing file"), systemImage: "lock.doc.fill")
+                .font(.subheadline.weight(.semibold))
+            Text(L("(Optional)"))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            pairingImportButton
+            pairingDocsLink
+        }
     }
 
     // MARK: Wi-Fi requirement
@@ -621,16 +767,21 @@ struct ContentView: View {
         Button {
             stepsExpanded.toggle()
         } label: {
-            Image(systemName: "chevron.down")
-                .font(.footnote.weight(.bold))
-                .foregroundStyle(.secondary)
-                .rotationEffect(.degrees(stepsExpanded ? 180 : 0))
-                .padding(7)
-                .background(Circle().fill(.white.opacity(0.08)))
+            disclosureChevron(expanded: stepsExpanded)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(stepsExpanded ? L("Show fewer steps") : L("Show all steps"))
+    }
+
+    /// Circled chevron that flips to point up while its section is open.
+    private func disclosureChevron(expanded: Bool) -> some View {
+        Image(systemName: "chevron.down")
+            .font(.footnote.weight(.bold))
+            .foregroundStyle(.secondary)
+            .rotationEffect(.degrees(expanded ? 180 : 0))
+            .padding(7)
+            .background(Circle().fill(.white.opacity(0.08)))
     }
 
     // MARK: Step timeline

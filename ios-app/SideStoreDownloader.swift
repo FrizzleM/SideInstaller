@@ -94,15 +94,33 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Local filename for the downloaded IPA, e.g. "SideStore-nightly.ipa".
-    func fileName(_ channel: ReleaseChannel) -> String {
-        let base: String
+    /// Local filename for the downloaded IPA, e.g. "SideStore-nightly.ipa", or
+    /// "SideStore (0.6.3).ipa" for a version picked under Advanced.
+    func fileName(_ channel: ReleaseChannel, version: String? = nil) -> String {
+        guard let stem = fileStem else { return "Custom.ipa" }
+        guard let version else { return "\(stem)\(channel.fileSuffix).ipa" }
+        // A tag may hold a path separator.
+        let safe = version.replacingOccurrences(of: "/", with: "-")
+        return "\(stem)\(channel.fileSuffix) (\(safe)).ipa"
+    }
+
+    /// The version in a name `fileName(_:version:)` wrote, e.g. "0.6.3" in
+    /// "SideStore (0.6.3).ipa"; nil for any other name.
+    func version(inFileName name: String, channel: ReleaseChannel) -> String? {
+        guard let stem = fileStem else { return nil }
+        let prefix = "\(stem)\(channel.fileSuffix) (", suffix = ").ipa"
+        guard name.hasPrefix(prefix), name.hasSuffix(suffix),
+              name.count > prefix.count + suffix.count else { return nil }
+        return String(name.dropFirst(prefix.count).dropLast(suffix.count))
+    }
+
+    /// Start of every downloaded filename; nil for a custom IPA.
+    private var fileStem: String? {
         switch self {
-        case .sideStore:     base = "SideStore"
-        case .liveContainer: base = "LiveContainer+SideStore"
-        case .custom:        return "Custom.ipa"
+        case .sideStore:     return "SideStore"
+        case .liveContainer: return "LiveContainer+SideStore"
+        case .custom:        return nil
         }
-        return "\(base)\(channel.fileSuffix).ipa"
     }
 
     // MARK: Pairing-file placement
@@ -155,6 +173,91 @@ enum InstallSource: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Versions to pick from
+
+/// One release of a build, as the version picker under Advanced offers it.
+struct ReleaseVersion: Identifiable, Hashable {
+    /// The release's tag, e.g. "0.6.3" or "alpha".
+    let tag: String
+    /// The release's title, which can carry a warning: "0.6.4 (DO NOT USE)".
+    let name: String
+    /// The build's `.ipa` on this release.
+    let assetName: String
+    let assetURL: URL
+
+    var id: String { tag }
+
+    /// Short label: the tag, or the title when the two differ only in case
+    /// ("Alpha").
+    var title: String {
+        name.caseInsensitiveCompare(tag) == .orderedSame ? name : tag
+    }
+
+    /// Menu label: the whole title when it starts with the tag, so the
+    /// maintainers' remarks show; otherwise the tag and the title.
+    var menuTitle: String {
+        if name.isEmpty || name.caseInsensitiveCompare(tag) == .orderedSame { return title }
+        return name.lowercased().hasPrefix(tag.lowercased()) ? name : "\(tag) – \(name)"
+    }
+
+    /// True when the title says more than the version.
+    var hasRemark: Bool { menuTitle != title }
+
+    // Identity is the tag, so a pick stays selected when the list reloads.
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.tag == rhs.tag }
+    func hash(into hasher: inout Hasher) { hasher.combine(tag) }
+}
+
+/// A build's releases on GitHub, sorted into the two channels for the picker.
+struct ReleaseCatalog {
+    /// The release "Latest" installs on each channel, when the list has it.
+    let latest: [ReleaseChannel: ReleaseVersion]
+    /// Each channel's other releases carrying the build, newest first.
+    let others: [ReleaseChannel: [ReleaseVersion]]
+    let fetched: Date
+
+    /// `releases` newest first, the order GitHub answers in.
+    init(source: InstallSource, releases: [SideStoreDownloader.GHRelease], fetched: Date = Date()) {
+        let offered = releases.compactMap { release -> (release: SideStoreDownloader.GHRelease,
+                                                        version: ReleaseVersion)? in
+            guard release.draft != true,
+                  let asset = source.selectAsset(from: release.assets),
+                  let url = URL(string: asset.browser_download_url) else { return nil }
+            let name = (release.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return (release, ReleaseVersion(tag: release.tag_name, name: name,
+                                            assetName: asset.name, assetURL: url))
+        }
+
+        // Resolved as the download resolves "Latest": GitHub's newest full
+        // release, and the fixed nightly tag, else the newest of either kind.
+        var latest: [ReleaseChannel: ReleaseVersion] = [:]
+        latest[.stable] = offered.first { $0.release.prerelease != true }?.version
+        latest[.nightly] = (offered.first { $0.release.tag_name == "nightly" } ?? offered.first)?.version
+
+        var others: [ReleaseChannel: [ReleaseVersion]] = [:]
+        for (release, version) in offered {
+            guard let channel = Self.channel(of: release), version != latest[channel] else { continue }
+            others[channel, default: []].append(version)
+        }
+        self.latest = latest
+        self.others = others
+        self.fetched = fetched
+    }
+
+    /// Nightly for a pre-release, whether GitHub flags it or its version says so
+    /// ("0.7.0-alpha"); stable for a plain version number. Other tags
+    /// ("auto-update-test") belong on neither.
+    private static func channel(of release: SideStoreDownloader.GHRelease) -> ReleaseChannel? {
+        let tag = release.tag_name
+        let numbered = tag.drop(while: { $0 == "v" }).first?.isNumber == true
+        // Semantic versioning puts a pre-release label after the first hyphen.
+        let labelled = tag.split(separator: "-", maxSplits: 1).dropFirst().first?
+            .contains(where: \.isLetter) == true
+        if release.prerelease == true || (numbered && labelled) { return .nightly }
+        return numbered ? .stable : nil
+    }
+}
+
 /// Downloads the newest IPA on the chosen `InstallSource` + `ReleaseChannel`
 /// into Documents.
 enum SideStoreDownloader {
@@ -170,6 +273,9 @@ enum SideStoreDownloader {
         /// Optional so decoding doesn't depend on it. Used by the release scan to
         /// keep stable requests off pre-releases.
         let prerelease: Bool?
+        /// The release's title. Optional, like `prerelease`.
+        let name: String?
+        let draft: Bool?
     }
 
     enum DownloadError: Error, CustomStringConvertible {
@@ -287,7 +393,8 @@ enum SideStoreDownloader {
 
         // Tens of megabytes aren't fetched again while the copy from an earlier
         // run is still the file GitHub serves.
-        if let current = await unchangedDownload(source: source, channel: channel, at: direct, log: log) {
+        let existing = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
+        if let current = await unchangedDownload(existing, at: direct, log: log) {
             return current.path
         }
 
@@ -303,33 +410,60 @@ enum SideStoreDownloader {
             }
         }
 
+        let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(fetched.channel))
+        try store(fetched, as: dest)
+        return dest.path
+    }
+
+    /// Downloads one release picked under Advanced. It's saved under its own
+    /// name, so it never replaces the latest build or an IPA the user placed in
+    /// Documents. Returns the local path; `log` receives progress.
+    static func download(_ version: ReleaseVersion,
+                         source: InstallSource,
+                         channel: ReleaseChannel,
+                         log: @escaping (String) -> Void) async throws -> String {
+        let dest = IPALibrary.documentsDir
+            .appendingPathComponent(source.fileName(channel, version: version.tag))
+        if let current = await unchangedDownload(dest, at: version.assetURL, log: log) {
+            return current.path
+        }
+        let fetched = try await fetch(version.assetURL, named: version.assetName, from: channel, log: log)
+        try store(fetched, as: dest)
+
+        // Keep one picked version per build and channel: drop the app's others.
+        for other in IPALibrary.scan()
+        where other.source == source && other.channel == channel
+            && other.version != nil && other.url.lastPathComponent != dest.lastPathComponent {
+            try? FileManager.default.removeItem(at: other.url)
+            DownloadLedger.forget(other.url)
+        }
+        return dest.path
+    }
+
+    /// Moves a finished download into Documents as `dest`.
+    private static func store(_ fetched: Fetched, as dest: URL) throws {
         // Validate now, so an error page or truncated download doesn't fail
         // later during signing.
         guard IPALibrary.looksLikeIPA(fetched.file) else {
             try? FileManager.default.removeItem(at: fetched.file)
             throw DownloadError.notAnIPA(fetched.name)
         }
-
-        let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(fetched.channel))
         try? FileManager.default.removeItem(at: dest)
         try FileManager.default.moveItem(at: fetched.file, to: dest)
         // Mark as app-downloaded, so later runs may replace it, or reuse it while
         // GitHub still serves the same file.
         DownloadLedger.record(dest, etag: fetched.etag)
-        return dest.path
     }
 
-    /// The IPA an earlier run downloaded for this build, if GitHub still serves
-    /// that exact file at `url`.
+    /// `file`, an IPA an earlier run downloaded, if GitHub still serves that
+    /// exact file at `url`.
     ///
     /// Only the headers are fetched (a HEAD request). The file must be one this
     /// app downloaded and nothing has touched since, its recorded ETag must match
     /// GitHub's current one, and its size the Content-Length. Anything else,
     /// including a failed request, returns nil so the caller downloads as usual.
-    private static func unchangedDownload(source: InstallSource, channel: ReleaseChannel,
-                                          at url: URL,
+    private static func unchangedDownload(_ file: URL, at url: URL,
                                           log: @escaping (String) -> Void) async -> URL? {
-        let file = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
         guard let recorded = DownloadLedger.etag(for: file),
               let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size]) as? Int
         else { return nil }
@@ -469,24 +603,9 @@ enum SideStoreDownloader {
     private static func fetchViaReleaseScan(source: InstallSource,
                                             channel: ReleaseChannel,
                                             log: @escaping (String) -> Void) async throws -> Fetched {
-        guard let repo = source.repo,
-              let api = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=20")
-        else { throw DownloadError.notDownloadable }
-
+        guard let repo = source.repo else { throw DownloadError.notDownloadable }
         log("That release has no \(source.displayName) IPA — looking through \(repo)'s other releases for one.")
-        var req = URLRequest(url: api)
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
-
-        let (data, response) = try await perform { try await URLSession.shared.data(for: req) }
-        try check(response, body: data)
-
-        let releases: [GHRelease]
-        do {
-            releases = try JSONDecoder().decode([GHRelease].self, from: data)
-        } catch {
-            throw DownloadError.badRelease(String(describing: error))
-        }
+        let releases = try await recentReleases(of: repo, count: 20)
 
         // Newest first, which is the order GitHub answers in.
         for release in releases {
@@ -499,6 +618,29 @@ enum SideStoreDownloader {
             return try await fetch(assetURL, named: asset.name, from: served, log: log)
         }
         throw DownloadError.noIPAAsset(source.displayName, channel)
+    }
+
+    /// Every release of `source` the version picker can offer, from one API call.
+    static func releaseCatalog(source: InstallSource) async throws -> ReleaseCatalog {
+        guard let repo = source.repo else { throw DownloadError.notDownloadable }
+        return ReleaseCatalog(source: source, releases: try await recentReleases(of: repo, count: 100))
+    }
+
+    /// A repo's `count` newest releases, newest first.
+    private static func recentReleases(of repo: String, count: Int) async throws -> [GHRelease] {
+        guard let api = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=\(count)")
+        else { throw DownloadError.badURL }
+        var req = URLRequest(url: api)
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await perform { try await URLSession.shared.data(for: req) }
+        try check(response, body: data)
+        do {
+            return try JSONDecoder().decode([GHRelease].self, from: data)
+        } catch {
+            throw DownloadError.badRelease(String(describing: error))
+        }
     }
 
     /// Runs a URLSession call, mapping `URLError` to `.unreachable` (or to
@@ -606,6 +748,9 @@ enum IPALibrary {
         let modified: Date?
         /// True when the user supplied this file rather than the app fetching it.
         let isImported: Bool
+        /// The release picked under Advanced that the app downloaded this as;
+        /// nil for the latest build, and for anything the user supplied.
+        let version: String?
     }
 
     /// Which build a filename names, loose about case, separators and versions,
@@ -625,10 +770,15 @@ enum IPALibrary {
     static func scan() -> [Entry] {
         let entries = describe(namesIn: documentsDir).compactMap { (name, url, attrs) -> Entry? in
             guard let kind = classify(name) else { return nil }
+            let isManaged = DownloadLedger.isManaged(url)
             return Entry(source: kind.source, channel: kind.channel, url: url,
                          size: (attrs[.size] as? Int) ?? 0,
                          modified: attrs[.modificationDate] as? Date,
-                         isImported: !DownloadLedger.isManaged(url))
+                         isImported: !isManaged,
+                         // Read only off the app's own files: a user's
+                         // "SideStore (1).ipa" names no version.
+                         version: isManaged
+                             ? kind.source.version(inFileName: name, channel: kind.channel) : nil)
         }
         return (entries + [customImport()].compactMap { $0 })
             .sorted { ($0.modified ?? .distantPast) > ($1.modified ?? .distantPast) }
@@ -642,7 +792,7 @@ enum IPALibrary {
                 Entry(source: .custom, channel: .stable, url: url,
                       size: (attrs[.size] as? Int) ?? 0,
                       modified: attrs[.modificationDate] as? Date,
-                      isImported: true)
+                      isImported: true, version: nil)
             }
             .max { ($0.modified ?? .distantPast) < ($1.modified ?? .distantPast) }
     }
@@ -658,8 +808,9 @@ enum IPALibrary {
         }
     }
 
-    /// The IPA to install for one build: an import outranks a download, the
-    /// canonical filename outranks any other, and ties fall to the newest.
+    /// The IPA to install for one build's latest release: an import outranks a
+    /// download, the canonical filename outranks any other, and ties fall to the
+    /// newest. Versions picked under Advanced are left out.
     static func entry(source: InstallSource, channel: ReleaseChannel) -> Entry? {
         guard source != .custom else { return customImport() }
         let canonical = source.fileName(channel)
@@ -667,8 +818,16 @@ enum IPALibrary {
             (e.isImported ? 0 : 2) + (e.url.lastPathComponent == canonical ? 0 : 1)
         }
         return scan()
-            .filter { $0.source == source && $0.channel == channel }
+            .filter { $0.source == source && $0.channel == channel && $0.version == nil }
             .min { rank($0) < rank($1) }
+    }
+
+    /// The app's earlier download of a version picked under Advanced, if it's
+    /// still intact.
+    static func pickedDownload(_ version: String, source: InstallSource,
+                               channel: ReleaseChannel) -> URL? {
+        let url = documentsDir.appendingPathComponent(source.fileName(channel, version: version))
+        return looksLikeIPA(url) ? url : nil
     }
 
     /// Thrown when the picked file isn't an IPA.

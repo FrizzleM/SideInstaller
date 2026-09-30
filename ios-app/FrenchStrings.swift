@@ -202,10 +202,11 @@ let frenchStrings: [String: String] = [
         "Fichier de jumelage prêt. Vous pouvez l'exporter ou l'installer dans une app ci-dessous.",
     "Pairing file installed into %@.": "Fichier de jumelage installé dans %@.",
 
-    // Importing a pairing file (iOS 26 and below)
+    // Importing a pairing file (required below iOS 27, under Advanced from 27)
 
     "Import pairing file": "Importer le fichier de jumelage",
     "How do I make one?": "Comment en créer un ?",
+    "(Optional)": "(Facultatif)",
     "imported pairing file": "fichier de jumelage importé",
     "No pairing file yet — tap “Import pairing file” first.":
         "Aucun fichier de jumelage — touchez d'abord « Importer le fichier de jumelage ».",
@@ -497,6 +498,15 @@ let frenchStrings: [String: String] = [
 
     "Stable": "Stable",
     "Nightly": "Nightly",
+
+    // Version picker (Advanced)
+
+    "%@ version": "Version de %@",
+    "Latest": "Dernière",
+    "Latest (%@)": "Dernière (%@)",
+    "Couldn't load the other versions: %@": "Impossible de charger les autres versions : %@",
+    "Try again": "Réessayer",
+
     "couldn't find the IPA in the %@ %@ release":
         "impossible de trouver l'IPA dans la version %@ de %@",
     "%@ has no %@ release right now": "%@ n'a aucune version %@ pour le moment",
@@ -526,6 +536,8 @@ let frenchStrings: [String: String] = [
         "Apple limite temporairement les connexions pour cet identifiant Apple ou ce réseau (HTTP 429). Essayer d'autres serveurs n'y changera rien et chaque tentative peut prolonger l'attente : patientez un moment avant de vous reconnecter.",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
         "Si vous êtes sûr que le mot de passe est correct, Apple limite peut-être les tentatives de connexion : patientez un moment avant de réessayer.",
+    "Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.":
+        "Apple a verrouillé ce compte Apple pour des raisons de sécurité (erreur -20209) : toute connexion échoue tant qu'il n'est pas déverrouillé. Réinitialisez son mot de passe sur iforgot.apple.com, puis reconnectez-vous avec le nouveau mot de passe.",
     "the anisette server": "le serveur anisette",
     "all %d anisette servers": "les %d serveurs anisette",
     "Not signed in.": "Non connecté.",
@@ -604,6 +616,18 @@ let frenchStrings: [String: String] = [
         "Vous pouvez aussi vous connecter ci-dessus avec un autre Apple ID (ou un compte de secours), puis toucher à nouveau Installer.",
 
     // MARK: - Guide cards
+
+    // Guide: reset a locked Apple Account
+
+    "Reset your Apple Account password": "Réinitialisez le mot de passe de votre compte Apple",
+    "Apple has locked this Apple Account for security reasons, often after too many sign-in attempts. Every sign-in fails until it's unlocked, so tapping Install again won't help yet.":
+        "Apple a verrouillé ce compte Apple pour des raisons de sécurité, souvent après trop de tentatives de connexion. Toute connexion échoue tant qu'il n'est pas déverrouillé : toucher à nouveau Installer ne servira à rien pour l'instant.",
+    "Open iForgot, enter this Apple Account's email, and follow Apple's steps to unlock it and reset its password.":
+        "Ouvrez iForgot, saisissez l'e-mail de ce compte Apple et suivez les étapes d'Apple pour le déverrouiller et réinitialiser son mot de passe.",
+    "Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password.":
+        "De retour dans SideInstaller, ouvrez Réglages › Compte, balayez cet Apple ID vers la gauche, touchez Modifier et saisissez le nouveau mot de passe.",
+    "Then tap Install again.": "Touchez ensuite à nouveau Installer.",
+    "Open iForgot": "Ouvrir iForgot",
 
     // Guide: import a pairing file
 

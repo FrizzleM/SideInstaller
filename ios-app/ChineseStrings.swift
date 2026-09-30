@@ -198,10 +198,11 @@ let chineseStrings: [String: String] = [
         "配对文件已就绪。你可以导出，或安装到下面的某个应用中。",
     "Pairing file installed into %@.": "配对文件已安装到 %@。",
 
-    // Importing a pairing file (iOS 26 and below)
+    // Importing a pairing file (required below iOS 27, under Advanced from 27)
 
     "Import pairing file": "导入配对文件",
     "How do I make one?": "怎么生成？",
+    "(Optional)": "（可选）",
     "imported pairing file": "已导入配对文件",
     "No pairing file yet — tap “Import pairing file” first.": "还没有配对文件 — 请先点按“导入配对文件”。",
     "Pairing file missing — import it first.": "缺少配对文件 — 请先导入。",
@@ -482,6 +483,15 @@ let chineseStrings: [String: String] = [
 
     "Stable": "稳定版",
     "Nightly": "Nightly",
+
+    // Version picker (Advanced)
+
+    "%@ version": "%@ 版本",
+    "Latest": "最新",
+    "Latest (%@)": "最新（%@）",
+    "Couldn't load the other versions: %@": "无法加载其他版本：%@",
+    "Try again": "重试",
+
     "couldn't find the IPA in the %@ %@ release":
         "在 %@ 渠道的 %@ 发行版中找不到 IPA 文件",
     "%@ has no %@ release right now": "%@ 目前没有任何 %@ 发行版",
@@ -510,6 +520,8 @@ let chineseStrings: [String: String] = [
         "Apple 正在暂时限制此 Apple ID 或此网络的登录（HTTP 429）。换用其他服务器无济于事，每次尝试还可能延长等待时间，请过一段时间再登录。",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
         "如果你确定密码正确，可能是 Apple 正在限制登录尝试：请过一段时间再试。",
+    "Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.":
+        "出于安全原因，Apple 已锁定此 Apple 账户（错误 -20209），在解锁之前每次登录都会失败。请在 iforgot.apple.com 重设其密码，然后用新密码重新登录。",
     "the anisette server": "anisette 服务器",
     "all %d anisette servers": "全部 %d 个 anisette 服务器",
     "Not signed in.": "尚未登录。",
@@ -586,6 +598,18 @@ let chineseStrings: [String: String] = [
         "或者，在上面用另一个（或备用的）Apple ID 登录，然后再次轻点“安装”。",
 
     // MARK: - Guide cards
+
+    // Guide: reset a locked Apple Account
+
+    "Reset your Apple Account password": "重设你的 Apple 账户密码",
+    "Apple has locked this Apple Account for security reasons, often after too many sign-in attempts. Every sign-in fails until it's unlocked, so tapping Install again won't help yet.":
+        "出于安全原因，Apple 已锁定此 Apple 账户，通常是因为登录尝试次数过多。在解锁之前每次登录都会失败，所以现在再次轻点“安装”也没有用。",
+    "Open iForgot, enter this Apple Account's email, and follow Apple's steps to unlock it and reset its password.":
+        "打开 iForgot，输入此 Apple 账户的电子邮件，然后按照 Apple 的步骤解锁并重设密码。",
+    "Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password.":
+        "回到 SideInstaller，打开“设置 › 账户”，在此 Apple ID 上向左轻扫，轻点“编辑”，然后输入新密码。",
+    "Then tap Install again.": "然后再次轻点“安装”。",
+    "Open iForgot": "打开 iForgot",
 
     // Guide: import a pairing file
 
