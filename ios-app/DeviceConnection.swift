@@ -180,7 +180,8 @@ final class DeviceConnection {
     /// resort and CoreDeviceProxy is tried — unless `allowLockdownMinting` is
     /// false, as it must be for another iPhone's file (Side by Side): minting
     /// stores this iPhone's own record and falls back to its own lockdownd on
-    /// 127.0.0.1.
+    /// 127.0.0.1. Never on iOS 27, where lockdownd won't pair
+    /// (`Engine.canMintLockdownRecord`).
     func connect(deviceIP: String, pairingFilePath: String, hostname: String = "SideInstaller",
                  allowLockdownMinting: Bool = true) throws {
         let kind = PairingFileKind.of(path: pairingFilePath)
@@ -196,8 +197,9 @@ final class DeviceConnection {
 
         var firstFailure: Error?
         // An RPPairing-only file can still fall back to creating a lockdown
-        // record (see below).
+        // record (see below), except on iOS 27, where lockdownd won't pair.
         let canMintLockdownRecord = !kind.hasLockdown && allowLockdownMinting
+            && Engine.canMintLockdownRecord
         for (index, useRemotePairing) in routes.enumerated() {
             do {
                 if useRemotePairing {
@@ -223,7 +225,7 @@ final class DeviceConnection {
         // tunnel listener only binds to the Wi-Fi interface, and the device
         // closes a tunnel to itself right after the TLS handshake.
         // CoreDeviceProxy needs no inbound listener, only a classic pair record,
-        // which lockdownd can create directly on its own port.
+        // which lockdownd can create directly on its own port (before iOS 27).
         if canMintLockdownRecord {
             do {
                 try connectByMintingLockdownRecord(deviceIP: deviceIP, hostname: hostname)
@@ -966,16 +968,66 @@ final class DeviceConnection {
 
     /// Writes `data` into `bundleID`'s Documents at `remoteRelativePath`, reads
     /// it back to verify, and returns the byte count.
-    ///
-    /// `house_arrest_vend_documents` consumes the HouseArrestClient on success
-    /// and failure, so `ha` is never freed. `afc_file_close` and
-    /// `afc_client_free` each consume their handle once.
     @discardableResult
     func writeFile(intoBundleID bundleID: String,
                    remoteRelativePath: String,
                    data: Data) throws -> Int {
+        // vend_documents roots AFC at the container, not Documents, and the
+        // container root itself is read-only, so the path carries "/Documents/".
+        let remotePath = "/Documents/\(remoteRelativePath)"
+        return try withAppContainer(bundleID, reachingLibrary: false) { afc in
+            try writeVerified(afc, remotePath: remotePath, data: data)
+        }
+    }
+
+    /// Edits the plist dictionary at `containerPath` (relative to the container
+    /// root) in `bundleID`'s container, starting from an empty one if the file
+    /// is missing, and writes it back as a binary plist. Returns the byte count.
+    ///
+    /// Throws, leaving the file alone, if it exists but can't be read or isn't
+    /// a dictionary, so the app's other settings are never overwritten.
+    @discardableResult
+    func updatePlist(inBundleID bundleID: String,
+                     containerPath: String,
+                     _ edit: (inout [String: Any]) -> Void) throws -> Int {
+        let remotePath = "/\(containerPath)"
+        // Anything outside Documents needs the whole container.
+        let reachingLibrary = !containerPath.hasPrefix("Documents/")
+        return try withAppContainer(bundleID, reachingLibrary: reachingLibrary) { afc in
+            var dict: [String: Any] = [:]
+            if let existing = try readIfPresent(afc, remotePath: remotePath), !existing.isEmpty {
+                let parsed = try PropertyListSerialization.propertyList(from: existing, options: [], format: nil)
+                guard let parsedDict = parsed as? [String: Any] else {
+                    throw fail("\(containerPath) in \(bundleID) isn't a plist dictionary")
+                }
+                dict = parsedDict
+            }
+            edit(&dict)
+            let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .binary, options: 0)
+            // Replaced by a rename, as cfprefsd saves it: an in-place rewrite
+            // keeps the inode, and cfprefsd keeps serving the copy it cached.
+            let staging = remotePath + ".sideinstaller"
+            let written = try writeVerified(afc, remotePath: staging, data: data)
+            try check(staging.withCString { from in
+                          remotePath.withCString { afc_rename_path(afc, from, $0) }
+                      },
+                      "afc_rename_path(\(staging) → \(remotePath)) failed")
+            return written
+        }
+    }
+
+    /// Opens an AFC client on `bundleID`'s container over house_arrest and runs
+    /// `body` with it.
+    ///
+    /// `reachingLibrary` vends the whole container, which only works for apps
+    /// signed for development (every app SideInstaller signs is); otherwise only
+    /// Documents is vended, the one writable folder under that root.
+    ///
+    /// Vending consumes the HouseArrestClient on success and failure, so `ha` is
+    /// never freed; `afc_client_free` consumes the AfcClient once.
+    private func withAppContainer<T>(_ bundleID: String, reachingLibrary: Bool,
+                                     _ body: (OpaquePointer) throws -> T) throws -> T {
         guard let adapter, let handshake else { throw fail("not connected") }
-        guard !data.isEmpty else { throw fail("refusing to write an empty file") }
 
         var ha: OpaquePointer?
         try check(house_arrest_client_connect_rsd(adapter, handshake, &ha),
@@ -984,14 +1036,49 @@ final class DeviceConnection {
 
         // vend consumes `ha` — do not free it. The AfcClient owns the Idevice.
         var afc: OpaquePointer?
-        let vendErr = bundleID.withCString { house_arrest_vend_documents(ha, $0, &afc) }
-        try check(vendErr, "house_arrest_vend_documents(\(bundleID)) failed")
+        if reachingLibrary {
+            let vendErr = bundleID.withCString { house_arrest_vend_container(ha, $0, &afc) }
+            try check(vendErr, "house_arrest_vend_container(\(bundleID)) failed")
+        } else {
+            let vendErr = bundleID.withCString { house_arrest_vend_documents(ha, $0, &afc) }
+            try check(vendErr, "house_arrest_vend_documents(\(bundleID)) failed")
+        }
         guard let afc else { throw fail("vended AFC client was null") }
         defer { afc_client_free(afc) }   // free the AfcClient (and its Idevice) once
+        return try body(afc)
+    }
 
-        // vend_documents roots AFC at the container, not Documents, and the
-        // container root itself is read-only, so the path carries "/Documents/".
-        let remotePath = "/Documents/\(remoteRelativePath)"
+    /// The file at `remotePath`, or nil if there's none. Any other failure throws.
+    private func readIfPresent(_ afc: OpaquePointer, remotePath: String) throws -> Data? {
+        var info = AfcFileInfo()
+        if let error = ffiError(remotePath.withCString { afc_get_file_info(afc, $0, &info) },
+                                "afc_get_file_info(\(remotePath)) failed") {
+            // AFC error 106, sub-code 8: ObjectNotFound.
+            if error.code == 106 && error.subCode == 8 { return nil }
+            throw error
+        }
+        afc_file_info_free(&info)
+
+        var rfile: OpaquePointer?
+        try check(remotePath.withCString { afc_file_open(afc, $0, AfcRdOnly, &rfile) },
+                  "afc_file_open(\(remotePath), read) failed")
+        guard let rfile else { throw fail("AFC read handle was null") }
+        var rdata: UnsafeMutablePointer<UInt8>?
+        var rlen = 0
+        let readErr = afc_file_read_entire(rfile, &rdata, &rlen)
+        _ = afc_file_close(rfile)       // consume the read handle
+        defer { if let rdata { afc_file_read_data_free(rdata, rlen) } }
+        try check(readErr, "afc_file_read_entire(\(remotePath)) failed")
+        guard let rdata else { return Data() }
+        return Data(bytes: rdata, count: rlen)
+    }
+
+    /// Writes `data` to `remotePath`, creating parent folders, then reads it
+    /// back and checks the length. Returns the byte count.
+    ///
+    /// `afc_file_close` consumes its handle once, on every path.
+    private func writeVerified(_ afc: OpaquePointer, remotePath: String, data: Data) throws -> Int {
+        guard !data.isEmpty else { throw fail("refusing to write an empty file") }
         makeRemoteDirectories(afc, forFileAt: remotePath)
 
         // Open (create and truncate), write the whole buffer, then close.

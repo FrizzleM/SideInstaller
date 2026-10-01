@@ -333,6 +333,11 @@ hosts and tries the VPN peer and plain loopback in turn, logging each. If neithe
 answers, the record can't be minted on-device at all and an imported pairing file
 stays the only way through for this iPhone.
 
+**Answered for iOS 27 (2026-09-30): neither answers.** The VPN peer resets the
+first request and loopback is refused by iOS, so on iOS 27 `connect` no longer
+tries this fallback — see
+[iOS 27: lockdownd won't pair on-device](#ios-27-lockdownd-wont-pair-on-device-over-any-route).
+
 #### Side by Side: iOS 27's lockdownd won't pair over Wi-Fi (issue #52)
 
 Side by Side pairs another iPhone with `lockdownPairRecordDirect` against
@@ -530,9 +535,14 @@ RSD instead of a usbmuxd cache entry.
 **Fallback, not a hard dependency:** if any of that fails, the write proceeds
 with the RPPairing record alone — what shipped before — and says so in the log.
 
-**Still unverified on hardware:** whether lockdownd accepts `Pair` on
-`com.apple.mobile.lockdown.remote.trusted`, and which of the two
-`EnableWifiDebugging` attempts lands. Both paths are logged explicitly.
+**Checked on hardware (iPhone 16, iOS 27, 2026-09-30): lockdownd refuses it.**
+`Pair` on `com.apple.mobile.lockdown.remote.trusted` answers `InvalidHostID`
+(FFI code 18) straight away, with no Trust prompt, and no variant of the request
+does better (see
+[iOS 27: lockdownd won't pair on-device](#ios-27-lockdownd-wont-pair-on-device-over-any-route)).
+On iOS 27 the attempt is now skipped and every write hands over the RPPairing
+record alone. SideStore nightlies from 2026-09-20 on can load that (see
+[SideStore's split pairing files](#fix-sidestore-nightly-asks-for-the-pairing-file)).
 
 **Transport used (whole pipeline):** the classic lockdown *transport* (usbmuxd,
 port 62078) is **not** used — every device service (lockdown info,
@@ -627,6 +637,108 @@ MB from 3.8.0 and logs each rung.
 The fallback is a good one, not just a survivable one: 3.8.0's guest SideStore is
 `0.6.4-20260714`, whose binary has **no** `acctFileChecksum`, so the certificate
 hand-off still lands silently there — better than the nightly would have been.
+
+#### Fix: SideStore nightly asks for the pairing file
+
+SideStore nightly `0.7.0-20260920.1479+0dd743f7` (develop `0dd743f7`, "implement
+dual pairing file support") changed how it finds the pairing file, and prompted
+for a manual import right after a SideInstaller install. Its
+`PairingFileManager.fetchPairingFile` now:
+
+- reads only `Documents/PairingFile_Lockdown.plist` or
+  `Documents/PairingFile_RemoteRP.plist`. `ALTPairingFile.mobiledevicepairing` is
+  migrated only by `MaintenanceManager` pass 7, which runs once per app group
+  (the counter lives there and outlives reinstalls) and *after* the boot check;
+- returns nil while `isPairingReset` is true, which `registerDefaults` makes the
+  default, and only an import sets it to false;
+- picks the file through `preferredPairingProtocol`, then `activePairingProtocol`,
+  and neither is set until an import;
+- hands minimuxer the string, whose `PairingFileParser.parse(preferred: nil)`
+  throws `.ambiguous` for a file with both records, i.e. our merged file.
+
+Confirmed from the phone's own SideStore console log: `Minimuxer check completed`
+1 ms after starting, with no `startMinimuxer` in between.
+
+Fix: `SideStorePairingHandoff` (in `PairingTargets.swift`) splits the file into
+a lockdown-only and an RPPairing-only record (XML, UDID stamped in), and
+`Engine.handOffSplitPairing` writes each under its new name next to the legacy
+file, then sets `isPairingReset = false` and `activePairingProtocol` (lockdown
+when there is a complete record, else `rppairing`) in SideStore's preferences
+plist. That is what SideStore's own import does. `preferredPairingProtocol` is left
+alone. Standalone SideStore's plist is `Library/Preferences/<bundle id>.plist`,
+reached with `house_arrest_vend_container` (development-signed apps only);
+LiveContainer's guest keeps it at `Documents/SideStore/Library/Preferences/
+com.SideStore.SideStore.plist` (signing leaves framework ids alone). Older
+builds read `ALTPairingFile` from Documents regardless of `isPairingReset`, so
+the extra files and keys are harmless there. LiveContainer nightly's guest is
+still `0.7.0-20260918` (legacy).
+
+**cfprefsd caches.** Once SideStore has run, editing its plist directly, even
+via a staging file and rename, isn't seen on the next launch: cfprefsd keeps
+serving its cached copy. A reinstall through installd drops that cache. Verified
+on the iPhone 16: after a full Nightly install the next launch logged
+`startMinimuxer() entered`, then `connection test SUCCEEDED` in `.rppairing` mode,
+and no prompt. The Pairing tab's write (no reinstall) says so in the log.
+
+#### iOS 27: lockdownd won't pair on-device, over any route
+
+Probed on the iPhone 16 (iOS 27, 2026-09-30) with a temporary hook that sent raw
+lockdown requests over the working RPPairing tunnel and logged lockdownd's whole
+reply, not just idevice's mapped error. `com.apple.mobile.lockdown.remote.trusted`
+and `.remote.untrusted` (both listed in the tunnel's RSD) answered identically:
+
+| `Pair` request | answer |
+|---|---|
+| no `PairRecord` | `MissingPairRecord` |
+| empty `PairRecord` | `InvalidResponse` |
+| any `PairRecord` with a `HostID`, `PairingOptions {ExtendedPairingErrors: true}` | `InvalidHostID` |
+| the same without `ExtendedPairingErrors` (absent or false; `ProtocolVersion` "2", "1" or absent) | `PasswordProtected`, with the phone unlocked |
+
+The `HostID`s tried: the stored `lockdownHostID`, and the RPPairing `identifier`
+uppercased and as stored (lowercase). Each went with idevice's full record
+(certificates plus `DevicePublicKey`, `RootPrivateKey`, `WiFiMACAddress`), with
+libimobiledevice's set (certificates, `HostID`, `SystemBUID`), and as `HostID` +
+`SystemBUID` with no certificates at all. Same answer every time, so lockdownd
+decides before it looks at the certificates, and no request brought up a Trust
+prompt.
+
+So `InvalidHostID` isn't about the HostID. It is lockdownd's extended code for
+"won't pair on this connection", and `PasswordProtected` is the legacy code for
+the same refusal. Apple's own host side never asks: MobileDevice.framework logs
+"Pairing over RemoteXPC is only supported for devices discovered via
+MobileDevice" and pairs those through RemotePairing, and pymobiledevice3's
+`RemoteLockdownClient.pair` raises `NotImplementedError` ("RemoteXPC lockdown
+version does not support pairing operations"). A connection over RSD is trusted
+because of its RPPairing record, and lockdown `Pair` isn't available on it.
+
+lockdownd's own port (`lockdownPairRecordDirect`) is closed too:
+
+- `10.7.0.1:62078` (the LocalDevVPN peer): the TCP connection opens, then
+  lockdownd resets it on the first request, `QueryType`, which normally needs no
+  pairing. `EnableWifiDebugging` and `EnableWifiConnections` were both already
+  true (read over RSD from `com.apple.mobile.wireless_lockdown`), so they aren't
+  the cause.
+- `127.0.0.1:62078` and the phone's own Wi-Fi address: `connect` fails with EPERM
+  (os error 1). iOS doesn't let an app reach them.
+
+A classic record would therefore be useless on iOS 27 even if the app had one.
+minimuxer and Feather reach lockdownd at `10.7.0.1:62078`, and
+[SideStore#1532](https://github.com/SideStore/SideStore/issues/1532) reports
+exactly this with a complete computer-made record on iOS 27: every connection
+closed within 1–2 ms. Side by Side sees the same reset over Wi-Fi.
+
+**What changed:** `Engine.canMintLockdownRecord` is false on iOS 27 and later.
+There, `placementPairingFile` no longer attempts `Pair`: it hands over the
+RPPairing record and logs one plain line, with no round trip and no ⚠️. And
+`DeviceConnection.connect` no longer falls back to
+`connectByMintingLockdownRecord` when the RPPairing tunnel fails. A pairing file
+that already carries a lockdown record (imported) still goes over as it is. On
+iOS 27, apps that only read a classic record can't be served: SideStore before
+nightly 0.7.0-20260920, LiveContainer's built-in SideStore (0.7.0-20260918), and
+Feather. They need a build that reads the RPPairing record. Before iOS 27 the
+attempt still runs; it is only reachable with an imported RPPairing-only file,
+and whether it works there is unverified (pymobiledevice3's refusal suggests it
+doesn't).
 
 ## Running on a device (what you do)
 

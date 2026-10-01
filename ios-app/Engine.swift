@@ -177,6 +177,16 @@ final class Engine: ObservableObject {
 
     var canSelfPair: Bool { Engine.deviceCanSelfPair }
 
+    /// False on iOS 27 and later, where this iPhone can't make itself a classic
+    /// lockdown pair record: lockdownd answers `Pair` over the tunnel with
+    /// `InvalidHostID` whatever the request carries, and resets every request
+    /// on port 62078, so no app could use such a record there anyway. See
+    /// NOTES.md ("lockdownd refuses it").
+    static var canMintLockdownRecord: Bool {
+        !ProcessInfo.processInfo.isOperatingSystemAtLeast(
+            OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0))
+    }
+
     /// False when iOS is too old for the install tunnel, even with an imported
     /// pairing file.
     var osSupported: Bool {
@@ -1630,6 +1640,11 @@ final class Engine: ObservableObject {
                                                        remoteRelativePath: remoteRel,
                                                        pairingFilePath: placement)
         log("Pairing file written into \(appName) and read-back VERIFIED (\(written) bytes).")
+        let signedSideStore = signedAppBundleID()?.hasPrefix("com.SideStore.SideStore") == true
+        if let home = source.sideStoreHome ?? (signedSideStore ? .standalone : nil) {
+            handOffSplitPairing(placementPath: placement, bundleID: bundleID,
+                                appName: appName, home: home, udid: udid)
+        }
 
         // Give SideStore the signing certificate so its first sign-in reuses it
         // instead of creating a new one and asking to resign. Failures only log.
@@ -2040,13 +2055,10 @@ final class Engine: ObservableObject {
     func installPairing(into target: InstalledPairingTarget) async throws {
         try await ensurePairingConnection()
         let path = pairingFilePath ?? PairingController.pairingFilePath()
-        let bundleID = target.bundleID
-        let rel = target.remoteRelativePath
         let udid = deviceUDID
         try await onDeviceQueue {
             let placement = try self.resolvePlacement(rpPairingPath: path, udid: udid)
-            try self.performInstallPairing(bundleID: bundleID, remoteRelativePath: rel,
-                                           placementPath: placement)
+            try self.performInstallPairing(target: target, placementPath: placement, udid: udid)
         }
     }
 
@@ -2064,12 +2076,9 @@ final class Engine: ObservableObject {
         }
         var failures: [String] = []
         for target in targets {
-            let bundleID = target.bundleID
-            let rel = target.remoteRelativePath
             do {
                 try await onDeviceQueue {
-                    try self.performInstallPairing(bundleID: bundleID, remoteRelativePath: rel,
-                                                   placementPath: placement)
+                    try self.performInstallPairing(target: target, placementPath: placement, udid: udid)
                 }
             } catch {
                 // One app refusing the write shouldn't cost the rest.
@@ -2106,16 +2115,58 @@ final class Engine: ObservableObject {
         pairingStatus = L("connected")
     }
 
-    /// Write the resolved pairing file into `bundleID`'s Documents, verifying
+    /// Write the resolved pairing file into `target`'s Documents, verifying
     /// the read-back.
-    private func performInstallPairing(bundleID: String, remoteRelativePath: String,
-                                       placementPath: String) throws {
+    private func performInstallPairing(target: InstalledPairingTarget, placementPath: String,
+                                       udid: String?) throws {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
-        log("Writing pairing file into \(bundleID) /Documents/\(remoteRelativePath) …")
+        let bundleID = target.bundleID
+        log("Writing pairing file into \(bundleID) /Documents/\(target.remoteRelativePath) …")
         let written = try connection.writePairingFile(intoBundleID: bundleID,
-                                                       remoteRelativePath: remoteRelativePath,
+                                                       remoteRelativePath: target.remoteRelativePath,
                                                        pairingFilePath: placementPath)
         log("Pairing file written into \(bundleID) and read-back VERIFIED (\(written) bytes).")
+        if let home = target.app.sideStoreHome {
+            handOffSplitPairing(placementPath: placementPath, bundleID: bundleID,
+                                appName: target.name, home: home, udid: udid)
+            // iOS caches an app's settings once it has run and ignores the
+            // edited file until the app is reinstalled or the iPhone restarts.
+            log("If \(target.name) has been opened since it was installed, it picks up these settings once it's reinstalled or this iPhone restarts.")
+        }
+    }
+
+    /// Hands the pairing to SideStore the way nightly 0.7.0-20260920 and later
+    /// read it (see `SideStorePairingHandoff`): one file per protocol, plus the
+    /// two settings its own import writes. Older builds read `ALTPairingFile`,
+    /// written just before, so failures here only log. Runs on `deviceQueue`.
+    private func handOffSplitPairing(placementPath: String, bundleID: String,
+                                     appName: String, home: SideStoreHome, udid: String?) {
+        do {
+            let records = try SideStorePairingHandoff.split(
+                Data(contentsOf: URL(fileURLWithPath: placementPath)), udid: udid)
+            if !records.missingLockdownKeys.isEmpty {
+                log("⚠️ The lockdown record lacks \(records.missingLockdownKeys.joined(separator: ", ")), which newer SideStore builds require — leaving it out of their files.")
+            }
+            guard let active = records.activeProtocol else {
+                log("⚠️ Nothing in the pairing file that newer \(appName) builds can load.")
+                return
+            }
+            for (name, data) in [(SideStorePairingHandoff.lockdownFileName, records.lockdown),
+                                 (SideStorePairingHandoff.remoteFileName, records.remote)] {
+                guard let data else { continue }
+                let rel = home.documentsPrefix + name
+                let written = try connection.writeFile(intoBundleID: bundleID,
+                                                       remoteRelativePath: rel, data: data)
+                log("Wrote /Documents/\(rel) into \(appName) (\(written) bytes, read-back VERIFIED).")
+            }
+            let prefsPath = home.preferencesPath(hostBundleID: bundleID)
+            try connection.updatePlist(inBundleID: bundleID, containerPath: prefsPath) { prefs in
+                SideStorePairingHandoff.applySettings(to: &prefs, activeProtocol: active)
+            }
+            log("Set \(appName) to load its \(active) pairing file (/\(prefsPath)), as its own import does.")
+        } catch {
+            log("⚠️ Couldn't hand \(appName) its pairing in the newer format (\(short(error))). SideStore nightlies from 20 September 2026 on may ask for the pairing file; older builds are set.")
+        }
     }
 
     /// The file to hand over, once the RPPairing record it's built from is known
@@ -2273,7 +2324,8 @@ final class Engine: ObservableObject {
     ///
     /// SideInstaller pairs via RPPairing, but minimuxer (SideStore, LiveContainer)
     /// and Feather need a classic lockdown record. This creates one over the open
-    /// tunnel and merges both records into one file, as iLoader does.
+    /// tunnel and merges both records into one file, as iLoader does. On iOS 27
+    /// lockdownd won't pair, so the RPPairing file goes alone.
     ///
     /// Runs on `deviceQueue`. Never throws: on failure it returns the RPPairing
     /// file alone, which StikDebug can still use.
@@ -2305,6 +2357,9 @@ final class Engine: ObservableObject {
             let lockdown: Data
             if let cached = CompositePairingFile.cachedLockdownRecord(forUDID: udid) {
                 lockdown = cached
+            } else if !Self.canMintLockdownRecord {
+                log("Handing over the RPPairing record on its own: iOS 27 doesn't let lockdown pair over the tunnel. StikDebug (sideloaded) and SideStore nightlies from 20 September 2026 on read it.")
+                return rpPairingPath
             } else {
                 log("Pairing with lockdown as well, so AltStore-family apps can read the file. Tap Trust if this iPhone asks, and unlock it if it's locked …")
                 let record = try connection.lockdownPairRecord(hostID: CompositePairingFile.hostID,
@@ -2326,7 +2381,7 @@ final class Engine: ObservableObject {
             log("Pairing file carries both records (\(merged.count) bytes) — readable by SideStore, LiveContainer and Feather as well as StikDebug.")
             return path
         } catch {
-            log("⚠️ Couldn't add the lockdown record to the pairing file (\(short(error))). Writing the RPPairing record on its own — StikDebug (sideloaded) reads that, SideStore and Feather won't.")
+            log("⚠️ Couldn't add the lockdown record to the pairing file (\(short(error))). Writing the RPPairing record on its own — StikDebug (sideloaded) and SideStore nightlies from 20 September 2026 on read that; older SideStore builds and Feather won't.")
             return rpPairingPath
         }
     }

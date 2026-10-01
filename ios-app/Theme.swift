@@ -367,14 +367,17 @@ private struct PopupStack<Item: Hashable, Card: View>: ViewModifier {
         return joins
     }
 
-    /// A thinned-out material over a dark wash: the app stays recognisable
-    /// behind, just blurred a little. A material rather than `.blur` on the
-    /// content, which would clip at the safe area and leave the status bar
-    /// strip unblurred.
+    /// A thinned-out material under a dark wash: the app stays recognisable
+    /// behind, blurred a little and dimmed until the last popup closes. A
+    /// material rather than `.blur` on the content, which would clip at the
+    /// safe area and leave the status bar strip unblurred. The material is
+    /// kept dark so in light mode it doesn't frost the app white and undo the
+    /// dimming.
     private var backdrop: some View {
         ZStack {
             Rectangle().fill(.ultraThinMaterial).opacity(0.7)
-            Color.black.opacity(0.35)
+                .environment(\.colorScheme, .dark)
+            Color.black.opacity(0.5)
         }
         .ignoresSafeArea()
         .contentShape(Rectangle())

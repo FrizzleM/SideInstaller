@@ -156,6 +156,16 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Where SideStore lives in the installed app. Nil for a custom IPA, which
+    /// only the signed bundle id can identify.
+    var sideStoreHome: SideStoreHome? {
+        switch self {
+        case .sideStore:     return .standalone
+        case .liveContainer: return .liveContainer
+        case .custom:        return nil
+        }
+    }
+
     /// Pick the right `.ipa` asset out of a release's assets.
     func selectAsset(from assets: [SideStoreDownloader.GHAsset]) -> SideStoreDownloader.GHAsset? {
         switch self {

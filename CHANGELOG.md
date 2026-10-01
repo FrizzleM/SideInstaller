@@ -27,8 +27,21 @@ All notable changes to SideInstaller are documented here.
   details stay, and errors now say why a request couldn't be sent (DNS, connection or TLS).
 - Closing a popup that a running install is waiting on, such as the pairing code or the steps to
   connect LocalDevVPN, now asks first, since it ends the install.
+- The app behind a popup is now dimmed further as well as blurred, in light mode too, until the
+  popup closes.
+- On iOS 27, handing the pairing file to another app no longer tries to add a classic lockdown
+  pairing first. iOS 27 refuses that every time, so the attempt only cost time and left a warning
+  in the log. The file carries the pairing that StikDebug and SideStore nightlies from 20 September
+  2026 on read. Older SideStore builds, LiveContainer's built-in SideStore and Feather need a
+  classic pairing, which iOS 27 doesn't allow these apps to use on the iPhone itself.
 
 ### Fixed
+- **SideStore Nightly no longer asks you to import the pairing file.** Nightlies from 20 September
+  2026 on stopped reading the pairing file where SideInstaller put it: they look for one file per
+  connection type under new names, turn down a file that holds both, and only load one after their
+  own import has saved two settings. SideInstaller now writes the pairing that way too, and sets
+  those settings the way SideStore's import does, so SideStore connects on first launch. Older
+  SideStore builds and LiveContainer + SideStore keep getting the file they read.
 - **Sign-in says when SideInstaller can't reach Apple.** It used to try every anisette server and
   blame them, although none was at fault. It now stops and says why: Cellular Data turned off for
   SideInstaller, Wi-Fi not allowed for it, no internet connection, a disconnected VPN holding traffic
