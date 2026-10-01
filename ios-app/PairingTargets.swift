@@ -13,6 +13,15 @@ struct PairingTargetApp: Identifiable, Equatable {
 
     var id: String { name }
 
+    /// Where SideStore lives in this app, for the apps that carry it.
+    var sideStoreHome: SideStoreHome? {
+        switch name {
+        case "SideStore":     return .standalone
+        case "LiveContainer": return .liveContainer
+        default:              return nil
+        }
+    }
+
     /// The supported apps, in display order. `StikDebug (Sideloaded)` is
     /// reached only through the bundle-id check in `PairingTargets.match`.
     static let all: [PairingTargetApp] = [
@@ -272,5 +281,115 @@ enum CompositePairingFile {
     /// lockdown record is kept.
     static func invalidateMerged() {
         try? FileManager.default.removeItem(at: PrivateStore.combinedPairingFile)
+    }
+}
+
+/// Where SideStore lives inside the app that receives the pairing file.
+enum SideStoreHome {
+    /// SideStore installed on its own.
+    case standalone
+    /// SideStore as LiveContainer's built-in guest, whose home folder is
+    /// Documents/SideStore in LiveContainer's container.
+    case liveContainer
+
+    /// SideStore's Documents, relative to the host app's Documents.
+    var documentsPrefix: String {
+        switch self {
+        case .standalone:    return ""
+        case .liveContainer: return "SideStore/Documents/"
+        }
+    }
+
+    /// SideStore's settings plist, relative to the host app's container root.
+    /// LiveContainer keeps a guest's settings in the guest's home folder, named
+    /// after its bundle id, which signing leaves unchanged for frameworks.
+    func preferencesPath(hostBundleID: String) -> String {
+        switch self {
+        case .standalone:    return "Library/Preferences/\(hostBundleID).plist"
+        case .liveContainer: return "Documents/SideStore/Library/Preferences/com.SideStore.SideStore.plist"
+        }
+    }
+}
+
+/// The pairing hand-off SideStore expects from nightly 0.7.0-20260920 on.
+///
+/// Those builds ignore `ALTPairingFile.mobiledevicepairing`, which older builds
+/// (and LiveContainer's built-in SideStore, so far) still read. They keep one
+/// file per protocol, reject a file holding both records as ambiguous, and load
+/// neither until an import has turned `isPairingReset` off (it defaults to on)
+/// and recorded the file's protocol in `activePairingProtocol`. So each record
+/// goes in its own file, and both settings are written into SideStore's
+/// preferences, as its own import does.
+enum SideStorePairingHandoff {
+
+    static let lockdownFileName = "PairingFile_Lockdown.plist"
+    static let remoteFileName = "PairingFile_RemoteRP.plist"
+
+    /// The keys minimuxer requires for each protocol (MinimuxerCommon's
+    /// `PairingFile.swift`).
+    private static let requiredLockdownKeys = [
+        "WiFiMACAddress", "SystemBUID", "RootPrivateKey", "HostPrivateKey", "HostID",
+        "RootCertificate", "UDID", "EscrowBag", "HostCertificate", "DeviceCertificate",
+    ]
+    private static let requiredRemoteKeys = ["private_key", "public_key", "identifier"]
+    /// Every RPPairing key, including the optional `alt_irk`.
+    private static let remoteKeys: Set<String> = ["private_key", "public_key", "identifier", "alt_irk"]
+
+    /// The records split out of the pairing file, each an XML plist (SideStore
+    /// reads the file as a UTF-8 string).
+    struct Records {
+        /// The lockdown record alone, or nil if the file has no complete one.
+        let lockdown: Data?
+        /// The RPPairing record alone, or nil if the file has none.
+        let remote: Data?
+        /// Keys missing from a partial lockdown record, for the log.
+        let missingLockdownKeys: [String]
+
+        /// The protocol SideStore should load. Lockdown goes first: SideStore
+        /// reaches lockdownd over the loopback VPN, while the RPPairing listener
+        /// can refuse a tunnel from the device itself.
+        var activeProtocol: String? {
+            if lockdown != nil { return "lockdown" }
+            if remote != nil { return "rppairing" }
+            return nil
+        }
+    }
+
+    /// Splits a pairing file (lockdown, RPPairing, or both merged) into one
+    /// record per protocol, adding the UDID the lockdown record needs if missing.
+    static func split(_ data: Data, udid: String?) throws -> Records {
+        let parsed = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+        guard let dict = parsed as? [String: Any] else {
+            throw CompositePairingFile.BuildError.notAPlistDictionary("pairing")
+        }
+
+        var lockdownDict = dict.filter { !remoteKeys.contains($0.key) }
+        if let udid, !udid.isEmpty, (lockdownDict["UDID"] as? String)?.isEmpty != false {
+            lockdownDict["UDID"] = udid
+        }
+        let missingLockdown = requiredLockdownKeys.filter { lockdownDict[$0] == nil }
+        // A file with no lockdown keys at all isn't missing anything worth logging.
+        let hasAnyLockdown = requiredLockdownKeys.contains { $0 != "UDID" && lockdownDict[$0] != nil }
+
+        let remoteDict = dict.filter { remoteKeys.contains($0.key) }
+        let hasRemote = requiredRemoteKeys.allSatisfy { remoteDict[$0] != nil }
+
+        return Records(
+            lockdown: missingLockdown.isEmpty ? try xml(lockdownDict) : nil,
+            remote: hasRemote ? try xml(remoteDict) : nil,
+            missingLockdownKeys: hasAnyLockdown ? missingLockdown : []
+        )
+    }
+
+    /// Sets what SideStore's own import sets: pairing no longer reset, and the
+    /// protocol whose file to load. A protocol picked in SideStore's settings
+    /// lives in `preferredPairingProtocol`, which is left alone.
+    static func applySettings(to prefs: inout [String: Any], activeProtocol: String) {
+        prefs["isPairingReset"] = false
+        prefs["activePairingProtocol"] = activeProtocol
+    }
+
+    private static func xml(_ dict: [String: Any]) throws -> Data {
+        try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
     }
 }

@@ -21,7 +21,7 @@
       "disableOnlyActiveArch" : true,
       "hostTargetedPlatform" : null,
       "platform" : "iphonesimulator",
-      "sdk" : "iphonesimulator26.5",
+      "sdk" : "iphonesimulator27.0",
       "sdkVariant" : "iphonesimulator",
       "supportedArchitectures" : [
         "i386",
@@ -42,7 +42,7 @@
     "overrides" : {
       "commandLine" : {
         "table" : {
-
+          "CODE_SIGNING_ALLOWED" : "NO"
         }
       },
       "synthesized" : {
