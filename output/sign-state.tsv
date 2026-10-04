@@ -2,14 +2,17 @@
 # Written by the last full run and compared before the next one; the run
 # is skipped when this file would come out identical. Delete to force.
 channel	stable
-ipa_url	https://github.com/FrizzleM/SideInstaller/releases/download/v1.2.1/SideInstaller.ipa
-ipa_size	9349679
+ipa_url	https://github.com/FrizzleM/SideInstaller/releases/download/v1.2.2/SideInstaller.ipa
+ipa_size	9379704
 output_base_url	https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output
 inputs_sha256	448e4579241719660ef7ff30fec0adc3dc1eb2c1ab6ccca63cd8e851543181fa
 cert	BOC-International-China-Limited-qi-ye-weixin-app-id-huiyi-kuozhan	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
 cert	BOC-International-China-Limited-qi-ye-weixin-app-id-kuozhan	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
 cert	BOC-International-China-Limited-qi-ye-weixin-app-id-tuisong-kuozhan	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
 cert	BOC-International-China-Limited-qi-ye-weixin-zhu-app-id	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
+cert	Beihang-University-OA	E6A320CFFAEEC58AF00923694A1FC5409E64F20F	2026-12-03	revoked
+cert	Beihang-University-bhpanshare	E6A320CFFAEEC58AF00923694A1FC5409E64F20F	2026-12-03	revoked
+cert	Beihang-University-buaawxworklocalNOTI	E6A320CFFAEEC58AF00923694A1FC5409E64F20F	2026-12-03	revoked
 cert	CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.thinghiemdien	C482649E7CD9FBB174DA0045F1CD5C3686D5E84C	2028-11-02	revoked
 cert	CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.tracnghiemantoan	C482649E7CD9FBB174DA0045F1CD5C3686D5E84C	2028-11-02	revoked
 cert	China-Academy-of-Railway-Sciences	4201B4662173FBEE7B8713990551BC6873211DC0	2028-10-27	revoked
@@ -33,5 +36,6 @@ cert	PowerChina-International-Group-Limited-iWaMrs	06C1A46DACAA1CE46F8B6D9AA215D
 cert	PowerChina-International-Group-Limited-j3krPY	06C1A46DACAA1CE46F8B6D9AA215D76630CC74C7	2028-10-21	revoked
 cert	PowerChina-International-Group-Limited-nj61nO	06C1A46DACAA1CE46F8B6D9AA215D76630CC74C7	2028-10-21	revoked
 cert	Qingdao-Rural-Commercial-Bank-Co.-Ltd	27413E49E9017DED9898F07771B057052F33D0DD	2028-11-14	revoked
+cert	VINWASH-COMPANY-LIMITED	C0A5093A8EF7EDB8FFFC6E08956559A36CC52674	2028-12-01	revoked
 cert	Viet-Nam-Rubber-Group-Limited	0708D9FE769ADE322561D33C080995D9ED186686	2028-10-14	revoked
 cert	XL-AXIATA-PT-TBK	DAE4476E22160B0BA19D1B406E8B82D99BC00E00	2029-02-17	revoked
