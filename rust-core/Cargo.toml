@@ -122,8 +122,9 @@ idevice = { path = "vendor/idevice" }
 # signs them all with the main app's entitlements. SideStore's prepareDatabase
 # throws "The app extension is missing a valid provisioning profile" on every
 # launch as a result (surfacing, confusingly, as a Core Data "Can't add the same
-# store twice" loop), so its widget extension bricks the app. Vendored with that
-# one change — see vendor/isideload/README.md.
+# store twice" loop), so its widget extension bricks the app. Vendored to fix
+# that, among other local changes; it also signs with apple-codesign-quick
+# instead of isideload-apple-codesign — see vendor/isideload/README.md.
 [patch."https://github.com/nab138/isideload.git"]
 isideload = { path = "vendor/isideload" }
 

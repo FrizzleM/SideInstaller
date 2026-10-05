@@ -5,6 +5,11 @@ All notable changes to SideInstaller are documented here.
 ## Unreleased
 
 ### Changed
+- **Signing uses apple-codesign-quick**, the signer iLoader moved to in 2.3.0. It hashes an app's
+  files and signs its extensions and frameworks in parallel. In tests on a Mac it signed SideStore
+  about 6 times faster and LiveContainer + SideStore about 9 times faster, and SideInstaller itself
+  is about 5 MB smaller. An imported IPA that still carries leftovers of an old signature inside its
+  `_CodeSignature` folder is signed cleanly as well.
 - **Installing SideStore or LiveContainer + SideStore is faster.** The download now starts as soon
   as the network is up and runs while your iPhone pairs, connects and signs in to your Apple ID,
   instead of waiting for all of that to finish first.

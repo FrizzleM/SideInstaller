@@ -211,25 +211,10 @@ impl Sideloader {
             ext.write_info()?;
         }
 
-        tokio::fs::write(
-            app.bundle.bundle_dir.join("embedded.mobileprovision"),
-            provisioning_profile.encoded_profile.as_ref(),
-        )
-        .await?;
-
-        // Every nested bundle is signed with the main app's entitlements below,
-        // so the main profile is the one that authorizes an extension too — give
-        // each .appex its own copy. Hosts read it back (AltStore-family apps
-        // reject an extension without one), and it must land before signing
-        // because embedded.mobileprovision is sealed into CodeResources.
-        for ext in app.bundle.app_extensions() {
-            tokio::fs::write(
-                ext.bundle_dir.join("embedded.mobileprovision"),
-                provisioning_profile.encoded_profile.as_ref(),
-            )
-            .await?;
-        }
-
+        // `sign` writes embedded.mobileprovision into the app and each .appex
+        // as it signs them, since the profile is sealed into CodeResources.
+        // Hosts read an extension's copy back: AltStore-family apps reject an
+        // extension without one.
         sign::sign(
             &mut app,
             &cert_identity,

@@ -1,7 +1,6 @@
 // Serialization/Desieralization borrowed from https://github.com/SideStore/apple-private-apis/blob/master/omnisette/src/remote_anisette_v3.rs
 
 use plist::Data;
-use rand::RngExt;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -54,7 +53,7 @@ pub struct AnisetteState {
 impl Default for AnisetteState {
     fn default() -> Self {
         AnisetteState {
-            keychain_identifier: rand::rng().random::<[u8; 16]>(),
+            keychain_identifier: rand::random::<[u8; 16]>(),
             adi_pb: None,
         }
     }
