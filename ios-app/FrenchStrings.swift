@@ -643,6 +643,30 @@ let frenchStrings: [String: String] = [
         "De retour dans SideInstaller, ouvrez Réglages › Compte, balayez cet Apple ID vers la gauche, touchez Modifier et saisissez le nouveau mot de passe.",
     "Then tap Install again.": "Touchez ensuite à nouveau Installer.",
     "Open iForgot": "Ouvrir iForgot",
+    "Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.":
+        "Apple n'autorise pas ce compte Apple à utiliser les services pour développeurs en raison de l'âge de son titulaire (erreur 1102). Connectez-vous plutôt avec le compte Apple d'un adulte.",
+    "This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "Cet Apple ID n'a plus d'App ID disponibles (erreur 9120). Un Apple ID gratuit peut en enregistrer 10 par semaine, et chacun compte pendant 7 jours : attendez que certains expirent ou connectez-vous avec un autre Apple ID.",
+    "This iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. Delete one of them, then try again.":
+        "Cet iPhone a déjà trois apps signées avec un Apple ID gratuit, le maximum autorisé par iOS, apps expirées comprises. Supprimez-en une, puis réessayez.",
+    "This Apple Account can't sign apps":
+        "Ce compte Apple ne peut pas signer d'apps",
+    "Apple only lets adults use the developer services SideInstaller signs apps with, and it reports that this Apple Account belongs to someone younger (error 1102).":
+        "Apple réserve aux adultes les services pour développeurs avec lesquels SideInstaller signe les apps, et indique que ce compte Apple appartient à une personne plus jeune (erreur 1102).",
+    "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
+        "Connectez-vous plutôt avec le compte Apple d'un adulte : ouvrez Réglages › Compte et ajoutez-le.",
+    "No App IDs left this week": "Plus d'App ID cette semaine",
+    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "Chaque app et extension d'app que SideInstaller signe a besoin d'un App ID. Un Apple ID gratuit peut en enregistrer 10 par semaine, et chacun compte pendant 7 jours.",
+    "They can't be deleted sooner. Wait until some expire, then tap Install again.":
+        "Ils ne peuvent pas être supprimés plus tôt. Attendez que certains expirent, puis touchez à nouveau Installer.",
+    "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
+        "Ou connectez-vous avec un autre Apple ID (ou un compte de secours) dans Réglages › Compte, puis touchez à nouveau Installer.",
+    "Three sideloaded apps already": "Déjà trois apps sideloadées",
+    "iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth.":
+        "iOS autorise trois apps signées avec un Apple ID gratuit à la fois sur un iPhone, et en a refusé une quatrième.",
+    "Expired apps count too. Delete one you no longer need from the Home Screen.":
+        "Les apps expirées comptent aussi. Supprimez de l'écran d'accueil une app dont vous n'avez plus besoin.",
 
     // Guide: import a pairing file
 

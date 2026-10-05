@@ -20,13 +20,33 @@ final class PairingController {
     /// The host name Side by Side pairs another iPhone with, shown on it as
     /// “Pair with …”.
     ///
-    /// A new host's identifier is derived from its name, so a different name
-    /// keeps Side by Side's record on their iPhone apart from the one their own
-    /// SideInstaller pairs itself with. With the same name, pairing them again
-    /// would replace that record, and the pairing files their SideInstaller put
-    /// into SideStore and the rest would stop working. Never change or localize
-    /// it: records already on other iPhones were paired under it.
+    /// Files paired before `peerHostIdentifier` existed have an identifier
+    /// derived from this name. A different name keeps that record on their
+    /// iPhone apart from the one their own SideInstaller pairs itself with. With
+    /// the same name, pairing them again would replace that record, and the
+    /// pairing files their SideInstaller put into SideStore and the rest would
+    /// stop working. Never change or localize it: records already on other
+    /// iPhones were paired under it.
     nonisolated static let peerHostName = "SideInstaller (Side by Side)"
+
+    /// The identifier a new Side by Side pairing file gets, made once per
+    /// install.
+    ///
+    /// Derived from `peerHostName`, it would be the same on every SideInstaller,
+    /// and their iPhone keeps one record per identifier: someone else pairing it
+    /// from their own iPhone would replace this one's record, and the pairing
+    /// remembered here would stop working. iLoader 2.3.5 gives each host its own
+    /// for the same reason. A file already at the run's path keeps its own.
+    private static let peerHostIdentifierKey = "sideBySideHostIdentifier"
+    private static var peerHostIdentifier: String {
+        if let stored = UserDefaults.standard.string(forKey: peerHostIdentifierKey), !stored.isEmpty {
+            return stored
+        }
+        // Lowercase, like the identifiers derived from a name.
+        let made = UUID().uuidString.lowercased()
+        UserDefaults.standard.set(made, forKey: peerHostIdentifierKey)
+        return made
+    }
 
     private var netService: NetService?
     private let localNetwork = LocalNetworkAuthorization()
@@ -90,6 +110,8 @@ final class PairingController {
         let name: String
         let outPath: String
         let altIRK: String
+        /// The identifier a new pairing file gets; "" derives it from `name`.
+        let identifier: String
         /// Side by Side's PIN display; nil when pairing this iPhone.
         let peerPIN: (@MainActor (String) -> Void)?
         /// Resolved when the run ends, or when it's cancelled; nil for `start()`.
@@ -102,12 +124,13 @@ final class PairingController {
 
         var isThisDevice: Bool { peerPIN == nil }
 
-        init(name: String, outPath: String, altIRK: String,
+        init(name: String, outPath: String, altIRK: String, identifier: String,
              peerPIN: (@MainActor (String) -> Void)?,
              continuation: CheckedContinuation<PairedDevice, Error>?) {
             self.name = name
             self.outPath = outPath
             self.altIRK = altIRK
+            self.identifier = identifier
             self.peerPIN = peerPIN
             self.continuation = continuation
         }
@@ -146,8 +169,10 @@ final class PairingController {
     }
 
     private func thisDeviceRun(continuation: CheckedContinuation<PairedDevice, Error>?) -> HostRun {
+        // Derived from the name, as when this iPhone first paired: its record
+        // is keyed by that identifier.
         HostRun(name: hostName, outPath: Self.pairingFilePath(), altIRK: Self.storedAltIRK,
-                peerPIN: nil, continuation: continuation)
+                identifier: "", peerPIN: nil, continuation: continuation)
     }
 
     // MARK: Pairing another iPhone (Side by Side)
@@ -165,6 +190,7 @@ final class PairingController {
         return try await withCheckedThrowingContinuation { cont in
             // No stored altIRK: a fresh one each run, as StikPair does.
             begin(HostRun(name: Self.peerHostName, outPath: outPath, altIRK: "",
+                          identifier: Self.peerHostIdentifier,
                           peerPIN: onPIN, continuation: cont))
         }
     }
@@ -221,6 +247,7 @@ final class PairingController {
         let model = hostModel
         let outPath = run.outPath
         let altIRK = run.altIRK
+        let identifier = run.identifier
         // Only this iPhone's host keeps its altIRK; see `storedAltIRK`.
         let keepsAltIRK = run.isThisDevice
         // Retained as the C callbacks' `ctx`, released after the run.
@@ -237,9 +264,11 @@ final class PairingController {
                     model.withCString { modelC in
                         outPath.withCString { outC in
                             altIRK.withCString { irkC in
-                                si_pairing_run_host(
-                                    bindC, 0, nameC, modelC, outC, irkC,
-                                    pairReadyCallback, pairPinCallback, ctx, &result)
+                                identifier.withCString { idC in
+                                    si_pairing_run_host(
+                                        bindC, 0, nameC, modelC, outC, irkC, idC,
+                                        pairReadyCallback, pairPinCallback, ctx, &result)
+                                }
                             }
                         }
                     }

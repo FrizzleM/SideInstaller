@@ -61,6 +61,9 @@ struct PairingTargetApp: Identifiable, Equatable {
         .init(name: "Reynard",
               remoteRelativePath: "pairingFile.plist",
               bundleIDContains: nil),
+        .init(name: "PanicAnalyzer",
+              remoteRelativePath: "pairingFile.plist",
+              bundleIDContains: nil),
     ]
 }
 

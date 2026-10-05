@@ -637,6 +637,30 @@ let vietnameseStrings: [String: String] = [
         "Quay lại SideInstaller, mở Cài đặt › Tài khoản, vuốt sang trái trên Apple ID này, chạm vào Sửa rồi nhập mật khẩu mới.",
     "Then tap Install again.": "Sau đó chạm vào Cài ứng dụng lần nữa.",
     "Open iForgot": "Mở iForgot",
+    "Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.":
+        "Apple không cho Apple Account này dùng dịch vụ dành cho nhà phát triển vì tuổi của chủ tài khoản (lỗi 1102). Hãy đăng nhập bằng Apple Account của một người lớn.",
+    "This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "Apple ID này đã hết App ID (lỗi 9120). Apple ID miễn phí chỉ đăng ký được 10 App ID mỗi tuần, và mỗi App ID được tính trong 7 ngày, nên hãy đợi một số hết hạn hoặc đăng nhập bằng Apple ID khác.",
+    "This iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. Delete one of them, then try again.":
+        "iPhone này đã có ba ứng dụng ký bằng Apple ID miễn phí, mức tối đa iOS cho phép, kể cả ứng dụng đã hết hạn. Hãy xóa một ứng dụng rồi thử lại.",
+    "This Apple Account can't sign apps":
+        "Apple Account này không thể ký ứng dụng",
+    "Apple only lets adults use the developer services SideInstaller signs apps with, and it reports that this Apple Account belongs to someone younger (error 1102).":
+        "Apple chỉ cho người lớn dùng dịch vụ dành cho nhà phát triển mà SideInstaller dùng để ký ứng dụng, và Apple cho biết Apple Account này thuộc về người chưa đủ tuổi (lỗi 1102).",
+    "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
+        "Hãy đăng nhập bằng Apple Account của một người lớn: mở Cài đặt › Tài khoản và thêm tài khoản đó vào.",
+    "No App IDs left this week": "Đã hết App ID trong tuần này",
+    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "Mỗi ứng dụng và tiện ích mở rộng mà SideInstaller ký đều cần một App ID. Apple ID miễn phí chỉ đăng ký được 10 App ID mỗi tuần, và mỗi App ID được tính trong 7 ngày.",
+    "They can't be deleted sooner. Wait until some expire, then tap Install again.":
+        "Không thể xóa chúng sớm hơn. Hãy đợi một số hết hạn, rồi chạm vào Cài ứng dụng lần nữa.",
+    "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
+        "Hoặc đăng nhập bằng một Apple ID khác (hoặc tài khoản dự phòng) trong Cài đặt › Tài khoản, rồi chạm vào Cài ứng dụng lần nữa.",
+    "Three sideloaded apps already": "Đã có ba ứng dụng sideload",
+    "iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth.":
+        "iOS chỉ cho phép ba ứng dụng ký bằng Apple ID miễn phí trên một iPhone cùng lúc, và đã từ chối ứng dụng thứ tư.",
+    "Expired apps count too. Delete one you no longer need from the Home Screen.":
+        "Ứng dụng đã hết hạn cũng được tính. Hãy xóa một ứng dụng bạn không cần nữa khỏi Màn hình chính.",
 
     // Guide: import a pairing file
 
