@@ -34,7 +34,14 @@ struct AccountSetupView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .preferredColorScheme(.dark)
-        .onAppear { focus = .email }
+        // Focus only once the welcome page has zoomed away and the card has
+        // faded in. AutoFill pairs the username field with a *visible* password
+        // field when it gains focus; focusing during the entrance (card still
+        // transparent) makes it fill the email alone, then the password separately.
+        .task {
+            try? await Task.sleep(for: .milliseconds(650))
+            focus = .email
+        }
     }
 
     private var header: some View {
