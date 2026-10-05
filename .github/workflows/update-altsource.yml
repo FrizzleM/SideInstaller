@@ -1,0 +1,66 @@
+name: update-altsource
+
+# Keeps the AltStore/SideStore source (frizzlem.json) in step with GitHub
+# Releases: every published, non-prerelease release with an .ipa attached gets
+# a version entry, and the newest one becomes the app's current version. See
+# scripts/update_altsource.py for exactly what is rewritten and what is kept.
+#
+# A SideInstaller release triggers this directly. Nightflix lives in its own
+# repo, whose releases can't fire a workflow here, so the schedule picks those
+# up — and also any release here that was published before its .ipa finished
+# uploading, or whose tag points at a commit older than this workflow.
+
+on:
+  release:
+    types: [released, edited, deleted]
+  schedule:
+    - cron: "17 */6 * * *"     # every 6 hours, for Nightflix and late uploads
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/update_altsource.py"
+      - ".github/workflows/update-altsource.yml"
+
+concurrency:
+  group: update-altsource
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # commit the updated source back to the repo
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # Release triggers check out the tag as a detached HEAD, which can't
+          # be pushed to. Use the default branch then, so the source served
+          # from main is the one that gets the new version.
+          ref: ${{ github.ref_type == 'tag' && (github.event.repository.default_branch || 'main') || github.ref_name }}
+
+      - name: Sync source with releases
+        id: sync
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/update_altsource.py
+
+      - name: Commit and push
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frizzlem.json
+          git commit -m "update-altsource: sync frizzlem.json with releases"
+
+          branch="$(git rev-parse --abbrev-ref HEAD)"
+          for attempt in 1 2 3; do
+            git pull --rebase origin "$branch" || true
+            if git push origin "HEAD:$branch"; then exit 0; fi
+            echo "Push failed; retrying (attempt $attempt)" >&2
+            sleep 5
+          done
+
+          echo "Failed to push after 3 attempts" >&2
+          exit 1

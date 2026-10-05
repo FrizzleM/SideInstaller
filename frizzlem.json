@@ -1,0 +1,246 @@
+{
+  "name": "FrizzleM's AltSource",
+  "identifier": "com.frizzlem.altsource",
+  "iconURL": "https://avatars.githubusercontent.com/u/182496942",
+  "apps": [
+    {
+      "bundleIdentifier": "com.frizzlem.sideinstaller",
+      "name": "SideInstaller",
+      "developerName": "FrizzleM",
+      "iconURL": "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon~ios-marketing.png",
+      "subtitle": "An an app that installs Sidestore on iOS 27, fully on-device",
+      "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
+      "version": "1.3.0",
+      "versionDate": "2026-10-05T18:55:57Z",
+      "versionDescription": "# Main changes:\r\n- Switched app signing to apple-codesign-quick (the same signer iLoader uses)\r\n    - Signing is about 6-9x faster\r\n    - SideInstaller is about 5 MB smaller\r\n- Popups that appear together are now merged into one card\r\n    - The pairing code and its Settings steps are now one popup\r\n    - An error and its fix steps are now one popup\r\n    - The \"Installed\" message, the trust step and LiveContainer's certificate import are now one \"Success: last steps\" popup\r\n- Added clear explanations and steps for more errors\r\n    - Apple Accounts that are too young to use developer services (error 1102)\r\n    - Running out of App IDs for the week (error 9120)\r\n    - Already having 3 apps installed with a free Apple ID\r\n- Logging in now automatically retries when Apple temporarily rate limits it (HTTP 429)\r\n- Added PanicAnalyzer to the apps that can receive the pairing file\r\n\r\n## Fixes:\r\n\r\n- Fixed LiveContainer + SideStore not downloading while the official LiveContainer GitHub is down (it now uses a temporary mirror, which only has the nightly build)\r\n- Fixed imported .ipa files with spaces, symbols or non-Latin letters in their name failing to sign (error 35)\r\n- Fixed some imported .ipa files that still had parts of an old signature failing to install\r\n- Fixed Side by Side: when two people pair the same iPhone, the second one no longer breaks the first one's pairing\r\n- Fixed not being able to revoke \"Apple Development\" certificates (the ones Xcode makes) in the Certificates tool (error 7252)\r\n- Fixed AutoFill filling in the email and password separately on the login page",
+      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.3.0/SideInstaller.ipa",
+      "size": 8883213,
+      "versions": [
+        {
+          "version": "1.3.0",
+          "date": "2026-10-05T18:55:57Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.3.0/SideInstaller.ipa",
+          "localizedDescription": "# Main changes:\r\n- Switched app signing to apple-codesign-quick (the same signer iLoader uses)\r\n    - Signing is about 6-9x faster\r\n    - SideInstaller is about 5 MB smaller\r\n- Popups that appear together are now merged into one card\r\n    - The pairing code and its Settings steps are now one popup\r\n    - An error and its fix steps are now one popup\r\n    - The \"Installed\" message, the trust step and LiveContainer's certificate import are now one \"Success: last steps\" popup\r\n- Added clear explanations and steps for more errors\r\n    - Apple Accounts that are too young to use developer services (error 1102)\r\n    - Running out of App IDs for the week (error 9120)\r\n    - Already having 3 apps installed with a free Apple ID\r\n- Logging in now automatically retries when Apple temporarily rate limits it (HTTP 429)\r\n- Added PanicAnalyzer to the apps that can receive the pairing file\r\n\r\n## Fixes:\r\n\r\n- Fixed LiveContainer + SideStore not downloading while the official LiveContainer GitHub is down (it now uses a temporary mirror, which only has the nightly build)\r\n- Fixed imported .ipa files with spaces, symbols or non-Latin letters in their name failing to sign (error 35)\r\n- Fixed some imported .ipa files that still had parts of an old signature failing to install\r\n- Fixed Side by Side: when two people pair the same iPhone, the second one no longer breaks the first one's pairing\r\n- Fixed not being able to revoke \"Apple Development\" certificates (the ones Xcode makes) in the Certificates tool (error 7252)\r\n- Fixed AutoFill filling in the email and password separately on the login page",
+          "size": 8883213
+        },
+        {
+          "version": "1.2.2",
+          "date": "2026-10-04T08:49:05Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.2.2/SideInstaller.ipa",
+          "localizedDescription": "- Fixed a bug in the installation of the latest nightly of SidesStore\r\n    - The app would put the pairing file in the wrong path as it has been changed with an update. Issue has been fixed.\r\n- Improved visibility of popups",
+          "size": 9379704
+        },
+        {
+          "version": "1.2.1",
+          "date": "2026-09-30T16:26:11Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.2.1/SideInstaller.ipa",
+          "localizedDescription": "- Closing certain popups will warn the user as it will end the process\r\n- Added an error for network issues\r\n- Removed certain personal data from logs to improve privacy",
+          "size": 9349679
+        },
+        {
+          "version": "1.2.0",
+          "date": "2026-09-30T14:26:55Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.2.0/SideInstaller.ipa",
+          "localizedDescription": "- Messages are now shown as popups to improve clarity\r\n- Added advanced options to the install page\r\n   - Users can now choose the Sidestore (+ Livecontainer) version\r\n   - Users can now manually import the pairing file on iOS 27+ #60 \r\n- Made transitions between pages smoother",
+          "size": 9331555
+        },
+        {
+          "version": "1.1.0",
+          "date": "2026-09-19T13:41:50Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.1.0/SideInstaller.ipa",
+          "localizedDescription": "- Strongly optimized the install process\r\n   - It can now be as short as 11.1s in ideal conditions\r\n- Fixed a bug in Side by Side #52",
+          "size": 9269862
+        },
+        {
+          "version": "1.0.0",
+          "date": "2026-09-14T17:59:20Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.0.0/SideInstaller.ipa",
+          "localizedDescription": "This is the biggest update SideInstaller has had so far. Enjoy v1, alongside iOS 27’s official release <3\r\n\r\n# Main changes:\r\n- Added a Tools page\r\n    - Added “Side by Side”, which lets one iPhone/iPad wirelessly install SideInstaller on another iPhone/iPad\r\n    - Certificates and Pairing are now in the Tools tab\r\n    - Added a location spoofer that lets your iPhone believe you are in any location\r\n    - Added an entitlement manager (mainly to let users add increased memory limit)\r\n- Added partial iOS 26-17 support\r\n    - Users on iOS 26-17 can now use SideInstaller, but only if they already have their pairing file, which they will need a pc to get\r\n    - iOS 26-17 devices cannot use the Pairing tool\r\n- Huge changes to the Apple ID logging in\r\n    - 2FA now supports SMS and calls\r\n    - Fixed the HTTP 503 error on log in\r\n    - Session IDs are now saved and reused to avoid Apple giving rate limits\r\n- Added support for URLs in the import .ipa\r\n- Added a new dark and glass app icon\r\n- Added Portuguese and Japanese (credits to @so-5699) languages\r\n\r\n## Fixes: \r\n\r\n- Fixed the LV + SS nightly bug that would make it ask for the certificate’s password\r\n- Added a LocalDevVPN start at launch\r\n- Fixed compatibility error with LocalDevVPN’s update\r\n- Improved the looks of the progress bar\r\n- Fixed the import .ipa bug that didn’t let users select any file\r\n- Reduced the amount of times the app will require to be approved in Privacy and Security\r\n- Changing the anisette server in the settings now persists",
+          "size": 9243749
+        },
+        {
+          "version": "0.9.0",
+          "date": "2026-08-07T14:00:16Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.9.0/SideInstaller.ipa",
+          "localizedDescription": "Sorry for the instability these days. This update makes SideInstaller fully compatible with the latest releases of all apps, including SideStore Nightly.\r\n\r\n## Changes: \r\n\r\n- SideStore, LiveContainer + SideStore and Feather now accept the pairing file SideInstaller puts in them, instead of asking you for one as though nothing had been placed.\r\nSideInstaller now switches on the setting those apps need to reach your iPhone over your local tunnel, which nothing was doing before.\r\n- The install may ask you to unlock your iPhone and tap Trust once, and it remembers the result so it won't ask again for that device.\r\nIf that extra step doesn't work, your install still finishes exactly as it did before, and the log tells you what went out.\r\nPairing tab\r\n- One button now writes the pairing file into every supported app it found, instead of you tapping through them one at a time.\r\n- One app refusing the pairing file no longer stops the others from getting it.\r\n- Export now shares the pairing file that every app can read, so importing it by hand works as well as letting SideInstaller place it.",
+          "size": 7908297
+        },
+        {
+          "version": "0.8.0",
+          "date": "2026-08-06T21:03:48Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.8.0/SideInstaller.ipa",
+          "localizedDescription": "# Note from the dev\r\nV1 is planned to be released by the time that Apple releases iSO 27’s official build. To ensure that, my goal currently is to bring a stable version of the app rather than introducing any new features. This update significantly brings us closer to that goal as it fixes the 2 most common and irritating errors reported so far. Please, keep testing it and share your issues on GitHub or on the discord server. <3\r\n\r\n# Changes\r\n\r\n- Fixed the SideStore nightly error “`Domain=AltSign.Error Code=1 The app extension is missing a valid provisioning profile. UserInfo={NSLocalizedFailureReason =The app extension is missing a valid provisioning profile.}`”\r\n\r\n- To fix it, the app now writes embedded.mobileprovision into each .appex before sign::sign, and rust-core/Cargo.toml redirects the git dep to it\r\n- Fixed a bug that occurred when the app downloaded an .ipa from GitHub\r\n    - The app now relies on the release’s download link rather than the GitHub API to ensure there are no API cap problems\r\n- [Updated dependencies](https://raw.githubusercontent.com/FrizzleM/SideInstaller/refs/heads/main/v0.8-dependency-updates.txt)",
+          "size": 8436151
+        },
+        {
+          "version": "0.7.0",
+          "date": "2026-08-03T13:58:44Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.7.0/SideInstaller.ipa",
+          "localizedDescription": "This update brings significant changes to the backend. The app is now more optimized with LocalDevVPN, which should cause much less issues with tunnel connections being refused or expired.\r\n\r\n## Custom IPAs\r\n- Users can now import any IPA from Files and SideInstaller signs and installs that instead of downloading. \r\n- Documents is now visible in **Files › On My iPhone › SideInstaller**. If you put a SideStore.ipa there, the install uses it. This can be useful for those who cannot access GitHub servers. #9 \r\n- A failed download falls back to a copy from an earlier run.\r\n- Imports are now backgrounded, work off iCloud Drive, don't destroy the previous file if they fail, and catch a truncated archive at import.\r\n\r\n## Security\r\n- The pairing file and your signing certificate moved out of Documents to Application Support. This fixes a huge security flaw since apps could abusively access your pairing files without your consent, giving them access to potential security exploits.\r\n\r\n## Tunnel and VPN\r\n- Any loopback VPN works, not just LocalDevVPN. The UI now says so and names ClashMi too. #9 \r\n- A tunnel on a mask other than /24 is detected; a Wi-Fi LAN on the same range no longer reads as a tunnel.\r\n- Entering LocalDevVPN's own address in Device IP is caught before the run starts, instead of failing at Connect.\r\n- Wi-Fi is only required for pairing. Installing with a saved pairing file works on cellular.\r\n\r\n## Fixes\r\n- Added new languages, such as Chinese\r\n- Pairing tab no longer fails with \"adapter closed\" after sitting idle, it re-establishes the device link first.\r\n- The tunnel/Wi-Fi poll no longer redraws the UI twice a second.\r\n- Large builds are mapped rather than read into memory whole during upload.\r\n- The activity log is capped at 2000 lines.\r\n- Removed the copy button from the code since it can't be pasted into the settings app, meaning it was useless\r\n\r\n**Full changelog:** https://github.com/FrizzleM/SideInstaller/compare/v0.6.5...v0.7.0",
+          "size": 7626179
+        },
+        {
+          "version": "0.6.5",
+          "date": "2026-07-21T18:23:55Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.6.5/SideInstaller.ipa",
+          "localizedDescription": "- Fixed urgent heartbeat bug\r\n- Improved translations",
+          "size": 7581370
+        },
+        {
+          "version": "0.6.4",
+          "date": "2026-07-21T17:07:22Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.6.4/SideInstaller.ipa",
+          "localizedDescription": "Fixed an urgent bug caused by translations",
+          "size": 7581179
+        },
+        {
+          "version": "0.6.3",
+          "date": "2026-07-21T14:46:53Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.6.3/SideInstaller.ipa",
+          "localizedDescription": "- Added Spanish, Vietnamese, Italian, and French languages",
+          "size": 7581349
+        },
+        {
+          "version": "0.6.2",
+          "date": "2026-07-19T15:46:20Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.6.2/SideInstaller.ipa",
+          "localizedDescription": "- Added a stable/nightly release selector",
+          "size": 7554853
+        },
+        {
+          "version": "0.6.1",
+          "date": "2026-07-09T13:06:19Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.6.1/SideInstaller.ipa",
+          "localizedDescription": "Fixed a bug with the check for updates",
+          "size": 7546083
+        },
+        {
+          "version": "0.6.0",
+          "date": "2026-07-09T12:57:41Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.6.0/SideInstaller.ipa",
+          "localizedDescription": "- Fixed a few tab transitioning bugs\r\n- Moved the .ipa downloads to the app's settings \r\n- Added a welcome screen with the necessity to accept the TOS",
+          "size": 7546033
+        },
+        {
+          "version": "0.5.0",
+          "date": "2026-07-03T12:13:21Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.5.0/SideInstaller.ipa",
+          "localizedDescription": "# New feature: Pairing\r\nUsers can now extract their pairing file fully on device on SideInstaller. Once that is done, they can either export it as a raw file or insert it directly into the apps that can use it (StikDebug, Feather, Livecontainer, ect.)\r\n\r\n<img width=\"292\" height=\"588\" alt=\"76728520-7438-467F-BA2C-5C766445F353_4_5005_c\" src=\"https://github.com/user-attachments/assets/fbd2a4d4-5a10-451d-a25b-afdb49cc05c2\" />\r\n\r\n# Other changes\r\n- New UI\r\n- New installable app: StikDebug\r\n- Fixed error \"Developer error 8220: Your team has no devices from which to generate a provisioning profile.\"\r\n- App now checks for updates and notifies user when there is one\r\n- App now better explains how to revoke a certificate if the user reaches their 3 cert limit\r\n- The app to install is now selected with a dropdown menu",
+          "size": 7540187
+        },
+        {
+          "version": "0.2.6",
+          "date": "2026-06-28T13:47:22Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.2.6/SideInstaller.ipa",
+          "localizedDescription": "- Added Discord, GitHub and Ko-Fi URLs to the settings page",
+          "size": 7474250
+        },
+        {
+          "version": "0.2.5",
+          "date": "2026-06-23T12:54:07Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.2.5/SideInstaller.ipa",
+          "localizedDescription": "- App is now compatible with devices that do not have developer mode on\r\n- If the above condition is true, the app will autonomously register the account to Apple's developer program\r\n- This is done autonomously, no user interaction required",
+          "size": 7467575
+        },
+        {
+          "version": "0.2.0",
+          "date": "2026-06-23T10:19:07Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.2.0/SideInstaller.ipa",
+          "localizedDescription": "- Remade UI \r\n- Fixed most bugs found in v0.1.0\r\n- Added \"downloads\" that lets the user delete the downloaded ipa files.",
+          "size": 7456091
+        },
+        {
+          "version": "0.1.0",
+          "date": "2026-06-22T11:33:44Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v0.1.0/SideInstaller.ipa",
+          "localizedDescription": "Beta phase. Will be unstable.",
+          "size": 7073668
+        }
+      ]
+    },
+    {
+      "bundleIdentifier": "FrizzleM.NightFlix",
+      "name": "Nightflix",
+      "developerName": "FrizzleM",
+      "iconURL": "https://raw.githubusercontent.com/FrizzleM/Nightflix/main/NightFlix/Assets.xcassets/AppIcon.appiconset/AppIcon-Light.png",
+      "subtitle": "An iOS movie and series streaming app",
+      "localizedDescription": "New here? Read the wiki",
+      "version": "2.2.0",
+      "versionDate": "2026-07-19T14:40:40Z",
+      "versionDescription": "Changed server provider due to Vidking servers not working",
+      "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v2.2.0/NightFlix.ipa",
+      "size": 6282415,
+      "versions": [
+        {
+          "version": "2.2.0",
+          "date": "2026-07-19T14:40:40Z",
+          "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v2.2.0/NightFlix.ipa",
+          "localizedDescription": "Changed server provider due to Vidking servers not working",
+          "size": 6282415
+        },
+        {
+          "version": "2.1.0",
+          "date": "2026-06-15T23:53:58Z",
+          "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v2.1.0/Nightflix.ipa",
+          "localizedDescription": "- header bg is now a transparent blur instead of black\r\n- continue playing finally works properly\r\n- improved a lot the video playing scripts, the watching experience should be smoother and better overall",
+          "size": 6263274
+        },
+        {
+          "version": "2.0.0",
+          "date": "2026-06-15T14:33:01Z",
+          "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v2.0.0/Nighflix.ipa",
+          "localizedDescription": "<!-- intentionally blank -->",
+          "size": 6242910
+        },
+        {
+          "version": "1.2.0",
+          "date": "2026-06-04T10:54:40Z",
+          "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v1.2.0/Nightflix.ipa",
+          "localizedDescription": "### Significantly improved the app's backend.\r\n\r\nMore specifically:\r\n- Moved TMDB JSON decoding off the main actor in TMDBService.swift.\r\n- Optimized TMDB memory-cache bookkeeping so pruning no longer repeatedly rescans cached data.\r\n- Made TMDB list decoding resilient: one malformed/null item no longer fails an entire feed/search/recommendation/episode list in TMDBModels.swift.\r\n- Added stale-request guards to feed, search, category, and season loaders to prevent older async responses from overwriting newer state.\r\n- Fixed a real season-loading race where an old season request could leak episodes into a newly loaded series.\r\n- Reused JSON encoders/decoders in local persistence managers and cleaned corrupt watch-history storage.",
+          "size": 6282314
+        },
+        {
+          "version": "1.1.2",
+          "date": "2026-06-04T10:12:55Z",
+          "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v1.1.2/Nightflix.ipa",
+          "localizedDescription": "Clarified the auto updates setting",
+          "size": 6261549
+        },
+        {
+          "version": "1.1.1",
+          "date": "2026-06-04T09:45:35Z",
+          "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v1.1.1/Nighflix.ipa",
+          "localizedDescription": "Added the option to disable auto update checks",
+          "size": 6261539
+        },
+        {
+          "version": "1.1.0",
+          "date": "2026-06-04T09:15:22Z",
+          "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v1.1.0/Nightflix.ipa",
+          "localizedDescription": "- Added an update checking system\r\n- Polished the top left logo and made it slightly interactive",
+          "size": 6259619
+        },
+        {
+          "version": "1.0.1",
+          "date": "2026-06-03T13:10:43Z",
+          "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v1.0.1/Nightflix.ipa",
+          "localizedDescription": "Fixed a bug in \"Delete keys\" in which the app would restart after more than 3 seconds",
+          "size": 6230147
+        },
+        {
+          "version": "1.0.0",
+          "date": "2026-06-03T09:33:31Z",
+          "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v1.0.0/Nightflix.ipa",
+          "localizedDescription": "First stable release.",
+          "size": 6229634
+        }
+      ],
+      "screenshotURLs": [
+        "https://github.com/user-attachments/assets/eab43986-eb41-4d90-ba12-9d49dad0b555",
+        "https://github.com/user-attachments/assets/776d5918-de13-4f8e-8cd3-6a577bc680bc"
+      ]
+    }
+  ],
+  "version": 1,
+  "apiVersion": "v1"
+}
