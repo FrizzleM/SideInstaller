@@ -148,6 +148,9 @@ let chineseStrings: [String: String] = [
         "关闭此弹窗将终止当前流程。确定要关闭吗？",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ 已安装。完成上面的信任步骤即可打开。",
+    "%@ is installed. Finish the trust step below to open it.":
+        "%@ 已安装。完成下面的信任步骤即可打开。",
+    "Success: last steps": "成功：最后几步",
     "Action needed": "需要操作",
     "Step %@ of %@": "第 %@ 步，共 %@ 步",
     "Show all steps": "显示所有步骤",

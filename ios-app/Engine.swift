@@ -591,8 +591,9 @@ final class Engine: ObservableObject {
         case certConflict
         case guide(Guide)
         case error(String, stoppedRun: Bool)
-        /// The build is on the device, named.
-        case success(String)
+        /// The build is on the device, named; `leads` when the trust step
+        /// follows it instead of coming first.
+        case success(String, leads: Bool)
         /// LiveContainer still needs SideStore's certificate imported.
         case liveContainerImport
     }
@@ -610,17 +611,27 @@ final class Engine: ObservableObject {
             guard isWaitingOnUser else { return [] }
             return [pairingPIN.map(Popup.pairingCode), guide.map(Popup.guide)].compactMap { $0 }
         }
+        if finished { return finishedPopups }
         var shown: [Popup] = []
         if certConflict { shown.append(.certConflict) }
         if let guide { shown.append(.guide(guide)) }
         if let lastError {
             shown.append(.error(lastError, stoppedRun: stepStates.values.contains(.failed)))
         }
-        if finished, !successClosed { shown.append(.success(installedSourceName)) }
-        if finished, installedIsLiveContainer, !liveContainerImportClosed {
-            shown.append(.liveContainerImport)
-        }
         return shown
+    }
+
+    /// A finished run's popups: the trust step, the news, and LiveContainer's
+    /// certificate import. With all three up the news leads, so both steps
+    /// follow it; otherwise it comes after the trust step it points to.
+    private var finishedPopups: [Popup] {
+        let trust = guide.map(Popup.guide)
+        let certificate: Popup? = installedIsLiveContainer && !liveContainerImportClosed
+            ? .liveContainerImport : nil
+        let leads = trust != nil && certificate != nil
+        let success: Popup? = successClosed ? nil : .success(installedSourceName, leads: leads)
+        return (leads ? [success, trust, certificate] : [trust, success, certificate])
+            .compactMap { $0 }
     }
 
     /// True for a popup the run is waiting on: closing it cancels the install.

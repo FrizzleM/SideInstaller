@@ -150,6 +150,9 @@ let portugueseStrings: [String: String] = [
         "Fechar este pop-up vai encerrar o processo. Tem certeza?",
     "%@ is installed. Finish the trust step above to open it.":
         "O %@ está instalado. Conclua a etapa de confiança acima para abri-lo.",
+    "%@ is installed. Finish the trust step below to open it.":
+        "O %@ está instalado. Conclua a etapa de confiança abaixo para abri-lo.",
+    "Success: last steps": "Pronto: últimas etapas",
     "Action needed": "Ação necessária",
     "Step %@ of %@": "Etapa %@ de %@",
     "Show all steps": "Mostrar todas as etapas",

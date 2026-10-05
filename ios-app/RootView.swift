@@ -31,6 +31,32 @@ struct RootView: View {
         case apps(ToolPopup)
     }
 
+    /// Popups that always come up together, so they share one card.
+    private enum PopupGroupKind: Hashable {
+        /// What an Install run is waiting on: the pairing code and the steps
+        /// for Settings, or Wi-Fi or the tunnel alone.
+        case installWaiting
+        /// Why an install stopped: the error, the guide for it, and
+        /// revoke-and-retry.
+        case installStopped
+        /// A finished install: the news, the trust step, and LiveContainer's
+        /// certificate import.
+        case installFinished
+        /// Side by Side's pairing code and the steps for their iPhone.
+        case sideBySidePairing
+        /// The Pairing page's code and the steps for Settings.
+        case pairingPage
+    }
+
+    /// One card in the popup stack: a popup, or popups that come up together.
+    private struct PopupEntry: Identifiable, Equatable {
+        var group: PopupGroupKind?
+        var items: [PopupItem]
+
+        /// A group keeps its card while members come and go.
+        var id: AnyHashable { group.map { AnyHashable($0) } ?? AnyHashable(items[0]) }
+    }
+
     @EnvironmentObject private var engine: Engine
     /// Declared so a language change relabels the tab bar.
     @EnvironmentObject private var loc: Localizer
@@ -68,8 +94,8 @@ struct RootView: View {
         // Animate the backdrop to the new tab's level.
         .onChange(of: page) { _, page in Backdrop.settle(on: page.wash) }
         // Over the tab bar too, so the whole app dims behind the popups.
-        .popupStack(popups, onBackdropTap: backdropTap, attached: attached) { item in
-            card(for: item).environment(\.popupEndsProcess, blocks(item))
+        .popupStack(entries, onBackdropTap: backdropTap) { entry in
+            card(for: entry)
         }
         // The Install tab's revoke-and-retry runs through this same manager
         // (declared below the popups, which use it too).
@@ -135,16 +161,67 @@ struct RootView: View {
         }
     }
 
-    /// A page's pairing steps hang under its pairing code, as one piece: no
-    /// gap, and the code's X — which ends the run — closes both.
-    private func attached(_ above: PopupItem, _ below: PopupItem) -> Bool {
-        switch (above, below) {
-        case (.install(.pairingCode(_)), .install(.guide(_))),
-             (.sideBySide(.pairingCode(_)), .sideBySide(.pairInSettings)),
-             (.pairing(.pairingCode(_)), .pairing(.pairInSettings)):
-            true
-        default:
-            false
+    /// The popups as cards, top to bottom: neighbours that come up together
+    /// share one.
+    private var entries: [PopupEntry] {
+        var entries: [PopupEntry] = []
+        for item in popups {
+            let kind = group(of: item)
+            if let kind, entries.last?.group == kind {
+                entries[entries.count - 1].items.append(item)
+            } else {
+                entries.append(PopupEntry(group: kind, items: [item]))
+            }
+        }
+        return entries
+    }
+
+    /// The group a popup comes up in, if it's ever up with others.
+    private func group(of item: PopupItem) -> PopupGroupKind? {
+        switch item {
+        case .install(.pairingCode):
+            .installWaiting
+        // The same guide slot holds what a run waits on, why it stopped, or
+        // the trust step it ended on.
+        case .install(.guide):
+            engine.isRunning ? .installWaiting : engine.finished ? .installFinished : .installStopped
+        case .install(.certConflict), .install(.error):
+            .installStopped
+        case .install(.success), .install(.liveContainerImport):
+            .installFinished
+        case .sideBySide(.pairingCode), .sideBySide(.pairInSettings):
+            .sideBySidePairing
+        case .pairing(.pairingCode), .pairing(.pairInSettings):
+            .pairingPage
+        case .sideBySide, .pairing, .certificates, .entitlements, .location, .apps:
+            nil
+        }
+    }
+
+    /// A group card's title, symbol and tint. A member titled the same goes
+    /// without its own title inside, so it's said once.
+    private func groupHeader(for group: PopupGroupKind,
+                             _ items: [PopupItem]) -> (title: String, systemImage: String, tint: Color) {
+        switch group {
+        case .installWaiting:
+            // Named after the steps for Settings.
+            let steps = items.lazy.compactMap { item -> Guide? in
+                if case .install(.guide(let guide)) = item { guide } else { nil }
+            }.first
+            return (steps?.title ?? L("Pairing code"), "lock.iphone", Theme.accent)
+        case .installStopped:
+            // Named after the error.
+            let stoppedRun = items.lazy.compactMap { item -> Bool? in
+                if case .install(.error(_, let stoppedRun)) = item { stoppedRun } else { nil }
+            }.first
+            return (InstallPopup.errorTitle(stoppedRun: stoppedRun ?? true),
+                    "exclamationmark.triangle.fill", .red)
+        case .installFinished:
+            return (L("Success: last steps"), "checkmark.seal.fill", .green)
+        case .sideBySidePairing:
+            return (SideBySidePopup.pairInSettingsTitle, "lock.iphone", Theme.accent)
+        case .pairingPage:
+            return (PairingPopup.pairInSettingsTitle, "lock.iphone", Theme.accent)
         }
     }
 
@@ -157,6 +234,27 @@ struct RootView: View {
         case .entitlements(let popup): entitlementsManager.closePopup(popup)
         case .location(let popup):     locationManager.closePopup(popup)
         case .apps(let popup):         appsManager.closePopup(popup)
+        }
+    }
+
+    /// A group's card holds its members as tiles, under one X that closes
+    /// them all; a popup alone is a card of its own.
+    @ViewBuilder
+    private func card(for entry: PopupEntry) -> some View {
+        if let group = entry.group {
+            let header = groupHeader(for: group, entry.items)
+            PopupGroupCard(title: header.title, systemImage: header.systemImage, tint: header.tint,
+                           isGrouped: entry.items.count > 1,
+                           onClose: { entry.items.forEach(close) }) {
+                ForEach(entry.items, id: \.self) { item in
+                    card(for: item)
+                        .environment(\.popupEndsProcess, blocks(item))
+                        .transition(.popup)
+                }
+            }
+            .environment(\.popupEndsProcess, entry.items.contains(where: blocks))
+        } else if let item = entry.items.first {
+            card(for: item).environment(\.popupEndsProcess, blocks(item))
         }
     }
 

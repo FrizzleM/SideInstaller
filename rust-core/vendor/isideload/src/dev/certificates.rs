@@ -1,12 +1,16 @@
-use crate::dev::{
-    developer_session::DeveloperSession,
-    device_type::{DeveloperDeviceType, dev_url},
-    teams::DeveloperTeam,
+use crate::{
+    SideloadError,
+    dev::{
+        developer_session::DeveloperSession,
+        device_type::{DeveloperDeviceType, dev_url, services_url},
+        teams::DeveloperTeam,
+    },
 };
 use plist::{Data, Date};
 use plist_macro::plist;
 use rootcause::prelude::*;
 use serde::Deserialize;
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Deserialize, Clone)]
@@ -130,18 +134,76 @@ pub trait CertificatesApi {
         serial_number: &str,
         device_type: impl Into<Option<DeveloperDeviceType>> + Send,
     ) -> Result<(), Report> {
+        let device_type = device_type.into();
         let body = plist!(dict {
             "teamId": &team.team_id,
             "serialNumber": serial_number,
         });
 
-        self.developer_session()
+        let Err(e) = self
+            .developer_session()
             .send_dev_request_no_response(
-                &dev_url("revokeDevelopmentCert", device_type),
+                &dev_url("revokeDevelopmentCert", device_type.clone()),
                 Some(body),
             )
             .await
+        else {
+            return Ok(());
+        };
+
+        // 7252 "There is no 'ios' certificate with serial number …": the
+        // platform endpoints only revoke their own certificate type, but
+        // `listAllDevelopmentCerts` also returns cross-platform "Apple
+        // Development" certificates (the kind Xcode makes). Those can only be
+        // deleted by ID through the JSON:API, as AltSign revokes every cert.
+        let wrong_platform = e
+            .iter_reports()
+            .find_map(|node| node.downcast_current_context::<SideloadError>())
+            .is_some_and(|err| matches!(err, SideloadError::DeveloperError(7252, _)));
+        let certificate_id = if wrong_platform {
+            self.list_all_development_certs(team, device_type)
+                .await?
+                .into_iter()
+                .find(|c| {
+                    c.serial_number
+                        .as_deref()
+                        .is_some_and(|s| s.eq_ignore_ascii_case(serial_number))
+                })
+                .and_then(|c| c.certificate_id)
+        } else {
+            None
+        };
+        // Another error, or 7252 for a certificate that isn't listed either
+        // (already revoked): Apple's error stands.
+        let Some(certificate_id) = certificate_id else {
+            return Err(e
+                .context("Failed to revoke development certificate")
+                .into_dynamic());
+        };
+
+        info!("Certificate {serial_number} isn't an iOS one; deleting it by ID {certificate_id}");
+        self.delete_certificate(team, &certificate_id)
+            .await
             .context("Failed to revoke development certificate")?;
+
+        Ok(())
+    }
+
+    /// Delete a certificate of any type by its `certificateId`, through
+    /// `DELETE services/v1/certificates/<id>`.
+    async fn delete_certificate(
+        &mut self,
+        team: &DeveloperTeam,
+        certificate_id: &str,
+    ) -> Result<(), Report> {
+        self.developer_session()
+            .send_services_request(
+                &services_url(&format!("certificates/{certificate_id}")),
+                team,
+                "DELETE",
+            )
+            .await
+            .context("Failed to delete certificate")?;
 
         Ok(())
     }

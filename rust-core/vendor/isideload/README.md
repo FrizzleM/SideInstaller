@@ -183,6 +183,31 @@ where the old ones had SHA-256 only. Not covered: symlinks in a bundle, which
 apple-codesign-quick's file walk skips and so leaves unsealed (none of the test
 IPAs has one).
 
+**8. `src/dev/certificates.rs`, `developer_session.rs` — revoke "Apple
+Development" certificates.**
+
+`ios/listAllDevelopmentCerts` returns the team's cross-platform "Apple
+Development" certificates (the kind Xcode makes) next to the "iOS Development"
+ones, and `list_ios_certs` keeps them, but `ios/revokeDevelopmentCert` refuses
+them by serial:
+
+```
+Developer error 7252: There is no 'ios' certificate with serial number
+'364D766243450DE16ED0CBBBF07FD9F2' on this team.
+```
+
+So the Certificates screen couldn't revoke one, and neither could
+`MaxCertsBehavior::Revoke`/`Prompt` if it picked one. iLoader 2.3.5 has the same
+bug (it calls the same endpoint). On 7252, `revoke_development_cert` now looks
+the serial up in `listAllDevelopmentCerts` and deletes that certificate by
+`certificateId` with `DELETE services/v1/certificates/<id>`, the request AltSign
+uses for every revoke (`sendServicesRequest`: a POST with
+`X-HTTP-Method-Override`, `application/vnd.api+json`, and
+`{"urlEncodedQueryParams": "teamId=…"}` as the body). A serial that isn't listed
+keeps Apple's 7252. The request's shape and its JSON:API error parsing are
+tested against a local server: `cargo test -p isideload --lib
+services_request_tests`.
+
 ## Re-vendoring
 
 Upstream fixed change 1 its own way in `baca89d` (per-extension profiles). A

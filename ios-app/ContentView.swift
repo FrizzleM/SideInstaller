@@ -845,7 +845,7 @@ struct InstallPopup: View {
         case .guide(let guide):
             guidePopup(guide)
         case .error(let message, let stoppedRun):
-            PopupCard(title: stoppedRun ? L("Install stopped") : L("Something went wrong"),
+            PopupCard(title: Self.errorTitle(stoppedRun: stoppedRun),
                       systemImage: "exclamationmark.triangle.fill",
                       tint: .red,
                       onClose: close) {
@@ -853,10 +853,11 @@ struct InstallPopup: View {
                     .font(.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
             }
-        case .success(let name):
+        case .success(let name, let leads):
             PopupCard(title: L("Installed"), systemImage: "checkmark.seal.fill", tint: .green,
                       onClose: close) {
-                Text(L("%@ is installed. Finish the trust step above to open it.", name))
+                Text(leads ? L("%@ is installed. Finish the trust step below to open it.", name)
+                           : L("%@ is installed. Finish the trust step above to open it.", name))
                     .font(.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -866,6 +867,11 @@ struct InstallPopup: View {
     }
 
     private func close() { engine.closePopup(popup) }
+
+    /// The error popup's title, which also titles the group it's in.
+    static func errorTitle(stoppedRun: Bool) -> String {
+        stoppedRun ? L("Install stopped") : L("Something went wrong")
+    }
 
     // MARK: Guides
 

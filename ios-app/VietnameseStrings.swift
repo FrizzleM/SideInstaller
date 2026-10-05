@@ -150,6 +150,9 @@ let vietnameseStrings: [String: String] = [
         "Đóng cửa sổ này sẽ dừng quá trình. Bạn có chắc không?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ đã được cài đặt. Hoàn tất bước tin cậy ở trên để mở ứng dụng.",
+    "%@ is installed. Finish the trust step below to open it.":
+        "%@ đã được cài đặt. Hoàn tất bước tin cậy ở dưới để mở ứng dụng.",
+    "Success: last steps": "Thành công: các bước cuối",
     "Action needed": "Cần thao tác",
     "Step %@ of %@": "Bước %@ trên %@",
     "Show all steps": "Hiện tất cả các bước",
