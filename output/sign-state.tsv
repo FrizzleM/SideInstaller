@@ -10,6 +10,7 @@ cert	Aramco	7E5CF3F26B293474757B449DF5FBFFAF0816D2F7	2026-09-24	revoked
 cert	Aramco	unknown	unknown	[WARN] Certificate Checker could not check ._Aramco.mobileprovision
 cert	BOC	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
 cert	BOC	unknown	unknown	[WARN] Certificate Checker could not check ._BOC.mobileprovision
+cert	Beihang-University-OA	E6A320CFFAEEC58AF00923694A1FC5409E64F20F	2026-12-03	revoked
 cert	CENTRAL-POWER-INFORMATION-TECHNOLOGY-COMPANY-CENTRAL-POWER-CORPORATION-com.cpc.it.thinghiemdien	C482649E7CD9FBB174DA0045F1CD5C3686D5E84C	2028-11-02	revoked
 cert	China-Telecom-Corporation-Limited-XC-com-ctq-qmc-yiban-inde	34591EF5246C536DE31B53F6B542F2A451B030AD	2029-02-23	revoked
 cert	ChinaAcademy	4201B4662173FBEE7B8713990551BC6873211DC0	2028-10-27	revoked
@@ -30,5 +31,6 @@ cert	Rural	27413E49E9017DED9898F07771B057052F33D0DD	2028-11-14	revoked
 cert	Rural	unknown	unknown	[WARN] Certificate Checker could not check ._Rural.mobileprovision
 cert	Simcere	121FAB5BFCF826AD1FCE426D8BEFB28B72DE32FD	2028-03-06	revoked
 cert	Simcere	unknown	unknown	[WARN] Certificate Checker could not check ._Simcere.mobileprovision
+cert	VINWASH-COMPANY-LIMITED	C0A5093A8EF7EDB8FFFC6E08956559A36CC52674	2028-12-01	revoked
 cert	XL	DAE4476E22160B0BA19D1B406E8B82D99BC00E00	2029-02-17	revoked
 cert	XL	unknown	unknown	[WARN] Certificate Checker could not check ._XL.mobileprovision
