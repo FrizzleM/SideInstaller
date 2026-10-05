@@ -150,6 +150,9 @@ let frenchStrings: [String: String] = [
         "Fermer cette fenêtre arrêtera le processus. Voulez-vous continuer ?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ est installé. Terminez l'étape de confiance ci-dessus pour l'ouvrir.",
+    "%@ is installed. Finish the trust step below to open it.":
+        "%@ est installé. Terminez l'étape de confiance ci-dessous pour l'ouvrir.",
+    "Success: last steps": "Terminé : dernières étapes",
     "Action needed": "Action requise",
     "Step %@ of %@": "Étape %@ sur %@",
     "Show all steps": "Afficher toutes les étapes",

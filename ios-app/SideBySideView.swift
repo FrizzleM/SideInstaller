@@ -1101,10 +1101,14 @@ struct SideBySidePopup: View {
 
     private func close() { manager.closePopup(popup) }
 
+    /// The pairing steps' title, which also titles the group they share with
+    /// the code.
+    static var pairInSettingsTitle: String { L("Pair their iPhone in Settings") }
+
     /// What to do on their iPhone while it has to pair from Settings. Nothing
     /// appears on it by itself, so without this the run just looks stuck.
     private var pairInSettingsPopup: some View {
-        PopupCard(title: L("Pair their iPhone in Settings"),
+        PopupCard(title: Self.pairInSettingsTitle,
                   systemImage: "gearshape",
                   tint: Theme.accent,
                   onClose: close) {

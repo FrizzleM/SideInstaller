@@ -151,6 +151,9 @@ let spanishStrings: [String: String] = [
         "Cerrar esta ventana terminará el proceso. ¿Seguro que quieres cerrarla?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ ya está instalado. Completa el paso de confianza de arriba para abrirlo.",
+    "%@ is installed. Finish the trust step below to open it.":
+        "%@ ya está instalado. Completa el paso de confianza de abajo para abrirlo.",
+    "Success: last steps": "Listo: últimos pasos",
     "Action needed": "Necesita tu atención",
     "Step %@ of %@": "Paso %@ de %@",
     "Show all steps": "Mostrar todos los pasos",

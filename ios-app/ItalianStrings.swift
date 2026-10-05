@@ -149,6 +149,9 @@ let italianStrings: [String: String] = [
         "Chiudere questo popup interromperà il processo. Vuoi continuare?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ è installato. Completa il passaggio di autorizzazione qui sopra per aprirlo.",
+    "%@ is installed. Finish the trust step below to open it.":
+        "%@ è installato. Completa il passaggio di autorizzazione qui sotto per aprirlo.",
+    "Success: last steps": "Fatto: ultimi passaggi",
     "Action needed": "Serve il tuo intervento",
     "Step %@ of %@": "Passaggio %@ di %@",
     "Show all steps": "Mostra tutti i passaggi",

@@ -148,6 +148,9 @@ let japaneseStrings: [String: String] = [
         "このポップアップを閉じると処理が終了します。よろしいですか？",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ はインストールされています。上記の信頼手順を完了すると開けます。",
+    "%@ is installed. Finish the trust step below to open it.":
+        "%@ はインストールされています。下記の信頼手順を完了すると開けます。",
+    "Success: last steps": "完了：最後の手順",
     "Action needed": "対応が必要です",
     "Step %@ of %@": "手順 %@／%@",
     "Show all steps": "すべての手順を表示",

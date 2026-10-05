@@ -290,7 +290,7 @@ struct PairingPopup: View {
             PairingCodePopup(pin: pin, caption: L("Type this into the prompt in Settings."),
                              onClose: close)
         case .pairInSettings:
-            PopupCard(title: L("Pair in Settings"),
+            PopupCard(title: Self.pairInSettingsTitle,
                       systemImage: "gearshape",
                       tint: Theme.accent,
                       onClose: close) {
@@ -319,4 +319,8 @@ struct PairingPopup: View {
     }
 
     private func close() { manager.closePopup(popup) }
+
+    /// The pairing steps' title, which also titles the group they share with
+    /// the code.
+    static var pairInSettingsTitle: String { L("Pair in Settings") }
 }
