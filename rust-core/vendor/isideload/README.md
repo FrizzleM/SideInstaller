@@ -4,15 +4,15 @@ Copy of the `isideload/` crate from
 [nab138/isideload](https://github.com/nab138/isideload) @
 `e319d931aa3f9d97fbd132149a3916dcd5c71f09` — the same revision `Cargo.lock`
 pinned for the git dependency in `rust-core/Cargo.toml`, so nothing about the
-auth / App ID / certificate behaviour described there changes.
+auth / App ID / certificate behaviour described there changes. Change 7 swaps
+the signing backend for the one upstream moved to after that revision.
 
 Vendored so `[patch."https://github.com/nab138/isideload.git"]` can redirect the
 dependency here.
 
 ## Local changes
 
-**1. `src/sideload/sideloader.rs` — write `embedded.mobileprovision` into
-each app extension.**
+**1. `src/sideload/sign.rs` — give each app extension `embedded.mobileprovision`.**
 
 `sign_app` downloaded a single provisioning profile (for `main_app_id`) and wrote
 it only to the main `.app`. App extensions got nothing, even though
@@ -40,9 +40,15 @@ actually appears is `NSCocoaErrorDomain 134081 "Can't add the same store twice"`
 on a Retry loop that never recovers. See SideStore issues #1394 and #1400 —
 closed upstream as an installer bug, and iLoader (same crate) has it too.
 
-The write has to happen *before* `sign::sign`: `embedded.mobileprovision` is
-sealed into `_CodeSignature/CodeResources` (`files` and `files2`), so adding it
-to an already-signed bundle breaks the resource envelope.
+The profile has to be in place before the bundle is sealed:
+`embedded.mobileprovision` is sealed into `_CodeSignature/CodeResources` (`files`
+and `files2`), so adding it to an already-signed bundle breaks the resource
+envelope. Since change 7, `sign` hands it to apple-codesign-quick for every
+`.appex` (nested ones too) through `embedded_mobileprovisions_by_bundle_id`,
+with the main entitlements through `entitlements_by_bundle_id`; before, it was
+written by hand in `sign_app`. Upstream `baca89d` fixes the same bug differently:
+it downloads each extension's own profile and signs the extension with that
+profile's entitlements, at one more request per extension.
 
 **2. `src/anisette/` and `src/auth/grandslam.rs` — report the client as akd,
 and don't reuse GrandSlam connections.**
@@ -140,12 +146,51 @@ too. `tokio`'s `time` feature is enabled for the wait. Tests (shorter waits unde
 `cfg(test)`, against a local server): `cargo test -p isideload --lib
 auth::grandslam`.
 
+**7. `src/sideload/sign.rs`, `cert_identity.rs`, `Cargo.toml` — sign with
+apple-codesign-quick.**
+
+Dadoum's [apple-codesign-quick](https://crates.io/crates/apple-codesign-quick)
+0.1.0 replaces `isideload-apple-codesign` 0.29, as upstream did in `cc9fa9c`,
+`5dd88f1` and `5992f00` (iLoader 2.3.0–2.3.4). It hashes files and signs nested
+bundles in parallel, and its dependency tree is far smaller: with it the iOS
+static library went from 79.1 MB to 69.0 MB and the app binary from 30.0 MB to
+25.0 MB. On an M-series Mac, signing SideStore nightly took 0.024 s instead of
+0.151 s, LiveContainer+SideStore 0.045 s instead of 0.39 s, and still 4–6× less
+with only two threads.
+
+Ported from upstream: `CertificateIdentity` keeps an `x509_cert::Certificate`
+and no `InMemoryPrivateKey`, and `profile_to_certificate_chain` builds the CMS
+chain from the profile's certificates plus the bundled WWDR G3 and Apple root
+(`src/assets/AppleWWDRCAG3.cer`; the root is `src/auth/apple_root.der`).
+`rsa` goes back to 0.9 and `rand` to 0.8, which apple-codesign-quick's
+`RustCryptoCmsSigner` needs; stored keys are PKCS#8 either way. Not taken:
+upstream's async/progress `sign`, its per-extension profiles (see change 1), and
+the wasm and callback changes around them.
+
+Local, on top: `sign` deletes every bundle's `_CodeSignature` folder first.
+apple-codesign-quick replaces `CodeResources` but seals anything else in there,
+so an IPA carrying a stray `_CodeSignature/ResourceRules` (seen in a re-signed
+game) failed `codesign --verify` with "a sealed resource is missing or invalid";
+`_CodeSignature` is never a sealed resource, and the old signer skipped it.
+
+Checked on the Mac (2026-10-05) by signing SideStore nightly,
+LiveContainer+SideStore and three other IPAs with a test CA and a CMS-wrapped
+profile, old signer against new: `codesign --verify --deep --strict` passes for
+every new output; identifiers, sealed file counts and profile placement match;
+entitlements are now readable where macOS called the old blob invalid; both XML
+and DER entitlements are present; code directories carry SHA-1 and SHA-256
+where the old ones had SHA-256 only. Not covered: symlinks in a bundle, which
+apple-codesign-quick's file walk skips and so leaves unsealed (none of the test
+IPAs has one).
+
 ## Re-vendoring
 
-Upstream had not fixed change 1 as of the pinned revision. Re-copying the crate
-from a newer revision drops the patch unless upstream has landed an equivalent —
-check `sign_app` in `src/sideload/sideloader.rs` for a profile write that loops
-over `app.bundle.app_extensions()` first.
+Upstream fixed change 1 its own way in `baca89d` (per-extension profiles). A
+re-vendor either keeps the main-profile arrangement in `sign.rs` or takes
+upstream's, which adds a profile download per extension to `sign_app`.
+
+Change 7 is upstream on `main` from `5992f00` (isideload 0.4.0), without the
+`_CodeSignature` cleanup.
 
 Change 2 is upstream on the `apple-codesign-quick` branch at `f6a4d5d` (what
 iLoader 2.3.3 pins) but was not on `main` (`b6d1113`) as of 2026-09-13. A

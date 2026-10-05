@@ -27,7 +27,7 @@ reqwest = { version = "0.13.2", features = ["json", "gzip"] }
 thiserror = "2.0.17"
 async-trait = "0.1.89"
 serde = "1.0.228"
-rand = "0.10.0"
+rand = "0.8.5"
 uuid = {version = "1.20.0", features = ["v4"] }
 tracing = "0.1.44"
 tokio-tungstenite = { version = "0.29.0", features = ["rustls-tls-webpki-roots"] }
@@ -43,14 +43,14 @@ hmac = "0.13.0"
 cbc = { version = "0.2.0", features = ["alloc"] }
 aes = "0.9.0"
 aes-gcm = "0.11.0-rc.3"
-rsa = { version = "0.10.0-rc.17" }
+rsa = { version = "0.9.10" }
 tokio = { version = "1.49.0", features = ["fs", "rt-multi-thread", "time"] }
 keyring = { version = "3.6.3", features = ["apple-native", "linux-native-sync-persistent", "windows-native"], optional = true }
-x509-certificate = { version = "0.26.0", package = "isideload-x509-certificate" }
+x509-cert = "0.2.5"
 rcgen = { version = "0.14.7", default-features = false, features = ["aws_lc_rs", "pem"] }
 p12-keystore = { version = "0.3.0-rc4", package = "isideload-p12-keystore" }
 zip = { version = "8.3", default-features = false, features = ["deflate"] }
-apple-codesign = { version = "0.29.4", package = "isideload-apple-codesign" }
+apple-codesign-quick = "0.1.0"
 sha1 = "0.11.0"
 
 # There is a bug in rustls-platform-verifier that causes an invalid certificate error with apple's root cert.
