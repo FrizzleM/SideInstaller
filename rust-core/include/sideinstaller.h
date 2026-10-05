@@ -68,12 +68,18 @@ typedef struct {
 // returned, or NULL/"" the first time. Passing it back keeps this host's
 // identity stable, so a device that has paired before recognises it instead of
 // being offered a brand-new pairing.
+// `host_identifier` is the identifier a new pairing file gets, or NULL/"" to
+// derive it from `name`, which gives every SideInstaller the same one. The
+// device keeps one record per identifier, so pairing it under an identifier
+// another host already used replaces that host's record. An existing file at
+// `out_path` keeps its own identifier either way.
 int32_t si_pairing_run_host(const char *bind_addr,
                             uint16_t port,
                             const char *name,
                             const char *model,
                             const char *out_path,
                             const char *host_alt_irk_hex,
+                            const char *host_identifier,
                             SIPairReadyCb ready_cb,
                             SIPairPinCb pin_cb,
                             void *ctx,

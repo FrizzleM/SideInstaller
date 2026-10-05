@@ -540,6 +540,29 @@ let japaneseStrings: [String: String] = [
         "SideInstaller に戻り、「設定 › アカウント」を開いて、この Apple ID を左にスワイプし、「編集」をタップして新しいパスワードを入力してください。",
     "Then tap Install again.": "その後、もう一度「インストール」をタップしてください。",
     "Open iForgot": "iForgot を開く",
+    "Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.":
+        "所有者の年齢を理由に、Apple はこの Apple アカウントでのデベロッパサービスの利用を許可していません（エラー 1102）。代わりに成人の Apple アカウントでサインインしてください。",
+    "This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "この Apple ID には使える App ID が残っていません（エラー 9120）。無料の Apple ID で登録できるのは週に 10 個までで、それぞれ 7 日間カウントされます。いくつか期限切れになるのを待つか、別の Apple ID でサインインしてください。",
+    "This iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. Delete one of them, then try again.":
+        "この iPhone には、無料の Apple ID で署名されたアプリがすでに iOS の上限である 3 つあります（期限切れのものも含みます）。いずれかを削除してから、もう一度お試しください。",
+    "This Apple Account can't sign apps": "この Apple アカウントではアプリに署名できません",
+    "Apple only lets adults use the developer services SideInstaller signs apps with, and it reports that this Apple Account belongs to someone younger (error 1102).":
+        "SideInstaller がアプリの署名に使うデベロッパサービスを Apple は成人にしか許可しておらず、この Apple アカウントは未成年のものだと報告しています（エラー 1102）。",
+    "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
+        "代わりに成人の Apple アカウントでサインインしてください：「設定 › アカウント」を開いて追加します。",
+    "No App IDs left this week": "今週使える App ID がありません",
+    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "SideInstaller が署名するアプリとアプリ拡張機能には、それぞれ App ID が必要です。無料の Apple ID で登録できるのは週に 10 個までで、それぞれ 7 日間カウントされます。",
+    "They can't be deleted sooner. Wait until some expire, then tap Install again.":
+        "期限前に削除することはできません。いくつか期限切れになったら、もう一度「インストール」をタップしてください。",
+    "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
+        "または、「設定 › アカウント」で別の（もしくは予備の）Apple ID でサインインしてから、もう一度「インストール」をタップしてください。",
+    "Three sideloaded apps already": "サイドロード済みアプリがすでに 3 つあります",
+    "iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth.":
+        "iOS では、無料の Apple ID で署名されたアプリは 1 台の iPhone に同時に 3 つまでしかインストールできず、4 つ目が拒否されました。",
+    "Expired apps count too. Delete one you no longer need from the Home Screen.":
+        "期限切れのアプリも数に含まれます。不要になったアプリをホーム画面から削除してください。",
 
     // Guide: import a pairing file
 

@@ -117,6 +117,29 @@ A negative quota now logs a warning and skips the pre-check; if the IDs really
 are exhausted, `add_app_id` fails with Apple's own error. Upstream `769e386`
 (on `main`) does the same.
 
+**5. `src/dev/` — register App IDs and app groups under a name Apple accepts.**
+
+`add_app_id` and `add_app_group` sent the bundle's `CFBundleName` as is, and
+Apple refuses anything but ASCII letters and digits with `Developer error 35: An
+invalid value was provided for the parameter 'appIdName'`, so an imported IPA
+named e.g. "YouTube Music+" couldn't be signed. `normalize_app_names` in
+`dev/mod.rs` strips the rest, and falls back to "App" for a name with nothing
+left. Same as upstream `3383885`, `a53be5c` and `37a1c64` (iLoader 2.3.4).
+Tests: `cargo test -p isideload --lib dev::tests`.
+
+**6. `src/auth/grandslam.rs` — retry a sign-in request GrandSlam answers 429.**
+
+`plist_request` takes a `retry_429` flag, set for the three sign-in requests in
+`apple_account.rs` and not for anisette provisioning. With it, a 429 is retried
+after 2 s and again after 5 s; a 429 after that fails with reqwest's status
+error as before, which the app matches ("apple.com" and "429 Too Many Requests")
+to stop sign-in and explain. Upstream `a00c3a7` (iLoader 2.3.4) has the same
+signature shape but retries 10 times without waiting, and replaces the final
+error with one that names neither, so a re-vendor needs the app's match updated
+too. `tokio`'s `time` feature is enabled for the wait. Tests (shorter waits under
+`cfg(test)`, against a local server): `cargo test -p isideload --lib
+auth::grandslam`.
+
 ## Re-vendoring
 
 Upstream had not fixed change 1 as of the pinned revision. Re-copying the crate

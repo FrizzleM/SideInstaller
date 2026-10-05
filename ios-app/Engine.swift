@@ -54,6 +54,13 @@ enum EngineError: LocalizedError {
     case deviceRegistration(udid: String, raw: String)
     /// GrandSlam error -20209: Apple locked the account until it's reset at iForgot.
     case accountLocked
+    /// Apple developer error 1102: the account's owner is too young for
+    /// developer services.
+    case underage
+    /// Apple error 9120, or the signer's own check: no App IDs left this week.
+    case appIDLimit
+    /// installd refused a fourth app signed by a free Apple ID.
+    case appLimit
 
     var errorDescription: String? {
         switch self {
@@ -61,6 +68,12 @@ enum EngineError: LocalizedError {
             return m
         case .accountLocked:
             return L("Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.")
+        case .underage:
+            return L("Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.")
+        case .appIDLimit:
+            return L("This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.")
+        case .appLimit:
+            return L("This iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. Delete one of them, then try again.")
         case .certExists:
             return L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists, or that a request for one is still pending (error 7460). SideInstaller couldn't reuse the certificate that's already there, so it stopped instead of replacing it. See the steps above.")
         case let .deviceRegistration(udid, raw):
@@ -869,6 +882,9 @@ final class Engine: ObservableObject {
             if case EngineError.accountLocked = error {
                 setGuide(Guides.accountLocked)
             }
+            if case EngineError.underage = error {
+                setGuide(Guides.underage)
+            }
             throw error
         }
     }
@@ -939,6 +955,13 @@ final class Engine: ObservableObject {
                     signInStatus = "sign-in failed"
                     log("Apple has locked this Apple Account: \(lastError)")
                     throw EngineError.accountLocked
+                }
+                // Apple turns the account down for its owner's age through
+                // every anisette server alike.
+                if Self.isUnderageError(lastError) {
+                    signInStatus = "sign-in failed"
+                    log("Apple won't let this Apple Account use developer services: \(lastError)")
+                    throw EngineError.underage
                 }
                 // Bad credentials fail everywhere, and retrying risks a lockout.
                 if Self.isCredentialError(lastError) {
@@ -1500,6 +1523,12 @@ final class Engine: ObservableObject {
             if case let EngineError.deviceRegistration(udid, raw) = error {
                 setGuide(Guides.deviceRegistration(udid: udid, raw: raw))
             }
+            if case EngineError.appIDLimit = error {
+                setGuide(Guides.appIDLimit)
+            }
+            if case EngineError.underage = error {
+                setGuide(Guides.underage)
+            }
             throw error
         }
     }
@@ -1519,6 +1548,8 @@ final class Engine: ObservableObject {
             error.map { si_string_free($0) }
             log("Sign FAILED: \(msg)")
             if Self.isCertExistsError(msg) { throw EngineError.certExists }
+            if Self.isAppIDLimitError(msg) { throw EngineError.appIDLimit }
+            if Self.isUnderageError(msg) { throw EngineError.underage }
             // Carry the UDID so the guide can show it for manual entry.
             if Self.isDeviceRegistrationError(msg) {
                 throw EngineError.deviceRegistration(udid: udid, raw: msg)
@@ -1552,6 +1583,28 @@ final class Engine: ObservableObject {
                 || (m.contains("limit") && !m.contains("no devices"))))
     }
 
+    /// Detect Apple developer error 1102, sent when the Apple Account's owner is
+    /// under the age Apple requires for developer services.
+    static func isUnderageError(_ raw: String) -> Bool {
+        raw.lowercased().contains("developer error 1102")
+    }
+
+    /// Detect running out of App IDs: Apple's error 9120 from `addAppId`, or the
+    /// signer's check before it registers any.
+    static func isAppIDLimitError(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("developer error 9120")
+            || m.contains("not enough available app ids")
+    }
+
+    /// Detect installd refusing an app because a free Apple ID's three are
+    /// already installed. Xcode words the same refusal differently.
+    static func isAppLimitError(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("maximum number of installed apps")
+            || m.contains("maximum number of apps for free development profiles")
+    }
+
     // MARK: Step 7 — install over AFC + installation_proxy
 
     @MainActor
@@ -1561,15 +1614,21 @@ final class Engine: ObservableObject {
         installProgress = 0
         let ip = deviceHost
         let path = pairingFilePath ?? PairingController.pairingFilePath()
-        try await onDeviceQueue {
-            // iOS drops the idle tunnel during sign-in and signing, and
-            // `isConnected` doesn't detect it, so reconnect first.
-            self.log("Refreshing device link before install (tunnel was idle during sign-in/download/sign) …")
-            try self.connection.connect(deviceIP: ip, pairingFilePath: path)
-            guard self.connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
-            self.log("Installing signed bundle via AFC + installation_proxy …")
-            try self.connection.installSignedApp(bundlePath: bundle)
-            self.log("Install request completed.")
+        do {
+            try await onDeviceQueue {
+                // iOS drops the idle tunnel during sign-in and signing, and
+                // `isConnected` doesn't detect it, so reconnect first.
+                self.log("Refreshing device link before install (tunnel was idle during sign-in/download/sign) …")
+                try self.connection.connect(deviceIP: ip, pairingFilePath: path)
+                guard self.connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
+                self.log("Installing signed bundle via AFC + installation_proxy …")
+                try self.connection.installSignedApp(bundlePath: bundle)
+                self.log("Install request completed.")
+            }
+        } catch where Self.isAppLimitError(String(describing: error)) {
+            log("installd refused the app: \(error)")
+            setGuide(Guides.appLimit)
+            throw EngineError.appLimit
         }
         installProgress = 1
         setStep(.install, .done)
@@ -2572,6 +2631,46 @@ enum Guides {
             ],
             actionLabel: L("Open iForgot"),
             actionURLString: "https://iforgot.apple.com")
+    }
+
+    /// Shown when Apple refuses developer services for the owner's age
+    /// (developer error 1102).
+    static var underage: Guide {
+        Guide(
+            title: L("This Apple Account can't sign apps"),
+            systemImage: "person.crop.circle.badge.exclamationmark",
+            steps: [
+                L("Apple only lets adults use the developer services SideInstaller signs apps with, and it reports that this Apple Account belongs to someone younger (error 1102)."),
+                L("Sign in with an adult's Apple Account instead: open Settings › Account and add it there."),
+                L("Then tap Install again."),
+            ],
+            actionLabel: nil, actionURLString: nil)
+    }
+
+    /// Shown when the Apple ID has no App IDs left this week (error 9120).
+    static var appIDLimit: Guide {
+        Guide(
+            title: L("No App IDs left this week"),
+            systemImage: "number.circle",
+            steps: [
+                L("Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days."),
+                L("They can't be deleted sooner. Wait until some expire, then tap Install again."),
+                L("Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again."),
+            ],
+            actionLabel: nil, actionURLString: nil)
+    }
+
+    /// Shown when installd refuses a fourth app signed by a free Apple ID.
+    static var appLimit: Guide {
+        Guide(
+            title: L("Three sideloaded apps already"),
+            systemImage: "square.stack.3d.up.slash",
+            steps: [
+                L("iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth."),
+                L("Expired apps count too. Delete one you no longer need from the Home Screen."),
+                L("Then tap Install again."),
+            ],
+            actionLabel: nil, actionURLString: nil)
     }
 
     /// Shown when no Apple ID is saved; points to Settings › Account.

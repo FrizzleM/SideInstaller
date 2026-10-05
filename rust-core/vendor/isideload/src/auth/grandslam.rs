@@ -2,16 +2,28 @@ use plist::Dictionary;
 use plist_macro::plist_to_xml_string;
 use plist_macro::pretty_print_dictionary;
 use reqwest::{
-    Certificate, ClientBuilder,
+    Certificate, ClientBuilder, StatusCode,
     header::{HeaderMap, HeaderValue},
 };
 use rootcause::prelude::*;
-use tracing::debug;
+use std::time::Duration;
+use tracing::{debug, warn};
 
 use crate::{SideloadError, anisette::AnisetteClientInfo, util::plist::PlistDataExtract};
 
 const APPLE_ROOT: &[u8] = include_bytes!("./apple_root.der");
 const URL_BAG: &str = "https://gsa.apple.com/grandslam/GsService2/lookup";
+
+/// Waits before each retry of a sign-in request GrandSlam answered with 429.
+///
+/// iLoader found these 429s are often momentary and a retry gets through
+/// (upstream a00c3a7, iLoader 2.3.4). Upstream retries 10 times back to back;
+/// a lasting limit only gets longer with every attempt, so this tries twice
+/// more, spaced out, and then gives up.
+#[cfg(not(test))]
+const RETRY_429_DELAYS: [Duration; 2] = [Duration::from_secs(2), Duration::from_secs(5)];
+#[cfg(test)]
+const RETRY_429_DELAYS: [Duration; 2] = [Duration::from_millis(10), Duration::from_millis(10)];
 
 pub struct GrandSlam {
     pub client: reqwest::Client,
@@ -136,19 +148,39 @@ impl GrandSlam {
         Ok(builder)
     }
 
+    /// POST `body` and return the plist's `Response`.
+    ///
+    /// With `retry_429`, a 429 Too Many Requests is retried after each of
+    /// `RETRY_429_DELAYS`. A 429 left after that fails with reqwest's own status
+    /// error, whose wording the app matches to stop sign-in and explain.
     pub async fn plist_request(
         &self,
         url: &str,
         body: &Dictionary,
         additional_headers: Option<HeaderMap>,
+        retry_429: bool,
     ) -> Result<Dictionary, Report> {
-        let resp = self
-            .post(url)?
-            .headers(additional_headers.unwrap_or_else(reqwest::header::HeaderMap::new))
-            .body(plist_to_xml_string(body))
-            .send()
-            .await
-            .context("Failed to send grandslam request")?
+        let delays: &[Duration] = if retry_429 { &RETRY_429_DELAYS } else { &[] };
+        let mut delays = delays.iter();
+        let response = loop {
+            let response = self
+                .post(url)?
+                .headers(additional_headers.clone().unwrap_or_default())
+                .body(plist_to_xml_string(body))
+                .send()
+                .await
+                .context("Failed to send grandslam request")?;
+            if response.status() != StatusCode::TOO_MANY_REQUESTS {
+                break response;
+            }
+            let Some(delay) = delays.next() else {
+                break response;
+            };
+            warn!("GrandSlam answered 429 Too Many Requests; retrying in {delay:?}");
+            tokio::time::sleep(*delay).await;
+        };
+
+        let resp = response
             .error_for_status()
             .context("Received error response from grandslam")?
             .text()
@@ -241,5 +273,116 @@ impl GrandSlamErrorChecker for Dictionary {
         }
 
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod retry_429_tests {
+    use super::{GrandSlam, RETRY_429_DELAYS};
+    use crate::anisette::AnisetteClientInfo;
+    use plist::Dictionary;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    const OK_BODY: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+        <plist version=\"1.0\"><dict><key>Response</key><dict>\
+        <key>ok</key><true/></dict></dict></plist>";
+
+    /// Answers each request with 429 until `rate_limited` have been, then 200,
+    /// one connection per request, and counts the requests.
+    fn serve(rate_limited: usize) -> (String, Arc<AtomicUsize>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/grandslam/GsService2", listener.local_addr().unwrap());
+        let seen = Arc::new(AtomicUsize::new(0));
+        let counter = seen.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                read_request(&mut stream);
+                let n = counter.fetch_add(1, Ordering::SeqCst);
+                let reply = if n < rate_limited {
+                    "HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        .to_string()
+                } else {
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/x-xml-plist\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{OK_BODY}",
+                        OK_BODY.len()
+                    )
+                };
+                stream.write_all(reply.as_bytes()).unwrap();
+            }
+        });
+        (url, seen)
+    }
+
+    /// Reads one request: headers, then `Content-Length` bytes of body.
+    fn read_request(stream: &mut std::net::TcpStream) {
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            let n = stream.read(&mut chunk).unwrap();
+            buf.extend_from_slice(&chunk[..n]);
+            let text = String::from_utf8_lossy(&buf);
+            if let Some(end) = text.find("\r\n\r\n") {
+                let length = text[..end]
+                    .lines()
+                    .find_map(|l| {
+                        let (k, v) = l.split_once(':')?;
+                        k.eq_ignore_ascii_case("content-length").then(|| v.trim().parse().ok())?
+                    })
+                    .unwrap_or(0usize);
+                if buf.len() >= end + 4 + length || n == 0 {
+                    return;
+                }
+            }
+            if n == 0 {
+                return;
+            }
+        }
+    }
+
+    fn request(url: &str, retry_429: bool) -> Result<Dictionary, String> {
+        let grandslam = GrandSlam {
+            client: GrandSlam::build_reqwest_client(false).unwrap(),
+            client_info: AnisetteClientInfo {
+                client_info: "<test>".into(),
+                user_agent: "test".into(),
+            },
+            url_bag: Dictionary::new(),
+        };
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(grandslam.plist_request(url, &Dictionary::new(), None, retry_429))
+            .map_err(|e| format!("{e}"))
+    }
+
+    #[test]
+    fn a_passing_429_is_retried() {
+        let (url, seen) = serve(RETRY_429_DELAYS.len());
+        let response = request(&url, true).unwrap();
+        assert_eq!(response.get("ok").and_then(|v| v.as_boolean()), Some(true));
+        assert_eq!(seen.load(Ordering::SeqCst), RETRY_429_DELAYS.len() + 1);
+    }
+
+    #[test]
+    fn a_lasting_429_keeps_the_status_wording() {
+        // The app stops sign-in on "429 Too Many Requests" in the error.
+        let (url, seen) = serve(usize::MAX);
+        let error = request(&url, true).unwrap_err();
+        assert!(error.contains("429 Too Many Requests"), "{error}");
+        assert_eq!(seen.load(Ordering::SeqCst), RETRY_429_DELAYS.len() + 1);
+    }
+
+    #[test]
+    fn provisioning_requests_are_not_retried() {
+        let (url, seen) = serve(usize::MAX);
+        assert!(request(&url, false).is_err());
+        assert_eq!(seen.load(Ordering::SeqCst), 1);
     }
 }

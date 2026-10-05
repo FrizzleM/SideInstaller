@@ -34,8 +34,14 @@ All notable changes to SideInstaller are documented here.
   in the log. The file carries the pairing that StikDebug and SideStore nightlies from 20 September
   2026 on read. Older SideStore builds, LiveContainer's built-in SideStore and Feather need a
   classic pairing, which iOS 27 doesn't allow these apps to use on the iPhone itself.
+- When Apple briefly turns a sign-in away as too many requests (HTTP 429), SideInstaller now tries
+  again twice, a few seconds apart, before saying Apple is limiting sign-ins. iLoader found these
+  often clear up straight away.
 
 ### Fixed
+- **An imported IPA whose name has symbols, spaces or non-Latin letters signs again.** Apple refuses
+  to register an App ID under such a name (error 35), so signing stopped before it started.
+  SideInstaller now registers it under the name's letters and digits only, as iLoader does.
 - **SideStore Nightly no longer asks you to import the pairing file.** Nightlies from 20 September
   2026 on stopped reading the pairing file where SideInstaller put it: they look for one file per
   connection type under new names, turn down a file that holds both, and only load one after their
@@ -54,9 +60,20 @@ All notable changes to SideInstaller are documented here.
   once they have. The pairing is remembered for that address, so installing again doesn't ask for it.
 - Pairing someone else's iPhone this way leaves this iPhone's own pairing file alone, and uses a name
   of its own, so it can't break the pairing their own SideInstaller sets up for itself.
+- When two people each pair the same iPhone with Side by Side, the second no longer undoes the
+  first. Every SideInstaller used to pair under one shared identifier, and an iPhone keeps a single
+  pairing per identifier; each install now pairs under its own. Pairings already remembered keep
+  working.
 - Cancel stops Side by Side straight away while it waits for their iPhone to pair.
 - Tapping Stop while the IPA downloads now stops the install, instead of carrying on with an older
   copy of the IPA left in Documents.
+
+### Added
+- Three more problems now get their own explanation and steps instead of a raw error: an Apple
+  Account Apple won't let sign apps because of its owner's age (error 1102), an Apple ID out of App
+  IDs for the week (error 9120), and an iPhone that already has the three apps a free Apple ID may
+  install. The age refusal also stops sign-in at once rather than trying every anisette server.
+- PanicAnalyzer joins the apps the Pairing tab can hand the pairing file to.
 
 ## 0.9.0
 

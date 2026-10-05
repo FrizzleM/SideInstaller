@@ -78,13 +78,24 @@ pub unsafe extern "C" fn si_pairing_run_host(
     model: *const c_char,
     out_path: *const c_char,
     host_alt_irk_hex: *const c_char,
+    host_identifier: *const c_char,
     ready_cb: ReadyCb,
     pin_cb: PinCb,
     ctx: *mut c_void,
     out: *mut PairResult,
 ) -> i32 {
     pairing::run_host(
-        bind_addr, port, name, model, out_path, host_alt_irk_hex, ready_cb, pin_cb, ctx, out,
+        bind_addr,
+        port,
+        name,
+        model,
+        out_path,
+        host_alt_irk_hex,
+        host_identifier,
+        ready_cb,
+        pin_cb,
+        ctx,
+        out,
     )
 }
 
