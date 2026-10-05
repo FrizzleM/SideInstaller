@@ -48,14 +48,15 @@
   }
 
   /* ---- entrance cascade, echoing the app's per-object settle-in ---- */
-  .hero,.notice,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
+  .hero,.notice,.tos-gate,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
+  .tos-gate{animation-delay:.03s}
   .step:nth-of-type(1){animation-delay:.06s}
   .step:nth-of-type(2){animation-delay:.12s}
   .step:nth-of-type(3){animation-delay:.18s}
   .footer{animation-delay:.24s}
   @keyframes rise{from{opacity:0; transform:translateY(16px) scale(.98)}}
   @media (prefers-reduced-motion:reduce){
-    .hero,.notice,.step,.footer{animation:none}
+    .hero,.notice,.tos-gate,.step,.footer{animation:none}
   }
 
   .wrap{max-width:920px; margin:0 auto}
@@ -239,9 +240,10 @@
   .callout b{color:var(--good)}
 
   /* ---- TOS gate ----
-     Downloads stay dimmed and non-interactive until the box is ticked. */
+     Sits above the guide. Until the box is ticked, steps 1-3 stay dimmed
+     and the certificate installs stay non-interactive. */
   .tos-gate{
-    display:flex; align-items:center; gap:12px; margin:0 0 14px; padding:15px 18px;
+    display:flex; align-items:center; gap:12px; margin:22px 0 0; padding:15px 18px;
     background:rgba(33,112,245,.08); border:1px solid rgba(33,112,245,.3);
     border-radius:var(--radius-sm); cursor:pointer;
     -webkit-user-select:none; user-select:none;
@@ -260,8 +262,9 @@
   .tos-text b{color:var(--text)}
   .tos-text a{color:var(--accent2); text-decoration:none; font-weight:600}
   .tos-text a:hover{text-decoration:underline}
-  .grid{transition:opacity .25s, filter .25s}
-  .grid.locked{opacity:.4; filter:saturate(.6); pointer-events:none}
+  .guide{transition:opacity .25s}
+  .guide.locked{opacity:.45}
+  .grid.locked{pointer-events:none}
 
   /* ---- controls ---- */
   .controls{
@@ -409,86 +412,88 @@
     <p>SideInstaller is not affiliated anyhow with SideStore. Please do not ask questions to the SideStore staff about SideInstaller as they are not able to answer. Instead, if you have issues or suggestions, write them in the <a href="https://discord.gg/sQ5Y8vbYJS" target="_blank" rel="noopener">SideInstaller Discord</a>.</p>
   </div>
 
-  <section class="step" id="setup">
-    <div class="step-head">
-      <span class="step-num">1</span>
-      <div>
-        <h2 class="step-title">Setup</h2>
+  <label class="tos-gate">
+    <input type="checkbox" id="tosCheck">
+    <span class="box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span>
+    <span class="tos-text">I have read and accept the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a>.</span>
+  </label>
+
+  <div class="guide" id="guide">
+    <section class="step" id="setup">
+      <div class="step-head">
+        <span class="step-num">1</span>
+        <div>
+          <h2 class="step-title">Setup</h2>
+        </div>
       </div>
-    </div>
-    <a class="install-btn" href="SideInstallerDNS.mobileconfig">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M12 3a15.3 15.3 0 0 1 0 18"/><path d="M12 3a15.3 15.3 0 0 0 0 18"/></svg>
-      Install DNS Profile
-    </a>
-    <div class="step-card">
-      <ol>
-        <li>Tap <b>Install DNS Profile</b> above and tap <b>Allow</b> when Safari asks to download the configuration profile.</li>
-        <li>Open <code>Settings</code> and tap <b>Profile Downloaded</b> (or go to <code>Settings → General → VPN &amp; Device Management</code>), then tap <b>Install</b>.</li>
-        <li>Apply the DNS: in <code>Settings → General → VPN &amp; Device Management</code>, open <b>DNS</b> and make sure <b>SideInstaller</b> is selected. Keep it enabled until setup is complete.</li>
-      </ol>
-    </div>
-  </section>
-
-  <section class="step" id="installation">
-    <div class="step-head">
-      <span class="step-num">2</span>
-      <div>
-        <h2 class="step-title">Installation</h2>
-      </div>
-    </div>
-
-    <label class="tos-gate">
-      <input type="checkbox" id="tosCheck">
-      <span class="box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg></span>
-      <span class="tos-text">I have read and accept the <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a>.</span>
-    </label>
-
-    <div class="controls">
-      <div class="search">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="q" type="search" placeholder="Search certificates…" autocomplete="off" spellcheck="false">
-      </div>
-      <select id="sort" class="sort" aria-label="Sort certificates">
-        <option value="days">Most days left</option>
-        <option value="days-asc">Soonest to expire</option>
-        <option value="name">Name (A–Z)</option>
-      </select>
-    </div>
-
-    <main id="grid" class="grid">
-{{CARDS}}
-    </main>
-    <p id="empty" class="empty">No certificates match your search.</p>
-
-    <details class="howto">
-      <summary>How to install</summary>
-      <div class="howto-body">
+      <a class="install-btn" href="SideInstallerDNS.mobileconfig">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M12 3a15.3 15.3 0 0 1 0 18"/><path d="M12 3a15.3 15.3 0 0 0 0 18"/></svg>
+        Install DNS Profile
+      </a>
+      <div class="step-card">
         <ol>
-          <li>Open this page <b>on your iPhone or iPad in Safari</b>.</li>
-          <li>Pick any certificate above and tap <b>Install</b>, then confirm the prompt.</li>
-          <li>Wait for the app to finish installing on your Home Screen.</li>
-          <li>Go to <code>Settings → General → VPN &amp; Device Management</code>, tap the developer profile, and <b>Trust</b> it.</li>
-          <li>Launch the app. If one certificate is revoked or won't open, just install with another.</li>
+          <li>Tap <b>Install DNS Profile</b> above and tap <b>Allow</b> when Safari asks to download the configuration profile.</li>
+          <li>Open <code>Settings</code> and tap <b>Profile Downloaded</b> (or go to <code>Settings → General → VPN &amp; Device Management</code>), then tap <b>Install</b>.</li>
+          <li>Apply the DNS: in <code>Settings → General → VPN &amp; Device Management</code>, open <b>DNS</b> and make sure <b>SideInstaller</b> is selected. Keep it enabled until setup is complete.</li>
         </ol>
       </div>
-    </details>
-  </section>
+    </section>
 
-  <section class="step" id="completion">
-    <div class="step-head">
-      <span class="step-num">3</span>
-      <div>
-        <h2 class="step-title">Completion</h2>
-        <p class="step-sub">You're all set.</p>
+    <section class="step" id="installation">
+      <div class="step-head">
+        <span class="step-num">2</span>
+        <div>
+          <h2 class="step-title">Installation</h2>
+        </div>
       </div>
-    </div>
-    <div class="step-card">
-      <p>That's it. Open <b>SideInstaller</b> from your Home Screen and use it to install <b>SideStore</b> (or SideStore + LiveContainer), straight from your device. No PC needed.</p>
-      <div class="callout">
-        <b>Once SideStore is installed, the DNS profile is no longer needed.</b> Remove it in <code>Settings → General → VPN &amp; Device Management</code> → <b>SideInstaller</b> → <b>Remove Profile</b> — or keep it and just stop using its DNS by switching <code>DNS</code> back to <b>Automatic</b> in the same menu.
+
+      <div class="controls">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="q" type="search" placeholder="Search certificates…" autocomplete="off" spellcheck="false">
+        </div>
+        <select id="sort" class="sort" aria-label="Sort certificates">
+          <option value="days">Most days left</option>
+          <option value="days-asc">Soonest to expire</option>
+          <option value="name">Name (A–Z)</option>
+        </select>
       </div>
-    </div>
-  </section>
+
+      <main id="grid" class="grid">
+  {{CARDS}}
+      </main>
+      <p id="empty" class="empty">No certificates match your search.</p>
+
+      <details class="howto">
+        <summary>How to install</summary>
+        <div class="howto-body">
+          <ol>
+            <li>Open this page <b>on your iPhone or iPad in Safari</b>.</li>
+            <li>Pick any certificate above and tap <b>Install</b>, then confirm the prompt.</li>
+            <li>Wait for the app to finish installing on your Home Screen.</li>
+            <li>Go to <code>Settings → General → VPN &amp; Device Management</code>, tap the developer profile, and <b>Trust</b> it.</li>
+            <li>Launch the app. If one certificate is revoked or won't open, just install with another.</li>
+          </ol>
+        </div>
+      </details>
+    </section>
+
+    <section class="step" id="completion">
+      <div class="step-head">
+        <span class="step-num">3</span>
+        <div>
+          <h2 class="step-title">Completion</h2>
+          <p class="step-sub">You're all set.</p>
+        </div>
+      </div>
+      <div class="step-card">
+        <p>That's it. Open <b>SideInstaller</b> from your Home Screen and use it to install <b>SideStore</b> (or SideStore + LiveContainer), straight from your device. No PC needed.</p>
+        <div class="callout">
+          <b>Once SideStore is installed, the DNS profile is no longer needed.</b> Remove it in <code>Settings → General → VPN &amp; Device Management</code> → <b>SideInstaller</b> → <b>Remove Profile</b> — or keep it and just stop using its DNS by switching <code>DNS</code> back to <b>Automatic</b> in the same menu.
+        </div>
+      </div>
+    </section>
+  </div>
 
   <footer class="footer">
     {{REPO_NOTE}}
@@ -584,12 +589,14 @@
   sortSel.addEventListener('change',apply);
   apply();
 
-  /* TOS gate: installs stay dimmed and inert until the box is ticked.
-     Acceptance is remembered per device. */
+  /* TOS gate: the guide stays dimmed, and installs inert, until the box
+     is ticked. Acceptance is remembered per device. */
   var tos=document.getElementById('tosCheck');
+  var guide=document.getElementById('guide');
   var TOS_KEY='si-tos-accepted';
   function tosLocked(){ return !tos.checked; }
   function applyTos(){
+    guide.classList.toggle('locked', tosLocked());
     grid.classList.toggle('locked', tosLocked());
     grid.setAttribute('aria-disabled', tosLocked()?'true':'false');
     if('inert' in grid) grid.inert=tosLocked();
