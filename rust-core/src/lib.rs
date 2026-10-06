@@ -143,6 +143,7 @@ pub unsafe extern "C" fn si_apple_signin(
 
 /// Sign the IPA at `ipa_path`, returning the `.app` bundle's path. Blocks.
 /// `udid` is registered with the team first; pass NULL to skip that.
+/// `pairing_file_path` goes into AltStore's bundle; pass NULL for none.
 ///
 /// # Safety
 /// See `account::sign_ipa`.
@@ -152,10 +153,19 @@ pub unsafe extern "C" fn si_sign_ipa(
     ipa_path: *const c_char,
     udid: *const c_char,
     device_name: *const c_char,
+    pairing_file_path: *const c_char,
     out_signed_path: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
-    account::sign_ipa(session, ipa_path, udid, device_name, out_signed_path, out_error)
+    account::sign_ipa(
+        session,
+        ipa_path,
+        udid,
+        device_name,
+        pairing_file_path,
+        out_signed_path,
+        out_error,
+    )
 }
 
 /// Build SideStore's `Account.sideconf` payload, setting `*out_json` to it.

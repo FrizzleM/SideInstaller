@@ -72,8 +72,29 @@ All notable changes to SideInstaller are documented here.
 - Cancel stops Side by Side straight away while it waits for their iPhone to pair.
 - Tapping Stop while the IPA downloads now stops the install, instead of carrying on with an older
   copy of the IPA left in Documents.
+- **SideStore's home screen widget shows your apps.** The widget looks for SideStore's app group in
+  its own settings, and SideInstaller only wrote the group into the app's, so the widget opened an
+  empty list. It now gets the group too, as AltServer does and as iLoader 2.3.6 does. This affects
+  SideStore 0.7.0-alpha and older; nightlies find the group another way.
+- **AltStore Classic installed as a custom IPA knows which iPhone it's on.** AltStore reads the
+  iPhone's UDID from its own settings, where AltServer writes it during installation. SideInstaller
+  left in whatever UDID the IPA came with, so AltStore registered that device with your Apple ID and
+  signed apps for it instead. It now gets the UDID of the iPhone it's installed on.
+- An imported app that schedules background work under its own bundle ID, such as a long export
+  with iOS's continued processing tasks, can run it again after signing. Signing adds your team ID
+  to the bundle ID, and iOS only runs those tasks under the bundle ID the app now has. Each such
+  task is now allowed under the new bundle ID too, and still under the old one for apps that name it
+  directly. Reported to iLoader in issue #649.
 
 ### Added
+- **AltStore Classic installed as a custom IPA comes with your pairing.** AltStore 2.3 can install
+  and refresh apps without a computer through a Remote AltServer, but setting that up asks you to
+  pair with a PC first. SideInstaller now puts your iPhone's pairing inside AltStore when it signs
+  it, encrypted the way AltServer does it, so after you sign in to AltStore the setup skips that
+  step. This works with the pairing SideInstaller creates on the iPhone itself on iOS 27, and with
+  an imported pairing file that includes the same kind of record. A file with only a classic
+  lockdown record isn't passed on, since AltStore can't connect with it. The pairing stays on your
+  iPhone.
 - Three more problems now get their own explanation and steps instead of a raw error: an Apple
   Account Apple won't let sign apps because of its owner's age (error 1102), an Apple ID out of App
   IDs for the week (error 9120), and an iPhone that already has the three apps a free Apple ID may

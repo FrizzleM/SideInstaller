@@ -137,11 +137,15 @@ int32_t si_apple_signin(const char *apple_id,
 // profile is requested — without it a fresh/free team fails with developer
 // error 8220 ("Your team has no devices …"). A registration failure is reported
 // with a "device registration failed for UDID <udid>:" prefix. Pass NULL/empty
-// `udid` to skip registration.
+// `udid` to skip registration. `pairing_file_path` is the pairing file used to
+// reach that device: when the IPA is AltStore, its RPPairing record is bundled
+// encrypted as ALTPairingFile.dat for Remote AltServer, as AltServer does. Pass
+// NULL/empty to bundle none.
 int32_t si_sign_ipa(SignSession *session,
                     const char *ipa_path,
                     const char *udid,
                     const char *device_name,
+                    const char *pairing_file_path,
                     char **out_signed_path,
                     char **out_error);
 
