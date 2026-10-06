@@ -53,22 +53,12 @@ enum InstallSource: String, CaseIterable, Identifiable {
     }
 
     /// GitHub "owner/repo" whose release holds the IPA.
-    ///
-    /// TEMPORARY: LiveContainer/LiveContainer is down, so LiveContainer comes
-    /// from a mirror. Revert this and `servedChannel` once upstream is back.
     var repo: String? {
         switch self {
         case .sideStore:     return "SideStore/SideStore"
-        case .liveContainer: return "LiveContainerMirror/LiveContainer"
+        case .liveContainer: return "LiveContainer/LiveContainer"
         case .custom:        return nil
         }
-    }
-
-    /// The channel whose release is fetched for `channel`. TEMPORARY: the
-    /// LiveContainer mirror publishes only the rolling `nightly` release, so
-    /// stable requests take that too.
-    func servedChannel(_ channel: ReleaseChannel) -> ReleaseChannel {
-        self == .liveContainer ? .nightly : channel
     }
 
     /// GitHub Releases API URL for a channel, used only when the direct download
@@ -77,7 +67,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
     func releaseAPI(_ channel: ReleaseChannel) -> URL? {
         guard let repo else { return nil }
         let base = "https://api.github.com/repos/\(repo)/releases"
-        switch servedChannel(channel) {
+        switch channel {
         case .stable:  return URL(string: "\(base)/latest")!
         case .nightly: return URL(string: "\(base)/tags/nightly")!
         }
@@ -97,7 +87,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
     func downloadURL(_ channel: ReleaseChannel) -> URL? {
         guard let repo, let assetFileName else { return nil }
         let base = "https://github.com/\(repo)/releases"
-        switch servedChannel(channel) {
+        switch channel {
         case .stable:  return URL(string: "\(base)/latest/download/\(assetFileName)")
         // The nightly tag is fixed, so nothing needs resolving.
         case .nightly: return URL(string: "\(base)/download/nightly/\(assetFileName)")
@@ -411,10 +401,6 @@ enum SideStoreDownloader {
             throw DownloadError.notDownloadable
         }
 
-        if source.servedChannel(channel) != channel, let repo = source.repo {
-            log("\(source.displayName) is coming from the \(repo) mirror, which only has the \(source.servedChannel(channel).displayName.lowercased()) build.")
-        }
-
         // Tens of megabytes aren't fetched again while the copy from an earlier
         // run is still the file GitHub serves.
         let existing = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
@@ -633,7 +619,7 @@ enum SideStoreDownloader {
 
         // Newest first, which is the order GitHub answers in.
         for release in releases {
-            if source.servedChannel(channel) == .stable, release.prerelease == true { continue }
+            if channel == .stable, release.prerelease == true { continue }
             guard let asset = source.selectAsset(from: release.assets),
                   let assetURL = URL(string: asset.browser_download_url) else { continue }
             // Save under the release's actual channel, not the requested one.
