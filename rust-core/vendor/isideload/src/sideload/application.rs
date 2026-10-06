@@ -7,13 +7,18 @@ use crate::dev::developer_session::DeveloperSession;
 use crate::dev::teams::DeveloperTeam;
 use crate::sideload::bundle::Bundle;
 use crate::sideload::cert_identity::CertificateIdentity;
+use aes_gcm::{AeadInOut, Aes256Gcm, KeyInit, Nonce};
 use rootcause::option_ext::OptionExt;
 use rootcause::prelude::*;
+use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::path::PathBuf;
 use tokio::io::AsyncWriteExt;
 use tracing::{info, warn};
 use zip::ZipArchive;
+
+/// Where AltStore looks for its pairing file (`Bundle.pairingFileURL`).
+const ALT_PAIRING_FILE: &str = "ALTPairingFile.dat";
 
 pub struct Application {
     pub bundle: Bundle,
@@ -237,10 +242,14 @@ impl Application {
         special: &Option<SpecialApp>,
         group_identifier: &str,
         cert: &CertificateIdentity,
+        device_udid: Option<&str>,
+        pairing_file: Option<&[u8]>,
     ) -> Result<(), Report> {
         let Some(special) = special.as_ref() else {
             return Ok(());
         };
+
+        self.set_alt_info(special, group_identifier, device_udid);
 
         if matches!(
             special,
@@ -249,12 +258,6 @@ impl Application {
                 | SpecialApp::AltStore
                 | SpecialApp::StikStore
         ) {
-            if !matches!(special, SpecialApp::StikStore) {
-                self.bundle.app_info.insert(
-                    "ALTAppGroups".to_string(),
-                    plist::Value::Array(vec![plist::Value::String(group_identifier.to_string())]),
-                );
-            }
             info!("Injecting certificate for {}", special);
 
             let target_bundle =
@@ -293,8 +296,105 @@ impl Application {
                     .context(format!("Failed to write {}", cert_file_name))?;
             }
         }
+
+        if matches!(special, SpecialApp::AltStore) {
+            self.bundle_pairing_file(pairing_file, &cert.machine_id).await?;
+        }
         Ok(())
     }
+
+    /// Puts the device's pairing file into AltStore's bundle as AltServer does,
+    /// so setting up a Remote AltServer (AltStore Classic 2.3) skips pairing.
+    /// AltStore decrypts it once signed in, with the machine identifier of the
+    /// certificate named by `ALTCertificateID`, which is `machine_id` here.
+    /// Upstream 4f7fb39 (iLoader 2.3.6).
+    async fn bundle_pairing_file(
+        &self,
+        pairing_file: Option<&[u8]>,
+        machine_id: &str,
+    ) -> Result<(), Report> {
+        let Some(pairing_file) = pairing_file else {
+            info!("No pairing file to bundle into AltStore; it pairs on its own instead");
+            return Ok(());
+        };
+        if machine_id.is_empty() {
+            warn!(
+                "The certificate has no machine identifier, so AltStore couldn't decrypt a \
+                 pairing file; not bundling one"
+            );
+            return Ok(());
+        }
+
+        info!("Bundling the pairing file into AltStore for Remote AltServer");
+        let sealed = seal_pairing_file(pairing_file, machine_id)?;
+        tokio::fs::write(self.bundle.bundle_dir.join(ALT_PAIRING_FILE), sealed)
+            .await
+            .context(format!("Failed to write {}", ALT_PAIRING_FILE))?;
+        Ok(())
+    }
+
+    /// The Info.plist values AltStore-family apps read about their install,
+    /// as AltServer writes them.
+    fn set_alt_info(
+        &mut self,
+        special: &SpecialApp,
+        group_identifier: &str,
+        device_udid: Option<&str>,
+    ) {
+        if matches!(
+            special,
+            SpecialApp::SideStoreLc | SpecialApp::SideStore | SpecialApp::AltStore
+        ) {
+            let app_groups =
+                plist::Value::Array(vec![plist::Value::String(group_identifier.to_string())]);
+            self.bundle.app_info.insert("ALTAppGroups".to_string(), app_groups.clone());
+            // Each extension reads the group from its own Info.plist. The widget
+            // in AltStore and in SideStore releases up to 0.7.0-alpha opens the
+            // shared database through it; without it, it opens an empty one in
+            // its own container. Upstream c23db68 (iLoader 2.3.6).
+            for ext in self.bundle.app_extensions_mut() {
+                ext.app_info.insert("ALTAppGroups".to_string(), app_groups.clone());
+            }
+        }
+
+        // AltStore registers this UDID with the team when it signs in and signs
+        // apps for it, so without the right one it can't install anything to
+        // this device. The IPA carries whichever UDID it was built with.
+        // Upstream dd44258 (iLoader 2.3.6) writes "ALTDeviceId", which AltStore
+        // doesn't read.
+        if matches!(special, SpecialApp::AltStore) {
+            if let Some(device_udid) = device_udid {
+                self.bundle.app_info.insert(
+                    "ALTDeviceID".to_string(),
+                    plist::Value::String(device_udid.to_string()),
+                );
+            } else {
+                warn!(
+                    "No device UDID to give AltStore; it keeps the ALTDeviceID it shipped with"
+                );
+            }
+        }
+    }
+}
+
+/// Seals `pairing_file` the way AltServer does for `ALTPairingFile.dat`:
+/// AES-256-GCM under SHA-256 of the machine identifier, laid out as CryptoKit's
+/// `AES.GCM.SealedBox.combined` (12-byte nonce, ciphertext, 16-byte tag), which
+/// AltStore opens with `SealedBox(combined:)`.
+fn seal_pairing_file(pairing_file: &[u8], machine_id: &str) -> Result<Vec<u8>, Report> {
+    let key = Sha256::digest(machine_id.as_bytes());
+    let cipher = Aes256Gcm::new(&key);
+    let nonce_bytes: [u8; 12] = rand::random();
+
+    let mut ciphertext = pairing_file.to_vec();
+    cipher
+        .encrypt_in_place(&Nonce::from(nonce_bytes), &[], &mut ciphertext)
+        .map_err(|e| report!("Failed to encrypt the pairing file: {e}"))?;
+
+    let mut sealed = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
+    sealed.extend_from_slice(&nonce_bytes);
+    sealed.extend_from_slice(&ciphertext);
+    Ok(sealed)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -316,5 +416,165 @@ impl std::fmt::Display for SpecialApp {
             SpecialApp::AltStore => write!(f, "AltStore"),
             SpecialApp::StikStore => write!(f, "StikStore"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const GROUP: &str = "group.com.rileytestut.AltStore.TEAMID";
+
+    /// An `.app` with a widget extension, in its own temp directory that goes
+    /// away with it.
+    struct TestApp {
+        root: PathBuf,
+        app: Application,
+    }
+
+    impl TestApp {
+        fn new(info: &[(&str, &str)]) -> Self {
+            let root =
+                std::env::temp_dir().join(format!("isideload-test-{}", uuid::Uuid::new_v4()));
+            let app_dir = root.join("Test.app");
+            let widget_dir = app_dir.join("PlugIns").join("Widget.appex");
+            std::fs::create_dir_all(&widget_dir).unwrap();
+
+            let write_info = |dir: &PathBuf, entries: &[(&str, &str)]| {
+                let mut dict = plist::Dictionary::new();
+                for (key, value) in entries {
+                    dict.insert(key.to_string(), (*value).into());
+                }
+                plist::to_file_xml(dir.join("Info.plist"), &dict).unwrap();
+            };
+            write_info(&app_dir, info);
+            write_info(&widget_dir, &[("CFBundleIdentifier", "com.example.app.widget")]);
+
+            let app = Application {
+                bundle: Bundle::new(app_dir).unwrap(),
+            };
+            TestApp { root, app }
+        }
+
+        fn main_value(&self, key: &str) -> Option<&plist::Value> {
+            self.app.bundle.app_info.get(key)
+        }
+
+        fn widget_value(&self, key: &str) -> Option<&plist::Value> {
+            self.app.bundle.app_extensions()[0].app_info.get(key)
+        }
+    }
+
+    impl Drop for TestApp {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn groups() -> plist::Value {
+        plist::Value::Array(vec![GROUP.into()])
+    }
+
+    #[test]
+    fn app_groups_reach_the_extensions() {
+        for special in [SpecialApp::SideStore, SpecialApp::SideStoreLc, SpecialApp::AltStore] {
+            let mut test = TestApp::new(&[("CFBundleIdentifier", "com.example.app")]);
+            test.app.set_alt_info(&special, GROUP, Some("UDID"));
+
+            assert_eq!(test.main_value("ALTAppGroups"), Some(&groups()), "{special}");
+            assert_eq!(test.widget_value("ALTAppGroups"), Some(&groups()), "{special}");
+        }
+    }
+
+    #[test]
+    fn other_apps_get_no_app_groups() {
+        for special in [SpecialApp::StikStore, SpecialApp::LiveContainer] {
+            let mut test = TestApp::new(&[("CFBundleIdentifier", "com.example.app")]);
+            test.app.set_alt_info(&special, GROUP, Some("UDID"));
+
+            assert_eq!(test.main_value("ALTAppGroups"), None, "{special}");
+            assert_eq!(test.widget_value("ALTAppGroups"), None, "{special}");
+        }
+    }
+
+    #[test]
+    fn altstore_gets_the_device_udid() {
+        let shipped = [
+            ("CFBundleIdentifier", "com.rileytestut.AltStore"),
+            ("ALTDeviceID", "SHIPPED-UDID"),
+        ];
+
+        let mut test = TestApp::new(&shipped);
+        test.app.set_alt_info(&SpecialApp::AltStore, GROUP, Some("DEVICE-UDID"));
+        assert_eq!(test.main_value("ALTDeviceID"), Some(&"DEVICE-UDID".into()));
+        assert_eq!(test.widget_value("ALTDeviceID"), None);
+
+        let mut test = TestApp::new(&shipped);
+        test.app.set_alt_info(&SpecialApp::AltStore, GROUP, None);
+        assert_eq!(test.main_value("ALTDeviceID"), Some(&"SHIPPED-UDID".into()));
+    }
+
+    /// What AltServer bundles, made by CryptoKit as AltServer does it:
+    /// `AES.GCM.seal(PLAINTEXT, using: SymmetricKey(data:
+    /// SHA256.hash(data: MACHINE_ID))).combined`.
+    const CRYPTOKIT_SEALED: &str = "I+l2DEWiBhUUgPVab47KxXzrL6G84DJXVi6OBf2x7iTKd1g6YSfua/juAE4oYZE3k6AMrzhIf8ggnnLBuoHUsktEcXu06+pb6ZZi8DcnCYFGS448/Q==";
+    const PLAINTEXT: &[u8] = b"<?xml version=\"1.0\"?><plist version=\"1.0\"><dict/></plist>";
+    const MACHINE_ID: &str = "TESTMACHINEID";
+
+    /// Opens a sealed pairing file as AltStore's `bundledPairingFile()` does.
+    fn open_sealed(sealed: &[u8], machine_id: &str) -> Option<Vec<u8>> {
+        let (nonce, ciphertext) = sealed.split_at_checked(12)?;
+        let nonce: [u8; 12] = nonce.try_into().ok()?;
+        let cipher = Aes256Gcm::new(&Sha256::digest(machine_id.as_bytes()));
+        let mut plaintext = ciphertext.to_vec();
+        cipher
+            .decrypt_in_place(&Nonce::from(nonce), &[], &mut plaintext)
+            .ok()?;
+        Some(plaintext)
+    }
+
+    #[test]
+    fn opens_what_altserver_seals() {
+        use base64::Engine;
+        let sealed = base64::engine::general_purpose::STANDARD
+            .decode(CRYPTOKIT_SEALED)
+            .unwrap();
+
+        assert_eq!(open_sealed(&sealed, MACHINE_ID).as_deref(), Some(PLAINTEXT));
+        assert_eq!(open_sealed(&sealed, "ANOTHERMACHINE"), None);
+    }
+
+    #[test]
+    fn seals_as_altserver_does() {
+        let sealed = seal_pairing_file(PLAINTEXT, MACHINE_ID).unwrap();
+
+        assert_eq!(sealed.len(), 12 + PLAINTEXT.len() + 16);
+        assert_eq!(open_sealed(&sealed, MACHINE_ID).as_deref(), Some(PLAINTEXT));
+        assert_ne!(seal_pairing_file(PLAINTEXT, MACHINE_ID).unwrap(), sealed);
+    }
+
+    #[test]
+    fn bundles_the_pairing_file_when_it_can() {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let bundled = |pairing_file: Option<&[u8]>, machine_id: &str| {
+            let test = TestApp::new(&[("CFBundleIdentifier", "com.rileytestut.AltStore")]);
+            runtime
+                .block_on(test.app.bundle_pairing_file(pairing_file, machine_id))
+                .unwrap();
+            std::fs::read(test.app.bundle.bundle_dir.join(ALT_PAIRING_FILE)).ok()
+        };
+
+        let sealed = bundled(Some(PLAINTEXT), MACHINE_ID).unwrap();
+        assert_eq!(open_sealed(&sealed, MACHINE_ID).as_deref(), Some(PLAINTEXT));
+        assert_eq!(bundled(None, MACHINE_ID), None);
+        assert_eq!(bundled(Some(PLAINTEXT), ""), None);
+    }
+
+    #[test]
+    fn only_altstore_gets_the_device_udid() {
+        let mut test = TestApp::new(&[("CFBundleIdentifier", "com.SideStore.SideStore")]);
+        test.app.set_alt_info(&SpecialApp::SideStore, GROUP, Some("UDID"));
+
+        assert_eq!(test.main_value("ALTDeviceID"), None);
     }
 }

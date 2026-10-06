@@ -1515,10 +1515,14 @@ final class Engine: ObservableObject {
         if udid.isEmpty {
             log("⚠️ No device UDID captured — run the Connect step first, or signing may fail with error 8220.")
         }
+        // Bundled into AltStore for its Remote AltServer setup; other apps
+        // get the pairing file after the install instead.
+        let pairingPath = pairingFilePath ?? PairingController.pairingFilePath()
         setStep(.sign, .active)
         do {
             let path = try await onSignQueue {
-                try self.performSign(session: session, ipa: ipa, udid: udid, deviceName: name)
+                try self.performSign(session: session, ipa: ipa, udid: udid, deviceName: name,
+                                     pairingFilePath: pairingPath)
             }
             signedAppPath = path
             // Read the app's name from the signed bundle (imported IPAs have none before this).
@@ -1544,11 +1548,12 @@ final class Engine: ObservableObject {
         }
     }
 
-    private func performSign(session: OpaquePointer, ipa: String, udid: String, deviceName: String) throws -> String {
+    private func performSign(session: OpaquePointer, ipa: String, udid: String, deviceName: String,
+                             pairingFilePath: String) throws -> String {
         log("Signing \(ipa) …")
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        let rc = si_sign_ipa(session, ipa, udid, deviceName, &signed, &error)
+        let rc = si_sign_ipa(session, ipa, udid, deviceName, pairingFilePath, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
             signed.map { si_string_free($0) }
@@ -2293,10 +2298,12 @@ final class Engine: ObservableObject {
         let udid = deviceUDID ?? ""
         let device = deviceName ?? ""
         log("=== Refreshing \(name) from \((ipaPath as NSString).lastPathComponent) ===")
+        let path = pairingFilePath ?? PairingController.pairingFilePath()
         let signed: String
         do {
             signed = try await onSignQueue {
-                try self.performSign(session: session, ipa: ipaPath, udid: udid, deviceName: device)
+                try self.performSign(session: session, ipa: ipaPath, udid: udid, deviceName: device,
+                                     pairingFilePath: path)
             }
         } catch EngineError.certExists {
             // Don't set `certConflict`: its retry button starts a full install
@@ -2306,7 +2313,6 @@ final class Engine: ObservableObject {
         defer { Self.discardSignedBundle(at: signed) }
         installProgress = 0
         let ip = deviceHost
-        let path = pairingFilePath ?? PairingController.pairingFilePath()
         try await onDeviceQueue {
             // iOS may drop the tunnel during signing and `isConnected` doesn't
             // detect it, so reconnect first (same as install).

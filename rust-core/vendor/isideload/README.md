@@ -208,6 +208,63 @@ keeps Apple's 7252. The request's shape and its JSON:API error parsing are
 tested against a local server: `cargo test -p isideload --lib
 services_request_tests`.
 
+**9. `src/sideload/application.rs`, `bundle.rs`, `sideloader.rs` — what
+isideload 0.4.1–0.4.3 adds to the bundle (iLoader 2.3.6).**
+
+- `ALTAppGroups` now goes into every app extension's Info.plist too, not just
+  the app's (upstream `c23db68`). Extensions read it from their own bundle, and
+  the widget in AltStore and in SideStore releases up to 0.7.0-alpha opens the
+  shared database through it (`PersistentContainer.defaultDirectoryURL`). Without
+  it the widget opened an empty database in its own container. SideStore
+  nightlies read the group from the entitlements instead.
+- AltStore gets `ALTDeviceID`: the UDID `sign_app` registers. AltStore registers
+  that UDID with the team when it signs in and signs apps for it, and the IPA
+  carries whichever UDID it was built with. Upstream `dd44258` writes
+  `ALTDeviceId`, which AltStore doesn't read (`Bundle.Info.deviceID` is
+  `"ALTDeviceID"`).
+- `set_bundle_identifier` also lists each `BGTaskSchedulerPermittedIdentifiers`
+  entry under the new bundle identifier (upstream `340cfea`, iLoader issue
+  #649). iOS accepts a `BGContinuedProcessingTask` only if its identifier starts
+  with the app's bundle identifier, so apps build it from
+  `Bundle.main.bundleIdentifier`, and that identifier then wasn't permitted.
+  Upstream replaces the old bundle identifier wherever it occurs in an entry and
+  drops the original. Here, only an entry equal to the old bundle identifier or
+  starting with it and a dot is rebased, and the original stays, so an app that
+  registers a hard-coded identifier keeps its background tasks. Tests:
+  `cargo test -p isideload --lib sideload::`.
+- AltStore gets the device's pairing file as `ALTPairingFile.dat` (upstream
+  `4f7fb39`), so setting up a Remote AltServer in AltStore Classic 2.3 skips the
+  "Pair with a PC" step. The format is AltServer's
+  (`ALTDeviceManager.encryptedPairingData` on AltStore's `classic` branch):
+  AES-256-GCM under SHA-256 of the certificate's machine identifier, written as
+  CryptoKit's `SealedBox.combined` (12-byte nonce, ciphertext, 16-byte tag).
+  AltStore opens it in `AppManager.bundledPairingFile()` once signed in, with
+  the machine identifier Apple lists for the certificate in `ALTCertificateID`
+  (`cert.machine_id` here, the same password the bundled p12 uses), and copies
+  it to its Keychain when Remote AltServer is set up. If it can't open the file
+  (say, AltStore kept a different certificate from an earlier install), it
+  pairs on its own as before.
+
+  Unlike upstream, which bundles iLoader's merged lockdown and RPPairing file as
+  is, only an RPPairing record goes in, re-serialized by idevice's
+  `RpPairingFile` as AltServer's `rp_pairing_file_to_bytes` writes it
+  (`altstore_pairing_file` in `rust-core/src/account.rs`). AltStore's
+  `OnDeviceClient` only connects with an RPPairing record (it refuses a file
+  without `private_key`), and AltStore keeps a bundled file without checking it,
+  so a lockdown-only file would make Remote AltServer look set up while every
+  install fails. With no RPPairing record, nothing is bundled. The file never
+  leaves the iPhone: AltStore only uses it for its own tunnel over LocalDevVPN.
+
+  Tests: `cargo test -p isideload --lib sideload::` opens a file CryptoKit
+  sealed and checks the layout; `cargo test --lib altstore_pairing_file` (from
+  `rust-core/`) covers what gets bundled. Checked once on the Mac the other way
+  round, too: AltStore's `bundledPairingFile()` code, run as a Swift script,
+  opened a file sealed here and got the record back unchanged.
+
+Not needed: upstream `0bee45d` (isideload 0.4.4, after iLoader 2.3.6). It
+gives LiveContainer's `LiveProcess.appex` the keychain groups, which every
+`.appex` here already gets with the main entitlements (change 1).
+
 ## Re-vendoring
 
 Upstream fixed change 1 its own way in `baca89d` (per-extension profiles). A
