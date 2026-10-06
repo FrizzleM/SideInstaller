@@ -10,12 +10,19 @@
       "iconURL": "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon~ios-marketing.png",
       "subtitle": "An an app that installs Sidestore on iOS 27, fully on-device",
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
-      "version": "1.3.0",
-      "versionDate": "2026-10-05T18:55:57Z",
-      "versionDescription": "# Main changes:\r\n- Switched app signing to apple-codesign-quick (the same signer iLoader uses)\r\n    - Signing is about 6-9x faster\r\n    - SideInstaller is about 5 MB smaller\r\n- Popups that appear together are now merged into one card\r\n    - The pairing code and its Settings steps are now one popup\r\n    - An error and its fix steps are now one popup\r\n    - The \"Installed\" message, the trust step and LiveContainer's certificate import are now one \"Success: last steps\" popup\r\n- Added clear explanations and steps for more errors\r\n    - Apple Accounts that are too young to use developer services (error 1102)\r\n    - Running out of App IDs for the week (error 9120)\r\n    - Already having 3 apps installed with a free Apple ID\r\n- Logging in now automatically retries when Apple temporarily rate limits it (HTTP 429)\r\n- Added PanicAnalyzer to the apps that can receive the pairing file\r\n\r\n## Fixes:\r\n\r\n- Fixed LiveContainer + SideStore not downloading while the official LiveContainer GitHub is down (it now uses a temporary mirror, which only has the nightly build)\r\n- Fixed imported .ipa files with spaces, symbols or non-Latin letters in their name failing to sign (error 35)\r\n- Fixed some imported .ipa files that still had parts of an old signature failing to install\r\n- Fixed Side by Side: when two people pair the same iPhone, the second one no longer breaks the first one's pairing\r\n- Fixed not being able to revoke \"Apple Development\" certificates (the ones Xcode makes) in the Certificates tool (error 7252)\r\n- Fixed AutoFill filling in the email and password separately on the login page",
-      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.3.0/SideInstaller.ipa",
-      "size": 8883213,
+      "version": "1.3.1",
+      "versionDate": "2026-10-06T15:06:36Z",
+      "versionDescription": "- Added experimental support for installing Altstore using the \"Custom .ipa\" feature\r\n    - Added support for \"ALTDeviceID\" for those who install Altstore using Custom .ipa\r\n    - SideInstaller will auto-insert the pairing file into Altstore if installed using Custom.ipa\r\n- Fixed a bug caused by background task IDs (iLoader issue #649)\r\n- Added app groups to extensions",
+      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.3.1/SideInstaller.ipa",
+      "size": 8902866,
       "versions": [
+        {
+          "version": "1.3.1",
+          "date": "2026-10-06T15:06:36Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.3.1/SideInstaller.ipa",
+          "localizedDescription": "- Added experimental support for installing Altstore using the \"Custom .ipa\" feature\r\n    - Added support for \"ALTDeviceID\" for those who install Altstore using Custom .ipa\r\n    - SideInstaller will auto-insert the pairing file into Altstore if installed using Custom.ipa\r\n- Fixed a bug caused by background task IDs (iLoader issue #649)\r\n- Added app groups to extensions",
+          "size": 8902866
+        },
         {
           "version": "1.3.0",
           "date": "2026-10-05T18:55:57Z",
