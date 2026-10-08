@@ -737,6 +737,18 @@ let portugueseStrings: [String: String] = [
     "Links": "Links",
     "Source code": "Código-fonte",
     "Support the project": "Apoie o projeto",
+    "Crypto": "Cripto",
+    "Donation wallets for Bitcoin, Ethereum and Solana.":
+        "Carteiras para doações em Bitcoin, Ethereum e Solana.",
+    "Crypto donations": "Doações em cripto",
+    "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
+        "As doações são totalmente opcionais. Elas não compram nada, não desbloqueiam nenhum recurso nem dão nada em troca; são só uma forma de agradecer se o SideInstaller te ajudou.",
+    "Coin": "Moeda",
+    "Network: %@": "Rede: %@",
+    "QR code for the %@ address": "Código QR do endereço %@",
+    "Copied": "Copiado",
+    "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
+        "Envie cada moeda apenas pela rede indicada. Criptomoedas enviadas por outra rede não podem ser recuperadas.",
 
     "Special thanks": "Agradecimentos especiais",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":

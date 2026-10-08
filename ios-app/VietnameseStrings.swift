@@ -740,6 +740,18 @@ let vietnameseStrings: [String: String] = [
     "Links": "Liên kết",
     "Source code": "Mã nguồn",
     "Support the project": "Ủng hộ dự án",
+    "Crypto": "Tiền mã hóa",
+    "Donation wallets for Bitcoin, Ethereum and Solana.":
+        "Ví nhận ủng hộ cho Bitcoin, Ethereum và Solana.",
+    "Crypto donations": "Ủng hộ bằng tiền mã hóa",
+    "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
+        "Việc ủng hộ hoàn toàn là tự nguyện. Khoản ủng hộ không dùng để mua gì, không mở khóa tính năng nào và bạn không nhận lại gì cả; đó chỉ là một cách để cảm ơn nếu SideInstaller đã giúp ích cho bạn.",
+    "Coin": "Đồng tiền",
+    "Network: %@": "Mạng: %@",
+    "QR code for the %@ address": "Mã QR của địa chỉ %@",
+    "Copied": "Đã sao chép",
+    "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
+        "Chỉ gửi mỗi đồng tiền qua đúng mạng được ghi. Tiền mã hóa gửi qua mạng khác sẽ không thể khôi phục.",
 
     "Special thanks": "Lời cảm ơn đặc biệt",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":

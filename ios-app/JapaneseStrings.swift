@@ -726,6 +726,18 @@ let japaneseStrings: [String: String] = [
     "Links": "リンク",
     "Source code": "ソースコード",
     "Support the project": "プロジェクトを支援",
+    "Crypto": "暗号資産",
+    "Donation wallets for Bitcoin, Ethereum and Solana.":
+        "Bitcoin・Ethereum・Solana の寄付用ウォレット。",
+    "Crypto donations": "暗号資産での寄付",
+    "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
+        "寄付は完全に任意です。何かを購入したり、機能が解放されたり、見返りがあったりするものではありません。SideInstaller が役に立ったときに感謝を伝えるための手段です。",
+    "Coin": "通貨",
+    "Network: %@": "ネットワーク：%@",
+    "QR code for the %@ address": "%@ アドレスの QR コード",
+    "Copied": "コピーしました",
+    "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
+        "各通貨は表示されたネットワークでのみ送金してください。別のネットワークで送金した暗号資産は取り戻せません。",
 
     "Special thanks": "特別な感謝",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":

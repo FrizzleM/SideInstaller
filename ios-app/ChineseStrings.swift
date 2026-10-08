@@ -727,6 +727,17 @@ let chineseStrings: [String: String] = [
     "Links": "链接",
     "Source code": "源代码",
     "Support the project": "支持这个项目",
+    "Crypto": "加密货币",
+    "Donation wallets for Bitcoin, Ethereum and Solana.": "比特币、以太坊和 Solana 的捐赠钱包。",
+    "Crypto donations": "加密货币捐赠",
+    "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
+        "捐赠完全自愿。捐赠不会购买任何东西，不会解锁任何功能，也不会带来任何回报；这只是在 SideInstaller 帮到你时表达感谢的一种方式。",
+    "Coin": "币种",
+    "Network: %@": "网络：%@",
+    "QR code for the %@ address": "%@ 地址的二维码",
+    "Copied": "已复制",
+    "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
+        "每种币请只通过所示网络发送。通过其他网络发送的加密货币将无法找回。",
 
     "Special thanks": "特别感谢",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
