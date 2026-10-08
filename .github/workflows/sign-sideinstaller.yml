@@ -6,7 +6,7 @@ name: sign-sideinstaller
 #
 # The cert pool is the merge of every source in cert-url.txt. That list starts
 # with the repo's own certs/ folder, so dropping a certificate in there (see
-# certs/README.md for the layout) adds it to the pool and triggers a run.
+# certs/README.md for the layout) adds it to the pool on the next run.
 #
 # Every run starts with a precheck (scripts/check_for_changes.sh) that compares
 # the certificate pool, the unsigned IPA and the page template against the state
@@ -40,10 +40,12 @@ on:
         default: false
   push:
     paths:
-      - "ipa-url.txt"          # re-run automatically when you point at a new IPA
-      - "certs/**"             # ...and when you upload/remove your own certificates
-  schedule:
-    - cron: "0 23 * * 0"       # weekly refresh (Sunday) so the page tracks cert expiry
+      - "scripts/template.html"           # the install page template
+      - "scripts/generate_index.sh"       # ...and the scripts that build the page
+      - "scripts/generate_plist.sh"
+      - "scripts/sign_with_all_certs.sh"  # ...and sign the IPAs
+  release:
+    types: [published]                    # a new release ships a new unsigned IPA
 
 concurrency:
   group: sign-sideinstaller
@@ -77,7 +79,7 @@ jobs:
       # Resolve the channel once and export the paths every later step + script
       # reads from env. Beta gets its own output dir and page so a test build is
       # never mixed into the public index.html / output/ artifacts. Automatic
-      # triggers (push, schedule) have no channel input and fall back to stable.
+      # triggers (push, release) have no channel input and fall back to stable.
       - name: Resolve release channel
         shell: bash
         env:
@@ -163,7 +165,7 @@ jobs:
           UNSIGNED_IPA_URL: ${{ github.event.inputs.ipa_url }}
         run: ./scripts/generate_index.sh
 
-      # Commit the state the precheck computed, not a fresh one, so next week's
+      # Commit the state the precheck computed, not a fresh one, so the next run's
       # comparison is against exactly the inputs this page was built from.
       - name: Record signing state
         if: steps.precheck.outputs.skip != 'true'
