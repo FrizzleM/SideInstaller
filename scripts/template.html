@@ -100,6 +100,8 @@
   .link-btn.kofi:hover{background:#ff5e5b; filter:brightness(1.08)}
   .link-btn.youtube{color:#fff; background:#ff0000; border-color:transparent}
   .link-btn.youtube:hover{background:#ff0000; filter:brightness(1.08)}
+  .link-btn.crypto{color:#1f1300; background:#f7931a; border-color:transparent}
+  .link-btn.crypto:hover{background:#f7931a; filter:brightness(1.08)}
   .link-btn.ipa{padding:8px 13px; font-size:12.5px; font-weight:600; color:var(--muted)}
   .link-btn.ipa svg{width:15px; height:15px}
   .link-btn.ipa:hover{color:var(--text)}
@@ -187,6 +189,50 @@
   }
   .video-cap a{color:var(--accent2); text-decoration:none}
   .video-cap a:hover{text-decoration:underline}
+
+  /* ---- crypto donations popup ----
+     One wallet at a time behind a tab row. The card scrolls inside itself so
+     a short phone screen never pushes the Copy button out of reach. */
+  #cryptoModal .modal-card{max-height:calc(100vh - 40px); max-height:calc(100dvh - 40px); overflow-y:auto; -webkit-overflow-scrolling:touch}
+  .donate-lead{margin:0 0 14px; color:var(--muted); font-size:14px}
+  .coin-tabs{
+    display:flex; gap:4px; padding:4px; margin-bottom:16px;
+    background:var(--card); border:1px solid var(--stroke); border-radius:999px;
+  }
+  .coin-tab{
+    flex:1; padding:8px 6px; font-family:inherit; font-size:13.5px; font-weight:700;
+    color:var(--muted); background:none; border:0; border-radius:999px; cursor:pointer;
+    transition:background .14s, color .14s;
+  }
+  .coin-tab:hover{color:var(--text)}
+  .coin-tab[aria-selected="true"]{color:#fff; background:var(--brand)}
+  .coin-tab:focus-visible{outline:2px solid var(--accent2); outline-offset:2px}
+  .coin[hidden]{display:none}
+  .coin-qr{width:min(200px,62vw); margin:0 auto; border-radius:var(--radius-sm); overflow:hidden; line-height:0}
+  .coin-qr svg{display:block; width:100%; height:auto}
+  .coin-net{margin:10px 0 0; text-align:center; color:var(--faint); font-size:12.5px; font-weight:600}
+  .coin-addr{
+    display:flex; align-items:center; gap:10px; margin-top:12px; padding:10px 10px 10px 14px;
+    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius-sm);
+  }
+  /* Breaks anywhere but never hyphenates: a hyphen copied by hand would
+     break the address. */
+  .coin-addr code{
+    flex:1; min-width:0; color:var(--text);
+    font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;
+    overflow-wrap:anywhere; -webkit-hyphens:none; hyphens:none;
+    -webkit-user-select:all; user-select:all;
+  }
+  .copy-btn{
+    flex:none; display:inline-flex; align-items:center; gap:6px; padding:8px 13px;
+    font-family:inherit; font-size:13px; font-weight:700; color:#fff;
+    background:var(--brand); border:0; border-radius:999px; cursor:pointer;
+    transition:filter .14s, transform .14s;
+  }
+  .copy-btn:hover{filter:brightness(1.08)}
+  .copy-btn:active{transform:scale(.96)}
+  .copy-btn svg{width:14px; height:14px}
+  .donate-warn{margin:14px 0 0; color:var(--faint); font-size:12.5px}
 
   /* ---- affiliation note, above the first step ----
      Bare text, no card, so it reads as a footnote beside the boxed steps.
@@ -394,6 +440,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
         Ko-fi
       </a>
+      <button type="button" class="link-btn crypto" id="cryptoBtn" aria-haspopup="dialog" aria-controls="cryptoModal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="M16.71 13.88l.7.71-2.82 2.82"/></svg>
+        Crypto
+      </button>
     </div>
     <div class="links repo">
       <a class="link-btn ipa" href="{{LATEST_RELEASE_URL}}" download rel="noopener">
@@ -550,6 +600,49 @@
         <div class="videos" id="tutorialVideos"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="modal" id="cryptoModal" role="dialog" aria-modal="true" aria-labelledby="cryptoTitle" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 class="modal-title" id="cryptoTitle">Crypto donations</h3>
+      <button type="button" class="modal-close" data-close aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="donate-lead">Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.</p>
+    <div class="coin-tabs" role="tablist" aria-label="Coin">
+      <button type="button" class="coin-tab" role="tab" id="coinTabBtc" aria-controls="coinBtc" aria-selected="true">Bitcoin</button>
+      <button type="button" class="coin-tab" role="tab" id="coinTabEth" aria-controls="coinEth" aria-selected="false" tabindex="-1">Ethereum</button>
+      <button type="button" class="coin-tab" role="tab" id="coinTabSol" aria-controls="coinSol" aria-selected="false" tabindex="-1">Solana</button>
+    </div>
+    <div class="coin" id="coinBtc" role="tabpanel" aria-labelledby="coinTabBtc">
+      <div class="coin-qr" role="img" aria-label="QR code for the Bitcoin address"><svg viewBox="-4 -4 37 37" shape-rendering="crispEdges" aria-hidden="true"><rect x="-4" y="-4" width="37" height="37" fill="#fff"/><path fill="#000" d="M0 0h7v1h-7zM10 0h2v1h-2zM14 0h1v1h-1zM16 0h1v1h-1zM19 0h2v1h-2zM22 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM10 1h1v1h-1zM12 1h2v1h-2zM15 1h1v1h-1zM17 1h2v1h-2zM22 1h1v1h-1zM28 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM8 2h3v1h-3zM12 2h1v1h-1zM15 2h2v1h-2zM19 2h2v1h-2zM22 2h1v1h-1zM24 2h3v1h-3zM28 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM8 3h1v1h-1zM12 3h2v1h-2zM15 3h5v1h-5zM22 3h1v1h-1zM24 3h3v1h-3zM28 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM8 4h1v1h-1zM10 4h1v1h-1zM12 4h1v1h-1zM14 4h1v1h-1zM16 4h2v1h-2zM19 4h2v1h-2zM22 4h1v1h-1zM24 4h3v1h-3zM28 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM11 5h1v1h-1zM13 5h1v1h-1zM15 5h1v1h-1zM18 5h1v1h-1zM20 5h1v1h-1zM22 5h1v1h-1zM28 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h7v1h-7zM8 7h4v1h-4zM14 7h2v1h-2zM18 7h1v1h-1zM0 8h1v1h-1zM2 8h5v1h-5zM10 8h2v1h-2zM13 8h2v1h-2zM17 8h2v1h-2zM20 8h1v1h-1zM22 8h5v1h-5zM2 9h4v1h-4zM9 9h1v1h-1zM12 9h1v1h-1zM14 9h1v1h-1zM16 9h2v1h-2zM19 9h2v1h-2zM22 9h1v1h-1zM24 9h1v1h-1zM28 9h1v1h-1zM0 10h3v1h-3zM5 10h2v1h-2zM8 10h2v1h-2zM12 10h1v1h-1zM15 10h2v1h-2zM18 10h1v1h-1zM24 10h2v1h-2zM1 11h1v1h-1zM3 11h3v1h-3zM7 11h2v1h-2zM11 11h1v1h-1zM19 11h1v1h-1zM22 11h4v1h-4zM0 12h4v1h-4zM6 12h4v1h-4zM11 12h3v1h-3zM15 12h3v1h-3zM19 12h2v1h-2zM23 12h1v1h-1zM26 12h2v1h-2zM0 13h1v1h-1zM5 13h1v1h-1zM9 13h1v1h-1zM11 13h1v1h-1zM13 13h2v1h-2zM16 13h1v1h-1zM19 13h4v1h-4zM24 13h2v1h-2zM28 13h1v1h-1zM0 14h7v1h-7zM9 14h1v1h-1zM12 14h1v1h-1zM15 14h1v1h-1zM17 14h1v1h-1zM20 14h5v1h-5zM26 14h2v1h-2zM0 15h5v1h-5zM9 15h4v1h-4zM14 15h1v1h-1zM18 15h1v1h-1zM22 15h1v1h-1zM24 15h1v1h-1zM28 15h1v1h-1zM1 16h1v1h-1zM3 16h2v1h-2zM6 16h1v1h-1zM8 16h1v1h-1zM11 16h4v1h-4zM16 16h2v1h-2zM21 16h1v1h-1zM23 16h1v1h-1zM25 16h3v1h-3zM0 17h1v1h-1zM8 17h2v1h-2zM12 17h1v1h-1zM14 17h1v1h-1zM16 17h5v1h-5zM22 17h4v1h-4zM27 17h2v1h-2zM0 18h1v1h-1zM2 18h1v1h-1zM4 18h9v1h-9zM15 18h1v1h-1zM17 18h1v1h-1zM21 18h1v1h-1zM23 18h2v1h-2zM0 19h1v1h-1zM3 19h2v1h-2zM7 19h1v1h-1zM9 19h1v1h-1zM12 19h1v1h-1zM15 19h1v1h-1zM18 19h1v1h-1zM21 19h1v1h-1zM23 19h3v1h-3zM27 19h2v1h-2zM0 20h1v1h-1zM2 20h2v1h-2zM6 20h3v1h-3zM10 20h2v1h-2zM13 20h2v1h-2zM16 20h2v1h-2zM19 20h9v1h-9zM8 21h1v1h-1zM11 21h2v1h-2zM16 21h1v1h-1zM20 21h1v1h-1zM24 21h2v1h-2zM27 21h2v1h-2zM0 22h7v1h-7zM9 22h2v1h-2zM14 22h2v1h-2zM17 22h4v1h-4zM22 22h1v1h-1zM24 22h1v1h-1zM0 23h1v1h-1zM6 23h1v1h-1zM8 23h2v1h-2zM11 23h1v1h-1zM16 23h1v1h-1zM18 23h3v1h-3zM24 23h1v1h-1zM27 23h2v1h-2zM0 24h1v1h-1zM2 24h3v1h-3zM6 24h1v1h-1zM8 24h1v1h-1zM10 24h1v1h-1zM15 24h1v1h-1zM17 24h2v1h-2zM20 24h9v1h-9zM0 25h1v1h-1zM2 25h3v1h-3zM6 25h1v1h-1zM8 25h1v1h-1zM11 25h2v1h-2zM16 25h2v1h-2zM20 25h1v1h-1zM27 25h2v1h-2zM0 26h1v1h-1zM2 26h3v1h-3zM6 26h1v1h-1zM8 26h2v1h-2zM15 26h2v1h-2zM18 26h3v1h-3zM22 26h6v1h-6zM0 27h1v1h-1zM6 27h1v1h-1zM9 27h3v1h-3zM13 27h2v1h-2zM18 27h1v1h-1zM20 27h2v1h-2zM25 27h1v1h-1zM27 27h1v1h-1zM0 28h7v1h-7zM8 28h2v1h-2zM12 28h2v1h-2zM15 28h5v1h-5zM22 28h3v1h-3zM26 28h1v1h-1z"/></svg></div>
+      <p class="coin-net">Network: Bitcoin (Native SegWit)</p>
+      <div class="coin-addr">
+        <code>bc1qf4t3feq47k0snhazqns89vnr83fxzshtr3p9pd</code>
+        <button type="button" class="copy-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span></button>
+      </div>
+    </div>
+    <div class="coin" id="coinEth" role="tabpanel" aria-labelledby="coinTabEth" hidden>
+      <div class="coin-qr" role="img" aria-label="QR code for the Ethereum address"><svg viewBox="-4 -4 37 37" shape-rendering="crispEdges" aria-hidden="true"><rect x="-4" y="-4" width="37" height="37" fill="#fff"/><path fill="#000" d="M0 0h7v1h-7zM10 0h1v1h-1zM12 0h1v1h-1zM15 0h2v1h-2zM18 0h3v1h-3zM22 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM14 1h4v1h-4zM20 1h1v1h-1zM22 1h1v1h-1zM28 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM8 2h3v1h-3zM15 2h1v1h-1zM18 2h1v1h-1zM20 2h1v1h-1zM22 2h1v1h-1zM24 2h3v1h-3zM28 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM8 3h1v1h-1zM10 3h4v1h-4zM16 3h3v1h-3zM20 3h1v1h-1zM22 3h1v1h-1zM24 3h3v1h-3zM28 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM8 4h2v1h-2zM14 4h1v1h-1zM17 4h1v1h-1zM19 4h1v1h-1zM22 4h1v1h-1zM24 4h3v1h-3zM28 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h2v1h-2zM11 5h2v1h-2zM15 5h1v1h-1zM18 5h1v1h-1zM22 5h1v1h-1zM28 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h7v1h-7zM8 7h1v1h-1zM10 7h2v1h-2zM14 7h1v1h-1zM18 7h2v1h-2zM0 8h1v1h-1zM2 8h5v1h-5zM12 8h2v1h-2zM15 8h1v1h-1zM17 8h2v1h-2zM22 8h5v1h-5zM0 9h3v1h-3zM4 9h1v1h-1zM7 9h2v1h-2zM10 9h1v1h-1zM14 9h1v1h-1zM16 9h1v1h-1zM20 9h1v1h-1zM22 9h1v1h-1zM24 9h1v1h-1zM28 9h1v1h-1zM6 10h1v1h-1zM12 10h2v1h-2zM15 10h1v1h-1zM17 10h1v1h-1zM20 10h2v1h-2zM23 10h2v1h-2zM27 10h1v1h-1zM2 11h1v1h-1zM10 11h1v1h-1zM15 11h1v1h-1zM18 11h1v1h-1zM20 11h2v1h-2zM24 11h2v1h-2zM28 11h1v1h-1zM1 12h1v1h-1zM6 12h1v1h-1zM8 12h1v1h-1zM12 12h2v1h-2zM15 12h4v1h-4zM21 12h1v1h-1zM24 12h1v1h-1zM27 12h1v1h-1zM1 13h4v1h-4zM8 13h3v1h-3zM14 13h1v1h-1zM20 13h1v1h-1zM22 13h3v1h-3zM27 13h1v1h-1zM2 14h2v1h-2zM5 14h2v1h-2zM9 14h1v1h-1zM12 14h6v1h-6zM20 14h3v1h-3zM24 14h2v1h-2zM3 15h1v1h-1zM5 15h1v1h-1zM8 15h1v1h-1zM14 15h2v1h-2zM18 15h1v1h-1zM20 15h1v1h-1zM23 15h3v1h-3zM27 15h1v1h-1zM0 16h7v1h-7zM8 16h1v1h-1zM11 16h4v1h-4zM16 16h2v1h-2zM21 16h1v1h-1zM26 16h3v1h-3zM0 17h1v1h-1zM2 17h4v1h-4zM8 17h1v1h-1zM11 17h2v1h-2zM18 17h1v1h-1zM20 17h1v1h-1zM22 17h4v1h-4zM28 17h1v1h-1zM0 18h1v1h-1zM4 18h1v1h-1zM6 18h3v1h-3zM11 18h1v1h-1zM14 18h2v1h-2zM21 18h5v1h-5zM0 19h1v1h-1zM2 19h2v1h-2zM9 19h1v1h-1zM12 19h1v1h-1zM15 19h1v1h-1zM20 19h1v1h-1zM24 19h1v1h-1zM27 19h1v1h-1zM0 20h1v1h-1zM2 20h1v1h-1zM5 20h3v1h-3zM11 20h3v1h-3zM16 20h2v1h-2zM20 20h8v1h-8zM8 21h3v1h-3zM14 21h1v1h-1zM18 21h1v1h-1zM20 21h1v1h-1zM24 21h2v1h-2zM28 21h1v1h-1zM0 22h7v1h-7zM9 22h1v1h-1zM11 22h1v1h-1zM13 22h1v1h-1zM15 22h1v1h-1zM20 22h1v1h-1zM22 22h1v1h-1zM24 22h4v1h-4zM0 23h1v1h-1zM6 23h1v1h-1zM8 23h4v1h-4zM14 23h1v1h-1zM19 23h2v1h-2zM24 23h1v1h-1zM27 23h2v1h-2zM0 24h1v1h-1zM2 24h3v1h-3zM6 24h1v1h-1zM8 24h3v1h-3zM15 24h1v1h-1zM17 24h2v1h-2zM20 24h9v1h-9zM0 25h1v1h-1zM2 25h3v1h-3zM6 25h1v1h-1zM8 25h1v1h-1zM12 25h2v1h-2zM16 25h2v1h-2zM19 25h1v1h-1zM24 25h1v1h-1zM27 25h2v1h-2zM0 26h1v1h-1zM2 26h3v1h-3zM6 26h1v1h-1zM8 26h6v1h-6zM15 26h2v1h-2zM18 26h1v1h-1zM21 26h4v1h-4zM26 26h2v1h-2zM0 27h1v1h-1zM6 27h1v1h-1zM10 27h2v1h-2zM14 27h2v1h-2zM21 27h1v1h-1zM24 27h1v1h-1zM27 27h1v1h-1zM0 28h7v1h-7zM8 28h1v1h-1zM11 28h1v1h-1zM15 28h5v1h-5zM21 28h2v1h-2zM25 28h2v1h-2z"/></svg></div>
+      <p class="coin-net">Network: Ethereum</p>
+      <div class="coin-addr">
+        <code>0xC0Ae728AdA099bADEEB5f866ee91b890b9D127d3</code>
+        <button type="button" class="copy-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span></button>
+      </div>
+    </div>
+    <div class="coin" id="coinSol" role="tabpanel" aria-labelledby="coinTabSol" hidden>
+      <div class="coin-qr" role="img" aria-label="QR code for the Solana address"><svg viewBox="-4 -4 41 41" shape-rendering="crispEdges" aria-hidden="true"><rect x="-4" y="-4" width="41" height="41" fill="#fff"/><path fill="#000" d="M0 0h7v1h-7zM10 0h1v1h-1zM14 0h2v1h-2zM20 0h1v1h-1zM22 0h2v1h-2zM26 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM8 1h3v1h-3zM12 1h3v1h-3zM17 1h1v1h-1zM21 1h2v1h-2zM24 1h1v1h-1zM26 1h1v1h-1zM32 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM8 2h1v1h-1zM11 2h1v1h-1zM13 2h1v1h-1zM15 2h1v1h-1zM17 2h4v1h-4zM23 2h2v1h-2zM26 2h1v1h-1zM28 2h3v1h-3zM32 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM8 3h2v1h-2zM12 3h1v1h-1zM15 3h1v1h-1zM19 3h1v1h-1zM23 3h2v1h-2zM26 3h1v1h-1zM28 3h3v1h-3zM32 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM10 4h2v1h-2zM13 4h1v1h-1zM15 4h1v1h-1zM18 4h1v1h-1zM24 4h1v1h-1zM26 4h1v1h-1zM28 4h3v1h-3zM32 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM11 5h1v1h-1zM13 5h1v1h-1zM16 5h1v1h-1zM20 5h1v1h-1zM22 5h1v1h-1zM24 5h1v1h-1zM26 5h1v1h-1zM32 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h7v1h-7zM8 7h1v1h-1zM10 7h2v1h-2zM24 7h1v1h-1zM0 8h1v1h-1zM6 8h1v1h-1zM8 8h1v1h-1zM10 8h3v1h-3zM14 8h2v1h-2zM22 8h5v1h-5zM29 8h3v1h-3zM0 9h4v1h-4zM5 9h1v1h-1zM8 9h1v1h-1zM19 9h1v1h-1zM23 9h1v1h-1zM25 9h4v1h-4zM30 9h1v1h-1zM0 10h1v1h-1zM3 10h9v1h-9zM15 10h1v1h-1zM18 10h1v1h-1zM20 10h2v1h-2zM24 10h2v1h-2zM27 10h1v1h-1zM29 10h1v1h-1zM31 10h1v1h-1zM0 11h1v1h-1zM2 11h1v1h-1zM5 11h1v1h-1zM9 11h1v1h-1zM14 11h1v1h-1zM22 11h4v1h-4zM29 11h2v1h-2zM32 11h1v1h-1zM1 12h1v1h-1zM6 12h2v1h-2zM9 12h1v1h-1zM12 12h3v1h-3zM16 12h7v1h-7zM24 12h1v1h-1zM26 12h1v1h-1zM28 12h2v1h-2zM31 12h1v1h-1zM4 13h1v1h-1zM7 13h3v1h-3zM12 13h3v1h-3zM16 13h2v1h-2zM20 13h1v1h-1zM22 13h2v1h-2zM26 13h2v1h-2zM30 13h2v1h-2zM1 14h1v1h-1zM3 14h1v1h-1zM6 14h1v1h-1zM9 14h5v1h-5zM17 14h3v1h-3zM21 14h1v1h-1zM24 14h1v1h-1zM27 14h5v1h-5zM1 15h1v1h-1zM4 15h1v1h-1zM7 15h1v1h-1zM12 15h2v1h-2zM15 15h1v1h-1zM18 15h2v1h-2zM22 15h1v1h-1zM25 15h2v1h-2zM28 15h3v1h-3zM0 16h1v1h-1zM3 16h1v1h-1zM6 16h1v1h-1zM8 16h1v1h-1zM10 16h1v1h-1zM12 16h1v1h-1zM19 16h1v1h-1zM22 16h4v1h-4zM0 17h2v1h-2zM5 17h1v1h-1zM7 17h3v1h-3zM11 17h2v1h-2zM16 17h2v1h-2zM19 17h5v1h-5zM25 17h1v1h-1zM27 17h1v1h-1zM29 17h1v1h-1zM3 18h1v1h-1zM6 18h2v1h-2zM9 18h3v1h-3zM13 18h3v1h-3zM19 18h1v1h-1zM23 18h3v1h-3zM28 18h1v1h-1zM32 18h1v1h-1zM1 19h2v1h-2zM8 19h3v1h-3zM13 19h1v1h-1zM16 19h3v1h-3zM20 19h2v1h-2zM23 19h2v1h-2zM26 19h1v1h-1zM28 19h1v1h-1zM30 19h1v1h-1zM32 19h1v1h-1zM0 20h1v1h-1zM4 20h1v1h-1zM6 20h1v1h-1zM8 20h1v1h-1zM11 20h6v1h-6zM20 20h3v1h-3zM24 20h1v1h-1zM27 20h1v1h-1zM29 20h1v1h-1zM31 20h1v1h-1zM0 21h1v1h-1zM2 21h1v1h-1zM4 21h1v1h-1zM10 21h1v1h-1zM12 21h1v1h-1zM16 21h1v1h-1zM18 21h1v1h-1zM20 21h3v1h-3zM25 21h1v1h-1zM27 21h2v1h-2zM32 21h1v1h-1zM0 22h1v1h-1zM2 22h1v1h-1zM4 22h1v1h-1zM6 22h1v1h-1zM11 22h1v1h-1zM14 22h4v1h-4zM20 22h1v1h-1zM24 22h2v1h-2zM27 22h5v1h-5zM0 23h1v1h-1zM4 23h2v1h-2zM7 23h5v1h-5zM13 23h2v1h-2zM18 23h1v1h-1zM23 23h1v1h-1zM25 23h6v1h-6zM0 24h2v1h-2zM4 24h1v1h-1zM6 24h2v1h-2zM9 24h2v1h-2zM13 24h1v1h-1zM15 24h3v1h-3zM19 24h2v1h-2zM23 24h6v1h-6zM30 24h1v1h-1zM8 25h2v1h-2zM11 25h1v1h-1zM13 25h2v1h-2zM16 25h1v1h-1zM20 25h1v1h-1zM22 25h1v1h-1zM24 25h1v1h-1zM28 25h1v1h-1zM30 25h3v1h-3zM0 26h7v1h-7zM9 26h1v1h-1zM12 26h2v1h-2zM15 26h2v1h-2zM18 26h1v1h-1zM21 26h1v1h-1zM24 26h1v1h-1zM26 26h1v1h-1zM28 26h4v1h-4zM0 27h1v1h-1zM6 27h1v1h-1zM11 27h2v1h-2zM16 27h1v1h-1zM20 27h1v1h-1zM23 27h2v1h-2zM28 27h3v1h-3zM0 28h1v1h-1zM2 28h3v1h-3zM6 28h1v1h-1zM9 28h2v1h-2zM18 28h2v1h-2zM21 28h1v1h-1zM24 28h6v1h-6zM0 29h1v1h-1zM2 29h3v1h-3zM6 29h1v1h-1zM9 29h1v1h-1zM11 29h1v1h-1zM13 29h1v1h-1zM16 29h2v1h-2zM20 29h1v1h-1zM22 29h1v1h-1zM25 29h1v1h-1zM27 29h1v1h-1zM29 29h2v1h-2zM32 29h1v1h-1zM0 30h1v1h-1zM2 30h3v1h-3zM6 30h1v1h-1zM9 30h1v1h-1zM11 30h2v1h-2zM14 30h1v1h-1zM16 30h3v1h-3zM20 30h2v1h-2zM25 30h2v1h-2zM28 30h2v1h-2zM31 30h2v1h-2zM0 31h1v1h-1zM6 31h1v1h-1zM9 31h3v1h-3zM13 31h1v1h-1zM15 31h2v1h-2zM18 31h3v1h-3zM22 31h1v1h-1zM25 31h1v1h-1zM29 31h2v1h-2zM0 32h7v1h-7zM8 32h4v1h-4zM16 32h2v1h-2zM19 32h2v1h-2zM23 32h2v1h-2zM27 32h1v1h-1zM30 32h2v1h-2z"/></svg></div>
+      <p class="coin-net">Network: Solana</p>
+      <div class="coin-addr">
+        <code>BSo1pYPQWNBjjLpzu8Ean5ZVXyEHHJRvJaiVNBUj4fLh</code>
+        <button type="button" class="copy-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span></button>
+      </div>
+    </div>
+    <p class="donate-warn">Send each coin only on the network shown. Crypto sent on another network can't be recovered.</p>
   </div>
 </div>
 
@@ -779,6 +872,80 @@
     if(e.key==='Escape' && !tutModal.hidden) closeTut();
   });
   window.addEventListener('resize',syncHeight);
+
+  /* Crypto donations popup: one wallet on screen at a time, picked by tab. */
+  var cryptoBtn=document.getElementById('cryptoBtn');
+  var cryptoModal=document.getElementById('cryptoModal');
+  var coinTabs=[].slice.call(cryptoModal.querySelectorAll('.coin-tab'));
+
+  function showCoin(tab){
+    coinTabs.forEach(function(b){
+      var on=b===tab;
+      b.setAttribute('aria-selected',on?'true':'false');
+      b.tabIndex=on?0:-1;
+      document.getElementById(b.getAttribute('aria-controls')).hidden=!on;
+    });
+  }
+  /* Left and right arrows move along the tabs, as in any tablist. */
+  cryptoModal.querySelector('.coin-tabs').addEventListener('keydown',function(e){
+    var i=coinTabs.indexOf(document.activeElement);
+    var dir=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0;
+    if(i<0 || !dir) return;
+    e.preventDefault();
+    var next=coinTabs[(i+dir+coinTabs.length)%coinTabs.length];
+    showCoin(next);
+    next.focus();
+  });
+
+  function copied(btn){
+    var label=btn.querySelector('span');
+    label.textContent='Copied';
+    clearTimeout(btn.copyTimer);
+    btn.copyTimer=setTimeout(function(){ label.textContent='Copy'; },1600);
+  }
+  /* The async clipboard needs a secure context; elsewhere fall back to
+     execCommand on a selection, which also leaves the address selected for
+     copying by hand if even that is refused. */
+  function copyAddress(btn){
+    var code=btn.parentNode.querySelector('code');
+    function fallback(){
+      var range=document.createRange();
+      range.selectNodeContents(code);
+      var sel=window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      var ok=false;
+      try{ ok=document.execCommand('copy'); }catch(e){}
+      if(ok) copied(btn);
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(code.textContent).then(function(){ copied(btn); },fallback);
+    }else{
+      fallback();
+    }
+  }
+
+  function openCrypto(){
+    cryptoModal.hidden=false;
+    document.body.style.overflow='hidden';
+    cryptoModal.querySelector('.coin-tab[aria-selected="true"]').focus();
+  }
+  function closeCrypto(){
+    cryptoModal.hidden=true;
+    document.body.style.overflow='';
+    cryptoBtn.focus();
+  }
+  cryptoBtn.addEventListener('click',openCrypto);
+  cryptoModal.addEventListener('click',function(e){
+    if(!e.target.closest) return;
+    var tab=e.target.closest('.coin-tab'), copy=e.target.closest('.copy-btn');
+    if(e.target.closest('[data-close]')) closeCrypto();
+    else if(tab) showCoin(tab);
+    else if(copy) copyAddress(copy);
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape' && !cryptoModal.hidden) closeCrypto();
+  });
 })();
 </script>
 </body>
