@@ -5,7 +5,7 @@ channel	stable
 ipa_url	https://github.com/FrizzleM/SideInstaller/releases/download/v1.3.1/SideInstaller.ipa
 ipa_size	8901679
 output_base_url	https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/output
-inputs_sha256	807d238876f46a0697c1b64f6b024dbe277f1730a6ea2e111800a68806733231
+inputs_sha256	384c50ecddce19a9586b99e6c3d110c21b45a0ae10c1c4ba8080635620b6d7e7
 cert	BOC-International-China-Limited-qi-ye-weixin-app-id-huiyi-kuozhan	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
 cert	BOC-International-China-Limited-qi-ye-weixin-app-id-kuozhan	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
 cert	BOC-International-China-Limited-qi-ye-weixin-app-id-tuisong-kuozhan	7E869FF0566ABD14D4D134191EE9D95DA21EC905	2026-11-06	revoked
