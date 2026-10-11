@@ -386,6 +386,57 @@ instructions, Cancel ending the host, and a second run starting cleanly. The PIN
 exchange and the tunnel need a second iPhone; the reporter ran the same mechanism
 (pairable host → RPPairing tunnel → RSD → install) end to end on two iOS 27 iPhones.
 
+#### The pairing Live Activity
+
+Pairing this iPhone means typing a code SideInstaller shows into a prompt in
+Settings, with SideInstaller behind it. `PairingLiveActivity` puts the code over
+Settings instead: `PairingController` starts the activity when the host goes up
+(the app is still in front then, which `Activity.request` needs), updates it with
+the code from `presentPin`, and ends it when the run does. The updates come from
+the background, which works because pairing's keep-alive audio keeps the app
+running. Both the code and "Paired" go out with an `AlertConfiguration`: that is
+what opens the Dynamic Island, and on an iPhone without one it drops the Lock
+Screen card down as a banner for about six seconds. Side by Side doesn't use it:
+that code is typed into the other iPhone, with this app in front.
+
+A Live Activity's views have to live in a widget extension, so there is a second
+target, `SideInstallerLiveActivity` (`ios-live-activity/`), embedded as
+`PlugIns/SideInstallerLiveActivity.appex`. It shares
+`ios-app/PairingActivityAttributes.swift` with the app and nothing else: the copy
+arrives in the content state, already translated, since the extension has neither
+the tables nor the language setting.
+
+An extension needs an application-identifier of its own, under the app's.
+`scripts/sign_with_all_certs.sh` therefore signs it only under a wildcard profile
+(`TEAM.*`), renamed to sit under the app's new bundle id; under an explicit
+profile, which covers one id, it removes `PlugIns/`. Every certificate in the pool
+on 2026-10-11 had an explicit profile, so none of those builds carry the
+extension. Xcode's automatic signing and SideStore/AltStore give the extension
+its own App ID, which on a free Apple ID counts against the weekly limit.
+
+Those builds get the code as a local notification instead (`PairingNotification`):
+"Pairing code" with the code as its subtitle, replaced by "Paired" under the same
+identifier, and cleared when the app is back in front. That costs the system's
+"would like to send you notifications" prompt, which comes up when the first
+pairing starts, with a step added to the guide saying why. `PairingController`
+picks the Live Activity or the notification once, on
+`PairingLiveActivity.hasExtension`, and `PairingNotification` checks it again
+before it asks or posts: a build with the extension never asks, also when Live
+Activities are switched off for the app. A refusal leaves the old wording and
+the popup in the app.
+
+Verified in the iOS 27 simulator with a staged run (start → code → paired): the
+compact and expanded island on an iPhone 17 (not the minimal one, which takes a
+second app's activity), the Lock Screen card, the banner on an iPhone 17e, and the
+activity ending 15 s after "Paired". The
+signing paths were run against the built app with an ad-hoc identity (wildcard,
+wildcard with `FORCED_BUNDLE_ID`, explicit). The notification path was staged the
+same way on a build with `PlugIns/` deleted: the prompt, both banners over
+Settings, one delivered notification going to none on return, and no prompt on
+the second run; the build with the extension stayed at "not determined"
+throughout. Not verified: a real pairing on a device, an install of a build
+signed through the wildcard path, and a refused prompt.
+
 
 ### Step 3 — Apple ID + signing — code complete; device/account steps unverified
 

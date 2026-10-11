@@ -615,6 +615,17 @@ let portugueseStrings: [String: String] = [
         "Digite o código do seu iPhone, se ele pedir.",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "Volte ao SideInstaller, veja o código que ele mostra e digite esse mesmo código no aviso que aparece nos Ajustes.",
+    "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
+        "Digite o código que aparece no topo da tela no aviso que aparece nos Ajustes. Se não aparecer nenhum, volte ao SideInstaller para ver.",
+    "Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings.":
+        "Permita as notificações quando o SideInstaller pedir: é assim que o código de pareamento chega até você nos Ajustes.",
+
+    // The pairing Live Activity
+    "Privacy & Security › Developer Mode › Pair with SideInstaller":
+        "Privacidade e Segurança › Modo de Desenvolvedor › Parear com o SideInstaller",
+    "Paired": "Pareado",
+    "Tap to return to SideInstaller.": "Toque para voltar ao SideInstaller.",
+
     "A signing certificate already exists": "Já existe um certificado de assinatura",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "A Apple devolveu o erro 7460: este Apple ID já tem um certificado de desenvolvimento iOS, ou um pedido continua pendente.",

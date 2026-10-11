@@ -2,6 +2,18 @@ import Foundation
 import Darwin
 import SideInstallerFFI
 
+/// Somewhere outside the app that shows this iPhone's pairing code while the
+/// app is behind Settings.
+@MainActor
+protocol PairingCodeSurface {
+    /// Pairing has begun, with the app still in front.
+    func start()
+    /// Settings is asking for `code`.
+    func show(code: String)
+    /// Pairing ended.
+    func finish(paired: Bool)
+}
+
 /// Drives the RPPairing host: requests Local Network, keeps the app alive while
 /// the user approves the PIN in Settings, advertises the service over Bonjour,
 /// and runs `si_pairing_run_host` off the main thread, logging into `Engine`.
@@ -51,6 +63,13 @@ final class PairingController {
     private var netService: NetService?
     private let localNetwork = LocalNetworkAuthorization()
     private let keepAlive = KeepAlive()
+    /// Shows this iPhone's pairing code over Settings: the Live Activity, or a
+    /// notification in a build without the extension that draws it. One or the
+    /// other, so a build that has the extension never asks to send
+    /// notifications. A Side by Side code needs neither: it's typed into their
+    /// iPhone, with this app in front.
+    private let overSettings: PairingCodeSurface =
+        PairingLiveActivity.hasExtension ? PairingLiveActivity.shared : PairingNotification.shared
 
     private var running = false
     /// The run in progress; nil when `running` is false.
@@ -160,6 +179,7 @@ final class PairingController {
         guard let run = current, run.isThisDevice, !run.cancelled else { return }
         run.cancelled = true
         resolve(run, .failure(CancellationError()))
+        overSettings.finish(paired: false)
         stopAdvertising()
         if let port = run.port { Self.wakeHost(port: port) }
     }
@@ -236,7 +256,12 @@ final class PairingController {
             }
             engine.log("RPPairing: Local Network granted. Starting keep-alive (silent audio).")
             keepAlive.startAudio()
-            if run.isThisDevice { engine.pairingStatus = L("waiting for device…") }
+            if run.isThisDevice {
+                engine.pairingStatus = L("waiting for device…")
+                // Now, while the app is still in front: an activity can't
+                // start later, and nor can the system ask about notifications.
+                overSettings.start()
+            }
             runHost(run)
         }
     }
@@ -338,6 +363,7 @@ final class PairingController {
             if size == 0 {
                 engine.log("⚠️ pairing file is zero bytes — Connect will refuse to use it.")
                 engine.pairingStatus = L("failed: empty pairing file")
+                overSettings.finish(paired: false)
                 resolve(run, .failure(PairingError.zeroBytes))
             } else {
                 engine.pairingFilePath = path
@@ -346,12 +372,14 @@ final class PairingController {
                 engine.pairingStatus = L("paired: %@ (%dB)", name, size)
                 // The merged file is now stale; the cached lockdown record is kept.
                 CompositePairingFile.invalidateMerged()
+                overSettings.finish(paired: true)
                 resolve(run, .success(PairedDevice(path: path, deviceName: name, deviceModel: model)))
             }
         case let .failure(message):
             // A cancelled run ends with whatever the woken host failed on.
             engine.log(run.cancelled ? "RPPairing: stopped." : "RPPairing: FAILED — \(message)")
             engine.pairingStatus = L("failed: %@", message)
+            overSettings.finish(paired: false)
             resolve(run, .failure(PairingError.failed(message)))
         }
     }
@@ -408,8 +436,9 @@ final class PairingController {
         }
         engine.log("RPPairing: PIN = \(pin) — confirm it on this device (Settings → Developer Mode → Pair with SideInstaller).")
         engine.pairingStatus = L("enter PIN %@ in Settings", pin)
-        // Displayed as a PIN card in the UI.
+        // Displayed as a PIN card in the UI, and over Settings.
         engine.pairingPIN = pin
+        overSettings.show(code: pin)
     }
 
     private func stopAdvertising() {

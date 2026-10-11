@@ -19,6 +19,12 @@ struct SideInstallerApp: App {
     /// active.
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        // A pairing code still up from a run that was killed means nothing now.
+        PairingLiveActivity.shared.endLeftovers()
+        PairingNotification.shared.reset()
+    }
+
     var body: some Scene {
         WindowGroup {
             ZStack {

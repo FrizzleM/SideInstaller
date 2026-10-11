@@ -109,6 +109,7 @@ anyone can inspect exactly what it does.
 | Path | What's in it |
 | :-- | :-- |
 | `ios-app/` | The SwiftUI app — UI, install engine, certificate handling, translations |
+| `ios-live-activity/` | The widget extension that draws the pairing code in the Dynamic Island and on the Lock Screen |
 | `rust-core/` | Rust core compiled into `SideInstallerFFI.xcframework` |
 | `scripts/` | Build, signing, and install-page generation scripts |
 | `.github/` | Workflows for signing and publishing the install page |

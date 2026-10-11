@@ -80,6 +80,8 @@
 	<string>SideInstaller can use location to keep running while you approve pairing in Settings.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SideInstaller can use location to keep running while you approve pairing in Settings.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

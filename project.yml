@@ -3,10 +3,11 @@ options:
   # Brand reverse-DNS prefix. NOTE: this is a chosen handle only — it is NOT
   # tied to an Apple Developer account (DEVELOPMENT_TEAM stays empty below).
   bundleIdPrefix: com.frizzle
-  # iOS 27 is what pairs itself; 18 is what the rest of the pipeline needs, and
-  # an older iPhone gets there by importing a pairing file made on a computer.
+  # iOS 27 is what pairs itself; 17.4 is what the rest of the pipeline needs
+  # (CoreDeviceProxy over LocalDevVPN, and the Rust core's minos), and an older
+  # iPhone gets there by importing a pairing file made on a computer.
   deploymentTarget:
-    iOS: "18.0"
+    iOS: "17.4"
   createIntermediateGroups: true
 
 settings:
@@ -32,6 +33,8 @@ targets:
     dependencies:
       - framework: SideInstallerFFI.xcframework
         embed: false
+      # Embedded as PlugIns/SideInstallerLiveActivity.appex.
+      - target: SideInstallerLiveActivity
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.frizzle.sideinstaller
@@ -39,3 +42,22 @@ targets:
         # idevice's static lib pulls in C++ symbols (aws-lc); link libc++.
         OTHER_LDFLAGS: "-lc++"
         GENERATE_INFOPLIST_FILE: NO
+
+  # Draws the pairing Live Activity: the code Settings asks for, in the Dynamic
+  # Island and on the Lock Screen. A Live Activity's views have to live in a
+  # widget extension; the app starts and updates it (PairingLiveActivity.swift).
+  SideInstallerLiveActivity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ios-live-activity
+      # What the activity shows, shared with the app.
+      - path: ios-app/PairingActivityAttributes.swift
+    settings:
+      base:
+        # Has to stay the app's identifier plus a suffix, or iOS refuses to
+        # install the app. Change both together.
+        PRODUCT_BUNDLE_IDENTIFIER: com.frizzle.sideinstaller.LiveActivity
+        INFOPLIST_FILE: ios-live-activity/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES

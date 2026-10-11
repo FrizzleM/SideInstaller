@@ -615,6 +615,17 @@ let vietnameseStrings: [String: String] = [
     "Enter your iPhone’s passcode if it asks for it.": "Nhập mật mã iPhone của bạn nếu được hỏi.",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "Quay lại SideInstaller, xem mã mà ứng dụng hiển thị, rồi nhập đúng mã đó vào hộp thoại trong Cài đặt.",
+    "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
+        "Nhập mã hiện ở đầu màn hình vào hộp thoại trong Cài đặt. Nếu không thấy mã, hãy quay lại SideInstaller để xem.",
+    "Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings.":
+        "Hãy cho phép thông báo khi SideInstaller hỏi: mã ghép nối sẽ đến với bạn trong Cài đặt bằng cách đó.",
+
+    // The pairing Live Activity
+    "Privacy & Security › Developer Mode › Pair with SideInstaller":
+        "Quyền riêng tư & Bảo mật › Chế độ nhà phát triển › Ghép nối với SideInstaller",
+    "Paired": "Đã ghép nối",
+    "Tap to return to SideInstaller.": "Chạm để quay lại SideInstaller.",
+
     "A signing certificate already exists": "Đã có một chứng chỉ ký",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple trả về lỗi 7460: Apple ID này đã có chứng chỉ phát triển iOS, hoặc một yêu cầu vẫn đang chờ xử lý.",

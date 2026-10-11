@@ -518,6 +518,17 @@ let japaneseStrings: [String: String] = [
     "Enter your iPhone’s passcode if it asks for it.": "パスコードの入力を求められた場合は、iPhone のパスコードを入力してください。",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "SideInstaller に戻り、表示されているコードを確認したら、同じコードを「設定」のダイアログに入力してください。",
+    "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
+        "画面上部に表示されるコードを「設定」のダイアログに入力してください。表示されない場合は、SideInstaller に戻ってコードを確認してください。",
+    "Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings.":
+        "SideInstaller から求められたら通知を許可してください。ペアリングコードは通知で「設定」の上に表示されます。",
+
+    // The pairing Live Activity
+    "Privacy & Security › Developer Mode › Pair with SideInstaller":
+        "プライバシーとセキュリティ › デベロッパモード › SideInstaller とペアリング",
+    "Paired": "ペアリング完了",
+    "Tap to return to SideInstaller.": "タップして SideInstaller に戻ります。",
+
     "A signing certificate already exists": "既に署名用証明書が存在します",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple からエラー 7460 が返されました。この Apple ID には既に iOS 開発用証明書が存在するか、発行のリクエストが処理中です。",

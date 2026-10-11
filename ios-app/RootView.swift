@@ -75,21 +75,22 @@ struct RootView: View {
     @State private var page: Page = .install
 
     var body: some View {
+        // `.tabItem`/`.tag` rather than iOS 18's `Tab`, to keep iOS 17.
         TabView(selection: $page) {
-            Tab(L("Install"), systemImage: "square.and.arrow.down", value: Page.install) {
-                ContentView()
-            }
-            Tab(L("Tools"), systemImage: "wrench.and.screwdriver", value: Page.tools) {
-                ToolsView(pairingManager: pairingManager,
-                          certManager: certManager,
-                          locationManager: locationManager,
-                          entitlementsManager: entitlementsManager,
-                          appsManager: appsManager,
-                          sideBySideManager: sideBySideManager)
-            }
-            Tab(L("About"), systemImage: "info.circle", value: Page.about) {
-                AboutView()
-            }
+            ContentView()
+                .tabItem { Label(L("Install"), systemImage: "square.and.arrow.down") }
+                .tag(Page.install)
+            ToolsView(pairingManager: pairingManager,
+                      certManager: certManager,
+                      locationManager: locationManager,
+                      entitlementsManager: entitlementsManager,
+                      appsManager: appsManager,
+                      sideBySideManager: sideBySideManager)
+                .tabItem { Label(L("Tools"), systemImage: "wrench.and.screwdriver") }
+                .tag(Page.tools)
+            AboutView()
+                .tabItem { Label(L("About"), systemImage: "info.circle") }
+                .tag(Page.about)
         }
         // Animate the backdrop to the new tab's level.
         .onChange(of: page) { _, page in Backdrop.settle(on: page.wash) }
