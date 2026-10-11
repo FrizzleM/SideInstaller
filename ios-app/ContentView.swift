@@ -249,22 +249,27 @@ struct ContentView: View {
                     .contentShape(Rectangle())
                 }
 
-                // A custom IPA has no release, so the importer takes that slot.
-                ZStack {
-                    if engine.installSource == .custom {
-                        importControl.transition(.opacity)
-                    } else {
-                        Picker(L("Release"), selection: $engine.releaseChannel) {
-                            ForEach(ReleaseChannel.allCases) { channel in
-                                Text(channel.displayName).tag(channel)
+                // A custom IPA has no release, so the importer takes that slot;
+                // a build with no nightly has nothing to pick and no slot.
+                if engine.installSource == .custom || engine.installSource.hasNightly {
+                    ZStack {
+                        if engine.installSource == .custom {
+                            importControl.transition(.opacity)
+                        } else {
+                            Picker(L("Release"), selection: $engine.releaseChannel) {
+                                ForEach(ReleaseChannel.allCases) { channel in
+                                    Text(channel.displayName).tag(channel)
+                                }
                             }
+                            .pickerStyle(.segmented)
+                            .transition(.opacity)
                         }
-                        .pickerStyle(.segmented)
-                        .transition(.opacity)
                     }
+                    .transition(.opacity)
                 }
-                .animation(.smooth(duration: 0.28), value: engine.installSource)
             }
+            // On the whole card, so it also resizes smoothly when the slot goes.
+            .animation(.smooth(duration: 0.28), value: engine.installSource)
         }
         .disabled(engine.isRunning)
     }
@@ -564,7 +569,7 @@ struct ContentView: View {
     private var versionOption: some View {
         let source = engine.installSource
         let catalog = engine.releaseCatalogs[source]
-        let latest = catalog?.latest[engine.releaseChannel]
+        let latest = catalog?.latest[engine.selectedChannel]
         let shown = engine.selectedVersion ?? latest
         return VStack(alignment: .leading, spacing: 12) {
             Label(L("%@ version", source.shortName), systemImage: "clock.arrow.circlepath")
@@ -572,7 +577,7 @@ struct ContentView: View {
             Menu {
                 Picker(L("Version"), selection: $engine.selectedVersion) {
                     Text(latestLabel(latest)).tag(ReleaseVersion?.none)
-                    ForEach(catalog?.others[engine.releaseChannel] ?? []) { version in
+                    ForEach(catalog?.others[engine.selectedChannel] ?? []) { version in
                         Text(version.menuTitle).tag(Optional(version))
                     }
                 }

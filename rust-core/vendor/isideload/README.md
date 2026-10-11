@@ -230,7 +230,11 @@ isideload 0.4.1–0.4.3 adds to the bundle (iLoader 2.3.6).**
   Upstream replaces the old bundle identifier wherever it occurs in an entry and
   drops the original. Here, only an entry equal to the old bundle identifier or
   starting with it and a dot is rebased, and the original stays, so an app that
-  registers a hard-coded identifier keeps its background tasks. Tests:
+  registers a hard-coded identifier keeps its background tasks. The rebased
+  entries go in front of the originals: Madeira takes the first entry ending in
+  `.download.*` (and `.pairing.*`) and builds its task identifier from that, so
+  with the originals first it asked iOS for one under its old bundle identifier
+  and lost its background downloads. Tests:
   `cargo test -p isideload --lib sideload::`.
 - AltStore gets the device's pairing file as `ALTPairingFile.dat` (upstream
   `4f7fb39`), so setting up a Remote AltServer in AltStore Classic 2.3 skips the
@@ -264,6 +268,16 @@ isideload 0.4.1–0.4.3 adds to the bundle (iLoader 2.3.6).**
 Not needed: upstream `0bee45d` (isideload 0.4.4, after iLoader 2.3.6). It
 gives LiveContainer's `LiveProcess.appex` the keychain groups, which every
 `.appex` here already gets with the main entitlements (change 1).
+
+**10. `src/sideload/sideloader.rs`, `src/dev/developer_session.rs` — for an app
+that renews its own profile (Madeira).**
+
+`sign_app` takes `app_group`: false skips `ensure_app_group`, the group feature
+and the assignment. Madeira registers its App ID again when the weekly one runs
+out, and a new App ID has no group, so a profile for it would grant less than a
+signature made with one. `DeveloperSession::token()` and `adsid()` expose what
+the session is signed in with, for `si_signing_account` to hand to Madeira.
+Local; upstream has neither. Not testable without an Apple ID.
 
 ## Re-vendoring
 
