@@ -775,4 +775,21 @@ let chineseStrings: [String: String] = [
         "只有官方安装页面和代码仓库上的构建版本才是我发布的。任何人都可以 fork 源代码，加入窃取凭据的代码，再用同样的名称和图标发布——所以不要把你的 Apple ID 交给来自其他地方的副本。",
     "Install page": "安装页面",
     "Terms": "条款",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ 需要 iOS %d 或更高版本。这台 iPhone 运行的是 iOS %@。",
+    "Open Madeira from your Home Screen.": "从主屏幕打开 Madeira。",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "在它的设置流程中，在“Set up JIT”下选择“In-app with pairing file”：SideInstaller 已经把文件放进去了，轻点“Continue”即可。",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "在它的设置流程中，在“Set up JIT”下选择这台 iPhone 获得 JIT 的方式。",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "从现在起，只要 Madeira 处于打开状态且 LocalDevVPN 已连接，它就会自行续签。为此 SideInstaller 给了它一个登录凭据：用于 Apple 开发者服务的令牌，而不是你的密码。可以在 Madeira 的 Settings › Signing 中将其移除。",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "它的签名有效期为 7 天。到期前，请在这里的“工具 › 侧载应用”中续签。",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "这个配对文件没有 RPPairing 记录，而 %@ 只读取这一种。",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "在你的 iPhone 上运行 Windows 电脑游戏，由 Will Faust 开发，GPL-3.0 许可证。",
 ]

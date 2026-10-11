@@ -44,6 +44,10 @@ All notable changes to SideInstaller are documented here.
   often clear up straight away.
 
 ### Fixed
+- An app that looks its background task up in its own Info.plist, taking the first entry of a kind,
+  now finds the one under the bundle ID it was signed with. SideInstaller listed those after the
+  originals, so such an app asked iOS for a task it wasn't allowed and lost its background work.
+  Madeira's Steam downloads rely on this to carry on in the background.
 - **An imported IPA whose name has symbols, spaces or non-Latin letters signs again.** Apple refuses
   to register an App ID under such a name (error 35), so signing stopped before it started.
   SideInstaller now registers it under the name's letters and digits only, as iLoader does.
@@ -87,6 +91,24 @@ All notable changes to SideInstaller are documented here.
   directly. Reported to iLoader in issue #649.
 
 ### Added
+- **Madeira joins the Install picker.** [Madeira](https://github.com/willfaust/Madeira) runs
+  Windows PC games on an iPhone. SideInstaller downloads its latest release, signs it with the
+  Increased Memory Limit entitlement it needs (Madeira shows it as Memory+), and puts your
+  iPhone's pairing inside it, so Madeira's built-in JIT is set up without pairing again or
+  importing a file: in its setup, “In-app with pairing file” already shows as done. Madeira needs
+  iOS 26 or later, and reads only the pairing iOS 27 makes on the iPhone itself, or an imported
+  file with the same kind of record. A file with only a classic lockdown record isn't passed on.
+- **Madeira renews its own signing.** SideInstaller hands Madeira the sign-in it needs for that: the
+  developer-service token this sign-in got and the anisette identity that goes with it, the same
+  things SideStore keeps to refresh. Your Apple ID password isn't included, and no 2FA code is
+  needed. Madeira moves it into its Keychain on first launch and from then on asks Apple for a new
+  profile and installs it itself, whenever it's open with LocalDevVPN connected, so it keeps working
+  with SideInstaller uninstalled. It needs SideInstaller again only when Apple stops accepting the
+  token (it has an expiry, and a password change ends it): installing Madeira again hands over a
+  new one. Only Madeira builds that say they take the sign-in get one; older ones are refreshed
+  under Tools › Sideloaded apps. Madeira is signed without an app group, since the App ID it
+  registers again each week comes without one.
+- Madeira joins the apps the Pairing tab can hand the pairing file to.
 - **The pairing code follows you into Settings.** While your iPhone pairs, SideInstaller now runs a
   Live Activity. When Settings asks for the code, it appears in the Dynamic Island, or drops down as
   a banner on an iPhone without one, and stays on the Lock Screen, so you no longer have to switch
