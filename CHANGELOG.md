@@ -87,6 +87,13 @@ All notable changes to SideInstaller are documented here.
   directly. Reported to iLoader in issue #649.
 
 ### Added
+- **The pairing code follows you into Settings.** While your iPhone pairs, SideInstaller now runs a
+  Live Activity. When Settings asks for the code, it appears in the Dynamic Island, or drops down as
+  a banner on an iPhone without one, and stays on the Lock Screen, so you no longer have to switch
+  back to SideInstaller to read it. Once the pairing goes through it says so, and a tap takes you
+  back to the app. A build signed with a certificate that can't sign app extensions sends the code
+  as a notification instead, and asks to allow notifications the first time you pair; builds with
+  the Live Activity never ask.
 - **AltStore Classic installed as a custom IPA comes with your pairing.** AltStore 2.3 can install
   and refresh apps without a computer through a Remote AltServer, but setting that up asks you to
   pair with a PC first. SideInstaller now puts your iPhone's pairing inside AltStore when it signs

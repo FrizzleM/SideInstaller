@@ -48,7 +48,7 @@
   }
 
   /* ---- entrance cascade, echoing the app's per-object settle-in ---- */
-  .hero,.notice,.tos-gate,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
+  .hero,.intro-video,.notice,.tos-gate,.step,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
   .tos-gate{animation-delay:.03s}
   .step:nth-of-type(1){animation-delay:.06s}
   .step:nth-of-type(2){animation-delay:.12s}
@@ -56,7 +56,7 @@
   .footer{animation-delay:.24s}
   @keyframes rise{from{opacity:0; transform:translateY(16px) scale(.98)}}
   @media (prefers-reduced-motion:reduce){
-    .hero,.notice,.tos-gate,.step,.footer{animation:none}
+    .hero,.intro-video,.notice,.tos-gate,.step,.footer{animation:none}
   }
 
   .wrap{max-width:920px; margin:0 auto}
@@ -233,6 +233,11 @@
   .copy-btn:active{transform:scale(.96)}
   .copy-btn svg{width:14px; height:14px}
   .donate-warn{margin:14px 0 0; color:var(--faint); font-size:12.5px}
+
+  /* ---- intro video, between the hero's buttons and the note ----
+     Borrows .video-frame from the tutorial popup. A <div> for the same
+     reason as the note below. */
+  .intro-video{max-width:640px; margin:26px auto 0}
 
   /* ---- affiliation note, above the first step ----
      Bare text, no card, so it reads as a footnote beside the boxed steps.
@@ -456,6 +461,12 @@
       </a>
     </div>
   </header>
+
+  <div class="intro-video">
+    <div class="video-frame">
+      <iframe src="https://www.youtube-nocookie.com/embed/W5afzxPfSwQ?rel=0" title="This is SideInstaller" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    </div>
+  </div>
 
   <div class="notice">
     <b>Note</b>

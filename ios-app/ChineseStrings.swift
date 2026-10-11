@@ -603,6 +603,17 @@ let chineseStrings: [String: String] = [
     "Enter your iPhone’s passcode if it asks for it.": "如果系统要求，请输入你的 iPhone 密码。",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "回到 SideInstaller，查看它显示给你的验证码，然后把相同的验证码输入到 设置 中的提示框内。",
+    "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
+        "将屏幕顶部显示的验证码输入到 设置 中的提示框内。如果没有显示，请回到 SideInstaller 查看。",
+    "Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings.":
+        "当 SideInstaller 询问时，请允许通知：配对码会通过通知显示在 设置 中。",
+
+    // The pairing Live Activity
+    "Privacy & Security › Developer Mode › Pair with SideInstaller":
+        "隐私与安全性 › 开发者模式 › 与 SideInstaller 配对",
+    "Paired": "已配对",
+    "Tap to return to SideInstaller.": "轻点以返回 SideInstaller。",
+
     "A signing certificate already exists": "已存在签名证书",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple 返回错误 7460：此 Apple ID 已有一个 iOS 开发证书，或者有一个申请仍在处理中。",

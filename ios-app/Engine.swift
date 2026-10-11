@@ -2718,15 +2718,25 @@ enum Guides {
     }
 
     static var pairing: Guide {
-        Guide(
+        // The Live Activity, or the notification standing in for it, puts the
+        // code over Settings; without either it's only in the app.
+        let codeOverSettings = PairingLiveActivity.isAvailable || PairingNotification.mayShow
+        var steps = [
+            L("Open the Settings app, then go to Privacy & Security › Developer Mode."),
+            L("Tap “Pair with SideInstaller”."),
+            L("Enter your iPhone’s passcode if it asks for it."),
+            codeOverSettings
+                ? L("Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.")
+                : L("Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings."),
+        ]
+        // The system's prompt gives no reason, and comes up with these steps.
+        if PairingNotification.willAsk {
+            steps.insert(L("Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings."), at: 0)
+        }
+        return Guide(
             title: L("Pair this iPhone in Settings"),
             systemImage: "lock.iphone",
-            steps: [
-                L("Open the Settings app, then go to Privacy & Security › Developer Mode."),
-                L("Tap “Pair with SideInstaller”."),
-                L("Enter your iPhone’s passcode if it asks for it."),
-                L("Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings."),
-            ],
+            steps: steps,
             actionLabel: nil, actionURLString: nil)
     }
 

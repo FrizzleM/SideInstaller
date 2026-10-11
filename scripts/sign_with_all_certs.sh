@@ -623,6 +623,47 @@ sign_embedded_code() {
   fi
 }
 
+# Sign the app's extensions (PlugIns/*.appex), such as the pairing Live
+# Activity. An extension needs an application-identifier of its own, under the
+# app's. A wildcard profile covers that: each extension is moved under the
+# app's new bundle id and signed with the same profile. An explicit profile
+# covers the app's id and nothing else, so the extensions are removed instead;
+# the app looks for its extension and does without one
+# (PairingLiveActivity.isAvailable).
+sign_app_extensions() {
+  local app_path="$1" identity="$2" profile="$3" profile_plist="$4" team_id="$5"
+  local profile_app_id="$6" original_bundle_id="$7" target_bundle_id="$8"
+  local plugins="$app_path/PlugIns"
+  [[ -d "$plugins" ]] || return 0
+
+  if [[ "$profile_app_id" != "$team_id.*" ]]; then
+    log "Explicit profile: removing app extensions, which it can't sign"
+    rm -rf "$plugins"
+    return 0
+  fi
+
+  local appex info appex_id entitlements="$TMP_DIR/appex-entitlements.plist"
+  while IFS= read -r appex; do
+    [[ -n "$appex" ]] || continue
+    info="$appex/Info.plist"
+    appex_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$info" 2>/dev/null || echo "")
+    [[ -n "$appex_id" ]] || return 1
+    # iOS refuses an extension whose id isn't the app's plus a suffix.
+    if [[ "$appex_id" == "$original_bundle_id."* ]]; then
+      appex_id="$target_bundle_id.${appex_id#"$original_bundle_id."}"
+    else
+      appex_id="$target_bundle_id.$(basename "$appex" .appex)"
+    fi
+    log "Extension: $(basename "$appex") -> $appex_id"
+    set_plist_string "$info" ":CFBundleIdentifier" "$appex_id"
+    cp "$profile" "$appex/embedded.mobileprovision"
+    rm -rf "$appex/_CodeSignature"
+    prepare_entitlements "$profile_plist" "$entitlements" "$team_id" "$appex_id" || return 1
+    sign_embedded_code "$appex" "$identity" || return 1
+    codesign -f -s "$identity" --generate-entitlement-der --timestamp=none --entitlements "$entitlements" "$appex" || return 1
+  done < <(find "$plugins" -maxdepth 1 -name '*.appex' | LC_ALL=C sort)
+}
+
 # Apple's WWDR intermediates and root; without them codesign can't build the
 # chain and reports "0 valid identities found".
 download_apple_intermediates() {
@@ -911,6 +952,14 @@ while IFS= read -r P12_FILE; do
   fi
 
   sign_embedded_code "$APP_PATH" "$IDENTITY"
+
+  # Before the app itself, whose signature seals the extensions'.
+  if ! sign_app_extensions "$APP_PATH" "$IDENTITY" "$PROFILE" "$PROFILE_PLIST" "$TEAM_ID" \
+      "$PROFILE_APP_ID" "$ORIGINAL_BUNDLE_ID" "$TARGET_BUNDLE_ID"; then
+    fail "App extension signing failed"
+    restore_keychains; security delete-keychain "$KEYCHAIN" >/dev/null 2>&1 || true
+    FAILED=$((FAILED + 1)); continue
+  fi
 
   if ! codesign -f -s "$IDENTITY" --generate-entitlement-der --timestamp=none --entitlements "$ENTITLEMENTS" "$APP_PATH"; then
     fail "codesign failed"

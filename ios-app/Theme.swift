@@ -88,7 +88,7 @@ struct AppBackground: View {
             let t = timeline.date.timeIntervalSinceReferenceDate
             ZStack {
                 Color.black
-                MeshGradient(width: 3, height: 3, points: meshPoints(at: t), colors: meshColors)
+                mesh(at: t)
                     .blur(radius: 24)
                     // Low enough to read as a deep tint rather than a light.
                     .opacity(0.2)
@@ -97,6 +97,21 @@ struct AppBackground: View {
                 Color.black.opacity(Backdrop.wash(at: t))
             }
             .ignoresSafeArea()
+        }
+    }
+
+    /// The blue layer: the swaying mesh, or on iOS 17 (no `MeshGradient`) a
+    /// radial bloom that follows the mesh's centre point.
+    @ViewBuilder
+    private func mesh(at t: TimeInterval) -> some View {
+        let points = meshPoints(at: t)
+        if #available(iOS 18.0, *) {
+            MeshGradient(width: 3, height: 3, points: points, colors: meshColors)
+        } else {
+            let centre = points[4]
+            RadialGradient(colors: [Theme.accent2, Theme.accent, Theme.glow],
+                           center: UnitPoint(x: CGFloat(centre.x), y: CGFloat(centre.y)),
+                           startRadius: 0, endRadius: 600)
         }
     }
 
