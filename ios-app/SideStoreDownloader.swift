@@ -140,6 +140,21 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
+    /// A fixed link that stands in for the build's latest release.
+    ///
+    /// Temporary, for Madeira: a build that renews its own signing, until
+    /// upstream publishes one. Remove it to go back to `repo`'s latest release.
+    /// A link that has gone fails the download: no release is tried in its
+    /// place, so another build is never installed instead.
+    var pinnedDownload: (url: URL, name: String)? {
+        switch self {
+        case .madeira:
+            return URL(string: "https://ts.buzzheavier.com/d/zvi3n1agakb5?v=UxWTGolNrwffipXPTdZMMjsycv8jwIjXuMZlDkh8oEEq5d0WJiMNDL7sQnypb0Ak3fVi_ieiv5cb-YMjuCssOHYdC-c5Q0GnRhRS08z4bzWsu2n9UJc600lwe2SoAJ6iC9vX19uwHzpNbbgSxRQgtwXFMI_PxgqtNJ6Xtqnvb_L8CC3329mTwvT9P1IAEnXQQA").map { ($0, "Madeira.ipa") }
+        case .sideStore, .liveContainer, .custom:
+            return nil
+        }
+    }
+
     /// Local filename for the downloaded IPA, e.g. "SideStore-nightly.ipa", or
     /// "SideStore (0.6.3).ipa" for a version picked under Advanced.
     func fileName(_ channel: ReleaseChannel, version: String? = nil) -> String {
@@ -479,7 +494,7 @@ enum SideStoreDownloader {
                 return current.path
             }
             fetched = try await fetch(asset.url, named: asset.name, from: channel, log: log)
-        } catch let error as DownloadError where error.isAssetMissing {
+        } catch let error as DownloadError where error.isAssetMissing && source.pinnedDownload == nil {
             log("No \(assetName) on that release — asking GitHub's API what the asset is called now.")
             do {
                 fetched = try await fetchViaAPI(source: source, channel: channel, log: log)
@@ -498,6 +513,7 @@ enum SideStoreDownloader {
     /// its latest tag looked up first.
     private static func latestAsset(of source: InstallSource,
                                     channel: ReleaseChannel) async throws -> (url: URL, name: String) {
+        if let pinned = source.pinnedDownload { return pinned }
         if let direct = source.downloadURL(channel), let name = source.assetFileName {
             return (direct, name)
         }
