@@ -13,9 +13,9 @@ All notable changes to SideInstaller are documented here.
 - **Installing SideStore or LiveContainer + SideStore is faster.** The download now starts as soon
   as the network is up and runs while your iPhone pairs, connects and signs in to your Apple ID,
   instead of waiting for all of that to finish first.
-- Signing in to your Apple ID now starts straight away, alongside pairing, instead of after it. If
-  Apple asks for a 2FA code, that prompt waits until you've finished pairing or tapping Trust, so
-  the two never cover each other.
+- Signing in to your Apple ID now happens while SideInstaller opens its link to your iPhone, rather
+  than after it. If Apple asks for a 2FA code while your iPhone is asking you to tap Trust,
+  SideInstaller's code prompt waits until you've answered.
 - An IPA downloaded on an earlier run is reused when GitHub still serves that exact file, so trying
   again after a failed install, or installing the same build later, skips the download.
 - SideStore's certificate hand-off is prepared while the app installs, and finding the installed app
