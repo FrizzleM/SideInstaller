@@ -68,12 +68,17 @@ impl Sideloader {
     /// first, since the provisioning profile only covers registered devices.
     /// `pairing_file` is that device's RPPairing record, which goes encrypted
     /// into AltStore's bundle and is ignored for every other app.
+    /// `app_group` is false for an app that renews its own profile (Madeira):
+    /// its App IDs then get no app group, so that a new App ID it registers
+    /// later, which comes with none, yields a profile that still covers it.
+    #[allow(clippy::too_many_arguments)]
     pub async fn sign_app(
         &mut self,
         app_path: PathBuf,
         team: Option<DeveloperTeam>,
         // this will be replaced with proper entitlement handling later
         increased_memory_limit: bool,
+        app_group: bool,
         register_device: Option<(&str, &str)>,
         pairing_file: Option<&[u8]>,
     ) -> Result<(PathBuf, Option<SpecialApp>), Report> {
@@ -147,7 +152,15 @@ impl Sideloader {
                     /*&self.extensions_behavior, */ &mut app_id_session,
                     &team,
                 ),
-                group_session.ensure_app_group(&team, &main_app_name, &group_identifier, None),
+                async {
+                    if !app_group {
+                        return Ok(None);
+                    }
+                    group_session
+                        .ensure_app_group(&team, &main_app_name, &group_identifier, None)
+                        .await
+                        .map(Some)
+                },
             )
             .await?;
 
@@ -167,10 +180,12 @@ impl Sideloader {
                 let mut session = app_id_session.clone();
                 let (team, app_group) = (&team, &app_group);
                 async move {
-                    app_id.ensure_group_feature(&mut session, team).await?;
-                    session
-                        .assign_app_group(team, app_group, app_id, None)
-                        .await?;
+                    if let Some(app_group) = app_group {
+                        app_id.ensure_group_feature(&mut session, team).await?;
+                        session
+                            .assign_app_group(team, app_group, app_id, None)
+                            .await?;
+                    }
                     if increased_memory_limit {
                         session.add_increased_memory_limit(team, app_id).await?;
                     }
@@ -257,6 +272,7 @@ impl Sideloader {
                 app_path,
                 Some(team),
                 increased_memory_limit,
+                true,
                 Some((&device_info.name, &device_info.udid)),
                 pairing_file,
             )

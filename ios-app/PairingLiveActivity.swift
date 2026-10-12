@@ -57,12 +57,17 @@ final class PairingLiveActivity: PairingCodeSurface {
     /// Pairing has begun: put up where to go in Settings. Call it with the app
     /// in front, which starting an activity needs.
     func start() {
-        guard Self.isAvailable else { return }
+        guard Self.isAvailable else {
+            // The popup in the app still shows the code.
+            Engine.shared.log("Live Activity: not started — Live Activities are off for SideInstaller in Settings.")
+            return
+        }
         enqueue { [self] in
             await endAll()
             do {
                 activity = try PairingActivity.request(
                     attributes: PairingActivityAttributes(), content: Self.content(.waiting))
+                Engine.shared.log("Live Activity: started.")
             } catch {
                 // The popup in the app still shows the code.
                 Engine.shared.log("Live Activity: not started — \(error.localizedDescription)")
@@ -74,8 +79,10 @@ final class PairingLiveActivity: PairingCodeSurface {
     /// or drops it down as a banner on an iPhone without one.
     func show(code: String) {
         enqueue { [self] in
+            guard let activity else { return }
             let content = Self.content(.code(code))
-            await activity?.update(content, alertConfiguration: Self.alert(for: content))
+            await activity.update(content, alertConfiguration: Self.alert(for: content))
+            Engine.shared.log("Live Activity: showing the code (\(activity.activityState)).")
         }
     }
 
