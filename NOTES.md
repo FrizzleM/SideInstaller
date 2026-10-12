@@ -809,7 +809,8 @@ needs.
 `com.apple.developer.kernel.increased-memory-limit`. `si_sign_ipa` takes a flag
 that has isideload enable that capability on the app's App IDs before the profile
 is requested (`Engine.isMadeira` also catches a Madeira IPA imported as custom, or
-refreshed from Documents). Its `MadeiraJITHelper.appex` is signed like every
+refreshed from Documents, by its bundle id: `com.willfaust.madeora` or any id under
+it, such as the `.test` one the pinned build has). Its `MadeiraJITHelper.appex` is signed like every
 extension here, with the main app's profile and entitlements, and renamed with the
 app (`<id>.<team>.JITHelper`), which is how Madeira finds it. Madeira picks its
 background task from `BGTaskSchedulerPermittedIdentifiers` by taking the first

@@ -314,6 +314,13 @@ enum MadeiraPairingHandoff {
     /// Its bundle id as published (spelled this way upstream), before signing
     /// appends the team id.
     static let bundleID = "com.willfaust.madeora"
+
+    /// True for Madeira's bundle id and any under it: a build published with
+    /// a suffix ("com.willfaust.madeora.test"), or a signed one, which has the
+    /// team id appended.
+    static func isMadeira(bundleID id: String) -> Bool {
+        id == bundleID || id.hasPrefix(bundleID + ".")
+    }
     /// Where the record goes, relative to Madeira's Documents.
     static let remoteRelativePath = "StikJIT/pairingFile.plist"
 
