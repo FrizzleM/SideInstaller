@@ -56,7 +56,7 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 
 ## Requirements
 
-- An iPhone or iPad on iOS 27
+- An iPhone or iPad on iOS 27+ (iOS 17.4+ if you have your pairing file)
 - Wi-Fi (first time only)
 - Your Apple account credentials (not collected)
 
@@ -78,8 +78,8 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 | iOS | Is it compatible? |
 | --- | --- |
 | 27 beta 1 - 27.0.1+ | ✅ Yes |
-| 18.0 - 26.7 | ⚠️ Yes, but [a pairing file is needed](https://docs.sidestore.io/docs/advanced/alternative#pairing), and that requires a PC |
-| ≤ iOS 17.7.11 | ❌ No |
+| 17.4 - 26.7 | ⚠️ Yes, but [a pairing file is needed](https://docs.sidestore.io/docs/advanced/alternative#pairing), and that requires a PC |
+| < iOS 17.4 | ❌ No |
 
 
 ## Is SideInstaller safe?
