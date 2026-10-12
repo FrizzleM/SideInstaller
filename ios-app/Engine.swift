@@ -290,8 +290,8 @@ final class Engine: ObservableObject {
     /// alongside pairing and sign-in instead of after them.
     private var prefetch: (source: InstallSource, channel: ReleaseChannel, version: String?,
                            task: Task<String, Error>)?
-    /// The Apple ID sign-in a run starts as soon as the network is up, so it runs
-    /// alongside pairing and the device link.
+    /// The Apple ID sign-in a run starts once pairing is settled, so it runs
+    /// while the device link opens.
     private var backgroundSignIn: Task<Void, Error>?
     /// Device work a run starts once the link is open, so it overlaps sign-in,
     /// download and signing; see `startDevicePreparation`.
@@ -303,8 +303,8 @@ final class Engine: ObservableObject {
     /// started, so a 2FA request it makes after its run stopped can be declined.
     /// Main thread only.
     private var finishedRuns = 0
-    /// Held while pairing or a Trust prompt has the user's attention, so a 2FA
-    /// sheet waits instead of covering it.
+    /// Held while a Trust prompt has the user's attention, so a 2FA sheet waits
+    /// instead of covering it.
     let attention = AttentionGate()
     /// Poll that keeps `vpnConnected` live; NWPathMonitor never fires for a
     /// loopback tunnel, which carries no default route.
@@ -573,11 +573,9 @@ final class Engine: ObservableObject {
         pipelineTask = Task { @MainActor in
             do {
                 try await ensureNetwork()
-                // Neither the download nor the sign-in needs the device, so both
-                // start now and run while pairing and the device link do. A 2FA
-                // prompt waits for pairing to finish rather than covering it.
+                // The download needs neither the device nor the Apple ID, so it
+                // starts now and runs while those steps do.
                 startPrefetch()
-                startBackgroundSignIn()
                 try await pairAndConnect()
                 // Device work that doesn't need the signed app starts on the fresh
                 // link and runs through sign-in, download and signing.
@@ -786,6 +784,11 @@ final class Engine: ObservableObject {
 
         await ensureLocalNetworkForImportedPairing()
 
+        // Pairing is settled, so sign in while the link opens. Not sooner: Apple
+        // sends its own 2FA alert to this iPhone before SideInstaller is asked
+        // for the code, and it would land on the user typing the pairing code.
+        startBackgroundSignIn()
+
         do {
             try await connect()
         } catch {
@@ -818,9 +821,6 @@ final class Engine: ObservableObject {
         }
         setStep(.pair, .waiting)
         setGuide(Guides.pairing)
-        // The user is typing a code into Settings: a 2FA sheet waits.
-        attention.begin()
-        defer { attention.end() }
         log("Pairing: starting on-device pairing service…")
         let path = try await PairingController.shared.startAndWait()
         pairingFilePath = path
@@ -841,8 +841,6 @@ final class Engine: ObservableObject {
     private func ensureLocalNetworkForImportedPairing() async {
         guard !canSelfPair || importedPairingName != nil, !askedLocalNetwork else { return }
         askedLocalNetwork = true
-        attention.begin()
-        defer { attention.end() }
         log("Checking Local Network permission — the device link needs it…")
         // Held only for the call; the browser and listener die with it.
         let localNetwork = LocalNetworkAuthorization()
@@ -2772,7 +2770,7 @@ final class Engine: ObservableObject {
                          run: Int? = nil) -> Int32 {
         guard let outBuf, len > 1 else { return 0 }
         let prompt = request.flatMap { TwoFactorPrompt(json: String(cString: $0)) } ?? .deviceOnly
-        // Don't cover pairing or a Trust prompt; the wait blocks, so never on main.
+        // Don't cover a Trust prompt; the wait blocks, so never on main.
         if !Thread.isMainThread { attention.waitUntilFree() }
         twoFactorLock.lock()
         twoFactorAnswer = nil
@@ -3167,8 +3165,8 @@ private let twoFactorCallback: SITwoFactorCb = { ctx, request, outBuf, bufLen in
                                   run: ctx.map { Int(bitPattern: $0) - 1 })
 }
 
-/// Counts what currently has the user's attention — pairing in Settings, a
-/// Trust prompt — so a 2FA sheet can wait for it to finish. Thread-safe.
+/// Counts what currently has the user's attention — a Trust prompt — so a 2FA
+/// sheet can wait for it to finish. Thread-safe.
 final class AttentionGate {
     private let condition = NSCondition()
     private var holders = 0
