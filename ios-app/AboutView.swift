@@ -141,6 +141,11 @@ struct AboutView: View {
                          title: "LiveContainer",
                          detail: L("Runs sideloaded apps without spending an app slot on each one."),
                          urlString: "https://github.com/LiveContainer/LiveContainer")
+                AboutRow(systemImage: "gamecontroller.fill",
+                         tint: .green,
+                         title: "Madeira",
+                         detail: L("Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0."),
+                         urlString: "https://github.com/willfaust/Madeira")
                 AboutRow(systemImage: "externaldrive.fill",
                          tint: .purple,
                          title: "DeveloperDiskImage",

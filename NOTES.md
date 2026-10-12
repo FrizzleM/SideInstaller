@@ -791,6 +791,78 @@ attempt still runs; it is only reachable with an imported RPPairing-only file,
 and whether it works there is unverified (pymobiledevice3's refusal suggests it
 doesn't).
 
+## Madeira
+
+[Madeira](https://github.com/willfaust/Madeira) (Windows PC games through Wine and
+FEX) is a fourth `InstallSource`. Four things differ from SideStore.
+
+**The download.** Its release asset is named after the version
+(`Madeira-0.1.3.ipa` on tag `v0.1.3`), so there's no fixed `latest/download` URL.
+`SideStoreDownloader.latestTag` reads the tag off where
+`github.com/<repo>/releases/latest` redirects to, which has no rate limit, and the
+URL is built from it; a 404 falls back to the API as before. There's no nightly,
+so the channel picker is hidden and `Engine.selectedChannel` is always stable.
+`minimumOSMajorVersion` stops a run below iOS 26, which Madeira's JIT helper
+needs.
+
+**Signing.** Madeira isn't ready to play without
+`com.apple.developer.kernel.increased-memory-limit`. `si_sign_ipa` takes a flag
+that has isideload enable that capability on the app's App IDs before the profile
+is requested (`Engine.isMadeira` also catches a Madeira IPA imported as custom, or
+refreshed from Documents). Its `MadeiraJITHelper.appex` is signed like every
+extension here, with the main app's profile and entitlements, and renamed with the
+app (`<id>.<team>.JITHelper`), which is how Madeira finds it. Madeira picks its
+background task from `BGTaskSchedulerPermittedIdentifiers` by taking the first
+entry ending in `.download.*`, so the rebased entries now go first (vendored
+isideload README, change 9).
+
+**The pairing file.** Madeira keeps it in its Keychain, which nothing outside can
+write, but moves in a file it finds at `Documents/StikJIT/pairingFile.plist`
+whenever it reads the pairing (`JITPairingFileStore.moveLegacyFile`, there for
+its builds from before the Keychain). `MadeiraPairingHandoff` writes the RPPairing
+record there, cut down to its own keys. Madeira refuses anything else and would
+leave it lying in Documents, so a file without that record isn't written. A
+failed hand-off doesn't fail the install: Madeira can pair itself on iOS 27. A
+Madeira IPA imported as a custom IPA is recognised by its signed bundle id and
+handled the same way.
+
+**The refresh.** Madeira renews its own profile, so it doesn't depend on
+SideInstaller staying installed. What it lacks is an Apple sign-in, and
+`MadeiraSigningHandoff` gives it one without the password: `si_signing_account`
+reads the session's `com.apple.gs.xcode.auth` token, its adsid, the team and the
+anisette identity (identifier and `adi.pb`) — what SideStore's `AuthManager`
+keeps to refresh from — and the engine adds the anisette servers a sign-in
+tries, the one in use first (HTTPS ones, six at most), so one server going away
+doesn't strand Madeira. It goes
+as a binary plist to `Library/Application Support/SigningAccount.plist` in
+Madeira's container (not Documents, which Files shows), and only when the signed
+bundle's Info.plist has `MadeiraSigningAccountVersion`, so a token is never left
+in a build that won't take it in. Madeira moves it to its Keychain at launch,
+then per refresh: anisette `v3/get_headers`, `listAppIds` (or `addAppId` once the
+weekly App ID has run out, plus the Increased Memory Limit capability),
+`downloadTeamProvisioningProfile`, and misagent over the RPPairing tunnel with
+its pairing file. Because a re-registered App ID has no app group, `si_sign_ipa`
+takes an `app_group` flag and Madeira is signed without one; otherwise its later
+profiles would grant less than its signature claims. When Apple rejects the
+token (expiry, or a password change), Madeira says to install again, which hands
+over a new one. The token's real lifetime wasn't measured here: Apple states it
+in the token, SideInstaller logs it at sign-in, and Madeira shows it.
+
+The Madeira side is a patch on the fork (branch `sideinstaller-refresh`):
+`SigningRefresh.swift`, one function in its Rust library, docs and checks.
+SideInstaller itself no longer renews anything for Madeira beyond "Refresh all".
+
+Verified on the Mac, 2026-10-11: the downloader against GitHub (tag from the
+redirect, URL, ETag reuse, the version list); `IPALibrary.appInfo` on the real
+`Madeira-0.1.3.ipa`; the vendored signer on that IPA with a test certificate and
+profile (`codesign --verify --deep --strict` passes, bundle ids and task
+identifiers as above, the entitlement present); the hand-over format through
+both apps' code; and Madeira's portal client against a stubbed Apple. Not
+verified, since they need the iPhone and an Apple ID: an install of Madeira,
+Apple granting the capability, Madeira picking up the pairing file and the
+sign-in, and a refresh in Madeira (Apple accepting the handed token, the tunnel,
+misagent accepting the profile).
+
 ## Running on a device (what you do)
 
 1. Install LocalDevVPN (App Store id 6755608044), connect it, keep Wi-Fi on.

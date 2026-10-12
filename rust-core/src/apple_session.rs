@@ -58,16 +58,13 @@ impl SavedSession {
         }
     }
 
-    /// Unix time (seconds) when the token expires, if known. Apple doesn't
-    /// document the unit, so both milliseconds and seconds are handled. A token
-    /// without an expiry is tried anyway.
+    /// Unix time (seconds) when the token expires, if known: Apple's stated
+    /// expiry, else its duration from when the token was saved. A token
+    /// without either is tried anyway.
     fn expires_at(&self) -> Option<u64> {
-        match self.expiry {
-            e if e >= 100_000_000_000 => Some(e / 1000),
-            e if e >= 1_000_000_000 => Some(e),
-            _ if self.duration > 0 => Some(self.saved_at.saturating_add(self.duration)),
-            _ => None,
-        }
+        stated_expiry(self.expiry).or_else(|| {
+            (self.duration > 0).then(|| self.saved_at.saturating_add(self.duration))
+        })
     }
 
     fn usable_for(&self, apple_id: &str, now: u64) -> bool {
@@ -101,6 +98,16 @@ impl SavedSession {
             Some(_) => format!(" (expiry={}, duration={})", self.expiry, self.duration),
             None => " (Apple gave no expiry)".to_string(),
         }
+    }
+}
+
+/// An app token's `expiry` as Unix seconds, or None when Apple sent none.
+/// Apple doesn't document the unit, so both milliseconds and seconds are read.
+pub(crate) fn stated_expiry(expiry: u64) -> Option<u64> {
+    match expiry {
+        e if e >= 100_000_000_000 => Some(e / 1000),
+        e if e >= 1_000_000_000 => Some(e),
+        _ => None,
     }
 }
 
@@ -343,6 +350,14 @@ mod tests {
     fn reads_expiry_in_milliseconds_or_seconds() {
         assert_eq!(saved(1_789_400_000_000, 0, NOW).expires_at(), Some(1_789_400_000));
         assert_eq!(saved(1_789_400_000, 0, NOW).expires_at(), Some(1_789_400_000));
+    }
+
+    #[test]
+    fn a_stated_expiry_is_read_and_a_missing_one_is_none() {
+        assert_eq!(stated_expiry(1_789_400_000_000), Some(1_789_400_000));
+        assert_eq!(stated_expiry(1_789_400_000), Some(1_789_400_000));
+        assert_eq!(stated_expiry(0), None);
+        assert_eq!(stated_expiry(3_600), None);
     }
 
     #[test]
