@@ -4,22 +4,23 @@
 Every app in the source names its GitHub repo through its downloadURL
 (https://github.com/<owner>/<repo>/releases/...). For each one this script
 lists that repo's published, non-prerelease releases and makes the app's
-`versions` list match them: one entry per release that has an .ipa attached,
-newest first, with the version taken from the tag (v1.3.0 -> 1.3.0), the
-release notes as the description and the asset's own URL and size.
+`versions` list hold only the latest one that has an .ipa attached, with the
+version taken from the tag (v1.3.0 -> 1.3.0), the release notes as the
+description and the asset's own URL and size. Older versions are never listed.
 
-Entries are merged, not rebuilt: keys added by hand to a version entry are
-kept, and only version, date, downloadURL, localizedDescription and size are
-rewritten. An entry is dropped only when it points at that repo's release
-downloads and its release no longer exists, so a version hosted elsewhere
-survives. The app's top-level version fields are then set from the newest
-entry, pinned to that release's own URL rather than releases/latest, so a new
-release can't be served under the previous version's size and number before
-this script has run.
+The entry is merged, not rebuilt: keys added by hand to it are kept, and only
+version, date, downloadURL, localizedDescription and size are rewritten. A
+hand-added entry hosted somewhere other than that repo's release downloads
+competes on its date like any release, so it stays only while it is the
+newest. The app's top-level version fields are then set from the entry, pinned
+to that release's own URL rather than releases/latest, so a new release can't
+be served under the previous version's size and number before this script has
+run.
 
 A release published without its .ipa yet is skipped (and logged) rather than
-listed with nothing to download; the next run picks it up once it's uploaded.
-Prereleases (Nightflix's nightly-* builds) are never listed.
+listed with nothing to download, leaving the previous release as the latest;
+the next run picks it up once it's uploaded. Prereleases (Nightflix's
+nightly-* builds) are never listed.
 
 Config, all overridable by env:
   SOURCE_FILE    source to update in place (default: frizzlem.json)
@@ -97,7 +98,8 @@ def sync_app(app):
         })
         versions.append(entry)
 
-    # Keep hand-added versions hosted anywhere but this repo's releases.
+    # Hand-added versions hosted anywhere but this repo's releases stay in
+    # the running; ones whose release is gone don't.
     for version, entry in existing.items():
         if version in released:
             continue
@@ -109,16 +111,16 @@ def sync_app(app):
     if not versions:
         print(f"{app['name']}: no releases with an .ipa found, left as is")
         return
-    versions.sort(key=lambda v: v.get("date", ""), reverse=True)
-    app["versions"] = versions
+    # Only the latest version is listed.
+    latest = max(versions, key=lambda v: v.get("date", ""))
+    app["versions"] = [latest]
 
-    latest = versions[0]
     app["version"] = latest["version"]
     app["versionDate"] = latest["date"]
     app["versionDescription"] = latest["localizedDescription"]
     app["downloadURL"] = latest["downloadURL"]
     app["size"] = latest["size"]
-    print(f"{app['name']}: {len(versions)} version(s), latest {latest['version']}")
+    print(f"{app['name']}: latest {latest['version']}")
 
 
 def main():
