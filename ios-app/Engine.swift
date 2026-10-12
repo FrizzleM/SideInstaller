@@ -1653,7 +1653,9 @@ final class Engine: ObservableObject {
     /// True when the IPA at `ipaPath` is Madeira, whichever way it got here: the
     /// download, an import, or a copy kept for refreshing.
     private static func isMadeira(ipaPath: String) -> Bool {
-        IPALibrary.appInfo(at: URL(fileURLWithPath: ipaPath))?.bundleID == MadeiraPairingHandoff.bundleID
+        IPALibrary.appInfo(at: URL(fileURLWithPath: ipaPath)).map {
+            MadeiraPairingHandoff.isMadeira(bundleID: $0.bundleID)
+        } ?? false
     }
 
     /// Detect Apple error 7460 in a raw signing error, by code or wording.
@@ -2315,8 +2317,7 @@ final class Engine: ObservableObject {
     private func signedAppIsMadeira(_ source: InstallSource) -> Bool {
         if source == .madeira { return true }
         guard source == .custom, let signed = signedAppBundleID() else { return false }
-        return signed == MadeiraPairingHandoff.bundleID
-            || signed.hasPrefix(MadeiraPairingHandoff.bundleID + ".")
+        return MadeiraPairingHandoff.isMadeira(bundleID: signed)
     }
 
     /// True when the signed Madeira takes in the sign-in it renews its own

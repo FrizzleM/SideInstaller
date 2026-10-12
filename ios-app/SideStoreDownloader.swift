@@ -163,7 +163,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
     var pinnedDownload: (url: URL, name: String)? {
         switch self {
         case .madeira:
-            return URL(string: "https://ts.buzzheavier.com/d/zvi3n1agakb5?v=UxWTGolNrwffipXPTdZMMjsycv8jwIjXuMZlDkh8oEEq5d0WJiMNDL7sQnypb0Ak3fVi_ieiv5cb-YMjuCssOHYdC-c5Q0GnRhRS08z4bzWsu2n9UJc600lwe2SoAJ6iC9vX19uwHzpNbbgSxRQgtwXFMI_PxgqtNJ6Xtqnvb_L8CC3329mTwvT9P1IAEnXQQA").map { ($0, "Madeira.ipa") }
+            return URL(string: "https://files.catbox.moe/06d9x0.ipa").map { ($0, "Madeira.ipa") }
         case .sideStore, .liveContainer, .custom:
             return nil
         }
