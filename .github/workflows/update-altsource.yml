@@ -1,8 +1,8 @@
 name: update-altsource
 
 # Keeps the AltStore/SideStore source (frizzlem.json) in step with GitHub
-# Releases: every published, non-prerelease release with an .ipa attached gets
-# a version entry, and the newest one becomes the app's current version. See
+# Releases: the newest published, non-prerelease release with an .ipa attached
+# becomes the app's current version and its only version entry. See
 # scripts/update_altsource.py for exactly what is rewritten and what is kept.
 #
 # A SideInstaller release triggers this directly. Nightflix lives in its own
