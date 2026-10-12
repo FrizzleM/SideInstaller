@@ -1,4 +1,5 @@
 import Compression
+import CryptoKit
 import Foundation
 
 /// Which release track to pull the IPA from.
@@ -23,6 +24,19 @@ enum ReleaseChannel: String, CaseIterable, Identifiable {
         case .nightly: return "-nightly"
         }
     }
+}
+
+/// A copy of a build's IPA on someone else's repository, for while the build's
+/// own is gone from GitHub.
+struct Mirror {
+    /// GitHub "owner/repo" holding the copy.
+    let repo: String
+    let url: URL
+    let assetName: String
+    /// The channel the copied build was published on.
+    let channel: ReleaseChannel
+    /// SHA-256 of the one file accepted from there, in lowercase hex.
+    let sha256: String
 }
 
 /// What to install: two SideStore builds and Madeira, fetched from GitHub, or a
@@ -151,6 +165,29 @@ enum InstallSource: String, CaseIterable, Identifiable {
         case .madeira:
             return URL(string: "https://ts.buzzheavier.com/d/zvi3n1agakb5?v=UxWTGolNrwffipXPTdZMMjsycv8jwIjXuMZlDkh8oEEq5d0WJiMNDL7sQnypb0Ak3fVi_ieiv5cb-YMjuCssOHYdC-c5Q0GnRhRS08z4bzWsu2n9UJc600lwe2SoAJ6iC9vX19uwHzpNbbgSxRQgtwXFMI_PxgqtNJ6Xtqnvb_L8CC3329mTwvT9P1IAEnXQQA").map { ($0, "Madeira.ipa") }
         case .sideStore, .liveContainer, .custom:
+            return nil
+        }
+    }
+
+    /// A copy to install while `repo` is gone from GitHub, as LiveContainer's
+    /// has been since GitHub hid its organization in October 2026.
+    ///
+    /// The copy is its last nightly (18 September 2026, commit 4dbe0f9), put up
+    /// by someone who isn't a maintainer, so only that file is taken, by its
+    /// hash. The hash is the one Atticus2077/lc-sidestore-nightly-source's CI
+    /// recorded for the official asset on 25 September, before the takedown,
+    /// and the copy that CI kept matches this one file for file. Anything else
+    /// under the same link is refused, and no other build stands in for it.
+    var mirror: Mirror? {
+        switch self {
+        case .liveContainer:
+            return Mirror(
+                repo: "LiveContainerMirror/LiveContainer",
+                url: URL(string: "https://github.com/LiveContainerMirror/LiveContainer/releases/download/nightly/LiveContainer+SideStore.ipa")!,
+                assetName: "LiveContainer+SideStore.ipa",
+                channel: .nightly,
+                sha256: "bec41bc21d75a0f2e85a0aa589ce5772e24e410deb017486758a3bc0503c8de7")
+        case .sideStore, .madeira, .custom:
             return nil
         }
     }
@@ -455,6 +492,12 @@ enum SideStoreDownloader {
             return false
         }
 
+        /// GitHub turned the request down for good, rather than asking to wait.
+        var isRefused: Bool {
+            if case let .badStatus(_, _, retryAfter) = self { return retryAfter == nil }
+            return false
+        }
+
         /// True when the channel's release is missing or has no usable IPA, so
         /// the repo's other releases should be scanned.
         var isChannelEmpty: Bool {
@@ -507,7 +550,12 @@ enum SideStoreDownloader {
                 return current.path
             }
             fetched = try await fetch(asset.url, named: asset.name, from: channel, log: log)
-        } catch let error as DownloadError where error.isAssetMissing && source.pinnedDownload == nil {
+        } catch let error as DownloadError where error.isRefused && source.pinnedDownload == nil {
+            // Either the asset was renamed, or the repository itself is gone.
+            if let mirror = source.mirror, let repo = source.repo, await isGone(repo) {
+                return try await downloadCopy(on: mirror, of: source, standingInFor: repo, log: log)
+            }
+            guard error.isAssetMissing else { throw error }
             log("No \(assetName) on that release — asking GitHub's API what the asset is called now.")
             do {
                 fetched = try await fetchViaAPI(source: source, channel: channel, log: log)
@@ -517,6 +565,57 @@ enum SideStoreDownloader {
         }
 
         let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(fetched.channel))
+        try store(fetched, as: dest)
+        return dest.path
+    }
+
+    /// True when GitHub turns down a request for `repo`'s own page: taken down,
+    /// private, blocked, or not being served. The website is asked, which has
+    /// no hourly limit as the API does. False when it can't be told: no answer,
+    /// or a rate limit.
+    private static func isGone(_ repo: String) async -> Bool {
+        guard let page = URL(string: "https://github.com/\(repo)") else { return false }
+        var req = URLRequest(url: page, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        req.httpMethod = "HEAD"
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        guard let (_, response) = try? await URLSession.shared.data(for: req),
+              let http = response as? HTTPURLResponse else { return false }
+        return !(200...299).contains(http.statusCode) && http.statusCode != 429 && retryAfter(http) == nil
+    }
+
+    /// Takes the build from the copy on `mirror` while `repo` is gone, and
+    /// returns its local path. Only the file the mirror is trusted for is taken: a missing
+    /// or different one is reported as the repository being unavailable.
+    private static func downloadCopy(on mirror: Mirror, of source: InstallSource,
+                                     standingInFor repo: String,
+                                     log: @escaping (String) -> Void) async throws -> String {
+        // Saved under the copy's own channel, whichever was asked for.
+        let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(mirror.channel))
+        log("\(repo) isn't on GitHub right now — taking its last \(mirror.channel.displayName.lowercased()) build from the copy on \(mirror.repo).")
+
+        if IPALibrary.sha256(of: dest) == mirror.sha256 {
+            log("\(dest.lastPathComponent) is already that file — skipping the download.")
+            return dest.path
+        }
+        // A file of that name the user put there isn't replaced.
+        if FileManager.default.fileExists(atPath: dest.path), !DownloadLedger.isManaged(dest) {
+            log("Using your own \(dest.lastPathComponent) instead — skipping the download.")
+            return dest.path
+        }
+
+        let fetched: Fetched
+        do {
+            fetched = try await fetch(mirror.url, named: mirror.assetName, from: mirror.channel, log: log)
+        } catch let error as DownloadError where error.isRefused {
+            log("⚠️ \(mirror.repo) doesn't have it either: \(error)")
+            throw DownloadError.repoUnavailable(repo)
+        }
+        guard IPALibrary.sha256(of: fetched.file) == mirror.sha256 else {
+            try? FileManager.default.removeItem(at: fetched.file)
+            log("⚠️ \(mirror.assetName) on \(mirror.repo) isn't the file SideInstaller accepts from there (SHA-256 \(mirror.sha256)) — it has been replaced, so it isn't installed.")
+            throw DownloadError.repoUnavailable(repo)
+        }
+        log("\(mirror.assetName) is the file expected from there (SHA-256 \(mirror.sha256.prefix(12))…).")
         try store(fetched, as: dest)
         return dest.path
     }
@@ -775,7 +874,12 @@ enum SideStoreDownloader {
     /// Every release of `source` the version picker can offer, from one API call.
     static func releaseCatalog(source: InstallSource) async throws -> ReleaseCatalog {
         guard let repo = source.repo else { throw DownloadError.notDownloadable }
-        return ReleaseCatalog(source: source, releases: try await recentReleases(of: repo, count: 100))
+        do {
+            return ReleaseCatalog(source: source, releases: try await recentReleases(of: repo, count: 100))
+        } catch let error as DownloadError where error.isRepoUnavailable && source.mirror != nil {
+            // The copy is one build, which "Latest" installs: no others to offer.
+            return ReleaseCatalog(source: source, releases: [])
+        }
     }
 
     /// A repo's `count` newest releases, newest first.
@@ -1067,6 +1171,22 @@ enum IPALibrary {
         guard (try? handle.seek(toOffset: UInt64(size - tailLength))) != nil,
               let tail = try? handle.readToEnd() else { return false }
         return tail.range(of: Data([0x50, 0x4B, 0x05, 0x06])) != nil
+    }
+
+    /// A file's SHA-256 in lowercase hex, or nil if it can't be read.
+    static func sha256(of url: URL) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        do {
+            // A megabyte at a time: an IPA is tens of them.
+            while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
+                hasher.update(data: chunk)
+            }
+        } catch {
+            return nil
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     /// `.ipa` files in Documents whose names identify no known build.
