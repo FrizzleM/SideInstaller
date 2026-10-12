@@ -57,11 +57,18 @@ All notable changes to SideInstaller are documented here.
   which can cut a transfer already going, and the install then stopped with “couldn't reach GitHub:
   The network connection was lost.” SideInstaller now tries twice more, a second and three seconds
   later, before it gives up.
-- **A build whose GitHub repository is gone says so.** Since GitHub took LiveContainer's
-  organization offline, installing LiveContainer + SideStore stopped with “GitHub answered HTTP 404:
-  Not Found”, which reads like a fault on your side. SideInstaller now says the repository is
-  unavailable and that your iPhone and network are fine, and shows how to install from an IPA you
-  got elsewhere: name it as shown and copy it into Files › On My iPhone › SideInstaller.
+- **LiveContainer + SideStore installs again.** GitHub has hidden LiveContainer's organization since
+  4 October 2026, so the download stopped with “GitHub answered HTTP 404: Not Found”. While the
+  repository is gone, SideInstaller takes LiveContainer's last nightly (18 September 2026) from the
+  copy on LiveContainerMirror/LiveContainer, and only that exact file: it's checked against the
+  SHA-256 of the official build, and anything else under that link is refused. Stable and Nightly
+  both install that build for now. Once the repository is back, SideInstaller goes back to it by
+  itself.
+- **A build whose GitHub repository is gone says so.** When there's no copy to fall back on, the
+  install no longer stops with a bare 404, which reads like a fault on your side. SideInstaller says
+  the repository is unavailable and that your iPhone and network are fine, and shows how to install
+  from an IPA you got elsewhere: name it as shown and copy it into Files › On My iPhone ›
+  SideInstaller.
 - An app that looks its background task up in its own Info.plist, taking the first entry of a kind,
   now finds the one under the bundle ID it was signed with. SideInstaller listed those after the
   originals, so such an app asked iOS for a task it wasn't allowed and lost its background work.
