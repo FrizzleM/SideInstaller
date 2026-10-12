@@ -518,6 +518,8 @@ let italianStrings: [String: String] = [
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub sta limitando le richieste da questa rete — non è bloccato, e il limite si azzera da solo. Riprova %@.",
     "GitHub answered HTTP %d%@": "GitHub ha risposto HTTP %d%@",
+    "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
+        "GitHub al momento non rende disponibile %@ — il repository è stato rimosso, spostato o reso privato, quindi non c'è nulla da scaricare. Questo iPhone e la sua rete non hanno nessun problema.",
     "couldn't reach GitHub: %@": "impossibile raggiungere GitHub: %@",
     "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
         "la risposta di GitHub non conteneva le informazioni sulla release (%@) — qualcosa su questa rete potrebbe averla sostituita.",
@@ -609,6 +611,13 @@ let italianStrings: [String: String] = [
         "Oppure copialo in File › Sul mio iPhone › SideInstaller, dove SideInstaller lo trova comunque.",
     "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
         "È la strada da seguire dove GitHub è bloccato: procurati l'IPA su un dispositivo qualsiasi, portalo qui e installalo.",
+    "Bring the .ipa yourself": "Procurati tu l'.ipa",
+    "%@ can't be downloaded while its GitHub repository is offline. The other apps still install as usual.":
+        "%@ non si può scaricare finché il suo repository GitHub è offline. Le altre app si installano come sempre.",
+    "To install it anyway, get its .ipa from somewhere you trust, name it %@, and copy it into Files › On My iPhone › SideInstaller.":
+        "Per installarlo comunque, procurati il suo .ipa da una fonte di cui ti fidi, chiamalo %@ e copialo in File › Sul mio iPhone › SideInstaller.",
+    "Then tap Install again — SideInstaller uses your file instead of downloading one.":
+        "Poi tocca di nuovo Installa — SideInstaller usa il tuo file invece di scaricarne uno.",
     "Pair this iPhone in Settings": "Abbina questo iPhone in Impostazioni",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "Apri l'app Impostazioni, poi vai in Privacy e sicurezza › Modalità sviluppatore.",

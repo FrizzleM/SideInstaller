@@ -507,6 +507,8 @@ let chineseStrings: [String: String] = [
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub 正在限制此网络的请求频率 —— 它没有被屏蔽，限制会自动解除。请在%@重试。",
     "GitHub answered HTTP %d%@": "GitHub 返回了 HTTP %d%@",
+    "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
+        "GitHub 目前无法提供 %@ —— 该代码仓库已被下架、迁移或设为私有，因此没有可下载的内容。这台 iPhone 及其网络没有任何问题。",
     "couldn't reach GitHub: %@": "无法连接到 GitHub：%@",
     "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
         "GitHub 的响应不是发行版信息（%@）—— 此网络上的某个环节可能替换了它。",
@@ -596,6 +598,13 @@ let chineseStrings: [String: String] = [
         "也可以把它复制到 文件 › 我的 iPhone › SideInstaller，SideInstaller 同样能找到。",
     "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
         "在 GitHub 被封锁的地区，这就是可行的办法：在任何设备上取得 IPA，带过来，然后在这里安装。",
+    "Bring the .ipa yourself": "自行提供 .ipa",
+    "%@ can't be downloaded while its GitHub repository is offline. The other apps still install as usual.":
+        "%@ 的 GitHub 代码仓库下线期间无法下载。其他 App 仍可照常安装。",
+    "To install it anyway, get its .ipa from somewhere you trust, name it %@, and copy it into Files › On My iPhone › SideInstaller.":
+        "如果仍想安装，请从你信任的来源取得它的 .ipa，命名为 %@，然后复制到 文件 › 我的 iPhone › SideInstaller。",
+    "Then tap Install again — SideInstaller uses your file instead of downloading one.":
+        "然后再次轻点“安装”—— SideInstaller 会使用你的文件，而不再下载。",
     "Pair this iPhone in Settings": "在 设置 中配对此 iPhone",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "打开 设置 应用，然后进入 隐私与安全性 › 开发者模式。",

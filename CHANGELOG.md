@@ -53,6 +53,15 @@ All notable changes to SideInstaller are documented here.
   often clear up straight away.
 
 ### Fixed
+- **A download whose connection drops is tried again.** The download runs while the VPN comes up,
+  which can cut a transfer already going, and the install then stopped with “couldn't reach GitHub:
+  The network connection was lost.” SideInstaller now tries twice more, a second and three seconds
+  later, before it gives up.
+- **A build whose GitHub repository is gone says so.** Since GitHub took LiveContainer's
+  organization offline, installing LiveContainer + SideStore stopped with “GitHub answered HTTP 404:
+  Not Found”, which reads like a fault on your side. SideInstaller now says the repository is
+  unavailable and that your iPhone and network are fine, and shows how to install from an IPA you
+  got elsewhere: name it as shown and copy it into Files › On My iPhone › SideInstaller.
 - An app that looks its background task up in its own Info.plist, taking the first entry of a kind,
   now finds the one under the bundle ID it was signed with. SideInstaller listed those after the
   originals, so such an app asked iOS for a task it wasn't allowed and lost its background work.

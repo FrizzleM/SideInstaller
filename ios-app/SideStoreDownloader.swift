@@ -379,6 +379,9 @@ enum SideStoreDownloader {
         /// GitHub answered with a status rather than a release or an IPA,
         /// carrying its explanation and, for a rate limit, when it clears.
         case badStatus(status: Int, detail: String?, retryAfter: Date?)
+        /// GitHub has no such repository ("owner/repo"): taken down, moved or
+        /// made private. No network reaches the build, only the user's own copy.
+        case repoUnavailable(String)
         /// The request never reached GitHub: offline, DNS, TLS, timeout, blocked.
         case unreachable(URLError)
         /// A 2xx whose body isn't the release JSON this app models.
@@ -408,6 +411,9 @@ enum SideStoreDownloader {
                              Self.relative(retryAfter))
                 }
                 return L("GitHub answered HTTP %d%@", status, detail.map { ": \($0)" } ?? "")
+            case let .repoUnavailable(repo):
+                return L("GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.",
+                         repo)
             case let .unreachable(error):
                 return L("couldn't reach GitHub: %@", error.localizedDescription)
             case let .badRelease(detail):
@@ -429,11 +435,18 @@ enum SideStoreDownloader {
             switch self {
             case .unreachable, .badRelease, .notAnIPA:
                 return true
-            case .noIPAAsset, .noRelease, .badURL, .notDownloadable, .linkStatus:
+            case .noIPAAsset, .noRelease, .badURL, .notDownloadable, .linkStatus, .repoUnavailable:
                 return false
             case let .badStatus(_, _, retryAfter):
                 return retryAfter == nil
             }
+        }
+
+        /// True when the build's repository is gone from GitHub, so only a copy
+        /// the user brings can be installed.
+        var isRepoUnavailable: Bool {
+            if case .repoUnavailable = self { return true }
+            return false
         }
 
         /// A 404 on the derived URL: the asset isn't under the expected name.
@@ -448,7 +461,7 @@ enum SideStoreDownloader {
             switch self {
             case .noIPAAsset, .noRelease:
                 return true
-            case .badURL, .notDownloadable, .badStatus, .unreachable,
+            case .badURL, .notDownloadable, .badStatus, .repoUnavailable, .unreachable,
                  .badRelease, .notAnIPA, .linkStatus:
                 return false
             }
@@ -631,7 +644,7 @@ enum SideStoreDownloader {
         let redirects = ReleaseTagRecorder()
 
         log("Downloading \(name) …")
-        let (file, response) = try await perform {
+        let (file, response) = try await perform(log: log) {
             try await URLSession.shared.download(for: req, delegate: redirects)
         }
         do {
@@ -705,7 +718,7 @@ enum SideStoreDownloader {
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
 
-        let (data, response) = try await perform { try await URLSession.shared.data(for: req) }
+        let (data, response) = try await perform(log: log) { try await URLSession.shared.data(for: req) }
         // A repo with no `nightly` tag answers 404: a missing channel, not a status.
         if (response as? HTTPURLResponse)?.statusCode == 404 {
             throw DownloadError.noRelease(source.displayName, channel)
@@ -774,6 +787,11 @@ enum SideStoreDownloader {
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await perform { try await URLSession.shared.data(for: req) }
+        // A repo without releases answers 200 with an empty list, so a 404 here
+        // is the repository itself.
+        if (response as? HTTPURLResponse)?.statusCode == 404 {
+            throw DownloadError.repoUnavailable(repo)
+        }
         try check(response, body: data)
         do {
             return try JSONDecoder().decode([GHRelease].self, from: data)
@@ -784,15 +802,37 @@ enum SideStoreDownloader {
 
     /// Runs a URLSession call, mapping `URLError` to `.unreachable` (or to
     /// `CancellationError` when cancelled).
-    private static func perform<T>(_ work: () async throws -> T) async throws -> T {
-        do {
-            return try await work()
-        } catch let error as URLError {
-            // A cancelled install arrives as a URLError, and isn't a failure.
-            if error.code == .cancelled { throw CancellationError() }
-            throw DownloadError.unreachable(error)
+    ///
+    /// A connection that drops is tried again, twice: the download overlaps the
+    /// VPN coming up, which changes the network under a transfer already going,
+    /// and a connection GitHub kept open from an earlier request can be dead by
+    /// the time it's reused.
+    private static func perform<T>(log: ((String) -> Void)? = nil,
+                                   _ work: () async throws -> T) async throws -> T {
+        var pauses: [UInt64] = [1, 3]
+        while true {
+            do {
+                return try await work()
+            } catch let error as URLError {
+                // A cancelled install arrives as a URLError, and isn't a failure.
+                if error.code == .cancelled { throw CancellationError() }
+                guard droppedConnection.contains(error.code), !pauses.isEmpty else {
+                    throw DownloadError.unreachable(error)
+                }
+                let pause = pauses.removeFirst()
+                log?("Connection to GitHub dropped (\(error.localizedDescription)) — trying again in \(pause) s.")
+                // Throws when the install is cancelled meanwhile.
+                try await Task.sleep(nanoseconds: pause * 1_000_000_000)
+            }
         }
     }
+
+    /// Failures that arrive at once and can pass by themselves. A timeout isn't
+    /// one: where GitHub is blocked, retrying would triple a minute's wait.
+    private static let droppedConnection: Set<URLError.Code> = [
+        .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost,
+        .cannotFindHost, .dnsLookupFailed,
+    ]
 
     /// Throws `badStatus` for a non-2xx response, before the body is decoded.
     private static func check(_ response: URLResponse, body: Data? = nil) throws {
