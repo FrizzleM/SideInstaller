@@ -788,7 +788,7 @@ impl AppleAccount {
 
         let response = self
             .grandslam_client
-            .plist_request(&gs_service_url, &req1, None)
+            .plist_request(&gs_service_url, &req1, None, true)
             .await
             .context("Failed to send initial login request")?
             .check_grandslam_error()
@@ -857,7 +857,7 @@ impl AppleAccount {
 
         let response2 = self
             .grandslam_client
-            .plist_request(&gs_service_url, &req2, Some(close_headers))
+            .plist_request(&gs_service_url, &req2, Some(close_headers), true)
             .await
             .context("Failed to send proof login request")?
             .check_grandslam_error()
@@ -960,7 +960,7 @@ impl AppleAccount {
 
         let resp = self
             .grandslam_client
-            .plist_request(&gs_service_url, &request, None)
+            .plist_request(&gs_service_url, &request, None, true)
             .await
             .context("Failed to send app token request")?
             .check_grandslam_error()

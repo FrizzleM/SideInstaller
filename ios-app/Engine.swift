@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import UIKit
 import SideInstallerFFI
 
@@ -34,7 +35,7 @@ enum StepState {
 }
 
 /// A contextual instruction card shown to the user.
-struct Guide: Equatable {
+struct Guide: Hashable {
     var title: String
     var systemImage: String
     var steps: [String]
@@ -51,11 +52,28 @@ enum EngineError: LocalizedError {
     case certExists
     /// Apple error 8220: the device UDID couldn't be registered with the team.
     case deviceRegistration(udid: String, raw: String)
+    /// GrandSlam error -20209: Apple locked the account until it's reset at iForgot.
+    case accountLocked
+    /// Apple developer error 1102: the account's owner is too young for
+    /// developer services.
+    case underage
+    /// Apple error 9120, or the signer's own check: no App IDs left this week.
+    case appIDLimit
+    /// installd refused a fourth app signed by a free Apple ID.
+    case appLimit
 
     var errorDescription: String? {
         switch self {
         case let .message(m):
             return m
+        case .accountLocked:
+            return L("Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.")
+        case .underage:
+            return L("Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.")
+        case .appIDLimit:
+            return L("This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.")
+        case .appLimit:
+            return L("This iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. Delete one of them, then try again.")
         case .certExists:
             return L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists, or that a request for one is still pending (error 7460). SideInstaller couldn't reuse the certificate that's already there, so it stopped instead of replacing it. See the steps above.")
         case let .deviceRegistration(udid, raw):
@@ -120,10 +138,33 @@ final class Engine: ObservableObject {
     @Published var deviceIP: String = "10.7.0.1"
     /// `deviceIP` normalized to a dialable host, e.g. `10.7.0.1/32` → `10.7.0.1`.
     var deviceHost: String { NetworkStatus.host(deviceIP) }
-    // Which build to install (SideStore, or LiveContainer + SideStore).
+    // Which build to install (SideStore, LiveContainer + SideStore, Madeira, or
+    // an imported IPA).
     @Published var installSource: InstallSource = .sideStore
     // Which release track to pull that build from (stable or nightly).
     @Published var releaseChannel: ReleaseChannel = .stable
+    /// The track the selected build is installed from: the picked one, or
+    /// stable for a build that has no nightly.
+    var selectedChannel: ReleaseChannel {
+        installSource.hasNightly ? releaseChannel : .stable
+    }
+    /// Versions picked under Advanced, per build and channel; a missing entry
+    /// installs the latest release. Not persisted, like the channel.
+    @Published private var pickedVersions: [InstallSource: [ReleaseChannel: ReleaseVersion]] = [:]
+
+    /// The version picked for the selected build and channel; nil installs the
+    /// latest release.
+    var selectedVersion: ReleaseVersion? {
+        get { pickedVersions[installSource]?[selectedChannel] }
+        set { pickedVersions[installSource, default: [:]][selectedChannel] = newValue }
+    }
+
+    /// Each build's releases, listed by the version picker under Advanced.
+    @Published private(set) var releaseCatalogs: [InstallSource: ReleaseCatalog] = [:]
+    /// The build whose releases are being fetched, if any.
+    @Published private(set) var loadingCatalog: InstallSource?
+    /// Why the last fetch of a build's releases failed.
+    @Published private(set) var catalogErrors: [InstallSource: String] = [:]
 
     // MARK: Plain-text status readouts
 
@@ -154,6 +195,16 @@ final class Engine: ObservableObject {
     }
 
     var canSelfPair: Bool { Engine.deviceCanSelfPair }
+
+    /// False on iOS 27 and later, where this iPhone can't make itself a classic
+    /// lockdown pair record: lockdownd answers `Pair` over the tunnel with
+    /// `InvalidHostID` whatever the request carries, and resets every request
+    /// on port 62078, so no app could use such a record there anyway. See
+    /// NOTES.md ("lockdownd refuses it").
+    static var canMintLockdownRecord: Bool {
+        !ProcessInfo.processInfo.isOperatingSystemAtLeast(
+            OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0))
+    }
 
     /// False when iOS is too old for the install tunnel, even with an imported
     /// pairing file.
@@ -222,6 +273,14 @@ final class Engine: ObservableObject {
     /// Set once the whole pipeline has completed successfully.
     @Published var finished: Bool = false
 
+    /// What this run put into Madeira, so the last steps can say what's there.
+    private var madeiraHandoff = MadeiraHandoff()
+
+    /// Set when the success popup, or the LiveContainer certificate popup, is
+    /// closed; a new run brings them back.
+    @Published private var successClosed = false
+    @Published private var liveContainerImportClosed = false
+
     /// True once the Local Network prompt has been raised this launch, so the
     /// imported-pairing path asks at most once.
     private var askedLocalNetwork = false
@@ -229,7 +288,8 @@ final class Engine: ObservableObject {
     private var pipelineTask: Task<Void, Never>?
     /// The IPA download a run starts as soon as the network is up, so it runs
     /// alongside pairing and sign-in instead of after them.
-    private var prefetch: (source: InstallSource, channel: ReleaseChannel, task: Task<String, Error>)?
+    private var prefetch: (source: InstallSource, channel: ReleaseChannel, version: String?,
+                           task: Task<String, Error>)?
     /// The Apple ID sign-in a run starts as soon as the network is up, so it runs
     /// alongside pairing and the device link.
     private var backgroundSignIn: Task<Void, Error>?
@@ -289,9 +349,11 @@ final class Engine: ObservableObject {
     /// apps signed by this team can be refreshed in place.
     @Published private(set) var signingTeamID: String?
     @Published var downloadedIPAPath: String?
-    // Source and channel the current download corresponds to.
+    // Source, channel and picked version (nil: latest) the current download
+    // corresponds to.
     private var downloadedSource: InstallSource?
     private var downloadedChannel: ReleaseChannel?
+    private var downloadedVersion: String?
     @Published var signedAppPath: String?
     /// CFBundleDisplayName read off the signed bundle.
     @Published private(set) var signedDisplayName: String?
@@ -379,7 +441,9 @@ final class Engine: ObservableObject {
     private static let mirrorsLogToStdout =
         ProcessInfo.processInfo.environment["SIDEINSTALLER_LOG_STDOUT"] != nil
 
-    private func appendLine(_ message: String) {
+    private func appendLine(_ raw: String) {
+        // Before anything keeps it: the console, Copy logs, and the stdout mirror.
+        let message = LogRedactor.redact(raw)
         let stamp = dateFormatter.string(from: Date())
         if Self.mirrorsLogToStdout {
             fputs("\(stamp)  \(message)\n", stdout)
@@ -430,7 +494,10 @@ final class Engine: ObservableObject {
             self.deviceName = nil
             self.lastError = nil
             self.finished = false
+            self.successClosed = false
+            self.liveContainerImportClosed = false
             self.certConflict = false
+            self.madeiraHandoff = MadeiraHandoff()
         }
     }
 
@@ -464,6 +531,15 @@ final class Engine: ObservableObject {
         guard !normalizedAppleID.isEmpty, !applePassword.isEmpty else {
             setGuide(Guides.account)
             log("⛔️ No Apple ID saved. Add one in Settings › Account, then tap Install again.")
+            return
+        }
+        // Installing a build this iOS can't run would only use up an App ID.
+        if let needed = installSource.minimumOSMajorVersion,
+           !ProcessInfo.processInfo.isOperatingSystemAtLeast(
+               OperatingSystemVersion(majorVersion: needed, minorVersion: 0, patchVersion: 0)) {
+            lastError = L("%@ needs iOS %d or later. This iPhone runs iOS %@.",
+                          installSource.displayName, needed, osVersionText)
+            log("⛔️ \(installSource.displayName) needs iOS \(needed) or later; this iPhone runs iOS \(osVersionText).")
             return
         }
         // A custom install needs its IPA before anything else runs.
@@ -546,6 +622,92 @@ final class Engine: ObservableObject {
         devicePreparation?.cancel()             // skip its ahead-of-install write
         prestage?.cancel()
         PairingController.shared.softCancel()   // unblock a pending pairing wait
+    }
+
+    // MARK: Popups
+
+    /// One of the Install tab's popups. Each was a card under the progress
+    /// before; they stack in this order, which the copy relies on ("Revoke and
+    /// retry above", "see the steps above", "the trust step above"). Each
+    /// carries what it shows, so it keeps its content while it closes.
+    enum Popup: Hashable {
+        /// The code Settings asks for while this iPhone pairs.
+        case pairingCode(String)
+        /// Revoke-and-retry, after Apple error 7460.
+        case certConflict
+        case guide(Guide)
+        case error(String, stoppedRun: Bool)
+        /// The build is on the device, named; `leads` when the trust step
+        /// follows it instead of coming first.
+        case success(String, leads: Bool)
+        /// LiveContainer still needs SideStore's certificate imported.
+        case liveContainerImport
+    }
+
+    /// True while the run is held up on the user — joining Wi-Fi, connecting
+    /// the tunnel, or pairing in Settings.
+    var isWaitingOnUser: Bool {
+        isRunning && stepStates.values.contains(.waiting)
+    }
+
+    /// The Install tab's popups up now, top to bottom. While the run goes, only
+    /// what it's waiting on shows; the rest waits for it to end.
+    var popups: [Popup] {
+        if isRunning {
+            guard isWaitingOnUser else { return [] }
+            return [pairingPIN.map(Popup.pairingCode), guide.map(Popup.guide)].compactMap { $0 }
+        }
+        if finished { return finishedPopups }
+        var shown: [Popup] = []
+        if certConflict { shown.append(.certConflict) }
+        if let guide { shown.append(.guide(guide)) }
+        if let lastError {
+            shown.append(.error(lastError, stoppedRun: stepStates.values.contains(.failed)))
+        }
+        return shown
+    }
+
+    /// A finished run's popups: the trust step, the news, and LiveContainer's
+    /// certificate import. With all three up the news leads, so both steps
+    /// follow it; otherwise it comes after the trust step it points to.
+    private var finishedPopups: [Popup] {
+        let trust = guide.map(Popup.guide)
+        let certificate: Popup? = installedIsLiveContainer && !liveContainerImportClosed
+            ? .liveContainerImport : nil
+        let leads = trust != nil && certificate != nil
+        let success: Popup? = successClosed ? nil : .success(installedSourceName, leads: leads)
+        return (leads ? [success, trust, certificate] : [trust, success, certificate])
+            .compactMap { $0 }
+    }
+
+    /// True for a popup the run is waiting on: closing it cancels the install.
+    func blocks(_ popup: Popup) -> Bool {
+        switch popup {
+        case .pairingCode, .guide: return isWaitingOnUser
+        default:                   return false
+        }
+    }
+
+    /// Closes one of the Install tab's popups. The run can't go on without one
+    /// it's waiting on, so closing that cancels the install, taking the other
+    /// popups it was waiting on along; any other just clears its message.
+    @MainActor
+    func closePopup(_ popup: Popup) {
+        if blocks(popup) {
+            cancelOneClick()
+            pairingPIN = nil
+            guide = nil
+            return
+        }
+        switch popup {
+        // The steps hang under the code and close with it.
+        case .pairingCode:         pairingPIN = nil; guide = nil
+        case .certConflict:        certConflict = false
+        case .guide:               guide = nil
+        case .error:               lastError = nil
+        case .success:             successClosed = true
+        case .liveContainerImport: liveContainerImportClosed = true
+        }
     }
 
     /// Cancel whatever the run started early and never got to use.
@@ -668,15 +830,16 @@ final class Engine: ObservableObject {
     }
 
     /// Triggers the Local Network permission prompt when an imported pairing
-    /// file is used (below iOS 27).
+    /// file is used (always below iOS 27, optionally from 27 on).
     ///
     /// Connecting to lockdownd over the tunnel counts as local-network access,
-    /// which iOS silently blocks until granted. On iOS 27 the RPPairing host
-    /// already triggers the prompt. Best-effort: if denied, the connect still
-    /// runs and reports its own error.
+    /// which iOS silently blocks until granted. When the iPhone pairs itself the
+    /// RPPairing host already triggers the prompt, but an imported file skips
+    /// that step. Best-effort: if denied, the connect still runs and reports its
+    /// own error.
     @MainActor
     private func ensureLocalNetworkForImportedPairing() async {
-        guard !canSelfPair, !askedLocalNetwork else { return }
+        guard !canSelfPair || importedPairingName != nil, !askedLocalNetwork else { return }
         askedLocalNetwork = true
         attention.begin()
         defer { attention.end() }
@@ -768,16 +931,27 @@ final class Engine: ObservableObject {
     /// device link, or signs in now when none was.
     @MainActor
     private func signInStep() async throws {
-        guard let started = backgroundSignIn else { return try await signIn() }
-        backgroundSignIn = nil
-        try Task.checkCancellation()
-        setStep(.signIn, .active)
-        try await withTaskCancellationHandler {
-            try await started.value
-        } onCancel: {
-            started.cancel()
+        do {
+            guard let started = backgroundSignIn else { return try await signIn() }
+            backgroundSignIn = nil
+            try Task.checkCancellation()
+            setStep(.signIn, .active)
+            try await withTaskCancellationHandler {
+                try await started.value
+            } onCancel: {
+                started.cancel()
+            }
+            setStep(.signIn, .done)
+        } catch {
+            // Only the account's owner can unlock it, so show them how.
+            if case EngineError.accountLocked = error {
+                setGuide(Guides.accountLocked)
+            }
+            if case EngineError.underage = error {
+                setGuide(Guides.underage)
+            }
+            throw error
         }
-        setStep(.signIn, .done)
     }
 
     /// Starts the Apple ID sign-in without touching the checklist, unless this
@@ -814,6 +988,7 @@ final class Engine: ObservableObject {
         twoFactorWasCancelled = false
         var lastError = "no anisette servers configured"
         var appleRefusals = 0
+        var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
             try Task.checkCancellation()
@@ -842,6 +1017,19 @@ final class Engine: ObservableObject {
                     signInStatus = "signed out"
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
+                // A locked account fails everywhere, and retrying keeps it locked.
+                if Self.isAccountLocked(lastError) {
+                    signInStatus = "sign-in failed"
+                    log("Apple has locked this Apple Account: \(lastError)")
+                    throw EngineError.accountLocked
+                }
+                // Apple turns the account down for its owner's age through
+                // every anisette server alike.
+                if Self.isUnderageError(lastError) {
+                    signInStatus = "sign-in failed"
+                    log("Apple won't let this Apple Account use developer services: \(lastError)")
+                    throw EngineError.underage
+                }
                 // Bad credentials fail everywhere, and retrying risks a lockout.
                 if Self.isCredentialError(lastError) {
                     signInStatus = "sign-in failed"
@@ -864,6 +1052,17 @@ final class Engine: ObservableObject {
                         throw EngineError.message(Self.appleServiceRefusalMessage)
                     }
                 }
+                // Every anisette server starts with the same request to Apple, so
+                // when that can't even be sent, more of them won't help.
+                if Self.isAppleUnreachable(lastError) {
+                    appleUnreachable += 1
+                    if let message = await appleUnreachableStop(failures: appleUnreachable) {
+                        signInStatus = "sign-in failed"
+                        throw EngineError.message(message)
+                    }
+                } else {
+                    appleUnreachable = 0
+                }
                 if idx < servers.count - 1 { log("Trying the next anisette server…") }
             }
         }
@@ -879,7 +1078,7 @@ final class Engine: ObservableObject {
     private func performSignIn(id: String, pw: String, ani: String, dir: String,
                                run: Int? = nil) throws -> String {
         defer { endTwoFactor() }
-        log("Apple ID sign-in for \(Self.oneLine(id)) via anisette \(Self.oneLine(ani)) …")
+        log("Apple ID sign-in for \(LogRedactor.maskAppleID(id)) via anisette \(Self.oneLine(ani)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
@@ -966,6 +1165,15 @@ final class Engine: ObservableObject {
         return m.contains("apple.com") && m.contains("429 too many requests")
     }
 
+    /// Detects GrandSlam -20209, "This Apple Account has been locked for security
+    /// reasons. Visit iForgot to reset your account". Only a reset unlocks it.
+    static func isAccountLocked(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("-20209")
+            || m.contains("locked for security reasons")
+            || m.contains("iforgot")
+    }
+
     /// Detect a credential failure, which no anisette server can fix.
     static func isCredentialError(_ raw: String) -> Bool {
         let m = raw.lowercased()
@@ -991,22 +1199,70 @@ final class Engine: ObservableObject {
         return m.contains("gsa.apple.com") && m.contains("503")
     }
 
+    /// Detects a sign-in that never reached Apple: sending GrandSlam's URL-bag
+    /// request to gsa.apple.com failed. It's the first request of a sign-in and
+    /// uses no anisette data, so every anisette server would fail it the same way.
+    static func isAppleUnreachable(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("failed to fetch url bag") && m.contains("error sending request")
+    }
+
+    /// Called after `failures` sign-in attempts in a row that couldn't reach
+    /// Apple. Logs how iOS sees this app's internet access, and returns the
+    /// message to stop the sign-in with, or nil to try once more.
+    @MainActor
+    func appleUnreachableStop(failures: Int, logPrefix: String = "") async -> String? {
+        let path = await NetworkStatus.internetPath()
+        log("\(logPrefix)Couldn't reach Apple's sign-in server (gsa.apple.com). iOS reports this app's internet path as: \(path.debugDescription)")
+        let message = Self.appleUnreachableMessage(
+            satisfied: path.status == .satisfied, reason: path.unsatisfiedReason, failures: failures)
+        if message != nil {
+            log("\(logPrefix)Stopping: the anisette server isn't the problem, so trying more of them won't help.")
+        }
+        return message
+    }
+
+    /// iOS saying this app has no usable internet is conclusive, so that stops
+    /// at the first failure. With internet up, the first failure may be a
+    /// blip; a second means something is blocking Apple.
+    static func appleUnreachableMessage(satisfied: Bool, reason: NWPath.UnsatisfiedReason,
+                                        failures: Int) -> String? {
+        guard !satisfied else {
+            guard failures >= 2 else { return nil }
+            return L("SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.")
+        }
+        switch reason {
+        case .cellularDenied:
+            return L("SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.")
+        case .wifiDenied:
+            return L("SideInstaller can't reach Apple: iOS isn't letting it use Wi-Fi. In Settings › Apps › SideInstaller › Wireless Data, choose WLAN & Cellular Data, then try again.")
+        case .vpnInactive:
+            return L("SideInstaller can't reach Apple: a VPN set to carry all traffic is disconnected, so iOS is holding traffic back. Reconnect it, or turn off its kill switch or Connect On Demand, then try again.")
+        default:
+            return L("SideInstaller can't reach Apple: this iPhone has no internet connection. Connect to Wi-Fi or turn on cellular data, then try again.")
+        }
+    }
+
     // MARK: Step 5 — download the IPA
 
     @MainActor
     private func download() async throws {
         let src = installSource
-        let channel = releaseChannel
-        // Keyed on source and channel, so changing either re-fetches.
+        let channel = selectedChannel
+        // A custom IPA has no versions to pick from.
+        let version = src == .custom ? nil : selectedVersion
+        // Keyed on source, channel and version, so changing any re-fetches.
         if let p = downloadedIPAPath, downloadedSource == src, downloadedChannel == channel,
-           FileManager.default.fileExists(atPath: p) {
-            log("\(channel.displayName) \(src.displayName) IPA already downloaded — skipping.")
+           downloadedVersion == version?.tag, FileManager.default.fileExists(atPath: p) {
+            log("\(buildName(src, channel, version)) IPA already downloaded — skipping.")
             setStep(.download, .done)
             return
         }
         setStep(.download, .active)
 
-        let onDisk = IPALibrary.entry(source: src, channel: channel)
+        // A picked version must be that exact release, so only the latest build
+        // takes a file already in Documents.
+        let onDisk = version == nil ? IPALibrary.entry(source: src, channel: channel) : nil
 
         // A custom install has no fallback: the imported file is the input.
         if src == .custom {
@@ -1025,21 +1281,29 @@ final class Engine: ObservableObject {
         }
 
         do {
-            let path = try await fetchLatest(source: src, channel: channel)
-            adopt(URL(fileURLWithPath: path), source: src, channel: channel)
+            let path = try await fetchBuild(source: src, channel: channel, version: version)
+            adopt(URL(fileURLWithPath: path), source: src, channel: channel, version: version?.tag)
             log("\(src.displayName) IPA ready at \(path)")
             setStep(.download, .done)
         } catch {
             // Stopping the install isn't a failed download: no cached copy stands in.
             if Task.isCancelled { throw CancellationError() }
-            // Offline or blocked: fall back to a copy an earlier run left behind.
-            if let cached = onDisk {
-                log("⚠️ Download failed (\(short(error))) — using \(cached.url.lastPathComponent) already in Documents instead.")
-                adopt(cached.url, source: src, channel: channel)
+            // Offline or blocked: fall back to a copy an earlier run left behind,
+            // which for a picked version must be that version.
+            let cached: URL?
+            if let version {
+                cached = IPALibrary.pickedDownload(version.tag, source: src, channel: channel)
+            } else {
+                cached = onDisk?.url
+            }
+            if let cached {
+                log("⚠️ Download failed (\(short(error))) — using \(cached.lastPathComponent) already in Documents instead.")
+                adopt(cached, source: src, channel: channel, version: version?.tag)
                 setStep(.download, .done)
                 return
             }
-            logImportHint(for: error, source: src, channel: channel)
+            // Renaming a file to the build's name helps only the latest build.
+            if version == nil { logImportHint(for: error, source: src, channel: channel) }
             throw error
         }
     }
@@ -1053,32 +1317,30 @@ final class Engine: ObservableObject {
         prefetch?.task.cancel()
         prefetch = nil
         let src = installSource
-        let channel = releaseChannel
+        let channel = selectedChannel
         guard src != .custom else { return }
+        let version = selectedVersion
         if let p = downloadedIPAPath, downloadedSource == src, downloadedChannel == channel,
-           FileManager.default.fileExists(atPath: p) {
+           downloadedVersion == version?.tag, FileManager.default.fileExists(atPath: p) {
             return
         }
-        if let onDisk = IPALibrary.entry(source: src, channel: channel), onDisk.isImported { return }
+        if version == nil, let onDisk = IPALibrary.entry(source: src, channel: channel),
+           onDisk.isImported { return }
 
-        log("Fetching \(channel.displayName.lowercased()) \(src.displayName) release in the background…")
-        let task = Task {
-            try await SideStoreDownloader.downloadLatest(source: src, channel: channel) { line in
-                self.log(line)
-            }
-        }
-        prefetch = (src, channel, task)
+        log("Fetching \(buildName(src, channel, version)) release in the background…")
+        let task = Task { try await self.downloadBuild(source: src, channel: channel, version: version) }
+        prefetch = (src, channel, version?.tag, task)
     }
 
     /// The selected build's download: the one this run started early when there
     /// is one, otherwise a new one. Cancelling the caller cancels either.
     @MainActor
-    private func fetchLatest(source: InstallSource, channel: ReleaseChannel) async throws -> String {
-        guard let started = prefetch, started.source == source, started.channel == channel else {
-            log("Fetching \(channel.displayName.lowercased()) \(source.displayName) release…")
-            return try await SideStoreDownloader.downloadLatest(source: source, channel: channel) { line in
-                self.log(line)
-            }
+    private func fetchBuild(source: InstallSource, channel: ReleaseChannel,
+                            version: ReleaseVersion?) async throws -> String {
+        guard let started = prefetch, started.source == source, started.channel == channel,
+              started.version == version?.tag else {
+            log("Fetching \(buildName(source, channel, version)) release…")
+            return try await downloadBuild(source: source, channel: channel, version: version)
         }
         prefetch = nil
         let task = started.task
@@ -1089,12 +1351,58 @@ final class Engine: ObservableObject {
         }
     }
 
+    /// Downloads the picked version, or else the channel's latest release.
+    @MainActor
+    private func downloadBuild(source: InstallSource, channel: ReleaseChannel,
+                               version: ReleaseVersion?) async throws -> String {
+        let log: (String) -> Void = { line in self.log(line) }
+        guard let version else {
+            return try await SideStoreDownloader.downloadLatest(source: source, channel: channel, log: log)
+        }
+        return try await SideStoreDownloader.download(version, source: source, channel: channel, log: log)
+    }
+
+    /// A build as the log names it: "Nightly SideStore", or "SideStore 0.6.3".
+    private func buildName(_ source: InstallSource, _ channel: ReleaseChannel,
+                           _ version: ReleaseVersion?) -> String {
+        guard let version else { return "\(channel.displayName) \(source.displayName)" }
+        return "\(source.displayName) \(version.title)"
+    }
+
     /// Point the rest of the pipeline at an IPA on disk, whatever its origin.
     @MainActor
-    private func adopt(_ url: URL, source: InstallSource, channel: ReleaseChannel) {
+    private func adopt(_ url: URL, source: InstallSource, channel: ReleaseChannel,
+                       version: String? = nil) {
         downloadedIPAPath = url.path
         downloadedSource = source
         downloadedChannel = channel
+        downloadedVersion = version
+    }
+
+    // MARK: Versions to pick from (Advanced)
+
+    /// Lists `source`'s releases for the version picker, unless a list from the
+    /// last 15 minutes is at hand. One GitHub API call, which counts against the
+    /// same hourly limit as the download's fallbacks.
+    @MainActor
+    func loadReleaseCatalog(for source: InstallSource, force: Bool = false) async {
+        guard source != .custom, loadingCatalog != source else { return }
+        if !force, let cached = releaseCatalogs[source],
+           Date().timeIntervalSince(cached.fetched) < 15 * 60 { return }
+        loadingCatalog = source
+        catalogErrors[source] = nil
+        // Checked, since a newer load for another build may have started since.
+        defer { if loadingCatalog == source { loadingCatalog = nil } }
+        do {
+            let catalog = try await SideStoreDownloader.releaseCatalog(source: source)
+            releaseCatalogs[source] = catalog
+            log("Versions: \(source.displayName) has \(catalog.others[.stable]?.count ?? 0) stable and \(catalog.others[.nightly]?.count ?? 0) pre-release builds besides the latest.")
+        } catch is CancellationError {
+            // The picker closed mid-fetch; opening it again retries.
+        } catch {
+            catalogErrors[source] = short(error)
+            log("⚠️ Couldn't list \(source.displayName) releases: \(short(error))")
+        }
     }
 
     /// Take a user-supplied IPA as the download step's result, if it is one.
@@ -1267,10 +1575,16 @@ final class Engine: ObservableObject {
         if udid.isEmpty {
             log("⚠️ No device UDID captured — run the Connect step first, or signing may fail with error 8220.")
         }
+        // Bundled into AltStore for its Remote AltServer setup; other apps
+        // get the pairing file after the install instead.
+        let pairingPath = pairingFilePath ?? PairingController.pairingFilePath()
+        let source = downloadedSource ?? installSource
         setStep(.sign, .active)
         do {
             let path = try await onSignQueue {
-                try self.performSign(session: session, ipa: ipa, udid: udid, deviceName: name)
+                try self.performSign(session: session, ipa: ipa, udid: udid, deviceName: name,
+                                     pairingFilePath: pairingPath,
+                                     forMadeira: source == .madeira || Self.isMadeira(ipaPath: ipa))
             }
             signedAppPath = path
             // Read the app's name from the signed bundle (imported IPAs have none before this).
@@ -1286,15 +1600,30 @@ final class Engine: ObservableObject {
             if case let EngineError.deviceRegistration(udid, raw) = error {
                 setGuide(Guides.deviceRegistration(udid: udid, raw: raw))
             }
+            if case EngineError.appIDLimit = error {
+                setGuide(Guides.appIDLimit)
+            }
+            if case EngineError.underage = error {
+                setGuide(Guides.underage)
+            }
             throw error
         }
     }
 
-    private func performSign(session: OpaquePointer, ipa: String, udid: String, deviceName: String) throws -> String {
+    /// `forMadeira` signs the way Madeira needs: with Increased Memory Limit
+    /// enabled on its App IDs before the profile is requested, and without an
+    /// app group. Madeira renews its own profile and registers its App ID again
+    /// when it runs out; it can restore the first on a new App ID, not the second.
+    private func performSign(session: OpaquePointer, ipa: String, udid: String, deviceName: String,
+                             pairingFilePath: String, forMadeira: Bool) throws -> String {
         log("Signing \(ipa) …")
+        if forMadeira {
+            log("Signing for Madeira: Increased Memory Limit on its App ID (it shows as Memory+), and no app group.")
+        }
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        let rc = si_sign_ipa(session, ipa, udid, deviceName, &signed, &error)
+        let rc = si_sign_ipa(session, ipa, udid, deviceName, pairingFilePath,
+                             forMadeira ? 1 : 0, forMadeira ? 0 : 1, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
             signed.map { si_string_free($0) }
@@ -1305,12 +1634,20 @@ final class Engine: ObservableObject {
             error.map { si_string_free($0) }
             log("Sign FAILED: \(msg)")
             if Self.isCertExistsError(msg) { throw EngineError.certExists }
+            if Self.isAppIDLimitError(msg) { throw EngineError.appIDLimit }
+            if Self.isUnderageError(msg) { throw EngineError.underage }
             // Carry the UDID so the guide can show it for manual entry.
             if Self.isDeviceRegistrationError(msg) {
                 throw EngineError.deviceRegistration(udid: udid, raw: msg)
             }
             throw EngineError.message(L("Signing failed: %@", msg))
         }
+    }
+
+    /// True when the IPA at `ipaPath` is Madeira, whichever way it got here: the
+    /// download, an import, or a copy kept for refreshing.
+    private static func isMadeira(ipaPath: String) -> Bool {
+        IPALibrary.appInfo(at: URL(fileURLWithPath: ipaPath))?.bundleID == MadeiraPairingHandoff.bundleID
     }
 
     /// Detect Apple error 7460 in a raw signing error, by code or wording.
@@ -1338,6 +1675,28 @@ final class Engine: ObservableObject {
                 || (m.contains("limit") && !m.contains("no devices"))))
     }
 
+    /// Detect Apple developer error 1102, sent when the Apple Account's owner is
+    /// under the age Apple requires for developer services.
+    static func isUnderageError(_ raw: String) -> Bool {
+        raw.lowercased().contains("developer error 1102")
+    }
+
+    /// Detect running out of App IDs: Apple's error 9120 from `addAppId`, or the
+    /// signer's check before it registers any.
+    static func isAppIDLimitError(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("developer error 9120")
+            || m.contains("not enough available app ids")
+    }
+
+    /// Detect installd refusing an app because a free Apple ID's three are
+    /// already installed. Xcode words the same refusal differently.
+    static func isAppLimitError(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("maximum number of installed apps")
+            || m.contains("maximum number of apps for free development profiles")
+    }
+
     // MARK: Step 7 — install over AFC + installation_proxy
 
     @MainActor
@@ -1347,15 +1706,21 @@ final class Engine: ObservableObject {
         installProgress = 0
         let ip = deviceHost
         let path = pairingFilePath ?? PairingController.pairingFilePath()
-        try await onDeviceQueue {
-            // iOS drops the idle tunnel during sign-in and signing, and
-            // `isConnected` doesn't detect it, so reconnect first.
-            self.log("Refreshing device link before install (tunnel was idle during sign-in/download/sign) …")
-            try self.connection.connect(deviceIP: ip, pairingFilePath: path)
-            guard self.connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
-            self.log("Installing signed bundle via AFC + installation_proxy …")
-            try self.connection.installSignedApp(bundlePath: bundle, prestaged: prestaged)
-            self.log("Install request completed.")
+        do {
+            try await onDeviceQueue {
+                // iOS drops the idle tunnel during sign-in and signing, and
+                // `isConnected` doesn't detect it, so reconnect first.
+                self.log("Refreshing device link before install (tunnel was idle during sign-in/download/sign) …")
+                try self.connection.connect(deviceIP: ip, pairingFilePath: path)
+                guard self.connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
+                self.log("Installing signed bundle via AFC + installation_proxy …")
+                try self.connection.installSignedApp(bundlePath: bundle, prestaged: prestaged)
+                self.log("Install request completed.")
+            }
+        } catch where Self.isAppLimitError(String(describing: error)) {
+            log("installd refused the app: \(error)")
+            setGuide(Guides.appLimit)
+            throw EngineError.appLimit
         }
         installProgress = 1
         setStep(.install, .done)
@@ -1416,8 +1781,10 @@ final class Engine: ObservableObject {
                 self.placementPairingFile(rpPairingPath: rpPath, udid: udid)
             }) ?? rpPath
 
-            // Signing names the app "<base>.<team ID>", so the team has to be known.
-            guard let base = source.pairingBundleIDBase else {
+            // Only SideStore reads the file as it's written here; Madeira takes
+            // the RPPairing record on its own, after the install. Signing names
+            // the app "<base>.<team ID>", so the team has to be known.
+            guard source.sideStoreHome != nil, let base = source.pairingBundleIDBase else {
                 return PreparedPairing(placement: placement, writtenInto: nil)
             }
             if let signingIn { _ = await signingIn.result }
@@ -1468,21 +1835,27 @@ final class Engine: ObservableObject {
         }
         let udid = deviceUDID
         do {
-            try await onDeviceQueue {
+            madeiraHandoff = try await onDeviceQueue {
                 try self.performWritePairing(path: path, udid: udid, source: source,
                                              accountConfig: accountConfig, prepared: prepared)
             }
         } catch {
-            // Only AltStore-family apps need this file, so an imported IPA
-            // failing here doesn't fail the run.
-            guard source == .custom else { throw error }
-            log("⚠️ Couldn't seed the pairing file into \(installedAppName) (\(short(error))). It's installed and ready — only AltStore-family apps need that file.")
+            // SideStore can't work without this file. Madeira can pair itself or
+            // use StikDebug, and an imported IPA may not want one at all.
+            guard source.pairingIsOptional else { throw error }
+            if signedAppIsMadeira(source) {
+                log("⚠️ Couldn't reach Madeira's container (\(short(error))). It's installed: set up JIT in Madeira, and refresh it under Tools › Sideloaded apps.")
+            } else {
+                log("⚠️ Couldn't seed the pairing file into \(installedAppName) (\(short(error))). It's installed and ready — only AltStore-family apps need that file.")
+            }
         }
         setStep(.writePairing, .done)
     }
 
+    /// Returns what Madeira was handed, when the app is Madeira.
     private func performWritePairing(path: String, udid: String?, source: InstallSource,
-                                     accountConfig: String?, prepared: PreparedPairing? = nil) throws {
+                                     accountConfig: String?,
+                                     prepared: PreparedPairing? = nil) throws -> MadeiraHandoff {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
         let size = fileSize(path)
         guard FileManager.default.fileExists(atPath: path), size > 0 else {
@@ -1511,17 +1884,35 @@ final class Engine: ObservableObject {
         } else {
             throw EngineError.message(L("%@ isn't installed yet — install must run first.", source.displayName))
         }
+        log("Resolved \(appName) bundle id: \(bundleID)")
+        if signedAppIsMadeira(source) {
+            // Neither hand-off depends on the other, and Madeira works without both.
+            var handed = MadeiraHandoff()
+            do {
+                handed.pairing = try handOffMadeiraPairing(placementPath: placement, bundleID: bundleID)
+            } catch {
+                log("⚠️ Couldn't hand Madeira the pairing file (\(short(error))). Pair it under its Settings › JIT › JIT setup, or write the file again from Tools › Pairing.")
+            }
+            handed.signIn = handOffMadeiraSignIn(accountConfig, bundleID: bundleID)
+            return handed
+        }
         // SideStore reads the file at its Documents root, LiveContainer deeper.
         let remoteRel = source.pairingRemoteRelativePath
         if prepared?.writtenInto == bundleID {
             log("Pairing file was already written into \(appName) before the install.")
         } else {
-            log("Resolved \(appName) bundle id: \(bundleID)")
             log("Writing pairing file into \(bundleID) /Documents/\(remoteRel) …")
             let written = try connection.writePairingFile(intoBundleID: bundleID,
                                                            remoteRelativePath: remoteRel,
                                                            pairingFilePath: placement)
             log("Pairing file written into \(appName) and read-back VERIFIED (\(written) bytes).")
+        }
+        // Always after the install: it's the reinstall that makes iOS read the
+        // settings this edits, so they can't go in ahead of it.
+        let signedSideStore = signedAppBundleID()?.hasPrefix("com.SideStore.SideStore") == true
+        if let home = source.sideStoreHome ?? (signedSideStore ? .standalone : nil) {
+            handOffSplitPairing(placementPath: placement, bundleID: bundleID,
+                                appName: appName, home: home, udid: udid)
         }
 
         // Give SideStore the signing certificate so its first sign-in reuses it
@@ -1536,6 +1927,43 @@ final class Engine: ObservableObject {
                 log("⚠️ Couldn't hand \(appName) the signing certificate (\(short(error))). It's installed and ready, but it will ask to resign itself on first sign-in.")
             }
         }
+        return MadeiraHandoff()
+    }
+
+    /// Gives Madeira the RPPairing record on its own (see
+    /// `MadeiraPairingHandoff`). Returns false, writing nothing, when the
+    /// pairing file has none. Runs on `deviceQueue`.
+    private func handOffMadeiraPairing(placementPath: String, bundleID: String) throws -> Bool {
+        let file = try Data(contentsOf: URL(fileURLWithPath: placementPath))
+        guard let record = MadeiraPairingHandoff.record(from: file) else {
+            log("⚠️ This pairing file has no RPPairing record, the only kind Madeira's built-in JIT reads, so nothing was written. Pair in Madeira (iOS 27), import an RPPairing file there, or use StikDebug.")
+            return false
+        }
+        let rel = MadeiraPairingHandoff.remoteRelativePath
+        log("Writing the RPPairing record into \(bundleID) /Documents/\(rel) …")
+        let written = try connection.writeFile(intoBundleID: bundleID, remoteRelativePath: rel, data: record)
+        log("Pairing file written into Madeira and read-back VERIFIED (\(written) bytes). Madeira moves it into its Keychain the next time it looks for one.")
+        return true
+    }
+
+    /// Gives Madeira the sign-in it renews its own signing with (see
+    /// `MadeiraSigningHandoff`), as `madeiraSigningAccountJSON` built it. Returns
+    /// whether it's there; failures only log. Runs on `deviceQueue`.
+    private func handOffMadeiraSignIn(_ account: String?, bundleID: String) -> Bool {
+        guard let account else { return false }
+        guard let handoff = MadeiraSigningHandoff.plist(from: account) else {
+            log("⚠️ The sign-in for Madeira is incomplete, or the anisette server in use isn't reached over HTTPS, so it wasn't handed over. Refresh Madeira under Tools › Sideloaded apps.")
+            return false
+        }
+        let path = MadeiraSigningHandoff.containerPath
+        do {
+            let written = try connection.updatePlist(inBundleID: bundleID, containerPath: path) { $0 = handoff }
+            log("Sign-in handed to Madeira: /\(path) written and read-back VERIFIED (\(written) bytes). It holds a developer-portal token and the anisette identity, not the Apple ID password. Madeira moves it into its Keychain when it next starts, and renews its own signing from then on.")
+            return true
+        } catch {
+            log("⚠️ Couldn't hand Madeira the sign-in (\(short(error))). It's installed and ready, but won't renew its own signing: refresh it under Tools › Sideloaded apps.")
+            return false
+        }
     }
 
     /// Starts building the certificate hand-off for the build just signed.
@@ -1545,10 +1973,12 @@ final class Engine: ObservableObject {
         return Task { @MainActor in await self.accountConfigJSON(source: source) }
     }
 
-    /// The `Account.sideconf` JSON for this install, or nil to skip the
-    /// certificate hand-off. Errors are logged, never thrown.
+    /// What the install hands over besides the pairing file, or nil for nothing:
+    /// SideStore's `Account.sideconf` JSON, or the sign-in Madeira renews its own
+    /// signing with. Errors are logged, never thrown.
     @MainActor
     private func accountConfigJSON(source: InstallSource) async -> String? {
+        if signedAppIsMadeira(source) { return await madeiraSigningAccountJSON() }
         guard accountConfigRemoteRelativePath(source: source) != nil else { return nil }
         guard let session = signSession else {
             log("No Apple ID session to build the account config from — skipping the certificate hand-off.")
@@ -1566,6 +1996,41 @@ final class Engine: ObservableObject {
             }
         } catch {
             log("⚠️ Couldn't build the certificate hand-off (\(short(error))). SideStore will ask to resign itself on first sign-in.")
+            return nil
+        }
+    }
+
+    /// The sign-in for Madeira as JSON: what `si_signing_account` reads off the
+    /// session, plus the anisette servers a sign-in here tries. Nil, with nothing
+    /// read, for a Madeira build that doesn't renew its own signing: a
+    /// credential isn't left where nothing takes it in.
+    @MainActor
+    private func madeiraSigningAccountJSON() async -> String? {
+        guard signedMadeiraRenewsItself() else {
+            log("This Madeira build doesn't renew its own signing, so no sign-in is handed to it. Refresh it under Tools › Sideloaded apps.")
+            return nil
+        }
+        guard let session = signSession else {
+            log("No Apple ID session to hand to Madeira — it won't renew its own signing. Refresh it under Tools › Sideloaded apps.")
+            return nil
+        }
+        let servers = anisetteCandidates()
+        do {
+            return try await onSignQueue { () -> String? in
+                var json: UnsafeMutablePointer<CChar>?
+                var error: UnsafeMutablePointer<CChar>?
+                let rc = si_signing_account(session, &json, &error)
+                guard rc == 0 else {
+                    let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
+                    error.map { si_string_free($0) }
+                    throw EngineError.message(msg)
+                }
+                let account = json.map { String(cString: $0) } ?? ""
+                json.map { si_string_free($0) }
+                return MadeiraSigningHandoff.adding(anisetteServers: servers, to: account)
+            }
+        } catch {
+            log("⚠️ Couldn't read the sign-in to hand to Madeira (\(short(error))). It won't renew its own signing: refresh it under Tools › Sideloaded apps.")
             return nil
         }
     }
@@ -1624,6 +2089,7 @@ final class Engine: ObservableObject {
         switch source {
         case .sideStore:     return "Account.sideconf"
         case .liveContainer: return "SideStore/Documents/Account.sideconf"
+        case .madeira:       return nil
         case .custom:
             guard signedAppBundleID()?.hasPrefix("com.SideStore.SideStore") == true else { return nil }
             return "Account.sideconf"
@@ -1650,7 +2116,10 @@ final class Engine: ObservableObject {
     @MainActor
     private func finishSuccess() {
         finished = true
-        setGuide(Guides.trust(appName: installedAppName))
+        let source = downloadedSource ?? installSource
+        setGuide(signedAppIsMadeira(source)
+                 ? Guides.trustMadeira(holding: madeiraHandoff)
+                 : Guides.trust(appName: installedAppName))
         log("✅ Done — \(installedSourceName) is installed. One trust step left (see the card).")
     }
 
@@ -1834,6 +2303,22 @@ final class Engine: ObservableObject {
         signedAppPlist()?["CFBundleIdentifier"] as? String
     }
 
+    /// True when what was installed is Madeira: picked as such, or imported as
+    /// a custom IPA, which only the signed bundle id (Madeira's, with the team
+    /// id appended) can tell.
+    private func signedAppIsMadeira(_ source: InstallSource) -> Bool {
+        if source == .madeira { return true }
+        guard source == .custom, let signed = signedAppBundleID() else { return false }
+        return signed == MadeiraPairingHandoff.bundleID
+            || signed.hasPrefix(MadeiraPairingHandoff.bundleID + ".")
+    }
+
+    /// True when the signed Madeira takes in the sign-in it renews its own
+    /// signing with: its Info.plist says which version of the hand-over it reads.
+    private func signedMadeiraRenewsItself() -> Bool {
+        (signedAppPlist()?[MadeiraSigningHandoff.infoKey] as? Int ?? 0) >= MadeiraSigningHandoff.version
+    }
+
     /// The signed app's home-screen name; an app carries only one of the two.
     private func signedAppName() -> String? {
         guard let plist = signedAppPlist() else { return nil }
@@ -1861,7 +2346,8 @@ final class Engine: ObservableObject {
     // the file, then write it into installed apps via house_arrest/AFC.
 
     /// Imports a pairing file made elsewhere (jitterbugpair, pymobiledevice3,
-    /// idevicepair, …), replacing the one on disk. Required below iOS 27.
+    /// idevicepair, …), replacing the one on disk. Required below iOS 27;
+    /// optional (under Advanced) from 27 on.
     @MainActor
     func importPairingFile(from url: URL) async {
         guard !isImportingPairing else { return }
@@ -1932,13 +2418,10 @@ final class Engine: ObservableObject {
     func installPairing(into target: InstalledPairingTarget) async throws {
         try await ensurePairingConnection()
         let path = pairingFilePath ?? PairingController.pairingFilePath()
-        let bundleID = target.bundleID
-        let rel = target.remoteRelativePath
         let udid = deviceUDID
         try await onDeviceQueue {
             let placement = try self.resolvePlacement(rpPairingPath: path, udid: udid)
-            try self.performInstallPairing(bundleID: bundleID, remoteRelativePath: rel,
-                                           placementPath: placement)
+            try self.performInstallPairing(target: target, placementPath: placement, udid: udid)
         }
     }
 
@@ -1956,12 +2439,9 @@ final class Engine: ObservableObject {
         }
         var failures: [String] = []
         for target in targets {
-            let bundleID = target.bundleID
-            let rel = target.remoteRelativePath
             do {
                 try await onDeviceQueue {
-                    try self.performInstallPairing(bundleID: bundleID, remoteRelativePath: rel,
-                                                   placementPath: placement)
+                    try self.performInstallPairing(target: target, placementPath: placement, udid: udid)
                 }
             } catch {
                 // One app refusing the write shouldn't cost the rest.
@@ -1998,16 +2478,64 @@ final class Engine: ObservableObject {
         pairingStatus = L("connected")
     }
 
-    /// Write the resolved pairing file into `bundleID`'s Documents, verifying
+    /// Write the resolved pairing file into `target`'s Documents, verifying
     /// the read-back.
-    private func performInstallPairing(bundleID: String, remoteRelativePath: String,
-                                       placementPath: String) throws {
+    private func performInstallPairing(target: InstalledPairingTarget, placementPath: String,
+                                       udid: String?) throws {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
-        log("Writing pairing file into \(bundleID) /Documents/\(remoteRelativePath) …")
+        let bundleID = target.bundleID
+        if target.app.takesRemoteRecordOnly {
+            guard try handOffMadeiraPairing(placementPath: placementPath, bundleID: bundleID) else {
+                throw EngineError.message(L("This pairing file has no RPPairing record, the only kind %@ reads.", target.name))
+            }
+            return
+        }
+        log("Writing pairing file into \(bundleID) /Documents/\(target.remoteRelativePath) …")
         let written = try connection.writePairingFile(intoBundleID: bundleID,
-                                                       remoteRelativePath: remoteRelativePath,
+                                                       remoteRelativePath: target.remoteRelativePath,
                                                        pairingFilePath: placementPath)
         log("Pairing file written into \(bundleID) and read-back VERIFIED (\(written) bytes).")
+        if let home = target.app.sideStoreHome {
+            handOffSplitPairing(placementPath: placementPath, bundleID: bundleID,
+                                appName: target.name, home: home, udid: udid)
+            // iOS caches an app's settings once it has run and ignores the
+            // edited file until the app is reinstalled or the iPhone restarts.
+            log("If \(target.name) has been opened since it was installed, it picks up these settings once it's reinstalled or this iPhone restarts.")
+        }
+    }
+
+    /// Hands the pairing to SideStore the way nightly 0.7.0-20260920 and later
+    /// read it (see `SideStorePairingHandoff`): one file per protocol, plus the
+    /// two settings its own import writes. Older builds read `ALTPairingFile`,
+    /// written just before, so failures here only log. Runs on `deviceQueue`.
+    private func handOffSplitPairing(placementPath: String, bundleID: String,
+                                     appName: String, home: SideStoreHome, udid: String?) {
+        do {
+            let records = try SideStorePairingHandoff.split(
+                Data(contentsOf: URL(fileURLWithPath: placementPath)), udid: udid)
+            if !records.missingLockdownKeys.isEmpty {
+                log("⚠️ The lockdown record lacks \(records.missingLockdownKeys.joined(separator: ", ")), which newer SideStore builds require — leaving it out of their files.")
+            }
+            guard let active = records.activeProtocol else {
+                log("⚠️ Nothing in the pairing file that newer \(appName) builds can load.")
+                return
+            }
+            for (name, data) in [(SideStorePairingHandoff.lockdownFileName, records.lockdown),
+                                 (SideStorePairingHandoff.remoteFileName, records.remote)] {
+                guard let data else { continue }
+                let rel = home.documentsPrefix + name
+                let written = try connection.writeFile(intoBundleID: bundleID,
+                                                       remoteRelativePath: rel, data: data)
+                log("Wrote /Documents/\(rel) into \(appName) (\(written) bytes, read-back VERIFIED).")
+            }
+            let prefsPath = home.preferencesPath(hostBundleID: bundleID)
+            try connection.updatePlist(inBundleID: bundleID, containerPath: prefsPath) { prefs in
+                SideStorePairingHandoff.applySettings(to: &prefs, activeProtocol: active)
+            }
+            log("Set \(appName) to load its \(active) pairing file (/\(prefsPath)), as its own import does.")
+        } catch {
+            log("⚠️ Couldn't hand \(appName) its pairing in the newer format (\(short(error))). SideStore nightlies from 20 September 2026 on may ask for the pairing file; older builds are set.")
+        }
     }
 
     /// The file to hand over, once the RPPairing record it's built from is known
@@ -2064,10 +2592,13 @@ final class Engine: ObservableObject {
         let udid = deviceUDID ?? ""
         let device = deviceName ?? ""
         log("=== Refreshing \(name) from \((ipaPath as NSString).lastPathComponent) ===")
+        let path = pairingFilePath ?? PairingController.pairingFilePath()
         let signed: String
         do {
             signed = try await onSignQueue {
-                try self.performSign(session: session, ipa: ipaPath, udid: udid, deviceName: device)
+                try self.performSign(session: session, ipa: ipaPath, udid: udid, deviceName: device,
+                                     pairingFilePath: path,
+                                     forMadeira: Self.isMadeira(ipaPath: ipaPath))
             }
         } catch EngineError.certExists {
             // Don't set `certConflict`: its retry button starts a full install
@@ -2077,7 +2608,6 @@ final class Engine: ObservableObject {
         defer { Self.discardSignedBundle(at: signed) }
         installProgress = 0
         let ip = deviceHost
-        let path = pairingFilePath ?? PairingController.pairingFilePath()
         try await onDeviceQueue {
             // iOS may drop the tunnel during signing and `isConnected` doesn't
             // detect it, so reconnect first (same as install).
@@ -2165,7 +2695,8 @@ final class Engine: ObservableObject {
     ///
     /// SideInstaller pairs via RPPairing, but minimuxer (SideStore, LiveContainer)
     /// and Feather need a classic lockdown record. This creates one over the open
-    /// tunnel and merges both records into one file, as iLoader does.
+    /// tunnel and merges both records into one file, as iLoader does. On iOS 27
+    /// lockdownd won't pair, so the RPPairing file goes alone.
     ///
     /// Runs on `deviceQueue`. Never throws: on failure it returns the RPPairing
     /// file alone, which StikDebug can still use.
@@ -2197,6 +2728,9 @@ final class Engine: ObservableObject {
             let lockdown: Data
             if let cached = CompositePairingFile.cachedLockdownRecord(forUDID: udid) {
                 lockdown = cached
+            } else if !Self.canMintLockdownRecord {
+                log("Handing over the RPPairing record on its own: iOS 27 doesn't let lockdown pair over the tunnel. StikDebug (sideloaded) and SideStore nightlies from 20 September 2026 on read it.")
+                return rpPairingPath
             } else {
                 log("Pairing with lockdown as well, so AltStore-family apps can read the file. Tap Trust if this iPhone asks, and unlock it if it's locked …")
                 // A Trust prompt may appear: a 2FA sheet waits for it.
@@ -2221,7 +2755,7 @@ final class Engine: ObservableObject {
             log("Pairing file carries both records (\(merged.count) bytes) — readable by SideStore, LiveContainer and Feather as well as StikDebug.")
             return path
         } catch {
-            log("⚠️ Couldn't add the lockdown record to the pairing file (\(short(error))). Writing the RPPairing record on its own — StikDebug (sideloaded) reads that, SideStore and Feather won't.")
+            log("⚠️ Couldn't add the lockdown record to the pairing file (\(short(error))). Writing the RPPairing record on its own — StikDebug (sideloaded) and SideStore nightlies from 20 September 2026 on read that; older SideStore builds and Feather won't.")
             return rpPairingPath
         }
     }
@@ -2413,6 +2947,62 @@ enum Guides {
             actionLabel: nil, actionURLString: nil)
     }
 
+    /// Shown when Apple has locked the Apple Account (GrandSlam -20209), which
+    /// only a password reset at iForgot undoes.
+    static var accountLocked: Guide {
+        Guide(
+            title: L("Reset your Apple Account password"),
+            systemImage: "lock.trianglebadge.exclamationmark",
+            steps: [
+                L("Apple has locked this Apple Account for security reasons, often after too many sign-in attempts. Every sign-in fails until it's unlocked, so tapping Install again won't help yet."),
+                L("Open iForgot, enter this Apple Account's email, and follow Apple's steps to unlock it and reset its password."),
+                L("Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password."),
+                L("Then tap Install again."),
+            ],
+            actionLabel: L("Open iForgot"),
+            actionURLString: "https://iforgot.apple.com")
+    }
+
+    /// Shown when Apple refuses developer services for the owner's age
+    /// (developer error 1102).
+    static var underage: Guide {
+        Guide(
+            title: L("This Apple Account can't sign apps"),
+            systemImage: "person.crop.circle.badge.exclamationmark",
+            steps: [
+                L("Apple only lets adults use the developer services SideInstaller signs apps with, and it reports that this Apple Account belongs to someone younger (error 1102)."),
+                L("Sign in with an adult's Apple Account instead: open Settings › Account and add it there."),
+                L("Then tap Install again."),
+            ],
+            actionLabel: nil, actionURLString: nil)
+    }
+
+    /// Shown when the Apple ID has no App IDs left this week (error 9120).
+    static var appIDLimit: Guide {
+        Guide(
+            title: L("No App IDs left this week"),
+            systemImage: "number.circle",
+            steps: [
+                L("Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days."),
+                L("They can't be deleted sooner. Wait until some expire, then tap Install again."),
+                L("Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again."),
+            ],
+            actionLabel: nil, actionURLString: nil)
+    }
+
+    /// Shown when installd refuses a fourth app signed by a free Apple ID.
+    static var appLimit: Guide {
+        Guide(
+            title: L("Three sideloaded apps already"),
+            systemImage: "square.stack.3d.up.slash",
+            steps: [
+                L("iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth."),
+                L("Expired apps count too. Delete one you no longer need from the Home Screen."),
+                L("Then tap Install again."),
+            ],
+            actionLabel: nil, actionURLString: nil)
+    }
+
     /// Shown when no Apple ID is saved; points to Settings › Account.
     static var account: Guide {
         Guide(
@@ -2441,15 +3031,25 @@ enum Guides {
     }
 
     static var pairing: Guide {
-        Guide(
+        // The Live Activity, or the notification standing in for it, puts the
+        // code over Settings; without either it's only in the app.
+        let codeOverSettings = PairingLiveActivity.isAvailable || PairingNotification.mayShow
+        var steps = [
+            L("Open the Settings app, then go to Privacy & Security › Developer Mode."),
+            L("Tap “Pair with SideInstaller”."),
+            L("Enter your iPhone’s passcode if it asks for it."),
+            codeOverSettings
+                ? L("Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.")
+                : L("Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings."),
+        ]
+        // The system's prompt gives no reason, and comes up with these steps.
+        if PairingNotification.willAsk {
+            steps.insert(L("Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings."), at: 0)
+        }
+        return Guide(
             title: L("Pair this iPhone in Settings"),
             systemImage: "lock.iphone",
-            steps: [
-                L("Open the Settings app, then go to Privacy & Security › Developer Mode."),
-                L("Tap “Pair with SideInstaller”."),
-                L("Enter your iPhone’s passcode if it asks for it."),
-                L("Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings."),
-            ],
+            steps: steps,
             actionLabel: nil, actionURLString: nil)
     }
 
@@ -2517,6 +3117,23 @@ enum Guides {
                 L("Open %@ from your Home Screen — you're done.", appName),
             ],
             actionLabel: nil, actionURLString: nil)
+    }
+
+    /// The trust step for Madeira, followed by what its own setup still asks
+    /// for, and how its signing is kept alive. With the pairing file already
+    /// inside, its setup shows that route as done. With the sign-in inside,
+    /// Madeira renews its own signing; without, it's refreshed from the Tools
+    /// tab like any other app.
+    static func trustMadeira(holding handoff: MadeiraHandoff) -> Guide {
+        var guide = trust(appName: MadeiraPairingHandoff.appName)
+        guide.steps[guide.steps.count - 1] = L("Open Madeira from your Home Screen.")
+        guide.steps.append(handoff.pairing
+            ? L("In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.")
+            : L("In its setup, under “Set up JIT”, pick how this iPhone gets JIT."))
+        guide.steps.append(handoff.signIn
+            ? L("Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.")
+            : L("Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps."))
+        return guide
     }
 
     /// Shown after a LiveContainer install, which needs SideStore's certificate.

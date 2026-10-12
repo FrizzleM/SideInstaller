@@ -333,6 +333,110 @@ hosts and tries the VPN peer and plain loopback in turn, logging each. If neithe
 answers, the record can't be minted on-device at all and an imported pairing file
 stays the only way through for this iPhone.
 
+**Answered for iOS 27 (2026-09-30): neither answers.** The VPN peer resets the
+first request and loopback is refused by iOS, so on iOS 27 `connect` no longer
+tries this fallback — see
+[iOS 27: lockdownd won't pair on-device](#ios-27-lockdownd-wont-pair-on-device-over-any-route).
+
+#### Side by Side: iOS 27's lockdownd won't pair over Wi-Fi (issue #52)
+
+Side by Side pairs another iPhone with `lockdownPairRecordDirect` against
+`<their IP>:62078`. On iOS 27 targets that never gets anywhere: lockdownd accepts
+the TCP connection and resets it (`ECONNRESET`, error 54) the moment the first
+request arrives — `GetValue(DevicePublicKey)`, the opening of `lockdownd_pair` —
+so no Trust prompt ever appears. Reproduced on two networks by the reporter. The
+way iOS 27 pairs over a network is the device-initiated one this app already uses
+for itself: the target taps a `_remotepairing-pairable-host._tcp` host under
+Settings › Privacy & Security › Developer Mode and types the PIN that host shows.
+
+So `SideBySideManager` keeps the lockdown attempt (it costs one round trip) and,
+when lockdownd answered but wouldn't pair — any failure of the `Pair` exchange
+except `UserDeniedPairing`, or a refused connection — runs
+`PairingController.pairPeer` instead, shows the instructions and the PIN on the
+Side by Side page, and tunnels with the resulting RPPairing file. A connection that
+never answers at all is the address or the network, and stops there.
+`DeviceConnection.LockdownPairError` carries which stage failed.
+
+Things the peer run must not do, all of which the plain `startAndWait` path does:
+
+- **Write this iPhone's pairing file.** `pairPeer` writes
+  `peer-pairings/remote-<ip>.plist`; the stored `altIRK`, `Engine.pairingStatus`,
+  `pairingPIN`, the imported-file mark and the merged file are left alone. Going
+  through `startAndWait` would have overwritten `rp_pairing_file.plist` with the
+  target's `alt_irk` — and replaced an *imported* file outright, since the Rust
+  side regenerates keys when the file isn't an RPPairing one.
+- **Share the host identifier.** A new file's identifier is
+  `uuid_v3(NAMESPACE_DNS, name)`, and every SideInstaller self-pairs as
+  `SideInstaller` (`d8442cca-…`). Pairing a target under that identifier would
+  replace the record *their* SideInstaller pairs itself with, breaking the files it
+  placed in SideStore and the rest. Side by Side's host is
+  `SideInstaller (Side by Side)` (`cd4b8503-…`) — never rename it.
+- **Mint a lockdown record.** `connect` falls back to minting one for an
+  RPPairing-only file, which stores *this* iPhone's record and dials its own
+  lockdownd on 127.0.0.1. Side by Side passes `allowLockdownMinting: false`.
+
+`cancelPeer` resolves the wait, stops advertising, and connects to the host's own
+listener on 127.0.0.1 and hangs up, so a host still blocked in `accept()` fails its
+handshake and returns — otherwise the next run would find the host busy. A target
+that has already connected keeps the host until it finishes or gives up.
+
+Verified here in the simulator against an address that refuses :62078: the switch
+to Remote Pairing, the advertisement (seen from a Mac with `dns-sd`), the
+instructions, Cancel ending the host, and a second run starting cleanly. The PIN
+exchange and the tunnel need a second iPhone; the reporter ran the same mechanism
+(pairable host → RPPairing tunnel → RSD → install) end to end on two iOS 27 iPhones.
+
+#### The pairing Live Activity
+
+Pairing this iPhone means typing a code SideInstaller shows into a prompt in
+Settings, with SideInstaller behind it. `PairingLiveActivity` puts the code over
+Settings instead: `PairingController` starts the activity when the host goes up
+(the app is still in front then, which `Activity.request` needs), updates it with
+the code from `presentPin`, and ends it when the run does. The updates come from
+the background, which works because pairing's keep-alive audio keeps the app
+running. Both the code and "Paired" go out with an `AlertConfiguration`: that is
+what opens the Dynamic Island, and on an iPhone without one it drops the Lock
+Screen card down as a banner for about six seconds. Side by Side doesn't use it:
+that code is typed into the other iPhone, with this app in front.
+
+A Live Activity's views have to live in a widget extension, so there is a second
+target, `SideInstallerLiveActivity` (`ios-live-activity/`), embedded as
+`PlugIns/SideInstallerLiveActivity.appex`. It shares
+`ios-app/PairingActivityAttributes.swift` with the app and nothing else: the copy
+arrives in the content state, already translated, since the extension has neither
+the tables nor the language setting.
+
+An extension needs an application-identifier of its own, under the app's.
+`scripts/sign_with_all_certs.sh` therefore signs it only under a wildcard profile
+(`TEAM.*`), renamed to sit under the app's new bundle id; under an explicit
+profile, which covers one id, it removes `PlugIns/`. Every certificate in the pool
+on 2026-10-11 had an explicit profile, so none of those builds carry the
+extension. Xcode's automatic signing and SideStore/AltStore give the extension
+its own App ID, which on a free Apple ID counts against the weekly limit.
+
+Those builds get the code as a local notification instead (`PairingNotification`):
+"Pairing code" with the code as its subtitle, replaced by "Paired" under the same
+identifier, and cleared when the app is back in front. That costs the system's
+"would like to send you notifications" prompt, which comes up when the first
+pairing starts, with a step added to the guide saying why. `PairingController`
+picks the Live Activity or the notification once, on
+`PairingLiveActivity.hasExtension`, and `PairingNotification` checks it again
+before it asks or posts: a build with the extension never asks, also when Live
+Activities are switched off for the app. A refusal leaves the old wording and
+the popup in the app.
+
+Verified in the iOS 27 simulator with a staged run (start → code → paired): the
+compact and expanded island on an iPhone 17 (not the minimal one, which takes a
+second app's activity), the Lock Screen card, the banner on an iPhone 17e, and the
+activity ending 15 s after "Paired". The
+signing paths were run against the built app with an ad-hoc identity (wildcard,
+wildcard with `FORCED_BUNDLE_ID`, explicit). The notification path was staged the
+same way on a build with `PlugIns/` deleted: the prompt, both banners over
+Settings, one delivered notification going to none on return, and no prompt on
+the second run; the build with the extension stayed at "not determined"
+throughout. Not verified: a real pairing on a device, an install of a build
+signed through the wildcard path, and a refused prompt.
+
 
 ### Step 3 — Apple ID + signing — code complete; device/account steps unverified
 
@@ -482,9 +586,14 @@ RSD instead of a usbmuxd cache entry.
 **Fallback, not a hard dependency:** if any of that fails, the write proceeds
 with the RPPairing record alone — what shipped before — and says so in the log.
 
-**Still unverified on hardware:** whether lockdownd accepts `Pair` on
-`com.apple.mobile.lockdown.remote.trusted`, and which of the two
-`EnableWifiDebugging` attempts lands. Both paths are logged explicitly.
+**Checked on hardware (iPhone 16, iOS 27, 2026-09-30): lockdownd refuses it.**
+`Pair` on `com.apple.mobile.lockdown.remote.trusted` answers `InvalidHostID`
+(FFI code 18) straight away, with no Trust prompt, and no variant of the request
+does better (see
+[iOS 27: lockdownd won't pair on-device](#ios-27-lockdownd-wont-pair-on-device-over-any-route)).
+On iOS 27 the attempt is now skipped and every write hands over the RPPairing
+record alone. SideStore nightlies from 2026-09-20 on can load that (see
+[SideStore's split pairing files](#fix-sidestore-nightly-asks-for-the-pairing-file)).
 
 **Transport used (whole pipeline):** the classic lockdown *transport* (usbmuxd,
 port 62078) is **not** used — every device service (lockdown info,
@@ -579,6 +688,180 @@ MB from 3.8.0 and logs each rung.
 The fallback is a good one, not just a survivable one: 3.8.0's guest SideStore is
 `0.6.4-20260714`, whose binary has **no** `acctFileChecksum`, so the certificate
 hand-off still lands silently there — better than the nightly would have been.
+
+#### Fix: SideStore nightly asks for the pairing file
+
+SideStore nightly `0.7.0-20260920.1479+0dd743f7` (develop `0dd743f7`, "implement
+dual pairing file support") changed how it finds the pairing file, and prompted
+for a manual import right after a SideInstaller install. Its
+`PairingFileManager.fetchPairingFile` now:
+
+- reads only `Documents/PairingFile_Lockdown.plist` or
+  `Documents/PairingFile_RemoteRP.plist`. `ALTPairingFile.mobiledevicepairing` is
+  migrated only by `MaintenanceManager` pass 7, which runs once per app group
+  (the counter lives there and outlives reinstalls) and *after* the boot check;
+- returns nil while `isPairingReset` is true, which `registerDefaults` makes the
+  default, and only an import sets it to false;
+- picks the file through `preferredPairingProtocol`, then `activePairingProtocol`,
+  and neither is set until an import;
+- hands minimuxer the string, whose `PairingFileParser.parse(preferred: nil)`
+  throws `.ambiguous` for a file with both records, i.e. our merged file.
+
+Confirmed from the phone's own SideStore console log: `Minimuxer check completed`
+1 ms after starting, with no `startMinimuxer` in between.
+
+Fix: `SideStorePairingHandoff` (in `PairingTargets.swift`) splits the file into
+a lockdown-only and an RPPairing-only record (XML, UDID stamped in), and
+`Engine.handOffSplitPairing` writes each under its new name next to the legacy
+file, then sets `isPairingReset = false` and `activePairingProtocol` (lockdown
+when there is a complete record, else `rppairing`) in SideStore's preferences
+plist. That is what SideStore's own import does. `preferredPairingProtocol` is left
+alone. Standalone SideStore's plist is `Library/Preferences/<bundle id>.plist`,
+reached with `house_arrest_vend_container` (development-signed apps only);
+LiveContainer's guest keeps it at `Documents/SideStore/Library/Preferences/
+com.SideStore.SideStore.plist` (signing leaves framework ids alone). Older
+builds read `ALTPairingFile` from Documents regardless of `isPairingReset`, so
+the extra files and keys are harmless there. LiveContainer nightly's guest is
+still `0.7.0-20260918` (legacy).
+
+**cfprefsd caches.** Once SideStore has run, editing its plist directly, even
+via a staging file and rename, isn't seen on the next launch: cfprefsd keeps
+serving its cached copy. A reinstall through installd drops that cache. Verified
+on the iPhone 16: after a full Nightly install the next launch logged
+`startMinimuxer() entered`, then `connection test SUCCEEDED` in `.rppairing` mode,
+and no prompt. The Pairing tab's write (no reinstall) says so in the log.
+
+#### iOS 27: lockdownd won't pair on-device, over any route
+
+Probed on the iPhone 16 (iOS 27, 2026-09-30) with a temporary hook that sent raw
+lockdown requests over the working RPPairing tunnel and logged lockdownd's whole
+reply, not just idevice's mapped error. `com.apple.mobile.lockdown.remote.trusted`
+and `.remote.untrusted` (both listed in the tunnel's RSD) answered identically:
+
+| `Pair` request | answer |
+|---|---|
+| no `PairRecord` | `MissingPairRecord` |
+| empty `PairRecord` | `InvalidResponse` |
+| any `PairRecord` with a `HostID`, `PairingOptions {ExtendedPairingErrors: true}` | `InvalidHostID` |
+| the same without `ExtendedPairingErrors` (absent or false; `ProtocolVersion` "2", "1" or absent) | `PasswordProtected`, with the phone unlocked |
+
+The `HostID`s tried: the stored `lockdownHostID`, and the RPPairing `identifier`
+uppercased and as stored (lowercase). Each went with idevice's full record
+(certificates plus `DevicePublicKey`, `RootPrivateKey`, `WiFiMACAddress`), with
+libimobiledevice's set (certificates, `HostID`, `SystemBUID`), and as `HostID` +
+`SystemBUID` with no certificates at all. Same answer every time, so lockdownd
+decides before it looks at the certificates, and no request brought up a Trust
+prompt.
+
+So `InvalidHostID` isn't about the HostID. It is lockdownd's extended code for
+"won't pair on this connection", and `PasswordProtected` is the legacy code for
+the same refusal. Apple's own host side never asks: MobileDevice.framework logs
+"Pairing over RemoteXPC is only supported for devices discovered via
+MobileDevice" and pairs those through RemotePairing, and pymobiledevice3's
+`RemoteLockdownClient.pair` raises `NotImplementedError` ("RemoteXPC lockdown
+version does not support pairing operations"). A connection over RSD is trusted
+because of its RPPairing record, and lockdown `Pair` isn't available on it.
+
+lockdownd's own port (`lockdownPairRecordDirect`) is closed too:
+
+- `10.7.0.1:62078` (the LocalDevVPN peer): the TCP connection opens, then
+  lockdownd resets it on the first request, `QueryType`, which normally needs no
+  pairing. `EnableWifiDebugging` and `EnableWifiConnections` were both already
+  true (read over RSD from `com.apple.mobile.wireless_lockdown`), so they aren't
+  the cause.
+- `127.0.0.1:62078` and the phone's own Wi-Fi address: `connect` fails with EPERM
+  (os error 1). iOS doesn't let an app reach them.
+
+A classic record would therefore be useless on iOS 27 even if the app had one.
+minimuxer and Feather reach lockdownd at `10.7.0.1:62078`, and
+[SideStore#1532](https://github.com/SideStore/SideStore/issues/1532) reports
+exactly this with a complete computer-made record on iOS 27: every connection
+closed within 1–2 ms. Side by Side sees the same reset over Wi-Fi.
+
+**What changed:** `Engine.canMintLockdownRecord` is false on iOS 27 and later.
+There, `placementPairingFile` no longer attempts `Pair`: it hands over the
+RPPairing record and logs one plain line, with no round trip and no ⚠️. And
+`DeviceConnection.connect` no longer falls back to
+`connectByMintingLockdownRecord` when the RPPairing tunnel fails. A pairing file
+that already carries a lockdown record (imported) still goes over as it is. On
+iOS 27, apps that only read a classic record can't be served: SideStore before
+nightly 0.7.0-20260920, LiveContainer's built-in SideStore (0.7.0-20260918), and
+Feather. They need a build that reads the RPPairing record. Before iOS 27 the
+attempt still runs; it is only reachable with an imported RPPairing-only file,
+and whether it works there is unverified (pymobiledevice3's refusal suggests it
+doesn't).
+
+## Madeira
+
+[Madeira](https://github.com/willfaust/Madeira) (Windows PC games through Wine and
+FEX) is a fourth `InstallSource`. Four things differ from SideStore.
+
+**The download.** Its release asset is named after the version
+(`Madeira-0.1.3.ipa` on tag `v0.1.3`), so there's no fixed `latest/download` URL.
+`SideStoreDownloader.latestTag` reads the tag off where
+`github.com/<repo>/releases/latest` redirects to, which has no rate limit, and the
+URL is built from it; a 404 falls back to the API as before. There's no nightly,
+so the channel picker is hidden and `Engine.selectedChannel` is always stable.
+`minimumOSMajorVersion` stops a run below iOS 26, which Madeira's JIT helper
+needs.
+
+**Signing.** Madeira isn't ready to play without
+`com.apple.developer.kernel.increased-memory-limit`. `si_sign_ipa` takes a flag
+that has isideload enable that capability on the app's App IDs before the profile
+is requested (`Engine.isMadeira` also catches a Madeira IPA imported as custom, or
+refreshed from Documents). Its `MadeiraJITHelper.appex` is signed like every
+extension here, with the main app's profile and entitlements, and renamed with the
+app (`<id>.<team>.JITHelper`), which is how Madeira finds it. Madeira picks its
+background task from `BGTaskSchedulerPermittedIdentifiers` by taking the first
+entry ending in `.download.*`, so the rebased entries now go first (vendored
+isideload README, change 9).
+
+**The pairing file.** Madeira keeps it in its Keychain, which nothing outside can
+write, but moves in a file it finds at `Documents/StikJIT/pairingFile.plist`
+whenever it reads the pairing (`JITPairingFileStore.moveLegacyFile`, there for
+its builds from before the Keychain). `MadeiraPairingHandoff` writes the RPPairing
+record there, cut down to its own keys. Madeira refuses anything else and would
+leave it lying in Documents, so a file without that record isn't written. A
+failed hand-off doesn't fail the install: Madeira can pair itself on iOS 27. A
+Madeira IPA imported as a custom IPA is recognised by its signed bundle id and
+handled the same way.
+
+**The refresh.** Madeira renews its own profile, so it doesn't depend on
+SideInstaller staying installed. What it lacks is an Apple sign-in, and
+`MadeiraSigningHandoff` gives it one without the password: `si_signing_account`
+reads the session's `com.apple.gs.xcode.auth` token, its adsid, the team and the
+anisette identity (identifier and `adi.pb`) — what SideStore's `AuthManager`
+keeps to refresh from — and the engine adds the anisette servers a sign-in
+tries, the one in use first (HTTPS ones, six at most), so one server going away
+doesn't strand Madeira. It goes
+as a binary plist to `Library/Application Support/SigningAccount.plist` in
+Madeira's container (not Documents, which Files shows), and only when the signed
+bundle's Info.plist has `MadeiraSigningAccountVersion`, so a token is never left
+in a build that won't take it in. Madeira moves it to its Keychain at launch,
+then per refresh: anisette `v3/get_headers`, `listAppIds` (or `addAppId` once the
+weekly App ID has run out, plus the Increased Memory Limit capability),
+`downloadTeamProvisioningProfile`, and misagent over the RPPairing tunnel with
+its pairing file. Because a re-registered App ID has no app group, `si_sign_ipa`
+takes an `app_group` flag and Madeira is signed without one; otherwise its later
+profiles would grant less than its signature claims. When Apple rejects the
+token (expiry, or a password change), Madeira says to install again, which hands
+over a new one. The token's real lifetime wasn't measured here: Apple states it
+in the token, SideInstaller logs it at sign-in, and Madeira shows it.
+
+The Madeira side is a patch on the fork (branch `sideinstaller-refresh`):
+`SigningRefresh.swift`, one function in its Rust library, docs and checks.
+SideInstaller itself no longer renews anything for Madeira beyond "Refresh all".
+
+Verified on the Mac, 2026-10-11: the downloader against GitHub (tag from the
+redirect, URL, ETag reuse, the version list); `IPALibrary.appInfo` on the real
+`Madeira-0.1.3.ipa`; the vendored signer on that IPA with a test certificate and
+profile (`codesign --verify --deep --strict` passes, bundle ids and task
+identifiers as above, the entitlement present); the hand-over format through
+both apps' code; and Madeira's portal client against a stubbed Apple. Not
+verified, since they need the iPhone and an Apple ID: an install of Madeira,
+Apple granting the capability, Madeira picking up the pairing file and the
+sign-in, and a refresh in Madeira (Apple accepting the handed token, the tunnel,
+misagent accepting the profile).
 
 ## Running on a device (what you do)
 

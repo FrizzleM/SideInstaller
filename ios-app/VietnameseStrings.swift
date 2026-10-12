@@ -143,8 +143,16 @@ let vietnameseStrings: [String: String] = [
     "Type this into the prompt in Settings.":
         "Nhập mã này vào hộp thoại trong Cài đặt.",
     "Install stopped": "Đã dừng cài đặt",
+    "Close": "Đóng",
+    "Yes": "Có",
+    "No": "Không",
+    "Closing this popup will end the process. Are you sure?":
+        "Đóng cửa sổ này sẽ dừng quá trình. Bạn có chắc không?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ đã được cài đặt. Hoàn tất bước tin cậy ở trên để mở ứng dụng.",
+    "%@ is installed. Finish the trust step below to open it.":
+        "%@ đã được cài đặt. Hoàn tất bước tin cậy ở dưới để mở ứng dụng.",
+    "Success: last steps": "Thành công: các bước cuối",
     "Action needed": "Cần thao tác",
     "Step %@ of %@": "Bước %@ trên %@",
     "Show all steps": "Hiện tất cả các bước",
@@ -202,10 +210,11 @@ let vietnameseStrings: [String: String] = [
         "Tệp ghép nối đã sẵn sàng. Bạn có thể xuất tệp hoặc cài vào một ứng dụng bên dưới.",
     "Pairing file installed into %@.": "Đã cài tệp ghép nối vào %@.",
 
-    // Importing a pairing file (iOS 26 and below)
+    // Importing a pairing file (required below iOS 27, under Advanced from 27)
 
     "Import pairing file": "Nhập tệp ghép nối",
     "How do I make one?": "Tạo nó như thế nào?",
+    "(Optional)": "(Không bắt buộc)",
     "imported pairing file": "đã nhập tệp ghép nối",
     "No pairing file yet — tap “Import pairing file” first.":
         "Chưa có tệp ghép nối — hãy chạm “Nhập tệp ghép nối” trước.",
@@ -409,6 +418,36 @@ let vietnameseStrings: [String: String] = [
     "Use my saved Apple ID instead": "Dùng Apple ID đã lưu của tôi",
     "Steps": "Các bước",
     "Waiting for them to tap Trust…": "Đang đợi họ chạm Tin cậy…",
+    "Waiting for them to pair in Settings…":
+        "Đang đợi họ ghép nối trong Cài đặt…",
+    "Waiting for them to enter the code…":
+        "Đang đợi họ nhập mã…",
+    "Pair their iPhone in Settings":
+        "Ghép nối iPhone của họ trong Cài đặt",
+    "Their iPhone won't ask by itself — pairing starts from its Settings.":
+        "iPhone của họ sẽ không tự hỏi — việc ghép nối bắt đầu từ Cài đặt của máy.",
+    "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
+        "Trên iPhone của họ, mở Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển.",
+    "Tap “Pair with %@”.":
+        "Chạm vào “Ghép nối với %@”.",
+    "Enter their iPhone’s passcode if it asks for it.":
+        "Nhập mật mã iPhone của họ nếu được hỏi.",
+    "Type the code that appears here into the prompt on their iPhone.":
+        "Nhập mã hiển thị tại đây vào hộp thoại trên iPhone của họ.",
+    "Type this into the prompt on their iPhone.":
+        "Nhập mã này vào hộp thoại trên iPhone của họ.",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "Họ đã chạm “Không tin cậy” trên iPhone của họ. Hãy bắt đầu lại và nhờ họ chạm Tin cậy.",
+    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+        "SideInstaller đang đợi một iPhone ghép nối với nó — từ thẻ Cài ứng dụng, trang Ghép nối, hoặc một lần thử trước ở đây. Hãy hoàn tất lần ghép nối đó, hoặc đóng rồi mở lại SideInstaller, sau đó thử lại.",
+    "Pairing with their iPhone didn't finish: %@":
+        "Ghép nối với iPhone của họ chưa hoàn tất: %@",
+    "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
+        "iPhone của họ ở %@ đã từ chối kết nối. Máy chỉ chấp nhận khi bật Chế độ nhà phát triển, và iOS yêu cầu xác nhận lại sau mỗi lần khởi động lại: trên iPhone của họ, hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển rồi thử lại.",
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "Không kết nối được tới iPhone của họ ở %@. Hãy kiểm tra địa chỉ (Cài đặt › Wi-Fi › ⓘ trên iPhone của họ), hai iPhone có cùng một mạng Wi-Fi không, và Mạng cục bộ đã được bật cho SideInstaller trong Cài đặt của iPhone này chưa. Mạng khách và mạng công cộng thường ngăn các thiết bị kết nối với nhau.",
+    "The link to their iPhone didn't come up: %@":
+        "Không mở được kết nối tới iPhone của họ: %@",
     "%d%% downloaded": "Đã tải %d%%",
     "%d%% uploaded": "Đã tải lên %d%%",
     "Start the install": "Bắt đầu cài đặt",
@@ -463,6 +502,15 @@ let vietnameseStrings: [String: String] = [
 
     "Stable": "Ổn định",
     "Nightly": "Nightly",
+
+    // Version picker (Advanced)
+
+    "%@ version": "Phiên bản %@",
+    "Latest": "Mới nhất",
+    "Latest (%@)": "Mới nhất (%@)",
+    "Couldn't load the other versions: %@": "Không thể tải các phiên bản khác: %@",
+    "Try again": "Thử lại",
+
     "couldn't find the IPA in the %@ %@ release":
         "không tìm thấy tệp IPA trong bản phát hành %@ của %@",
     "%@ has no %@ release right now": "%@ hiện không có bản phát hành %@ nào",
@@ -487,10 +535,22 @@ let vietnameseStrings: [String: String] = [
         "Đăng nhập Apple ID thất bại trên %@. Lỗi cuối cùng: %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Máy chủ đăng nhập của Apple đã từ chối yêu cầu (HTTP 503). Lỗi không phải do mật khẩu hay máy chủ anisette, nên thử thêm máy chủ khác cũng không giúp được. Hãy thử lại sau hoặc cập nhật SideInstaller.",
+    "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
+        "SideInstaller không kết nối được tới máy chủ đăng nhập của Apple (gsa.apple.com), dù iPhone này vẫn có kết nối internet. Có thứ gì đó đang chặn nó: tường lửa, bộ lọc DNS hoặc trình chặn quảng cáo, giới hạn nội dung trong Thời gian sử dụng, hoặc một ứng dụng VPN khác. Hãy tắt nó hoặc thử mạng khác, rồi thử lại.",
+    "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":
+        "SideInstaller không kết nối được tới Apple: Dữ liệu di động đang bị tắt cho ứng dụng này. Hãy bật SideInstaller trong Cài đặt › Di động, hoặc kết nối Wi-Fi có internet, rồi thử lại.",
+    "SideInstaller can't reach Apple: iOS isn't letting it use Wi-Fi. In Settings › Apps › SideInstaller › Wireless Data, choose WLAN & Cellular Data, then try again.":
+        "SideInstaller không kết nối được tới Apple: iOS không cho phép nó dùng Wi-Fi. Vào Cài đặt › Ứng dụng › SideInstaller › Dữ liệu không dây, chọn WLAN & Dữ liệu di động, rồi thử lại.",
+    "SideInstaller can't reach Apple: a VPN set to carry all traffic is disconnected, so iOS is holding traffic back. Reconnect it, or turn off its kill switch or Connect On Demand, then try again.":
+        "SideInstaller không kết nối được tới Apple: một VPN được đặt để chuyển toàn bộ lưu lượng đang bị ngắt kết nối, nên iOS đang giữ lại lưu lượng. Hãy kết nối lại, hoặc tắt kill switch hay Kết nối theo yêu cầu của nó, rồi thử lại.",
+    "SideInstaller can't reach Apple: this iPhone has no internet connection. Connect to Wi-Fi or turn on cellular data, then try again.":
+        "SideInstaller không kết nối được tới Apple: iPhone này không có kết nối internet. Hãy kết nối Wi-Fi hoặc bật dữ liệu di động, rồi thử lại.",
     "Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.":
         "Apple đang tạm thời giới hạn việc đăng nhập cho Apple ID hoặc mạng này (HTTP 429). Thử máy chủ khác cũng không giúp được, và mỗi lần thử có thể kéo dài thời gian chờ, nên hãy đợi một lúc rồi mới đăng nhập lại.",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
         "Nếu bạn chắc chắn mật khẩu đúng, có thể Apple đang giới hạn số lần đăng nhập: hãy đợi một lúc rồi thử lại.",
+    "Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.":
+        "Apple đã khóa Apple Account này vì lý do bảo mật (lỗi -20209), nên mọi lần đăng nhập đều thất bại cho đến khi tài khoản được mở khóa. Hãy đặt lại mật khẩu tại iforgot.apple.com, rồi đăng nhập lại bằng mật khẩu mới.",
     "the anisette server": "máy chủ anisette",
     "all %d anisette servers": "tất cả %d máy chủ anisette",
     "Not signed in.": "Chưa đăng nhập.",
@@ -555,6 +615,17 @@ let vietnameseStrings: [String: String] = [
     "Enter your iPhone’s passcode if it asks for it.": "Nhập mật mã iPhone của bạn nếu được hỏi.",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "Quay lại SideInstaller, xem mã mà ứng dụng hiển thị, rồi nhập đúng mã đó vào hộp thoại trong Cài đặt.",
+    "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
+        "Nhập mã hiện ở đầu màn hình vào hộp thoại trong Cài đặt. Nếu không thấy mã, hãy quay lại SideInstaller để xem.",
+    "Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings.":
+        "Hãy cho phép thông báo khi SideInstaller hỏi: mã ghép nối sẽ đến với bạn trong Cài đặt bằng cách đó.",
+
+    // The pairing Live Activity
+    "Privacy & Security › Developer Mode › Pair with SideInstaller":
+        "Quyền riêng tư & Bảo mật › Chế độ nhà phát triển › Ghép nối với SideInstaller",
+    "Paired": "Đã ghép nối",
+    "Tap to return to SideInstaller.": "Chạm để quay lại SideInstaller.",
+
     "A signing certificate already exists": "Đã có một chứng chỉ ký",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple trả về lỗi 7460: Apple ID này đã có chứng chỉ phát triển iOS, hoặc một yêu cầu vẫn đang chờ xử lý.",
@@ -568,6 +639,42 @@ let vietnameseStrings: [String: String] = [
         "Hoặc đăng nhập bằng một Apple ID khác (hoặc tài khoản dự phòng) ở trên, rồi chạm vào Cài đặt lần nữa.",
 
     // MARK: - Guide cards
+
+    // Guide: reset a locked Apple Account
+
+    "Reset your Apple Account password": "Đặt lại mật khẩu Apple Account",
+    "Apple has locked this Apple Account for security reasons, often after too many sign-in attempts. Every sign-in fails until it's unlocked, so tapping Install again won't help yet.":
+        "Apple đã khóa Apple Account này vì lý do bảo mật, thường là sau quá nhiều lần thử đăng nhập. Mọi lần đăng nhập đều thất bại cho đến khi tài khoản được mở khóa, nên lúc này chạm vào Cài ứng dụng lần nữa chưa có tác dụng.",
+    "Open iForgot, enter this Apple Account's email, and follow Apple's steps to unlock it and reset its password.":
+        "Mở iForgot, nhập email của Apple Account này và làm theo các bước của Apple để mở khóa và đặt lại mật khẩu.",
+    "Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password.":
+        "Quay lại SideInstaller, mở Cài đặt › Tài khoản, vuốt sang trái trên Apple ID này, chạm vào Sửa rồi nhập mật khẩu mới.",
+    "Then tap Install again.": "Sau đó chạm vào Cài ứng dụng lần nữa.",
+    "Open iForgot": "Mở iForgot",
+    "Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.":
+        "Apple không cho Apple Account này dùng dịch vụ dành cho nhà phát triển vì tuổi của chủ tài khoản (lỗi 1102). Hãy đăng nhập bằng Apple Account của một người lớn.",
+    "This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "Apple ID này đã hết App ID (lỗi 9120). Apple ID miễn phí chỉ đăng ký được 10 App ID mỗi tuần, và mỗi App ID được tính trong 7 ngày, nên hãy đợi một số hết hạn hoặc đăng nhập bằng Apple ID khác.",
+    "This iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. Delete one of them, then try again.":
+        "iPhone này đã có ba ứng dụng ký bằng Apple ID miễn phí, mức tối đa iOS cho phép, kể cả ứng dụng đã hết hạn. Hãy xóa một ứng dụng rồi thử lại.",
+    "This Apple Account can't sign apps":
+        "Apple Account này không thể ký ứng dụng",
+    "Apple only lets adults use the developer services SideInstaller signs apps with, and it reports that this Apple Account belongs to someone younger (error 1102).":
+        "Apple chỉ cho người lớn dùng dịch vụ dành cho nhà phát triển mà SideInstaller dùng để ký ứng dụng, và Apple cho biết Apple Account này thuộc về người chưa đủ tuổi (lỗi 1102).",
+    "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
+        "Hãy đăng nhập bằng Apple Account của một người lớn: mở Cài đặt › Tài khoản và thêm tài khoản đó vào.",
+    "No App IDs left this week": "Đã hết App ID trong tuần này",
+    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "Mỗi ứng dụng và tiện ích mở rộng mà SideInstaller ký đều cần một App ID. Apple ID miễn phí chỉ đăng ký được 10 App ID mỗi tuần, và mỗi App ID được tính trong 7 ngày.",
+    "They can't be deleted sooner. Wait until some expire, then tap Install again.":
+        "Không thể xóa chúng sớm hơn. Hãy đợi một số hết hạn, rồi chạm vào Cài ứng dụng lần nữa.",
+    "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
+        "Hoặc đăng nhập bằng một Apple ID khác (hoặc tài khoản dự phòng) trong Cài đặt › Tài khoản, rồi chạm vào Cài ứng dụng lần nữa.",
+    "Three sideloaded apps already": "Đã có ba ứng dụng sideload",
+    "iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth.":
+        "iOS chỉ cho phép ba ứng dụng ký bằng Apple ID miễn phí trên một iPhone cùng lúc, và đã từ chối ứng dụng thứ tư.",
+    "Expired apps count too. Delete one you no longer need from the Home Screen.":
+        "Ứng dụng đã hết hạn cũng được tính. Hãy xóa một ứng dụng bạn không cần nữa khỏi Màn hình chính.",
 
     // Guide: import a pairing file
 
@@ -644,6 +751,18 @@ let vietnameseStrings: [String: String] = [
     "Links": "Liên kết",
     "Source code": "Mã nguồn",
     "Support the project": "Ủng hộ dự án",
+    "Crypto": "Tiền mã hóa",
+    "Donation wallets for Bitcoin, Ethereum and Solana.":
+        "Ví nhận ủng hộ cho Bitcoin, Ethereum và Solana.",
+    "Crypto donations": "Ủng hộ bằng tiền mã hóa",
+    "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
+        "Việc ủng hộ hoàn toàn là tự nguyện. Khoản ủng hộ không dùng để mua gì, không mở khóa tính năng nào và bạn không nhận lại gì cả; đó chỉ là một cách để cảm ơn nếu SideInstaller đã giúp ích cho bạn.",
+    "Coin": "Đồng tiền",
+    "Network: %@": "Mạng: %@",
+    "QR code for the %@ address": "Mã QR của địa chỉ %@",
+    "Copied": "Đã sao chép",
+    "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
+        "Chỉ gửi mỗi đồng tiền qua đúng mạng được ghi. Tiền mã hóa gửi qua mạng khác sẽ không thể khôi phục.",
 
     "Special thanks": "Lời cảm ơn đặc biệt",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
@@ -671,4 +790,22 @@ let vietnameseStrings: [String: String] = [
         "Chỉ những bản dựng trên trang cài đặt và kho mã chính thức mới là của tôi. Bất kỳ ai cũng có thể fork mã nguồn, thêm mã đánh cắp thông tin đăng nhập rồi phát hành với cùng tên và biểu tượng — vì vậy đừng giao Apple ID của bạn cho một bản sao lấy từ nơi khác.",
     "Install page": "Trang cài đặt",
     "Terms": "Điều khoản",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.":
+        "%@ cần iOS %d trở lên. iPhone này đang chạy iOS %@.",
+    "Open Madeira from your Home Screen.": "Mở Madeira từ Màn hình chính.",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "Trong phần thiết lập của nó, ở mục “Set up JIT”, chọn “In-app with pairing file”: SideInstaller đã đặt sẵn tệp ở đó, nên hãy chạm vào “Continue”.",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "Trong phần thiết lập của nó, ở mục “Set up JIT”, chọn cách iPhone này có JIT.",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "Từ giờ Madeira tự gia hạn chữ ký của mình, khi nó đang mở và LocalDevVPN đang kết nối. SideInstaller đã cấp cho nó một phiên đăng nhập để làm việc đó: một token cho dịch vụ nhà phát triển của Apple, không phải mật khẩu của bạn. Madeira có thể xoá nó trong Settings › Signing.",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "Chữ ký của nó có hiệu lực 7 ngày. Trước khi hết hạn, hãy gia hạn tại đây trong Công cụ › Ứng dụng sideload.",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "Tệp ghép nối này không có bản ghi RPPairing, loại duy nhất mà %@ đọc được.",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "Chạy game PC Windows trên iPhone của bạn. Của Will Faust, giấy phép GPL-3.0.",
 ]

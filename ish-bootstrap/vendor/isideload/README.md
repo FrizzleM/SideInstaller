@@ -59,6 +59,11 @@ Apple's GSA edge answers HTTP 503 to an Xcode `X-Mme-Client-Info`, which this
 crate used to take from the anisette server; see change 2 in
 `rust-core/vendor/isideload/README.md` for the evidence and the upstream commits.
 
+**Negative App ID quota** (`src/sideload/application.rs`), applied identically
+to both copies on 2026-09-17. A negative `availableQuantity` from Apple made
+`register_app_ids` fail with `out of range integral type conversion attempted`;
+see change 4 in `rust-core/vendor/isideload/README.md`.
+
 **`src/sideload/sideloader.rs` — write `embedded.mobileprovision` into
 each app extension.**
 

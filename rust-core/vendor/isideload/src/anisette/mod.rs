@@ -88,6 +88,20 @@ impl AnisetteData {
         cpd
     }
 
+    /// Placeholder values, for tests that send requests to a local server.
+    #[cfg(test)]
+    pub(crate) fn for_tests() -> Self {
+        AnisetteData {
+            machine_id: "machine-id".into(),
+            one_time_password: "otp".into(),
+            routing_info: "17106176".into(),
+            _device_description: "<test>".into(),
+            device_unique_identifier: "device-id".into(),
+            _local_user_id: "local-user".into(),
+            generated_at: SystemTime::now(),
+        }
+    }
+
     pub fn needs_refresh(&self) -> bool {
         let elapsed = self.generated_at.elapsed();
         match elapsed {

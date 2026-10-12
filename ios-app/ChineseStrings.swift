@@ -141,8 +141,16 @@ let chineseStrings: [String: String] = [
     "Type this into the prompt in Settings.":
         "将它输入到 设置 中的提示框内。",
     "Install stopped": "安装已停止",
+    "Close": "关闭",
+    "Yes": "是",
+    "No": "否",
+    "Closing this popup will end the process. Are you sure?":
+        "关闭此弹窗将终止当前流程。确定要关闭吗？",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ 已安装。完成上面的信任步骤即可打开。",
+    "%@ is installed. Finish the trust step below to open it.":
+        "%@ 已安装。完成下面的信任步骤即可打开。",
+    "Success: last steps": "成功：最后几步",
     "Action needed": "需要操作",
     "Step %@ of %@": "第 %@ 步，共 %@ 步",
     "Show all steps": "显示所有步骤",
@@ -198,10 +206,11 @@ let chineseStrings: [String: String] = [
         "配对文件已就绪。你可以导出，或安装到下面的某个应用中。",
     "Pairing file installed into %@.": "配对文件已安装到 %@。",
 
-    // Importing a pairing file (iOS 26 and below)
+    // Importing a pairing file (required below iOS 27, under Advanced from 27)
 
     "Import pairing file": "导入配对文件",
     "How do I make one?": "怎么生成？",
+    "(Optional)": "（可选）",
     "imported pairing file": "已导入配对文件",
     "No pairing file yet — tap “Import pairing file” first.": "还没有配对文件 — 请先点按“导入配对文件”。",
     "Pairing file missing — import it first.": "缺少配对文件 — 请先导入。",
@@ -399,6 +408,36 @@ let chineseStrings: [String: String] = [
     "Use my saved Apple ID instead": "改用我保存的 Apple ID",
     "Steps": "步骤",
     "Waiting for them to tap Trust…": "等待对方轻点“信任”…",
+    "Waiting for them to pair in Settings…":
+        "等待对方在 设置 中配对…",
+    "Waiting for them to enter the code…":
+        "等待对方输入验证码…",
+    "Pair their iPhone in Settings":
+        "在 设置 中配对对方的 iPhone",
+    "Their iPhone won't ask by itself — pairing starts from its Settings.":
+        "对方的 iPhone 不会自己弹出提示——配对要从它的 设置 开始。",
+    "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
+        "在对方的 iPhone 上，打开 设置 › 隐私与安全性 › 开发者模式。",
+    "Tap “Pair with %@”.":
+        "轻点“与 %@ 配对”。",
+    "Enter their iPhone’s passcode if it asks for it.":
+        "如果系统要求，请输入对方 iPhone 的密码。",
+    "Type the code that appears here into the prompt on their iPhone.":
+        "把这里显示的验证码输入到对方 iPhone 上的提示框内。",
+    "Type this into the prompt on their iPhone.":
+        "将它输入到对方 iPhone 上的提示框内。",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "对方在 iPhone 上轻点了“不信任”。请重新开始，并让对方轻点“信任”。",
+    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+        "SideInstaller 已在等待某台 iPhone 与它配对——来自“安装”标签页、“配对”页面，或这里之前的一次尝试。请先完成那次配对，或关闭后重新打开 SideInstaller，然后重试。",
+    "Pairing with their iPhone didn't finish: %@":
+        "与对方 iPhone 的配对未完成：%@",
+    "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
+        "对方位于 %@ 的 iPhone 拒绝了连接。只有开启开发者模式时它才接受连接，而且每次重启后 iOS 都会要求再次确认：请在对方 iPhone 的 设置 › 隐私与安全性 › 开发者模式 中打开它，然后重试。",
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "无法连接到位于 %@ 的对方 iPhone。请检查地址（在对方 iPhone 的 设置 › 无线局域网 › ⓘ 中），确认两台 iPhone 连接的是同一个 Wi-Fi 网络，并确认已在这台 iPhone 的 设置 中为 SideInstaller 打开本地网络。访客网络和公共网络通常会阻止设备之间互相连接。",
+    "The link to their iPhone didn't come up: %@":
+        "未能建立与对方 iPhone 的连接：%@",
     "%d%% downloaded": "已下载 %d%%",
     "%d%% uploaded": "已上传 %d%%",
     "Start the install": "开始安装",
@@ -452,6 +491,15 @@ let chineseStrings: [String: String] = [
 
     "Stable": "稳定版",
     "Nightly": "Nightly",
+
+    // Version picker (Advanced)
+
+    "%@ version": "%@ 版本",
+    "Latest": "最新",
+    "Latest (%@)": "最新（%@）",
+    "Couldn't load the other versions: %@": "无法加载其他版本：%@",
+    "Try again": "重试",
+
     "couldn't find the IPA in the %@ %@ release":
         "在 %@ 渠道的 %@ 发行版中找不到 IPA 文件",
     "%@ has no %@ release right now": "%@ 目前没有任何 %@ 发行版",
@@ -476,10 +524,22 @@ let chineseStrings: [String: String] = [
         "在 %@ 上登录 Apple ID 失败。最后的错误：%@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Apple 登录服务器拒绝了请求（HTTP 503）。这不是你的密码或 anisette 服务器的问题，换用其他服务器也无济于事。请稍后重试，或更新 SideInstaller。",
+    "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
+        "SideInstaller 无法连接 Apple 登录服务器（gsa.apple.com），但这台 iPhone 已连接互联网。有东西在拦截它：防火墙、DNS 过滤或广告拦截工具、屏幕使用时间的内容限制，或其他 VPN App。请将其关闭或换一个网络，然后重试。",
+    "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":
+        "SideInstaller 无法连接 Apple：它的蜂窝数据已被关闭。请在 设置 › 蜂窝网络 中打开 SideInstaller，或连接可以上网的无线局域网，然后重试。",
+    "SideInstaller can't reach Apple: iOS isn't letting it use Wi-Fi. In Settings › Apps › SideInstaller › Wireless Data, choose WLAN & Cellular Data, then try again.":
+        "SideInstaller 无法连接 Apple：iOS 不允许它使用无线局域网。请在 设置 › App › SideInstaller › 无线数据 中选择“无线局域网与蜂窝网络”，然后重试。",
+    "SideInstaller can't reach Apple: a VPN set to carry all traffic is disconnected, so iOS is holding traffic back. Reconnect it, or turn off its kill switch or Connect On Demand, then try again.":
+        "SideInstaller 无法连接 Apple：一个设为承载所有流量的 VPN 已断开，因此 iOS 暂停了网络流量。请重新连接它，或关闭它的断网保护（kill switch）或按需连接，然后重试。",
+    "SideInstaller can't reach Apple: this iPhone has no internet connection. Connect to Wi-Fi or turn on cellular data, then try again.":
+        "SideInstaller 无法连接 Apple：这台 iPhone 没有连接互联网。请连接无线局域网或打开蜂窝数据，然后重试。",
     "Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.":
         "Apple 正在暂时限制此 Apple ID 或此网络的登录（HTTP 429）。换用其他服务器无济于事，每次尝试还可能延长等待时间，请过一段时间再登录。",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
         "如果你确定密码正确，可能是 Apple 正在限制登录尝试：请过一段时间再试。",
+    "Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.":
+        "出于安全原因，Apple 已锁定此 Apple 账户（错误 -20209），在解锁之前每次登录都会失败。请在 iforgot.apple.com 重设其密码，然后用新密码重新登录。",
     "the anisette server": "anisette 服务器",
     "all %d anisette servers": "全部 %d 个 anisette 服务器",
     "Not signed in.": "尚未登录。",
@@ -543,6 +603,17 @@ let chineseStrings: [String: String] = [
     "Enter your iPhone’s passcode if it asks for it.": "如果系统要求，请输入你的 iPhone 密码。",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "回到 SideInstaller，查看它显示给你的验证码，然后把相同的验证码输入到 设置 中的提示框内。",
+    "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
+        "将屏幕顶部显示的验证码输入到 设置 中的提示框内。如果没有显示，请回到 SideInstaller 查看。",
+    "Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings.":
+        "当 SideInstaller 询问时，请允许通知：配对码会通过通知显示在 设置 中。",
+
+    // The pairing Live Activity
+    "Privacy & Security › Developer Mode › Pair with SideInstaller":
+        "隐私与安全性 › 开发者模式 › 与 SideInstaller 配对",
+    "Paired": "已配对",
+    "Tap to return to SideInstaller.": "轻点以返回 SideInstaller。",
+
     "A signing certificate already exists": "已存在签名证书",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple 返回错误 7460：此 Apple ID 已有一个 iOS 开发证书，或者有一个申请仍在处理中。",
@@ -556,6 +627,41 @@ let chineseStrings: [String: String] = [
         "或者，在上面用另一个（或备用的）Apple ID 登录，然后再次轻点“安装”。",
 
     // MARK: - Guide cards
+
+    // Guide: reset a locked Apple Account
+
+    "Reset your Apple Account password": "重设你的 Apple 账户密码",
+    "Apple has locked this Apple Account for security reasons, often after too many sign-in attempts. Every sign-in fails until it's unlocked, so tapping Install again won't help yet.":
+        "出于安全原因，Apple 已锁定此 Apple 账户，通常是因为登录尝试次数过多。在解锁之前每次登录都会失败，所以现在再次轻点“安装”也没有用。",
+    "Open iForgot, enter this Apple Account's email, and follow Apple's steps to unlock it and reset its password.":
+        "打开 iForgot，输入此 Apple 账户的电子邮件，然后按照 Apple 的步骤解锁并重设密码。",
+    "Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password.":
+        "回到 SideInstaller，打开“设置 › 账户”，在此 Apple ID 上向左轻扫，轻点“编辑”，然后输入新密码。",
+    "Then tap Install again.": "然后再次轻点“安装”。",
+    "Open iForgot": "打开 iForgot",
+    "Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.":
+        "由于账户持有人的年龄，Apple 不允许此 Apple 账户使用开发者服务（错误 1102）。请改用成年人的 Apple 账户登录。",
+    "This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "此 Apple ID 已没有可用的 App ID（错误 9120）。免费 Apple ID 每周可注册 10 个，每个会占用 7 天，所以请等一些过期，或用另一个 Apple ID 登录。",
+    "This iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. Delete one of them, then try again.":
+        "此 iPhone 上已有三个用免费 Apple ID 签名的 App，这是 iOS 允许的上限，已过期的也算在内。删除其中一个后再试一次。",
+    "This Apple Account can't sign apps": "此 Apple 账户无法签名 App",
+    "Apple only lets adults use the developer services SideInstaller signs apps with, and it reports that this Apple Account belongs to someone younger (error 1102).":
+        "Apple 只允许成年人使用 SideInstaller 用来签名 App 的开发者服务，而它显示此 Apple 账户属于未成年人（错误 1102）。",
+    "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
+        "请改用成年人的 Apple 账户登录：打开“设置 › 账户”并在那里添加。",
+    "No App IDs left this week": "本周已没有可用的 App ID",
+    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "SideInstaller 签名的每个 App 和 App 扩展都需要一个 App ID。免费 Apple ID 每周可注册 10 个，每个会占用 7 天。",
+    "They can't be deleted sooner. Wait until some expire, then tap Install again.":
+        "它们无法提前删除。等一些过期后，再次轻点“安装”。",
+    "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
+        "或者在“设置 › 账户”中用另一个（或备用的）Apple ID 登录，然后再次轻点“安装”。",
+    "Three sideloaded apps already": "已有三个侧载应用",
+    "iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth.":
+        "iOS 只允许一台 iPhone 同时安装三个用免费 Apple ID 签名的 App，因此拒绝了第四个。",
+    "Expired apps count too. Delete one you no longer need from the Home Screen.":
+        "已过期的 App 也算在内。从主屏幕删除一个不再需要的 App。",
 
     // Guide: import a pairing file
 
@@ -632,6 +738,17 @@ let chineseStrings: [String: String] = [
     "Links": "链接",
     "Source code": "源代码",
     "Support the project": "支持这个项目",
+    "Crypto": "加密货币",
+    "Donation wallets for Bitcoin, Ethereum and Solana.": "比特币、以太坊和 Solana 的捐赠钱包。",
+    "Crypto donations": "加密货币捐赠",
+    "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
+        "捐赠完全自愿。捐赠不会购买任何东西，不会解锁任何功能，也不会带来任何回报；这只是在 SideInstaller 帮到你时表达感谢的一种方式。",
+    "Coin": "币种",
+    "Network: %@": "网络：%@",
+    "QR code for the %@ address": "%@ 地址的二维码",
+    "Copied": "已复制",
+    "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
+        "每种币请只通过所示网络发送。通过其他网络发送的加密货币将无法找回。",
 
     "Special thanks": "特别感谢",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
@@ -658,4 +775,21 @@ let chineseStrings: [String: String] = [
         "只有官方安装页面和代码仓库上的构建版本才是我发布的。任何人都可以 fork 源代码，加入窃取凭据的代码，再用同样的名称和图标发布——所以不要把你的 Apple ID 交给来自其他地方的副本。",
     "Install page": "安装页面",
     "Terms": "条款",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ 需要 iOS %d 或更高版本。这台 iPhone 运行的是 iOS %@。",
+    "Open Madeira from your Home Screen.": "从主屏幕打开 Madeira。",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "在它的设置流程中，在“Set up JIT”下选择“In-app with pairing file”：SideInstaller 已经把文件放进去了，轻点“Continue”即可。",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "在它的设置流程中，在“Set up JIT”下选择这台 iPhone 获得 JIT 的方式。",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "从现在起，只要 Madeira 处于打开状态且 LocalDevVPN 已连接，它就会自行续签。为此 SideInstaller 给了它一个登录凭据：用于 Apple 开发者服务的令牌，而不是你的密码。可以在 Madeira 的 Settings › Signing 中将其移除。",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "它的签名有效期为 7 天。到期前，请在这里的“工具 › 侧载应用”中续签。",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "这个配对文件没有 RPPairing 记录，而 %@ 只读取这一种。",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "在你的 iPhone 上运行 Windows 电脑游戏，由 Will Faust 开发，GPL-3.0 许可证。",
 ]

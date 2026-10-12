@@ -73,6 +73,7 @@ pub unsafe fn run_host(
     model: *const c_char,
     out_path: *const c_char,
     host_alt_irk_hex: *const c_char,
+    host_identifier: *const c_char,
     ready_cb: ReadyCb,
     pin_cb: PinCb,
     ctx: *mut c_void,
@@ -88,6 +89,7 @@ pub unsafe fn run_host(
     let model = opt_str(model, "Mac17,7");
     let out_path = opt_str(out_path, "rp_pairing_file.plist");
     let saved_alt_irk = parse_alt_irk(&opt_str(host_alt_irk_hex, ""));
+    let identifier = opt_str(host_identifier, "");
     let cbs = Callbacks { ready: ready_cb, pin: pin_cb, ctx };
 
     let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
@@ -98,7 +100,7 @@ pub unsafe fn run_host(
         }
     };
 
-    match rt.block_on(run(bind_addr, port, name, model, out_path, saved_alt_irk, cbs)) {
+    match rt.block_on(run(bind_addr, port, name, model, out_path, saved_alt_irk, identifier, cbs)) {
         Ok(res) => {
             (*out).device_name = cstr(res.name);
             (*out).device_model = cstr(res.model);
@@ -130,6 +132,7 @@ async fn run(
     model: String,
     out_path: String,
     saved_alt_irk: Option<[u8; 16]>,
+    identifier: String,
     cbs: Callbacks,
 ) -> Result<Paired, String> {
     tracing::info!("RPPairing: binding listener on {bind_addr}:{port}");
@@ -164,7 +167,13 @@ async fn run(
         }
         Err(_) => {
             tracing::info!("RPPairing: no reusable host key pair at {out_path}; generating one");
-            RpPairingFile::generate(&name)
+            let mut file = RpPairingFile::generate(&name);
+            // `generate` derives the identifier from the name alone, the same on
+            // every SideInstaller; a caller's own keeps their records apart.
+            if !identifier.is_empty() {
+                file.identifier = identifier;
+            }
+            file
         }
     };
     let mut host_info = PairableHostInfo::generate(&name, &model);
@@ -199,11 +208,7 @@ async fn run(
         })
         .await
         .map_err(|e| format!("pairing failed: {e}"))?;
-    tracing::info!(
-        "RPPairing: MILESTONE handshake complete (PIN accepted): {} ({})",
-        peer.name,
-        peer.model
-    );
+    tracing::info!("RPPairing: MILESTONE handshake complete (PIN accepted): {}", peer.model);
 
     pairing_file
         .write_to_file(&out_path)

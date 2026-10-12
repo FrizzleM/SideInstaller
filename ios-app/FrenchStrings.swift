@@ -143,8 +143,16 @@ let frenchStrings: [String: String] = [
     "Type this into the prompt in Settings.":
         "Saisissez ce code dans la demande affichée dans Réglages.",
     "Install stopped": "Installation interrompue",
+    "Close": "Fermer",
+    "Yes": "Oui",
+    "No": "Non",
+    "Closing this popup will end the process. Are you sure?":
+        "Fermer cette fenêtre arrêtera le processus. Voulez-vous continuer ?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ est installé. Terminez l'étape de confiance ci-dessus pour l'ouvrir.",
+    "%@ is installed. Finish the trust step below to open it.":
+        "%@ est installé. Terminez l'étape de confiance ci-dessous pour l'ouvrir.",
+    "Success: last steps": "Terminé : dernières étapes",
     "Action needed": "Action requise",
     "Step %@ of %@": "Étape %@ sur %@",
     "Show all steps": "Afficher toutes les étapes",
@@ -202,10 +210,11 @@ let frenchStrings: [String: String] = [
         "Fichier de jumelage prêt. Vous pouvez l'exporter ou l'installer dans une app ci-dessous.",
     "Pairing file installed into %@.": "Fichier de jumelage installé dans %@.",
 
-    // Importing a pairing file (iOS 26 and below)
+    // Importing a pairing file (required below iOS 27, under Advanced from 27)
 
     "Import pairing file": "Importer le fichier de jumelage",
     "How do I make one?": "Comment en créer un ?",
+    "(Optional)": "(Facultatif)",
     "imported pairing file": "fichier de jumelage importé",
     "No pairing file yet — tap “Import pairing file” first.":
         "Aucun fichier de jumelage — touchez d'abord « Importer le fichier de jumelage ».",
@@ -413,6 +422,36 @@ let frenchStrings: [String: String] = [
     "Use my saved Apple ID instead": "Utiliser plutôt mon Apple ID enregistré",
     "Steps": "Étapes",
     "Waiting for them to tap Trust…": "En attente qu'ils touchent Faire confiance…",
+    "Waiting for them to pair in Settings…":
+        "En attente qu'ils jumellent l'iPhone dans Réglages…",
+    "Waiting for them to enter the code…":
+        "En attente qu'ils saisissent le code…",
+    "Pair their iPhone in Settings":
+        "Jumelez leur iPhone dans Réglages",
+    "Their iPhone won't ask by itself — pairing starts from its Settings.":
+        "Leur iPhone ne le demandera pas de lui-même : le jumelage se lance depuis ses Réglages.",
+    "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
+        "Sur leur iPhone, ouvrez Réglages › Confidentialité et sécurité › Mode développeur.",
+    "Tap “Pair with %@”.":
+        "Touchez « Jumeler avec %@ ».",
+    "Enter their iPhone’s passcode if it asks for it.":
+        "Saisissez le code de leur iPhone s'il le demande.",
+    "Type the code that appears here into the prompt on their iPhone.":
+        "Saisissez le code qui s'affiche ici dans la demande affichée sur leur iPhone.",
+    "Type this into the prompt on their iPhone.":
+        "Saisissez ce code dans la demande affichée sur leur iPhone.",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "Ils ont touché « Ne pas faire confiance » sur leur iPhone. Recommencez et demandez-leur de toucher Faire confiance.",
+    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+        "SideInstaller attend déjà qu'un iPhone se jumelle avec lui — depuis l'onglet Installer, la page Jumelage ou une tentative précédente ici. Terminez ce jumelage, ou fermez puis rouvrez SideInstaller, puis réessayez.",
+    "Pairing with their iPhone didn't finish: %@":
+        "Le jumelage avec leur iPhone n'a pas abouti : %@",
+    "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
+        "Leur iPhone à l'adresse %@ a refusé la connexion. Il n'en accepte qu'avec le mode développeur activé, et iOS demande de le confirmer de nouveau après chaque redémarrage : sur leur iPhone, activez-le dans Réglages › Confidentialité et sécurité › Mode développeur, puis réessayez.",
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "Impossible de joindre leur iPhone à l'adresse %@. Vérifiez l'adresse (Réglages › Wi-Fi › ⓘ sur leur iPhone), que les deux iPhone sont sur le même réseau Wi-Fi et que Réseau local est activé pour SideInstaller dans les Réglages de cet iPhone. Les réseaux invités et publics empêchent souvent les appareils de communiquer entre eux.",
+    "The link to their iPhone didn't come up: %@":
+        "La liaison avec leur iPhone n'a pas pu s'établir : %@",
     "%d%% downloaded": "%d%% téléchargés",
     "%d%% uploaded": "%d%% envoyés",
     "Start the install": "Lancer l'installation",
@@ -467,6 +506,15 @@ let frenchStrings: [String: String] = [
 
     "Stable": "Stable",
     "Nightly": "Nightly",
+
+    // Version picker (Advanced)
+
+    "%@ version": "Version de %@",
+    "Latest": "Dernière",
+    "Latest (%@)": "Dernière (%@)",
+    "Couldn't load the other versions: %@": "Impossible de charger les autres versions : %@",
+    "Try again": "Réessayer",
+
     "couldn't find the IPA in the %@ %@ release":
         "impossible de trouver l'IPA dans la version %@ de %@",
     "%@ has no %@ release right now": "%@ n'a aucune version %@ pour le moment",
@@ -492,10 +540,22 @@ let frenchStrings: [String: String] = [
         "Échec de la connexion à l'Apple ID sur %@. Dernière erreur : %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Le serveur de connexion d'Apple a refusé la requête (HTTP 503). Ce n'est ni votre mot de passe ni le serveur anisette : essayer d'autres serveurs n'y changera rien. Réessayez plus tard ou mettez à jour SideInstaller.",
+    "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
+        "SideInstaller ne parvient pas à joindre le serveur de connexion d'Apple (gsa.apple.com), alors que cet iPhone est connecté à Internet. Quelque chose le bloque : un pare-feu, un filtre DNS ou un bloqueur de publicités, les restrictions de contenu de Temps d'écran ou une autre app VPN. Désactivez-le ou essayez un autre réseau, puis réessayez.",
+    "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":
+        "SideInstaller ne parvient pas à joindre Apple : les données cellulaires sont désactivées pour l'app. Activez SideInstaller dans Réglages › Données cellulaires, ou connectez-vous à un réseau Wi-Fi avec accès à Internet, puis réessayez.",
+    "SideInstaller can't reach Apple: iOS isn't letting it use Wi-Fi. In Settings › Apps › SideInstaller › Wireless Data, choose WLAN & Cellular Data, then try again.":
+        "SideInstaller ne parvient pas à joindre Apple : iOS ne l'autorise pas à utiliser le Wi-Fi. Dans Réglages › Apps › SideInstaller › Données sans fil, choisissez « WLAN et données cellulaires », puis réessayez.",
+    "SideInstaller can't reach Apple: a VPN set to carry all traffic is disconnected, so iOS is holding traffic back. Reconnect it, or turn off its kill switch or Connect On Demand, then try again.":
+        "SideInstaller ne parvient pas à joindre Apple : un VPN configuré pour faire passer tout le trafic est déconnecté, et iOS retient donc le trafic. Reconnectez-le, ou désactivez son kill switch ou sa connexion à la demande, puis réessayez.",
+    "SideInstaller can't reach Apple: this iPhone has no internet connection. Connect to Wi-Fi or turn on cellular data, then try again.":
+        "SideInstaller ne parvient pas à joindre Apple : cet iPhone n'est pas connecté à Internet. Connectez-vous à un réseau Wi-Fi ou activez les données cellulaires, puis réessayez.",
     "Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.":
         "Apple limite temporairement les connexions pour cet identifiant Apple ou ce réseau (HTTP 429). Essayer d'autres serveurs n'y changera rien et chaque tentative peut prolonger l'attente : patientez un moment avant de vous reconnecter.",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
         "Si vous êtes sûr que le mot de passe est correct, Apple limite peut-être les tentatives de connexion : patientez un moment avant de réessayer.",
+    "Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.":
+        "Apple a verrouillé ce compte Apple pour des raisons de sécurité (erreur -20209) : toute connexion échoue tant qu'il n'est pas déverrouillé. Réinitialisez son mot de passe sur iforgot.apple.com, puis reconnectez-vous avec le nouveau mot de passe.",
     "the anisette server": "le serveur anisette",
     "all %d anisette servers": "les %d serveurs anisette",
     "Not signed in.": "Non connecté.",
@@ -561,6 +621,17 @@ let frenchStrings: [String: String] = [
         "Saisissez le code de votre iPhone s'il vous le demande.",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "Revenez dans SideInstaller, notez le code qu'il affiche, puis saisissez ce même code dans la demande affichée dans Réglages.",
+    "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
+        "Saisissez le code qui s'affiche en haut de l'écran dans la demande affichée dans Réglages. S'il n'apparaît pas, revenez dans SideInstaller pour le lire.",
+    "Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings.":
+        "Autorisez les notifications quand SideInstaller le demande : c'est ainsi que le code de jumelage vous parvient dans Réglages.",
+
+    // The pairing Live Activity
+    "Privacy & Security › Developer Mode › Pair with SideInstaller":
+        "Confidentialité et sécurité › Mode développeur › Jumeler avec SideInstaller",
+    "Paired": "Jumelé",
+    "Tap to return to SideInstaller.": "Touchez pour revenir dans SideInstaller.",
+
     "A signing certificate already exists": "Un certificat de signature existe déjà",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple a renvoyé l'erreur 7460 : cet Apple ID possède déjà un certificat de développement iOS, ou une demande est encore en attente.",
@@ -574,6 +645,42 @@ let frenchStrings: [String: String] = [
         "Vous pouvez aussi vous connecter ci-dessus avec un autre Apple ID (ou un compte de secours), puis toucher à nouveau Installer.",
 
     // MARK: - Guide cards
+
+    // Guide: reset a locked Apple Account
+
+    "Reset your Apple Account password": "Réinitialisez le mot de passe de votre compte Apple",
+    "Apple has locked this Apple Account for security reasons, often after too many sign-in attempts. Every sign-in fails until it's unlocked, so tapping Install again won't help yet.":
+        "Apple a verrouillé ce compte Apple pour des raisons de sécurité, souvent après trop de tentatives de connexion. Toute connexion échoue tant qu'il n'est pas déverrouillé : toucher à nouveau Installer ne servira à rien pour l'instant.",
+    "Open iForgot, enter this Apple Account's email, and follow Apple's steps to unlock it and reset its password.":
+        "Ouvrez iForgot, saisissez l'e-mail de ce compte Apple et suivez les étapes d'Apple pour le déverrouiller et réinitialiser son mot de passe.",
+    "Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password.":
+        "De retour dans SideInstaller, ouvrez Réglages › Compte, balayez cet Apple ID vers la gauche, touchez Modifier et saisissez le nouveau mot de passe.",
+    "Then tap Install again.": "Touchez ensuite à nouveau Installer.",
+    "Open iForgot": "Ouvrir iForgot",
+    "Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.":
+        "Apple n'autorise pas ce compte Apple à utiliser les services pour développeurs en raison de l'âge de son titulaire (erreur 1102). Connectez-vous plutôt avec le compte Apple d'un adulte.",
+    "This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "Cet Apple ID n'a plus d'App ID disponibles (erreur 9120). Un Apple ID gratuit peut en enregistrer 10 par semaine, et chacun compte pendant 7 jours : attendez que certains expirent ou connectez-vous avec un autre Apple ID.",
+    "This iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. Delete one of them, then try again.":
+        "Cet iPhone a déjà trois apps signées avec un Apple ID gratuit, le maximum autorisé par iOS, apps expirées comprises. Supprimez-en une, puis réessayez.",
+    "This Apple Account can't sign apps":
+        "Ce compte Apple ne peut pas signer d'apps",
+    "Apple only lets adults use the developer services SideInstaller signs apps with, and it reports that this Apple Account belongs to someone younger (error 1102).":
+        "Apple réserve aux adultes les services pour développeurs avec lesquels SideInstaller signe les apps, et indique que ce compte Apple appartient à une personne plus jeune (erreur 1102).",
+    "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
+        "Connectez-vous plutôt avec le compte Apple d'un adulte : ouvrez Réglages › Compte et ajoutez-le.",
+    "No App IDs left this week": "Plus d'App ID cette semaine",
+    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "Chaque app et extension d'app que SideInstaller signe a besoin d'un App ID. Un Apple ID gratuit peut en enregistrer 10 par semaine, et chacun compte pendant 7 jours.",
+    "They can't be deleted sooner. Wait until some expire, then tap Install again.":
+        "Ils ne peuvent pas être supprimés plus tôt. Attendez que certains expirent, puis touchez à nouveau Installer.",
+    "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
+        "Ou connectez-vous avec un autre Apple ID (ou un compte de secours) dans Réglages › Compte, puis touchez à nouveau Installer.",
+    "Three sideloaded apps already": "Déjà trois apps sideloadées",
+    "iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth.":
+        "iOS autorise trois apps signées avec un Apple ID gratuit à la fois sur un iPhone, et en a refusé une quatrième.",
+    "Expired apps count too. Delete one you no longer need from the Home Screen.":
+        "Les apps expirées comptent aussi. Supprimez de l'écran d'accueil une app dont vous n'avez plus besoin.",
 
     // Guide: import a pairing file
 
@@ -651,6 +758,18 @@ let frenchStrings: [String: String] = [
     "Links": "Liens",
     "Source code": "Code source",
     "Support the project": "Soutenir le projet",
+    "Crypto": "Crypto",
+    "Donation wallets for Bitcoin, Ethereum and Solana.":
+        "Portefeuilles de dons pour Bitcoin, Ethereum et Solana.",
+    "Crypto donations": "Dons en crypto",
+    "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
+        "Les dons sont entièrement facultatifs. Ils n'achètent rien, ne débloquent aucune fonction et ne donnent droit à rien en retour : c'est simplement une façon de dire merci si SideInstaller vous a aidé.",
+    "Coin": "Monnaie",
+    "Network: %@": "Réseau : %@",
+    "QR code for the %@ address": "Code QR de l'adresse %@",
+    "Copied": "Copié",
+    "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
+        "N'envoyez chaque monnaie que sur le réseau indiqué. Les cryptos envoyées sur un autre réseau sont irrécupérables.",
 
     "Special thanks": "Remerciements",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
@@ -678,4 +797,22 @@ let frenchStrings: [String: String] = [
         "Seules les versions publiées sur la page d’installation et le dépôt officiels sont les miennes. N’importe qui peut forker le code, y ajouter un voleur d’identifiants et le diffuser sous le même nom et la même icône : ne confiez pas votre Apple ID à une copie trouvée ailleurs.",
     "Install page": "Page d’installation",
     "Terms": "Conditions",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.":
+        "%@ nécessite iOS %d ou une version ultérieure. Cet iPhone utilise iOS %@.",
+    "Open Madeira from your Home Screen.": "Ouvrez Madeira depuis votre écran d'accueil.",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "Dans sa configuration, sous « Set up JIT », choisissez « In-app with pairing file » : SideInstaller y a déjà placé le fichier, touchez donc « Continue ».",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "Dans sa configuration, sous « Set up JIT », choisissez comment cet iPhone obtient le JIT.",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "Désormais, Madeira renouvelle lui-même sa signature, quand il est ouvert et que LocalDevVPN est connecté. SideInstaller lui a donné une connexion pour cela : un jeton pour le service développeur d'Apple, pas votre mot de passe. Madeira peut l'oublier dans Settings › Signing.",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "Sa signature dure 7 jours. Avant qu'ils ne soient écoulés, renouvelez-la ici dans Outils › Apps sideloadées.",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "Ce fichier de jumelage ne contient pas d'enregistrement RPPairing, le seul type que %@ lit.",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "Fait tourner les jeux PC Windows sur votre iPhone. Par Will Faust, GPL-3.0.",
 ]

@@ -1,7 +1,8 @@
-use apple_codesign::{SigningSettings, UnifiedSigner};
+use apple_codesign_quick::{
+    BundleSigningSettings, ProvisioningProfile, RustCryptoCmsSigner, sign_bundle,
+};
 use plist::Dictionary;
-use plist_macro::plist_to_xml_string;
-use rootcause::{option_ext::OptionExt, prelude::*};
+use rootcause::prelude::*;
 use tracing::info;
 
 use crate::{
@@ -10,9 +11,18 @@ use crate::{
         application::{Application, SpecialApp},
         cert_identity::CertificateIdentity,
     },
-    util::plist::PlistDataExtract,
 };
 
+/// Signs the app and every bundle in it with apple-codesign-quick, which
+/// hashes and signs nested bundles in parallel (upstream cc9fa9c, iLoader
+/// 2.3.0), and embeds the provisioning profile while doing so.
+///
+/// Every app extension, nested ones too, gets the main app's entitlements and
+/// a copy of its profile, as before the switch: the main profile is the one
+/// that authorizes them (README change 1). apple-codesign-quick gives a nested
+/// bundle only what is listed for its bundle ID, which by default is no profile
+/// and no entitlements, so each extension is listed. Frameworks and dylibs get
+/// neither, as Xcode signs them.
 pub fn sign(
     app: &mut Application,
     cert_identity: &CertificateIdentity,
@@ -20,73 +30,85 @@ pub fn sign(
     special: &Option<SpecialApp>,
     team: &DeveloperTeam,
 ) -> Result<(), Report> {
-    let mut settings = signing_settings(cert_identity)?;
-    let entitlements: Dictionary = entitlements_from_prov(
-        provisioning_profile.encoded_profile.as_ref(),
-        special,
-        team,
-    )?;
+    let profile_der: &[u8] = provisioning_profile.encoded_profile.as_ref();
+    let profile =
+        ProvisioningProfile::parse(profile_der).context("Failed to parse provisioning profile")?;
+    let certificate_chain = cert_identity
+        .profile_to_certificate_chain(&profile)
+        .context("Failed to build the signing certificate chain")?;
+    let signer = RustCryptoCmsSigner::new(
+        cert_identity.private_key.clone(),
+        cert_identity.certificate.clone(),
+        certificate_chain,
+    );
 
-    settings
-        .set_entitlements_xml(
-            apple_codesign::SettingsScope::Main,
-            plist_to_xml_string(&entitlements),
-        )
-        .context("Failed to set entitlements XML")?;
-    let signer = UnifiedSigner::new(settings);
+    let entitlements = entitlements(&profile, special, team);
 
-    for bundle in app.bundle.collect_bundles_sorted() {
-        info!(
-            "Signing {}",
-            bundle
-                .bundle_dir
-                .file_name()
-                .unwrap_or(bundle.bundle_dir.as_os_str())
-                .to_string_lossy()
-        );
-        signer
-            .sign_path_in_place(&bundle.bundle_dir)
-            .context(format!(
-                "Failed to sign bundle: {}",
-                bundle.bundle_dir.display()
-            ))?;
+    clear_old_signatures(app)?;
+
+    let mut settings = BundleSigningSettings::new(&team.team_id, entitlements.clone(), Some(&signer));
+    settings.embedded_mobileprovision = Some(profile_der);
+    for bundle in app.bundle.collect_nested_bundles() {
+        if bundle.bundle_dir.extension().and_then(|e| e.to_str()) != Some("appex") {
+            continue;
+        }
+        let Some(bundle_id) = bundle.bundle_identifier() else {
+            continue;
+        };
+        settings
+            .embedded_mobileprovisions_by_bundle_id
+            .insert(bundle_id.to_string(), profile_der);
+        settings
+            .entitlements_by_bundle_id
+            .insert(bundle_id.to_string(), entitlements.clone());
     }
+
+    info!(
+        "Signing {} and {} app extension(s)",
+        app.bundle
+            .bundle_dir
+            .file_name()
+            .unwrap_or(app.bundle.bundle_dir.as_os_str())
+            .to_string_lossy(),
+        settings.entitlements_by_bundle_id.len()
+    );
+    sign_bundle(&app.bundle.bundle_dir, &settings).context(format!(
+        "Failed to sign bundle: {}",
+        app.bundle.bundle_dir.display()
+    ))?;
 
     Ok(())
 }
 
-pub fn signing_settings<'a>(cert: &'a CertificateIdentity) -> Result<SigningSettings<'a>, Report> {
-    let mut settings = SigningSettings::default();
-
-    cert.setup_signing_settings(&mut settings)?;
-    settings.set_for_notarization(false);
-    settings.set_shallow(true);
-
-    Ok(settings)
+/// Deletes each bundle's `_CodeSignature` folder before it is signed again.
+///
+/// apple-codesign-quick replaces `CodeResources` but seals anything else it
+/// finds in there, such as the `ResourceRules` some re-signed IPAs carry.
+/// Nothing in `_CodeSignature` is ever a sealed resource, so verification then
+/// fails with "a sealed resource is missing or invalid". The old signer
+/// skipped the folder.
+fn clear_old_signatures(app: &Application) -> Result<(), Report> {
+    let nested = app.bundle.collect_nested_bundles();
+    let bundle_dirs = std::iter::once(&app.bundle.bundle_dir).chain(nested.iter().map(|b| &b.bundle_dir));
+    for bundle_dir in bundle_dirs {
+        let signature_dir = bundle_dir.join("_CodeSignature");
+        if signature_dir.is_dir() {
+            std::fs::remove_dir_all(&signature_dir).context(format!(
+                "Failed to remove the old signature in {}",
+                bundle_dir.display()
+            ))?;
+        }
+    }
+    Ok(())
 }
 
-fn entitlements_from_prov(
-    data: &[u8],
+/// The profile's entitlements, plus the keychain groups LiveContainer needs.
+fn entitlements(
+    profile: &ProvisioningProfile,
     special: &Option<SpecialApp>,
     team: &DeveloperTeam,
-) -> Result<Dictionary, Report> {
-    let start = data
-        .windows(6)
-        .position(|w| w == b"<plist")
-        .ok_or_report()?;
-    let end = data
-        .windows(8)
-        .rposition(|w| w == b"</plist>")
-        .ok_or_report()?
-        + 8;
-    let plist_data = &data[start..end];
-    let plist = plist::Value::from_reader_xml(plist_data)?;
-
-    let mut entitlements = plist
-        .as_dictionary()
-        .ok_or_report()?
-        .get_dict("Entitlements")?
-        .clone();
+) -> Dictionary {
+    let mut entitlements = profile.entitlements().clone();
 
     if matches!(
         special,
@@ -110,5 +132,5 @@ fn entitlements_from_prov(
         );
     }
 
-    Ok(entitlements)
+    entitlements
 }

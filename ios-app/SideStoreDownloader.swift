@@ -25,11 +25,13 @@ enum ReleaseChannel: String, CaseIterable, Identifiable {
     }
 }
 
-/// What to install: two SideStore builds fetched from GitHub, or a user-supplied
-/// IPA. Nothing is known about the latter, so its release properties are nil.
+/// What to install: two SideStore builds and Madeira, fetched from GitHub, or a
+/// user-supplied IPA. Nothing is known about the latter, so its release
+/// properties are nil.
 enum InstallSource: String, CaseIterable, Identifiable {
     case sideStore
     case liveContainer
+    case madeira
     case custom
 
     var id: String { rawValue }
@@ -39,6 +41,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "LiveContainer + SideStore"
+        case .madeira:       return "Madeira"
         case .custom:        return L("Custom .ipa")
         }
     }
@@ -48,6 +51,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "SS + LiveContainer"
+        case .madeira:       return "Madeira"
         case .custom:        return L("Custom .ipa")
         }
     }
@@ -57,7 +61,26 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore/SideStore"
         case .liveContainer: return "LiveContainer/LiveContainer"
+        case .madeira:       return "willfaust/Madeira"
         case .custom:        return nil
+        }
+    }
+
+    /// False for a build with no nightly release, which is always installed
+    /// from the stable channel.
+    var hasNightly: Bool {
+        switch self {
+        case .sideStore, .liveContainer: return true
+        case .madeira, .custom:          return false
+        }
+    }
+
+    /// The oldest iOS the build runs on, when that is newer than what
+    /// SideInstaller itself installs on. Madeira's JIT helper needs iOS 26.
+    var minimumOSMajorVersion: Int? {
+        switch self {
+        case .madeira:                            return 26
+        case .sideStore, .liveContainer, .custom: return nil
         }
     }
 
@@ -73,12 +96,35 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Published `.ipa` asset name, used to build the direct download URL.
+    /// Published `.ipa` asset name, used to build the direct download URL. Nil
+    /// for Madeira too, whose asset is named after its release: see
+    /// `assetFileName(forTag:)`.
     var assetFileName: String? {
         switch self {
-        case .sideStore:     return "SideStore.ipa"
-        case .liveContainer: return "LiveContainer+SideStore.ipa"
-        case .custom:        return nil
+        case .sideStore:        return "SideStore.ipa"
+        case .liveContainer:    return "LiveContainer+SideStore.ipa"
+        case .madeira, .custom: return nil
+        }
+    }
+
+    /// The `.ipa` asset's name on the release tagged `tag`, for a build that
+    /// names it after the version: "Madeira-0.1.3.ipa" on "v0.1.3".
+    func assetFileName(forTag tag: String) -> String? {
+        switch self {
+        case .madeira:
+            let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+            return version.isEmpty ? nil : "Madeira-\(version).ipa"
+        case .sideStore, .liveContainer, .custom:
+            return nil
+        }
+    }
+
+    /// True when a release's title only repeats the build's name and the
+    /// version its tag carries ("Madeira 0.1.3" on "v0.1.3").
+    func titleRestatesTag(_ title: String, tag: String) -> Bool {
+        let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+        return [version, tag].contains {
+            title.caseInsensitiveCompare("\(displayName) \($0)") == .orderedSame
         }
     }
 
@@ -94,15 +140,49 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Local filename for the downloaded IPA, e.g. "SideStore-nightly.ipa".
-    func fileName(_ channel: ReleaseChannel) -> String {
-        let base: String
+    /// A fixed link that stands in for the build's latest release.
+    ///
+    /// Temporary, for Madeira: a build that renews its own signing, until
+    /// upstream publishes one. Remove it to go back to `repo`'s latest release.
+    /// A link that has gone fails the download: no release is tried in its
+    /// place, so another build is never installed instead.
+    var pinnedDownload: (url: URL, name: String)? {
         switch self {
-        case .sideStore:     base = "SideStore"
-        case .liveContainer: base = "LiveContainer+SideStore"
-        case .custom:        return "Custom.ipa"
+        case .madeira:
+            return URL(string: "https://ts.buzzheavier.com/d/zvi3n1agakb5?v=UxWTGolNrwffipXPTdZMMjsycv8jwIjXuMZlDkh8oEEq5d0WJiMNDL7sQnypb0Ak3fVi_ieiv5cb-YMjuCssOHYdC-c5Q0GnRhRS08z4bzWsu2n9UJc600lwe2SoAJ6iC9vX19uwHzpNbbgSxRQgtwXFMI_PxgqtNJ6Xtqnvb_L8CC3329mTwvT9P1IAEnXQQA").map { ($0, "Madeira.ipa") }
+        case .sideStore, .liveContainer, .custom:
+            return nil
         }
-        return "\(base)\(channel.fileSuffix).ipa"
+    }
+
+    /// Local filename for the downloaded IPA, e.g. "SideStore-nightly.ipa", or
+    /// "SideStore (0.6.3).ipa" for a version picked under Advanced.
+    func fileName(_ channel: ReleaseChannel, version: String? = nil) -> String {
+        guard let stem = fileStem else { return "Custom.ipa" }
+        guard let version else { return "\(stem)\(channel.fileSuffix).ipa" }
+        // A tag may hold a path separator.
+        let safe = version.replacingOccurrences(of: "/", with: "-")
+        return "\(stem)\(channel.fileSuffix) (\(safe)).ipa"
+    }
+
+    /// The version in a name `fileName(_:version:)` wrote, e.g. "0.6.3" in
+    /// "SideStore (0.6.3).ipa"; nil for any other name.
+    func version(inFileName name: String, channel: ReleaseChannel) -> String? {
+        guard let stem = fileStem else { return nil }
+        let prefix = "\(stem)\(channel.fileSuffix) (", suffix = ").ipa"
+        guard name.hasPrefix(prefix), name.hasSuffix(suffix),
+              name.count > prefix.count + suffix.count else { return nil }
+        return String(name.dropFirst(prefix.count).dropLast(suffix.count))
+    }
+
+    /// Start of every downloaded filename; nil for a custom IPA.
+    private var fileStem: String? {
+        switch self {
+        case .sideStore:     return "SideStore"
+        case .liveContainer: return "LiveContainer+SideStore"
+        case .madeira:       return "Madeira"
+        case .custom:        return nil
+        }
     }
 
     // MARK: Pairing-file placement
@@ -116,6 +196,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "LiveContainer"
+        case .madeira:       return MadeiraPairingHandoff.appName
         case .custom:        return nil
         }
     }
@@ -125,6 +206,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore:     return "com.SideStore.SideStore"
         case .liveContainer: return "com.kdt.livecontainer"
+        case .madeira:       return MadeiraPairingHandoff.bundleID
         case .custom:        return nil
         }
     }
@@ -135,6 +217,27 @@ enum InstallSource: String, CaseIterable, Identifiable {
         switch self {
         case .sideStore, .custom: return "ALTPairingFile.mobiledevicepairing"
         case .liveContainer:      return "SideStore/Documents/ALTPairingFile.mobiledevicepairing"
+        case .madeira:            return MadeiraPairingHandoff.remoteRelativePath
+        }
+    }
+
+    /// True when the app works without the pairing file, so failing to place
+    /// it doesn't fail the install: Madeira can pair itself or use StikDebug,
+    /// and nothing is known about a custom IPA.
+    var pairingIsOptional: Bool {
+        switch self {
+        case .sideStore, .liveContainer: return false
+        case .madeira, .custom:          return true
+        }
+    }
+
+    /// Where SideStore lives in the installed app. Nil for a custom IPA, which
+    /// only the signed bundle id can identify.
+    var sideStoreHome: SideStoreHome? {
+        switch self {
+        case .sideStore:        return .standalone
+        case .liveContainer:    return .liveContainer
+        case .madeira, .custom: return nil
         }
     }
 
@@ -148,10 +251,102 @@ enum InstallSource: String, CaseIterable, Identifiable {
             // Prefer the published name, in case the asset is renamed later.
             return assets.first { $0.name == "LiveContainer+SideStore.ipa" }
                 ?? assets.first { $0.name.lowercased().contains("sidestore") && $0.name.hasSuffix(".ipa") }
+        case .madeira:
+            // "Madeira-<version>.ipa", beside its checksum file.
+            return assets.first { $0.name.lowercased().hasPrefix("madeira") && $0.name.hasSuffix(".ipa") }
+                ?? assets.first { $0.name.hasSuffix(".ipa") }
         case .custom:
             // No release to pick from.
             return nil
         }
+    }
+}
+
+// MARK: - Versions to pick from
+
+/// One release of a build, as the version picker under Advanced offers it.
+struct ReleaseVersion: Identifiable, Hashable {
+    /// The release's tag, e.g. "0.6.3" or "alpha".
+    let tag: String
+    /// The release's title, which can carry a warning: "0.6.4 (DO NOT USE)".
+    let name: String
+    /// The build's `.ipa` on this release.
+    let assetName: String
+    let assetURL: URL
+
+    var id: String { tag }
+
+    /// Short label: the tag, or the title when the two differ only in case
+    /// ("Alpha").
+    var title: String {
+        name.caseInsensitiveCompare(tag) == .orderedSame ? name : tag
+    }
+
+    /// Menu label: the whole title when it starts with the tag, so the
+    /// maintainers' remarks show; otherwise the tag and the title.
+    var menuTitle: String {
+        if name.isEmpty || name.caseInsensitiveCompare(tag) == .orderedSame { return title }
+        return name.lowercased().hasPrefix(tag.lowercased()) ? name : "\(tag) – \(name)"
+    }
+
+    /// True when the title says more than the version.
+    var hasRemark: Bool { menuTitle != title }
+
+    // Identity is the tag, so a pick stays selected when the list reloads.
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.tag == rhs.tag }
+    func hash(into hasher: inout Hasher) { hasher.combine(tag) }
+}
+
+/// A build's releases on GitHub, sorted into the two channels for the picker.
+struct ReleaseCatalog {
+    /// The release "Latest" installs on each channel, when the list has it.
+    let latest: [ReleaseChannel: ReleaseVersion]
+    /// Each channel's other releases carrying the build, newest first.
+    let others: [ReleaseChannel: [ReleaseVersion]]
+    let fetched: Date
+
+    /// `releases` newest first, the order GitHub answers in.
+    init(source: InstallSource, releases: [SideStoreDownloader.GHRelease], fetched: Date = Date()) {
+        let offered = releases.compactMap { release -> (release: SideStoreDownloader.GHRelease,
+                                                        version: ReleaseVersion)? in
+            guard release.draft != true,
+                  let asset = source.selectAsset(from: release.assets),
+                  let url = URL(string: asset.browser_download_url) else { return nil }
+            var name = (release.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            // "Madeira 0.1.3" on the tag "v0.1.3" is no remark: it says what
+            // the tag says.
+            if source.titleRestatesTag(name, tag: release.tag_name) { name = release.tag_name }
+            return (release, ReleaseVersion(tag: release.tag_name, name: name,
+                                            assetName: asset.name, assetURL: url))
+        }
+
+        // Resolved as the download resolves "Latest": GitHub's newest full
+        // release, and the fixed nightly tag, else the newest of either kind.
+        var latest: [ReleaseChannel: ReleaseVersion] = [:]
+        latest[.stable] = offered.first { $0.release.prerelease != true }?.version
+        latest[.nightly] = (offered.first { $0.release.tag_name == "nightly" } ?? offered.first)?.version
+
+        var others: [ReleaseChannel: [ReleaseVersion]] = [:]
+        for (release, version) in offered {
+            guard let channel = Self.channel(of: release), version != latest[channel] else { continue }
+            others[channel, default: []].append(version)
+        }
+        self.latest = latest
+        self.others = others
+        self.fetched = fetched
+    }
+
+    /// Nightly for a pre-release, whether GitHub flags it or its version says so
+    /// ("0.7.0-alpha"); stable for a plain version number. Other tags
+    /// ("auto-update-test") belong on neither.
+    private static func channel(of release: SideStoreDownloader.GHRelease) -> ReleaseChannel? {
+        let tag = release.tag_name
+        let numbered = tag.drop(while: { $0 == "v" }).first?.isNumber == true
+        // Semantic versioning puts a pre-release label after the first hyphen.
+        let labelled = tag.split(separator: "-", maxSplits: 1).dropFirst().first?
+            .contains(where: \.isLetter) == true
+        if release.prerelease == true || (numbered && labelled) { return .nightly }
+        return numbered ? .stable : nil
     }
 }
 
@@ -170,6 +365,9 @@ enum SideStoreDownloader {
         /// Optional so decoding doesn't depend on it. Used by the release scan to
         /// keep stable requests off pre-releases.
         let prerelease: Bool?
+        /// The release's title. Optional, like `prerelease`.
+        let name: String?
+        let draft: Bool?
     }
 
     enum DownloadError: Error, CustomStringConvertible {
@@ -281,20 +479,22 @@ enum SideStoreDownloader {
     static func downloadLatest(source: InstallSource,
                                channel: ReleaseChannel,
                                log: @escaping (String) -> Void) async throws -> String {
-        guard let direct = source.downloadURL(channel), let assetName = source.assetFileName else {
-            throw DownloadError.notDownloadable
-        }
+        guard source.repo != nil else { throw DownloadError.notDownloadable }
 
-        // Tens of megabytes aren't fetched again while the copy from an earlier
-        // run is still the file GitHub serves.
-        if let current = await unchangedDownload(source: source, channel: channel, at: direct, log: log) {
-            return current.path
-        }
-
+        let existing = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
+        // What the log calls the asset until its name is known.
+        var assetName = source.assetFileName ?? "\(source.displayName) IPA"
         let fetched: Fetched
         do {
-            fetched = try await fetch(direct, named: assetName, from: channel, log: log)
-        } catch let error as DownloadError where error.isAssetMissing {
+            let asset = try await latestAsset(of: source, channel: channel)
+            assetName = asset.name
+            // Tens of megabytes aren't fetched again while the copy from an
+            // earlier run is still the file GitHub serves.
+            if let current = await unchangedDownload(existing, at: asset.url, log: log) {
+                return current.path
+            }
+            fetched = try await fetch(asset.url, named: asset.name, from: channel, log: log)
+        } catch let error as DownloadError where error.isAssetMissing && source.pinnedDownload == nil {
             log("No \(assetName) on that release — asking GitHub's API what the asset is called now.")
             do {
                 fetched = try await fetchViaAPI(source: source, channel: channel, log: log)
@@ -303,33 +503,106 @@ enum SideStoreDownloader {
             }
         }
 
+        let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(fetched.channel))
+        try store(fetched, as: dest)
+        return dest.path
+    }
+
+    /// Where the channel's newest IPA is and what it's called, without asking
+    /// the API. A build whose asset is named after its version (Madeira) has
+    /// its latest tag looked up first.
+    private static func latestAsset(of source: InstallSource,
+                                    channel: ReleaseChannel) async throws -> (url: URL, name: String) {
+        if let pinned = source.pinnedDownload { return pinned }
+        if let direct = source.downloadURL(channel), let name = source.assetFileName {
+            return (direct, name)
+        }
+        guard let repo = source.repo else { throw DownloadError.notDownloadable }
+        let tag = try await latestTag(of: repo)
+        guard let name = source.assetFileName(forTag: tag),
+              let path = "\(repo)/releases/download/\(tag)/\(name)"
+                  .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let url = URL(string: "https://github.com/\(path)")
+        else { throw DownloadError.badURL }
+        return (url, name)
+    }
+
+    /// The tag of a repo's latest full release, read off where its
+    /// `releases/latest` page redirects to (`releases/tag/<tag>`). Like the
+    /// download link and unlike the API, that page has no per-IP rate limit.
+    private static func latestTag(of repo: String) async throws -> String {
+        guard let page = URL(string: "https://github.com/\(repo)/releases/latest") else {
+            throw DownloadError.badURL
+        }
+        var req = URLRequest(url: page, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        req.httpMethod = "HEAD"
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        // The recorder keeps the request a HEAD through the redirect.
+        let (_, response) = try await perform {
+            try await URLSession.shared.data(for: req, delegate: ReleaseTagRecorder())
+        }
+        try check(response)
+        let parts = response.url?.pathComponents ?? []
+        guard let marker = parts.lastIndex(of: "tag"), marker > 0, parts[marker - 1] == "releases",
+              marker + 1 < parts.count
+        else {
+            // A repo without a full release lands on its release list instead.
+            // Reported as a missing asset, so the API is asked next.
+            throw DownloadError.badStatus(status: 404, detail: nil, retryAfter: nil)
+        }
+        // A tag can hold slashes, which arrive as further path components.
+        return parts[(marker + 1)...].joined(separator: "/")
+    }
+
+    /// Downloads one release picked under Advanced. It's saved under its own
+    /// name, so it never replaces the latest build or an IPA the user placed in
+    /// Documents. Returns the local path; `log` receives progress.
+    static func download(_ version: ReleaseVersion,
+                         source: InstallSource,
+                         channel: ReleaseChannel,
+                         log: @escaping (String) -> Void) async throws -> String {
+        let dest = IPALibrary.documentsDir
+            .appendingPathComponent(source.fileName(channel, version: version.tag))
+        if let current = await unchangedDownload(dest, at: version.assetURL, log: log) {
+            return current.path
+        }
+        let fetched = try await fetch(version.assetURL, named: version.assetName, from: channel, log: log)
+        try store(fetched, as: dest)
+
+        // Keep one picked version per build and channel: drop the app's others.
+        for other in IPALibrary.scan()
+        where other.source == source && other.channel == channel
+            && other.version != nil && other.url.lastPathComponent != dest.lastPathComponent {
+            try? FileManager.default.removeItem(at: other.url)
+            DownloadLedger.forget(other.url)
+        }
+        return dest.path
+    }
+
+    /// Moves a finished download into Documents as `dest`.
+    private static func store(_ fetched: Fetched, as dest: URL) throws {
         // Validate now, so an error page or truncated download doesn't fail
         // later during signing.
         guard IPALibrary.looksLikeIPA(fetched.file) else {
             try? FileManager.default.removeItem(at: fetched.file)
             throw DownloadError.notAnIPA(fetched.name)
         }
-
-        let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(fetched.channel))
         try? FileManager.default.removeItem(at: dest)
         try FileManager.default.moveItem(at: fetched.file, to: dest)
         // Mark as app-downloaded, so later runs may replace it, or reuse it while
         // GitHub still serves the same file.
         DownloadLedger.record(dest, etag: fetched.etag)
-        return dest.path
     }
 
-    /// The IPA an earlier run downloaded for this build, if GitHub still serves
-    /// that exact file at `url`.
+    /// `file`, an IPA an earlier run downloaded, if GitHub still serves that
+    /// exact file at `url`.
     ///
     /// Only the headers are fetched (a HEAD request). The file must be one this
     /// app downloaded and nothing has touched since, its recorded ETag must match
     /// GitHub's current one, and its size the Content-Length. Anything else,
     /// including a failed request, returns nil so the caller downloads as usual.
-    private static func unchangedDownload(source: InstallSource, channel: ReleaseChannel,
-                                          at url: URL,
+    private static func unchangedDownload(_ file: URL, at url: URL,
                                           log: @escaping (String) -> Void) async -> URL? {
-        let file = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
         guard let recorded = DownloadLedger.etag(for: file),
               let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size]) as? Int
         else { return nil }
@@ -469,24 +742,9 @@ enum SideStoreDownloader {
     private static func fetchViaReleaseScan(source: InstallSource,
                                             channel: ReleaseChannel,
                                             log: @escaping (String) -> Void) async throws -> Fetched {
-        guard let repo = source.repo,
-              let api = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=20")
-        else { throw DownloadError.notDownloadable }
-
+        guard let repo = source.repo else { throw DownloadError.notDownloadable }
         log("That release has no \(source.displayName) IPA — looking through \(repo)'s other releases for one.")
-        var req = URLRequest(url: api)
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
-
-        let (data, response) = try await perform { try await URLSession.shared.data(for: req) }
-        try check(response, body: data)
-
-        let releases: [GHRelease]
-        do {
-            releases = try JSONDecoder().decode([GHRelease].self, from: data)
-        } catch {
-            throw DownloadError.badRelease(String(describing: error))
-        }
+        let releases = try await recentReleases(of: repo, count: 20)
 
         // Newest first, which is the order GitHub answers in.
         for release in releases {
@@ -499,6 +757,29 @@ enum SideStoreDownloader {
             return try await fetch(assetURL, named: asset.name, from: served, log: log)
         }
         throw DownloadError.noIPAAsset(source.displayName, channel)
+    }
+
+    /// Every release of `source` the version picker can offer, from one API call.
+    static func releaseCatalog(source: InstallSource) async throws -> ReleaseCatalog {
+        guard let repo = source.repo else { throw DownloadError.notDownloadable }
+        return ReleaseCatalog(source: source, releases: try await recentReleases(of: repo, count: 100))
+    }
+
+    /// A repo's `count` newest releases, newest first.
+    private static func recentReleases(of repo: String, count: Int) async throws -> [GHRelease] {
+        guard let api = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=\(count)")
+        else { throw DownloadError.badURL }
+        var req = URLRequest(url: api)
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await perform { try await URLSession.shared.data(for: req) }
+        try check(response, body: data)
+        do {
+            return try JSONDecoder().decode([GHRelease].self, from: data)
+        } catch {
+            throw DownloadError.badRelease(String(describing: error))
+        }
     }
 
     /// Runs a URLSession call, mapping `URLError` to `.unreachable` (or to
@@ -606,6 +887,9 @@ enum IPALibrary {
         let modified: Date?
         /// True when the user supplied this file rather than the app fetching it.
         let isImported: Bool
+        /// The release picked under Advanced that the app downloaded this as;
+        /// nil for the latest build, and for anything the user supplied.
+        let version: String?
     }
 
     /// Which build a filename names, loose about case, separators and versions,
@@ -617,6 +901,7 @@ enum IPALibrary {
         // LiveContainer's asset also carries "SideStore", so test it first.
         if name.contains("livecontainer")     { source = .liveContainer }
         else if name.contains("sidestore")    { source = .sideStore }
+        else if name.contains("madeira")      { source = .madeira }
         else { return nil }
         return (source, name.contains("nightly") ? .nightly : .stable)
     }
@@ -625,10 +910,15 @@ enum IPALibrary {
     static func scan() -> [Entry] {
         let entries = describe(namesIn: documentsDir).compactMap { (name, url, attrs) -> Entry? in
             guard let kind = classify(name) else { return nil }
+            let isManaged = DownloadLedger.isManaged(url)
             return Entry(source: kind.source, channel: kind.channel, url: url,
                          size: (attrs[.size] as? Int) ?? 0,
                          modified: attrs[.modificationDate] as? Date,
-                         isImported: !DownloadLedger.isManaged(url))
+                         isImported: !isManaged,
+                         // Read only off the app's own files: a user's
+                         // "SideStore (1).ipa" names no version.
+                         version: isManaged
+                             ? kind.source.version(inFileName: name, channel: kind.channel) : nil)
         }
         return (entries + [customImport()].compactMap { $0 })
             .sorted { ($0.modified ?? .distantPast) > ($1.modified ?? .distantPast) }
@@ -642,7 +932,7 @@ enum IPALibrary {
                 Entry(source: .custom, channel: .stable, url: url,
                       size: (attrs[.size] as? Int) ?? 0,
                       modified: attrs[.modificationDate] as? Date,
-                      isImported: true)
+                      isImported: true, version: nil)
             }
             .max { ($0.modified ?? .distantPast) < ($1.modified ?? .distantPast) }
     }
@@ -658,8 +948,9 @@ enum IPALibrary {
         }
     }
 
-    /// The IPA to install for one build: an import outranks a download, the
-    /// canonical filename outranks any other, and ties fall to the newest.
+    /// The IPA to install for one build's latest release: an import outranks a
+    /// download, the canonical filename outranks any other, and ties fall to the
+    /// newest. Versions picked under Advanced are left out.
     static func entry(source: InstallSource, channel: ReleaseChannel) -> Entry? {
         guard source != .custom else { return customImport() }
         let canonical = source.fileName(channel)
@@ -667,8 +958,16 @@ enum IPALibrary {
             (e.isImported ? 0 : 2) + (e.url.lastPathComponent == canonical ? 0 : 1)
         }
         return scan()
-            .filter { $0.source == source && $0.channel == channel }
+            .filter { $0.source == source && $0.channel == channel && $0.version == nil }
             .min { rank($0) < rank($1) }
+    }
+
+    /// The app's earlier download of a version picked under Advanced, if it's
+    /// still intact.
+    static func pickedDownload(_ version: String, source: InstallSource,
+                               channel: ReleaseChannel) -> URL? {
+        let url = documentsDir.appendingPathComponent(source.fileName(channel, version: version))
+        return looksLikeIPA(url) ? url : nil
     }
 
     /// Thrown when the picked file isn't an IPA.
@@ -970,11 +1269,23 @@ enum PrivateStore {
     /// Keyed by address because the UDID isn't known before connecting. A record
     /// that stops working is created again.
     static func peerPairRecord(host: String) -> URL {
+        peerPairingsFile(prefix: "lockdown", host: host)
+    }
+
+    /// RPPairing file for another device on the LAN (Side by Side), written when
+    /// it pairs from its own Settings — the only way iOS 27 pairs over Wi-Fi.
+    /// Separate from `pairingFile`, which belongs to this iPhone. Keyed by
+    /// address like `peerPairRecord`.
+    static func peerRemotePairing(host: String) -> URL {
+        peerPairingsFile(prefix: "remote", host: host)
+    }
+
+    private static func peerPairingsFile(prefix: String, host: String) -> URL {
         let dir = directory.appendingPathComponent("peer-pairings", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         // Keep only digits and dots for a safe filename.
         let key = host.filter { $0.isNumber || $0 == "." }
-        return dir.appendingPathComponent("lockdown-\(key.isEmpty ? "unknown" : key).plist")
+        return dir.appendingPathComponent("\(prefix)-\(key.isEmpty ? "unknown" : key).plist")
     }
 
     /// isideload's `FsStorage` root, created on demand as isideload expects.

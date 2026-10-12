@@ -10,6 +10,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
 use base64::{prelude::BASE64_STANDARD, Engine as _};
+use idevice::remote_pairing::RpPairingFile;
 use isideload::{
     anisette::remote_v3::state::AnisetteState,
     auth::apple_account::{TwoFactorCallbackParams, TwoFactorCallbackResponse},
@@ -22,8 +23,10 @@ use isideload::{
 
 use rootcause::Report;
 use serde::{Deserialize, Serialize};
+use tracing::subscriber::NoSubscriber;
 
 use crate::apple_session;
+use crate::error_text::report_text;
 use crate::ffi_util::cstr;
 
 /// `int (*)(void *ctx, const char *request_json, char *out_buf, size_t buf_len)`.
@@ -247,7 +250,7 @@ pub unsafe fn apple_signin(
             let team = sideloader
                 .get_team()
                 .await
-                .map_err(|e| format!("get_team: {e}"))?;
+                .map_err(|e| format!("get_team: {}", report_text(&e)))?;
             let summary = format!(
                 "team: {} ({})",
                 team.name.as_deref().unwrap_or("<unnamed>"),
@@ -288,13 +291,21 @@ pub unsafe fn apple_signin(
 /// rejects it with error 8220. A failure there is prefixed `device registration
 /// failed for UDID <udid>:` so the caller can show it. Empty `udid` skips this.
 ///
+/// `pairing_file_path` is the pairing file used to reach that device. When the
+/// IPA is AltStore, its RPPairing record goes into the bundle, as AltServer
+/// does (see [`altstore_pairing_file`]). Empty or NULL bundles none.
+///
 /// # Safety
 /// `session` must be a valid pointer from `apple_signin`; out pointers valid.
+#[allow(clippy::too_many_arguments)]
 pub unsafe fn sign_ipa(
     session: *mut SignSession,
     ipa_path: *const c_char,
     udid: *const c_char,
     device_name: *const c_char,
+    pairing_file_path: *const c_char,
+    increased_memory_limit: bool,
+    app_group: bool,
     out_signed_path: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
@@ -306,6 +317,7 @@ pub unsafe fn sign_ipa(
     let ipa_path = opt(ipa_path, "");
     let udid = opt(udid, "");
     let device_name = opt(device_name, "");
+    let pairing_file = altstore_pairing_file(&opt(pairing_file_path, ""));
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         session.rt.block_on(async {
@@ -323,19 +335,26 @@ pub unsafe fn sign_ipa(
                 );
                 None
             } else {
-                tracing::info!("Registering device {udid} ({name}) with the team while signing");
+                tracing::info!("Registering device {udid} with the team while signing");
                 Some((name, udid.as_str()))
             };
 
             tracing::info!("Signing IPA at {ipa_path}");
             let (signed, _special) = session
                 .sideloader
-                .sign_app(PathBuf::from(&ipa_path), None, false, device)
+                .sign_app(
+                    PathBuf::from(&ipa_path),
+                    None,
+                    increased_memory_limit,
+                    app_group,
+                    device,
+                    pairing_file.as_deref(),
+                )
                 .await
                 .map_err(|e| {
                     // Left unprefixed so the app still recognises a failed
                     // registration and shows its guide.
-                    let message = e.to_string();
+                    let message = report_text(&e);
                     if message.starts_with("device registration failed") {
                         message
                     } else {
@@ -359,6 +378,37 @@ pub unsafe fn sign_ipa(
         Err(_) => {
             *out_error = cstr("panic during signing");
             2
+        }
+    }
+}
+
+/// The RPPairing record in the pairing file at `path`, re-serialized by idevice
+/// as AltServer's `rp_pairing_file_to_bytes` writes it, for AltStore's bundle.
+///
+/// AltStore Classic 2.3 only connects with an RPPairing record (`OnDeviceClient`
+/// refuses one without `private_key`) and takes a bundled file without checking
+/// it, so a lockdown-only file, or a merged one as is, must not go in. None
+/// when there is no usable record; AltStore then pairs on its own.
+fn altstore_pairing_file(path: &str) -> Option<Vec<u8>> {
+    if path.is_empty() {
+        return None;
+    }
+    let data = match std::fs::read(path) {
+        Ok(data) => data,
+        Err(e) => {
+            tracing::warn!("Couldn't read the pairing file for AltStore: {e}");
+            return None;
+        }
+    };
+    // idevice logs the parsed record, private key included, at debug level.
+    let parsed = tracing::subscriber::with_default(NoSubscriber::default(), || {
+        RpPairingFile::from_bytes(&data)
+    });
+    match parsed {
+        Ok(record) => Some(record.to_bytes()),
+        Err(_) => {
+            tracing::debug!("The pairing file has no RPPairing record, which AltStore needs");
+            None
         }
     }
 }
@@ -419,7 +469,7 @@ pub unsafe fn account_config(
                 .sideloader
                 .get_team()
                 .await
-                .map_err(|e| format!("get_team: {e}"))?;
+                .map_err(|e| format!("get_team: {}", report_text(&e)))?;
             let email = session.sideloader.get_email().to_string();
 
             tracing::info!("Looking up the '{machine_name}' certificate to hand over");
@@ -431,7 +481,7 @@ pub unsafe fn account_config(
                 &storage,
             )
             .await
-            .map_err(|e| format!("certificate lookup failed: {e}"))?
+            .map_err(|e| format!("certificate lookup failed: {}", report_text(&e)))?
             .ok_or_else(|| {
                 format!(
                     "no '{machine_name}' certificate on this Apple ID yet — install \
@@ -477,6 +527,87 @@ pub unsafe fn account_config(
         }
         Err(_) => {
             *out_error = cstr("panic while building the account config");
+            2
+        }
+    }
+}
+
+/// The sign-in an app needs to renew its own provisioning profile, as Swift
+/// decodes it: the developer-portal token, the account it belongs to and the
+/// anisette identity it was issued to. No password.
+#[derive(Serialize)]
+struct SigningAccount {
+    team_id: String,
+    adsid: String,
+    token: String,
+    /// Unix seconds of the token's expiry as Apple stated it; 0 if it gave none.
+    token_expires: u64,
+    /// The identity's 16 bytes and its provisioning (`adi.pb`), base64-encoded.
+    anisette_identifier: String,
+    anisette_adi_pb: String,
+}
+
+/// Set `*out_json` to the [`SigningAccount`] this session is signed in with,
+/// for Madeira, which then asks Apple for its own profiles (the way SideStore
+/// refreshes from a stored token). Reads what the session and the anisette
+/// state already hold: nothing is asked of Apple.
+///
+/// # Safety
+/// `session` must be a valid pointer from `apple_signin`; out pointers valid.
+pub unsafe fn signing_account(
+    session: *mut SignSession,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    if session.is_null() {
+        *out_error = cstr("null session");
+        return 2;
+    }
+    let session = &mut *session;
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let storage = FsStorage::new(session.storage_dir.clone());
+        let raw = storage
+            .retrieve_data("anisette_state")
+            .map_err(|e| format!("could not read the anisette state: {e}"))?
+            .ok_or("no anisette state stored yet — sign in first")?;
+        let state: AnisetteState =
+            plist::from_bytes(&raw).map_err(|e| format!("could not parse the anisette state: {e}"))?;
+        let adi_pb = state
+            .adi_pb
+            .ok_or("this device hasn't been provisioned with the anisette server yet")?;
+
+        session.rt.block_on(async {
+            let team = session
+                .sideloader
+                .get_team()
+                .await
+                .map_err(|e| format!("get_team: {}", report_text(&e)))?;
+            let dev = session.sideloader.get_dev_session();
+            let token = dev.token();
+            serde_json::to_string(&SigningAccount {
+                team_id: team.team_id,
+                adsid: dev.adsid().to_string(),
+                token: token.token.clone(),
+                token_expires: apple_session::stated_expiry(token.expiry).unwrap_or(0),
+                anisette_identifier: BASE64_STANDARD.encode(state.keychain_identifier),
+                anisette_adi_pb: BASE64_STANDARD.encode(adi_pb),
+            })
+            .map_err(|e| format!("serialize the signing account: {e}"))
+        })
+    }));
+
+    match result {
+        Ok(Ok(json)) => {
+            *out_json = cstr(json);
+            0
+        }
+        Ok(Err(e)) => {
+            *out_error = cstr(e);
+            1
+        }
+        Err(_) => {
+            *out_error = cstr("panic while reading the signing account");
             2
         }
     }
@@ -600,5 +731,120 @@ mod two_factor_bridge_tests {
         assert!(matches!(ask_swift(Some(texting_callback), &ctx, &p), R::SendSms(1)));
         assert!(matches!(ask_swift(Some(cancelling_callback), &ctx, &p), R::Abort));
         assert!(matches!(ask_swift(None, &ctx, &p), R::Abort));
+    }
+}
+
+#[cfg(test)]
+mod altstore_pairing_file_tests {
+    use super::*;
+
+    /// Writes `dict` as an XML plist to a temp file that is removed on drop.
+    struct TempPlist(PathBuf);
+
+    impl TempPlist {
+        fn new(dict: &plist::Dictionary) -> Self {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static NEXT: AtomicUsize = AtomicUsize::new(0);
+            let name = format!(
+                "sideinstaller-pairing-{}-{}.plist",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            );
+            let path = std::env::temp_dir().join(name);
+            plist::to_file_xml(&path, dict).unwrap();
+            TempPlist(path)
+        }
+
+        fn path(&self) -> &str {
+            self.0.to_str().unwrap()
+        }
+    }
+
+    impl Drop for TempPlist {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+
+    fn rp_record() -> plist::Dictionary {
+        plist::from_bytes(&RpPairingFile::generate("test-host").to_bytes()).unwrap()
+    }
+
+    fn lockdown_record() -> plist::Dictionary {
+        let mut dict = plist::Dictionary::new();
+        for key in ["HostCertificate", "HostPrivateKey", "DeviceCertificate", "RootCertificate"] {
+            dict.insert(key.to_string(), plist::Value::Data(b"-----BEGIN-----".to_vec()));
+        }
+        dict.insert("HostID".to_string(), "HOST".into());
+        dict.insert("UDID".to_string(), "00008140-TEST".into());
+        dict
+    }
+
+    fn keys(bytes: &[u8]) -> Vec<String> {
+        let dict: plist::Dictionary = plist::from_bytes(bytes).unwrap();
+        let mut keys: Vec<String> = dict.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
+    #[test]
+    fn keeps_an_rppairing_record_as_idevice_writes_it() {
+        let record = rp_record();
+        let file = TempPlist::new(&record);
+
+        let bundled = altstore_pairing_file(file.path()).unwrap();
+        assert_eq!(keys(&bundled), ["identifier", "private_key", "public_key"]);
+        let parsed: plist::Dictionary = plist::from_bytes(&bundled).unwrap();
+        assert_eq!(parsed, record);
+    }
+
+    #[test]
+    fn leaves_the_lockdown_record_of_a_merged_file_out() {
+        let mut merged = lockdown_record();
+        merged.extend(rp_record());
+        let file = TempPlist::new(&merged);
+
+        let bundled = altstore_pairing_file(file.path()).unwrap();
+        assert_eq!(keys(&bundled), ["identifier", "private_key", "public_key"]);
+    }
+
+    #[test]
+    fn bundles_nothing_without_an_rppairing_record() {
+        let file = TempPlist::new(&lockdown_record());
+
+        assert_eq!(altstore_pairing_file(file.path()), None);
+        assert_eq!(altstore_pairing_file(""), None);
+        assert_eq!(altstore_pairing_file("/nonexistent/pairing.plist"), None);
+    }
+}
+
+#[cfg(test)]
+mod signing_account_tests {
+    use super::*;
+
+    /// The shape `MadeiraSigningHandoff.plist(from:)` reads in the app.
+    #[test]
+    fn serializes_as_the_json_swift_reads() {
+        let account = SigningAccount {
+            team_id: "TEAM123456".into(),
+            adsid: "000123-08-abcdef".into(),
+            token: "AAAABLwIAAAAAGW".into(),
+            token_expires: 1_800_000_000,
+            anisette_identifier: BASE64_STANDARD.encode([7u8; 16]),
+            anisette_adi_pb: BASE64_STANDARD.encode([9u8; 3]),
+        };
+        let json: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&account).unwrap()).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "team_id": "TEAM123456",
+                "adsid": "000123-08-abcdef",
+                "token": "AAAABLwIAAAAAGW",
+                "token_expires": 1_800_000_000u64,
+                "anisette_identifier": "BwcHBwcHBwcHBwcHBwcHBw==",
+                "anisette_adi_pb": "CQkJ",
+            })
+        );
     }
 }

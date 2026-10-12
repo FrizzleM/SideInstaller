@@ -5,6 +5,11 @@ All notable changes to SideInstaller are documented here.
 ## Unreleased
 
 ### Changed
+- **Signing uses apple-codesign-quick**, the signer iLoader moved to in 2.3.0. It hashes an app's
+  files and signs its extensions and frameworks in parallel. In tests on a Mac it signed SideStore
+  about 6 times faster and LiveContainer + SideStore about 9 times faster, and SideInstaller itself
+  is about 5 MB smaller. An imported IPA that still carries leftovers of an old signature inside its
+  `_CodeSignature` folder is signed cleanly as well.
 - **Installing SideStore or LiveContainer + SideStore is faster.** The download now starts as soon
   as the network is up and runs while your iPhone pairs, connects and signs in to your Apple ID,
   instead of waiting for all of that to finish first.
@@ -30,10 +35,109 @@ All notable changes to SideInstaller are documented here.
 - When SideStore or LiveContainer is already installed, the pairing file goes in while the app is
   being signed rather than after the install. Together, reinstalling SideStore on an iPhone 16 now
   takes about 8.5 seconds, down from about 18.5.
+- **The log is safe to share.** It leaves out your Apple ID, your iPhone's name, serial numbers,
+  IMEI, SIM and subscriber numbers, network hardware addresses, Find My data and pairing keys, and
+  shortens the UDID to its first and last characters. Model, iOS version, errors and connection
+  details stay, and errors now say why a request couldn't be sent (DNS, connection or TLS).
+- Closing a popup that a running install is waiting on, such as the pairing code or the steps to
+  connect LocalDevVPN, now asks first, since it ends the install.
+- The app behind a popup is now dimmed further as well as blurred, in light mode too, until the
+  popup closes.
+- On iOS 27, handing the pairing file to another app no longer tries to add a classic lockdown
+  pairing first. iOS 27 refuses that every time, so the attempt only cost time and left a warning
+  in the log. The file carries the pairing that StikDebug and SideStore nightlies from 20 September
+  2026 on read. Older SideStore builds, LiveContainer's built-in SideStore and Feather need a
+  classic pairing, which iOS 27 doesn't allow these apps to use on the iPhone itself.
+- When Apple briefly turns a sign-in away as too many requests (HTTP 429), SideInstaller now tries
+  again twice, a few seconds apart, before saying Apple is limiting sign-ins. iLoader found these
+  often clear up straight away.
 
 ### Fixed
+- An app that looks its background task up in its own Info.plist, taking the first entry of a kind,
+  now finds the one under the bundle ID it was signed with. SideInstaller listed those after the
+  originals, so such an app asked iOS for a task it wasn't allowed and lost its background work.
+  Madeira's Steam downloads rely on this to carry on in the background.
+- **An imported IPA whose name has symbols, spaces or non-Latin letters signs again.** Apple refuses
+  to register an App ID under such a name (error 35), so signing stopped before it started.
+  SideInstaller now registers it under the name's letters and digits only, as iLoader does.
+- **SideStore Nightly no longer asks you to import the pairing file.** Nightlies from 20 September
+  2026 on stopped reading the pairing file where SideInstaller put it: they look for one file per
+  connection type under new names, turn down a file that holds both, and only load one after their
+  own import has saved two settings. SideInstaller now writes the pairing that way too, and sets
+  those settings the way SideStore's import does, so SideStore connects on first launch. Older
+  SideStore builds and LiveContainer + SideStore keep getting the file they read.
+- **Sign-in says when SideInstaller can't reach Apple.** It used to try every anisette server and
+  blame them, although none was at fault. It now stops and says why: Cellular Data turned off for
+  SideInstaller, Wi-Fi not allowed for it, no internet connection, a disconnected VPN holding traffic
+  back, or something on the network blocking Apple.
+- **Side by Side works with iPhones on iOS 27.** Their iPhone dropped the connection the moment
+  SideInstaller asked it to pair (error 54), before any Trust prompt could appear, so every run
+  stopped at the first step. iOS 27 only pairs over Wi-Fi from its own Settings, so Side by Side now
+  switches to that: it shows what to do on their iPhone — Settings › Privacy & Security › Developer
+  Mode, then “Pair with SideInstaller (Side by Side)” — and the code to type there, and carries on
+  once they have. The pairing is remembered for that address, so installing again doesn't ask for it.
+- Pairing someone else's iPhone this way leaves this iPhone's own pairing file alone, and uses a name
+  of its own, so it can't break the pairing their own SideInstaller sets up for itself.
+- When two people each pair the same iPhone with Side by Side, the second no longer undoes the
+  first. Every SideInstaller used to pair under one shared identifier, and an iPhone keeps a single
+  pairing per identifier; each install now pairs under its own. Pairings already remembered keep
+  working.
+- Cancel stops Side by Side straight away while it waits for their iPhone to pair.
 - Tapping Stop while the IPA downloads now stops the install, instead of carrying on with an older
   copy of the IPA left in Documents.
+- **SideStore's home screen widget shows your apps.** The widget looks for SideStore's app group in
+  its own settings, and SideInstaller only wrote the group into the app's, so the widget opened an
+  empty list. It now gets the group too, as AltServer does and as iLoader 2.3.6 does. This affects
+  SideStore 0.7.0-alpha and older; nightlies find the group another way.
+- **AltStore Classic installed as a custom IPA knows which iPhone it's on.** AltStore reads the
+  iPhone's UDID from its own settings, where AltServer writes it during installation. SideInstaller
+  left in whatever UDID the IPA came with, so AltStore registered that device with your Apple ID and
+  signed apps for it instead. It now gets the UDID of the iPhone it's installed on.
+- An imported app that schedules background work under its own bundle ID, such as a long export
+  with iOS's continued processing tasks, can run it again after signing. Signing adds your team ID
+  to the bundle ID, and iOS only runs those tasks under the bundle ID the app now has. Each such
+  task is now allowed under the new bundle ID too, and still under the old one for apps that name it
+  directly. Reported to iLoader in issue #649.
+
+### Added
+- **Madeira joins the Install picker.** [Madeira](https://github.com/willfaust/Madeira) runs
+  Windows PC games on an iPhone. SideInstaller downloads its latest release, signs it with the
+  Increased Memory Limit entitlement it needs (Madeira shows it as Memory+), and puts your
+  iPhone's pairing inside it, so Madeira's built-in JIT is set up without pairing again or
+  importing a file: in its setup, “In-app with pairing file” already shows as done. Madeira needs
+  iOS 26 or later, and reads only the pairing iOS 27 makes on the iPhone itself, or an imported
+  file with the same kind of record. A file with only a classic lockdown record isn't passed on.
+- **Madeira renews its own signing.** SideInstaller hands Madeira the sign-in it needs for that: the
+  developer-service token this sign-in got and the anisette identity that goes with it, the same
+  things SideStore keeps to refresh. Your Apple ID password isn't included, and no 2FA code is
+  needed. Madeira moves it into its Keychain on first launch and from then on asks Apple for a new
+  profile and installs it itself, whenever it's open with LocalDevVPN connected, so it keeps working
+  with SideInstaller uninstalled. It needs SideInstaller again only when Apple stops accepting the
+  token (it has an expiry, and a password change ends it): installing Madeira again hands over a
+  new one. Only Madeira builds that say they take the sign-in get one; older ones are refreshed
+  under Tools › Sideloaded apps. Madeira is signed without an app group, since the App ID it
+  registers again each week comes without one.
+- Madeira joins the apps the Pairing tab can hand the pairing file to.
+- **The pairing code follows you into Settings.** While your iPhone pairs, SideInstaller now runs a
+  Live Activity. When Settings asks for the code, it appears in the Dynamic Island, or drops down as
+  a banner on an iPhone without one, and stays on the Lock Screen, so you no longer have to switch
+  back to SideInstaller to read it. Once the pairing goes through it says so, and a tap takes you
+  back to the app. A build signed with a certificate that can't sign app extensions sends the code
+  as a notification instead, and asks to allow notifications the first time you pair; builds with
+  the Live Activity never ask.
+- **AltStore Classic installed as a custom IPA comes with your pairing.** AltStore 2.3 can install
+  and refresh apps without a computer through a Remote AltServer, but setting that up asks you to
+  pair with a PC first. SideInstaller now puts your iPhone's pairing inside AltStore when it signs
+  it, encrypted the way AltServer does it, so after you sign in to AltStore the setup skips that
+  step. This works with the pairing SideInstaller creates on the iPhone itself on iOS 27, and with
+  an imported pairing file that includes the same kind of record. A file with only a classic
+  lockdown record isn't passed on, since AltStore can't connect with it. The pairing stays on your
+  iPhone.
+- Three more problems now get their own explanation and steps instead of a raw error: an Apple
+  Account Apple won't let sign apps because of its owner's age (error 1102), an Apple ID out of App
+  IDs for the week (error 9120), and an iPhone that already has the three apps a free Apple ID may
+  install. The age refusal also stops sign-in at once rather than trying every anisette server.
+- PanicAnalyzer joins the apps the Pairing tab can hand the pairing file to.
 
 ## 0.9.0
 
