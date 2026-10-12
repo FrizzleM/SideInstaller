@@ -99,7 +99,9 @@ impl Bundle {
     /// with the app's bundle identifier, so an app that builds it from
     /// `Bundle.main.bundleIdentifier` submits `<new id>.…`, which then has to
     /// be in `BGTaskSchedulerPermittedIdentifiers` (iLoader issue #649). The
-    /// old entries stay, for apps that register a hard-coded identifier.
+    /// old entries stay, for apps that register a hard-coded identifier, after
+    /// the new ones: an app that takes the first entry of a kind (Madeira, the
+    /// first ending in `.download.*`) then finds the one iOS accepts.
     pub fn set_bundle_identifier(&mut self, id: &str) {
         if let Some(old_id) = self.bundle_identifier().map(str::to_string)
             && let Some(Value::Array(task_ids)) =
@@ -111,7 +113,7 @@ impl Bundle {
                 .filter(|new_id| !task_ids.iter().any(|t| t.as_string() == Some(new_id)))
                 .map(Value::String)
                 .collect();
-            task_ids.extend(renamed);
+            task_ids.splice(0..0, renamed);
         }
 
         self.app_info.insert(
@@ -321,14 +323,14 @@ mod tests {
         assert_eq!(
             task_ids(&bundle),
             [
+                "com.example.app.TEAMID.continued.*",
+                "com.example.app.TEAMID.refresh",
+                "com.example.app.TEAMID",
                 "com.example.app.continued.*",
                 "com.example.app.refresh",
                 "com.example.app",
                 "com.example.apple.sync",
                 "com.other.task",
-                "com.example.app.TEAMID.continued.*",
-                "com.example.app.TEAMID.refresh",
-                "com.example.app.TEAMID",
             ]
         );
     }

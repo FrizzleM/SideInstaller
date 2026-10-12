@@ -87,6 +87,16 @@ impl DeveloperSession {
         self.client.clone()
     }
 
+    /// The portal token and the account it belongs to, for handing the session
+    /// to an app that renews its own provisioning profile.
+    pub fn token(&self) -> &AppToken {
+        &self.token
+    }
+
+    pub fn adsid(&self) -> &str {
+        &self.adsid
+    }
+
     async fn send_dev_request_internal(
         &mut self,
         url: &str,

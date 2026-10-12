@@ -699,8 +699,9 @@ final class SideBySideManager: ObservableObject {
         engine.log("Signing \(ipa) for \(udid.isEmpty ? "their iPhone" : udid) …")
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        // SideInstaller has no use for a bundled pairing file.
-        let rc = si_sign_ipa(session, ipa, udid, deviceName, nil, &signed, &error)
+        // SideInstaller has no use for a bundled pairing file, or for more
+        // memory; it gets its app group like any app.
+        let rc = si_sign_ipa(session, ipa, udid, deviceName, nil, 0, 1, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
             signed.map { si_string_free($0) }

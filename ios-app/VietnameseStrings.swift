@@ -790,4 +790,22 @@ let vietnameseStrings: [String: String] = [
         "Chỉ những bản dựng trên trang cài đặt và kho mã chính thức mới là của tôi. Bất kỳ ai cũng có thể fork mã nguồn, thêm mã đánh cắp thông tin đăng nhập rồi phát hành với cùng tên và biểu tượng — vì vậy đừng giao Apple ID của bạn cho một bản sao lấy từ nơi khác.",
     "Install page": "Trang cài đặt",
     "Terms": "Điều khoản",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.":
+        "%@ cần iOS %d trở lên. iPhone này đang chạy iOS %@.",
+    "Open Madeira from your Home Screen.": "Mở Madeira từ Màn hình chính.",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "Trong phần thiết lập của nó, ở mục “Set up JIT”, chọn “In-app with pairing file”: SideInstaller đã đặt sẵn tệp ở đó, nên hãy chạm vào “Continue”.",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "Trong phần thiết lập của nó, ở mục “Set up JIT”, chọn cách iPhone này có JIT.",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "Từ giờ Madeira tự gia hạn chữ ký của mình, khi nó đang mở và LocalDevVPN đang kết nối. SideInstaller đã cấp cho nó một phiên đăng nhập để làm việc đó: một token cho dịch vụ nhà phát triển của Apple, không phải mật khẩu của bạn. Madeira có thể xoá nó trong Settings › Signing.",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "Chữ ký của nó có hiệu lực 7 ngày. Trước khi hết hạn, hãy gia hạn tại đây trong Công cụ › Ứng dụng sideload.",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "Tệp ghép nối này không có bản ghi RPPairing, loại duy nhất mà %@ đọc được.",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "Chạy game PC Windows trên iPhone của bạn. Của Will Faust, giấy phép GPL-3.0.",
 ]
