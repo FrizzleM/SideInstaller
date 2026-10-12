@@ -14,7 +14,8 @@ All notable changes to SideInstaller are documented here.
   as the network is up and runs while your iPhone pairs, connects and signs in to your Apple ID,
   instead of waiting for all of that to finish first.
 - Signing in to your Apple ID now happens while SideInstaller opens its link to your iPhone, rather
-  than after it.
+  than after it. If Apple asks for a 2FA code while your iPhone is asking you to tap Trust,
+  SideInstaller's code prompt waits until you've answered.
 - An IPA downloaded on an earlier run is reused when GitHub still serves that exact file, so trying
   again after a failed install, or installing the same build later, skips the download.
 - SideStore's certificate hand-off is prepared while the app installs, and finding the installed app
@@ -24,8 +25,16 @@ All notable changes to SideInstaller are documented here.
   another, so signing SideStore takes under 3 seconds instead of over 6.
 - Signing in with a saved Apple ID session makes two fewer requests to Apple.
 - The signed app reaches your iPhone over several connections at once, which shaves a little more
-  off the install. Together, a SideStore install on an iPhone 16 went from about 18.5 seconds to
-  about 11.
+  off the install.
+- **Most of the app is already on your iPhone by the time signing finishes.** Signing only changes a
+  few of an app's files, so the rest is copied over from the download while signing runs, and only
+  the changed files are sent afterwards. Every file copied early is checked against the signed app
+  before installing.
+- If the install needs you to tap Trust for the pairing file, it now asks right after connecting, so
+  you can answer while everything else runs, instead of at the very end.
+- When SideStore or LiveContainer is already installed, the pairing file goes in while the app is
+  being signed rather than after the install. Together, reinstalling SideStore on an iPhone 16 now
+  takes about 8.5 seconds, down from about 18.5.
 - **The log is safe to share.** It leaves out your Apple ID, your iPhone's name, serial numbers,
   IMEI, SIM and subscriber numbers, network hardware addresses, Find My data and pairing keys, and
   shortens the UDID to its first and last characters. Model, iOS version, errors and connection

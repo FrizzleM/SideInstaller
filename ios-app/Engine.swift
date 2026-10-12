@@ -293,6 +293,19 @@ final class Engine: ObservableObject {
     /// The Apple ID sign-in a run starts once pairing is settled, so it runs
     /// while the device link opens.
     private var backgroundSignIn: Task<Void, Error>?
+    /// Device work a run starts once the link is open, so it overlaps sign-in,
+    /// download and signing; see `startDevicePreparation`.
+    private var devicePreparation: Task<PreparedPairing, Never>?
+    /// The files signing won't change, copied to the device from the downloaded
+    /// IPA while signing runs; see `startPrestage`.
+    private var prestage: Task<DeviceConnection.PrestagedBundle?, Never>?
+    /// Runs that have ended. A background sign-in carries the count from when it
+    /// started, so a 2FA request it makes after its run stopped can be declined.
+    /// Main thread only.
+    private var finishedRuns = 0
+    /// Held while a Trust prompt has the user's attention, so a 2FA sheet waits
+    /// instead of covering it.
+    let attention = AttentionGate()
     /// Poll that keeps `vpnConnected` live; NWPathMonitor never fires for a
     /// loopback tunnel, which carries no default route.
     private var statusTimer: Timer?
@@ -564,14 +577,24 @@ final class Engine: ObservableObject {
                 // starts now and runs while those steps do.
                 startPrefetch()
                 try await pairAndConnect()
+                // Device work that doesn't need the signed app starts on the fresh
+                // link and runs through sign-in, download and signing.
+                startDevicePreparation()
                 try await signInStep()
                 try await download()
+                // Most of the app is the same signed or not, so that part goes
+                // to the device while signing runs.
+                startPrestage()
                 try await signApp()
                 // The certificate hand-off is built on the sign queue, which the
                 // install doesn't use, so it's ready once the install is done.
                 let accountConfig = startAccountConfig()
-                try await install()
-                try await writePairing(accountConfig: accountConfig)
+                // Both share the device queue with the install.
+                let prepared = await devicePreparation?.value
+                let staged = await prestage?.value
+                try Task.checkCancellation()
+                try await install(prestaged: staged)
+                try await writePairing(accountConfig: accountConfig, prepared: prepared)
                 finishSuccess()
             } catch is CancellationError {
                 log("Install cancelled.")
@@ -594,6 +617,8 @@ final class Engine: ObservableObject {
     func cancelOneClick() {
         pipelineTask?.cancel()
         prefetch?.task.cancel()                 // stop the download now, not at its step
+        devicePreparation?.cancel()             // skip its ahead-of-install write
+        prestage?.cancel()
         PairingController.shared.softCancel()   // unblock a pending pairing wait
     }
 
@@ -690,6 +715,12 @@ final class Engine: ObservableObject {
         prefetch = nil
         backgroundSignIn?.cancel()
         backgroundSignIn = nil
+        devicePreparation?.cancel()
+        devicePreparation = nil
+        prestage?.cancel()
+        prestage = nil
+        // A sign-in this run left running now declines any 2FA request.
+        finishedRuns += 1
     }
 
     // MARK: Step 1 — network (waits for the loopback tunnel)
@@ -753,7 +784,9 @@ final class Engine: ObservableObject {
 
         await ensureLocalNetworkForImportedPairing()
 
-        // Pairing is settled, so sign in while the link opens.
+        // Pairing is settled, so sign in while the link opens. Not sooner: Apple
+        // sends its own 2FA alert to this iPhone before SideInstaller is asked
+        // for the code, and it would land on the user typing the pairing code.
         startBackgroundSignIn()
 
         do {
@@ -925,16 +958,18 @@ final class Engine: ObservableObject {
     @MainActor
     private func startBackgroundSignIn() {
         guard backgroundSignIn == nil, signSession == nil else { return }
+        let run = finishedRuns
         backgroundSignIn = Task { @MainActor in
-            try await self.signIn(updatingChecklist: false)
+            try await self.signIn(updatingChecklist: false, run: run)
         }
     }
 
     /// Signs in to the Apple ID, trying each anisette server in turn.
     /// Pass `updatingChecklist: false` from flows outside the Install tab (e.g.
-    /// app refresh) so they don't change its checklist.
+    /// app refresh) so they don't change its checklist. `run` tags a run's
+    /// background sign-in; see `finishedRuns`.
     @MainActor
-    private func signIn(updatingChecklist: Bool = true) async throws {
+    private func signIn(updatingChecklist: Bool = true, run: Int? = nil) async throws {
         if signSession != nil {
             log("Already signed in this session — skipping.")
             if updatingChecklist { setStep(.signIn, .done) }
@@ -964,7 +999,7 @@ final class Engine: ObservableObject {
             }
             do {
                 let summary = try await onSignQueue {
-                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir)
+                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, run: run)
                 }
                 // Stick with the server that worked.
                 anisetteURL = ani
@@ -1038,16 +1073,20 @@ final class Engine: ObservableObject {
     }
 
     /// One sign-in attempt against a specific anisette server.
-    private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {
+    private func performSignIn(id: String, pw: String, ani: String, dir: String,
+                               run: Int? = nil) throws -> String {
         defer { endTwoFactor() }
         log("Apple ID sign-in for \(LogRedactor.maskAppleID(id)) via anisette \(Self.oneLine(ani)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
+        // The run rides along as the callback's context (offset by one, since a
+        // null context means none), so its 2FA requests can be told apart.
+        let context = run.flatMap { UnsafeMutableRawPointer(bitPattern: $0 + 1) }
         // 1 = save and reuse the developer session, so repeat sign-ins skip
         // Apple authentication until the token expires.
         let rc = si_apple_signin(id, pw, ani, "SideInstaller", dir, 1,
-                                 twoFactorCallback, nil,
+                                 twoFactorCallback, context,
                                  &session, &summary, &error)
         if rc == 0 {
             if let old = self.signSession { si_sign_session_free(old) }
@@ -1659,7 +1698,7 @@ final class Engine: ObservableObject {
     // MARK: Step 7 — install over AFC + installation_proxy
 
     @MainActor
-    private func install() async throws {
+    private func install(prestaged: DeviceConnection.PrestagedBundle? = nil) async throws {
         guard let bundle = signedAppPath else { throw EngineError.message(L("No signed bundle to install.")) }
         setStep(.install, .active)
         installProgress = 0
@@ -1673,7 +1712,7 @@ final class Engine: ObservableObject {
                 try self.connection.connect(deviceIP: ip, pairingFilePath: path)
                 guard self.connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
                 self.log("Installing signed bundle via AFC + installation_proxy …")
-                try self.connection.installSignedApp(bundlePath: bundle)
+                try self.connection.installSignedApp(bundlePath: bundle, prestaged: prestaged)
                 self.log("Install request completed.")
             }
         } catch where Self.isAppLimitError(String(describing: error)) {
@@ -1685,10 +1724,101 @@ final class Engine: ObservableObject {
         setStep(.install, .done)
     }
 
+    /// Starts copying the files signing won't change from the downloaded IPA
+    /// into /PublicStaging, on the device queue while signing runs on its own.
+    /// A failure only means the install uploads everything, as it used to.
+    @MainActor
+    private func startPrestage() {
+        guard let ipa = downloadedIPAPath else { return }
+        let ip = deviceHost
+        let rpPath = pairingFilePath ?? PairingController.pairingFilePath()
+        prestage = Task { @MainActor in
+            guard !Task.isCancelled else { return nil }
+            do {
+                return try await self.onDeviceQueue { () -> DeviceConnection.PrestagedBundle? in
+                    let started = Date()
+                    // The link may have sat idle since it opened, and iOS drops idle tunnels.
+                    try self.connection.connect(deviceIP: ip, pairingFilePath: rpPath)
+                    let staged = try self.connection.prestageUnsignedBundle(ipaPath: ipa)
+                    self.log(String(format: "Staged %d files signing won't change, straight from the IPA, in %.2f s.",
+                                    staged.files.count, Date().timeIntervalSince(started)))
+                    return staged
+                }
+            } catch {
+                self.log("⚠️ Couldn't stage the app ahead of signing (\(self.short(error))); the install uploads all of it.")
+                return nil
+            }
+        }
+    }
+
     // MARK: Step 8 — write the pairing file into SideStore
 
+    /// What a run did on the device link before the install.
+    private struct PreparedPairing {
+        /// The pairing file to hand over, with the lockdown record when that worked.
+        let placement: String
+        /// The app the file was already written into, if any.
+        let writtenInto: String?
+    }
+
+    /// Starts the device work that doesn't need the signed app, on the link just
+    /// opened: adding the lockdown record to the pairing file (a Trust prompt the
+    /// user can answer while signing runs), then, when the app being installed is
+    /// already on the iPhone, writing the pairing file into it now. Installing
+    /// over an app keeps its Documents, so that write needn't wait for the install.
     @MainActor
-    private func writePairing(accountConfig handOff: Task<String?, Never>? = nil) async throws {
+    private func startDevicePreparation() {
+        let rpPath = pairingFilePath ?? PairingController.pairingFilePath()
+        let udid = deviceUDID
+        let ip = deviceHost
+        let source = installSource
+        let signingIn = backgroundSignIn
+        devicePreparation = Task { @MainActor in
+            // Never throws; the fallback is only there for the queue's signature.
+            let placement = (try? await self.onDeviceQueue {
+                self.placementPairingFile(rpPairingPath: rpPath, udid: udid)
+            }) ?? rpPath
+
+            // Only SideStore reads the file as it's written here; Madeira takes
+            // the RPPairing record on its own, after the install. Signing names
+            // the app "<base>.<team ID>", so the team has to be known.
+            guard source.sideStoreHome != nil, let base = source.pairingBundleIDBase else {
+                return PreparedPairing(placement: placement, writtenInto: nil)
+            }
+            if let signingIn { _ = await signingIn.result }
+            guard !Task.isCancelled, let team = self.signingTeamID else {
+                return PreparedPairing(placement: placement, writtenInto: nil)
+            }
+            let bundleID = "\(base).\(team)"
+            // Any failure leaves the write to after the install, as before.
+            let written: String? = (try? await self.onDeviceQueue {
+                try self.writePairingAheadOfInstall(bundleID: bundleID, source: source,
+                                                    placement: placement, ip: ip, rpPath: rpPath)
+            }) ?? nil
+            return PreparedPairing(placement: placement, writtenInto: written)
+        }
+    }
+
+    /// Writes the pairing file into `bundleID` if that app is installed already,
+    /// returning the bundle ID written into, or nil when it isn't installed yet.
+    /// Runs on `deviceQueue`.
+    private func writePairingAheadOfInstall(bundleID: String, source: InstallSource,
+                                            placement: String, ip: String, rpPath: String) throws -> String? {
+        // The link sat idle while the sign-in finished, and iOS drops idle tunnels.
+        try connection.connect(deviceIP: ip, pairingFilePath: rpPath)
+        guard try connection.isInstalled(bundleID: bundleID) else { return nil }
+        let remoteRel = source.pairingRemoteRelativePath
+        log("\(bundleID) is already installed — writing the pairing file into it ahead of the install …")
+        let written = try connection.writePairingFile(intoBundleID: bundleID,
+                                                       remoteRelativePath: remoteRel,
+                                                       pairingFilePath: placement)
+        log("Pairing file written into \(bundleID) and read-back VERIFIED (\(written) bytes); installing over the app keeps it.")
+        return bundleID
+    }
+
+    @MainActor
+    private func writePairing(accountConfig handOff: Task<String?, Never>? = nil,
+                              prepared: PreparedPairing? = nil) async throws {
         setStep(.writePairing, .active)
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         // The installed build decides the host app and where the file lands.
@@ -1704,8 +1834,8 @@ final class Engine: ObservableObject {
         let udid = deviceUDID
         do {
             madeiraHandoff = try await onDeviceQueue {
-                try self.performWritePairing(path: path, udid: udid,
-                                             source: source, accountConfig: accountConfig)
+                try self.performWritePairing(path: path, udid: udid, source: source,
+                                             accountConfig: accountConfig, prepared: prepared)
             }
         } catch {
             // SideStore can't work without this file. Madeira can pair itself or
@@ -1721,23 +1851,28 @@ final class Engine: ObservableObject {
     }
 
     /// Returns what Madeira was handed, when the app is Madeira.
-    private func performWritePairing(path: String, udid: String?,
-                                     source: InstallSource, accountConfig: String?) throws -> MadeiraHandoff {
+    private func performWritePairing(path: String, udid: String?, source: InstallSource,
+                                     accountConfig: String?,
+                                     prepared: PreparedPairing? = nil) throws -> MadeiraHandoff {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
         let size = fileSize(path)
         guard FileManager.default.fileExists(atPath: path), size > 0 else {
             throw EngineError.message(L("Pairing file missing — pairing must run first."))
         }
-        // Add a lockdown record so AltStore-family apps can read the file.
-        let placement = placementPairingFile(rpPairingPath: path, udid: udid)
+        // Add a lockdown record so AltStore-family apps can read the file. A run
+        // has already done this right after opening the link.
+        let placement = prepared?.placement ?? placementPairingFile(rpPairingPath: path, udid: udid)
 
-        // Resolve the host app's bundle id from installation_proxy, by display
-        // name then base id, falling back to the signed bundle's own id.
         let appName = source.pairingAppDisplayName ?? signedAppName() ?? source.displayName
         let bundleID: String
-        if let displayName = source.pairingAppDisplayName,
-           let base = source.pairingBundleIDBase,
-           let found = try connection.resolveInstalledBundleID(displayName: displayName, bundleIDBase: base) {
+        if prepared != nil, let signed = signedAppBundleID() {
+            // A run has just installed the signed bundle, so its ID is the app's.
+            bundleID = signed
+        } else if let displayName = source.pairingAppDisplayName,
+                  let base = source.pairingBundleIDBase,
+                  let found = try connection.resolveInstalledBundleID(displayName: displayName, bundleIDBase: base) {
+            // Otherwise resolve the host app from installation_proxy, by display
+            // name then base id, falling back to the signed bundle's own id.
             bundleID = found
         } else if let signed = signedAppBundleID() {
             bundleID = signed
@@ -1761,11 +1896,17 @@ final class Engine: ObservableObject {
         }
         // SideStore reads the file at its Documents root, LiveContainer deeper.
         let remoteRel = source.pairingRemoteRelativePath
-        log("Writing pairing file into \(bundleID) /Documents/\(remoteRel) …")
-        let written = try connection.writePairingFile(intoBundleID: bundleID,
-                                                       remoteRelativePath: remoteRel,
-                                                       pairingFilePath: placement)
-        log("Pairing file written into \(appName) and read-back VERIFIED (\(written) bytes).")
+        if prepared?.writtenInto == bundleID {
+            log("Pairing file was already written into \(appName) before the install.")
+        } else {
+            log("Writing pairing file into \(bundleID) /Documents/\(remoteRel) …")
+            let written = try connection.writePairingFile(intoBundleID: bundleID,
+                                                           remoteRelativePath: remoteRel,
+                                                           pairingFilePath: placement)
+            log("Pairing file written into \(appName) and read-back VERIFIED (\(written) bytes).")
+        }
+        // Always after the install: it's the reinstall that makes iOS read the
+        // settings this edits, so they can't go in ahead of it.
         let signedSideStore = signedAppBundleID()?.hasPrefix("com.SideStore.SideStore") == true
         if let home = source.sideStoreHome ?? (signedSideStore ? .standalone : nil) {
             handOffSplitPairing(placementPath: placement, bundleID: bundleID,
@@ -2590,6 +2731,9 @@ final class Engine: ObservableObject {
                 return rpPairingPath
             } else {
                 log("Pairing with lockdown as well, so AltStore-family apps can read the file. Tap Trust if this iPhone asks, and unlock it if it's locked …")
+                // A Trust prompt may appear: a 2FA sheet waits for it.
+                attention.begin()
+                defer { attention.end() }
                 let record = try connection.lockdownPairRecord(hostID: CompositePairingFile.hostID,
                                                                systemBUID: CompositePairingFile.systemBUID)
                 if let problem = record.wirelessLockdownError {
@@ -2619,9 +2763,15 @@ final class Engine: ObservableObject {
     /// Called from a Rust worker thread with isideload's request as JSON; blocks
     /// until the sheet answers. Writes the JSON answer into `outBuf` and returns
     /// 1, or returns 0 to cancel.
-    func answerTwoFactor(request: UnsafePointer<CChar>?, outBuf: UnsafeMutablePointer<CChar>?, len: Int) -> Int32 {
+    ///
+    /// `run` is the run a background sign-in belongs to; a request from one whose
+    /// run has ended is declined, so no sheet appears after an install stopped.
+    func answerTwoFactor(request: UnsafePointer<CChar>?, outBuf: UnsafeMutablePointer<CChar>?, len: Int,
+                         run: Int? = nil) -> Int32 {
         guard let outBuf, len > 1 else { return 0 }
         let prompt = request.flatMap { TwoFactorPrompt(json: String(cString: $0)) } ?? .deviceOnly
+        // Don't cover a Trust prompt; the wait blocks, so never on main.
+        if !Thread.isMainThread { attention.waitUntilFree() }
         twoFactorLock.lock()
         twoFactorAnswer = nil
         awaitingTwoFactor = true
@@ -2630,8 +2780,17 @@ final class Engine: ObservableObject {
             // A cancel can land between the lock above and this block running.
             self.twoFactorLock.lock()
             let stillWaiting = self.awaitingTwoFactor
+            // Checked here, on main, where a stopping run has already counted
+            // itself finished by the time this block runs.
+            let abandoned = run.map { $0 < self.finishedRuns } ?? false
+            if abandoned { self.awaitingTwoFactor = false }
             self.twoFactorLock.unlock()
             guard stillWaiting else { return }
+            if abandoned {
+                self.log("2FA requested by the sign-in of an install that already stopped — declined.")
+                self.twoFactorSem.signal()      // no answer, so the sign-in aborts
+                return
+            }
             self.twoFactor = .asking(prompt)
             self.log(prompt.logLine)
         }
@@ -3001,8 +3160,36 @@ private let siLogCallback: SILogCallback = { _, msg in
 }
 
 /// Bridges isideload's 2FA request to the engine's blocking prompt.
-private let twoFactorCallback: SITwoFactorCb = { _, request, outBuf, bufLen in
-    Engine.shared.answerTwoFactor(request: request, outBuf: outBuf, len: Int(bufLen))
+private let twoFactorCallback: SITwoFactorCb = { ctx, request, outBuf, bufLen in
+    Engine.shared.answerTwoFactor(request: request, outBuf: outBuf, len: Int(bufLen),
+                                  run: ctx.map { Int(bitPattern: $0) - 1 })
+}
+
+/// Counts what currently has the user's attention — a Trust prompt — so a 2FA
+/// sheet can wait for it to finish. Thread-safe.
+final class AttentionGate {
+    private let condition = NSCondition()
+    private var holders = 0
+
+    func begin() {
+        condition.lock()
+        holders += 1
+        condition.unlock()
+    }
+
+    func end() {
+        condition.lock()
+        holders = max(0, holders - 1)
+        if holders == 0 { condition.broadcast() }
+        condition.unlock()
+    }
+
+    /// Blocks until nothing holds the user's attention. Never on the main thread.
+    func waitUntilFree() {
+        condition.lock()
+        while holders > 0 { condition.wait() }
+        condition.unlock()
+    }
 }
 
 // MARK: - Two-factor prompt
