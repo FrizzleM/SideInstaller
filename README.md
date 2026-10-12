@@ -75,14 +75,6 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 6. Wait while your selection installs.
 7. That's it. No PC and no extra steps required.
 
-### Madeira
-
-The Install picker also offers [Madeira](https://github.com/willfaust/Madeira), which runs Windows PC
-games on an iPhone (iOS 26 or later). SideInstaller signs it with the Increased Memory Limit
-entitlement it needs and hands it your iPhone's pairing, so its built-in JIT is set up. It also hands
-Madeira a sign-in to Apple's developer service (a token, not your password), with which Madeira renews
-its own 7-day signing whenever it's open with LocalDevVPN connected. A Madeira build without that
-feature is refreshed under **Tools › Sideloaded apps** instead.
 
 ## Compatibility
 
