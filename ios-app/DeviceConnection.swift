@@ -1062,7 +1062,8 @@ final class DeviceConnection {
             let relative = String(file.path.dropFirst(prefix.count))
             let name = (relative as NSString).lastPathComponent
             guard !file.isExecutable, name != "Info.plist", name != "embedded.mobileprovision",
-                  !name.hasSuffix(".dylib"), !relative.contains("_CodeSignature/") else { continue }
+                  !name.hasSuffix(".dylib"), !relative.contains("_CodeSignature/"),
+                  file.size <= Self.prestageFileLimit else { continue }
             var parent = (relative as NSString).deletingLastPathComponent
             while !parent.isEmpty, directories.insert(parent).inserted {
                 parent = (parent as NSString).deletingLastPathComponent
@@ -1085,6 +1086,11 @@ final class DeviceConnection {
         }
         return PrestagedBundle(remoteRoot: remoteRoot, files: files, directories: directories)
     }
+
+    /// The largest file staged ahead of signing. Each is inflated whole onto the
+    /// heap, one per upload connection, where a signed bundle's files are mapped,
+    /// so a bigger one waits for the upload after signing.
+    private static let prestageFileLimit = 32 << 20
 
     /// A file to upload: where it goes, its size, and how to read it.
     private struct UploadItem {
