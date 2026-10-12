@@ -796,4 +796,22 @@ let spanishStrings: [String: String] = [
         "Solo las compilaciones de la página de instalación y del repositorio oficiales son mías. Cualquiera puede bifurcar el código, añadirle un ladrón de credenciales y publicarlo con el mismo nombre e icono: no confíes tu Apple ID a una copia de otro sitio.",
     "Install page": "Página de instalación",
     "Terms": "Términos",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.":
+        "%@ necesita iOS %d o posterior. Este iPhone usa iOS %@.",
+    "Open Madeira from your Home Screen.": "Abre Madeira desde la pantalla de inicio.",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "En su configuración, en “Set up JIT”, elige “In-app with pairing file”: SideInstaller ya ha puesto el archivo ahí, así que toca “Continue”.",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "En su configuración, en “Set up JIT”, elige cómo obtiene JIT este iPhone.",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "A partir de ahora Madeira renueva su propia firma, cuando está abierto y LocalDevVPN está conectado. SideInstaller le ha dado un inicio de sesión para eso: un token para el servicio de desarrolladores de Apple, no tu contraseña. Madeira puede olvidarlo en Settings › Signing.",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "Su firma dura 7 días. Antes de que se acaben, renuévala aquí en Herramientas › Apps sideloadeadas.",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "Este archivo de emparejamiento no tiene un registro RPPairing, el único tipo que lee %@.",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "Ejecuta juegos de PC para Windows en tu iPhone. De Will Faust, GPL-3.0.",
 ]

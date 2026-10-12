@@ -775,4 +775,21 @@ let japaneseStrings: [String: String] = [
         "公式のインストールページとリポジトリにあるビルドのみが本物です。誰でもソースコードを fork し、認証情報を盗むコードを仕込んで、同じ名前とアイコンで配布することができます。そのため、他所から入手したコピーに Apple ID を入力しないでください。",
     "Install page": "インストールページ",
     "Terms": "利用規約",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ には iOS %d 以降が必要です。この iPhone は iOS %@ です。",
+    "Open Madeira from your Home Screen.": "ホーム画面から Madeira を開いてください。",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "初期設定の「Set up JIT」で「In-app with pairing file」を選んでください。ファイルは SideInstaller がすでに入れてあるので、「Continue」をタップします。",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "初期設定の「Set up JIT」で、この iPhone で JIT を使う方法を選んでください。",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "今後は、Madeira を開いていて LocalDevVPN が接続されているときに、Madeira が自分で署名を更新します。そのために SideInstaller がサインイン情報を渡しました。Apple の開発者サービス用のトークンで、パスワードではありません。Madeira の Settings › Signing で削除できます。",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "署名の有効期間は7日間です。期限が切れる前に、このアプリの「ツール › サイドロード済みアプリ」で更新してください。",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "このペアリングファイルには、%@ が読み取れる唯一の形式である RPPairing レコードがありません。",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "Windows 向け PC ゲームを iPhone で動かします。Will Faust 開発、GPL-3.0 ライセンス。",
 ]

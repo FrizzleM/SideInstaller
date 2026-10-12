@@ -797,4 +797,22 @@ let frenchStrings: [String: String] = [
         "Seules les versions publiées sur la page d’installation et le dépôt officiels sont les miennes. N’importe qui peut forker le code, y ajouter un voleur d’identifiants et le diffuser sous le même nom et la même icône : ne confiez pas votre Apple ID à une copie trouvée ailleurs.",
     "Install page": "Page d’installation",
     "Terms": "Conditions",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.":
+        "%@ nécessite iOS %d ou une version ultérieure. Cet iPhone utilise iOS %@.",
+    "Open Madeira from your Home Screen.": "Ouvrez Madeira depuis votre écran d'accueil.",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "Dans sa configuration, sous « Set up JIT », choisissez « In-app with pairing file » : SideInstaller y a déjà placé le fichier, touchez donc « Continue ».",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "Dans sa configuration, sous « Set up JIT », choisissez comment cet iPhone obtient le JIT.",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "Désormais, Madeira renouvelle lui-même sa signature, quand il est ouvert et que LocalDevVPN est connecté. SideInstaller lui a donné une connexion pour cela : un jeton pour le service développeur d'Apple, pas votre mot de passe. Madeira peut l'oublier dans Settings › Signing.",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "Sa signature dure 7 jours. Avant qu'ils ne soient écoulés, renouvelez-la ici dans Outils › Apps sideloadées.",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "Ce fichier de jumelage ne contient pas d'enregistrement RPPairing, le seul type que %@ lit.",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "Fait tourner les jeux PC Windows sur votre iPhone. Par Will Faust, GPL-3.0.",
 ]

@@ -138,10 +138,16 @@ final class Engine: ObservableObject {
     @Published var deviceIP: String = "10.7.0.1"
     /// `deviceIP` normalized to a dialable host, e.g. `10.7.0.1/32` → `10.7.0.1`.
     var deviceHost: String { NetworkStatus.host(deviceIP) }
-    // Which build to install (SideStore, or LiveContainer + SideStore).
+    // Which build to install (SideStore, LiveContainer + SideStore, Madeira, or
+    // an imported IPA).
     @Published var installSource: InstallSource = .sideStore
     // Which release track to pull that build from (stable or nightly).
     @Published var releaseChannel: ReleaseChannel = .stable
+    /// The track the selected build is installed from: the picked one, or
+    /// stable for a build that has no nightly.
+    var selectedChannel: ReleaseChannel {
+        installSource.hasNightly ? releaseChannel : .stable
+    }
     /// Versions picked under Advanced, per build and channel; a missing entry
     /// installs the latest release. Not persisted, like the channel.
     @Published private var pickedVersions: [InstallSource: [ReleaseChannel: ReleaseVersion]] = [:]
@@ -149,8 +155,8 @@ final class Engine: ObservableObject {
     /// The version picked for the selected build and channel; nil installs the
     /// latest release.
     var selectedVersion: ReleaseVersion? {
-        get { pickedVersions[installSource]?[releaseChannel] }
-        set { pickedVersions[installSource, default: [:]][releaseChannel] = newValue }
+        get { pickedVersions[installSource]?[selectedChannel] }
+        set { pickedVersions[installSource, default: [:]][selectedChannel] = newValue }
     }
 
     /// Each build's releases, listed by the version picker under Advanced.
@@ -266,6 +272,9 @@ final class Engine: ObservableObject {
 
     /// Set once the whole pipeline has completed successfully.
     @Published var finished: Bool = false
+
+    /// What this run put into Madeira, so the last steps can say what's there.
+    private var madeiraHandoff = MadeiraHandoff()
 
     /// Set when the success popup, or the LiveContainer certificate popup, is
     /// closed; a new run brings them back.
@@ -475,6 +484,7 @@ final class Engine: ObservableObject {
             self.successClosed = false
             self.liveContainerImportClosed = false
             self.certConflict = false
+            self.madeiraHandoff = MadeiraHandoff()
         }
     }
 
@@ -508,6 +518,15 @@ final class Engine: ObservableObject {
         guard !normalizedAppleID.isEmpty, !applePassword.isEmpty else {
             setGuide(Guides.account)
             log("⛔️ No Apple ID saved. Add one in Settings › Account, then tap Install again.")
+            return
+        }
+        // Installing a build this iOS can't run would only use up an App ID.
+        if let needed = installSource.minimumOSMajorVersion,
+           !ProcessInfo.processInfo.isOperatingSystemAtLeast(
+               OperatingSystemVersion(majorVersion: needed, minorVersion: 0, patchVersion: 0)) {
+            lastError = L("%@ needs iOS %d or later. This iPhone runs iOS %@.",
+                          installSource.displayName, needed, osVersionText)
+            log("⛔️ \(installSource.displayName) needs iOS \(needed) or later; this iPhone runs iOS \(osVersionText).")
             return
         }
         // A custom install needs its IPA before anything else runs.
@@ -1188,7 +1207,7 @@ final class Engine: ObservableObject {
     @MainActor
     private func download() async throws {
         let src = installSource
-        let channel = releaseChannel
+        let channel = selectedChannel
         // A custom IPA has no versions to pick from.
         let version = src == .custom ? nil : selectedVersion
         // Keyed on source, channel and version, so changing any re-fetches.
@@ -1257,7 +1276,7 @@ final class Engine: ObservableObject {
         prefetch?.task.cancel()
         prefetch = nil
         let src = installSource
-        let channel = releaseChannel
+        let channel = selectedChannel
         guard src != .custom else { return }
         let version = selectedVersion
         if let p = downloadedIPAPath, downloadedSource == src, downloadedChannel == channel,
@@ -1518,11 +1537,13 @@ final class Engine: ObservableObject {
         // Bundled into AltStore for its Remote AltServer setup; other apps
         // get the pairing file after the install instead.
         let pairingPath = pairingFilePath ?? PairingController.pairingFilePath()
+        let source = downloadedSource ?? installSource
         setStep(.sign, .active)
         do {
             let path = try await onSignQueue {
                 try self.performSign(session: session, ipa: ipa, udid: udid, deviceName: name,
-                                     pairingFilePath: pairingPath)
+                                     pairingFilePath: pairingPath,
+                                     forMadeira: source == .madeira || Self.isMadeira(ipaPath: ipa))
             }
             signedAppPath = path
             // Read the app's name from the signed bundle (imported IPAs have none before this).
@@ -1548,12 +1569,20 @@ final class Engine: ObservableObject {
         }
     }
 
+    /// `forMadeira` signs the way Madeira needs: with Increased Memory Limit
+    /// enabled on its App IDs before the profile is requested, and without an
+    /// app group. Madeira renews its own profile and registers its App ID again
+    /// when it runs out; it can restore the first on a new App ID, not the second.
     private func performSign(session: OpaquePointer, ipa: String, udid: String, deviceName: String,
-                             pairingFilePath: String) throws -> String {
+                             pairingFilePath: String, forMadeira: Bool) throws -> String {
         log("Signing \(ipa) …")
+        if forMadeira {
+            log("Signing for Madeira: Increased Memory Limit on its App ID (it shows as Memory+), and no app group.")
+        }
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        let rc = si_sign_ipa(session, ipa, udid, deviceName, pairingFilePath, &signed, &error)
+        let rc = si_sign_ipa(session, ipa, udid, deviceName, pairingFilePath,
+                             forMadeira ? 1 : 0, forMadeira ? 0 : 1, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
             signed.map { si_string_free($0) }
@@ -1572,6 +1601,12 @@ final class Engine: ObservableObject {
             }
             throw EngineError.message(L("Signing failed: %@", msg))
         }
+    }
+
+    /// True when the IPA at `ipaPath` is Madeira, whichever way it got here: the
+    /// download, an import, or a copy kept for refreshing.
+    private static func isMadeira(ipaPath: String) -> Bool {
+        IPALibrary.appInfo(at: URL(fileURLWithPath: ipaPath))?.bundleID == MadeiraPairingHandoff.bundleID
     }
 
     /// Detect Apple error 7460 in a raw signing error, by code or wording.
@@ -1668,21 +1703,26 @@ final class Engine: ObservableObject {
         }
         let udid = deviceUDID
         do {
-            try await onDeviceQueue {
+            madeiraHandoff = try await onDeviceQueue {
                 try self.performWritePairing(path: path, udid: udid,
                                              source: source, accountConfig: accountConfig)
             }
         } catch {
-            // Only AltStore-family apps need this file, so an imported IPA
-            // failing here doesn't fail the run.
-            guard source == .custom else { throw error }
-            log("⚠️ Couldn't seed the pairing file into \(installedAppName) (\(short(error))). It's installed and ready — only AltStore-family apps need that file.")
+            // SideStore can't work without this file. Madeira can pair itself or
+            // use StikDebug, and an imported IPA may not want one at all.
+            guard source.pairingIsOptional else { throw error }
+            if signedAppIsMadeira(source) {
+                log("⚠️ Couldn't reach Madeira's container (\(short(error))). It's installed: set up JIT in Madeira, and refresh it under Tools › Sideloaded apps.")
+            } else {
+                log("⚠️ Couldn't seed the pairing file into \(installedAppName) (\(short(error))). It's installed and ready — only AltStore-family apps need that file.")
+            }
         }
         setStep(.writePairing, .done)
     }
 
+    /// Returns what Madeira was handed, when the app is Madeira.
     private func performWritePairing(path: String, udid: String?,
-                                     source: InstallSource, accountConfig: String?) throws {
+                                     source: InstallSource, accountConfig: String?) throws -> MadeiraHandoff {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
         let size = fileSize(path)
         guard FileManager.default.fileExists(atPath: path), size > 0 else {
@@ -1707,9 +1747,20 @@ final class Engine: ObservableObject {
         } else {
             throw EngineError.message(L("%@ isn't installed yet — install must run first.", source.displayName))
         }
+        log("Resolved \(appName) bundle id: \(bundleID)")
+        if signedAppIsMadeira(source) {
+            // Neither hand-off depends on the other, and Madeira works without both.
+            var handed = MadeiraHandoff()
+            do {
+                handed.pairing = try handOffMadeiraPairing(placementPath: placement, bundleID: bundleID)
+            } catch {
+                log("⚠️ Couldn't hand Madeira the pairing file (\(short(error))). Pair it under its Settings › JIT › JIT setup, or write the file again from Tools › Pairing.")
+            }
+            handed.signIn = handOffMadeiraSignIn(accountConfig, bundleID: bundleID)
+            return handed
+        }
         // SideStore reads the file at its Documents root, LiveContainer deeper.
         let remoteRel = source.pairingRemoteRelativePath
-        log("Resolved \(appName) bundle id: \(bundleID)")
         log("Writing pairing file into \(bundleID) /Documents/\(remoteRel) …")
         let written = try connection.writePairingFile(intoBundleID: bundleID,
                                                        remoteRelativePath: remoteRel,
@@ -1733,6 +1784,43 @@ final class Engine: ObservableObject {
                 log("⚠️ Couldn't hand \(appName) the signing certificate (\(short(error))). It's installed and ready, but it will ask to resign itself on first sign-in.")
             }
         }
+        return MadeiraHandoff()
+    }
+
+    /// Gives Madeira the RPPairing record on its own (see
+    /// `MadeiraPairingHandoff`). Returns false, writing nothing, when the
+    /// pairing file has none. Runs on `deviceQueue`.
+    private func handOffMadeiraPairing(placementPath: String, bundleID: String) throws -> Bool {
+        let file = try Data(contentsOf: URL(fileURLWithPath: placementPath))
+        guard let record = MadeiraPairingHandoff.record(from: file) else {
+            log("⚠️ This pairing file has no RPPairing record, the only kind Madeira's built-in JIT reads, so nothing was written. Pair in Madeira (iOS 27), import an RPPairing file there, or use StikDebug.")
+            return false
+        }
+        let rel = MadeiraPairingHandoff.remoteRelativePath
+        log("Writing the RPPairing record into \(bundleID) /Documents/\(rel) …")
+        let written = try connection.writeFile(intoBundleID: bundleID, remoteRelativePath: rel, data: record)
+        log("Pairing file written into Madeira and read-back VERIFIED (\(written) bytes). Madeira moves it into its Keychain the next time it looks for one.")
+        return true
+    }
+
+    /// Gives Madeira the sign-in it renews its own signing with (see
+    /// `MadeiraSigningHandoff`), as `madeiraSigningAccountJSON` built it. Returns
+    /// whether it's there; failures only log. Runs on `deviceQueue`.
+    private func handOffMadeiraSignIn(_ account: String?, bundleID: String) -> Bool {
+        guard let account else { return false }
+        guard let handoff = MadeiraSigningHandoff.plist(from: account) else {
+            log("⚠️ The sign-in for Madeira is incomplete, or the anisette server in use isn't reached over HTTPS, so it wasn't handed over. Refresh Madeira under Tools › Sideloaded apps.")
+            return false
+        }
+        let path = MadeiraSigningHandoff.containerPath
+        do {
+            let written = try connection.updatePlist(inBundleID: bundleID, containerPath: path) { $0 = handoff }
+            log("Sign-in handed to Madeira: /\(path) written and read-back VERIFIED (\(written) bytes). It holds a developer-portal token and the anisette identity, not the Apple ID password. Madeira moves it into its Keychain when it next starts, and renews its own signing from then on.")
+            return true
+        } catch {
+            log("⚠️ Couldn't hand Madeira the sign-in (\(short(error))). It's installed and ready, but won't renew its own signing: refresh it under Tools › Sideloaded apps.")
+            return false
+        }
     }
 
     /// Starts building the certificate hand-off for the build just signed.
@@ -1742,10 +1830,12 @@ final class Engine: ObservableObject {
         return Task { @MainActor in await self.accountConfigJSON(source: source) }
     }
 
-    /// The `Account.sideconf` JSON for this install, or nil to skip the
-    /// certificate hand-off. Errors are logged, never thrown.
+    /// What the install hands over besides the pairing file, or nil for nothing:
+    /// SideStore's `Account.sideconf` JSON, or the sign-in Madeira renews its own
+    /// signing with. Errors are logged, never thrown.
     @MainActor
     private func accountConfigJSON(source: InstallSource) async -> String? {
+        if signedAppIsMadeira(source) { return await madeiraSigningAccountJSON() }
         guard accountConfigRemoteRelativePath(source: source) != nil else { return nil }
         guard let session = signSession else {
             log("No Apple ID session to build the account config from — skipping the certificate hand-off.")
@@ -1763,6 +1853,41 @@ final class Engine: ObservableObject {
             }
         } catch {
             log("⚠️ Couldn't build the certificate hand-off (\(short(error))). SideStore will ask to resign itself on first sign-in.")
+            return nil
+        }
+    }
+
+    /// The sign-in for Madeira as JSON: what `si_signing_account` reads off the
+    /// session, plus the anisette servers a sign-in here tries. Nil, with nothing
+    /// read, for a Madeira build that doesn't renew its own signing: a
+    /// credential isn't left where nothing takes it in.
+    @MainActor
+    private func madeiraSigningAccountJSON() async -> String? {
+        guard signedMadeiraRenewsItself() else {
+            log("This Madeira build doesn't renew its own signing, so no sign-in is handed to it. Refresh it under Tools › Sideloaded apps.")
+            return nil
+        }
+        guard let session = signSession else {
+            log("No Apple ID session to hand to Madeira — it won't renew its own signing. Refresh it under Tools › Sideloaded apps.")
+            return nil
+        }
+        let servers = anisetteCandidates()
+        do {
+            return try await onSignQueue { () -> String? in
+                var json: UnsafeMutablePointer<CChar>?
+                var error: UnsafeMutablePointer<CChar>?
+                let rc = si_signing_account(session, &json, &error)
+                guard rc == 0 else {
+                    let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
+                    error.map { si_string_free($0) }
+                    throw EngineError.message(msg)
+                }
+                let account = json.map { String(cString: $0) } ?? ""
+                json.map { si_string_free($0) }
+                return MadeiraSigningHandoff.adding(anisetteServers: servers, to: account)
+            }
+        } catch {
+            log("⚠️ Couldn't read the sign-in to hand to Madeira (\(short(error))). It won't renew its own signing: refresh it under Tools › Sideloaded apps.")
             return nil
         }
     }
@@ -1821,6 +1946,7 @@ final class Engine: ObservableObject {
         switch source {
         case .sideStore:     return "Account.sideconf"
         case .liveContainer: return "SideStore/Documents/Account.sideconf"
+        case .madeira:       return nil
         case .custom:
             guard signedAppBundleID()?.hasPrefix("com.SideStore.SideStore") == true else { return nil }
             return "Account.sideconf"
@@ -1847,7 +1973,10 @@ final class Engine: ObservableObject {
     @MainActor
     private func finishSuccess() {
         finished = true
-        setGuide(Guides.trust(appName: installedAppName))
+        let source = downloadedSource ?? installSource
+        setGuide(signedAppIsMadeira(source)
+                 ? Guides.trustMadeira(holding: madeiraHandoff)
+                 : Guides.trust(appName: installedAppName))
         log("✅ Done — \(installedSourceName) is installed. One trust step left (see the card).")
     }
 
@@ -2031,6 +2160,22 @@ final class Engine: ObservableObject {
         signedAppPlist()?["CFBundleIdentifier"] as? String
     }
 
+    /// True when what was installed is Madeira: picked as such, or imported as
+    /// a custom IPA, which only the signed bundle id (Madeira's, with the team
+    /// id appended) can tell.
+    private func signedAppIsMadeira(_ source: InstallSource) -> Bool {
+        if source == .madeira { return true }
+        guard source == .custom, let signed = signedAppBundleID() else { return false }
+        return signed == MadeiraPairingHandoff.bundleID
+            || signed.hasPrefix(MadeiraPairingHandoff.bundleID + ".")
+    }
+
+    /// True when the signed Madeira takes in the sign-in it renews its own
+    /// signing with: its Info.plist says which version of the hand-over it reads.
+    private func signedMadeiraRenewsItself() -> Bool {
+        (signedAppPlist()?[MadeiraSigningHandoff.infoKey] as? Int ?? 0) >= MadeiraSigningHandoff.version
+    }
+
     /// The signed app's home-screen name; an app carries only one of the two.
     private func signedAppName() -> String? {
         guard let plist = signedAppPlist() else { return nil }
@@ -2196,6 +2341,12 @@ final class Engine: ObservableObject {
                                        udid: String?) throws {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
         let bundleID = target.bundleID
+        if target.app.takesRemoteRecordOnly {
+            guard try handOffMadeiraPairing(placementPath: placementPath, bundleID: bundleID) else {
+                throw EngineError.message(L("This pairing file has no RPPairing record, the only kind %@ reads.", target.name))
+            }
+            return
+        }
         log("Writing pairing file into \(bundleID) /Documents/\(target.remoteRelativePath) …")
         let written = try connection.writePairingFile(intoBundleID: bundleID,
                                                        remoteRelativePath: target.remoteRelativePath,
@@ -2303,7 +2454,8 @@ final class Engine: ObservableObject {
         do {
             signed = try await onSignQueue {
                 try self.performSign(session: session, ipa: ipaPath, udid: udid, deviceName: device,
-                                     pairingFilePath: path)
+                                     pairingFilePath: path,
+                                     forMadeira: Self.isMadeira(ipaPath: ipaPath))
             }
         } catch EngineError.certExists {
             // Don't set `certConflict`: its retry button starts a full install
@@ -2804,6 +2956,23 @@ enum Guides {
                 L("Open %@ from your Home Screen — you're done.", appName),
             ],
             actionLabel: nil, actionURLString: nil)
+    }
+
+    /// The trust step for Madeira, followed by what its own setup still asks
+    /// for, and how its signing is kept alive. With the pairing file already
+    /// inside, its setup shows that route as done. With the sign-in inside,
+    /// Madeira renews its own signing; without, it's refreshed from the Tools
+    /// tab like any other app.
+    static func trustMadeira(holding handoff: MadeiraHandoff) -> Guide {
+        var guide = trust(appName: MadeiraPairingHandoff.appName)
+        guide.steps[guide.steps.count - 1] = L("Open Madeira from your Home Screen.")
+        guide.steps.append(handoff.pairing
+            ? L("In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.")
+            : L("In its setup, under “Set up JIT”, pick how this iPhone gets JIT."))
+        guide.steps.append(handoff.signIn
+            ? L("Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.")
+            : L("Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps."))
+        return guide
     }
 
     /// Shown after a LiveContainer install, which needs SideStore's certificate.
