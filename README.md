@@ -7,7 +7,7 @@
 **Install SideStore and LiveContainer directly on your iPhone. No PC required.**
 
 [![Install](https://img.shields.io/badge/Install-SideInstaller-2ea44f?style=for-the-badge)](https://sideinstaller.net/)
-[![Version](https://img.shields.io/badge/version-0.9.0-blue?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.1-blue?style=for-the-badge)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-iOS-lightgrey?style=for-the-badge&logo=apple)](#requirements)
 [![License](https://img.shields.io/badge/license-Custom-orange?style=for-the-badge)](LICENSE.md)
 
@@ -66,14 +66,31 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 
 ## How to use it
 
-1. Connect the device to LocalDevVPN (or any alternative)
-2. Open [the official install page](https://frizzlem.github.io/SideInstaller/) and install the app using any
+1. Open [the official install page](https://frizzlem.github.io/SideInstaller/) and install the app using any
    of the certificates.
-3. Once it's installed, open it.
+2. Once it's installed, open it.
+3. Connect the device to LocalDevVPN (or any alternative)
 4. Log in with your Apple account credentials.
 5. Tap **Install SideStore** or **Install SideStore + LiveContainer**.
 6. Wait while your selection installs.
 7. That's it. No PC and no extra steps required.
+
+### Madeira
+
+The Install picker also offers [Madeira](https://github.com/willfaust/Madeira), which runs Windows PC
+games on an iPhone (iOS 26 or later). SideInstaller signs it with the Increased Memory Limit
+entitlement it needs and hands it your iPhone's pairing, so its built-in JIT is set up. It also hands
+Madeira a sign-in to Apple's developer service (a token, not your password), with which Madeira renews
+its own 7-day signing whenever it's open with LocalDevVPN connected. A Madeira build without that
+feature is refreshed under **Tools › Sideloaded apps** instead.
+
+## Compatibility
+
+| iOS | Is it compatible? |
+| --- | --- |
+| 27 beta 1 - 27.0.1+ | ✅ Yes |
+| 18.0 - 26.7 | ⚠️ Yes, but [a pairing file is needed](https://docs.sidestore.io/docs/advanced/alternative#pairing), and that requires a PC |
+| ≤ iOS 17.7.11 | ❌ No |
 
 
 ## Is SideInstaller safe?
@@ -100,6 +117,7 @@ anyone can inspect exactly what it does.
 | Path | What's in it |
 | :-- | :-- |
 | `ios-app/` | The SwiftUI app — UI, install engine, certificate handling, translations |
+| `ios-live-activity/` | The widget extension that draws the pairing code in the Dynamic Island and on the Lock Screen |
 | `rust-core/` | Rust core compiled into `SideInstallerFFI.xcframework` |
 | `scripts/` | Build, signing, and install-page generation scripts |
 | `.github/` | Workflows for signing and publishing the install page |

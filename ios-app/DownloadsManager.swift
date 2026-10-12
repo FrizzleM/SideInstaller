@@ -9,15 +9,19 @@ struct DownloadedIPA: Identifiable, Equatable {
     let modified: Date?
     /// True when this file arrived from the Files app rather than a download.
     let isImported: Bool
+    /// The release picked under Advanced that this was downloaded as.
+    let version: String?
 
     /// Stable identity: the path is unique per source and channel.
     var id: String { url.path }
 
-    /// Channel-qualified name, e.g. "LiveContainer + SideStore (Nightly)", or
-    /// the filename for a custom IPA, which the row already names.
+    /// Channel-qualified name, e.g. "LiveContainer + SideStore (Nightly)" or
+    /// "SideStore 0.6.3", or the filename for a custom IPA, which the row
+    /// already names.
     var displayName: String {
         guard source != .custom else { return fileName }
         var name = source.displayName
+        if let version { name += " \(version)" }
         if channel == .nightly { name += " (\(channel.displayName))" }
         if isImported { name += " — \(L("imported"))" }
         return name
@@ -60,7 +64,8 @@ final class DownloadsManager: ObservableObject {
     func refresh() {
         downloads = IPALibrary.scan().map {
             DownloadedIPA(source: $0.source, channel: $0.channel, url: $0.url,
-                          size: $0.size, modified: $0.modified, isImported: $0.isImported)
+                          size: $0.size, modified: $0.modified, isImported: $0.isImported,
+                          version: $0.version)
         }
         hasLoaded = true
     }

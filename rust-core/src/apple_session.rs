@@ -27,6 +27,8 @@ use isideload::{
 use rootcause::Report;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+
+use crate::error_text::report_text;
 use tokio::sync::RwLock;
 
 /// Sign in again this long before Apple's stated expiry rather than race it.
@@ -56,16 +58,13 @@ impl SavedSession {
         }
     }
 
-    /// Unix time (seconds) when the token expires, if known. Apple doesn't
-    /// document the unit, so both milliseconds and seconds are handled. A token
-    /// without an expiry is tried anyway.
+    /// Unix time (seconds) when the token expires, if known: Apple's stated
+    /// expiry, else its duration from when the token was saved. A token
+    /// without either is tried anyway.
     fn expires_at(&self) -> Option<u64> {
-        match self.expiry {
-            e if e >= 100_000_000_000 => Some(e / 1000),
-            e if e >= 1_000_000_000 => Some(e),
-            _ if self.duration > 0 => Some(self.saved_at.saturating_add(self.duration)),
-            _ => None,
-        }
+        stated_expiry(self.expiry).or_else(|| {
+            (self.duration > 0).then(|| self.saved_at.saturating_add(self.duration))
+        })
     }
 
     fn usable_for(&self, apple_id: &str, now: u64) -> bool {
@@ -99,6 +98,16 @@ impl SavedSession {
             Some(_) => format!(" (expiry={}, duration={})", self.expiry, self.duration),
             None => " (Apple gave no expiry)".to_string(),
         }
+    }
+}
+
+/// An app token's `expiry` as Unix seconds, or None when Apple sent none.
+/// Apple doesn't document the unit, so both milliseconds and seconds are read.
+pub(crate) fn stated_expiry(expiry: u64) -> Option<u64> {
+    match expiry {
+        e if e >= 100_000_000_000 => Some(e / 1000),
+        e if e >= 1_000_000_000 => Some(e),
+        _ => None,
     }
 }
 
@@ -201,14 +210,14 @@ where
         Box::new(FsStorage::new(storage_dir.to_path_buf())),
         "0".to_string(),
     )
-    .map_err(|e| format!("anisette provider: {e}"))?;
+    .map_err(|e| format!("anisette provider: {}", report_text(&e)))?;
 
     // Only fetches client info and the URL bag; doesn't sign in.
     let mut account = AppleAccount::builder(apple_id)
         .anisette_provider(anisette)
         .build()
         .await
-        .map_err(|e| format!("login failed: {e}"))?;
+        .map_err(|e| format!("login failed: {}", report_text(&e)))?;
 
     if let Some(saved) = saved {
         if saved.usable_for(apple_id, now) {
@@ -227,7 +236,7 @@ where
                     return Ok((dev, teams));
                 }
                 Err(e) => {
-                    let text = format!("{e}");
+                    let text = report_text(&e);
                     if is_transient(&text) {
                         return Err(format!("developer session: {text}"));
                     }
@@ -244,17 +253,17 @@ where
         }
     }
 
-    tracing::info!("{label}: logging in {apple_id}");
+    tracing::info!("{label}: logging in");
     account
         .login(password, two_factor)
         .await
-        .map_err(|e| format!("login failed: {e}"))?;
+        .map_err(|e| format!("login failed: {}", report_text(&e)))?;
     tracing::info!("{label}: login OK; opening developer session");
 
     let token = account
         .get_app_token("xcode.auth")
         .await
-        .map_err(|e| format!("developer session: {e}"))?;
+        .map_err(|e| format!("developer session: {}", report_text(&e)))?;
     let adsid = account
         .spd
         .as_ref()
@@ -285,7 +294,7 @@ where
     let teams = dev
         .list_teams()
         .await
-        .map_err(|e| format!("list teams: {e}"))?;
+        .map_err(|e| format!("list teams: {}", report_text(&e)))?;
     Ok((dev, teams))
 }
 
@@ -303,20 +312,20 @@ async fn reuse_without_url_bag(
         Box::new(FsStorage::new(storage_dir.to_path_buf())),
         "0".to_string(),
     )
-    .map_err(|e| format!("anisette provider: {e}"))?;
+    .map_err(|e| format!("anisette provider: {}", report_text(&e)))?;
     let client_info = anisette
         .get_client_info()
         .await
-        .map_err(|e| format!("anisette client info: {e}"))?;
+        .map_err(|e| format!("anisette client info: {}", report_text(&e)))?;
     let client = GrandSlam::without_url_bag(client_info, false)
-        .map_err(|e| format!("GrandSlam client: {e}"))?;
+        .map_err(|e| format!("GrandSlam client: {}", report_text(&e)))?;
     let mut dev = DeveloperSession::new(
         saved.app_token(),
         saved.adsid.clone(),
         Arc::new(client),
         AnisetteDataGenerator::new(Arc::new(RwLock::new(anisette))),
     );
-    let teams = dev.list_teams().await.map_err(|e| format!("{e}"))?;
+    let teams = dev.list_teams().await.map_err(|e| report_text(&e))?;
     Ok((dev, teams))
 }
 
@@ -341,6 +350,14 @@ mod tests {
     fn reads_expiry_in_milliseconds_or_seconds() {
         assert_eq!(saved(1_789_400_000_000, 0, NOW).expires_at(), Some(1_789_400_000));
         assert_eq!(saved(1_789_400_000, 0, NOW).expires_at(), Some(1_789_400_000));
+    }
+
+    #[test]
+    fn a_stated_expiry_is_read_and_a_missing_one_is_none() {
+        assert_eq!(stated_expiry(1_789_400_000_000), Some(1_789_400_000));
+        assert_eq!(stated_expiry(1_789_400_000), Some(1_789_400_000));
+        assert_eq!(stated_expiry(0), None);
+        assert_eq!(stated_expiry(3_600), None);
     }
 
     #[test]

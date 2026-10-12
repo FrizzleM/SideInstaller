@@ -4,15 +4,15 @@ Copy of the `isideload/` crate from
 [nab138/isideload](https://github.com/nab138/isideload) @
 `e319d931aa3f9d97fbd132149a3916dcd5c71f09` — the same revision `Cargo.lock`
 pinned for the git dependency in `rust-core/Cargo.toml`, so nothing about the
-auth / App ID / certificate behaviour described there changes.
+auth / App ID / certificate behaviour described there changes. Change 7 swaps
+the signing backend for the one upstream moved to after that revision.
 
 Vendored so `[patch."https://github.com/nab138/isideload.git"]` can redirect the
 dependency here.
 
 ## Local changes
 
-**1. `src/sideload/sideloader.rs` — write `embedded.mobileprovision` into
-each app extension.**
+**1. `src/sideload/sign.rs` — give each app extension `embedded.mobileprovision`.**
 
 `sign_app` downloaded a single provisioning profile (for `main_app_id`) and wrote
 it only to the main `.app`. App extensions got nothing, even though
@@ -40,9 +40,15 @@ actually appears is `NSCocoaErrorDomain 134081 "Can't add the same store twice"`
 on a Retry loop that never recovers. See SideStore issues #1394 and #1400 —
 closed upstream as an installer bug, and iLoader (same crate) has it too.
 
-The write has to happen *before* `sign::sign`: `embedded.mobileprovision` is
-sealed into `_CodeSignature/CodeResources` (`files` and `files2`), so adding it
-to an already-signed bundle breaks the resource envelope.
+The profile has to be in place before the bundle is sealed:
+`embedded.mobileprovision` is sealed into `_CodeSignature/CodeResources` (`files`
+and `files2`), so adding it to an already-signed bundle breaks the resource
+envelope. Since change 7, `sign` hands it to apple-codesign-quick for every
+`.appex` (nested ones too) through `embedded_mobileprovisions_by_bundle_id`,
+with the main entitlements through `entitlements_by_bundle_id`; before, it was
+written by hand in `sign_app`. Upstream `baca89d` fixes the same bug differently:
+it downloads each extension's own profile and signs the extension with that
+profile's entitlements, at one more request per extension.
 
 **2. `src/anisette/` and `src/auth/grandslam.rs` — report the client as akd,
 and don't reuse GrandSlam connections.**
@@ -106,40 +112,181 @@ On top of the port, all local:
 `rust-core/src/account.rs` bridges this callback to Swift as JSON; the shapes
 are documented on `SITwoFactorCb` in `rust-core/include/sideinstaller.h`.
 
-**4. `src/sideload/sideloader.rs`, `application.rs` — send `sign_app`'s
-requests to Apple concurrently.**
+**4. `src/sideload/application.rs` — tolerate a negative App ID quota.**
 
-`sign_app` ran every developer-portal request one after another on a single
-`DeveloperSession`: the certificate lookup, `listAppIds` twice, the app group,
-one feature check and one group assignment per App ID, then the profile. On an
-iPhone 16 that was about 5.5 s of a SideStore install spent waiting on Apple.
+`register_app_ids` converted Apple's `availableQuantity` (an `i64`) with
+`try_into()?` before comparing it. Apple can return a negative number, and then
+signing died with `out of range integral type conversion attempted` at
+`application.rs:192` — even when every App ID already existed and nothing needed
+registering. Seen 2026-09-17 on a free account signing LiveContainer+SideStore.
+A negative quota now logs a warning and skips the pre-check; if the IDs really
+are exhausted, `add_app_id` fails with Apple's own error. Upstream `769e386`
+(on `main`) does the same.
 
-It now takes a device `(name, UDID)` to register and sends what doesn't depend
-on anything else at once, each on a clone of the session (anisette headers are
-fetched first, so the clones share them rather than each asking the server):
+**5. `src/dev/` — register App IDs and app groups under a name Apple accepts.**
 
-1. device registration, the certificate lookup, and — once the archive is
-   extracted on a blocking thread — the App IDs and the app group together, then
-   every App ID's feature check and group assignment side by side;
-2. the provisioning profile, which needs all of that, while the certificate is
-   written into the bundle.
+`add_app_id` and `add_app_group` sent the bundle's `CFBundleName` as is, and
+Apple refuses anything but ASCII letters and digits with `Developer error 35: An
+invalid value was provided for the parameter 'appIdName'`, so an imported IPA
+named e.g. "YouTube Music+" couldn't be signed. `normalize_app_names` in
+`dev/mod.rs` strips the rest, and falls back to "App" for a name with nothing
+left. Same as upstream `3383885`, `a53be5c` and `37a1c64` (iLoader 2.3.4).
+Tests: `cargo test -p isideload --lib dev::tests`.
 
-`register_app_ids` also skips its second `listAppIds` when nothing new was
-registered, since the first listing is already current. `install_app` passes
-its device through instead of registering it separately first.
+**6. `src/auth/grandslam.rs` — retry a sign-in request GrandSlam answers 429.**
 
-Two additions serve `rust-core`'s sign-in, which cost another 1.5 s:
-`Sideloader::set_team` takes a team the caller has already listed (so
-`get_team` doesn't list them a second time), and `GrandSlam::without_url_bag`
-builds a client that skips the URL-bag fetch, for reusing a saved developer
-session — portal requests use fixed URLs and never read the bag.
+`plist_request` takes a `retry_429` flag, set for the three sign-in requests in
+`apple_account.rs` and not for anisette provisioning. With it, a 429 is retried
+after 2 s and again after 5 s; a 429 after that fails with reqwest's status
+error as before, which the app matches ("apple.com" and "429 Too Many Requests")
+to stop sign-in and explain. Upstream `a00c3a7` (iLoader 2.3.4) has the same
+signature shape but retries 10 times without waiting, and replaces the final
+error with one that names neither, so a re-vendor needs the app's match updated
+too. `tokio`'s `time` feature is enabled for the wait. Tests (shorter waits under
+`cfg(test)`, against a local server): `cargo test -p isideload --lib
+auth::grandslam`.
+
+**7. `src/sideload/sign.rs`, `cert_identity.rs`, `Cargo.toml` — sign with
+apple-codesign-quick.**
+
+Dadoum's [apple-codesign-quick](https://crates.io/crates/apple-codesign-quick)
+0.1.0 replaces `isideload-apple-codesign` 0.29, as upstream did in `cc9fa9c`,
+`5dd88f1` and `5992f00` (iLoader 2.3.0–2.3.4). It hashes files and signs nested
+bundles in parallel, and its dependency tree is far smaller: with it the iOS
+static library went from 79.1 MB to 69.0 MB and the app binary from 30.0 MB to
+25.0 MB. On an M-series Mac, signing SideStore nightly took 0.024 s instead of
+0.151 s, LiveContainer+SideStore 0.045 s instead of 0.39 s, and still 4–6× less
+with only two threads.
+
+Ported from upstream: `CertificateIdentity` keeps an `x509_cert::Certificate`
+and no `InMemoryPrivateKey`, and `profile_to_certificate_chain` builds the CMS
+chain from the profile's certificates plus the bundled WWDR G3 and Apple root
+(`src/assets/AppleWWDRCAG3.cer`; the root is `src/auth/apple_root.der`).
+`rsa` goes back to 0.9 and `rand` to 0.8, which apple-codesign-quick's
+`RustCryptoCmsSigner` needs; stored keys are PKCS#8 either way. Not taken:
+upstream's async/progress `sign`, its per-extension profiles (see change 1), and
+the wasm and callback changes around them.
+
+Local, on top: `sign` deletes every bundle's `_CodeSignature` folder first.
+apple-codesign-quick replaces `CodeResources` but seals anything else in there,
+so an IPA carrying a stray `_CodeSignature/ResourceRules` (seen in a re-signed
+game) failed `codesign --verify` with "a sealed resource is missing or invalid";
+`_CodeSignature` is never a sealed resource, and the old signer skipped it.
+
+Checked on the Mac (2026-10-05) by signing SideStore nightly,
+LiveContainer+SideStore and three other IPAs with a test CA and a CMS-wrapped
+profile, old signer against new: `codesign --verify --deep --strict` passes for
+every new output; identifiers, sealed file counts and profile placement match;
+entitlements are now readable where macOS called the old blob invalid; both XML
+and DER entitlements are present; code directories carry SHA-1 and SHA-256
+where the old ones had SHA-256 only. Not covered: symlinks in a bundle, which
+apple-codesign-quick's file walk skips and so leaves unsealed (none of the test
+IPAs has one).
+
+**8. `src/dev/certificates.rs`, `developer_session.rs` — revoke "Apple
+Development" certificates.**
+
+`ios/listAllDevelopmentCerts` returns the team's cross-platform "Apple
+Development" certificates (the kind Xcode makes) next to the "iOS Development"
+ones, and `list_ios_certs` keeps them, but `ios/revokeDevelopmentCert` refuses
+them by serial:
+
+```
+Developer error 7252: There is no 'ios' certificate with serial number
+'364D766243450DE16ED0CBBBF07FD9F2' on this team.
+```
+
+So the Certificates screen couldn't revoke one, and neither could
+`MaxCertsBehavior::Revoke`/`Prompt` if it picked one. iLoader 2.3.5 has the same
+bug (it calls the same endpoint). On 7252, `revoke_development_cert` now looks
+the serial up in `listAllDevelopmentCerts` and deletes that certificate by
+`certificateId` with `DELETE services/v1/certificates/<id>`, the request AltSign
+uses for every revoke (`sendServicesRequest`: a POST with
+`X-HTTP-Method-Override`, `application/vnd.api+json`, and
+`{"urlEncodedQueryParams": "teamId=…"}` as the body). A serial that isn't listed
+keeps Apple's 7252. The request's shape and its JSON:API error parsing are
+tested against a local server: `cargo test -p isideload --lib
+services_request_tests`.
+
+**9. `src/sideload/application.rs`, `bundle.rs`, `sideloader.rs` — what
+isideload 0.4.1–0.4.3 adds to the bundle (iLoader 2.3.6).**
+
+- `ALTAppGroups` now goes into every app extension's Info.plist too, not just
+  the app's (upstream `c23db68`). Extensions read it from their own bundle, and
+  the widget in AltStore and in SideStore releases up to 0.7.0-alpha opens the
+  shared database through it (`PersistentContainer.defaultDirectoryURL`). Without
+  it the widget opened an empty database in its own container. SideStore
+  nightlies read the group from the entitlements instead.
+- AltStore gets `ALTDeviceID`: the UDID `sign_app` registers. AltStore registers
+  that UDID with the team when it signs in and signs apps for it, and the IPA
+  carries whichever UDID it was built with. Upstream `dd44258` writes
+  `ALTDeviceId`, which AltStore doesn't read (`Bundle.Info.deviceID` is
+  `"ALTDeviceID"`).
+- `set_bundle_identifier` also lists each `BGTaskSchedulerPermittedIdentifiers`
+  entry under the new bundle identifier (upstream `340cfea`, iLoader issue
+  #649). iOS accepts a `BGContinuedProcessingTask` only if its identifier starts
+  with the app's bundle identifier, so apps build it from
+  `Bundle.main.bundleIdentifier`, and that identifier then wasn't permitted.
+  Upstream replaces the old bundle identifier wherever it occurs in an entry and
+  drops the original. Here, only an entry equal to the old bundle identifier or
+  starting with it and a dot is rebased, and the original stays, so an app that
+  registers a hard-coded identifier keeps its background tasks. The rebased
+  entries go in front of the originals: Madeira takes the first entry ending in
+  `.download.*` (and `.pairing.*`) and builds its task identifier from that, so
+  with the originals first it asked iOS for one under its old bundle identifier
+  and lost its background downloads. Tests:
+  `cargo test -p isideload --lib sideload::`.
+- AltStore gets the device's pairing file as `ALTPairingFile.dat` (upstream
+  `4f7fb39`), so setting up a Remote AltServer in AltStore Classic 2.3 skips the
+  "Pair with a PC" step. The format is AltServer's
+  (`ALTDeviceManager.encryptedPairingData` on AltStore's `classic` branch):
+  AES-256-GCM under SHA-256 of the certificate's machine identifier, written as
+  CryptoKit's `SealedBox.combined` (12-byte nonce, ciphertext, 16-byte tag).
+  AltStore opens it in `AppManager.bundledPairingFile()` once signed in, with
+  the machine identifier Apple lists for the certificate in `ALTCertificateID`
+  (`cert.machine_id` here, the same password the bundled p12 uses), and copies
+  it to its Keychain when Remote AltServer is set up. If it can't open the file
+  (say, AltStore kept a different certificate from an earlier install), it
+  pairs on its own as before.
+
+  Unlike upstream, which bundles iLoader's merged lockdown and RPPairing file as
+  is, only an RPPairing record goes in, re-serialized by idevice's
+  `RpPairingFile` as AltServer's `rp_pairing_file_to_bytes` writes it
+  (`altstore_pairing_file` in `rust-core/src/account.rs`). AltStore's
+  `OnDeviceClient` only connects with an RPPairing record (it refuses a file
+  without `private_key`), and AltStore keeps a bundled file without checking it,
+  so a lockdown-only file would make Remote AltServer look set up while every
+  install fails. With no RPPairing record, nothing is bundled. The file never
+  leaves the iPhone: AltStore only uses it for its own tunnel over LocalDevVPN.
+
+  Tests: `cargo test -p isideload --lib sideload::` opens a file CryptoKit
+  sealed and checks the layout; `cargo test --lib altstore_pairing_file` (from
+  `rust-core/`) covers what gets bundled. Checked once on the Mac the other way
+  round, too: AltStore's `bundledPairingFile()` code, run as a Swift script,
+  opened a file sealed here and got the record back unchanged.
+
+Not needed: upstream `0bee45d` (isideload 0.4.4, after iLoader 2.3.6). It
+gives LiveContainer's `LiveProcess.appex` the keychain groups, which every
+`.appex` here already gets with the main entitlements (change 1).
+
+**10. `src/sideload/sideloader.rs`, `src/dev/developer_session.rs` — for an app
+that renews its own profile (Madeira).**
+
+`sign_app` takes `app_group`: false skips `ensure_app_group`, the group feature
+and the assignment. Madeira registers its App ID again when the weekly one runs
+out, and a new App ID has no group, so a profile for it would grant less than a
+signature made with one. `DeveloperSession::token()` and `adsid()` expose what
+the session is signed in with, for `si_signing_account` to hand to Madeira.
+Local; upstream has neither. Not testable without an Apple ID.
 
 ## Re-vendoring
 
-Upstream had not fixed change 1 as of the pinned revision. Re-copying the crate
-from a newer revision drops the patch unless upstream has landed an equivalent —
-check `sign_app` in `src/sideload/sideloader.rs` for a profile write that loops
-over `app.bundle.app_extensions()` first.
+Upstream fixed change 1 its own way in `baca89d` (per-extension profiles). A
+re-vendor either keeps the main-profile arrangement in `sign.rs` or takes
+upstream's, which adds a profile download per extension to `sign_app`.
+
+Change 7 is upstream on `main` from `5992f00` (isideload 0.4.0), without the
+`_CodeSignature` cleanup.
 
 Change 2 is upstream on the `apple-codesign-quick` branch at `f6a4d5d` (what
 iLoader 2.3.3 pins) but was not on `main` (`b6d1113`) as of 2026-09-13. A

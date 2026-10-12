@@ -11,6 +11,7 @@ mod account;
 mod apple_session;
 mod certs;
 mod entitlements;
+mod error_text;
 mod ffi_util;
 mod logging;
 mod pairing;
@@ -77,13 +78,24 @@ pub unsafe extern "C" fn si_pairing_run_host(
     model: *const c_char,
     out_path: *const c_char,
     host_alt_irk_hex: *const c_char,
+    host_identifier: *const c_char,
     ready_cb: ReadyCb,
     pin_cb: PinCb,
     ctx: *mut c_void,
     out: *mut PairResult,
 ) -> i32 {
     pairing::run_host(
-        bind_addr, port, name, model, out_path, host_alt_irk_hex, ready_cb, pin_cb, ctx, out,
+        bind_addr,
+        port,
+        name,
+        model,
+        out_path,
+        host_alt_irk_hex,
+        host_identifier,
+        ready_cb,
+        pin_cb,
+        ctx,
+        out,
     )
 }
 
@@ -131,19 +143,52 @@ pub unsafe extern "C" fn si_apple_signin(
 
 /// Sign the IPA at `ipa_path`, returning the `.app` bundle's path. Blocks.
 /// `udid` is registered with the team first; pass NULL to skip that.
+/// `pairing_file_path` goes into AltStore's bundle; pass NULL for none.
+/// A non-zero `increased_memory_limit` enables that capability on the app's
+/// App IDs first, so the profile grants it. A zero `app_group` leaves them
+/// without an app group, for an app that renews its own profile.
 ///
 /// # Safety
 /// See `account::sign_ipa`.
 #[no_mangle]
+#[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn si_sign_ipa(
     session: *mut SignSession,
     ipa_path: *const c_char,
     udid: *const c_char,
     device_name: *const c_char,
+    pairing_file_path: *const c_char,
+    increased_memory_limit: i32,
+    app_group: i32,
     out_signed_path: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
-    account::sign_ipa(session, ipa_path, udid, device_name, out_signed_path, out_error)
+    account::sign_ipa(
+        session,
+        ipa_path,
+        udid,
+        device_name,
+        pairing_file_path,
+        increased_memory_limit != 0,
+        app_group != 0,
+        out_signed_path,
+        out_error,
+    )
+}
+
+/// Set `*out_json` to the sign-in an app needs to renew its own provisioning
+/// profile: `{team_id, adsid, token, token_expires, anisette_identifier,
+/// anisette_adi_pb}`. Blocks, but asks Apple nothing.
+///
+/// # Safety
+/// See `account::signing_account`.
+#[no_mangle]
+pub unsafe extern "C" fn si_signing_account(
+    session: *mut SignSession,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    account::signing_account(session, out_json, out_error)
 }
 
 /// Build SideStore's `Account.sideconf` payload, setting `*out_json` to it.

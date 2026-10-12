@@ -84,7 +84,7 @@ struct AppIdentifier: Identifiable, Decodable, Equatable {
 }
 
 /// What Apple said about one capability, decoded from `si_appid_enable`.
-struct EntitlementOutcome: Identifiable, Decodable, Equatable {
+struct EntitlementOutcome: Identifiable, Decodable, Hashable {
     let capability: String
     let ok: Bool
     let error: String
@@ -107,6 +107,8 @@ final class EntitlementsManager: ObservableObject {
     /// Last run's per-capability outcomes, keyed by App ID.
     @Published private(set) var outcomes: [String: [EntitlementOutcome]] = [:]
     @Published var lastError: String?
+    /// The App ID whose results popup is up, from the last run until closed.
+    @Published private var reportedID: String?
     @Published private(set) var hasLoaded = false
 
     private var session: OpaquePointer?            // CertSession*
@@ -123,6 +125,34 @@ final class EntitlementsManager: ObservableObject {
     }
 
     var isBusy: Bool { isWorking || applyingID != nil }
+
+    // MARK: Popups
+
+    /// One of this page's popups; they stack in this order. Each carries what
+    /// it shows, so it keeps its content while it closes.
+    enum Popup: Hashable {
+        /// What Apple accepted on an App ID, and why it refused the rest.
+        case results(appName: String, [EntitlementOutcome])
+        case error(String)
+    }
+
+    /// The popups up now, top to bottom.
+    var popups: [Popup] {
+        var shown: [Popup] = []
+        if let reportedID, let results = outcomes[reportedID] {
+            let name = apps.first { $0.id == reportedID }?.displayName ?? reportedID
+            shown.append(.results(appName: name, results))
+        }
+        if let lastError { shown.append(.error(lastError)) }
+        return shown
+    }
+
+    func closePopup(_ popup: Popup) {
+        switch popup {
+        case .results: reportedID = nil
+        case .error:   lastError = nil
+        }
+    }
 
     // MARK: Actions
 
@@ -169,12 +199,14 @@ final class EntitlementsManager: ObservableObject {
         guard session != nil, !isBusy, !ids.isEmpty else { return }
         applyingID = app.id
         lastError = nil
+        reportedID = nil
         outcomes[app.id] = nil
         engine.log("Entitlements: enabling \(ids.count) capability(ies) on \(app.identifier) …")
         Task { @MainActor in
             do {
                 let results = try await onQueue { try self.performEnable(appIdId: app.appIdId, ids: ids) }
                 outcomes[app.id] = results
+                reportedID = app.id
                 let granted = results.filter(\.ok).count
                 engine.log("Entitlements: Apple accepted \(granted)/\(results.count) on \(app.identifier).")
             } catch {
@@ -210,6 +242,7 @@ final class EntitlementsManager: ObservableObject {
         engine.twoFactorWasCancelled = false
         var lastError = "no anisette servers configured"
         var appleRefusals = 0
+        var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
             do {
@@ -224,6 +257,9 @@ final class EntitlementsManager: ObservableObject {
                 lastError = error.errorDescription ?? "sign-in failed"
                 if engine.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
+                }
+                if Engine.isAccountLocked(lastError) {
+                    throw EngineError.accountLocked
                 }
                 if Engine.isCredentialError(lastError) {
                     throw EngineError.message(Engine.credentialErrorMessage)
@@ -240,6 +276,17 @@ final class EntitlementsManager: ObservableObject {
                         engine.log("Entitlements: Apple's sign-in server refused \(appleRefusals) attempts with HTTP 503 — stopping.")
                         throw EngineError.message(Engine.appleServiceRefusalMessage)
                     }
+                }
+                // Every anisette server starts with the same request to Apple, so
+                // when that can't even be sent, more of them won't help.
+                if Engine.isAppleUnreachable(lastError) {
+                    appleUnreachable += 1
+                    if let message = await engine.appleUnreachableStop(
+                        failures: appleUnreachable, logPrefix: "Entitlements: ") {
+                        throw EngineError.message(message)
+                    }
+                } else {
+                    appleUnreachable = 0
                 }
             }
         }
@@ -363,13 +410,11 @@ struct EntitlementsView: View {
             VStack(spacing: 18) {
                 header.cascadeItem(0)
                 loadButton.cascadeItem(1)
-                if let error = manager.lastError {
-                    errorCallout(error).transition(.cardAppear)
-                }
+                // Errors and results show as popups, which `RootView` lays
+                // over the app.
                 appList
             }
             .padding(20)
-            .animation(.smooth(duration: 0.35), value: manager.lastError)
             .animation(.smooth(duration: 0.35), value: manager.apps)
             .animation(.smooth(duration: 0.3), value: manager.isWorking)
             .animation(.smooth(duration: 0.35), value: manager.teamSummary)
@@ -484,24 +529,6 @@ struct EntitlementsView: View {
         }
     }
 
-    private func errorCallout(_ message: String) -> some View {
-        CalloutCard(tint: .red) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.red)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Something went wrong"))
-                        .font(.subheadline.weight(.semibold))
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
-
 }
 
 // MARK: - Picker
@@ -521,9 +548,9 @@ private struct EntitlementPicker: View {
         ScrollView {
             VStack(spacing: 18) {
                 appCard.cascadeItem(0)
-                if let results { resultsCard(results).cascadeItem(1) }
+                // What Apple said shows as a popup; the rows keep its marks.
                 ForEach(Array(Entitlement.Group.allCases.enumerated()), id: \.element.id) { idx, group in
-                    groupCard(group).cascadeItem(2 + idx)
+                    groupCard(group).cascadeItem(1 + idx)
                 }
             }
             .padding(20)
@@ -615,34 +642,6 @@ private struct EntitlementPicker: View {
         .buttonStyle(.plain)
     }
 
-    /// What Apple accepted, and why it refused the rest.
-    private func resultsCard(_ results: [EntitlementOutcome]) -> some View {
-        let granted = results.filter(\.ok)
-        let refused = results.filter { !$0.ok }
-        return CalloutCard(tint: granted.isEmpty ? .orange : .green) {
-            VStack(alignment: .leading, spacing: 10) {
-                Label(L("%d of %d enabled", granted.count, results.count),
-                      systemImage: granted.isEmpty ? "exclamationmark.triangle.fill" : "checkmark.seal.fill")
-                    .font(.subheadline.weight(.semibold))
-                if !granted.isEmpty {
-                    Text(L("Install the app again for these to take effect."))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(refused) { outcome in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(outcome.name)
-                            .font(.caption.weight(.semibold))
-                        Text(outcome.error)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-        }
-    }
-
     private var applyBar: some View {
         Button { manager.enable(Array(selected), on: app) } label: {
             HStack(spacing: 10) {
@@ -660,5 +659,61 @@ private struct EntitlementPicker: View {
         .padding(.horizontal, 20)
         .padding(.bottom, 12)
         .background(.ultraThinMaterial)
+    }
+}
+
+// MARK: - Popup
+
+/// One of the Entitlements page's popups, which `RootView` stacks over the whole
+/// app: what Apple said to the last request, or what went wrong. See
+/// `EntitlementsManager.Popup`.
+struct EntitlementsPopup: View {
+    @ObservedObject var manager: EntitlementsManager
+    let popup: EntitlementsManager.Popup
+
+    /// Observed so labels redraw when the language changes.
+    @EnvironmentObject private var loc: Localizer
+
+    var body: some View {
+        switch popup {
+        case .results(let appName, let results):
+            resultsPopup(appName: appName, results: results)
+        case .error(let message):
+            MessagePopup(title: L("Something went wrong"), message: message, isError: true,
+                         onClose: close)
+        }
+    }
+
+    private func close() { manager.closePopup(popup) }
+
+    /// What Apple accepted, and why it refused the rest.
+    private func resultsPopup(appName: String, results: [EntitlementOutcome]) -> some View {
+        let granted = results.filter(\.ok)
+        let refused = results.filter { !$0.ok }
+        return PopupCard(title: L("%d of %d enabled", granted.count, results.count),
+                         systemImage: granted.isEmpty ? "exclamationmark.triangle.fill" : "checkmark.seal.fill",
+                         tint: granted.isEmpty ? .orange : .green,
+                         onClose: close) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(appName)
+                    .font(.subheadline.weight(.semibold))
+                if !granted.isEmpty {
+                    Text(L("Install the app again for these to take effect."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(refused) { outcome in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(outcome.name)
+                            .font(.caption.weight(.semibold))
+                        Text(outcome.error)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
     }
 }

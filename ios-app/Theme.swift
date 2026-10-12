@@ -88,7 +88,7 @@ struct AppBackground: View {
             let t = timeline.date.timeIntervalSinceReferenceDate
             ZStack {
                 Color.black
-                MeshGradient(width: 3, height: 3, points: meshPoints(at: t), colors: meshColors)
+                mesh(at: t)
                     .blur(radius: 24)
                     // Low enough to read as a deep tint rather than a light.
                     .opacity(0.2)
@@ -97,6 +97,21 @@ struct AppBackground: View {
                 Color.black.opacity(Backdrop.wash(at: t))
             }
             .ignoresSafeArea()
+        }
+    }
+
+    /// The blue layer: the swaying mesh, or on iOS 17 (no `MeshGradient`) a
+    /// radial bloom that follows the mesh's centre point.
+    @ViewBuilder
+    private func mesh(at t: TimeInterval) -> some View {
+        let points = meshPoints(at: t)
+        if #available(iOS 18.0, *) {
+            MeshGradient(width: 3, height: 3, points: points, colors: meshColors)
+        } else {
+            let centre = points[4]
+            RadialGradient(colors: [Theme.accent2, Theme.accent, Theme.glow],
+                           center: UnitPoint(x: CGFloat(centre.x), y: CGFloat(centre.y)),
+                           startRadius: 0, endRadius: 600)
         }
     }
 
@@ -166,6 +181,374 @@ struct CalloutCard<Content: View>: View {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .strokeBorder(tint.opacity(0.35), lineWidth: 1)
             )
+    }
+}
+
+// MARK: - Popups
+
+/// A message that floats over the whole app, which dims and softly blurs
+/// behind it (see `popupStack`). Each replaces a callout card that used to sit
+/// under a page's progress; several stack, each closing on its own.
+///
+/// A blocking popup holds what a running step is waiting on, such as the
+/// pairing code: closing it stops the run, so taps on the backdrop leave it
+/// open, and its X asks before closing it.
+///
+/// Inside a `PopupGroupCard` it's drawn as a tile instead: no X or shadow of
+/// its own, since the group's card has them.
+struct PopupCard<Content: View>: View {
+    var title: String
+    var systemImage: String
+    var tint: Color
+    var onClose: () -> Void
+    @ViewBuilder var content: () -> Content
+
+    /// The group card this one sits in as a tile, if any.
+    @Environment(\.popupGroup) private var group
+    /// True while a run is waiting on this card, so closing it ends the run.
+    @Environment(\.popupEndsProcess) private var endsProcess
+    /// Shows the "are you sure" alert before a blocking card closes.
+    @State private var confirmingClose = false
+
+    private var isTile: Bool { group != nil }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: isTile ? 12 : 16) {
+            // A tile titled like its group leaves the title to the group.
+            if title != group?.title {
+                header
+            }
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(isTile ? 16 : 20)
+        .frame(maxWidth: 460)
+        .background(
+            shape
+                .fill(Color(.secondarySystemBackground).opacity(isTile ? 0 : 1))
+                .overlay(shape.fill(tint.opacity(0.1)))
+        )
+        .overlay(shape.strokeBorder(tint.opacity(isTile ? 0.25 : 0.35), lineWidth: 1))
+        .shadow(color: .black.opacity(isTile ? 0 : 0.45), radius: 30, x: 0, y: 14)
+        .accessibilityElement(children: .contain)
+        .accessibilityAction(.escape, requestClose)
+        .alert(L("Closing this popup will end the process. Are you sure?"),
+               isPresented: $confirmingClose) {
+            Button(L("Yes"), role: .destructive, action: onClose)
+            Button(L("No"), role: .cancel) { }
+        }
+    }
+
+    /// Closes the card, asking first when that would end the run. A tile
+    /// closes its whole group.
+    private func requestClose() {
+        if let group {
+            group.close()
+        } else if endsProcess {
+            confirmingClose = true
+        } else {
+            onClose()
+        }
+    }
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: isTile ? 20 : 28, style: .continuous)
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font((isTile ? Font.body : .title3).weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: isTile ? 34 : 40, height: isTile ? 34 : 40)
+                .background(Circle().fill(tint.opacity(0.16)))
+            Text(title)
+                .font(.headline)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            if !isTile {
+                PopupCloseButton(action: requestClose)
+                    .transition(.opacity.combined(with: .scale(scale: 0.6)))
+            }
+        }
+    }
+}
+
+/// Popups that always come up together, as one card under a title of their
+/// own: each sits inside as a tile in its own tint, and the card's X closes
+/// them all. With only one of them up the card steps back and that one shows
+/// as a popup of its own; the card stays in place, so the others join it
+/// without a jump.
+struct PopupGroupCard<Content: View>: View {
+    var title: String
+    var systemImage: String
+    var tint: Color
+    /// False while only one member is up.
+    var isGrouped: Bool
+    /// Closes every member.
+    var onClose: () -> Void
+    @ViewBuilder var content: () -> Content
+
+    /// True while a run is waiting on a member, so closing them ends the run.
+    @Environment(\.popupEndsProcess) private var endsProcess
+    @State private var confirmingClose = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if isGrouped {
+                header
+                    .padding(.bottom, 4)
+                    .transition(.opacity)
+            }
+            content()
+        }
+        .environment(\.popupGroup, isGrouped ? PopupGroup(title: title, close: requestClose) : nil)
+        .padding(isGrouped ? 20 : 0)
+        .frame(maxWidth: 460)
+        .background(
+            shape
+                .fill(Color(.secondarySystemBackground))
+                .overlay(shape.fill(tint.opacity(0.08)))
+                .opacity(isGrouped ? 1 : 0)
+        )
+        .overlay(shape.strokeBorder(tint.opacity(isGrouped ? 0.35 : 0), lineWidth: 1))
+        .shadow(color: .black.opacity(isGrouped ? 0.45 : 0), radius: 30, x: 0, y: 14)
+        .accessibilityElement(children: .contain)
+        .accessibilityAction(.escape, requestClose)
+        .alert(L("Closing this popup will end the process. Are you sure?"),
+               isPresented: $confirmingClose) {
+            Button(L("Yes"), role: .destructive, action: onClose)
+            Button(L("No"), role: .cancel) { }
+        }
+    }
+
+    /// Closes the group, asking first when that would end the run.
+    private func requestClose() {
+        if endsProcess {
+            confirmingClose = true
+        } else {
+            onClose()
+        }
+    }
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 30, style: .continuous)
+    }
+
+    private var header: some View {
+        HStack(spacing: 14) {
+            Image(systemName: systemImage)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 48, height: 48)
+                .background(Circle().fill(tint.opacity(0.16)))
+            Text(title)
+                .font(.title2.weight(.bold))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            PopupCloseButton(action: requestClose)
+        }
+    }
+}
+
+/// The X at the top right of a popup.
+private struct PopupCloseButton: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(.secondary)
+                .padding(8)
+                .background(Circle().fill(.white.opacity(0.08)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L("Close"))
+    }
+}
+
+/// The group card a popup sits in as a tile; see `PopupGroupCard`.
+struct PopupGroup {
+    /// The group's title. A tile with the same one doesn't repeat it.
+    var title: String
+    /// Closes the whole group, asking first when that ends a run.
+    var close: () -> Void
+}
+
+private struct PopupGroupKey: EnvironmentKey {
+    static let defaultValue: PopupGroup? = nil
+}
+
+private struct PopupEndsProcessKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// The group card a popup sits in as a tile, nil for one of its own.
+    var popupGroup: PopupGroup? {
+        get { self[PopupGroupKey.self] }
+        set { self[PopupGroupKey.self] = newValue }
+    }
+
+    /// True when a run is waiting on the popup card, so closing it ends the
+    /// run; set by `RootView`, which knows what each page is waiting on.
+    var popupEndsProcess: Bool {
+        get { self[PopupEndsProcessKey.self] }
+        set { self[PopupEndsProcessKey.self] = newValue }
+    }
+}
+
+/// Lays popups over this view, one above the other and centred as a group:
+/// what's behind darkens and blurs a little, and takes no taps. Closing one
+/// lets the rest glide back to the centre. Applied once, by `RootView`, so the
+/// tab bar goes under too.
+private struct PopupStack<Item: Identifiable & Equatable, Card: View>: ViewModifier {
+    /// The popup cards up, top to bottom.
+    var items: [Item]
+    /// Runs on a tap outside the cards. Nil leaves the popups up, so a stray
+    /// tap can't stop a run that's waiting on them.
+    var onBackdropTap: (() -> Void)?
+    @ViewBuilder var card: (Item) -> Card
+
+    private var isPresented: Bool { !items.isEmpty }
+
+    func body(content: Content) -> some View {
+        content
+            .accessibilityHidden(isPresented)
+            .overlay {
+                ZStack {
+                    if isPresented {
+                        backdrop
+                            .transition(.opacity)
+                        // The first popup to open and the last to close zoom
+                        // with the stack; the rest come and go inside it.
+                        cards
+                            .transition(.popup)
+                    }
+                }
+                .animation(.smooth(duration: 0.35), value: isPresented)
+            }
+    }
+
+    /// The cards, centred while they fit and scrolling once they don't.
+    private var cards: some View {
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: 14) {
+                    ForEach(items) { item in
+                        card(item)
+                            .transition(.popup)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+                // The gaps around the cards are backdrop too.
+                .background {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { onBackdropTap?() }
+                }
+                .animation(.smooth(duration: 0.4, extraBounce: 0.08), value: items)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+    }
+
+    /// A thinned-out material under a dark wash: the app stays recognisable
+    /// behind, blurred a little and dimmed until the last popup closes. A
+    /// material rather than `.blur` on the content, which would clip at the
+    /// safe area and leave the status bar strip unblurred. The material is
+    /// kept dark so in light mode it doesn't frost the app white and undo the
+    /// dimming.
+    private var backdrop: some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial).opacity(0.7)
+                .environment(\.colorScheme, .dark)
+            Color.black.opacity(0.5)
+        }
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .onTapGesture { onBackdropTap?() }
+        .accessibilityHidden(true)
+    }
+}
+
+extension View {
+    /// Shows a popup card over this view for each of `items`, stacked in
+    /// order; see `PopupStack`.
+    func popupStack<Item: Identifiable & Equatable, Card: View>(_ items: [Item],
+                                                                onBackdropTap: (() -> Void)?,
+                                                                @ViewBuilder card: @escaping (Item) -> Card) -> some View {
+        modifier(PopupStack(items: items, onBackdropTap: onBackdropTap, card: card))
+    }
+}
+
+/// A popup that only reports: what went wrong, or what went right.
+struct MessagePopup: View {
+    var title: String
+    var message: String
+    var isError: Bool
+    var onClose: () -> Void
+
+    var body: some View {
+        PopupCard(title: title,
+                  systemImage: isError ? "exclamationmark.triangle.fill" : "checkmark.seal.fill",
+                  tint: isError ? .red : .green,
+                  onClose: onClose) {
+            Text(message)
+                .font(.subheadline)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// Numbered instructions, as the guides and pairing popups list them.
+struct NumberedSteps: View {
+    var steps: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(steps.enumerated()), id: \.offset) { idx, step in
+                HStack(alignment: .top, spacing: 12) {
+                    Text("\(idx + 1)")
+                        .font(.caption.weight(.bold).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(Theme.brand))
+                    Text(step)
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+}
+
+/// The code an iPhone asks for while it pairs, as a popup of its own: big
+/// enough to read at a glance, with where it goes.
+struct PairingCodePopup: View {
+    var pin: String
+    var caption: String
+    var onClose: () -> Void
+
+    var body: some View {
+        PopupCard(title: L("Pairing code"), systemImage: "lock.iphone", tint: .orange,
+                  onClose: onClose) {
+            VStack(spacing: 10) {
+                Text(pin)
+                    .font(.system(size: 46, weight: .bold, design: .rounded))
+                    .tracking(8)
+                Text(caption)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity)
+        }
     }
 }
 
@@ -324,6 +707,11 @@ extension AnyTransition {
                 .combined(with: .offset(y: -10)),
             removal: .opacity.combined(with: .scale(scale: 0.98, anchor: .top))
         )
+    }
+
+    /// A popup card rising into place, and sinking away when it closes.
+    static var popup: AnyTransition {
+        .opacity.combined(with: .scale(scale: 0.92))
     }
 }
 

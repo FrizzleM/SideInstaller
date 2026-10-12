@@ -8,15 +8,14 @@ struct ContentView: View {
     @EnvironmentObject private var updateChecker: UpdateChecker
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
-    /// Shared with the Certificates page; used by `certConflictCallout`.
-    @EnvironmentObject private var certManager: CertManager
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
     @State private var showImporter = false
-    /// True while the pairing-file picker is up, on an iPhone below iOS 27.
+    /// True while the pairing-file picker is up.
     @State private var showPairingImporter = false
-    /// Shows the dialog for choosing which certificate to revoke.
-    @State private var showRevokeChooser = false
+    /// When false, the Advanced section under the Install button shows only its
+    /// title.
+    @State private var advancedExpanded = false
     /// When false, the timeline shows only the current step.
     @State private var stepsExpanded = false
     /// Text in the IPA download-link field.
@@ -51,31 +50,22 @@ struct ContentView: View {
                         }
                     }
                     // Progress sits above the Install/Cancel button.
+                    // The cascade handles its entrance (including on a tab
+                    // switch mid-run), so the transition only covers removal.
                     if showProgress {
-                        progressCard.transition(.cardAppear)
+                        progressCard
+                            .cascadeItem(cascade(3))
+                            .transition(.asymmetric(insertion: .identity, removal: .cardAppear))
                     }
-                    installButton.cascadeItem(cascade(3))
-                    if let pin = engine.pairingPIN {
-                        pinCallout(pin).transition(.cardAppear)
+                    installButton.cascadeItem(cascade(4))
+                    // The build's version, and from iOS 27 (which pairs itself)
+                    // the optional pairing-file import, folded away.
+                    if showsAdvanced {
+                        advancedSection.cascadeItem(cascade(5))
                     }
-                    // Revoke-and-retry shortcut for the certificate-conflict guide.
-                    if engine.certConflict, !engine.isRunning {
-                        certConflictCallout.transition(.cardAppear)
-                    }
-                    if let guide = engine.guide {
-                        guideCallout(guide).transition(.cardAppear)
-                    }
-                    if showError, let error = engine.lastError {
-                        errorCallout(error).transition(.cardAppear)
-                    }
-                    if engine.finished {
-                        successCallout.transition(.cardAppear)
-                    }
-                    // LiveContainer still needs SideStore's certificate imported.
-                    if engine.finished, engine.installedIsLiveContainer {
-                        guideCallout(Guides.liveContainerImport).transition(.cardAppear)
-                    }
-                    footer.cascadeItem(cascade(4))
+                    // Guides, the pairing code, errors and success show as
+                    // `InstallPopup`, which `RootView` lays over the app.
+                    footer.cascadeItem(cascade(6))
                 }
                 .padding(20)
                 // One modifier per piece of state, so only its own card animates.
@@ -83,15 +73,12 @@ struct ContentView: View {
                 .animation(.smooth(duration: 0.35), value: engine.vpnConnected)
                 .animation(.smooth(duration: 0.35), value: engine.wifiConnected)
                 .animation(.smooth(duration: 0.35), value: showProgress)
-                .animation(.smooth(duration: 0.35), value: engine.pairingPIN)
-                .animation(.smooth(duration: 0.35), value: engine.guide?.title)
-                .animation(.smooth(duration: 0.35), value: engine.certConflict)
-                .animation(.smooth(duration: 0.3), value: certManager.isWorking)
-                .animation(.smooth(duration: 0.35), value: showError)
                 .animation(.smooth(duration: 0.4, extraBounce: 0.12), value: engine.finished)
                 .animation(.smooth(duration: 0.35), value: engine.deviceSummary)
                 .animation(.smooth(duration: 0.3), value: engine.isRunning)
                 .animation(.smooth(duration: 0.35), value: engine.importedPairingName)
+                .animation(.smooth(duration: 0.35), value: advancedExpanded)
+                .animation(.smooth(duration: 0.35), value: showsAdvanced)
             }
             .background(AppBackground())
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
@@ -125,14 +112,16 @@ struct ContentView: View {
         engine.osSupported && !engine.canSelfPair
     }
 
+    /// True when Advanced has something to hold: a version to pick (not for a
+    /// custom IPA), or the optional pairing file (iOS 27 and above).
+    private var showsAdvanced: Bool {
+        engine.installSource != .custom || engine.canSelfPair
+    }
+
     /// Cascade index for items below the pairing-file card, shifted by one when
     /// that card is shown.
     private func cascade(_ position: Int) -> Int {
         showsPairingCard ? position + 1 : position
-    }
-
-    private var showError: Bool {
-        engine.lastError != nil && !engine.isRunning
     }
 
     /// True once a step has failed; turns the progress card red.
@@ -260,22 +249,27 @@ struct ContentView: View {
                     .contentShape(Rectangle())
                 }
 
-                // A custom IPA has no release, so the importer takes that slot.
-                ZStack {
-                    if engine.installSource == .custom {
-                        importControl.transition(.opacity)
-                    } else {
-                        Picker(L("Release"), selection: $engine.releaseChannel) {
-                            ForEach(ReleaseChannel.allCases) { channel in
-                                Text(channel.displayName).tag(channel)
+                // A custom IPA has no release, so the importer takes that slot;
+                // a build with no nightly has nothing to pick and no slot.
+                if engine.installSource == .custom || engine.installSource.hasNightly {
+                    ZStack {
+                        if engine.installSource == .custom {
+                            importControl.transition(.opacity)
+                        } else {
+                            Picker(L("Release"), selection: $engine.releaseChannel) {
+                                ForEach(ReleaseChannel.allCases) { channel in
+                                    Text(channel.displayName).tag(channel)
+                                }
                             }
+                            .pickerStyle(.segmented)
+                            .transition(.opacity)
                         }
-                        .pickerStyle(.segmented)
-                        .transition(.opacity)
                     }
+                    .transition(.opacity)
                 }
-                .animation(.smooth(duration: 0.28), value: engine.installSource)
             }
+            // On the whole card, so it also resizes smoothly when the slot goes.
+            .animation(.smooth(duration: 0.28), value: engine.installSource)
         }
         .disabled(engine.isRunning)
     }
@@ -415,8 +409,7 @@ struct ContentView: View {
                 } else {
                     Image(systemName: engine.finished ? "arrow.clockwise" : "square.and.arrow.down.fill")
                         .contentTransition(.symbolEffect(.replace))
-                    Text(engine.finished ? L("Reinstall")
-                                         : L("Install %@", engine.installSource.shortName))
+                    Text(engine.finished ? L("Reinstall") : L("Install %@", installTargetName))
                 }
             }
         }
@@ -427,6 +420,12 @@ struct ContentView: View {
                 : Theme.brand,
             glow: engine.isRunning ? .red : Theme.accent))
         .animation(.smooth(duration: 0.3), value: engine.isRunning)
+    }
+
+    /// The build the Install button names, with its version when one is picked.
+    private var installTargetName: String {
+        let name = engine.installSource.shortName
+        return engine.selectedVersion.map { "\(name) \($0.title)" } ?? name
     }
 
     // MARK: iOS version requirement
@@ -452,7 +451,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Pairing file (iOS 26 and below)
+    // MARK: Pairing file
 
     /// SideStore's guide to creating a pairing file on a computer.
     private static let pairingDocsURL =
@@ -473,21 +472,25 @@ struct ContentView: View {
                 }
 
                 pairingImportButton
-
-                Button {
-                    if let url = URL(string: Self.pairingDocsURL) { openURL(url) }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(L("How do I make one?"))
-                        Image(systemName: "arrow.up.right")
-                    }
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Theme.accent2)
-                }
-                .buttonStyle(.plain)
+                pairingDocsLink
             }
         }
         .disabled(engine.isRunning)
+    }
+
+    /// Link to SideStore's guide to making a pairing file.
+    private var pairingDocsLink: some View {
+        Button {
+            if let url = URL(string: Self.pairingDocsURL) { openURL(url) }
+        } label: {
+            HStack(spacing: 4) {
+                Text(L("How do I make one?"))
+                Image(systemName: "arrow.up.right")
+            }
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(Theme.accent2)
+        }
+        .buttonStyle(.plain)
     }
 
     /// Import button, labelled with the imported file's name once one is in.
@@ -518,6 +521,127 @@ struct ContentView: View {
         }
         .buttonStyle(.plain)
         .disabled(engine.isImportingPairing)
+    }
+
+    // MARK: Advanced
+
+    /// Advanced section under the Install button, collapsed until its title is
+    /// tapped. Holds the build's version and, from iOS 27, the optional
+    /// pairing-file import.
+    private var advancedSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button { advancedExpanded.toggle() } label: {
+                HStack(spacing: 8) {
+                    sectionTitle(L("Advanced"), systemImage: "slider.horizontal.3")
+                    Spacer(minLength: 4)
+                    // Collapsed, this is the only sign an imported file is in use.
+                    if engine.canSelfPair, engine.importedPairingName != nil {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundStyle(.green)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                    disclosureChevron(expanded: advancedExpanded)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if advancedExpanded {
+                VStack(alignment: .leading, spacing: 22) {
+                    if engine.installSource != .custom {
+                        versionOption
+                    }
+                    if engine.canSelfPair {
+                        pairingFileOption
+                    }
+                }
+                .disabled(engine.isRunning)
+                .transition(.opacity.combined(with: .offset(y: -6)))
+            }
+        }
+        // No card behind it; inset to line up with the card contents above.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18)
+    }
+
+    /// Which release of the selected build to install. The list follows the
+    /// channel picked above; "Latest" is the default.
+    private var versionOption: some View {
+        let source = engine.installSource
+        let catalog = engine.releaseCatalogs[source]
+        let latest = catalog?.latest[engine.selectedChannel]
+        let shown = engine.selectedVersion ?? latest
+        return VStack(alignment: .leading, spacing: 12) {
+            Label(L("%@ version", source.shortName), systemImage: "clock.arrow.circlepath")
+                .font(.subheadline.weight(.semibold))
+            Menu {
+                Picker(L("Version"), selection: $engine.selectedVersion) {
+                    Text(latestLabel(latest)).tag(ReleaseVersion?.none)
+                    ForEach(catalog?.others[engine.selectedChannel] ?? []) { version in
+                        Text(version.menuTitle).tag(Optional(version))
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(engine.selectedVersion?.title ?? latestLabel(latest))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Spacer()
+                    if engine.loadingCatalog == source {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .fieldBackground()
+                .contentShape(Rectangle())
+            }
+            // A release's title can carry the maintainers' warning ("DO NOT USE").
+            if let shown, shown.hasRemark {
+                Label(shown.menuTitle, systemImage: "info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let error = engine.catalogErrors[source] {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L("Couldn't load the other versions: %@", error))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(L("Try again")) {
+                        Task { await engine.loadReleaseCatalog(for: source, force: true) }
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.accent2)
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        // Fetched when the section opens, and again for another build.
+        .task(id: source) { await engine.loadReleaseCatalog(for: source) }
+    }
+
+    /// "Latest", naming the release it stands for when that has a version.
+    private func latestLabel(_ latest: ReleaseVersion?) -> String {
+        // The nightly tag names no version, so it isn't repeated.
+        guard let latest, latest.tag != "nightly" else { return L("Latest") }
+        return L("Latest (%@)", latest.title)
+    }
+
+    /// The optional pairing-file import (iOS 27 and above).
+    private var pairingFileOption: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(L("Pairing file"), systemImage: "lock.doc.fill")
+                .font(.subheadline.weight(.semibold))
+            Text(L("(Optional)"))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            pairingImportButton
+            pairingDocsLink
+        }
     }
 
     // MARK: Wi-Fi requirement
@@ -621,16 +745,21 @@ struct ContentView: View {
         Button {
             stepsExpanded.toggle()
         } label: {
-            Image(systemName: "chevron.down")
-                .font(.footnote.weight(.bold))
-                .foregroundStyle(.secondary)
-                .rotationEffect(.degrees(stepsExpanded ? 180 : 0))
-                .padding(7)
-                .background(Circle().fill(.white.opacity(0.08)))
+            disclosureChevron(expanded: stepsExpanded)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(stepsExpanded ? L("Show fewer steps") : L("Show all steps"))
+    }
+
+    /// Circled chevron that flips to point up while its section is open.
+    private func disclosureChevron(expanded: Bool) -> some View {
+        Image(systemName: "chevron.down")
+            .font(.footnote.weight(.bold))
+            .foregroundStyle(.secondary)
+            .rotationEffect(.degrees(expanded ? 180 : 0))
+            .padding(7)
+            .background(Circle().fill(.white.opacity(0.08)))
     }
 
     // MARK: Step timeline
@@ -682,44 +811,81 @@ struct ContentView: View {
         .animation(.smooth(duration: 0.35), value: step)
     }
 
-    // MARK: PIN callout
+    // MARK: Helpers
 
-    private func pinCallout(_ pin: String) -> some View {
-        CalloutCard(tint: .orange) {
-            VStack(spacing: 12) {
-                sectionTitle(L("Pairing code"), systemImage: "lock.iphone")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(pin)
-                    .font(.system(size: 46, weight: .bold, design: .rounded))
-                    .tracking(8)
-                    .frame(maxWidth: .infinity)
-                Text(L("Type this into the prompt in Settings."))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+    private func sectionTitle(_ title: String, systemImage: String) -> some View {
+        Label {
+            Text(title).font(.headline)
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(Theme.brand)
+        }
+    }
+}
+
+// MARK: - Popup
+
+/// One of the Install tab's popups, which `RootView` stacks over the whole app:
+/// what a waiting step needs (Wi-Fi, the tunnel, the pairing code), a guide for
+/// a run that couldn't start, or how the run ended. See `Engine.Popup`.
+struct InstallPopup: View {
+    let popup: Engine.Popup
+
+    @EnvironmentObject private var engine: Engine
+    /// Observed so labels redraw when the language changes.
+    @EnvironmentObject private var loc: Localizer
+    /// Shared with the Certificates page; revoke-and-retry runs through it.
+    @EnvironmentObject private var certManager: CertManager
+    @Environment(\.openURL) private var openURL
+    /// Shows the dialog for choosing which certificate to revoke.
+    @State private var showRevokeChooser = false
+
+    var body: some View {
+        switch popup {
+        case .pairingCode(let pin):
+            PairingCodePopup(pin: pin, caption: L("Type this into the prompt in Settings."),
+                             onClose: close)
+        case .certConflict:
+            certConflictPopup
+        case .guide(let guide):
+            guidePopup(guide)
+        case .error(let message, let stoppedRun):
+            PopupCard(title: Self.errorTitle(stoppedRun: stoppedRun),
+                      systemImage: "exclamationmark.triangle.fill",
+                      tint: .red,
+                      onClose: close) {
+                Text(message)
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+        case .success(let name, let leads):
+            PopupCard(title: L("Installed"), systemImage: "checkmark.seal.fill", tint: .green,
+                      onClose: close) {
+                Text(leads ? L("%@ is installed. Finish the trust step below to open it.", name)
+                           : L("%@ is installed. Finish the trust step above to open it.", name))
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .liveContainerImport:
+            guidePopup(Guides.liveContainerImport)
         }
     }
 
-    // MARK: Guidance callout
+    private func close() { engine.closePopup(popup) }
 
-    private func guideCallout(_ guide: Guide) -> some View {
-        CalloutCard(tint: Theme.accent) {
+    /// The error popup's title, which also titles the group it's in.
+    static func errorTitle(stoppedRun: Bool) -> String {
+        stoppedRun ? L("Install stopped") : L("Something went wrong")
+    }
+
+    // MARK: Guides
+
+    /// A guide's steps, and its link out when it has one.
+    private func guidePopup(_ guide: Guide) -> some View {
+        PopupCard(title: guide.title, systemImage: guide.systemImage, tint: Theme.accent,
+                  onClose: close) {
             VStack(alignment: .leading, spacing: 14) {
-                sectionTitle(guide.title, systemImage: guide.systemImage)
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(Array(guide.steps.enumerated()), id: \.offset) { idx, step in
-                        HStack(alignment: .top, spacing: 12) {
-                            Text("\(idx + 1)")
-                                .font(.caption.weight(.bold).monospacedDigit())
-                                .foregroundStyle(.white)
-                                .frame(width: 22, height: 22)
-                                .background(Circle().fill(Theme.brand))
-                            Text(step)
-                                .font(.subheadline)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
+                NumberedSteps(steps: guide.steps)
                 if let label = guide.actionLabel, let url = guide.actionURL {
                     Button { openURL(url) } label: {
                         Label(label, systemImage: "arrow.up.right")
@@ -736,22 +902,16 @@ struct ContentView: View {
 
     /// Shown on error 7460. The button loads the certificates; the dialog asks
     /// which one to revoke, then retries the install.
-    private var certConflictCallout: some View {
-        CalloutCard(tint: .orange) {
+    private var certConflictPopup: some View {
+        PopupCard(title: L("A certificate already exists"),
+                  systemImage: "exclamationmark.shield.fill",
+                  tint: .orange,
+                  onClose: close) {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: "exclamationmark.shield.fill")
-                        .font(.title2)
-                        .foregroundStyle(.orange)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L("A certificate already exists"))
-                            .font(.subheadline.weight(.semibold))
-                        Text(L("Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone."))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
+                Text(L("Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Button {
                     // Load first, so the chooser can name the certificates.
                     certManager.ensureLoaded { showRevokeChooser = true }
@@ -771,14 +931,10 @@ struct ContentView: View {
                 .buttonStyle(.bordered)
                 .tint(.orange)
                 .disabled(certManager.isWorking || certManager.revokingID != nil)
-
-                if let error = certManager.lastError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                // A failed load or revoke shows as the Certificates popup, under
+                // this one.
             }
+            .animation(.smooth(duration: 0.3), value: certManager.isWorking)
         }
         .confirmationDialog(L("Which certificate should be revoked?"),
                             isPresented: $showRevokeChooser,
@@ -805,52 +961,6 @@ struct ContentView: View {
         if let machine = cert.machineLabel { label += " — \(machine)" }
         if cert.isExpired { label += L(" (expired)") }
         return label
-    }
-
-    // MARK: Error / success
-
-    private func errorCallout(_ message: String) -> some View {
-        CalloutCard(tint: .red) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.red)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Install stopped"))
-                        .font(.subheadline.weight(.semibold))
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
-
-    private var successCallout: some View {
-        CalloutCard(tint: .green) {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.title)
-                    .foregroundStyle(.green)
-                    .symbolEffect(.bounce, options: .nonRepeating, value: engine.finished)
-                Text(L("%@ is installed. Finish the trust step above to open it.",
-                       engine.installedSourceName))
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    // MARK: Helpers
-
-    private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        Label {
-            Text(title).font(.headline)
-        } icon: {
-            Image(systemName: systemImage)
-                .foregroundStyle(Theme.brand)
-        }
     }
 }
 

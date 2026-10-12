@@ -27,3 +27,9 @@ pub fn dev_url(endpoint: &str, device_type: impl Into<Option<DeveloperDeviceType
         endpoint,
     )
 }
+
+/// URL of `path` on Xcode's JSON:API endpoint (`services/v1`), which
+/// `DeveloperSession::send_services_request` talks to.
+pub fn services_url(path: &str) -> String {
+    format!("https://developerservices2.apple.com/services/v1/{path}")
+}

@@ -80,6 +80,13 @@ final class CertManager: ObservableObject {
         if let session { si_cert_session_free(session) }
     }
 
+    // MARK: - Popups
+
+    /// What went wrong last, as a popup `RootView` stacks over the app.
+    var popups: [ToolPopup] { lastError.map { [.error($0)] } ?? [] }
+
+    func closePopup(_ popup: ToolPopup) { lastError = nil }
+
     // MARK: - Public actions
 
     /// Loads certificates when the page opens. Does nothing if no Apple ID is
@@ -193,6 +200,7 @@ final class CertManager: ObservableObject {
         engine.twoFactorWasCancelled = false
         var lastError = "no anisette servers configured"
         var appleRefusals = 0
+        var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
             do {
@@ -210,6 +218,10 @@ final class CertManager: ObservableObject {
                     engine.log("Two-factor verification cancelled — stopping.")
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
+                if Engine.isAccountLocked(lastError) {
+                    engine.log("Apple has locked this Apple Account: \(lastError)")
+                    throw EngineError.accountLocked
+                }
                 if Engine.isCredentialError(lastError) {
                     engine.log("Apple ID credentials rejected: \(lastError)")
                     throw EngineError.message(Engine.credentialErrorMessage)
@@ -226,6 +238,17 @@ final class CertManager: ObservableObject {
                         engine.log("Certificates: Apple's sign-in server refused \(appleRefusals) attempts with HTTP 503 — stopping.")
                         throw EngineError.message(Engine.appleServiceRefusalMessage)
                     }
+                }
+                // Every anisette server starts with the same request to Apple, so
+                // when that can't even be sent, more of them won't help.
+                if Engine.isAppleUnreachable(lastError) {
+                    appleUnreachable += 1
+                    if let message = await engine.appleUnreachableStop(
+                        failures: appleUnreachable, logPrefix: "Certificates: ") {
+                        throw EngineError.message(message)
+                    }
+                } else {
+                    appleUnreachable = 0
                 }
             }
         }
