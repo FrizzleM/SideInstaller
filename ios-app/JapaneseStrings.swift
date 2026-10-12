@@ -422,6 +422,8 @@ let japaneseStrings: [String: String] = [
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "このネットワークからのアクセスが GitHub によりレート制限されています。ブロックされているわけではなく、制限は自動的に解除されます。%@ 後に再度お試しください。",
     "GitHub answered HTTP %d%@": "GitHub の応答：HTTP %d%@",
+    "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
+        "GitHub は現在 %@ を提供していません。リポジトリが削除、移動、または非公開にされたため、ダウンロードできるものがありません。この iPhone やネットワークに問題はありません。",
     "couldn't reach GitHub: %@": "GitHub に接続できませんでした：%@",
     "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
         "GitHub の応答がリリース情報ではありませんでした（%@）。このネットワーク上の何かが内容を置き換えている可能性があります。",
@@ -511,6 +513,13 @@ let japaneseStrings: [String: String] = [
         "あるいは「ファイル › このiPhone内 › SideInstaller」にコピーしておいても、SideInstaller が見つけられます。",
     "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
         "GitHub がブロックされている環境では、この方法が有効です。別のデバイスで IPA を取得し、こちらに持ってきてインストールしてください。",
+    "Bring the .ipa yourself": ".ipa を自分で用意する",
+    "%@ can't be downloaded while its GitHub repository is offline. The other apps still install as usual.":
+        "GitHub リポジトリがオフラインの間、%@ はダウンロードできません。ほかのアプリは通常どおりインストールできます。",
+    "To install it anyway, get its .ipa from somewhere you trust, name it %@, and copy it into Files › On My iPhone › SideInstaller.":
+        "それでもインストールするには、信頼できる入手先から .ipa を入手し、名前を %@ にして「ファイル › このiPhone内 › SideInstaller」にコピーしてください。",
+    "Then tap Install again — SideInstaller uses your file instead of downloading one.":
+        "その後、もう一度「インストール」をタップしてください。SideInstaller はダウンロードの代わりにそのファイルを使います。",
     "Pair this iPhone in Settings": "「設定」でこの iPhone をペアリング",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "「設定」アプリを開き、「プライバシーとセキュリティ › デベロッパモード」に進んでください。",

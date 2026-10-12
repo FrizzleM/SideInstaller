@@ -518,6 +518,8 @@ let vietnameseStrings: [String: String] = [
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub đang giới hạn số yêu cầu từ mạng này — GitHub không bị chặn, và giới hạn sẽ tự hết. Hãy thử lại %@.",
     "GitHub answered HTTP %d%@": "GitHub đã trả về HTTP %d%@",
+    "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
+        "GitHub hiện không cung cấp %@ — kho mã đã bị gỡ, chuyển đi hoặc chuyển thành riêng tư nên không có gì để tải. iPhone này và mạng của nó không có vấn đề gì.",
     "couldn't reach GitHub: %@": "không kết nối được tới GitHub: %@",
     "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
         "phản hồi của GitHub không phải là thông tin bản phát hành (%@) — có thể thứ gì đó trên mạng này đã thay thế nó.",
@@ -608,6 +610,13 @@ let vietnameseStrings: [String: String] = [
         "Hoặc chép tệp vào Tệp › Trên iPhone của tôi › SideInstaller — SideInstaller cũng tìm thấy ở đó.",
     "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
         "Đây là lối đi ở những nơi GitHub bị chặn: tải IPA trên bất kỳ thiết bị nào, mang sang đây rồi cài đặt.",
+    "Bring the .ipa yourself": "Tự mang tệp .ipa đến",
+    "%@ can't be downloaded while its GitHub repository is offline. The other apps still install as usual.":
+        "Không thể tải %@ khi kho mã của nó trên GitHub đang ngoại tuyến. Các ứng dụng khác vẫn cài được như bình thường.",
+    "To install it anyway, get its .ipa from somewhere you trust, name it %@, and copy it into Files › On My iPhone › SideInstaller.":
+        "Để vẫn cài được, hãy lấy tệp .ipa của nó từ một nguồn bạn tin cậy, đặt tên là %@ rồi chép vào Tệp › Trên iPhone của tôi › SideInstaller.",
+    "Then tap Install again — SideInstaller uses your file instead of downloading one.":
+        "Sau đó chạm vào Cài ứng dụng lần nữa — SideInstaller sẽ dùng tệp của bạn thay vì tải về.",
     "Pair this iPhone in Settings": "Ghép nối iPhone này trong Cài đặt",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "Mở ứng dụng Cài đặt, rồi vào Quyền riêng tư & Bảo mật › Chế độ nhà phát triển.",

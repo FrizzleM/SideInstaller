@@ -1300,6 +1300,10 @@ final class Engine: ObservableObject {
                 setStep(.download, .done)
                 return
             }
+            // With the repository gone, the user's own copy is the only way in.
+            if (error as? SideStoreDownloader.DownloadError)?.isRepoUnavailable == true {
+                setGuide(Guides.repoUnavailable(source: src, saveAs: src.fileName(channel)))
+            }
             // Renaming a file to the build's name helps only the latest build.
             if version == nil { logImportHint(for: error, source: src, channel: channel) }
             throw error
@@ -1554,6 +1558,10 @@ final class Engine: ObservableObject {
         let strays = IPALibrary.unrecognized()
         if !strays.isEmpty {
             log("Found \(strays.joined(separator: ", ")) in Documents, but the name doesn't say which build it is. Rename it to \(wanted) and tap Install again.")
+            return
+        }
+        if (error as? SideStoreDownloader.DownloadError)?.isRepoUnavailable == true {
+            log("\(source.displayName)'s repository is gone from GitHub. Have its IPA from somewhere else? Save it as \(wanted) in Files › On My iPhone › SideInstaller, then tap Install again.")
             return
         }
         guard (error as? SideStoreDownloader.DownloadError)?.manualSideloadHelps ?? true else { return }
@@ -3024,6 +3032,22 @@ enum Guides {
                 L("Or open the Files app, press and hold the .ipa, tap Share, and pick SideInstaller — that hands the file over without the picker."),
                 L("Or copy it into Files › On My iPhone › SideInstaller, where SideInstaller also finds it."),
                 L("This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here."),
+            ],
+            actionLabel: nil, actionURLString: nil)
+    }
+
+    /// Shown when the build's GitHub repository is gone, so there's nothing to
+    /// download. `fileName` is the name the download step looks for in Documents.
+    static func repoUnavailable(source: InstallSource, saveAs fileName: String) -> Guide {
+        Guide(
+            title: L("Bring the .ipa yourself"),
+            systemImage: "tray.and.arrow.down",
+            steps: [
+                L("%@ can't be downloaded while its GitHub repository is offline. The other apps still install as usual.",
+                  source.displayName),
+                L("To install it anyway, get its .ipa from somewhere you trust, name it %@, and copy it into Files › On My iPhone › SideInstaller.",
+                  fileName),
+                L("Then tap Install again — SideInstaller uses your file instead of downloading one."),
             ],
             actionLabel: nil, actionURLString: nil)
     }
