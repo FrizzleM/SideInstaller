@@ -2,6 +2,33 @@
 
 All notable changes to SideInstaller are documented here.
 
+## 1.5.0
+
+### Changed
+- **The Install button grows into the progress card.** Starting an install reshapes the button into
+  the card that shows its steps, instead of turning it into a Cancel button under a separate card.
+  After an install that finished or failed the card stays and the button comes back under it, as
+  before.
+- **Stopping an install asks first.** The progress card has an X in its corner, and tapping it asks
+  “Cancel the install?” before anything stops. While the step in flight winds down the card reads
+  “Cancelling”, then it shrinks back into the Install button.
+- Advanced steps aside while an install runs, since a run can't take a change to the version or the
+  pairing file. It comes back under the Install button once the install finishes, fails or is
+  cancelled, as open or closed as you left it.
+- **Cards are clear glass.** Every card is now a clear pane the animated backdrop shows through,
+  drawn by a rim lit along its top edge, in place of the gray cards. It looks the same on every iOS
+  version.
+- The new text is translated into Chinese, French, Italian, Japanese, Portuguese, Spanish and
+  Vietnamese.
+
+### Fixed
+- **Signing in to your Apple ID works again.** Since 12 October 2026 Apple has turned away sign-ins
+  made through the public anisette servers (error -80045, “This action cannot be completed at this
+  time”). Apple now refuses a sign-in that doesn't come from the kind of device the anisette data
+  was made on: those servers make it with Apple's Android library, and SideInstaller said it was a
+  Mac. It now signs in as the Android device the data belongs to. After your password, Apple sends a
+  verification code to your trusted devices straight away, and SideInstaller asks for it.
+
 ## 1.4.0
 
 ### Added
