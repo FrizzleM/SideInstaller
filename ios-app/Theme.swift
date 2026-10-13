@@ -156,37 +156,24 @@ struct PanelCard<Content: View>: View {
     }
 }
 
-/// What a card is made of: dark blue glass, which the backdrop's blues sway
-/// behind. Liquid Glass needs iOS 26; before that it's a thin material under
-/// the same tint, with the hairline and shadow the glass would otherwise bring.
+/// What a card is made of: the navy of the backdrop's corners (#011A5C),
+/// under a hairline and a soft shadow.
 private struct CardSurface<S: InsettableShape>: ViewModifier {
     var shape: S
     /// False takes the surface away without changing the view, for one that
     /// is a card only some of the time.
     var shown: Bool
 
-    /// A navy a shade deeper than the backdrop's corners (#01113D), strong
-    /// enough that the glass reads as dark blue and thin enough that the
-    /// backdrop still moves behind it.
-    private var tint: Color {
-        Color(red: 1 / 255, green: 17 / 255, blue: 61 / 255).opacity(0.75)
-    }
-
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content.glassEffect(shown ? .clear.tint(tint) : .identity, in: shape)
-        } else {
-            content
-                .background(shape.fill(.ultraThinMaterial).overlay(shape.fill(tint))
-                    .opacity(shown ? 1 : 0))
-                .overlay(shape.strokeBorder(.white.opacity(shown ? 0.06 : 0), lineWidth: 1))
-                .shadow(color: .black.opacity(shown ? 0.07 : 0), radius: 14, x: 0, y: 7)
-        }
+        content
+            .background(shape.fill(Theme.glow).opacity(shown ? 1 : 0))
+            .overlay(shape.strokeBorder(.white.opacity(shown ? 0.06 : 0), lineWidth: 1))
+            .shadow(color: .black.opacity(shown ? 0.07 : 0), radius: 14, x: 0, y: 7)
     }
 }
 
 extension View {
-    /// Puts a card's glass behind this view, cut to `shape`.
+    /// Puts a card's surface behind this view, cut to `shape`.
     func cardSurface(in shape: some InsettableShape, shown: Bool = true) -> some View {
         modifier(CardSurface(shape: shape, shown: shown))
     }

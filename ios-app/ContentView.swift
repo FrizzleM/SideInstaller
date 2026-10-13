@@ -417,7 +417,7 @@ struct ContentView: View {
     /// starting a run reshapes the button instead of swapping it for a card.
     /// Only the two sets of content cross-fade; the surface itself changes
     /// size and corners, and the button's gradient gives way to the card's
-    /// glass.
+    /// fill.
     private var installSurface: some View {
         let shape = RoundedRectangle(cornerRadius: showProgress ? 22 : 18, style: .continuous)
         return ZStack(alignment: .top) {
@@ -442,7 +442,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
         // Clips the incoming content to the surface while it's still growing.
         .clipShape(shape)
-        // The button's gradient and glow, which give way to the card's glass.
+        // The button's gradient and glow, which give way to the card's fill.
         .background(
             shape
                 .fill(Theme.brand)
@@ -1335,7 +1335,7 @@ private struct StepNode: View {
         case .done:    return .green
         case .failed:  return .red
         case .waiting: return .orange
-        // Nothing of its own: the card's glass shows through.
+        // Nothing of its own: the card shows through.
         default:       return .clear
         }
     }
