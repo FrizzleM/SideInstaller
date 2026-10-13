@@ -152,15 +152,35 @@ struct PanelCard<Content: View>: View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(18)
-            .background(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(Color(.secondarySystemBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(.white.opacity(0.06), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.07), radius: 14, x: 0, y: 7)
+            .cardSurface(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+}
+
+/// What a card is made of: clear glass, so the backdrop's blues sway through
+/// it. Liquid Glass needs iOS 26; before that it's a thin material, with the
+/// hairline and shadow the glass would otherwise bring.
+private struct CardSurface<S: InsettableShape>: ViewModifier {
+    var shape: S
+    /// False takes the surface away without changing the view, for one that
+    /// is a card only some of the time.
+    var shown: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.glassEffect(shown ? .clear : .identity, in: shape)
+        } else {
+            content
+                .background(shape.fill(.ultraThinMaterial).opacity(shown ? 1 : 0))
+                .overlay(shape.strokeBorder(.white.opacity(shown ? 0.06 : 0), lineWidth: 1))
+                .shadow(color: .black.opacity(shown ? 0.07 : 0), radius: 14, x: 0, y: 7)
+        }
+    }
+}
+
+extension View {
+    /// Puts a card's glass behind this view, cut to `shape`.
+    func cardSurface(in shape: some InsettableShape, shown: Bool = true) -> some View {
+        modifier(CardSurface(shape: shape, shown: shown))
     }
 }
 
@@ -662,7 +682,7 @@ private struct FieldBackground: ViewModifier {
             .padding(.vertical, 13)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(.tertiarySystemBackground))
+                    .fill(.white.opacity(0.07))
             )
     }
 }

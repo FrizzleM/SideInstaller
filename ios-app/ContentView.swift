@@ -415,8 +415,9 @@ struct ContentView: View {
 
     /// The Install button and the progress card it turns into, as one surface:
     /// starting a run reshapes the button instead of swapping it for a card.
-    /// Only the two sets of content cross-fade; the fill, corners, border and
-    /// shadow all move between the button's and the card's.
+    /// Only the two sets of content cross-fade; the surface itself changes
+    /// size and corners, and the button's gradient gives way to the card's
+    /// glass.
     private var installSurface: some View {
         let shape = RoundedRectangle(cornerRadius: showProgress ? 22 : 18, style: .continuous)
         return ZStack(alignment: .top) {
@@ -441,14 +442,14 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
         // Clips the incoming content to the surface while it's still growing.
         .clipShape(shape)
+        // The button's gradient and glow, which give way to the card's glass.
         .background(
             shape
-                .fill(Color(.secondarySystemBackground))
-                .overlay(shape.fill(Theme.brand).opacity(showProgress ? 0 : 1))
-                .shadow(color: showProgress ? .black.opacity(0.07) : Theme.accent.opacity(0.4),
-                        radius: showProgress ? 14 : 16, x: 0, y: showProgress ? 7 : 8)
+                .fill(Theme.brand)
+                .shadow(color: Theme.accent.opacity(0.4), radius: 16, x: 0, y: 8)
+                .opacity(showProgress ? 0 : 1)
         )
-        .overlay(shape.strokeBorder(.white.opacity(showProgress ? 0.06 : 0), lineWidth: 1))
+        .cardSurface(in: shape, shown: showProgress)
         // The press `PrimaryButtonStyle` draws, kept apart from the reshaping.
         .animation(.snappy(duration: 0.22)) { surface in
             surface
@@ -1099,7 +1100,7 @@ private extension AnyTransition {
 
     /// A fade that's over before what's below has moved up into its place.
     static var quickFade: AnyTransition {
-        .opacity.animation(.easeOut(duration: 0.18))
+        .opacity.animation(.easeOut(duration: 0.12))
     }
 
     /// The Install button leaving as a run starts: up and under the progress
@@ -1334,7 +1335,8 @@ private struct StepNode: View {
         case .done:    return .green
         case .failed:  return .red
         case .waiting: return .orange
-        default:       return Color(.secondarySystemBackground)
+        // Nothing of its own: the card's glass shows through.
+        default:       return .clear
         }
     }
 
