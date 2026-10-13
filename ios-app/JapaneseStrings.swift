@@ -14,6 +14,7 @@ let japaneseStrings: [String: String] = [
     "Password": "パスワード",
     "Install": "インストール",
     "Installing": "インストール中",
+    "Cancelling": "キャンセル中",
     "Installed": "インストール済み",
     "Something went wrong": "問題が発生しました",
     "an app by Frizzle": "Frizzle 制作のアプリ",
@@ -146,6 +147,7 @@ let japaneseStrings: [String: String] = [
     "No": "いいえ",
     "Closing this popup will end the process. Are you sure?":
         "このポップアップを閉じると処理が終了します。よろしいですか？",
+    "Cancel the install?": "インストールをキャンセルしますか？",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ はインストールされています。上記の信頼手順を完了すると開けます。",
     "%@ is installed. Finish the trust step below to open it.":

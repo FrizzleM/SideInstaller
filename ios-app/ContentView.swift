@@ -18,6 +18,11 @@ struct ContentView: View {
     @State private var advancedExpanded = false
     /// When false, the timeline shows only the current step.
     @State private var stepsExpanded = false
+    /// True while the Install button is held down. Its surface is drawn outside
+    /// the button, so the press is passed out to it.
+    @State private var installPressed = false
+    /// Shows the "are you sure" alert before the progress card's X stops a run.
+    @State private var confirmingCancel = false
     /// Text in the IPA download-link field.
     @State private var ipaLink = ""
     @FocusState private var linkFieldFocused: Bool
@@ -49,15 +54,20 @@ struct ContentView: View {
                             vpnRequirement.cascadeItem(cascade(2))
                         }
                     }
-                    // Progress sits above the Install/Cancel button.
-                    // The cascade handles its entrance (including on a tab
-                    // switch mid-run), so the transition only covers removal.
-                    if showProgress {
-                        progressCard
-                            .cascadeItem(cascade(3))
-                            .transition(.asymmetric(insertion: .identity, removal: .cardAppear))
+                    // The Install button, which grows into the run's progress.
+                    // Drawn over what follows, so the button below tucks in
+                    // under it.
+                    installSurface
+                        .cascadeItem(cascade(3))
+                        .zIndex(1)
+                    // The progress outlives its run, so the button comes back
+                    // under it. The cascade handles its entrance (including
+                    // on a tab switch), so the transition only covers removal.
+                    if showProgress && !engine.isRunning {
+                        installButton
+                            .cascadeItem(cascade(4))
+                            .transition(.asymmetric(insertion: .identity, removal: .tuckUnder))
                     }
-                    installButton.cascadeItem(cascade(4))
                     // The build's version, and from iOS 27 (which pairs itself)
                     // the optional pairing-file import, folded away.
                     if showsAdvanced {
@@ -72,7 +82,8 @@ struct ContentView: View {
                 .animation(.smooth(duration: 0.35), value: updateChecker.showBanner)
                 .animation(.smooth(duration: 0.35), value: engine.vpnConnected)
                 .animation(.smooth(duration: 0.35), value: engine.wifiConnected)
-                .animation(.smooth(duration: 0.35), value: showProgress)
+                // The surface's change of shape, and what it pushes along.
+                .animation(.smooth(duration: 0.45), value: showProgress)
                 .animation(.smooth(duration: 0.4, extraBounce: 0.12), value: engine.finished)
                 .animation(.smooth(duration: 0.35), value: engine.deviceSummary)
                 .animation(.smooth(duration: 0.3), value: engine.isRunning)
@@ -398,28 +409,82 @@ struct ContentView: View {
 
     // MARK: Primary action
 
-    private var installButton: some View {
-        Button {
-            if engine.isRunning { engine.cancelOneClick() } else { engine.runOneClick() }
-        } label: {
-            HStack(spacing: 10) {
-                if engine.isRunning {
-                    ProgressView().tint(.white)
-                    Text(L("Cancel"))
-                } else {
-                    Image(systemName: engine.finished ? "arrow.clockwise" : "square.and.arrow.down.fill")
-                        .contentTransition(.symbolEffect(.replace))
-                    Text(engine.finished ? L("Reinstall") : L("Install %@", installTargetName))
+    /// The Install button and the progress card it turns into, as one surface:
+    /// starting a run reshapes the button instead of swapping it for a card.
+    /// Only the two sets of content cross-fade; the fill, corners, border and
+    /// shadow all move between the button's and the card's.
+    private var installSurface: some View {
+        let shape = RoundedRectangle(cornerRadius: showProgress ? 22 : 18, style: .continuous)
+        return ZStack(alignment: .top) {
+            if showProgress {
+                progressContent
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(18)
+                    .transition(.surfaceSwap)
+            } else {
+                Button(action: startInstall) {
+                    installLabel
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(PressReportingButtonStyle(isPressed: $installPressed))
+                .transition(.surfaceSwap)
             }
         }
-        .buttonStyle(PrimaryButtonStyle(
-            gradient: engine.isRunning
-                ? LinearGradient(colors: [.red, Color(red: 0.9, green: 0.3, blue: 0.35)],
-                                 startPoint: .topLeading, endPoint: .bottomTrailing)
-                : Theme.brand,
-            glow: engine.isRunning ? .red : Theme.accent))
-        .animation(.smooth(duration: 0.3), value: engine.isRunning)
+        .frame(maxWidth: .infinity)
+        // Clips the incoming content to the surface while it's still growing.
+        .clipShape(shape)
+        .background(
+            shape
+                .fill(Color(.secondarySystemBackground))
+                .overlay(shape.fill(Theme.brand).opacity(showProgress ? 0 : 1))
+                .shadow(color: showProgress ? .black.opacity(0.07) : Theme.accent.opacity(0.4),
+                        radius: showProgress ? 14 : 16, x: 0, y: showProgress ? 7 : 8)
+        )
+        .overlay(shape.strokeBorder(.white.opacity(showProgress ? 0.06 : 0), lineWidth: 1))
+        // The press `PrimaryButtonStyle` draws, kept apart from the reshaping.
+        .animation(.snappy(duration: 0.22)) { surface in
+            surface
+                .scaleEffect(surfacePressed ? 0.97 : 1)
+                .opacity(surfacePressed ? 0.92 : 1)
+        }
+        .alert(L("Cancel the install?"), isPresented: $confirmingCancel) {
+            Button(L("Yes"), role: .destructive) { engine.cancelOneClick() }
+            Button(L("No"), role: .cancel) { }
+        }
+        .onChange(of: engine.isRunning) { _, running in
+            // A run that ended by itself leaves nothing to cancel.
+            if !running { confirmingCancel = false }
+        }
+    }
+
+    /// True while the surface is the button and is held down.
+    private var surfacePressed: Bool {
+        installPressed && !showProgress
+    }
+
+    /// Starts the run straight from the tap. The surface reshapes because the
+    /// run is going, so nothing waits on the animation.
+    private func startInstall() {
+        installPressed = false
+        engine.runOneClick()
+    }
+
+    /// The button under a run's progress once it has ended.
+    private var installButton: some View {
+        Button(action: startInstall) { installLabel }
+            .buttonStyle(PrimaryButtonStyle())
+    }
+
+    private var installLabel: some View {
+        HStack(spacing: 10) {
+            Image(systemName: engine.finished ? "arrow.clockwise" : "square.and.arrow.down.fill")
+                .contentTransition(.symbolEffect(.replace))
+            Text(engine.finished ? L("Reinstall") : L("Install %@", installTargetName))
+        }
     }
 
     /// The build the Install button names, with its version when one is picked.
@@ -701,30 +766,59 @@ struct ContentView: View {
 
     // MARK: Progress + step timeline
 
-    private var progressCard: some View {
-        PanelCard {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 10) {
-                    Text(engine.finished ? L("Installed") : L("Installing"))
-                        .font(.headline)
-                        .contentTransition(.opacity)
-                    Spacer(minLength: 4)
-                    Text("\(Int(engine.overallProgress * 100))%")
-                        .font(.headline.monospacedDigit())
-                        .foregroundStyle(progressTint)
-                        .contentTransition(.numericText(value: engine.overallProgress))
-                        .animation(.smooth(duration: 0.3), value: engine.overallProgress)
-                    stepsDisclosure
+    /// What the install surface holds as a card; `installSurface` draws the
+    /// card itself.
+    private var progressContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                Text(progressTitle)
+                    .font(.headline)
+                    .contentTransition(.opacity)
+                Spacer(minLength: 4)
+                Text("\(Int(engine.overallProgress * 100))%")
+                    .font(.headline.monospacedDigit())
+                    .foregroundStyle(progressTint)
+                    .contentTransition(.numericText(value: engine.overallProgress))
+                    .animation(.smooth(duration: 0.3), value: engine.overallProgress)
+                stepsDisclosure
+                // Only a run in flight can be cancelled.
+                if engine.isRunning {
+                    cancelButton
+                        .transition(.opacity.combined(with: .scale(scale: 0.6)))
                 }
-
-                InstallProgressBar(progress: engine.overallProgress,
-                                   tint: progressTint,
-                                   gradient: progressGradient,
-                                   animating: engine.isRunning && !engine.finished && !runFailed)
-
-                stepSection
             }
+
+            InstallProgressBar(progress: engine.overallProgress,
+                               tint: progressTint,
+                               gradient: progressGradient,
+                               animating: engine.isRunning && !engine.finished && !runFailed)
+
+            stepSection
         }
+    }
+
+    private var progressTitle: String {
+        if engine.finished { return L("Installed") }
+        return engine.isCancelling ? L("Cancelling") : L("Installing")
+    }
+
+    /// The X in the card's corner, which stops the run after asking. It dims
+    /// once the run is stopping, which waits for the step in flight.
+    private var cancelButton: some View {
+        Button {
+            confirmingCancel = true
+        } label: {
+            Image(systemName: "xmark")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(.secondary)
+                .padding(7)
+                .background(Circle().fill(.white.opacity(0.08)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(engine.isCancelling)
+        .opacity(engine.isCancelling ? 0.4 : 1)
+        .accessibilityLabel(L("Cancel"))
     }
 
     /// Progress color: red on failure, green when finished, brand blue while
@@ -975,6 +1069,39 @@ extension View {
             }
             .tint(.primary)
         }
+    }
+}
+
+// MARK: - Install surface
+
+/// A button that draws nothing of its own and reports its press, for a surface
+/// drawn outside the button to show.
+private struct PressReportingButtonStyle: ButtonStyle {
+    @Binding var isPressed: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { _, pressed in isPressed = pressed }
+    }
+}
+
+private extension AnyTransition {
+    /// Content changing places inside a surface that is changing shape: the old
+    /// is all but gone before the new comes in, so the two don't show through
+    /// each other.
+    static var surfaceSwap: AnyTransition {
+        .asymmetric(insertion: .opacity.animation(.easeIn(duration: 0.28).delay(0.1)),
+                    removal: .opacity.animation(.easeOut(duration: 0.15)))
+    }
+
+    /// The Install button leaving as a run starts: up and under the progress
+    /// card above it.
+    static var tuckUnder: AnyTransition {
+        .opacity
+            .combined(with: .scale(scale: 0.94, anchor: .top))
+            .combined(with: .offset(y: -28))
+            // Gone before what's below has moved up into its place.
+            .animation(.easeOut(duration: 0.22))
     }
 }
 
