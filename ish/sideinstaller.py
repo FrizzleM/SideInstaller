@@ -661,12 +661,14 @@ class WebSocket:
 # reading the rest; isideload, AltStore and SideSign all switched to akd.
 GSA_CLIENT_INFO = "<Pixel 7> <Android;14;UQ1A.240205.002> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
 GSA_USER_AGENT = "akd/1.0 CFNetwork/808.1.4"
-# The URL bag alone is asked for as a Mac. Asked as an Android phone, the lookup
-# answers with ten URLs on gsd.apple.com; as a Mac, with the full bag on
-# gsa.apple.com, where the other URLs in this script live and where sign-in as
-# an Android phone was tested. The lookup carries no anisette data, so there is
-# no machine ID for the OS to disagree with.
-GSA_LOOKUP_CLIENT_INFO = "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+# Two kinds of request are made as a Mac, because Apple won't take them from an
+# Android phone. The URL bag: asked as an Android phone, the lookup answers with
+# ten URLs on gsd.apple.com; as a Mac, with the full bag on gsa.apple.com, where
+# the other URLs in this script live and where sign-in as an Android phone was
+# tested. And the second-factor pages under gsa.apple.com/auth (sending the code
+# to the trusted devices again, texting it, checking a texted code): asked as an
+# Android phone they answer a bare 403, before they read who is asking.
+GSA_MAC_CLIENT_INFO = "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
 
 
 class Anisette:
@@ -857,9 +859,7 @@ class Anisette:
 class GrandSlam:
     def __init__(self, anisette):
         self.anisette = anisette
-        headers = self.base_headers()
-        headers["X-Mme-Client-Info"] = GSA_LOOKUP_CLIENT_INFO
-        status, _, body = request("GET", GSA_URL_BAG, headers=headers)
+        status, _, body = request("GET", GSA_URL_BAG, headers=self.mac_headers())
         if status != 200:
             raise Fail("Could not reach Apple's GrandSlam service (HTTP %d)." % status)
         self.url_bag = plistlib.loads(body)["urls"]
@@ -873,6 +873,12 @@ class GrandSlam:
         headers["User-Agent"] = self.anisette.user_agent
         headers["X-Xcode-Version"] = "14.2 (14C18)"
         headers["X-Apple-App-Info"] = "com.apple.gs.xcode.auth"
+        return headers
+
+    def mac_headers(self, plist=True):
+        """base_headers, saying the client is a Mac (see GSA_MAC_CLIENT_INFO)."""
+        headers = self.base_headers(plist)
+        headers["X-Mme-Client-Info"] = GSA_MAC_CLIENT_INFO
         return headers
 
     def url(self, key):
@@ -1008,7 +1014,7 @@ class AppleAccount:
         """Ask for the trusted-device code and hand it to Apple. With `send`
         false Apple has pushed the code already, and says so in `sm`."""
         if send:
-            headers = self.gs.base_headers()
+            headers = self.gs.mac_headers()
             headers.update(self._identity_headers())
             status, _, _ = request("GET", self.gs.url("trustedDeviceSecondaryAuth"),
                                    headers=headers)
@@ -1028,7 +1034,7 @@ class AppleAccount:
         check_gs_error(plistlib.loads(body))
 
     def _sms_2fa(self, ask_code):
-        headers = self.gs.base_headers(plist=False)
+        headers = self.gs.mac_headers(plist=False)
         headers.update(self._identity_headers())
         status, _, _ = request("GET", self.gs.url("secondaryAuth"), headers=headers)
         if status >= 400:
@@ -1036,7 +1042,7 @@ class AppleAccount:
         info("A verification code has been sent by SMS.")
 
         code = ask_code("SMS code")
-        headers = self.gs.base_headers(plist=False)
+        headers = self.gs.mac_headers(plist=False)
         headers.update(self._identity_headers())
         headers["Content-Type"] = "application/json"
         headers["Accept"] = "application/json, text/javascript, */*; q=0.01"

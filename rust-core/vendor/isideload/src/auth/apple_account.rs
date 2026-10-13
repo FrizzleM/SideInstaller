@@ -419,7 +419,7 @@ impl AppleAccount {
             .get_url("trustedDeviceSecondaryAuth")?;
 
         self.grandslam_client
-            .get(&request_code_url)?
+            .get_auth(&request_code_url)?
             .headers(self.build_2fa_headers(&anisette_data).await?)
             .send()
             .await
