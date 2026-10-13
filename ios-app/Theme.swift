@@ -10,6 +10,11 @@ enum Theme {
     /// Deep-navy halo behind each header icon, matching the icon art (#011A5C).
     static let glow = Color(red: 1 / 255, green: 26 / 255, blue: 92 / 255)
 
+    /// The fill of every card (#0A1F44): the brand blue taken down to a deep
+    /// navy, a step above the backdrop so a card lifts off it without glaring,
+    /// and dark enough that brand-blue text on it stays readable.
+    static let card = Color(red: 10 / 255, green: 31 / 255, blue: 68 / 255)
+
     /// The signature diagonal gradient used for the logo, CTA and accents.
     static var brand: LinearGradient {
         LinearGradient(colors: [accent, accent2],
@@ -156,8 +161,7 @@ struct PanelCard<Content: View>: View {
     }
 }
 
-/// What a card is made of: the navy of the backdrop's corners (#011A5C),
-/// under a hairline and a soft shadow.
+/// What a card is made of: `Theme.card` under a hairline and a soft shadow.
 private struct CardSurface<S: InsettableShape>: ViewModifier {
     var shape: S
     /// False takes the surface away without changing the view, for one that
@@ -166,7 +170,7 @@ private struct CardSurface<S: InsettableShape>: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(shape.fill(Theme.glow).opacity(shown ? 1 : 0))
+            .background(shape.fill(Theme.card).opacity(shown ? 1 : 0))
             .overlay(shape.strokeBorder(.white.opacity(shown ? 0.06 : 0), lineWidth: 1))
             .shadow(color: .black.opacity(shown ? 0.07 : 0), radius: 14, x: 0, y: 7)
     }
