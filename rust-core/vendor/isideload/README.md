@@ -116,12 +116,12 @@ identity keeps working, so nobody has to provision again. A server that moves
 to the Windows or macOS library will need that OS here instead, and will answer
 -80045 until then.
 
-Reporting an Android phone changes two more of Apple's answers. Both were found
-on 2026-10-13 by signing in with a real account.
+Reporting an Android phone changes three more of Apple's answers, all found on
+2026-10-13 with a real account.
 
 - The URL-bag lookup answers an Android client with ten URLs on gsd.apple.com,
   not the 175 on gsa.apple.com. `GrandSlam::new` asks for the bag as a Mac
-  (`LOOKUP_CLIENT_INFO`), which keeps sign-in on gsa.apple.com, where the URLs
+  (`MAC_CLIENT_INFO`), which keeps sign-in on gsa.apple.com, where the URLs
   hardcoded in `apple_account.rs` live. The lookup carries no anisette data, so
   the Mac identity is not refused there. gsd.apple.com answered `init`,
   `complete` and a too-early `apptokens` exactly as gsa.apple.com did; nothing
@@ -136,6 +136,17 @@ on 2026-10-13 by signing in with a real account.
   this time"). `state_after_proof` maps the answer to
   `NeedsDevice2FAVerification`, and that state now loads the trusted numbers
   itself. Tests: `cargo test -p isideload --lib state_after_proof`.
+- The second-factor pages under gsa.apple.com/auth answer an Android client
+  with a bare 403: `GET /auth` (the trusted numbers), `PUT /auth/verify/phone`
+  (send a text or a call), `POST /auth/verify/phone/securitycode` (check its
+  code) and `GET /auth/verify/trusteddevice` (send the code to the trusted
+  devices again). With no numbers the app had no text or call to offer, and
+  asking for another code ended the sign-in. Sent with a made-up identity
+  token, each answers 403 as the Android phone and 401 as a Mac, a Windows PC
+  or an iPhone, on gsd.apple.com too, so the refusal comes before Apple reads
+  who is asking; `GsService2/validate` answers 401 to all of them. These four
+  are now sent as the Mac as well (`get_sms`, `put_sms`, `post_sms` and the new
+  `get_auth`). Test: `cargo test -p isideload --lib client_info_tests`.
 
 With both in place one account went all the way on 2026-10-13: proof, the
 pushed code, the second sign-in (hsc 200), an `xcode.auth` token good for a
@@ -146,10 +157,14 @@ also worked with the Mac identity. `listTeams` with the token and a newly
 provisioned anisette identity answered 1100, "Your session has expired", so a
 token goes with the machine ID that signed in.
 
-**Not verified:** this crate's own sign-in loop with a real account; an account
-whose only second factor is a phone number (what Apple sends unasked, and
-whether `validateCode` takes it); and the SMS and call requests under this
-identity.
+The app's own sign-in then ran on an iPhone the same day, with the code from a
+trusted device and, once the pages under `/auth` were asked as a Mac, with the
+trusted numbers listed and a code by phone.
+
+**Not verified:** an account whose only second factor is a phone number. Apple
+no longer says in `au` that such a code goes by text, so the prompt still names
+the trusted devices; what Apple sends unasked, and whether `validateCode` takes
+it, isn't known.
 
 **3. `src/auth/apple_account.rs`, `builder.rs`, `grandslam.rs` — let the user
 choose how the 2FA code arrives.**
