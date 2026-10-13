@@ -69,9 +69,12 @@ struct ContentView: View {
                             .transition(.asymmetric(insertion: .identity, removal: .tuckUnder))
                     }
                     // The build's version, and from iOS 27 (which pairs itself)
-                    // the optional pairing-file import, folded away.
+                    // the optional pairing-file import, folded away. Like the
+                    // button above, the cascade brings it back after a run.
                     if showsAdvanced {
-                        advancedSection.cascadeItem(cascade(5))
+                        advancedSection
+                            .cascadeItem(cascade(5))
+                            .transition(.asymmetric(insertion: .identity, removal: .quickFade))
                     }
                     // Guides, the pairing code, errors and success show as
                     // `InstallPopup`, which `RootView` lays over the app.
@@ -124,9 +127,10 @@ struct ContentView: View {
     }
 
     /// True when Advanced has something to hold: a version to pick (not for a
-    /// custom IPA), or the optional pairing file (iOS 27 and above).
+    /// custom IPA), or the optional pairing file (iOS 27 and above). A run
+    /// can't take a change to either, so it's away while one goes.
     private var showsAdvanced: Bool {
-        engine.installSource != .custom || engine.canSelfPair
+        !engine.isRunning && (engine.installSource != .custom || engine.canSelfPair)
     }
 
     /// Cascade index for items below the pairing-file card, shifted by one when
@@ -620,7 +624,6 @@ struct ContentView: View {
                         pairingFileOption
                     }
                 }
-                .disabled(engine.isRunning)
                 .transition(.opacity.combined(with: .offset(y: -6)))
             }
         }
@@ -1092,6 +1095,11 @@ private extension AnyTransition {
     static var surfaceSwap: AnyTransition {
         .asymmetric(insertion: .opacity.animation(.easeIn(duration: 0.28).delay(0.1)),
                     removal: .opacity.animation(.easeOut(duration: 0.15)))
+    }
+
+    /// A fade that's over before what's below has moved up into its place.
+    static var quickFade: AnyTransition {
+        .opacity.animation(.easeOut(duration: 0.18))
     }
 
     /// The Install button leaving as a run starts: up and under the progress
