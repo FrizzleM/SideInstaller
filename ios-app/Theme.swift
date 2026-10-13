@@ -165,9 +165,12 @@ private struct CardSurface<S: InsettableShape>: ViewModifier {
     /// is a card only some of the time.
     var shown: Bool
 
-    /// The navy of the backdrop's corners, strong enough that the glass reads
-    /// as dark blue and thin enough that the backdrop still moves behind it.
-    private var tint: Color { Theme.glow.opacity(0.75) }
+    /// A navy a shade deeper than the backdrop's corners (#01113D), strong
+    /// enough that the glass reads as dark blue and thin enough that the
+    /// backdrop still moves behind it.
+    private var tint: Color {
+        Color(red: 1 / 255, green: 17 / 255, blue: 61 / 255).opacity(0.75)
+    }
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
