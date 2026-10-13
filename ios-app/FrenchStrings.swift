@@ -13,6 +13,7 @@ let frenchStrings: [String: String] = [
     "Password": "Mot de passe",
     "Install": "Installer",
     "Installing": "Installation en cours",
+    "Cancelling": "Annulation en cours",
     "Installed": "Installé",
     "Something went wrong": "Une erreur s'est produite",
     "an app by Frizzle": "une app de Frizzle",
@@ -148,6 +149,7 @@ let frenchStrings: [String: String] = [
     "No": "Non",
     "Closing this popup will end the process. Are you sure?":
         "Fermer cette fenêtre arrêtera le processus. Voulez-vous continuer ?",
+    "Cancel the install?": "Annuler l'installation ?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ est installé. Terminez l'étape de confiance ci-dessus pour l'ouvrir.",
     "%@ is installed. Finish the trust step below to open it.":

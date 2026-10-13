@@ -16,6 +16,7 @@ let portugueseStrings: [String: String] = [
     "Password": "Senha",
     "Install": "Instalar",
     "Installing": "Instalando",
+    "Cancelling": "Cancelando",
     "Installed": "Instalado",
     "Something went wrong": "Algo deu errado",
     "an app by Frizzle": "um app de Frizzle",
@@ -148,6 +149,7 @@ let portugueseStrings: [String: String] = [
     "No": "Não",
     "Closing this popup will end the process. Are you sure?":
         "Fechar este pop-up vai encerrar o processo. Tem certeza?",
+    "Cancel the install?": "Cancelar a instalação?",
     "%@ is installed. Finish the trust step above to open it.":
         "O %@ está instalado. Conclua a etapa de confiança acima para abri-lo.",
     "%@ is installed. Finish the trust step below to open it.":
