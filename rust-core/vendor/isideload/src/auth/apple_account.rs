@@ -240,6 +240,8 @@ impl AppleAccount {
                     self.login_state = LoginState::NeedsDevice2FAVerification;
                 }
                 LoginState::NeedsDevice2FAVerification => {
+                    // Not loaded yet when Apple sent the code unasked.
+                    self.load_trusted_numbers().await;
                     let response = two_factor_callback(self.callback_params(false, None)).await?;
                     self.last_error = None;
                     self.login_state = match response {
@@ -891,18 +893,33 @@ impl AppleAccount {
 
         debug!("Login step 2 completed");
 
+        Ok(Self::state_after_proof(status))
+    }
+
+    /// What the `Status` of an accepted password proof asks for next.
+    fn state_after_proof(status: &Dictionary) -> LoginState {
         if let Some(plist::Value::String(s)) = status.get("au") {
-            return Ok(match s.as_str() {
+            return match s.as_str() {
                 "trustedDeviceSecondaryAuth" => LoginState::NeedsDevice2FA,
                 // Names no number: start from 1 as upstream does; the
                 // state swaps in a real trusted number if 1 isn't one.
                 "secondaryAuth" => LoginState::NeedsSMS2FA(1),
                 "repair" => LoginState::LoggedIn, // Just means that you don't have 2FA set up
                 unknown => LoginState::NeedsExtraStep(unknown.to_string()),
-            });
+            };
         }
 
-        Ok(LoginState::LoggedIn)
+        // An Android client (see `RemoteV3AnisetteProvider::get_client_info`)
+        // gets no `au`. With hsc 409 a second step is still due, and Apple has
+        // already pushed a code to the trusted devices: asking for another
+        // isn't needed, `validateCode` takes that one. Taken for a finished
+        // sign-in, the app token request after it fails with -22411.
+        if status.get("hsc").and_then(|v| v.as_signed_integer()) == Some(409) {
+            info!("Apple has sent a 2FA code to the trusted devices");
+            return LoginState::NeedsDevice2FAVerification;
+        }
+
+        LoginState::LoggedIn
     }
 
     pub async fn get_app_token(&mut self, app: &str) -> Result<AppToken, Report> {
@@ -1257,6 +1274,59 @@ mod sms_send_response_tests {
         assert_eq!(AppleAccount::pick_number_id(&[], 1), 1);
         assert_eq!(numbers[0].push_mode, "");
         assert_eq!(numbers[1].push_mode, "voice");
+    }
+}
+
+#[cfg(test)]
+mod state_after_proof_tests {
+    use super::{AppleAccount, LoginState};
+    use plist::Dictionary;
+
+    fn status(hsc: i64, au: Option<&str>) -> Dictionary {
+        let mut status = Dictionary::new();
+        status.insert("ec".into(), 0.into());
+        status.insert("hsc".into(), hsc.into());
+        if let Some(au) = au {
+            status.insert("au".into(), au.into());
+        }
+        status
+    }
+
+    #[test]
+    fn a_named_step_is_followed() {
+        assert!(matches!(
+            AppleAccount::state_after_proof(&status(409, Some("trustedDeviceSecondaryAuth"))),
+            LoginState::NeedsDevice2FA
+        ));
+        assert!(matches!(
+            AppleAccount::state_after_proof(&status(409, Some("secondaryAuth"))),
+            LoginState::NeedsSMS2FA(1)
+        ));
+        assert!(matches!(
+            AppleAccount::state_after_proof(&status(409, Some("repair"))),
+            LoginState::LoggedIn
+        ));
+    }
+
+    #[test]
+    fn a_pending_step_apple_names_none_for_waits_for_the_code_it_sent() {
+        // What gsa.apple.com answered an Android client on 2026-10-13.
+        assert!(matches!(
+            AppleAccount::state_after_proof(&status(409, None)),
+            LoginState::NeedsDevice2FAVerification
+        ));
+    }
+
+    #[test]
+    fn nothing_pending_is_logged_in() {
+        assert!(matches!(
+            AppleAccount::state_after_proof(&status(200, None)),
+            LoginState::LoggedIn
+        ));
+        assert!(matches!(
+            AppleAccount::state_after_proof(&Dictionary::new()),
+            LoginState::LoggedIn
+        ));
     }
 }
 

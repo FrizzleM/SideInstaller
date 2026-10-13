@@ -50,7 +50,8 @@ written by hand in `sign_app`. Upstream `baca89d` fixes the same bug differently
 it downloads each extension's own profile and signs the extension with that
 profile's entitlements, at one more request per extension.
 
-**2. `src/anisette/` and `src/auth/grandslam.rs` — report the client as akd,
+**2. `src/anisette/`, `src/auth/grandslam.rs`, `apple_account.rs` — report the
+client as akd on an Android phone, take the 2FA code Apple sends one unasked,
 and don't reuse GrandSlam connections.**
 
 Since early September 2026 Apple's GSA edge answers HTTP 503 to any request
@@ -77,6 +78,78 @@ never requests `/v3/client_info` — upstream `232c7f3` (hardcode) plus `a19f5f0
 Measured 2026-09-13 with curl against `GsService2`: both Xcode strings got 503
 on every try, the akd string got past the edge. `X-Xcode-Version` `14.2 (14C18)`
 and upstream's `27.0 (27A5218g)` behaved the same, so it is left unchanged.
+
+From 2026-10-12 that identity's Mac device and OS stopped working too. The
+first sign-in request (SRP `init`) came back HTTP 200 with
+
+```
+Auth error -80045: This action cannot be completed at this time.
+```
+
+for every account, real or made up, on every server, in every tool that uses
+them. The public servers run Dadoum's anisette-v3-server, which makes anisette
+data with the ADI library from Apple Music for Android, and GrandSlam now
+refuses a client whose OS isn't the one the machine ID was made on (Dadoum,
+anisette-v3-server #61). So `get_client_info` reports an Android phone, and
+keeps akd and the user agent:
+
+```
+<Pixel 7> <Android;14;UQ1A.240205.002> <com.apple.AuthKit/1 (com.apple.akd/1.0)>
+```
+
+Measured 2026-10-13 against `GsService2` with a made-up account, through
+ani.npeg.us, ani.stikstore.app, ani.sidestore.io and ani.jaydenha.uk:
+
+| `X-Mme-Client-Info` device and OS | `init` answer |
+|---|---|
+| `<Mac15,7> <macOS;27.0;26A5378j>` | -80045 |
+| `<PC> <Windows;6.2(0,0);9200>` (iCloud for Windows) | -80045 |
+| `<iPhone15,2> <iPhone OS;17.4;21E219>` | -80045 |
+| `<PC> <Linux;6.1;0>` | HTTP 404 |
+| `<Pixel 7> <Android;14;UQ1A.240205.002>` | -20101, "Your account information was entered incorrectly" |
+
+-20101 is the answer for an account that doesn't exist (#61 reports the same
+from a Mac's own anisette), so the request reaches the account check. With the
+Android device and OS, naming akd or Apple Music for Android as the app, with
+either's user agent, got -20101 alike. Anisette state provisioned under the Mac
+identity keeps working, so nobody has to provision again. A server that moves
+to the Windows or macOS library will need that OS here instead, and will answer
+-80045 until then.
+
+Reporting an Android phone changes two more of Apple's answers. Both were found
+on 2026-10-13 by signing in with a real account.
+
+- The URL-bag lookup answers an Android client with ten URLs on gsd.apple.com,
+  not the 175 on gsa.apple.com. `GrandSlam::new` asks for the bag as a Mac
+  (`LOOKUP_CLIENT_INFO`), which keeps sign-in on gsa.apple.com, where the URLs
+  hardcoded in `apple_account.rs` live. The lookup carries no anisette data, so
+  the Mac identity is not refused there. gsd.apple.com answered `init`,
+  `complete` and a too-early `apptokens` exactly as gsa.apple.com did; nothing
+  past that was tried on it.
+- An accepted password proof comes back with hsc 409 and no `au`. Apple has
+  already pushed a code to the trusted devices (the decrypted `spd` has
+  `status-code` 409 and `sm`, "A message with a verification code has been sent
+  to your other devices… Enter the code to continue."), and `validateCode`
+  takes that code with no `trustedDeviceSecondaryAuth` request first. The
+  pinned code read a missing `au` as signed in, and the `xcode.auth` request
+  after it failed with -22411 (hsc 401, "This action cannot be completed at
+  this time"). `state_after_proof` maps the answer to
+  `NeedsDevice2FAVerification`, and that state now loads the trusted numbers
+  itself. Tests: `cargo test -p isideload --lib state_after_proof`.
+
+With both in place one account went all the way on 2026-10-13: proof, the
+pushed code, the second sign-in (hsc 200), an `xcode.auth` token good for a
+year, and `listTeams`. That run was `ish/sideinstaller.py`, which sends the
+same requests. From this crate, the lookup as a Mac and `listTeams` with that
+session's token and anisette state were run. The token request and `listTeams`
+also worked with the Mac identity. `listTeams` with the token and a newly
+provisioned anisette identity answered 1100, "Your session has expired", so a
+token goes with the machine ID that signed in.
+
+**Not verified:** this crate's own sign-in loop with a real account; an account
+whose only second factor is a phone number (what Apple sends unasked, and
+whether `validateCode` takes it); and the SMS and call requests under this
+identity.
 
 **3. `src/auth/apple_account.rs`, `builder.rs`, `grandslam.rs` — let the user
 choose how the 2FA code arrives.**
