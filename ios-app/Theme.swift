@@ -152,15 +152,46 @@ struct PanelCard<Content: View>: View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(18)
-            .background(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(Color(.secondarySystemBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(.white.opacity(0.06), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.07), radius: 14, x: 0, y: 7)
+            .cardSurface(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+}
+
+/// What a card is made of: a pane of glass with nothing in it. The backdrop
+/// shows through untouched, under the faintest wash, and the pane is drawn by
+/// its rim: lit along the top, dim down the sides, catching a little light
+/// again at the foot. Drawn by hand, since the system's glass and materials
+/// all frost what's behind them, which over this backdrop reads as gray.
+private struct CardSurface<S: InsettableShape>: ViewModifier {
+    var shape: S
+    /// False takes the surface away without changing the view, for one that
+    /// is a card only some of the time.
+    var shown: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .background(shape.fill(wash))
+            .overlay(shape.strokeBorder(rim, lineWidth: 1))
+    }
+
+    /// A sheen that fades out down the pane, so it has a surface at all.
+    private var wash: LinearGradient {
+        LinearGradient(colors: [.white.opacity(shown ? 0.025 : 0), .clear],
+                       startPoint: .top, endPoint: .bottom)
+    }
+
+    private var rim: LinearGradient {
+        LinearGradient(stops: [.init(color: .white.opacity(shown ? 0.38 : 0), location: 0),
+                               .init(color: .white.opacity(shown ? 0.08 : 0), location: 0.35),
+                               .init(color: .white.opacity(shown ? 0.05 : 0), location: 0.8),
+                               .init(color: .white.opacity(shown ? 0.18 : 0), location: 1)],
+                       startPoint: .top, endPoint: .bottom)
+    }
+}
+
+extension View {
+    /// Puts a card's surface behind this view, cut to `shape`.
+    func cardSurface(in shape: some InsettableShape, shown: Bool = true) -> some View {
+        modifier(CardSurface(shape: shape, shown: shown))
     }
 }
 
@@ -662,7 +693,7 @@ private struct FieldBackground: ViewModifier {
             .padding(.vertical, 13)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color(.tertiarySystemBackground))
+                    .fill(.white.opacity(0.07))
             )
     }
 }

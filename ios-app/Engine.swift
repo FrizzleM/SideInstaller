@@ -267,6 +267,10 @@ final class Engine: ObservableObject {
     /// True while the one-click pipeline is running.
     @Published var isRunning: Bool = false
 
+    /// True from a cancel until the run stops, which waits for the step in
+    /// flight to reach a safe point.
+    @Published private(set) var isCancelling: Bool = false
+
     /// Set when the pipeline stops on an error; cleared on a new run.
     @Published var lastError: String?
 
@@ -598,7 +602,10 @@ final class Engine: ObservableObject {
                 finishSuccess()
             } catch is CancellationError {
                 log("Install cancelled.")
-                failActiveStep(to: .pending)
+                // A cancelled run leaves no progress behind, so the Install
+                // tab goes back to its button.
+                for s in Step.allCases { stepStates[s] = .pending }
+                installProgress = 0
                 setGuide(nil)
             } catch {
                 let msg = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
@@ -608,6 +615,7 @@ final class Engine: ObservableObject {
             }
             stopBackgroundWork()
             isRunning = false
+            isCancelling = false
             pairingPIN = nil
         }
     }
@@ -615,6 +623,8 @@ final class Engine: ObservableObject {
     /// Stop the pipeline at the next safe point.
     @MainActor
     func cancelOneClick() {
+        guard isRunning else { return }
+        isCancelling = true
         pipelineTask?.cancel()
         prefetch?.task.cancel()                 // stop the download now, not at its step
         devicePreparation?.cancel()             // skip its ahead-of-install write

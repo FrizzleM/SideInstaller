@@ -14,6 +14,7 @@ let spanishStrings: [String: String] = [
     "Password": "Contraseña",
     "Install": "Instalar",
     "Installing": "Instalando",
+    "Cancelling": "Cancelando",
     "Installed": "Instalado",
     "Something went wrong": "Algo ha ido mal",
     "an app by Frizzle": "una app de Frizzle",
@@ -149,6 +150,7 @@ let spanishStrings: [String: String] = [
     "No": "No",
     "Closing this popup will end the process. Are you sure?":
         "Cerrar esta ventana terminará el proceso. ¿Seguro que quieres cerrarla?",
+    "Cancel the install?": "¿Cancelar la instalación?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ ya está instalado. Completa el paso de confianza de arriba para abrirlo.",
     "%@ is installed. Finish the trust step below to open it.":

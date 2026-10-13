@@ -14,6 +14,7 @@ let vietnameseStrings: [String: String] = [
     "Password": "Mật khẩu",
     "Install": "Cài ứng dụng",
     "Installing": "Đang cài đặt",
+    "Cancelling": "Đang hủy",
     "Installed": "Đã cài đặt",
     "Something went wrong": "Đã xảy ra lỗi",
     "an app by Frizzle": "một ứng dụng của Frizzle",
@@ -148,6 +149,7 @@ let vietnameseStrings: [String: String] = [
     "No": "Không",
     "Closing this popup will end the process. Are you sure?":
         "Đóng cửa sổ này sẽ dừng quá trình. Bạn có chắc không?",
+    "Cancel the install?": "Hủy cài đặt?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ đã được cài đặt. Hoàn tất bước tin cậy ở trên để mở ứng dụng.",
     "%@ is installed. Finish the trust step below to open it.":

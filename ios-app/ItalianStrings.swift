@@ -12,6 +12,7 @@ let italianStrings: [String: String] = [
     "Password": "Password",
     "Install": "Installa",
     "Installing": "Installazione in corso",
+    "Cancelling": "Annullamento in corso",
     "Installed": "Installato",
     "Something went wrong": "Qualcosa è andato storto",
     "an app by Frizzle": "un'app di Frizzle",
@@ -147,6 +148,7 @@ let italianStrings: [String: String] = [
     "No": "No",
     "Closing this popup will end the process. Are you sure?":
         "Chiudere questo popup interromperà il processo. Vuoi continuare?",
+    "Cancel the install?": "Annullare l'installazione?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ è installato. Completa il passaggio di autorizzazione qui sopra per aprirlo.",
     "%@ is installed. Finish the trust step below to open it.":
