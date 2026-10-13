@@ -156,21 +156,26 @@ struct PanelCard<Content: View>: View {
     }
 }
 
-/// What a card is made of: clear glass, so the backdrop's blues sway through
-/// it. Liquid Glass needs iOS 26; before that it's a thin material, with the
-/// hairline and shadow the glass would otherwise bring.
+/// What a card is made of: dark blue glass, which the backdrop's blues sway
+/// behind. Liquid Glass needs iOS 26; before that it's a thin material under
+/// the same tint, with the hairline and shadow the glass would otherwise bring.
 private struct CardSurface<S: InsettableShape>: ViewModifier {
     var shape: S
     /// False takes the surface away without changing the view, for one that
     /// is a card only some of the time.
     var shown: Bool
 
+    /// The navy of the backdrop's corners, strong enough that the glass reads
+    /// as dark blue and thin enough that the backdrop still moves behind it.
+    private var tint: Color { Theme.glow.opacity(0.75) }
+
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.glassEffect(shown ? .clear : .identity, in: shape)
+            content.glassEffect(shown ? .clear.tint(tint) : .identity, in: shape)
         } else {
             content
-                .background(shape.fill(.ultraThinMaterial).opacity(shown ? 1 : 0))
+                .background(shape.fill(.ultraThinMaterial).overlay(shape.fill(tint))
+                    .opacity(shown ? 1 : 0))
                 .overlay(shape.strokeBorder(.white.opacity(shown ? 0.06 : 0), lineWidth: 1))
                 .shadow(color: .black.opacity(shown ? 0.07 : 0), radius: 14, x: 0, y: 7)
         }
