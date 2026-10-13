@@ -14,6 +14,7 @@ let chineseStrings: [String: String] = [
     "Password": "密码",
     "Install": "安装",
     "Installing": "正在安装",
+    "Cancelling": "正在取消",
     "Installed": "已安装",
     "Something went wrong": "出了点问题",
     "an app by Frizzle": "由 Frizzle 打造的应用",
@@ -146,6 +147,7 @@ let chineseStrings: [String: String] = [
     "No": "否",
     "Closing this popup will end the process. Are you sure?":
         "关闭此弹窗将终止当前流程。确定要关闭吗？",
+    "Cancel the install?": "要取消安装吗？",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ 已安装。完成上面的信任步骤即可打开。",
     "%@ is installed. Finish the trust step below to open it.":
