@@ -100,7 +100,11 @@ struct WelcomeView: View {
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityAddTraits(accepted ? [.isSelected] : [])
+            // A tickbox to assistive tech, with an on/off value, not a button.
+            .accessibilityRepresentation {
+                Toggle(L("I have accepted the") + " TOS",
+                       isOn: $accepted.animation(.snappy(duration: 0.25)))
+            }
 
             Link(destination: URL(string: "https://frizzlem.github.io/SideInstaller/terms.html")!) {
                 Text("TOS")
