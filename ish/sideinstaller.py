@@ -25,6 +25,7 @@ endpoints reject the plausible-looking alternative.
 import base64
 import binascii
 import getpass
+import gzip
 import hashlib
 import hmac
 import http.client
@@ -206,6 +207,9 @@ def request(method, url, headers=None, body=None, timeout=60, redirects=5):
         data = response.read()
         status = response.status
         got = {k.lower(): v for k, v in response.getheaders()}
+        # The developer portal gzips its replies whatever Accept-Encoding says.
+        if got.get("content-encoding", "").lower() == "gzip":
+            data = gzip.decompress(data)
     finally:
         conn.close()
 
@@ -456,6 +460,15 @@ def _sha256(*chunks):
     return digest.digest()
 
 
+def loads_bare_plist(data):
+    """plistlib.loads for what GrandSlam encrypts (the sign-in response, app
+    tokens): a bare <dict>, which plistlib only reads inside a <plist>."""
+    data = data.strip()
+    if data.startswith(b"<dict"):
+        data = b'<plist version="1.0">' + data + b"</plist>"
+    return plistlib.loads(data)
+
+
 class SRPClient:
     def __init__(self):
         self.n_bytes = _trim(SRP_N)
@@ -511,7 +524,7 @@ class SRPClient:
             key = hmac.new(base, b"extra data key:", hashlib.sha256).digest()
             iv = hmac.new(base, b"extra data iv:", hashlib.sha256).digest()[:16]
             try:
-                return plistlib.loads(aes_cbc_decrypt(key, iv, blob))
+                return loads_bare_plist(aes_cbc_decrypt(key, iv, blob))
             except Exception as exc:  # noqa: BLE001 - any failure means "wrong key"
                 errors.append("%s: %s" % (label, exc))
         raise Fail("Could not decrypt the sign-in response (%s)." % "; ".join(errors))
@@ -639,11 +652,21 @@ class WebSocket:
 # ----------------------------------------------------------------------------
 
 # What we tell GrandSlam we are, whatever the anisette server suggests. Public
-# servers still hand out a com.apple.dt.Xcode client info, and since September
-# 2026 Apple's GSA edge answers any request carrying one with HTTP 503 before
-# reading the rest. isideload, AltStore and SideSign all switched to akd.
-GSA_CLIENT_INFO = "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+# servers make anisette data with Apple's Android ADI library and hand out a
+# macOS client info, and since 2026-10-12 GrandSlam refuses a sign-in whose
+# client OS isn't the one the machine ID was made on (-80045, "This action
+# cannot be completed at this time"). So the device and OS are an Android
+# phone's. Most servers also still name com.apple.dt.Xcode, and since September
+# 2026 Apple's GSA edge answers any request carrying that with HTTP 503 before
+# reading the rest; isideload, AltStore and SideSign all switched to akd.
+GSA_CLIENT_INFO = "<Pixel 7> <Android;14;UQ1A.240205.002> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
 GSA_USER_AGENT = "akd/1.0 CFNetwork/808.1.4"
+# The URL bag alone is asked for as a Mac. Asked as an Android phone, the lookup
+# answers with ten URLs on gsd.apple.com; as a Mac, with the full bag on
+# gsa.apple.com, where the other URLs in this script live and where sign-in as
+# an Android phone was tested. The lookup carries no anisette data, so there is
+# no machine ID for the OS to disagree with.
+GSA_LOOKUP_CLIENT_INFO = "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
 
 
 class Anisette:
@@ -834,7 +857,9 @@ class Anisette:
 class GrandSlam:
     def __init__(self, anisette):
         self.anisette = anisette
-        status, _, body = request("GET", GSA_URL_BAG, headers=self.base_headers())
+        headers = self.base_headers()
+        headers["X-Mme-Client-Info"] = GSA_LOOKUP_CLIENT_INFO
+        status, _, body = request("GET", GSA_URL_BAG, headers=headers)
         if status != 200:
             raise Fail("Could not reach Apple's GrandSlam service (HTTP %d)." % status)
         self.url_bag = plistlib.loads(body)["urls"]
@@ -895,6 +920,8 @@ class AppleAccount:
                 return
             if state == "device-2fa":
                 self._device_2fa(ask_code)
+            elif state == "device-2fa-sent":
+                self._device_2fa(ask_code, send=False)
             elif state == "sms-2fa":
                 self._sms_2fa(ask_code)
             else:
@@ -956,11 +983,16 @@ class AppleAccount:
 
         self.spd = srp.decrypt_spd(bytes(second["spd"]))
 
-        au = second.get("Status", {}).get("au")
+        status = second.get("Status", {})
+        au = status.get("au")
         if au == "trustedDeviceSecondaryAuth":
             return "device-2fa"
         if au == "secondaryAuth":
             return "sms-2fa"
+        if au is None and status.get("hsc") == 409:
+            # What an Android client gets: 409 (a second step is due) with no
+            # step named, and a code already pushed to the trusted devices.
+            return "device-2fa-sent"
         if au == "repair" or au is None:
             return "ok"
         return au
@@ -972,13 +1004,19 @@ class AppleAccount:
         headers["X-Apple-I-MD-RINFO"] = self.anisette.routing_info
         return headers
 
-    def _device_2fa(self, ask_code):
-        headers = self.gs.base_headers()
-        headers.update(self._identity_headers())
-        status, _, _ = request("GET", self.gs.url("trustedDeviceSecondaryAuth"), headers=headers)
-        if status >= 400:
-            raise Fail("Apple would not send a verification code (HTTP %d)." % status)
-        info("A verification code has been sent to your trusted devices.")
+    def _device_2fa(self, ask_code, send=True):
+        """Ask for the trusted-device code and hand it to Apple. With `send`
+        false Apple has pushed the code already, and says so in `sm`."""
+        if send:
+            headers = self.gs.base_headers()
+            headers.update(self._identity_headers())
+            status, _, _ = request("GET", self.gs.url("trustedDeviceSecondaryAuth"),
+                                   headers=headers)
+            if status >= 400:
+                raise Fail("Apple would not send a verification code (HTTP %d)." % status)
+            info("A verification code has been sent to your trusted devices.")
+        else:
+            info(self.spd.get("sm") or "A verification code has been sent to your trusted devices.")
 
         code = ask_code("Two-factor code")
         headers = self.gs.base_headers()
@@ -1052,7 +1090,7 @@ class AppleAccount:
         decrypted = aes_gcm_decrypt(
             session_key, blob[3:19], blob[19:-16], blob[:3], blob[-16:]
         )
-        token = plistlib.loads(decrypted)
+        token = loads_bare_plist(decrypted)
         if token.get("status-code") != 200:
             raise Fail("Apple refused the developer token (status %s)." % token.get("status-code"))
         return token["t"][app]["token"], adsid

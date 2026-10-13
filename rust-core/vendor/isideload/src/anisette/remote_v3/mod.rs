@@ -134,13 +134,21 @@ impl AnisetteProvider for RemoteV3AnisetteProvider {
         }
     }
 
-    /// Hardcoded, not fetched from the server's `/v3/client_info`: public anisette
-    /// servers still answer with a `com.apple.dt.Xcode` client, and since
-    /// September 2026 Apple's GSA edge returns HTTP 503 to any request carrying
-    /// one. Reporting akd matches upstream a19f5f0, AltStore #1790 and SideSign.
+    /// Hardcoded, not fetched from the server's `/v3/client_info`, which is wrong
+    /// twice over on the public servers.
+    ///
+    /// They make anisette data with Apple's Android ADI library and answer with
+    /// a macOS client. Since 2026-10-12 GrandSlam refuses a sign-in whose client
+    /// OS isn't the one the machine ID was made on (-80045, "This action cannot
+    /// be completed at this time"), so the device and OS here are an Android
+    /// phone's.
+    ///
+    /// Most also still name `com.apple.dt.Xcode`, and since September 2026
+    /// Apple's GSA edge returns HTTP 503 to any request carrying that. Reporting
+    /// akd matches upstream a19f5f0, AltStore #1790 and SideSign.
     async fn get_client_info(&self) -> Result<AnisetteClientInfo, Report> {
         Ok(AnisetteClientInfo {
-            client_info: "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>".to_string(),
+            client_info: "<Pixel 7> <Android;14;UQ1A.240205.002> <com.apple.AuthKit/1 (com.apple.akd/1.0)>".to_string(),
             user_agent: "akd/1.0 CFNetwork/808.1.4".to_string(),
         })
     }

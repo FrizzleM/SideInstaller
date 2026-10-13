@@ -14,6 +14,18 @@ use crate::{SideloadError, anisette::AnisetteClientInfo, util::plist::PlistDataE
 const APPLE_ROOT: &[u8] = include_bytes!("./apple_root.der");
 const URL_BAG: &str = "https://gsa.apple.com/grandslam/GsService2/lookup";
 
+/// What the URL-bag lookup alone says the client is: a Mac.
+///
+/// Asked as the Android phone every other request reports (see
+/// `RemoteV3AnisetteProvider::get_client_info`), the lookup answers with ten
+/// URLs on gsd.apple.com. Asked as a Mac, it answers with the full bag on
+/// gsa.apple.com, where the URLs this crate hardcodes live and where sign-in
+/// as an Android phone was checked through to the developer portal. The lookup
+/// carries no anisette data, so there is no machine ID for the OS to disagree
+/// with.
+const LOOKUP_CLIENT_INFO: &str =
+    "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+
 /// Waits before each retry of a sign-in request GrandSlam answered with 429.
 ///
 /// iLoader found these 429s are often momentary and a retry gets through
@@ -38,7 +50,11 @@ impl GrandSlam {
     /// - `client`: The reqwest client to use for requests
     pub async fn new(client_info: AnisetteClientInfo, debug: bool) -> Result<Self, Report> {
         let client = Self::build_reqwest_client(debug).context("Failed to build HTTP client")?;
-        let base_headers = Self::base_headers(&client_info, false)?;
+        let mut base_headers = Self::base_headers(&client_info, false)?;
+        base_headers.insert(
+            "X-Mme-Client-Info",
+            HeaderValue::from_static(LOOKUP_CLIENT_INFO),
+        );
         let url_bag = Self::fetch_url_bag(&client, base_headers).await?;
         Ok(Self {
             client,
