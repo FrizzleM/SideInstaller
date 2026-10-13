@@ -2,6 +2,16 @@
 
 All notable changes to SideInstaller are documented here.
 
+## 1.5.1
+
+### Fixed
+- **A verification code by text or phone call works again.** Since 1.5.0 signs in as an Android
+  device, Apple turned away the requests that list your trusted phone numbers and send a code to
+  one, so the code prompt had no number to offer and the code could only come from a trusted device.
+  Asking for a new code on your devices failed the same way and ended the sign-in. Those requests
+  are made the way Apple accepts them again: your numbers are back in the prompt, with a text or a
+  call to each, and a new code can be sent to your devices.
+
 ## 1.5.0
 
 ### Changed
