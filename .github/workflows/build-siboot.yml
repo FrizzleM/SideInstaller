@@ -20,10 +20,14 @@ name: build-siboot
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - "ish-bootstrap/**"
-      - ".github/workflows/build-siboot.yml"
+  # Automatic runs are off for now; run it from the Actions tab. To turn them
+  # back on, uncomment the block below. `branches` keeps release tags from
+  # starting it: GitHub ignores the path filters on tag pushes.
+  # push:
+  #   branches: ["**"]
+  #   paths:
+  #     - "ish-bootstrap/**"
+  #     - ".github/workflows/build-siboot.yml"
 
 permissions:
   contents: read

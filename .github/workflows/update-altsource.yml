@@ -17,6 +17,9 @@ on:
     - cron: "17 */6 * * *"     # every 6 hours, for Nightflix and late uploads
   workflow_dispatch:
   push:
+    # main only. Publishing a release pushes its tag, and GitHub ignores the
+    # path filters on tag pushes, so without this every release ran twice.
+    branches: [main]
     paths:
       - "scripts/update_altsource.py"
       - ".github/workflows/update-altsource.yml"
