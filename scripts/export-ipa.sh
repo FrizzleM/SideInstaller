@@ -5,6 +5,10 @@
 #   scripts/export-ipa.sh            pick a branch from a list
 #   scripts/export-ipa.sh <branch>   export that branch (or any tag / commit)
 #
+# It then asks where the IPA goes: the Desktop, as SideInstaller.ipa (replacing
+# the one there), or the folder it was run from, named with version, branch and
+# commit. When done, the IPA is selected in Finder.
+#
 # The branch's last commit is built in a separate worktree under CACHE_DIR, so
 # this checkout, its uncommitted changes and Xcode's own build folder are left
 # alone. The Xcode project is gitignored, so the local one is copied in with
@@ -16,14 +20,16 @@
 #
 # Config, all overridable by env:
 #   BUNDLE_ID   bundle id of the exported app (default: com.frizzlem.sideinstaller)
-#   OUTPUT_DIR  where the .ipa lands (default: ~/Desktop)
+#   OUTPUT_DIR  skip the question and save there, named as in the run folder
+#   REVEAL      1 = select the .ipa in Finder when done, 0 = don't (default: 1)
 #   XCODEPROJ   Xcode project to copy in, instead of picking one as above
 #   CACHE_DIR   worktree, build folders and built Rust libraries, reused between
 #               runs (default: ~/Library/Caches/SideInstallerExport)
 set -euo pipefail
 
 BUNDLE_ID="${BUNDLE_ID:-com.frizzlem.sideinstaller}"
-OUTPUT_DIR="${OUTPUT_DIR:-$HOME/Desktop}"
+OUTPUT_DIR="${OUTPUT_DIR:-}"
+REVEAL="${REVEAL:-1}"
 CACHE_DIR="${CACHE_DIR:-$HOME/Library/Caches/SideInstallerExport}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,6 +53,7 @@ build_failed() {
 }
 plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$2" 2>/dev/null; }
 
+HERE="$PWD"
 cd "$ROOT"
 
 # --- Pick the branch ----------------------------------------------------------
@@ -78,6 +85,24 @@ if [ -z "$ref" ]; then
 fi
 commit="$(git rev-parse --verify --quiet "$ref^{commit}")" || die "unknown branch or commit: $ref"
 short="$(git rev-parse --short "$commit")"
+
+# --- Pick where the IPA goes --------------------------------------------------
+# An empty name means the long one, made once the version is known.
+if [ -n "$OUTPUT_DIR" ]; then
+  case "$OUTPUT_DIR" in /*) out_dir="$OUTPUT_DIR" ;; *) out_dir="$HERE/$OUTPUT_DIR" ;; esac
+  out_name=""
+else
+  echo "Save the IPA to:"
+  echo "  1) Desktop, as SideInstaller.ipa (replaces the one there)"
+  echo "  2) this folder: $HERE"
+  printf 'Where? [1] '
+  read -r where
+  case "${where:-1}" in
+    1) out_dir="$HOME/Desktop" out_name="SideInstaller.ipa" ;;
+    2) out_dir="$HERE" out_name="" ;;
+    *) die "not 1 or 2: $where" ;;
+  esac
+fi
 echo "==> Exporting $ref at $short: $(git log -1 --format=%s "$commit")"
 
 # Where the branch is checked out, if anywhere (this checkout or a worktree).
@@ -197,13 +222,14 @@ version="$(plist CFBundleShortVersionString "$app/Info.plist")"
 # --- IPA ----------------------------------------------------------------------
 stage="$CACHE_DIR/stage"
 rm -rf "$stage"
-mkdir -p "$stage/Payload" "$OUTPUT_DIR"
+mkdir -p "$stage/Payload" "$out_dir"
 ditto "$app" "$stage/Payload/SideInstaller.app"
 find "$stage" -name .DS_Store -delete
-out="$OUTPUT_DIR/SideInstaller-$version-$(printf '%s' "$ref" | tr '/' '-')-$short.ipa"
-rm -f "$out"
+out="$out_dir/${out_name:-SideInstaller-$version-$(printf '%s' "$ref" | tr '/' '-')-$short.ipa}"
+rm -f "$out" # zip would add to an existing archive instead of replacing it
 (cd "$stage" && zip -qryX "$out" Payload)
 rm -rf "$stage"
 
 echo "==> Done: $out ($(du -h "$out" | cut -f1 | tr -d ' '))"
 echo "    $BUNDLE_ID, version $version, unsigned"
+if [ "$REVEAL" = 1 ]; then open -R "$out"; fi
