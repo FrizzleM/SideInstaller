@@ -10,18 +10,18 @@
       "iconURL": "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon~ios-marketing.png",
       "subtitle": "An an app that installs Sidestore on iOS 27, fully on-device",
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
-      "version": "1.5.0",
-      "versionDate": "2026-10-13T17:27:12Z",
-      "versionDescription": "- Fixed the urgent anisette error -80045\r\n   - Please note, apps such as Sidestore and Livecontainer may still need to patch this error, so you may still get it on those apps. That doesn't depend on me\r\n- The app now uses glass for its buttons\r\n- Improved accessibility by making the ToS checkbox an actual checkbox",
-      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.0/SideInstaller.ipa",
-      "size": 7945191,
+      "version": "1.5.1",
+      "versionDate": "2026-10-14T09:25:30Z",
+      "versionDescription": "Improved certain aspects of the Apple ID login\r\n- **2FA with SMS and calls work again**. They stopped working in v1.5.0 because requests are now sent from Android which doesn't support those methods, and to fix it, SideInstaller makes that request from a Mac and the rest is still done from an Android.\r\n- Added an error message for Apple accounts with unverified emails, with clear instructions on how to do so.",
+      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.1/SideInstaller.ipa",
+      "size": 9141048,
       "versions": [
         {
-          "version": "1.5.0",
-          "date": "2026-10-13T17:27:12Z",
-          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.0/SideInstaller.ipa",
-          "localizedDescription": "- Fixed the urgent anisette error -80045\r\n   - Please note, apps such as Sidestore and Livecontainer may still need to patch this error, so you may still get it on those apps. That doesn't depend on me\r\n- The app now uses glass for its buttons\r\n- Improved accessibility by making the ToS checkbox an actual checkbox",
-          "size": 7945191
+          "version": "1.5.1",
+          "date": "2026-10-14T09:25:30Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.1/SideInstaller.ipa",
+          "localizedDescription": "Improved certain aspects of the Apple ID login\r\n- **2FA with SMS and calls work again**. They stopped working in v1.5.0 because requests are now sent from Android which doesn't support those methods, and to fix it, SideInstaller makes that request from a Mac and the rest is still done from an Android.\r\n- Added an error message for Apple accounts with unverified emails, with clear instructions on how to do so.",
+          "size": 9141048
         }
       ]
     },
