@@ -261,6 +261,9 @@ final class EntitlementsManager: ObservableObject {
                 if Engine.isAccountLocked(lastError) {
                     throw EngineError.accountLocked
                 }
+                if Engine.isEmailUnverifiedError(lastError) {
+                    throw EngineError.emailUnverified
+                }
                 if Engine.isCredentialError(lastError) {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }

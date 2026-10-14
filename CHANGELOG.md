@@ -11,6 +11,12 @@ All notable changes to SideInstaller are documented here.
   Asking for a new code on your devices failed the same way and ended the sign-in. Those requests
   are made the way Apple accepts them again: your numbers are back in the prompt, with a text or a
   call to each, and a new code can be sent to your devices.
+- **An Apple Account with an unverified email address is told so.** Apple won't let such an account
+  use developer services (error 2160), and SideInstaller took that for a stale sign-in: it signed in
+  again with the password on each anisette server in turn, about every 8 seconds, before giving up
+  with a raw error. It now stops at the first refusal, keeps the saved sign-in, and shows how to
+  verify the address at account.apple.com. Certificates, Entitlements and Side by Side stop the same
+  way.
 
 ## 1.5.0
 

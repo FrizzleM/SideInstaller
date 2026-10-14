@@ -569,6 +569,10 @@ final class SideBySideManager: ObservableObject {
                     engine.log("Apple has locked this Apple Account: \(lastFailure)")
                     throw EngineError.accountLocked
                 }
+                if Engine.isEmailUnverifiedError(lastFailure) {
+                    engine.log("Apple wants this Apple Account's email address verified first: \(lastFailure)")
+                    throw EngineError.emailUnverified
+                }
                 // Bad credentials fail everywhere, and retrying risks a lockout.
                 if Engine.isCredentialError(lastFailure) {
                     engine.log("Apple ID credentials rejected: \(lastFailure)")

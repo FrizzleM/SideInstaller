@@ -222,6 +222,10 @@ final class CertManager: ObservableObject {
                     engine.log("Apple has locked this Apple Account: \(lastError)")
                     throw EngineError.accountLocked
                 }
+                if Engine.isEmailUnverifiedError(lastError) {
+                    engine.log("Apple wants this Apple Account's email address verified first: \(lastError)")
+                    throw EngineError.emailUnverified
+                }
                 if Engine.isCredentialError(lastError) {
                     engine.log("Apple ID credentials rejected: \(lastError)")
                     throw EngineError.message(Engine.credentialErrorMessage)

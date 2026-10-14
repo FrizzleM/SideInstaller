@@ -674,6 +674,16 @@ let vietnameseStrings: [String: String] = [
         "Apple chỉ cho người lớn dùng dịch vụ dành cho nhà phát triển mà SideInstaller dùng để ký ứng dụng, và Apple cho biết Apple Account này thuộc về người chưa đủ tuổi (lỗi 1102).",
     "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
         "Hãy đăng nhập bằng Apple Account của một người lớn: mở Cài đặt › Tài khoản và thêm tài khoản đó vào.",
+    "Apple won't let this Apple Account use developer services until its email address is verified (error 2160). Verify it at account.apple.com, then try again.":
+        "Apple không cho Apple Account này dùng dịch vụ dành cho nhà phát triển cho đến khi địa chỉ email của tài khoản được xác minh (lỗi 2160). Hãy xác minh tại account.apple.com rồi thử lại.",
+    "Verify your Apple Account's email":
+        "Xác minh email của Apple Account",
+    "Apple won't let this Apple Account sign apps until its email address is verified (error 2160). Signing in again or through another anisette server won't change that.":
+        "Apple không cho Apple Account này ký ứng dụng cho đến khi địa chỉ email của tài khoản được xác minh (lỗi 2160). Đăng nhập lại hay dùng máy chủ anisette khác cũng không thay đổi được điều đó.",
+    "Sign in at account.apple.com with this Apple Account and verify its email address when Apple asks. Apple sends the code or link to that address, so check its spam folder too.":
+        "Đăng nhập account.apple.com bằng Apple Account này và xác minh địa chỉ email khi Apple yêu cầu. Apple gửi mã hoặc liên kết đến địa chỉ đó, nên hãy kiểm tra cả thư mục thư rác.",
+    "Open Apple Account":
+        "Mở Apple Account",
     "No App IDs left this week": "Đã hết App ID trong tuần này",
     "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
         "Mỗi ứng dụng và tiện ích mở rộng mà SideInstaller ký đều cần một App ID. Apple ID miễn phí chỉ đăng ký được 10 App ID mỗi tuần, và mỗi App ID được tính trong 7 ngày.",

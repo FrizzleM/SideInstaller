@@ -576,6 +576,16 @@ let japaneseStrings: [String: String] = [
         "SideInstaller がアプリの署名に使うデベロッパサービスを Apple は成人にしか許可しておらず、この Apple アカウントは未成年のものだと報告しています（エラー 1102）。",
     "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
         "代わりに成人の Apple アカウントでサインインしてください：「設定 › アカウント」を開いて追加します。",
+    "Apple won't let this Apple Account use developer services until its email address is verified (error 2160). Verify it at account.apple.com, then try again.":
+        "メールアドレスの確認が済むまで、Apple はこの Apple アカウントでのデベロッパサービスの利用を許可しません（エラー 2160）。account.apple.com で確認してから、もう一度お試しください。",
+    "Verify your Apple Account's email":
+        "Apple アカウントのメールアドレスを確認",
+    "Apple won't let this Apple Account sign apps until its email address is verified (error 2160). Signing in again or through another anisette server won't change that.":
+        "メールアドレスの確認が済むまで、Apple はこの Apple アカウントでのアプリへの署名を許可しません（エラー 2160）。サインインし直しても、別の anisette サーバーを使っても変わりません。",
+    "Sign in at account.apple.com with this Apple Account and verify its email address when Apple asks. Apple sends the code or link to that address, so check its spam folder too.":
+        "この Apple アカウントで account.apple.com にサインインし、Apple に求められたらメールアドレスを確認してください。確認コードまたはリンクはそのアドレスに届くので、迷惑メールフォルダも確認してください。",
+    "Open Apple Account":
+        "Apple アカウントを開く",
     "No App IDs left this week": "今週使える App ID がありません",
     "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
         "SideInstaller が署名するアプリとアプリ拡張機能には、それぞれ App ID が必要です。無料の Apple ID で登録できるのは週に 10 個までで、それぞれ 7 日間カウントされます。",
