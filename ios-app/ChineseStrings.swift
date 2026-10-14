@@ -661,6 +661,16 @@ let chineseStrings: [String: String] = [
         "Apple 只允许成年人使用 SideInstaller 用来签名 App 的开发者服务，而它显示此 Apple 账户属于未成年人（错误 1102）。",
     "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
         "请改用成年人的 Apple 账户登录：打开“设置 › 账户”并在那里添加。",
+    "Apple won't let this Apple Account use developer services until its email address is verified (error 2160). Verify it at account.apple.com, then try again.":
+        "在电子邮件地址通过验证之前，Apple 不允许此 Apple 账户使用开发者服务（错误 2160）。请在 account.apple.com 验证后再试。",
+    "Verify your Apple Account's email":
+        "验证你的 Apple 账户电子邮件",
+    "Apple won't let this Apple Account sign apps until its email address is verified (error 2160). Signing in again or through another anisette server won't change that.":
+        "在电子邮件地址通过验证之前，Apple 不允许此 Apple 账户签名 App（错误 2160）。重新登录或换用其他 anisette 服务器都无法改变这一点。",
+    "Sign in at account.apple.com with this Apple Account and verify its email address when Apple asks. Apple sends the code or link to that address, so check its spam folder too.":
+        "用此 Apple 账户登录 account.apple.com，并在 Apple 提示时验证电子邮件地址。Apple 会把验证码或链接发送到该地址，也请检查垃圾邮件文件夹。",
+    "Open Apple Account":
+        "打开 Apple 账户",
     "No App IDs left this week": "本周已没有可用的 App ID",
     "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
         "SideInstaller 签名的每个 App 和 App 扩展都需要一个 App ID。免费 Apple ID 每周可注册 10 个，每个会占用 7 天。",

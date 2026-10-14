@@ -674,6 +674,16 @@ let portugueseStrings: [String: String] = [
         "A Apple só deixa adultos usarem os serviços para desenvolvedores com que o SideInstaller assina apps, e informa que esta conta Apple pertence a alguém mais novo (erro 1102).",
     "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
         "Entre com a conta Apple de um adulto: abra Ajustes › Conta e adicione-a lá.",
+    "Apple won't let this Apple Account use developer services until its email address is verified (error 2160). Verify it at account.apple.com, then try again.":
+        "A Apple não deixa esta conta Apple usar os serviços para desenvolvedores até o endereço de e-mail dela ser verificado (erro 2160). Verifique-o em account.apple.com e tente de novo.",
+    "Verify your Apple Account's email":
+        "Verifique o e-mail da sua conta Apple",
+    "Apple won't let this Apple Account sign apps until its email address is verified (error 2160). Signing in again or through another anisette server won't change that.":
+        "A Apple não deixa esta conta Apple assinar apps até o endereço de e-mail dela ser verificado (erro 2160). Entrar de novo ou usar outro servidor anisette não muda isso.",
+    "Sign in at account.apple.com with this Apple Account and verify its email address when Apple asks. Apple sends the code or link to that address, so check its spam folder too.":
+        "Entre em account.apple.com com esta conta Apple e verifique o endereço de e-mail quando a Apple pedir. A Apple envia o código ou o link para esse endereço, então confira também a pasta de spam.",
+    "Open Apple Account":
+        "Abrir a conta Apple",
     "No App IDs left this week": "Sem App IDs nesta semana",
     "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
         "Todo app e extensão de app que o SideInstaller assina precisa de um App ID. Um Apple ID gratuito pode registrar 10 por semana, e cada um conta por 7 dias.",

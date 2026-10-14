@@ -152,6 +152,15 @@ fn is_transient(error: &str) -> bool {
         || e.contains("server error (5")
 }
 
+/// True for portal errors about the Apple Account itself, which a new token
+/// doesn't change: 1102 (its owner's age) and 2160 (its email address isn't
+/// verified). They're returned to the caller as-is and the saved session is
+/// kept, since signing in again only meets the same refusal.
+fn is_account_refusal(error: &str) -> bool {
+    let e = error.to_lowercase();
+    e.contains("developer error 1102") || e.contains("developer error 2160")
+}
+
 fn first_line(text: &str) -> &str {
     text.lines()
         .map(|line| line.trim_start_matches([' ', '●']).trim())
@@ -197,6 +206,7 @@ where
                 );
                 return Ok(opened);
             }
+            Err(e) if is_account_refusal(&e) => return Err(format!("list teams: {e}")),
             Err(e) => tracing::info!(
                 "{label}: couldn't reuse the saved session straight away ({}); checking it with a full sign-in client",
                 first_line(&e)
@@ -237,7 +247,7 @@ where
                 }
                 Err(e) => {
                     let text = report_text(&e);
-                    if is_transient(&text) {
+                    if is_transient(&text) || is_account_refusal(&text) {
                         return Err(format!("developer session: {text}"));
                     }
                     tracing::info!(
@@ -426,6 +436,22 @@ mod tests {
             " ● Failed to extract developer request result",
         ] {
             assert!(!is_transient(rejected), "{rejected}");
+        }
+    }
+
+    #[test]
+    fn account_refusals_keep_the_token() {
+        for refusal in [
+            " ● Failed to list developer teams\n ├ vendor/isideload/src/dev/teams.rs:26\n │\n ● Developer error 2160: Please verify the email address associated with your Apple Account. Please visit \n │ https://account.apple.com.",
+            " ● Failed to list developer teams\n ● Developer error 1102: (Apple's age refusal)",
+        ] {
+            assert!(is_account_refusal(refusal), "{refusal}");
+        }
+        for other in [
+            " ● Developer error 1100: Your session has expired. Please log in.",
+            " ● Developer request failed\n ● HTTP status client error (401 Unauthorized) for url (https://developerservices2.apple.com/)",
+        ] {
+            assert!(!is_account_refusal(other), "{other}");
         }
     }
 

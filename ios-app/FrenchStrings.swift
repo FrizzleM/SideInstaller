@@ -680,6 +680,16 @@ let frenchStrings: [String: String] = [
         "Apple réserve aux adultes les services pour développeurs avec lesquels SideInstaller signe les apps, et indique que ce compte Apple appartient à une personne plus jeune (erreur 1102).",
     "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
         "Connectez-vous plutôt avec le compte Apple d'un adulte : ouvrez Réglages › Compte et ajoutez-le.",
+    "Apple won't let this Apple Account use developer services until its email address is verified (error 2160). Verify it at account.apple.com, then try again.":
+        "Apple n'autorise pas ce compte Apple à utiliser les services pour développeurs tant que son adresse e-mail n'est pas vérifiée (erreur 2160). Vérifiez-la sur account.apple.com, puis réessayez.",
+    "Verify your Apple Account's email":
+        "Vérifiez l'e-mail de votre compte Apple",
+    "Apple won't let this Apple Account sign apps until its email address is verified (error 2160). Signing in again or through another anisette server won't change that.":
+        "Apple n'autorise pas ce compte Apple à signer des apps tant que son adresse e-mail n'est pas vérifiée (erreur 2160). Se reconnecter ou passer par un autre serveur anisette n'y changera rien.",
+    "Sign in at account.apple.com with this Apple Account and verify its email address when Apple asks. Apple sends the code or link to that address, so check its spam folder too.":
+        "Connectez-vous à account.apple.com avec ce compte Apple et vérifiez son adresse e-mail quand Apple le demande. Apple envoie le code ou le lien à cette adresse : pensez aussi à regarder dans les spams.",
+    "Open Apple Account":
+        "Ouvrir le compte Apple",
     "No App IDs left this week": "Plus d'App ID cette semaine",
     "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
         "Chaque app et extension d'app que SideInstaller signe a besoin d'un App ID. Un Apple ID gratuit peut en enregistrer 10 par semaine, et chacun compte pendant 7 jours.",

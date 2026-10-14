@@ -57,6 +57,9 @@ enum EngineError: LocalizedError {
     /// Apple developer error 1102: the account's owner is too young for
     /// developer services.
     case underage
+    /// Apple developer error 2160: the Apple Account's email address isn't
+    /// verified yet.
+    case emailUnverified
     /// Apple error 9120, or the signer's own check: no App IDs left this week.
     case appIDLimit
     /// installd refused a fourth app signed by a free Apple ID.
@@ -70,6 +73,8 @@ enum EngineError: LocalizedError {
             return L("Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.")
         case .underage:
             return L("Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.")
+        case .emailUnverified:
+            return L("Apple won't let this Apple Account use developer services until its email address is verified (error 2160). Verify it at account.apple.com, then try again.")
         case .appIDLimit:
             return L("This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.")
         case .appLimit:
@@ -958,6 +963,9 @@ final class Engine: ObservableObject {
             if case EngineError.underage = error {
                 setGuide(Guides.underage)
             }
+            if case EngineError.emailUnverified = error {
+                setGuide(Guides.emailUnverified)
+            }
             throw error
         }
     }
@@ -1037,6 +1045,13 @@ final class Engine: ObservableObject {
                     signInStatus = "sign-in failed"
                     log("Apple won't let this Apple Account use developer services: \(lastError)")
                     throw EngineError.underage
+                }
+                // So does an email address Apple hasn't seen verified, and
+                // signing in again only meets the same refusal.
+                if Self.isEmailUnverifiedError(lastError) {
+                    signInStatus = "sign-in failed"
+                    log("Apple wants this Apple Account's email address verified first: \(lastError)")
+                    throw EngineError.emailUnverified
                 }
                 // Bad credentials fail everywhere, and retrying risks a lockout.
                 if Self.isCredentialError(lastError) {
@@ -1622,6 +1637,9 @@ final class Engine: ObservableObject {
             if case EngineError.underage = error {
                 setGuide(Guides.underage)
             }
+            if case EngineError.emailUnverified = error {
+                setGuide(Guides.emailUnverified)
+            }
             throw error
         }
     }
@@ -1652,6 +1670,7 @@ final class Engine: ObservableObject {
             if Self.isCertExistsError(msg) { throw EngineError.certExists }
             if Self.isAppIDLimitError(msg) { throw EngineError.appIDLimit }
             if Self.isUnderageError(msg) { throw EngineError.underage }
+            if Self.isEmailUnverifiedError(msg) { throw EngineError.emailUnverified }
             // Carry the UDID so the guide can show it for manual entry.
             if Self.isDeviceRegistrationError(msg) {
                 throw EngineError.deviceRegistration(udid: udid, raw: msg)
@@ -1697,6 +1716,12 @@ final class Engine: ObservableObject {
     /// under the age Apple requires for developer services.
     static func isUnderageError(_ raw: String) -> Bool {
         raw.lowercased().contains("developer error 1102")
+    }
+
+    /// Detect Apple developer error 2160, sent until the Apple Account's email
+    /// address is verified.
+    static func isEmailUnverifiedError(_ raw: String) -> Bool {
+        raw.lowercased().contains("developer error 2160")
     }
 
     /// Detect running out of App IDs: Apple's error 9120 from `addAppId`, or the
@@ -2992,6 +3017,21 @@ enum Guides {
                 L("Then tap Install again."),
             ],
             actionLabel: nil, actionURLString: nil)
+    }
+
+    /// Shown when Apple wants the Apple Account's email address verified before
+    /// it allows developer services (developer error 2160).
+    static var emailUnverified: Guide {
+        Guide(
+            title: L("Verify your Apple Account's email"),
+            systemImage: "envelope.badge",
+            steps: [
+                L("Apple won't let this Apple Account sign apps until its email address is verified (error 2160). Signing in again or through another anisette server won't change that."),
+                L("Sign in at account.apple.com with this Apple Account and verify its email address when Apple asks. Apple sends the code or link to that address, so check its spam folder too."),
+                L("Then tap Install again."),
+            ],
+            actionLabel: L("Open Apple Account"),
+            actionURLString: "https://account.apple.com")
     }
 
     /// Shown when the Apple ID has no App IDs left this week (error 9120).
