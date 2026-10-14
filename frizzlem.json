@@ -12,7 +12,7 @@
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
       "version": "1.5.0",
       "versionDate": "2026-10-13T17:27:12Z",
-      "versionDescription": "- Fixed the urgent anisette error -80045\r\n   - Please note, apps such as Sidestore and Livecontainer still need to patch this error, so you may still get it on those apps. That doesn't depend on me\r\n- The app now uses glass for its buttons\r\n- Improved accessibility by making the ToS checkbox an actual checkbox",
+      "versionDescription": "- Fixed the urgent anisette error -80045\r\n   - Please note, apps such as Sidestore and Livecontainer may still need to patch this error, so you may still get it on those apps. That doesn't depend on me\r\n- The app now uses glass for its buttons\r\n- Improved accessibility by making the ToS checkbox an actual checkbox",
       "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.0/SideInstaller.ipa",
       "size": 7945191,
       "versions": [
@@ -20,7 +20,7 @@
           "version": "1.5.0",
           "date": "2026-10-13T17:27:12Z",
           "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.0/SideInstaller.ipa",
-          "localizedDescription": "- Fixed the urgent anisette error -80045\r\n   - Please note, apps such as Sidestore and Livecontainer still need to patch this error, so you may still get it on those apps. That doesn't depend on me\r\n- The app now uses glass for its buttons\r\n- Improved accessibility by making the ToS checkbox an actual checkbox",
+          "localizedDescription": "- Fixed the urgent anisette error -80045\r\n   - Please note, apps such as Sidestore and Livecontainer may still need to patch this error, so you may still get it on those apps. That doesn't depend on me\r\n- The app now uses glass for its buttons\r\n- Improved accessibility by making the ToS checkbox an actual checkbox",
           "size": 7945191
         }
       ]
