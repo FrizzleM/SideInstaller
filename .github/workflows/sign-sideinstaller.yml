@@ -39,6 +39,9 @@ on:
         type: boolean
         default: false
   push:
+    # main only. Publishing a release pushes its tag, and GitHub ignores the
+    # path filters on tag pushes, so without this every release ran twice.
+    branches: [main]
     paths:
       - "scripts/template.html"           # the install page template
       - "scripts/generate_index.sh"       # ...and the scripts that build the page
