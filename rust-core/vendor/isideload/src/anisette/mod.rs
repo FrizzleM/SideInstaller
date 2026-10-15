@@ -116,6 +116,8 @@ impl AnisetteData {
 
 #[async_trait::async_trait]
 pub trait AnisetteProvider {
+    /// Fails with `SideloadError::AnisetteNotProvisioned` when the server says
+    /// the identity in use isn't provisioned with it (ADI error -45061).
     async fn get_anisette_data(&self) -> Result<AnisetteData, Report>;
 
     /// Anisette data made after applying the resync data (`sim`, base64)
@@ -126,9 +128,21 @@ pub trait AnisetteProvider {
 
     async fn get_client_info(&self) -> Result<AnisetteClientInfo, Report>;
 
-    async fn provision(&mut self, gs: Arc<GrandSlam>) -> Result<(), Report>;
+    /// Picks the identity to use, provisioning one if needed. `rejected` says
+    /// the server has just refused the identity in use as not provisioned.
+    async fn provision(&mut self, gs: Arc<GrandSlam>, rejected: bool) -> Result<(), Report>;
 
     fn needs_provisioning(&self) -> Result<bool, Report>;
+}
+
+/// True if `report` is, or was caused by, `SideloadError::AnisetteNotProvisioned`.
+pub fn is_not_provisioned(report: &Report) -> bool {
+    report.iter_reports().any(|cause| {
+        matches!(
+            cause.downcast_current_context::<crate::SideloadError>(),
+            Some(crate::SideloadError::AnisetteNotProvisioned)
+        )
+    })
 }
 
 #[derive(Clone)]
@@ -155,26 +169,33 @@ impl AnisetteDataGenerator {
             return Ok(data.clone());
         }
 
-        // trying to avoid locking as write unless necessary to promote concurrency
-        let provider = self.provider.read().await;
-
-        if provider.needs_provisioning()? {
-            drop(provider);
-            let mut provider_write = self.provider.write().await;
-            provider_write.provision(gs).await?;
-            drop(provider_write);
+        // An identity the server refuses as not provisioned (one made on
+        // another ADI library, or one the server lost) gets one more pick.
+        let mut rejected = false;
+        for _ in 0..2 {
+            // trying to avoid locking as write unless necessary to promote concurrency
+            let provider = self.provider.read().await;
+            if rejected || provider.needs_provisioning()? {
+                drop(provider);
+                let mut provider_write = self.provider.write().await;
+                provider_write.provision(gs.clone(), rejected).await?;
+            }
 
             let provider = self.provider.read().await;
-            let data = provider.get_anisette_data().await?;
-            let arc_data = Arc::new(data);
-            self.data = Some(arc_data.clone());
-            Ok(arc_data)
-        } else {
-            let data = provider.get_anisette_data().await?;
-            let arc_data = Arc::new(data);
-            self.data = Some(arc_data.clone());
-            Ok(arc_data)
+            match provider.get_anisette_data().await {
+                Ok(data) => {
+                    let arc_data = Arc::new(data);
+                    self.data = Some(arc_data.clone());
+                    return Ok(arc_data);
+                }
+                Err(e) if !rejected && is_not_provisioned(&e) => {
+                    warn!("The anisette server says this identity isn't provisioned with it");
+                    rejected = true;
+                }
+                Err(e) => return Err(e),
+            }
         }
+        unreachable!("the second pass returns")
     }
 
     /// Resyncs with `sim` (see `AnisetteProvider::resync`) and replaces the

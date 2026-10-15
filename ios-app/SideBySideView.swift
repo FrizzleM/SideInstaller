@@ -773,15 +773,9 @@ final class SideBySideManager: ObservableObject {
 
     // MARK: - Helpers
 
-    /// Anisette addresses to try, the engine's current pick first.
+    /// Anisette addresses to try, in the engine's order.
     private func anisetteCandidates() -> [String] {
-        var seen = Set<String>()
-        var out: [String] = []
-        for address in [engine.anisetteURL] + engine.anisetteServers.map(\.address) {
-            let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty, seen.insert(trimmed).inserted { out.append(trimmed) }
-        }
-        return out
+        engine.anisetteCandidates()
     }
 
     private static func tidy(_ value: String) -> String {

@@ -461,7 +461,10 @@ signed through the wildcard path, and a refused prompt.
 - `si_account_config(session, …)` — builds the `Account.sideconf` payload
   SideStore imports at launch: Apple ID, the signing certificate as a PKCS#12
   encrypted with its machine id (the convention AltStore-family apps expect),
-  and the anisette identity. Swift writes it into SideStore's Documents in the
+  and the anisette identity the session signed in with (since 1.5.2 there is
+  one per ADI library, Android and Windows, which can't use each other's:
+  `remote_v3::state_key_for` names the session server's). Swift writes it into
+  SideStore's Documents in the
   same step as the pairing file (step 8), and SideStore's
   `LaunchViewController.detectAndImportAccountFile` adopts it and deletes it.
 
@@ -833,8 +836,9 @@ SideInstaller staying installed. What it lacks is an Apple sign-in, and
 reads the session's `com.apple.gs.xcode.auth` token, its adsid, the team and the
 anisette identity (identifier and `adi.pb`) — what SideStore's `AuthManager`
 keeps to refresh from — and the engine adds the anisette servers a sign-in
-tries, the one in use first (HTTPS ones, six at most), so one server going away
-doesn't strand Madeira. It goes
+tries that are on the same ADI library as the one in use (only those can use
+that identity), the one in use first (HTTPS ones, six at most), so one server
+going away doesn't strand Madeira. It goes
 as a binary plist to `Library/Application Support/SigningAccount.plist` in
 Madeira's container (not Documents, which Files shows), and only when the signed
 bundle's Info.plist has `MadeiraSigningAccountVersion`, so a token is never left

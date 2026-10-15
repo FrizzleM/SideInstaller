@@ -112,8 +112,7 @@ final class Engine: ObservableObject {
     var applePassword: String { AccountStore.shared.activePassword }
     /// Anisette server in use. Persisted, and updated to whichever server the
     /// last successful sign-in used.
-    @Published var anisetteURL: String =
-        UserDefaults.standard.string(forKey: Engine.anisetteURLKey) ?? AnisetteServer.fallback.address {
+    @Published var anisetteURL: String = Engine.savedAnisetteURL() {
         didSet {
             guard anisetteURL != oldValue else { return }
             UserDefaults.standard.set(anisetteURL, forKey: Engine.anisetteURLKey)
@@ -121,6 +120,24 @@ final class Engine: ObservableObject {
     }
 
     static let anisetteURLKey = "anisetteServerURL"
+
+    /// The saved anisette server, or the one to start with, saved.
+    ///
+    /// Until 1.5.2 the default was `AnisetteServer.legacyDefault`, and a pick
+    /// that stayed the default wasn't saved. Someone who signed in through it
+    /// has an anisette identity on its library, with a developer token that
+    /// only works with that identity, so they stay on it: moving them to the
+    /// new default would make a new identity, which Apple asks the second
+    /// factor for, and sign in again. The start is saved either way, since
+    /// from 1.5.2 on a stored identity no longer means an older install.
+    static func savedAnisetteURL() -> String {
+        if let saved = UserDefaults.standard.string(forKey: anisetteURLKey) { return saved }
+        let identity = PrivateStore.isideload.appendingPathComponent("anisette_state").path
+        let start = FileManager.default.fileExists(atPath: identity)
+            ? AnisetteServer.legacyDefault : AnisetteServer.fallback
+        UserDefaults.standard.set(start.address, forKey: anisetteURLKey)
+        return start.address
+    }
     /// Servers for the picker; a bundled snapshot until the live list loads.
     @Published private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
     /// "Start LocalDevVPN when SideInstaller opens" setting. On by default, since
@@ -1066,7 +1083,10 @@ final class Engine: ObservableObject {
                     throw EngineError.message(Self.appleRateLimitMessage)
                 }
                 // Apple refusing the request looks the same through every
-                // anisette server, so a second refusal ends the loop.
+                // anisette server, so a second refusal ends the loop. The
+                // second server tried is on the Windows ADI library unless the
+                // first was (`AnisetteServer.candidates`), so a refusal of the
+                // other library alone doesn't end it.
                 if Self.isAppleServiceRefusal(lastError) {
                     appleRefusals += 1
                     if appleRefusals >= 2 {
@@ -1146,15 +1166,10 @@ final class Engine: ObservableObject {
             .trimmingCharacters(in: .whitespaces)
     }
 
-    /// Anisette addresses to try, the current pick first, de-duplicated.
-    private func anisetteCandidates() -> [String] {
-        var seen = Set<String>()
-        var out: [String] = []
-        for addr in [anisetteURL] + anisetteServers.map(\.address) {
-            let a = addr.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !a.isEmpty, seen.insert(a).inserted { out.append(a) }
-        }
-        return out
+    /// Anisette addresses to try (`AnisetteServer.candidates`): the current
+    /// pick first, then the Windows-ADI servers, then the rest.
+    func anisetteCandidates() -> [String] {
+        AnisetteServer.candidates(pick: anisetteURL, servers: anisetteServers)
     }
 
     /// Friendly name for an anisette address (falls back to the address itself).
@@ -2058,7 +2073,8 @@ final class Engine: ObservableObject {
             log("No Apple ID session to hand to Madeira — it won't renew its own signing. Refresh it under Tools › Sideloaded apps.")
             return nil
         }
-        let servers = anisetteCandidates()
+        // Only servers that can use the identity the hand-off carries.
+        let servers = AnisetteServer.sameLibrary(asFirstOf: anisetteCandidates(), in: anisetteServers)
         do {
             return try await onSignQueue { () -> String? in
                 var json: UnsafeMutablePointer<CChar>?

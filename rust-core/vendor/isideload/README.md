@@ -51,9 +51,10 @@ it downloads each extension's own profile and signs the extension with that
 profile's entitlements, at one more request per extension.
 
 **2. `src/anisette/`, `src/auth/grandslam.rs`, `apple_account.rs` — report the
-client as akd on an Android phone, now iTunes on a Windows PC, take the 2FA
-code Apple sends unasked, resync anisette when Apple asks, and don't reuse
-GrandSlam connections.**
+client as akd on an Android phone, now iTunes on a Windows PC or what the
+server's library calls for, keep one anisette identity per ADI library, take
+the 2FA code Apple sends unasked, resync anisette when Apple asks, and don't
+reuse GrandSlam connections.**
 
 Since early September 2026 Apple's GSA edge answers HTTP 503 to any request
 whose `X-Mme-Client-Info` names `com.apple.dt.Xcode`, before it looks at
@@ -170,7 +171,8 @@ it, isn't known.
 By 2026-10-15 Apple had closed the Android route: `init` as the Android phone
 gets a bare HTTP 503 on every server. A SideStore developer reported that the
 Windows client the new Windows-ADI servers hand out goes through on the old
-Android-ADI ones too, and it does, so `get_client_info` now reports
+Android-ADI ones too, and it does, so `get_client_info` reports (where the
+server's own client info can't be used, below)
 
 ```
 <PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.iTunes/12.12.4.1)>
@@ -202,13 +204,81 @@ throwaway `#[ignore]` test ran `AppleAccount::login` with fresh anisette state
 through ani.npeg.us, ani.stikstore.app, win.ani.sidestore.io and
 ani.jkcoxson.com: -20970 on all four.
 
-The bag lookup and the pages under `/auth` stay on the Mac (`MAC_CLIENT_INFO`).
-As the Windows PC the lookup returns 122 URLs on gsa.apple.com with every URL
-this crate uses, and `/auth` reaches the token check (401 to a made-up token,
-as for the Mac), so either would do; the Mac is what sign-in has run with.
-Not yet run with the Windows identity and a real account: the proof, which
-second-factor answer Apple gives (`au` or the Android-era hsc 409, both
-handled), the token and the portal.
+Later on 2026-10-15 the rest followed what the SideStore and iLoader
+developers had worked out by then: Apple only lets the Windows PC through the
+Android-ADI servers by leniency it can withdraw, Windows ADI is the route they
+moved to (iLoader 2.3.8 dropped the Android servers; isideload 0.4.6 takes the
+client info from the server, 8ca39b62 provisions again on -45061), and a
+macOS-ADI server is planned behind it, which clients that take the server's
+client info and handle -45061 should follow with no update. Anisette v4 is to
+have the server choose the client info outright.
+
+- **Client info from the server, where it is the server's own.**
+  `get_client_info` asks `/v3/client_info` once per provider and passes it
+  through `client_info_to_use`: a stock identity (anisette-v3-server's
+  `<MacBookPro13,2> <macOS;13.1;22C65>`, AltServer/omnisette's
+  `<MacBookPro15,1> <Mac OS X;10.15.2;19C57>`, which every Android-ADI server
+  hands out, Xcode or akd) or an Android one becomes `WINDOWS_CLIENT_INFO`;
+  anything else is kept, as the Windows-ADI servers' own string is. A server
+  that can't be asked fails the attempt, so the app moves to the next one.
+  That request now comes before the URL bag, so on a network that resolves no
+  names for the app (a public Wi-Fi's DNS did that to the Rust side on
+  2026-10-15 while URLSession still worked) every server failed alike and the
+  app tried all of them. `AppleAccount::new` now fetches the bag as well when
+  the server can't be reached at all (`is_unreachable`: connect, DNS or
+  timeout), and returns its "Failed to fetch URL Bag … error sending request"
+  if Apple can't be reached either, which the app stops on as before.
+- **One anisette identity per ADI library.** Measured 2026-10-15: an identity
+  provisioned through an Android-ADI server gets `GetHeadersError` "ADI Login
+  error: -45061" from all three Windows-ADI servers (ani.jkcoxson.com,
+  win.ani.sidestore.io, ani2.stikstore.app), and one provisioned through a
+  Windows-ADI server gets "provision.adi.ADIException: not provisioned
+  (-45061)" from the Android ones; within a library it works everywhere
+  (identical headers from all three Windows servers). The pinned code kept one
+  `anisette_state`, so a sign-in loop that crossed libraries failed every
+  server of the other one, and upstream's reset on -45061 would give a user who
+  alternates a new machine, and Apple's second-factor prompt, each time.
+  `RemoteV3AnisetteProvider::provision` now keeps `Slots`
+  (`anisette_slots.json`: which identity each server took, and when each
+  worked): the identity a server took before; else the first stored one it
+  doesn't answer with -45061 (most recently used first, then the old
+  `anisette_state`, which stays the first identity's key, so existing state,
+  tokens and hand-offs carry on); else a new one, provisioned through it and
+  kept only once the server makes headers from it. -45061 from
+  `/v3/get_headers` is `SideloadError::AnisetteNotProvisioned`, and
+  `AnisetteDataGenerator::get_anisette_data` picks once more on it, which is
+  how a server that moves to another library is followed. `state_key_for`
+  names a server's identity, for what is handed on with a token.
+- **The bag and the pages under `/auth` as the same client.** As the Windows PC
+  the lookup returns 122 URLs on gsa.apple.com with every URL this crate uses,
+  and `/auth` reaches the token check (401 to a made-up token, as for the Mac),
+  and the Mac on those requests alone was a mix the SideStore developers
+  expected Apple to close. `GrandSlam::new` asks for the bag as the anisette
+  client and only asks again as the Mac if it lacks a URL in `BAG_KEYS` or has
+  GsService2 off gsa.apple.com. The `/auth` pages go through
+  `AppleAccount::send_auth` (`GrandSlam::auth`), which asks once more as the
+  Mac, and keeps to it for the session, if a page answers a bare 403 (no
+  `serviceErrors`), the Android phone's refusal.
+
+Also seen 2026-10-15: after a resync through one Windows-ADI server, the same
+identity needed none through the other two (Apple keeps it per machine); a
+first `init` right after a resync on another server once answered -90010,
+"This action cannot be completed at this time", and once HTTP 503, and both
+passed on the next try; and a made-up address `init` is sent for too often
+starts getting -20209 ("locked") instead of -20970.
+
+Tests: `cargo test -p isideload --lib remote_v3` (`client_info_to_use`, the
+slots, and a local stand-in server that answers -45061 to the other library's
+identities, including one that changes library under the same address) and
+`client_info_tests`. A throwaway binary signed a made-up account in through
+ani.sidestore.io, ani.jkcoxson.com, ani.npeg.us, win.ani.sidestore.io,
+ani2.stikstore.app and ani.sidestore.io again, on one storage directory: two
+identities, provisioned once each (the Windows one resynced once), every later
+server matched without provisioning, -20970 throughout. On 2026-10-15 the
+app's Certificates sign-in also went through with a real account on an
+iPhone, a fresh install (so a new identity, through ani.jkcoxson.com unless
+it was down), over mobile data; which second-factor route Apple took, and
+whether `/auth` needed the Mac fallback, wasn't logged.
 
 **3. `src/auth/apple_account.rs`, `builder.rs`, `grandslam.rs` — let the user
 choose how the 2FA code arrives.**

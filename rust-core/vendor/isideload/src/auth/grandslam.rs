@@ -14,25 +14,35 @@ use crate::{SideloadError, anisette::AnisetteClientInfo, util::plist::PlistDataE
 const APPLE_ROOT: &[u8] = include_bytes!("./apple_root.der");
 const URL_BAG: &str = "https://gsa.apple.com/grandslam/GsService2/lookup";
 
-/// What the requests that were moved off the Android phone say the client is:
-/// a Mac. Every other request reports the client of
-/// `RemoteV3AnisetteProvider::get_client_info`, a Windows PC since 2026-10-15
-/// and an Android phone from 2026-10-13 until then.
+/// The client two kinds of request fall back to when Apple won't answer them
+/// for the client of `RemoteV3AnisetteProvider::get_client_info` (a Windows PC
+/// since 2026-10-15, an Android phone from 2026-10-13 until then): a Mac.
 ///
 /// - The URL-bag lookup. Asked as the Android phone it answered with ten URLs
 ///   on gsd.apple.com; asked as a Mac, with the full bag on gsa.apple.com,
-///   where the URLs this crate hardcodes live and where sign-in was checked
-///   through to the developer portal. (The Windows PC gets a 122-URL bag on
-///   gsa.apple.com with every URL used here, but the Mac's is the one sign-in
-///   has run with.)
+///   where the URLs this crate hardcodes live. The Windows PC gets a 122-URL
+///   bag on gsa.apple.com with every URL used here, so it no longer falls back.
 /// - The second-factor pages under gsa.apple.com/auth: the trusted numbers,
 ///   sending a text or a call, checking its code, and sending the code to the
 ///   trusted devices again. Asked as the Android phone they answered a bare
-///   403 on 2026-10-13, before they read who is asking. As a Mac they worked
-///   that day with a real account; on 2026-10-15 they still answered a made-up
-///   identity token with 401 (it was read) as a Mac and as the Windows PC.
+///   403 on 2026-10-13, before they read who is asking, and as a Mac they
+///   worked that day with a real account. On 2026-10-15 they answered a
+///   made-up identity token with 401 (it was read) as the Windows PC, as
+///   they do as a Mac, so they are now asked as the Windows PC like the rest:
+///   one client for a whole sign-in is what Apple's own clients send, and a
+///   Mac on those pages alone is a mix Apple can close. `AppleAccount` falls
+///   back to the Mac on a bare 403.
 const MAC_CLIENT_INFO: &str =
     "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+
+/// The URL-bag entries this crate uses.
+const BAG_KEYS: [&str; 5] = [
+    "gsService",
+    "midStartProvisioning",
+    "midFinishProvisioning",
+    "trustedDeviceSecondaryAuth",
+    "validateCode",
+];
 
 /// Waits before each retry of a sign-in request GrandSlam answered with 429.
 ///
@@ -58,8 +68,15 @@ impl GrandSlam {
     /// - `client`: The reqwest client to use for requests
     pub async fn new(client_info: AnisetteClientInfo, debug: bool) -> Result<Self, Report> {
         let client = Self::build_reqwest_client(debug).context("Failed to build HTTP client")?;
-        let base_headers = Self::mac_headers(&client_info, false)?;
-        let url_bag = Self::fetch_url_bag(&client, base_headers).await?;
+        let mut url_bag =
+            Self::fetch_url_bag(&client, Self::base_headers(&client_info, false)?).await?;
+        if !Self::bag_is_complete(&url_bag) && !Self::is_mac_client(&client_info) {
+            warn!(
+                "GrandSlam's URL bag for {} lacks URLs sign-in uses on gsa.apple.com; asking as a Mac",
+                client_info.client_info
+            );
+            url_bag = Self::fetch_url_bag(&client, Self::mac_headers(&client_info, false)?).await?;
+        }
         Ok(Self {
             client,
             client_info,
@@ -106,6 +123,25 @@ impl GrandSlam {
         Ok(urls)
     }
 
+    /// Whether `bag` has every URL in `BAG_KEYS`, with GsService2 on
+    /// gsa.apple.com (the Android phone's bag put it on gsd.apple.com).
+    fn bag_is_complete(bag: &Dictionary) -> bool {
+        BAG_KEYS.iter().all(|key| bag.get_string(key).is_ok())
+            && bag
+                .get_string("gsService")
+                .is_ok_and(|url| url.starts_with("https://gsa.apple.com/"))
+    }
+
+    fn is_mac_client(client_info: &AnisetteClientInfo) -> bool {
+        let client = &client_info.client_info;
+        client.contains("<macOS;") || client.contains("<Mac OS X;")
+    }
+
+    /// Whether this client already reports itself as a Mac.
+    pub fn is_mac(&self) -> bool {
+        Self::is_mac_client(&self.client_info)
+    }
+
     pub fn get_url(&self, key: &str) -> Result<String, Report> {
         let url = self
             .url_bag
@@ -123,45 +159,23 @@ impl GrandSlam {
         Ok(builder)
     }
 
-    /// GET for the page under `/auth` that sends the code to the trusted
-    /// devices, as a Mac (see `MAC_CLIENT_INFO`).
-    pub fn get_auth(&self, url: &str) -> Result<reqwest::RequestBuilder, Report> {
-        let builder = self
-            .client
-            .get(url)
-            .headers(Self::mac_headers(&self.client_info, false)?);
-
-        Ok(builder)
-    }
-
-    // The three below are the JSON requests of the phone pages under `/auth`,
-    // as a Mac too.
-
-    pub fn get_sms(&self, url: &str) -> Result<reqwest::RequestBuilder, Report> {
-        let builder = self
-            .client
-            .get(url)
-            .headers(Self::mac_headers(&self.client_info, true)?);
-
-        Ok(builder)
-    }
-
-    pub fn put_sms(&self, url: &str) -> Result<reqwest::RequestBuilder, Report> {
-        let builder = self
-            .client
-            .put(url)
-            .headers(Self::mac_headers(&self.client_info, true)?);
-
-        Ok(builder)
-    }
-
-    pub fn post_sms(&self, url: &str) -> Result<reqwest::RequestBuilder, Report> {
-        let builder = self
-            .client
-            .post(url)
-            .headers(Self::mac_headers(&self.client_info, true)?);
-
-        Ok(builder)
+    /// A request to a page under gsa.apple.com/auth: JSON for the phone pages
+    /// (`json`), a plist for the one that sends the code to the trusted
+    /// devices again. With `as_mac` it says the client is a Mac (see
+    /// `MAC_CLIENT_INFO`).
+    pub fn auth(
+        &self,
+        method: reqwest::Method,
+        url: &str,
+        json: bool,
+        as_mac: bool,
+    ) -> Result<reqwest::RequestBuilder, Report> {
+        let headers = if as_mac {
+            Self::mac_headers(&self.client_info, json)?
+        } else {
+            Self::base_headers(&self.client_info, json)?
+        };
+        Ok(self.client.request(method, url).headers(headers))
     }
 
     pub fn post(&self, url: &str) -> Result<reqwest::RequestBuilder, Report> {
@@ -337,32 +351,51 @@ mod client_info_tests {
         request.headers()["X-Mme-Client-Info"].to_str().unwrap().to_string()
     }
 
-    #[test]
-    fn only_the_pages_under_auth_are_asked_as_a_mac() {
-        let grandslam = GrandSlam {
+    fn windows() -> GrandSlam {
+        GrandSlam {
             client: GrandSlam::build_reqwest_client(false).unwrap(),
             client_info: AnisetteClientInfo {
                 client_info: WINDOWS.into(),
                 user_agent: "akd/1.0 CFNetwork/808.1.4".into(),
             },
             url_bag: Dictionary::new(),
-        };
+        }
+    }
+
+    #[test]
+    fn every_request_says_the_anisette_client_unless_asked_as_a_mac() {
+        let grandslam = windows();
+        assert!(!grandslam.is_mac());
         let service = "https://gsa.apple.com/grandslam/GsService2";
         assert_eq!(said(grandslam.post(service).unwrap()), WINDOWS);
         assert_eq!(said(grandslam.get(&format!("{service}/validate")).unwrap()), WINDOWS);
         assert_eq!(said(grandslam.patch(service).unwrap()), WINDOWS);
 
         let auth = "https://gsa.apple.com/auth";
-        assert_eq!(said(grandslam.get_sms(auth).unwrap()), MAC_CLIENT_INFO);
-        assert_eq!(said(grandslam.put_sms(&format!("{auth}/verify/phone")).unwrap()), MAC_CLIENT_INFO);
-        assert_eq!(
-            said(grandslam.post_sms(&format!("{auth}/verify/phone/securitycode")).unwrap()),
-            MAC_CLIENT_INFO
-        );
-        assert_eq!(
-            said(grandslam.get_auth(&format!("{auth}/verify/trusteddevice")).unwrap()),
-            MAC_CLIENT_INFO
-        );
+        let page = |json, as_mac| {
+            said(grandslam.auth(reqwest::Method::GET, auth, json, as_mac).unwrap())
+        };
+        assert_eq!(page(true, false), WINDOWS);
+        assert_eq!(page(false, false), WINDOWS);
+        assert_eq!(page(true, true), MAC_CLIENT_INFO);
+        assert_eq!(page(false, true), MAC_CLIENT_INFO);
+    }
+
+    #[test]
+    fn a_bag_needs_every_url_used_with_gsservice_on_gsa() {
+        let bag = |gs_service: &str| {
+            let mut bag = Dictionary::new();
+            for key in super::BAG_KEYS {
+                bag.insert(key.into(), "https://gsa.apple.com/x".into());
+            }
+            bag.insert("gsService".into(), gs_service.into());
+            bag
+        };
+        assert!(GrandSlam::bag_is_complete(&bag("https://gsa.apple.com/grandslam/GsService2")));
+        assert!(!GrandSlam::bag_is_complete(&bag("https://gsd.apple.com/grandslam/GsService2")));
+        let mut partial = bag("https://gsa.apple.com/grandslam/GsService2");
+        partial.remove("validateCode");
+        assert!(!GrandSlam::bag_is_complete(&partial));
     }
 }
 

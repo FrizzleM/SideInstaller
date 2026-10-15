@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use idevice::remote_pairing::RpPairingFile;
 use isideload::{
-    anisette::remote_v3::state::AnisetteState,
+    anisette::remote_v3::{state::AnisetteState, state_key_for},
     auth::apple_account::{TwoFactorCallbackParams, TwoFactorCallbackResponse},
     sideload::{
         builder::MaxCertsBehavior, cert_identity::CertificateIdentity, sideloader::Sideloader,
@@ -125,6 +125,28 @@ pub struct SignSession {
     /// both to look up the signing identity the same way `sign_app` does.
     machine_name: String,
     storage_dir: PathBuf,
+    /// The anisette server signed in through. Each server family keeps its
+    /// own identity, and the hand-offs carry the one this session's token
+    /// was issued to (`state_key_for`).
+    anisette_url: String,
+}
+
+impl SignSession {
+    /// The provisioned anisette identity this session signed in with.
+    fn anisette_state(&self, storage: &FsStorage) -> Result<(AnisetteState, Vec<u8>), String> {
+        let key = state_key_for(storage, &self.anisette_url);
+        let raw = storage
+            .retrieve_data(&key)
+            .map_err(|e| format!("could not read the anisette state: {e}"))?
+            .ok_or("no anisette state stored yet — sign in first")?;
+        let state: AnisetteState = plist::from_bytes(&raw)
+            .map_err(|e| format!("could not parse the anisette state: {e}"))?;
+        let adi_pb = state
+            .adi_pb
+            .clone()
+            .ok_or("this device hasn't been provisioned with the anisette server yet")?;
+        Ok((state, adi_pb))
+    }
 }
 
 // Used only through its own runtime, serialized by Swift on one queue.
@@ -269,6 +291,7 @@ pub unsafe fn apple_signin(
                 sideloader,
                 machine_name,
                 storage_dir: PathBuf::from(&storage_dir),
+                anisette_url,
             });
             *out_session = Box::into_raw(session);
             *out_summary = cstr(summary);
@@ -447,17 +470,10 @@ pub unsafe fn account_config(
 
         // SideStore wants the same two values isideload hands the anisette
         // server, encoded the same way: base64 of the 16 identifier bytes, and
-        // base64 of the provisioned adi.pb.
+        // base64 of the provisioned adi.pb. They're the identity this session
+        // signed in with, which Apple has just seen pass its second factor.
         let (anisette_identifier, anisette_adi_blob) = {
-            let raw = storage
-                .retrieve_data("anisette_state")
-                .map_err(|e| format!("could not read the anisette state: {e}"))?
-                .ok_or("no anisette state stored yet — sign in first")?;
-            let state: AnisetteState = plist::from_bytes(&raw)
-                .map_err(|e| format!("could not parse the anisette state: {e}"))?;
-            let adi_pb = state
-                .adi_pb
-                .ok_or("this device hasn't been provisioned with the anisette server yet")?;
+            let (state, adi_pb) = session.anisette_state(&storage)?;
             (
                 BASE64_STANDARD.encode(state.keychain_identifier),
                 BASE64_STANDARD.encode(adi_pb),
@@ -567,15 +583,7 @@ pub unsafe fn signing_account(
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         let storage = FsStorage::new(session.storage_dir.clone());
-        let raw = storage
-            .retrieve_data("anisette_state")
-            .map_err(|e| format!("could not read the anisette state: {e}"))?
-            .ok_or("no anisette state stored yet — sign in first")?;
-        let state: AnisetteState =
-            plist::from_bytes(&raw).map_err(|e| format!("could not parse the anisette state: {e}"))?;
-        let adi_pb = state
-            .adi_pb
-            .ok_or("this device hasn't been provisioned with the anisette server yet")?;
+        let (state, adi_pb) = session.anisette_state(&storage)?;
 
         session.rt.block_on(async {
             let team = session
