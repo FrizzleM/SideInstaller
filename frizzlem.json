@@ -12,7 +12,7 @@
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
       "version": "1.5.2",
       "versionDate": "2026-10-15T07:49:16Z",
-      "versionDescription": "Apple already fixed the patch v1.5.0, so I switched the login device to Windows and it now works\r\n- Fixed the Apple ID login error\r\n- This is a temporary fix, and will likely be patched by Apple as well. A permanent one is in the works.",
+      "versionDescription": "Apple fixed the patch v1.5.0, so I switched the login device to Windows and it now works\r\n- Fixed the Apple ID login error\r\n- This is a temporary fix, and will likely be patched by Apple as well, just like the Android in v1.5. A permanent one is in the works.",
       "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.2/SideInstaller.ipa",
       "size": 9150282,
       "versions": [
@@ -20,7 +20,7 @@
           "version": "1.5.2",
           "date": "2026-10-15T07:49:16Z",
           "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.2/SideInstaller.ipa",
-          "localizedDescription": "Apple already fixed the patch v1.5.0, so I switched the login device to Windows and it now works\r\n- Fixed the Apple ID login error\r\n- This is a temporary fix, and will likely be patched by Apple as well. A permanent one is in the works.",
+          "localizedDescription": "Apple fixed the patch v1.5.0, so I switched the login device to Windows and it now works\r\n- Fixed the Apple ID login error\r\n- This is a temporary fix, and will likely be patched by Apple as well, just like the Android in v1.5. A permanent one is in the works.",
           "size": 9150282
         }
       ]
