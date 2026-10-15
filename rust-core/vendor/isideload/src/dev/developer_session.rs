@@ -294,7 +294,7 @@ mod services_request_tests {
             unreachable!()
         }
 
-        async fn provision(&mut self, _gs: Arc<GrandSlam>) -> Result<(), Report> {
+        async fn provision(&mut self, _gs: Arc<GrandSlam>, _rejected: bool) -> Result<(), Report> {
             Ok(())
         }
 

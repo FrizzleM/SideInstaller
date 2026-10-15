@@ -364,14 +364,9 @@ final class EntitlementsManager: ObservableObject {
 
     // MARK: Helpers
 
+    /// Anisette addresses to try, in the engine's order.
     private func anisetteCandidates() -> [String] {
-        var seen = Set<String>()
-        var out: [String] = []
-        for addr in [engine.anisetteURL] + engine.anisetteServers.map(\.address) {
-            let a = addr.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !a.isEmpty, seen.insert(a).inserted { out.append(a) }
-        }
-        return out
+        engine.anisetteCandidates()
     }
 
     private var storageDir: String { PrivateStore.isideload.path }

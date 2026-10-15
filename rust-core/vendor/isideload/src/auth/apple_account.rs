@@ -2,7 +2,10 @@ use std::{future::Future, sync::Arc};
 
 use crate::{
     SideloadError,
-    anisette::{AnisetteData, AnisetteDataGenerator},
+    anisette::{
+        AnisetteClientInfo, AnisetteData, AnisetteDataGenerator,
+        remote_v3::WINDOWS_CLIENT_INFO,
+    },
     auth::{
         builder::AppleAccountBuilder,
         grandslam::{GrandSlam, GrandSlamErrorChecker},
@@ -37,6 +40,9 @@ pub struct AppleAccount {
     last_error: Option<String>,
     /// How the pending phone code was asked for: a text or a call.
     phone_mode: PhoneCodeMode,
+    /// The pages under gsa.apple.com/auth turned the client away with a bare
+    /// 403, so they're asked as a Mac (see `send_auth`).
+    auth_as_mac: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -167,10 +173,26 @@ impl AppleAccount {
             warn!("Debug mode enabled: this is a security risk!");
         }
 
-        let client_info = anisette_generator
-            .get_client_info()
-            .await
-            .context("Failed to get anisette client info")?;
+        let client_info = match anisette_generator.get_client_info().await {
+            Ok(client_info) => client_info,
+            // The anisette server is asked before Apple. When it can't be
+            // reached at all, Apple is checked too: if the URL bag can't be
+            // fetched either, the device's network is the problem, and that
+            // error says so, as it did when the bag came first.
+            Err(e) if is_unreachable(&e) => {
+                let fallback = AnisetteClientInfo {
+                    client_info: WINDOWS_CLIENT_INFO.to_string(),
+                    user_agent: "akd/1.0 CFNetwork/808.1.4".to_string(),
+                };
+                if let Err(apple) = GrandSlam::new(fallback, debug).await {
+                    return Err(apple
+                        .context("Neither the anisette server nor Apple could be reached")
+                        .into());
+                }
+                return Err(e.context("Failed to get anisette client info").into());
+            }
+            Err(e) => return Err(e.context("Failed to get anisette client info").into()),
+        };
 
         let grandslam_client = GrandSlam::new(client_info, debug).await?;
 
@@ -184,6 +206,7 @@ impl AppleAccount {
             trusted_phone_numbers: None,
             last_error: None,
             phone_mode: PhoneCodeMode::Sms,
+            auth_as_mac: false,
         })
     }
 
@@ -418,14 +441,18 @@ impl AppleAccount {
             .grandslam_client
             .get_url("trustedDeviceSecondaryAuth")?;
 
-        self.grandslam_client
-            .get_auth(&request_code_url)?
-            .headers(self.build_2fa_headers(&anisette_data).await?)
-            .send()
+        let headers = self.build_2fa_headers(&anisette_data).await?;
+        let (status, text) = self
+            .send_auth(reqwest::Method::GET, &request_code_url, false, headers, None)
             .await
-            .context("Failed to request trusted device 2fa")?
-            .error_for_status()
-            .context("Trusted device 2FA request failed")?;
+            .context("Failed to request trusted device 2fa")?;
+        if !status.is_success() {
+            bail!(
+                "Trusted device 2FA request failed with http status {}: {}",
+                status.as_u16(),
+                text
+            );
+        }
 
         info!("Trusted device 2FA request sent");
 
@@ -498,23 +525,17 @@ impl AppleAccount {
             "mode": mode.as_str()
         });
 
-        let res = self
-            .grandslam_client
-            .put_sms("https://gsa.apple.com/auth/verify/phone")?
-            .headers(self.build_2fa_headers(&anisette_data).await?)
-            .body(send_body.to_string())
-            .send()
+        let headers = self.build_2fa_headers(&anisette_data).await?;
+        let (status, text) = self
+            .send_auth(
+                reqwest::Method::PUT,
+                "https://gsa.apple.com/auth/verify/phone",
+                true,
+                headers,
+                Some(send_body.to_string()),
+            )
             .await
             .context("Failed to request phone 2FA code")?;
-
-        let status = res.status();
-        let text = if status.is_success() {
-            String::new()
-        } else {
-            res.text()
-                .await
-                .context("Failed to read phone 2FA response text")?
-        };
 
         match Self::classify_sms_send_response(status.as_u16(), &text, id, mode)? {
             SmsSendOutcome::Sent => {
@@ -559,20 +580,17 @@ impl AppleAccount {
             "mode": self.phone_mode.as_str()
         });
 
-        let res = self
-            .grandslam_client
-            .post_sms("https://gsa.apple.com/auth/verify/phone/securitycode")?
-            .headers(self.build_2fa_headers(&anisette_data).await?)
-            .body(body.to_string())
-            .send()
+        let headers = self.build_2fa_headers(&anisette_data).await?;
+        let (status, text) = self
+            .send_auth(
+                reqwest::Method::POST,
+                "https://gsa.apple.com/auth/verify/phone/securitycode",
+                true,
+                headers,
+                Some(body.to_string()),
+            )
             .await
             .context("Failed to submit phone 2FA code")?;
-
-        let status = res.status();
-        let text = res
-            .text()
-            .await
-            .context("Failed to read phone 2FA response text")?;
         if !status.is_success() {
             let error = Self::parse_sms_error(text, status.as_u16())?;
 
@@ -675,18 +693,18 @@ impl AppleAccount {
             .await
             .context("Failed to get anisette data for 2FA")?;
 
-        let res = self
-            .grandslam_client
-            .get_sms("https://gsa.apple.com/auth")?
-            .headers(self.build_2fa_headers(&anisette_data).await?)
-            .send()
-            .await?;
-
-        let status = res.status().as_u16();
-        let text = res
-            .text()
+        let headers = self.build_2fa_headers(&anisette_data).await?;
+        let (status, text) = self
+            .send_auth(
+                reqwest::Method::GET,
+                "https://gsa.apple.com/auth",
+                true,
+                headers,
+                None,
+            )
             .await
-            .context("Failed to read trusted phone numbers response text")?;
+            .context("Failed to read the trusted phone numbers")?;
+        let status = status.as_u16();
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text)
             && let Some(numbers) = json.get("trustedPhoneNumbers")
         {
@@ -724,6 +742,51 @@ impl AppleAccount {
             return Ok(LoginState::NeedsSMS2FA(number.id));
         }
         bail!("Selected trusted number ID not found in trusted numbers");
+    }
+
+    /// Sends a request to a page under gsa.apple.com/auth and returns its
+    /// status and body. It says the client is the one the rest of sign-in
+    /// reports; if a page turns that away with a bare 403 (no `serviceErrors`),
+    /// as these pages did the Android phone, it's sent again as a Mac, and so
+    /// are the session's later ones (see `GrandSlam`'s `MAC_CLIENT_INFO`).
+    async fn send_auth(
+        &mut self,
+        method: reqwest::Method,
+        url: &str,
+        json: bool,
+        headers: HeaderMap,
+        body: Option<String>,
+    ) -> Result<(reqwest::StatusCode, String), Report> {
+        loop {
+            let mut request = self
+                .grandslam_client
+                .auth(method.clone(), url, json, self.auth_as_mac)?
+                .headers(headers.clone());
+            if let Some(body) = &body {
+                request = request.body(body.clone());
+            }
+            let response = request.send().await?;
+            let status = response.status();
+            let text = response.text().await.context("Failed to read the response")?;
+            if Self::refuses_client(status.as_u16(), &text)
+                && !self.auth_as_mac
+                && !self.grandslam_client.is_mac()
+            {
+                warn!(
+                    "{url} turned {} away with a bare 403; asking as a Mac",
+                    self.grandslam_client.client_info.client_info
+                );
+                self.auth_as_mac = true;
+                continue;
+            }
+            return Ok((status, text));
+        }
+    }
+
+    /// A 403 without Apple's `serviceErrors`: the page refusing the client
+    /// itself rather than answering the request.
+    fn refuses_client(status: u16, text: &str) -> bool {
+        status == 403 && Self::parse_sms_service_error(text).is_none()
     }
 
     async fn build_2fa_headers(&self, anisette_data: &AnisetteData) -> Result<HeaderMap, Report> {
@@ -1442,5 +1505,60 @@ fn censor_email(email: &str) -> String {
         }
     } else {
         "***".to_string()
+    }
+}
+
+/// True if `report` comes from a request that never reached its server: no
+/// connection (DNS included) or no answer in time.
+fn is_unreachable(report: &Report) -> bool {
+    report.iter_reports().any(|cause| {
+        cause
+            .downcast_current_context::<reqwest::Error>()
+            .is_some_and(|e| e.is_connect() || e.is_timeout())
+    })
+}
+
+#[cfg(test)]
+mod unreachable_tests {
+    use super::is_unreachable;
+    use rootcause::prelude::*;
+
+    fn get(url: &str) -> Report {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                reqwest::get(url)
+                    .await
+                    .context("Failed to ask")
+                    .unwrap_err()
+                    .into()
+            })
+    }
+
+    #[test]
+    fn a_closed_port_or_unknown_host_is_unreachable() {
+        let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+        assert!(is_unreachable(&get(&format!("http://127.0.0.1:{port}/v3/client_info"))));
+        assert!(is_unreachable(&get("http://no-such-host.invalid/v3/client_info")));
+        assert!(!is_unreachable(&report!("Failed to read the anisette server's client info").into()));
+    }
+}
+
+#[cfg(test)]
+mod auth_page_tests {
+    use super::AppleAccount;
+
+    #[test]
+    fn only_a_bare_403_refuses_the_client() {
+        // How the pages under /auth turned the Android phone away.
+        assert!(AppleAccount::refuses_client(403, ""));
+        assert!(AppleAccount::refuses_client(403, "<html>Forbidden</html>"));
+        // A refusal of the request itself is answered, not retried as a Mac.
+        let refused = r#"{"serviceErrors":[{"code":"-22981","title":"t","message":"m"}]}"#;
+        assert!(!AppleAccount::refuses_client(403, refused));
+        assert!(!AppleAccount::refuses_client(401, ""));
+        assert!(!AppleAccount::refuses_client(200, ""));
     }
 }

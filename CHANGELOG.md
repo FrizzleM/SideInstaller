@@ -2,6 +2,31 @@
 
 All notable changes to SideInstaller are documented here.
 
+## 1.5.3
+
+### Fixed
+- **Moving between the two kinds of anisette server no longer breaks sign-in.** Servers on Apple's
+  Android library and on its Windows library can't use each other's anisette identity, and
+  SideInstaller kept only one, so when a server went down and sign-in moved on, every server of the
+  other kind failed. SideInstaller now keeps one identity for each kind and remembers which one each
+  server takes, so it can move back and forth without making a new identity, which Apple would ask
+  for your verification code again. A server that changes kind is followed the same way.
+
+### Changed
+- **New sign-ins start on a Windows anisette server.** A first sign-in now goes through
+  “jkcoxson (Windows ADI)”, where SideInstaller's Windows PC matches the machine the anisette data
+  comes from, as iLoader now does. Through the Android servers it only passes as long as Apple lets
+  it. If you have signed in before, SideInstaller stays on the server you used, keeping your saved
+  sign-in. When that server fails, the Windows servers are tried next, and “StikStore (Windows
+  ADI)” is added to the list for that.
+- **The anisette server decides what device SideInstaller signs in as**, when it names a device of
+  its own, as the Windows servers do. Servers that still name the old Mac, which Apple refuses,
+  get the Windows PC. A server that moves to another of Apple's libraries then works without an
+  update.
+- **Sign-in reports the same device from start to finish.** The verification-code requests, which
+  SideInstaller sent as a Mac since 1.5.1, now go as the Windows PC like the rest, since Apple
+  accepts them from it. If Apple turns them away, they go as a Mac again.
+
 ## 1.5.2
 
 ### Fixed
