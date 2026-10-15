@@ -10,18 +10,18 @@
       "iconURL": "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon~ios-marketing.png",
       "subtitle": "An an app that installs Sidestore on iOS 27, fully on-device",
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
-      "version": "1.5.1",
-      "versionDate": "2026-10-14T09:25:30Z",
-      "versionDescription": "Improved certain aspects of the Apple ID login\r\n- **2FA with SMS and calls work again**. They stopped working in v1.5.0 because requests are now sent from Android which doesn't support those methods, and to fix it, SideInstaller makes that request from a Mac and the rest is still done from an Android.\r\n- Added an error message for Apple accounts with unverified emails, with clear instructions on how to do so.",
-      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.1/SideInstaller.ipa",
-      "size": 9141048,
+      "version": "1.5.2",
+      "versionDate": "2026-10-15T07:49:16Z",
+      "versionDescription": "Apple already fixed the patch v1.5.0, so I switched the login device to Windows and it now works\r\n- Fixed the Apple ID login error\r\n- This is a temporary fix, and will likely be patched by Apple as well. A permanent one is in the works.",
+      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.2/SideInstaller.ipa",
+      "size": 9150282,
       "versions": [
         {
-          "version": "1.5.1",
-          "date": "2026-10-14T09:25:30Z",
-          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.1/SideInstaller.ipa",
-          "localizedDescription": "Improved certain aspects of the Apple ID login\r\n- **2FA with SMS and calls work again**. They stopped working in v1.5.0 because requests are now sent from Android which doesn't support those methods, and to fix it, SideInstaller makes that request from a Mac and the rest is still done from an Android.\r\n- Added an error message for Apple accounts with unverified emails, with clear instructions on how to do so.",
-          "size": 9141048
+          "version": "1.5.2",
+          "date": "2026-10-15T07:49:16Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.2/SideInstaller.ipa",
+          "localizedDescription": "Apple already fixed the patch v1.5.0, so I switched the login device to Windows and it now works\r\n- Fixed the Apple ID login error\r\n- This is a temporary fix, and will likely be patched by Apple as well. A permanent one is in the works.",
+          "size": 9150282
         }
       ]
     },
