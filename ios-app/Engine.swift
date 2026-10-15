@@ -156,6 +156,24 @@ final class Engine: ObservableObject {
 
     static let autoStartVPNKey = "autoStartLocalDevVPN"
 
+    /// MadeiraM change: "Madeira: add App Group" setting. Off by default, which keeps
+    /// the signing Madeira needs (no app group, because Madeira renews its own
+    /// profile and can't restore a group on a new App ID). MadeiraM, a build based on
+    /// Madeira 0.1.3, doesn't renew itself and needs an App Group shared by the app
+    /// and its JIT helper extension, alongside Increased Memory Limit.
+    @Published var madeiraAppGroup: Bool =
+        UserDefaults.standard.bool(forKey: Engine.madeiraAppGroupKey) {
+        didSet {
+            guard madeiraAppGroup != oldValue else { return }
+            UserDefaults.standard.set(madeiraAppGroup, forKey: Engine.madeiraAppGroupKey)
+            log(madeiraAppGroup
+                ? "Madeira will be signed with an App Group as well (MadeiraM)."
+                : "Madeira will be signed without an App Group, as before.")
+        }
+    }
+
+    static let madeiraAppGroupKey = "madeiraAppGroup"
+
     // The loopback VPN's device-side IP; configurable in Advanced.
     @Published var deviceIP: String = "10.7.0.1"
     /// `deviceIP` normalized to a dialable host, e.g. `10.7.0.1/32` → `10.7.0.1`.
@@ -1667,13 +1685,17 @@ final class Engine: ObservableObject {
     private func performSign(session: OpaquePointer, ipa: String, udid: String, deviceName: String,
                              pairingFilePath: String, forMadeira: Bool) throws -> String {
         log("Signing \(ipa) …")
+        // MadeiraM change: the app group follows the "Madeira: add App Group" setting.
+        let madeiraGroup = forMadeira && madeiraAppGroup
         if forMadeira {
-            log("Signing for Madeira: Increased Memory Limit on its App ID (it shows as Memory+), and no app group.")
+            log(madeiraGroup
+                ? "Signing for Madeira: Increased Memory Limit on its App ID (it shows as Memory+), and an app group (MadeiraM setting)."
+                : "Signing for Madeira: Increased Memory Limit on its App ID (it shows as Memory+), and no app group.")
         }
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_sign_ipa(session, ipa, udid, deviceName, pairingFilePath,
-                             forMadeira ? 1 : 0, forMadeira ? 0 : 1, &signed, &error)
+                             forMadeira ? 1 : 0, (forMadeira && !madeiraGroup) ? 0 : 1, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
             signed.map { si_string_free($0) }

@@ -29,6 +29,7 @@ struct SettingsView: View {
                 accountSection
                 languageSection
                 tunnelSection
+                madeiraSection
                 downloadsSection
                 anisetteSection
                 advancedSection
@@ -189,6 +190,21 @@ struct SettingsView: View {
             if !engine.localDevVPNInstalled {
                 Text(L("LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you."))
             }
+        }
+    }
+
+    // MARK: Madeira (MadeiraM change)
+
+    /// Whether Madeira is signed with an App Group too. Off is what Madeira needs;
+    /// on is for MadeiraM, which shares an App Group with its JIT helper extension.
+    @ViewBuilder
+    private var madeiraSection: some View {
+        Section {
+            Toggle(L("Madeira: add App Group"), isOn: $engine.madeiraAppGroup)
+        } header: {
+            Text("Madeira")
+        } footer: {
+            Text(L("For MadeiraM only. Leave this off for Madeira: it renews its own profile, and can't restore an App Group on a new App ID. Applies the next time Madeira is signed."))
         }
     }
 
