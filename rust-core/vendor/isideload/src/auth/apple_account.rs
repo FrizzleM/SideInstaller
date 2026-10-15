@@ -764,35 +764,60 @@ impl AppleAccount {
         let gs_service_url = self.grandslam_client.get_url("gsService")?;
         debug!("GrandSlam service URL: {}", gs_service_url);
 
-        let cpd = anisette_data.get_client_provided_data();
+        let mut cpd = anisette_data.get_client_provided_data();
 
         let srp_client = srp::Client::<G2048, Sha256>::new_with_options(false);
         let a: Vec<u8> = (0..32).map(|_| rand::random::<u8>()).collect();
         let a_pub = srp_client.compute_public_ephemeral(&a);
 
-        let req1 = plist!(dict {
-            "Header": {
-                "Version": "1.0.1"
-            },
-            "Request": {
-                "A2k": a_pub, // A2k = client public ephemeral
-                "cpd": cpd.clone(), // cpd = client provided data
-                "o": "init", // o = operation
-                "ps": [ // ps = protocols supported
-                    "s2k",
-                    "s2k_fo"
-                ],
-                "u": self.email.clone(), // u = username
-            }
-        });
+        let email = self.email.clone();
+        let init_request = |cpd: &Dictionary| {
+            plist!(dict {
+                "Header": {
+                    "Version": "1.0.1"
+                },
+                "Request": {
+                    "A2k": a_pub.clone(), // A2k = client public ephemeral
+                    "cpd": cpd.clone(), // cpd = client provided data
+                    "o": "init", // o = operation
+                    "ps": [ // ps = protocols supported
+                        "s2k",
+                        "s2k_fo"
+                    ],
+                    "u": email.clone(), // u = username
+                }
+            })
+        };
 
         debug!("Sending initial login request");
 
-        let response = self
+        let mut response = self
             .grandslam_client
-            .plist_request(&gs_service_url, &req1, None, true)
+            .plist_request(&gs_service_url, &init_request(&cpd), None, true)
             .await
-            .context("Failed to send initial login request")?
+            .context("Failed to send initial login request")?;
+
+        // Anisette servers on Apple's Windows ADI library (ani.jkcoxson.com,
+        // win.ani.sidestore.io) get this at the first sign-in of a machine:
+        // hsc 434, -22421 "This action could not be completed. Try again.", with
+        // resync data for the ADI library. Once the server has applied it, the
+        // same request goes through, and later sign-ins need no resync.
+        if let Some(sim) = Self::resync_sim(&response) {
+            info!("GrandSlam asked for an anisette resync (hsc 434); retrying");
+            cpd = self
+                .anisette_generator
+                .resync(&sim)
+                .await
+                .context("Anisette resync failed")?
+                .get_client_provided_data();
+            response = self
+                .grandslam_client
+                .plist_request(&gs_service_url, &init_request(&cpd), None, true)
+                .await
+                .context("Failed to send initial login request after the anisette resync")?;
+        }
+
+        let response = response
             .check_grandslam_error()
             .context("GrandSlam error during initial login request")?;
 
@@ -896,6 +921,20 @@ impl AppleAccount {
         Ok(Self::state_after_proof(status))
     }
 
+    /// The resync data (base64) in a GrandSlam `Response` whose `Status` asks
+    /// for an anisette resync with hsc 434, or `None`.
+    fn resync_sim(response: &Dictionary) -> Option<String> {
+        let status = response.get("Status")?.as_dictionary()?;
+        if status.get("hsc").and_then(|v| v.as_signed_integer()) != Some(434) {
+            return None;
+        }
+        match status.get("X-Apple-I-MD-DATA")? {
+            plist::Value::String(sim) => Some(sim.clone()),
+            plist::Value::Data(sim) => Some(BASE64_STANDARD.encode(sim)),
+            _ => None,
+        }
+    }
+
     /// What the `Status` of an accepted password proof asks for next.
     fn state_after_proof(status: &Dictionary) -> LoginState {
         if let Some(plist::Value::String(s)) = status.get("au") {
@@ -909,8 +948,8 @@ impl AppleAccount {
             };
         }
 
-        // An Android client (see `RemoteV3AnisetteProvider::get_client_info`)
-        // gets no `au`. With hsc 409 a second step is still due, and Apple has
+        // The Android phone this crate reported from 2026-10-13 to 2026-10-15
+        // got no `au`. With hsc 409 a second step is still due, and Apple has
         // already pushed a code to the trusted devices: asking for another
         // isn't needed, `validateCode` takes that one. Taken for a finished
         // sign-in, the app token request after it fails with -22411.
@@ -1315,6 +1354,43 @@ mod state_after_proof_tests {
             AppleAccount::state_after_proof(&status(409, None)),
             LoginState::NeedsDevice2FAVerification
         ));
+    }
+
+    fn response(status: Dictionary) -> Dictionary {
+        let mut response = Dictionary::new();
+        response.insert("Status".into(), status.into());
+        response
+    }
+
+    #[test]
+    fn a_resync_request_yields_its_sim_as_base64() {
+        // ani.jkcoxson.com's first init on 2026-10-15 got a string.
+        let mut asked = status(434, None);
+        asked.insert("ec".into(), (-22421).into());
+        asked.insert("X-Apple-I-MD-DATA".into(), "c2ltLWRhdGE=".into());
+        assert_eq!(
+            AppleAccount::resync_sim(&response(asked.clone())).as_deref(),
+            Some("c2ltLWRhdGE=")
+        );
+
+        asked.insert(
+            "X-Apple-I-MD-DATA".into(),
+            plist::Value::Data(b"sim-data".to_vec()),
+        );
+        assert_eq!(
+            AppleAccount::resync_sim(&response(asked)).as_deref(),
+            Some("c2ltLWRhdGE=")
+        );
+    }
+
+    #[test]
+    fn anything_else_needs_no_resync() {
+        assert_eq!(AppleAccount::resync_sim(&response(status(200, None))), None);
+        assert_eq!(AppleAccount::resync_sim(&response(status(434, None))), None);
+        let mut other = status(409, None);
+        other.insert("X-Apple-I-MD-DATA".into(), "c2ltLWRhdGE=".into());
+        assert_eq!(AppleAccount::resync_sim(&response(other)), None);
+        assert_eq!(AppleAccount::resync_sim(&Dictionary::new()), None);
     }
 
     #[test]

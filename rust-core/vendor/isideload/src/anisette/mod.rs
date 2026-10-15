@@ -118,6 +118,12 @@ impl AnisetteData {
 pub trait AnisetteProvider {
     async fn get_anisette_data(&self) -> Result<AnisetteData, Report>;
 
+    /// Anisette data made after applying the resync data (`sim`, base64)
+    /// GrandSlam sent with an hsc 434.
+    async fn resync(&self, _sim: &str) -> Result<AnisetteData, Report> {
+        Err(report!("This anisette provider can't resync"))
+    }
+
     async fn get_client_info(&self) -> Result<AnisetteClientInfo, Report>;
 
     async fn provision(&mut self, gs: Arc<GrandSlam>) -> Result<(), Report>;
@@ -169,6 +175,15 @@ impl AnisetteDataGenerator {
             self.data = Some(arc_data.clone());
             Ok(arc_data)
         }
+    }
+
+    /// Resyncs with `sim` (see `AnisetteProvider::resync`) and replaces the
+    /// cached data with what comes back.
+    pub async fn resync(&mut self, sim: &str) -> Result<Arc<AnisetteData>, Report> {
+        let provider = self.provider.read().await;
+        let data = Arc::new(provider.resync(sim).await?);
+        self.data = Some(data.clone());
+        Ok(data)
     }
 
     pub async fn get_client_info(&self) -> Result<AnisetteClientInfo, Report> {

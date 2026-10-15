@@ -2,6 +2,22 @@
 
 All notable changes to SideInstaller are documented here.
 
+## 1.5.2
+
+### Fixed
+- **Signing in works again.** Apple now turns away the Android device SideInstaller has signed in
+  as since 1.5.0, and sign-in stopped with “Apple's sign-in server refused the request (HTTP 503)”.
+  SideInstaller now signs in as a Windows PC, which Apple accepts through the same anisette servers.
+  The anisette identity SideInstaller already saved keeps working.
+- **The Windows anisette servers work.** “SideStore (Windows ADI)” and “jkcoxson (Windows ADI)” in
+  the server list make their data with Apple's Windows library. Sign-in through them failed while
+  the anisette identity was being set up, since SideInstaller didn't say it was a Windows PC, and
+  Apple asks each new identity on them to resync once before it signs in. SideInstaller now does
+  both.
+- **A mistyped Apple ID is reported at the first server.** Apple now answers an Apple ID it doesn't
+  know with a new error code, which SideInstaller tried on every anisette server in turn before
+  giving up. It now says the Apple ID or password is incorrect straight away, as it did before.
+
 ## 1.5.1
 
 ### Fixed

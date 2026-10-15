@@ -83,6 +83,56 @@ impl RemoteV3AnisetteProvider {
 #[async_trait::async_trait]
 impl AnisetteProvider for RemoteV3AnisetteProvider {
     async fn get_anisette_data(&self) -> Result<AnisetteData, Report> {
+        self.fetch_headers(None).await
+    }
+
+    async fn resync(&self, sim: &str) -> Result<AnisetteData, Report> {
+        self.fetch_headers(Some(sim)).await
+    }
+
+    /// Hardcoded, not fetched from the server's `/v3/client_info`, which most
+    /// public servers still answer with a Mac running Xcode.
+    ///
+    /// The device and OS are a Windows PC's, as iTunes reports them. Since
+    /// 2026-10-12 GrandSlam refuses a Mac with -80045 ("This action cannot be
+    /// completed at this time") on these servers, and since 2026-10-15 it
+    /// answers the Android phone used in between with HTTP 503. The Windows PC
+    /// gets through on servers that make anisette data with the Android ADI
+    /// library and on the newer ones that use the Windows library (those need
+    /// the resync in `AppleAccount::login_inner`). This is the string
+    /// ani.jkcoxson.com and win.ani.sidestore.io hand out.
+    ///
+    /// Most servers also still name `com.apple.dt.Xcode`, and since September
+    /// 2026 Apple's GSA edge returns HTTP 503 to any request carrying that.
+    /// The user agent stays akd's, as on those Windows servers.
+    async fn get_client_info(&self) -> Result<AnisetteClientInfo, Report> {
+        Ok(AnisetteClientInfo {
+            client_info:
+                "<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.iTunes/12.12.4.1)>"
+                    .to_string(),
+            user_agent: "akd/1.0 CFNetwork/808.1.4".to_string(),
+        })
+    }
+
+    fn needs_provisioning(&self) -> Result<bool, Report> {
+        if let Some(state) = &self.state {
+            Ok(!state.is_provisioned())
+        } else {
+            Ok(true)
+        }
+    }
+
+    async fn provision(&mut self, gs: Arc<GrandSlam>) -> Result<(), Report> {
+        self.get_state(gs).await?;
+        Ok(())
+    }
+}
+
+impl RemoteV3AnisetteProvider {
+    /// Headers from `/v3/get_headers`. With `sim`, the server first applies
+    /// the resync data GrandSlam sent with an hsc 434 (upstream 0.4.5's
+    /// request: `sim` plus the device ID and local user ID).
+    async fn fetch_headers(&self, sim: Option<&str>) -> Result<AnisetteData, Report> {
         let state = self
             .state
             .as_ref()
@@ -93,17 +143,21 @@ impl AnisetteProvider for RemoteV3AnisetteProvider {
             .ok_or(SideloadError::AnisetteNotProvisioned)?;
         let client_info = self.get_client_info().await?;
 
+        let mut body = serde_json::json!({
+            "identifier": BASE64_STANDARD.encode(state.keychain_identifier),
+            "adi_pb": BASE64_STANDARD.encode(adi_pb),
+        });
+        if let Some(sim) = sim {
+            body["sim"] = serde_json::Value::String(sim.to_string());
+            body["device_id"] = serde_json::Value::String(state.get_device_id());
+            body["md_lu"] = serde_json::Value::String(hex::encode(state.get_md_lu()));
+        }
+
         let headers = self
             .client
             .post(format!("{}/v3/get_headers", self.url))
             .header(CONTENT_TYPE, "application/json")
-            .body(
-                serde_json::json!({
-                "identifier": BASE64_STANDARD.encode(state.keychain_identifier),
-                "adi_pb": BASE64_STANDARD.encode(adi_pb)
-                })
-                .to_string(),
-            )
+            .body(body.to_string())
             .send()
             .await?
             .error_for_status()?
@@ -134,40 +188,6 @@ impl AnisetteProvider for RemoteV3AnisetteProvider {
         }
     }
 
-    /// Hardcoded, not fetched from the server's `/v3/client_info`, which is wrong
-    /// twice over on the public servers.
-    ///
-    /// They make anisette data with Apple's Android ADI library and answer with
-    /// a macOS client. Since 2026-10-12 GrandSlam refuses a sign-in whose client
-    /// OS isn't the one the machine ID was made on (-80045, "This action cannot
-    /// be completed at this time"), so the device and OS here are an Android
-    /// phone's.
-    ///
-    /// Most also still name `com.apple.dt.Xcode`, and since September 2026
-    /// Apple's GSA edge returns HTTP 503 to any request carrying that. Reporting
-    /// akd matches upstream a19f5f0, AltStore #1790 and SideSign.
-    async fn get_client_info(&self) -> Result<AnisetteClientInfo, Report> {
-        Ok(AnisetteClientInfo {
-            client_info: "<Pixel 7> <Android;14;UQ1A.240205.002> <com.apple.AuthKit/1 (com.apple.akd/1.0)>".to_string(),
-            user_agent: "akd/1.0 CFNetwork/808.1.4".to_string(),
-        })
-    }
-
-    fn needs_provisioning(&self) -> Result<bool, Report> {
-        if let Some(state) = &self.state {
-            Ok(!state.is_provisioned())
-        } else {
-            Ok(true)
-        }
-    }
-
-    async fn provision(&mut self, gs: Arc<GrandSlam>) -> Result<(), Report> {
-        self.get_state(gs).await?;
-        Ok(())
-    }
-}
-
-impl RemoteV3AnisetteProvider {
     async fn get_state(&mut self, gs: Arc<GrandSlam>) -> Result<&mut AnisetteState, Report> {
         if self.state.is_none() {
             if let Ok(Some(state)) = &self.storage.retrieve_data("anisette_state") {

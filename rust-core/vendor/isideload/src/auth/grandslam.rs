@@ -14,18 +14,23 @@ use crate::{SideloadError, anisette::AnisetteClientInfo, util::plist::PlistDataE
 const APPLE_ROOT: &[u8] = include_bytes!("./apple_root.der");
 const URL_BAG: &str = "https://gsa.apple.com/grandslam/GsService2/lookup";
 
-/// What the requests Apple won't take from an Android phone say the client
-/// is: a Mac. Every other request reports the Android phone (see
-/// `RemoteV3AnisetteProvider::get_client_info`).
+/// What the requests that were moved off the Android phone say the client is:
+/// a Mac. Every other request reports the client of
+/// `RemoteV3AnisetteProvider::get_client_info`, a Windows PC since 2026-10-15
+/// and an Android phone from 2026-10-13 until then.
 ///
-/// - The URL-bag lookup. Asked as the Android phone it answers with ten URLs
+/// - The URL-bag lookup. Asked as the Android phone it answered with ten URLs
 ///   on gsd.apple.com; asked as a Mac, with the full bag on gsa.apple.com,
-///   where the URLs this crate hardcodes live and where sign-in as an Android
-///   phone was checked through to the developer portal.
+///   where the URLs this crate hardcodes live and where sign-in was checked
+///   through to the developer portal. (The Windows PC gets a 122-URL bag on
+///   gsa.apple.com with every URL used here, but the Mac's is the one sign-in
+///   has run with.)
 /// - The second-factor pages under gsa.apple.com/auth: the trusted numbers,
 ///   sending a text or a call, checking its code, and sending the code to the
-///   trusted devices again. Asked as the Android phone they answer a bare 403,
-///   before they read who is asking.
+///   trusted devices again. Asked as the Android phone they answered a bare
+///   403 on 2026-10-13, before they read who is asking. As a Mac they worked
+///   that day with a real account; on 2026-10-15 they still answered a made-up
+///   identity token with 401 (it was read) as a Mac and as the Windows PC.
 const MAC_CLIENT_INFO: &str =
     "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
 
@@ -324,7 +329,8 @@ mod client_info_tests {
     use crate::anisette::AnisetteClientInfo;
     use plist::Dictionary;
 
-    const ANDROID: &str = "<Pixel 7> <Android;14;UQ1A.240205.002> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+    const WINDOWS: &str =
+        "<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.iTunes/12.12.4.1)>";
 
     fn said(request: reqwest::RequestBuilder) -> String {
         let request = request.build().unwrap();
@@ -336,15 +342,15 @@ mod client_info_tests {
         let grandslam = GrandSlam {
             client: GrandSlam::build_reqwest_client(false).unwrap(),
             client_info: AnisetteClientInfo {
-                client_info: ANDROID.into(),
+                client_info: WINDOWS.into(),
                 user_agent: "akd/1.0 CFNetwork/808.1.4".into(),
             },
             url_bag: Dictionary::new(),
         };
         let service = "https://gsa.apple.com/grandslam/GsService2";
-        assert_eq!(said(grandslam.post(service).unwrap()), ANDROID);
-        assert_eq!(said(grandslam.get(&format!("{service}/validate")).unwrap()), ANDROID);
-        assert_eq!(said(grandslam.patch(service).unwrap()), ANDROID);
+        assert_eq!(said(grandslam.post(service).unwrap()), WINDOWS);
+        assert_eq!(said(grandslam.get(&format!("{service}/validate")).unwrap()), WINDOWS);
+        assert_eq!(said(grandslam.patch(service).unwrap()), WINDOWS);
 
         let auth = "https://gsa.apple.com/auth";
         assert_eq!(said(grandslam.get_sms(auth).unwrap()), MAC_CLIENT_INFO);
