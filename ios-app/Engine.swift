@@ -1165,6 +1165,7 @@ final class Engine: ObservableObject {
     /// GrandSlam codes meaning the credentials themselves were rejected.
     private static let credentialErrorCodes = [
         "-20101",   // invalid username/password
+        "-20970",   // "Your account information was entered incorrectly." (no such Apple ID, since 2026-10-15; was -20101)
         "-22406",   // "Enter the correct password for this Apple Account."
     ]
 

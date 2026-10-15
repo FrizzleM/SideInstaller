@@ -51,8 +51,9 @@ it downloads each extension's own profile and signs the extension with that
 profile's entitlements, at one more request per extension.
 
 **2. `src/anisette/`, `src/auth/grandslam.rs`, `apple_account.rs` — report the
-client as akd on an Android phone, take the 2FA code Apple sends one unasked,
-and don't reuse GrandSlam connections.**
+client as akd on an Android phone, now iTunes on a Windows PC, take the 2FA
+code Apple sends unasked, resync anisette when Apple asks, and don't reuse
+GrandSlam connections.**
 
 Since early September 2026 Apple's GSA edge answers HTTP 503 to any request
 whose `X-Mme-Client-Info` names `com.apple.dt.Xcode`, before it looks at
@@ -165,6 +166,49 @@ trusted numbers listed and a code by phone.
 no longer says in `au` that such a code goes by text, so the prompt still names
 the trusted devices; what Apple sends unasked, and whether `validateCode` takes
 it, isn't known.
+
+By 2026-10-15 Apple had closed the Android route: `init` as the Android phone
+gets a bare HTTP 503 on every server. A SideStore developer reported that the
+Windows client the new Windows-ADI servers hand out goes through on the old
+Android-ADI ones too, and it does, so `get_client_info` now reports
+
+```
+<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.iTunes/12.12.4.1)>
+```
+
+with akd's user agent, as ani.jkcoxson.com and win.ani.sidestore.io advertise
+it. Measured 2026-10-15 with made-up accounts, `init` answers:
+
+| `X-Mme-Client-Info` | Android-ADI servers (ani.npeg.us, ani.stikstore.app, ani.sidestore.io, ani.jaydenha.uk) | Windows-ADI servers (win.ani.sidestore.io, ani.jkcoxson.com) |
+|---|---|---|
+| `<Pixel 7> <Android;14;…>` (akd) | HTTP 503 | HTTP 503 |
+| `<Mac15,7> <macOS;27.0;…>` (akd) | -80045 | -22410 or HTTP 429 |
+| `<PC> <Windows;6.2(0,0);9200>` (iTunes or akd) | -20970, "Your account information was entered incorrectly" | hsc 434, -22421, then -20970 after a resync |
+
+-20970 carries the wording -20101 had, so the account check is reached; the
+app counts it as a credential error. Anisette state provisioned under the
+Android or Mac identity keeps working with the Windows one. Windows-ADI servers
+must be provisioned as Windows (as the Android phone, `finishMachineProvisioning`
+answered 401), which they now are, since provisioning sends the same client
+info.
+
+A Windows-ADI server's machine gets hsc 434 at its first `init`, with resync
+data in `Status`'s `X-Apple-I-MD-DATA`. `login_inner` passes it to the server
+(`/v3/get_headers` with `sim`, `device_id` and `md_lu`, upstream 0.4.5's
+request, through `AnisetteProvider::resync`) and sends `init` again with the
+new headers; later sign-ins with that machine need no resync. Tests:
+`cargo test -p isideload --lib state_after_proof_tests` (`resync_sim`). A
+throwaway `#[ignore]` test ran `AppleAccount::login` with fresh anisette state
+through ani.npeg.us, ani.stikstore.app, win.ani.sidestore.io and
+ani.jkcoxson.com: -20970 on all four.
+
+The bag lookup and the pages under `/auth` stay on the Mac (`MAC_CLIENT_INFO`).
+As the Windows PC the lookup returns 122 URLs on gsa.apple.com with every URL
+this crate uses, and `/auth` reaches the token check (401 to a made-up token,
+as for the Mac), so either would do; the Mac is what sign-in has run with.
+Not yet run with the Windows identity and a real account: the proof, which
+second-factor answer Apple gives (`au` or the Android-era hsc 409, both
+handled), the token and the portal.
 
 **3. `src/auth/apple_account.rs`, `builder.rs`, `grandslam.rs` — let the user
 choose how the 2FA code arrives.**

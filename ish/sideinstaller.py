@@ -651,23 +651,25 @@ class WebSocket:
 # mints headers from the stored blob; v1 just returns a header set per request.
 # ----------------------------------------------------------------------------
 
-# What we tell GrandSlam we are, whatever the anisette server suggests. Public
-# servers make anisette data with Apple's Android ADI library and hand out a
-# macOS client info, and since 2026-10-12 GrandSlam refuses a sign-in whose
-# client OS isn't the one the machine ID was made on (-80045, "This action
-# cannot be completed at this time"). So the device and OS are an Android
-# phone's. Most servers also still name com.apple.dt.Xcode, and since September
-# 2026 Apple's GSA edge answers any request carrying that with HTTP 503 before
-# reading the rest; isideload, AltStore and SideSign all switched to akd.
-GSA_CLIENT_INFO = "<Pixel 7> <Android;14;UQ1A.240205.002> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+# What we tell GrandSlam we are, whatever the anisette server suggests: a
+# Windows PC, as iTunes reports it. Since 2026-10-12 GrandSlam refuses a Mac
+# with -80045 ("This action cannot be completed at this time") on the public
+# servers, and since 2026-10-15 it answers the Android phone used in between
+# with HTTP 503. The Windows PC gets through on servers that make anisette
+# data with Apple's Android ADI library and on the newer ones that use the
+# Windows library (those need the resync in AppleAccount._init). Most servers
+# also still name com.apple.dt.Xcode, and since September 2026 Apple's GSA edge
+# answers any request carrying that with HTTP 503 before reading the rest.
+GSA_CLIENT_INFO = "<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.iTunes/12.12.4.1)>"
 GSA_USER_AGENT = "akd/1.0 CFNetwork/808.1.4"
-# Two kinds of request are made as a Mac, because Apple won't take them from an
-# Android phone. The URL bag: asked as an Android phone, the lookup answers with
-# ten URLs on gsd.apple.com; as a Mac, with the full bag on gsa.apple.com, where
-# the other URLs in this script live and where sign-in as an Android phone was
-# tested. And the second-factor pages under gsa.apple.com/auth (sending the code
-# to the trusted devices again, texting it, checking a texted code): asked as an
-# Android phone they answer a bare 403, before they read who is asking.
+# Two kinds of request are made as a Mac, as they were while the client was an
+# Android phone, which Apple wouldn't take them from. The URL bag: asked as an
+# Android phone, the lookup answered with ten URLs on gsd.apple.com; as a Mac,
+# with the full bag on gsa.apple.com, where the other URLs in this script live.
+# And the second-factor pages under gsa.apple.com/auth (sending the code to the
+# trusted devices again, texting it, checking a texted code): asked as an
+# Android phone they answered a bare 403. The Windows PC gets the gsa.apple.com
+# bag and reaches the token check on /auth too, but sign-in has run as a Mac.
 GSA_MAC_CLIENT_INFO = "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
 
 
@@ -803,9 +805,10 @@ class Anisette:
 
     # -- headers --------------------------------------------------------------
 
-    def headers(self):
+    def headers(self, sim=None):
         """The three headers Apple checks, refreshed per request (X-Apple-I-MD
-        is a one-time password and does not survive being reused)."""
+        is a one-time password and does not survive being reused). With `sim`
+        a v3 server first applies the resync data GrandSlam sent with hsc 434."""
         if self.version == 1:
             status, _, body = request("GET", self.url + "/")
             if status != 200:
@@ -818,13 +821,16 @@ class Anisette:
                 "X-Apple-I-MD-M": payload["X-Apple-I-MD-M"],
             }
 
+        payload = {
+            "identifier": base64.b64encode(self.identifier).decode(),
+            "adi_pb": base64.b64encode(self.adi_pb).decode(),
+        }
+        if sim:
+            payload.update(sim=sim, device_id=self.device_id, md_lu=self.md_lu)
         status, _, body = request(
             "POST", self.url + "/v3/get_headers",
             headers={"Content-Type": "application/json"},
-            body=json.dumps({
-                "identifier": base64.b64encode(self.identifier).decode(),
-                "adi_pb": base64.b64encode(self.adi_pb).decode(),
-            }),
+            body=json.dumps(payload),
         )
         payload = self._json(body, "a header request") if body else {}
         if status != 200 or payload.get("result") != "Headers":
@@ -837,7 +843,7 @@ class Anisette:
             "X-Apple-I-MD-M": payload["X-Apple-I-MD-M"],
         }
 
-    def client_provided_data(self):
+    def client_provided_data(self, sim=None):
         # These really are the strings "true"/"false", not plist booleans —
         # isideload sends them that way and Apple accepts it.
         cpd = {
@@ -848,7 +854,7 @@ class Anisette:
             "prkgen": "true",
             "svct": "iCloud",
         }
-        cpd.update(self.headers())
+        cpd.update(self.headers(sim))
         return cpd
 
 
@@ -886,7 +892,7 @@ class GrandSlam:
             raise Fail("Apple's URL bag has no '%s' entry." % key)
         return self.url_bag[key]
 
-    def plist_request(self, url, body, extra_headers=None):
+    def plist_request(self, url, body, extra_headers=None, check=True):
         headers = self.base_headers()
         headers.update(extra_headers or {})
         payload = plistlib.dumps(body, fmt=plistlib.FMT_XML)
@@ -896,7 +902,7 @@ class GrandSlam:
         parsed = plistlib.loads(response)
         if "Response" not in parsed:
             raise Fail("Unexpected reply from Apple (no Response section).")
-        return check_gs_error(parsed["Response"])
+        return check_gs_error(parsed["Response"]) if check else parsed["Response"]
 
 
 def check_gs_error(response):
@@ -950,19 +956,8 @@ class AppleAccount:
         # one-time password, but the pair belongs to a single SRP exchange —
         # isideload reuses it here and refreshing mid-handshake risks Apple
         # rejecting the second leg.
-        cpd = self.anisette.client_provided_data()
         srp = SRPClient()
-
-        first = self.gs.plist_request(self.gs.url("gsService"), {
-            "Header": {"Version": "1.0.1"},
-            "Request": {
-                "A2k": srp.a_pub,
-                "cpd": cpd,
-                "o": "init",
-                "ps": ["s2k", "s2k_fo"],
-                "u": self.email,
-            },
-        })
+        first, cpd = self._init(srp)
 
         password_key = srp_password_key(
             password, bytes(first["s"]), int(first["i"]), first["sp"]
@@ -1002,6 +997,39 @@ class AppleAccount:
         if au == "repair" or au is None:
             return "ok"
         return au
+
+    def _init(self, srp):
+        """SRP init. Returns the answer and the cpd the rest of the handshake
+        reuses.
+
+        Anisette servers on Apple's Windows ADI library (ani.jkcoxson.com,
+        win.ani.sidestore.io) get hsc 434, -22421 "This action could not be
+        completed. Try again." at a machine's first sign-in, with resync data
+        for the ADI library. Once the server has applied it, the same request
+        goes through, and later sign-ins need no resync."""
+        def send(cpd):
+            return self.gs.plist_request(self.gs.url("gsService"), {
+                "Header": {"Version": "1.0.1"},
+                "Request": {
+                    "A2k": srp.a_pub,
+                    "cpd": cpd,
+                    "o": "init",
+                    "ps": ["s2k", "s2k_fo"],
+                    "u": self.email,
+                },
+            }, check=False)
+
+        cpd = self.anisette.client_provided_data()
+        first = send(cpd)
+        status = first.get("Status", {})
+        sim = status.get("X-Apple-I-MD-DATA")
+        if status.get("hsc") == 434 and sim:
+            if isinstance(sim, bytes):
+                sim = base64.b64encode(sim).decode()
+            info("Apple asked the anisette server to resync; retrying.")
+            cpd = self.anisette.client_provided_data(sim)
+            first = send(cpd)
+        return check_gs_error(first), cpd
 
     def _identity_headers(self):
         headers = self.anisette.headers()
