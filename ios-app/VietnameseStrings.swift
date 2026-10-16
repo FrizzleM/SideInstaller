@@ -833,4 +833,21 @@ let vietnameseStrings: [String: String] = [
         "Tệp ghép nối này không có bản ghi RPPairing, loại duy nhất mà %@ đọc được.",
     "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
         "Chạy game PC Windows trên iPhone của bạn. Của Will Faust, giấy phép GPL-3.0.",
+
+    // MARK: - App ID cost
+
+    "App IDs for this app": "App ID cho ứng dụng này",
+    "Cost": "Cần dùng",
+    "Left now": "Còn lại",
+    "Left after": "Còn sau đó",
+    "New App IDs": "App ID mới",
+    "This Apple ID doesn't have enough App IDs left: this app needs %d, and %d are left. Each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "Apple ID này không còn đủ App ID: ứng dụng này cần %d, nhưng chỉ còn %d. Mỗi App ID được tính trong 7 ngày, nên hãy chờ vài App ID hết hạn hoặc đăng nhập bằng Apple ID khác.",
+    "The next one frees up on %@.": "App ID tiếp theo được giải phóng vào %@.",
+    "Your Apple ID already has every App ID this app needs, so installing it uses none.":
+        "Apple ID của bạn đã có mọi App ID mà ứng dụng này cần, nên cài nó không tốn App ID nào.",
+    "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
+        "Khi ký, một App ID được đăng ký cho ứng dụng và cho từng tiện ích mở rộng của nó, và mỗi App ID được tính trong 7 ngày.",
+    "This Apple ID can register %d a week.":
+        "Apple ID này đăng ký được %d App ID mỗi tuần.",
 ]

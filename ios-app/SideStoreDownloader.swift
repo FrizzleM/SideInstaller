@@ -1239,6 +1239,40 @@ extension IPALibrary {
                        version: dict["CFBundleShortVersionString"] as? String)
     }
 
+    /// The bundle IDs signing registers App IDs for, as the IPA has them: the
+    /// main app's first, then each extension's directly in its `PlugIns`
+    /// folder, which is what isideload signs. Empty if the main app's can't be
+    /// read.
+    static func bundleIdentifiers(at url: URL) -> [String] {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return [] }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size),
+              let main = mainInfoPlist(in: directory),
+              let mainID = bundleIdentifier(of: main, handle) else { return [] }
+        // `Payload/<app>.app/`, so extensions are looked for in the same app.
+        let appDirectory = main.name.dropLast("Info.plist".count)
+        let extensions = directory.filter { entry in
+            guard entry.name.hasPrefix(appDirectory) else { return false }
+            let parts = entry.name.dropFirst(appDirectory.count)
+                .split(separator: "/", omittingEmptySubsequences: false)
+            return parts.count == 3 && parts[0] == "PlugIns" && parts[2] == "Info.plist"
+        }
+        .sorted { $0.name < $1.name }
+        .compactMap { bundleIdentifier(of: $0, handle) }
+        return [mainID] + extensions
+    }
+
+    /// `CFBundleIdentifier` from one Info.plist in the archive.
+    private static func bundleIdentifier(of entry: ZipEntry, _ handle: FileHandle) -> String? {
+        guard let raw = contents(of: entry, handle),
+              let plist = try? PropertyListSerialization.propertyList(from: raw, format: nil),
+              let id = (plist as? [String: Any])?["CFBundleIdentifier"] as? String,
+              !id.isEmpty else { return nil }
+        return id
+    }
+
     /// One file inside an IPA, for copying it out without unpacking the rest.
     struct ArchiveFile {
         /// Path inside the archive, e.g. "Payload/SideStore.app/Assets.car".

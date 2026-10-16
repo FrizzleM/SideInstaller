@@ -836,4 +836,21 @@ let italianStrings: [String: String] = [
         "Questo file di abbinamento non contiene un record RPPairing, l'unico tipo che %@ legge.",
     "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
         "Esegue i giochi per PC Windows sul tuo iPhone. Di Will Faust, GPL-3.0.",
+
+    // MARK: - App ID cost
+
+    "App IDs for this app": "App ID per questa app",
+    "Cost": "Costo",
+    "Left now": "Rimasti ora",
+    "Left after": "Rimasti dopo",
+    "New App IDs": "Nuovi App ID",
+    "This Apple ID doesn't have enough App IDs left: this app needs %d, and %d are left. Each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "A questo Apple ID non restano abbastanza App ID: questa app ne richiede %d e ne restano %d. Ognuno conta per 7 giorni, quindi aspetta che alcuni scadano o accedi con un altro Apple ID.",
+    "The next one frees up on %@.": "Il prossimo si libera il %@.",
+    "Your Apple ID already has every App ID this app needs, so installing it uses none.":
+        "Il tuo Apple ID ha già tutti gli App ID che servono a questa app, quindi installarla non ne usa nessuno.",
+    "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
+        "La firma registra un App ID per l'app e uno per ciascuna delle sue estensioni, e ognuno conta per 7 giorni.",
+    "This Apple ID can register %d a week.":
+        "Questo Apple ID può registrarne %d a settimana.",
 ]

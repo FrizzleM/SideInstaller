@@ -829,4 +829,21 @@ let portugueseStrings: [String: String] = [
         "Este arquivo de pareamento não tem um registro RPPairing, o único tipo que o %@ lê.",
     "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
         "Roda jogos de PC para Windows no seu iPhone. De Will Faust, GPL-3.0.",
+
+    // MARK: - App ID cost
+
+    "App IDs for this app": "App IDs deste app",
+    "Cost": "Custo",
+    "Left now": "Restam agora",
+    "Left after": "Restarão",
+    "New App IDs": "Novos App IDs",
+    "This Apple ID doesn't have enough App IDs left: this app needs %d, and %d are left. Each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "Este Apple ID não tem App IDs suficientes: este app precisa de %d e restam %d. Cada um conta por 7 dias, então espere alguns expirarem ou entre com outro Apple ID.",
+    "The next one frees up on %@.": "O próximo é liberado em %@.",
+    "Your Apple ID already has every App ID this app needs, so installing it uses none.":
+        "Seu Apple ID já tem todos os App IDs de que este app precisa, então instalá-lo não usa nenhum.",
+    "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
+        "A assinatura registra um App ID para o app e um para cada uma de suas extensões, e cada um conta por 7 dias.",
+    "This Apple ID can register %d a week.":
+        "Este Apple ID pode registrar %d por semana.",
 ]

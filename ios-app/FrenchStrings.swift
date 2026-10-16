@@ -840,4 +840,21 @@ let frenchStrings: [String: String] = [
         "Ce fichier de jumelage ne contient pas d'enregistrement RPPairing, le seul type que %@ lit.",
     "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
         "Fait tourner les jeux PC Windows sur votre iPhone. Par Will Faust, GPL-3.0.",
+
+    // MARK: - App ID cost
+
+    "App IDs for this app": "App IDs de cette app",
+    "Cost": "Coût",
+    "Left now": "Restants",
+    "Left after": "Restants après",
+    "New App IDs": "Nouveaux App IDs",
+    "This Apple ID doesn't have enough App IDs left: this app needs %d, and %d are left. Each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "Il ne reste pas assez d'App IDs à cet Apple ID : cette app en demande %d et il en reste %d. Chacun compte pendant 7 jours, alors attendez que certains expirent ou connectez-vous avec un autre Apple ID.",
+    "The next one frees up on %@.": "Le prochain se libère le %@.",
+    "Your Apple ID already has every App ID this app needs, so installing it uses none.":
+        "Votre Apple ID a déjà tous les App IDs dont cette app a besoin, donc l'installer n'en utilise aucun.",
+    "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
+        "La signature enregistre un App ID pour l'app et un pour chacune de ses extensions, et chacun compte pendant 7 jours.",
+    "This Apple ID can register %d a week.":
+        "Cet Apple ID peut en enregistrer %d par semaine.",
 ]
