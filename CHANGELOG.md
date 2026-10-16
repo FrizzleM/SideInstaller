@@ -11,6 +11,19 @@ All notable changes to SideInstaller are documented here.
   them, so the check always failed and pairing stopped at “Local Network denied” even with access
   turned on for LiveContainer (issue #38). The check now uses StikPair's service type, which
   LiveContainer lists.
+- **Side by Side's IP field has a dot key.** It used a number pad whose separator is a comma in
+  many regions, so an address could only be pasted in (issue #54). It now uses the keyboard of the
+  Device IP field in Settings.
+- **Side by Side forgets the other iPhone once SideInstaller is on it.** Pairings with other
+  people's iPhones were kept for good, so the iPhone that helped could still reach a friend's long
+  after. They're now deleted after a successful install, and “Clear their details” deletes them
+  too, along with the address. While one is kept, a note under that button says so.
+
+### Changed
+- **Side by Side doesn't need the other iPhone's IP address.** Leave the field empty and their
+  iPhone pairs from its Settings straight away. SideInstaller reaches it at the address it paired
+  from and fills that in, so a retry after a failed step uses the same pairing. A typed address
+  works as before, and if their iPhone pairs from a different one, that one is used.
 
 ## 1.5.3
 

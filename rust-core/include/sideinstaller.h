@@ -59,6 +59,8 @@ typedef struct {
     char *device_udid;
     char *pairing_file_path;
     char *host_alt_irk_hex;
+    // The address the device connected from: its IP on this network.
+    char *device_address;
 } SIPairResult;
 
 // Run the RPPairing host. BLOCKS until a device pairs or an error occurs — run

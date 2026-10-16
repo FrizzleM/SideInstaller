@@ -382,12 +382,12 @@ let vietnameseStrings: [String: String] = [
     "Sign in to their Apple ID": "Đăng nhập Apple ID của họ",
     "Download SideInstaller": "Tải SideInstaller",
     "Install on their iPhone": "Cài lên iPhone của họ",
-    "Enter the other iPhone's IP address. It's in Settings › Wi-Fi, next to the network it's on.":
-        "Nhập địa chỉ IP của chiếc iPhone kia. Nó nằm trong Cài đặt › Wi-Fi, ngay cạnh mạng mà máy đang kết nối.",
     "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
         "“%@” không phải là địa chỉ IPv4. Nó phải có dạng 192.168.1.42.",
     "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
         "%@ là địa chỉ mà chính chiếc iPhone này đang dùng. Side by Side cài lên iPhone của người khác — hãy dùng địa chỉ của họ. Để cài lên máy này, hãy dùng tab Cài ứng dụng.",
+    "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the Install tab.":
+        "iPhone vừa ghép nối là chính máy này. Hãy ghép nối từ Cài đặt trên iPhone của họ. Để cài lên iPhone này, hãy dùng tab Cài ứng dụng.",
     "Enter the Apple ID to sign with, and its password.":
         "Nhập Apple ID dùng để ký và mật khẩu của nó.",
     "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
@@ -409,7 +409,9 @@ let vietnameseStrings: [String: String] = [
     "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
         "iPhone của họ cần iOS %@: sau khi cài, SideInstaller tự ghép nối, còn các phiên bản cũ hơn thì không thể.",
     "Their iPhone": "iPhone của họ",
-    "IP address (e.g. 192.168.1.42)": "Địa chỉ IP (ví dụ 192.168.1.42)",
+    "IP address (optional)": "Địa chỉ IP (không bắt buộc)",
+    "Optional: leave it empty, and it fills in when their iPhone pairs.":
+        "Không bắt buộc: để trống, địa chỉ sẽ tự điền khi iPhone của họ ghép nối.",
     "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
         "Trên iPhone của họ: Cài đặt › Wi-Fi › ⓘ cạnh tên mạng, rồi xem “Địa chỉ IP”.",
     "This iPhone is %@, so theirs will look similar.":
@@ -455,6 +457,8 @@ let vietnameseStrings: [String: String] = [
     "Start the install": "Bắt đầu cài đặt",
     "Install again": "Cài lại",
     "Clear their details": "Xóa thông tin của họ",
+    "This iPhone is still paired with theirs. Clearing forgets it.":
+        "iPhone này vẫn đang ghép nối với iPhone của họ. Xóa sẽ bỏ ghép nối đó.",
     "Last step: they trust %@": "Bước cuối: họ tin cậy %@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "Trên iPhone của họ: Cài đặt › Cài đặt chung › VPN & Quản lý thiết bị.",

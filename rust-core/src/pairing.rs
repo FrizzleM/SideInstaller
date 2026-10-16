@@ -37,6 +37,8 @@ pub struct PairResult {
     pub device_udid: *mut c_char,
     pub pairing_file_path: *mut c_char,
     pub host_alt_irk_hex: *mut c_char,
+    /// The address the device connected from: its IP on this network.
+    pub device_address: *mut c_char,
 }
 
 impl PairResult {
@@ -48,6 +50,7 @@ impl PairResult {
             device_udid: ptr::null_mut(),
             pairing_file_path: ptr::null_mut(),
             host_alt_irk_hex: ptr::null_mut(),
+            device_address: ptr::null_mut(),
         }
     }
 }
@@ -107,6 +110,7 @@ pub unsafe fn run_host(
             (*out).device_udid = cstr(res.udid);
             (*out).pairing_file_path = cstr(res.path);
             (*out).host_alt_irk_hex = cstr(res.host_alt_irk_hex);
+            (*out).device_address = cstr(res.address);
             0
         }
         Err(e) => {
@@ -122,6 +126,7 @@ struct Paired {
     udid: String,
     path: String,
     host_alt_irk_hex: String,
+    address: String,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -233,6 +238,8 @@ async fn run(
         udid: peer.remotepairing_udid,
         path: out_path,
         host_alt_irk_hex: hex(&host_alt_irk),
+        // The device dialled us over the network, so this is where to reach it.
+        address: peer_addr.ip().to_canonical().to_string(),
     })
 }
 
@@ -297,6 +304,7 @@ pub unsafe fn result_free(r: *mut PairResult) {
         (*r).device_udid,
         (*r).pairing_file_path,
         (*r).host_alt_irk_hex,
+        (*r).device_address,
     ] {
         if !p.is_null() {
             drop(CString::from_raw(p));

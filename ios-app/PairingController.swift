@@ -120,6 +120,8 @@ final class PairingController {
         let path: String
         let deviceName: String
         let deviceModel: String
+        /// The address it connected from: its IP on this network.
+        let address: String
     }
 
     /// One run of the host. Main-actor bound like the controller: the
@@ -309,7 +311,8 @@ final class PairingController {
                     name: cStr(result.device_name),
                     model: cStr(result.device_model),
                     udid: cStr(result.device_udid),
-                    path: cStr(result.pairing_file_path))
+                    path: cStr(result.pairing_file_path),
+                    address: cStr(result.device_address))
             } else {
                 let msg = cStr(result.error)
                 outcome = .failure(msg.isEmpty ? "pairing failed (rc=\(rc))" : msg)
@@ -324,7 +327,7 @@ final class PairingController {
     }
 
     private enum PairOutcome {
-        case success(name: String, model: String, udid: String, path: String)
+        case success(name: String, model: String, udid: String, path: String, address: String)
         case failure(String)
     }
 
@@ -356,7 +359,7 @@ final class PairingController {
         engine.pairingPIN = nil
 
         switch outcome {
-        case let .success(name, model, udid, path):
+        case let .success(name, model, udid, path, address):
             let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? 0
             engine.log("RPPairing: SUCCESS — \(model), UDID \(udid)")
             engine.log("RPPairing: pairing file written to \(path) (\(size) bytes)")
@@ -373,7 +376,8 @@ final class PairingController {
                 // The merged file is now stale; the cached lockdown record is kept.
                 CompositePairingFile.invalidateMerged()
                 overSettings.finish(paired: true)
-                resolve(run, .success(PairedDevice(path: path, deviceName: name, deviceModel: model)))
+                resolve(run, .success(PairedDevice(path: path, deviceName: name, deviceModel: model,
+                                                   address: address)))
             }
         case let .failure(message):
             // A cancelled run ends with whatever the woken host failed on.
@@ -386,14 +390,15 @@ final class PairingController {
 
     private func finishPeer(_ outcome: PairOutcome, _ run: HostRun) {
         switch outcome {
-        case let .success(name, model, udid, path):
+        case let .success(name, model, udid, path, address):
             let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? 0
-            engine.log("RPPairing: SUCCESS — \(model), UDID \(udid)")
+            engine.log("RPPairing: SUCCESS — \(model), UDID \(udid), connected from \(address)")
             engine.log("RPPairing: their pairing file written to \(path) (\(size) bytes)")
             if size == 0 {
                 resolve(run, .failure(PairingError.zeroBytes))
             } else {
-                resolve(run, .success(PairedDevice(path: path, deviceName: name, deviceModel: model)))
+                resolve(run, .success(PairedDevice(path: path, deviceName: name, deviceModel: model,
+                                                   address: address)))
             }
         case let .failure(message):
             // A cancelled run ends with whatever the woken host failed on.

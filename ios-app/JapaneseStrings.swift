@@ -675,15 +675,17 @@ let japaneseStrings: [String: String] = [
         "相手の iPhone には iOS %@ が必要です。インストール後、SideInstaller は自分でペアリングしますが、それより古いバージョンではできません。",
     "Their iPhone": "相手の iPhone",
     "This iPhone is %@, so theirs will look similar.": "この iPhone は %@ です。相手のアドレスもこれに近い形になります。",
-    "IP address (e.g. 192.168.1.42)": "IP アドレス（例：192.168.1.42）",
-    "Enter the other iPhone's IP address. It's in Settings › Wi-Fi, next to the network it's on.":
-        "相手の iPhone の IP アドレスを入力してください。「設定」>「Wi-Fi」の、接続中のネットワークの横で確認できます。",
+    "IP address (optional)": "IP アドレス（任意）",
+    "Optional: leave it empty, and it fills in when their iPhone pairs.":
+        "任意：空欄のままにすると、相手の iPhone がペアリングしたときに自動で入力されます。",
     "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
         "相手の iPhone で「設定」>「Wi-Fi」>ネットワーク横の ⓘ >「IP アドレス」の順に開きます。",
     "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
         "「%@」は IPv4 アドレスではありません。192.168.1.42 のような形式で入力してください。",
     "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
         "%@ はこの iPhone 自身のアドレスです。Side by Side は他の人の iPhone にインストールするための機能なので、相手のアドレスを入力してください。この iPhone にインストールするには「インストール」タブを使用してください。",
+    "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the Install tab.":
+        "ペアリングしたのはこの iPhone でした。相手の iPhone の「設定」からペアリングしてください。この iPhone にインストールするには「インストール」タブを使用してください。",
     "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
         "Wi-Fi がオフになっています。この機能を使うには、両方の iPhone が同じ Wi-Fi ネットワークに接続されている必要があります。",
     "Pair with their iPhone": "相手の iPhone とペアリング",
@@ -696,6 +698,8 @@ let japaneseStrings: [String: String] = [
         "ヒント：その iPhone/iPad の持ち主の Apple アカウントの認証情報を使ってください",
     "Use my saved Apple ID instead": "保存済みの自分の Apple ID を使用",
     "Clear their details": "入力した情報を消去",
+    "This iPhone is still paired with theirs. Clearing forgets it.":
+        "この iPhone はまだ相手の iPhone とペアリングされています。消去するとこのペアリングも削除されます。",
     "Download SideInstaller": "SideInstaller をダウンロード",
     "Couldn't download the latest SideInstaller release: %@": "SideInstaller の最新リリースをダウンロードできませんでした：%@",
     "The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute.":

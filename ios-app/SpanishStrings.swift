@@ -385,12 +385,12 @@ let spanishStrings: [String: String] = [
     "Sign in to their Apple ID": "Iniciar sesión en su Apple ID",
     "Download SideInstaller": "Descargar SideInstaller",
     "Install on their iPhone": "Instalar en su iPhone",
-    "Enter the other iPhone's IP address. It's in Settings › Wi-Fi, next to the network it's on.":
-        "Introduce la dirección IP del otro iPhone. Está en Ajustes › Wi-Fi, junto a la red a la que está conectado.",
     "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
         "“%@” no es una dirección IPv4. Debe tener este aspecto: 192.168.1.42.",
     "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
         "%@ es una dirección que este iPhone ya tiene. Side by Side instala en el iPhone de otra persona: usa el suyo. Para instalar en este, usa la pestaña Instalar.",
+    "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the Install tab.":
+        "El iPhone que se emparejó es este. Empareja desde los Ajustes de su iPhone. Para instalar en este iPhone, usa la pestaña Instalar.",
     "Enter the Apple ID to sign with, and its password.":
         "Introduce el Apple ID con el que firmar y su contraseña.",
     "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
@@ -413,7 +413,9 @@ let spanishStrings: [String: String] = [
     "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
         "Su iPhone necesita iOS %@: una vez instalado, SideInstaller se empareja solo, y las versiones anteriores no pueden.",
     "Their iPhone": "Su iPhone",
-    "IP address (e.g. 192.168.1.42)": "Dirección IP (p. ej. 192.168.1.42)",
+    "IP address (optional)": "Dirección IP (opcional)",
+    "Optional: leave it empty, and it fills in when their iPhone pairs.":
+        "Opcional: déjala vacía y se rellena sola cuando su iPhone se empareje.",
     "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
         "En su iPhone: Ajustes › Wi-Fi › ⓘ junto a la red y luego “Dirección IP”.",
     "This iPhone is %@, so theirs will look similar.":
@@ -459,6 +461,8 @@ let spanishStrings: [String: String] = [
     "Start the install": "Iniciar la instalación",
     "Install again": "Instalar otra vez",
     "Clear their details": "Borrar sus datos",
+    "This iPhone is still paired with theirs. Clearing forgets it.":
+        "Este iPhone sigue emparejado con el suyo. Al borrar, se olvida ese emparejamiento.",
     "Last step: they trust %@": "Último paso: confían en %@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "En su iPhone: Ajustes › General › VPN y gestión de dispositivos.",
