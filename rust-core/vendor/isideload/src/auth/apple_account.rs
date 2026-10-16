@@ -861,7 +861,8 @@ impl AppleAccount {
             .context("Failed to send initial login request")?;
 
         // Anisette servers on Apple's Windows ADI library (ani.jkcoxson.com,
-        // win.ani.sidestore.io) get this at the first sign-in of a machine:
+        // win.ani.sidestore.io) get this at the first sign-in of a machine
+        // (the macOS-ADI ones haven't, 2026-10-16):
         // hsc 434, -22421 "This action could not be completed. Try again.", with
         // resync data for the ADI library. Once the server has applied it, the
         // same request goes through, and later sign-ins need no resync.

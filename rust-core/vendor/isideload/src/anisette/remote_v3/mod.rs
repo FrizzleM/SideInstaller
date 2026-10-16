@@ -61,8 +61,9 @@ const STOCK_CLIENTS: [&str; 2] = [
 /// The server's own, unless it is a stock one or an Android phone's (which
 /// Apple answers with 503): then `WINDOWS_CLIENT_INFO`. A server that hands out
 /// something else made it for the library it runs, as the Windows-ADI servers
-/// do, and so will a server on another library (SideStore's planned macOS
-/// one, anisette v4's server-chosen client).
+/// do and the macOS-ADI ones (mac-ani.jkcoxson.com, new.ani.sidestore.io:
+/// `<MacBookPro13,3> <Mac OS X;10.12.6;16G29>`, which Apple accepts from them),
+/// and so will anisette v4's server-chosen client.
 pub fn client_info_to_use(advertised: &AnisetteClientInfo) -> AnisetteClientInfo {
     let client = advertised.client_info.trim();
     let stock = STOCK_CLIENTS.iter().any(|s| client.starts_with(s));
@@ -707,11 +708,17 @@ mod tests {
     fn a_server_made_client_is_kept() {
         let used = client_info_to_use(&info(WINDOWS_CLIENT_INFO, "akd/1.0 CFNetwork/808.1.4"));
         assert_eq!(used.client_info, WINDOWS_CLIENT_INFO);
-        // A Mac-ADI server would name a Mac of its own.
+        // A Mac-ADI server names a Mac of its own.
         let mac = "<Mac14,2> <macOS;14.6;23G80> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
         let used = client_info_to_use(&info(mac, ""));
         assert_eq!(used.client_info, mac);
         assert_eq!(used.user_agent, AKD_USER_AGENT);
+        // What mac-ani.jkcoxson.com and new.ani.sidestore.io hand out.
+        let mac_adi = "<MacBookPro13,3> <Mac OS X;10.12.6;16G29> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+        let ua = "akd/1.0 CFNetwork/811.5.4 Darwin/16.7.0";
+        let used = client_info_to_use(&info(mac_adi, ua));
+        assert_eq!(used.client_info, mac_adi);
+        assert_eq!(used.user_agent, ua);
     }
 
     #[test]
