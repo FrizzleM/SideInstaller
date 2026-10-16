@@ -35,6 +35,11 @@ All notable changes to SideInstaller are documented here.
 - **Sign-in reports the same device from start to finish.** The verification-code requests, which
   SideInstaller sent as a Mac since 1.5.1, now go as the Windows PC like the rest, since Apple
   accepts them from it. If Apple turns them away, they go as a Mac again.
+- **LocalDevVPN starts when it's needed, not when SideInstaller opens.** The setting is now
+  “Start LocalDevVPN when needed”, and your choice carries over. With it on, opening SideInstaller
+  no longer sends you to LocalDevVPN. Installing, scanning or writing on the Pairing page, loading
+  or refreshing on the Apps page, and setting a location start it when the tunnel is off, then carry
+  on once you're back. Opening the Apps or Location page uses the tunnel only if it's already up.
 
 ## 1.5.2
 

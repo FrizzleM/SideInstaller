@@ -140,20 +140,23 @@ final class Engine: ObservableObject {
     }
     /// Servers for the picker; a bundled snapshot until the live list loads.
     @Published private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
-    /// "Start LocalDevVPN when SideInstaller opens" setting. On by default, since
-    /// every page needs the tunnel. Stored here (not `@AppStorage`) so the launch
-    /// hook and the Settings toggle share one value.
+    /// "Start LocalDevVPN when needed" setting: whatever needs the tunnel starts
+    /// LocalDevVPN when it's down, instead of asking for it. On by default.
+    /// Stored here (not `@AppStorage`) so the engine and the Settings toggle
+    /// share one value.
     @Published var autoStartVPN: Bool =
         (UserDefaults.standard.object(forKey: Engine.autoStartVPNKey) as? Bool) ?? true {
         didSet {
             guard autoStartVPN != oldValue else { return }
             UserDefaults.standard.set(autoStartVPN, forKey: Engine.autoStartVPNKey)
             log(autoStartVPN
-                ? "LocalDevVPN will be started when SideInstaller opens."
-                : "LocalDevVPN will no longer be started when SideInstaller opens.")
+                ? "LocalDevVPN will be started whenever something needs the tunnel."
+                : "LocalDevVPN will no longer be started for you.")
         }
     }
 
+    /// Kept from when the setting started LocalDevVPN at launch, so the choice
+    /// carries over.
     static let autoStartVPNKey = "autoStartLocalDevVPN"
 
     // The loopback VPN's device-side IP; configurable in Advanced.
@@ -574,14 +577,15 @@ final class Engine: ObservableObject {
             log("⛔️ No IPA imported yet. Tap “Import .ipa” and pick one, then tap Install again.")
             return
         }
-        // The install runs over the loopback tunnel, so require it up front.
+        // The install runs over the loopback tunnel, so require it up front,
+        // unless the run can start LocalDevVPN itself (see `ensureNetwork`).
         refreshNetworkStatus()
         guard !needsFreshPairing || wifiConnected else {
             setGuide(Guides.wifi)
             log("⛔️ Wi-Fi is off, and pairing this iPhone needs it. Connect to a Wi-Fi network, then tap Install again.")
             return
         }
-        guard vpnConnected else {
+        guard tunnelAvailable else {
             setGuide(Guides.vpn)
             log("⛔️ No loopback VPN is connected. Turn one on, then tap Install again.")
             return
@@ -765,6 +769,9 @@ final class Engine: ObservableObject {
     @MainActor
     private func ensureNetwork() async throws {
         setStep(.network, .active)
+        // With “Start LocalDevVPN when needed” on, a missing tunnel is started
+        // now; if it still doesn't come up, the wait below asks for it.
+        _ = await tunnelUp()
         // The blocker last logged, so each one is announced once.
         var announced: String?
         while true {
@@ -774,6 +781,12 @@ final class Engine: ObservableObject {
             // Only a run that pairs needs Wi-Fi; the tunnel is always required.
             let wifiSatisfied = wifi || !needsFreshPairing
             if wifiSatisfied && vpn {
+                // Install checks this too, but only while a tunnel is up, and
+                // this run may have started it.
+                if NetworkStatus.isOwnAddress(deviceHost) {
+                    setGuide(Guides.deviceIPMismatch)
+                    throw EngineError.message(L("Wrong device IP"))
+                }
                 log("Network OK: \(detail)")
                 setStep(.network, .done)
                 setGuide(nil)
@@ -2258,7 +2271,8 @@ final class Engine: ObservableObject {
         return UIApplication.shared.canOpenURL(url)
     }
 
-    /// Time of the last handover, so returning from LocalDevVPN doesn't trigger another.
+    /// Time of the last handover, so a second caller waits for it instead of
+    /// opening LocalDevVPN again.
     private var lastVPNStartAttempt: Date?
 
     /// Opens LocalDevVPN to connect its tunnel and return. Returns false if it
@@ -2278,25 +2292,39 @@ final class Engine: ObservableObject {
         return true
     }
 
-    /// Starts LocalDevVPN when the setting is on and no tunnel is up. Called on
-    /// every app activation, so a tunnel dropped while backgrounded is caught too.
+    /// True when something that needs the tunnel starts LocalDevVPN itself, so
+    /// the UI needn't ask for the tunnel first.
+    var startsVPNWhenNeeded: Bool { autoStartVPN && localDevVPNInstalled }
+
+    /// True when the tunnel is up, or will be started by what needs it.
+    var tunnelAvailable: Bool { vpnConnected || startsVPNWhenNeeded }
+
+    /// Makes sure the tunnel is up for something about to use it. With “Start
+    /// LocalDevVPN when needed” on and no tunnel, hands over to LocalDevVPN and
+    /// waits for the tunnel once SideInstaller is back. Returns whether it's up.
     @MainActor
-    func autoStartVPNIfWanted() {
-        guard autoStartVPN else { return }
-        // Wait until onboarding (terms and account setup) is finished.
-        let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: "hasAcceptedTOS"),
-              defaults.bool(forKey: "hasCompletedAccountSetup") else { return }
-        // Skip for 30s after a handover, so returning from LocalDevVPN doesn't
-        // immediately open it again.
-        if let last = lastVPNStartAttempt, Date().timeIntervalSince(last) < 30 { return }
+    func tunnelUp() async -> Bool {
         refreshNetworkStatus()
-        guard !vpnConnected else { return }
-        guard localDevVPNInstalled else {
-            log("⚠️ “Start LocalDevVPN on launch” is on, but LocalDevVPN isn't installed.")
-            return
+        guard !vpnConnected, startsVPNWhenNeeded else { return vpnConnected }
+        // A handover a moment ago is still under way: wait for it, don't
+        // open LocalDevVPN again.
+        let handingOver = lastVPNStartAttempt.map { Date().timeIntervalSince($0) < 5 } ?? false
+        guard handingOver || startLocalDevVPN() else { return false }
+        // Only time back in SideInstaller counts, so a while spent in
+        // LocalDevVPN (its VPN permission prompt, say) doesn't use up the wait.
+        var waited = 0.0
+        while waited < 15 {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if Task.isCancelled { return false }
+            refreshNetworkStatus()
+            if vpnConnected {
+                log("Tunnel up.")
+                return true
+            }
+            if UIApplication.shared.applicationState == .active { waited += 0.5 }
         }
-        startLocalDevVPN()
+        log("⚠️ LocalDevVPN didn't connect its tunnel.")
+        return false
     }
 
     /// Start the RPPairing host; it reports back through the shared engine.
@@ -2520,9 +2548,8 @@ final class Engine: ObservableObject {
     /// a fresh tunnel: `isConnected` still reads true after iOS tears one down.
     @MainActor
     private func ensurePairingConnection() async throws {
-        refreshNetworkStatus()
         // No Wi-Fi check: this all runs over the loopback tunnel.
-        guard vpnConnected else {
+        guard await tunnelUp() else {
             throw EngineError.message(L("LocalDevVPN isn't connected. Connect it, then try again."))
         }
         let path = pairingFilePath ?? PairingController.pairingFilePath()

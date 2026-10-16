@@ -475,7 +475,7 @@ let portugueseStrings: [String: String] = [
     "Tunnel": "Túnel",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "Algo em %@:%d recusou a conexão, então o túnel está funcionando: é o dispositivo que não está escutando na porta de pareamento. Essa porta só abre com o Modo de Desenvolvedor ligado, e o iOS pede de novo depois de cada reinício: ative em Ajustes › Privacidade e Segurança › Modo de Desenvolvedor e tente outra vez. Se já estiver ligado, pareie este iPhone de novo em “Arquivo de pareamento”.",
-    "Start LocalDevVPN on launch": "Iniciar o LocalDevVPN ao abrir",
+    "Start LocalDevVPN when needed": "Iniciar o LocalDevVPN quando for preciso",
     "Start LocalDevVPN now": "Iniciar o LocalDevVPN agora",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "O LocalDevVPN não está instalado. Baixe-o na App Store e o SideInstaller poderá iniciá-lo para você.",

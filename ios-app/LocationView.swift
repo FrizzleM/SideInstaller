@@ -121,15 +121,16 @@ final class LocationManager: ObservableObject {
     /// Runs setup in the background: downloads the disk image, mounts it if the
     /// device has none, and opens the DVT session.
     ///
-    /// Called when the page opens. Failures (usually no tunnel yet) are only
-    /// logged; `simulate` repeats the setup and shows errors to the user.
+    /// Called when the page opens. Without a tunnel it stops after the
+    /// download, since opening the page doesn't start LocalDevVPN. Failures are
+    /// only logged; `simulate` repeats the setup and shows errors to the user.
     ///
     /// Uses its own task, so leaving the page doesn't cancel it.
     func prepareQuietly() {
         guard stage != .ready, !isBusy else { return }
         isBusy = true
         Task {
-            do { try await ensureReady() }
+            do { try await ensureReady(quietly: true) }
             catch is CancellationError { }
             catch { engine.log("Location: not ready yet (\(message(error)))") }
             isBusy = false
@@ -138,12 +139,20 @@ final class LocationManager: ObservableObject {
 
     /// Download the image if it's missing, mount it if the device has none, and
     /// open the location session. Every step is a no-op once it has run, so this
-    /// is cheap to call again.
-    private func ensureReady() async throws {
+    /// is cheap to call again. `quietly` leaves the device alone unless the
+    /// tunnel is already up.
+    private func ensureReady(quietly: Bool = false) async throws {
         guard stage != .ready else { return }
         if !DeveloperDiskImage.isDownloaded {
             stage = .downloading
             try await DeveloperDiskImage.downloadMissing { _ in }
+        }
+        if quietly {
+            engine.refreshNetworkStatus()
+            guard engine.vpnConnected else {
+                stage = .notReady
+                return
+            }
         }
         stage = .mounting
         // Mount progress goes to the activity log only.
@@ -289,7 +298,8 @@ struct LocationView: View {
         ScrollView {
             VStack(spacing: 18) {
                 header.cascadeItem(0)
-                if !engine.vpnConnected {
+                // No note when Set location starts LocalDevVPN itself.
+                if !engine.tunnelAvailable {
                     vpnNote.cascadeItem(1)
                 }
                 mapCard.cascadeItem(2)
@@ -394,7 +404,7 @@ struct LocationView: View {
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(manager.isBusy || !engine.vpnConnected || engine.isRunning)
+                .disabled(manager.isBusy || !engine.tunnelAvailable || engine.isRunning)
 
                 if manager.isSimulating {
                     Button { manager.stop() } label: {

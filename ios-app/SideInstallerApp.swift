@@ -15,9 +15,6 @@ struct SideInstallerApp: App {
     /// False until account setup is completed or skipped. Never reset, even if
     /// all accounts are removed later.
     @AppStorage("hasCompletedAccountSetup") private var hasCompletedAccountSetup = false
-    /// Observed to run the LocalDevVPN auto-start each time the app becomes
-    /// active.
-    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         // A pairing code still up from a run that was killed means nothing now.
@@ -58,11 +55,6 @@ struct SideInstallerApp: App {
             }
             .animation(.smooth(duration: 0.5), value: hasAcceptedTOS)
             .animation(.smooth(duration: 0.5), value: hasCompletedAccountSetup)
-            // Auto-start LocalDevVPN on activation; `autoStartVPNIfWanted`
-            // checks the setting and other conditions.
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .active { engine.autoStartVPNIfWanted() }
-            }
             // Files opened in the app (share sheet, "Open with", other apps), as
             // an alternative to the document picker.
             .onOpenURL { url in

@@ -170,12 +170,13 @@ struct SettingsView: View {
 
     // MARK: Tunnel
 
-    /// LocalDevVPN controls: start on launch, or start now. Uses LocalDevVPN's
-    /// `localdevvpn://enable` URL, which connects and then returns to this app.
+    /// LocalDevVPN controls: start it whenever something needs the tunnel, or
+    /// start it now. Uses LocalDevVPN's `localdevvpn://enable` URL, which
+    /// connects and then returns to this app.
     @ViewBuilder
     private var tunnelSection: some View {
         Section {
-            Toggle(L("Start LocalDevVPN on launch"), isOn: $engine.autoStartVPN)
+            Toggle(L("Start LocalDevVPN when needed"), isOn: $engine.autoStartVPN)
             Button {
                 engine.startLocalDevVPN()
             } label: {

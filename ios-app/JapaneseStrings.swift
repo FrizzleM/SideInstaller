@@ -378,7 +378,7 @@ let japaneseStrings: [String: String] = [
     "Tunnel": "トンネル",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "%@:%d で接続が拒否されました。トンネルは通っていて、デバイスがペアリング用のポートで待ち受けていないだけです。このポートはデベロッパモードが有効なときだけ開き、再起動のたびに iOS が確認を求めます。「設定 › プライバシーとセキュリティ › デベロッパモード」で有効にしてから、もう一度お試しください。すでに有効な場合は、「ペアリングファイル」からこの iPhone をペアリングし直してください。",
-    "Start LocalDevVPN on launch": "起動時に LocalDevVPN を開始",
+    "Start LocalDevVPN when needed": "必要なときに LocalDevVPN を開始",
     "Start LocalDevVPN now": "今すぐ LocalDevVPN を開始",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "LocalDevVPN がインストールされていません。App Store から入手すると、SideInstaller が起動できるようになります。",
