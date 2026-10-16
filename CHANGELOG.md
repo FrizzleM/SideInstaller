@@ -2,6 +2,16 @@
 
 All notable changes to SideInstaller are documented here.
 
+## 1.5.4
+
+### Fixed
+- **Pairing works when SideInstaller runs inside LiveContainer.** Before pairing, SideInstaller
+  checks Local Network access by looking for a Bonjour service of its own. Inside LiveContainer,
+  iOS only allows the service types listed by LiveContainer, and SideInstaller's wasn't one of
+  them, so the check always failed and pairing stopped at “Local Network denied” even with access
+  turned on for LiveContainer (issue #38). The check now uses StikPair's service type, which
+  LiveContainer lists.
+
 ## 1.5.3
 
 ### Fixed

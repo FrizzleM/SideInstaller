@@ -9,8 +9,11 @@ final class LocalNetworkAuthorization {
     private var listener: NWListener?
     private var continuation: CheckedContinuation<Bool, Never>?
 
-    // Must match an entry in Info.plist NSBonjourServices.
-    private let probeType = "_sideinstallerprobe._tcp"
+    // Must be in NSBonjourServices of the bundle the process runs as, or the
+    // browse fails and reads as "denied". Inside LiveContainer that's
+    // LiveContainer's Info.plist, which lists StikPair's probe type but not one
+    // of ours, so we use StikPair's (ours lists it too).
+    private let probeType = "_stikpairprobe._tcp"
 
     func request(timeout: TimeInterval = 60) async -> Bool {
         await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
