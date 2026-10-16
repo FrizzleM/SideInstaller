@@ -45,6 +45,25 @@ struct Guide: Hashable {
     var actionURL: URL? { actionURLString.flatMap(URL.init(string:)) }
 }
 
+/// What signing a custom IPA costs in App IDs, shown before it's signed.
+struct AppIDCost: Hashable {
+    /// The App IDs signing would register: one for the app and one for each
+    /// extension that the Apple ID doesn't have yet.
+    let newIDs: [String]
+    /// How many more Apple allows now; nil when it doesn't say.
+    let available: Int?
+    /// The limit, 10 a week for a free Apple ID; nil when Apple doesn't say.
+    let limit: Int?
+    /// When the soonest of the Apple ID's App IDs expires, freeing its slot.
+    let nextExpiry: Date?
+
+    var cost: Int { newIDs.count }
+    /// False when Apple says too few are left: signing would stop with 9120.
+    var isAffordable: Bool { available.map { cost <= $0 } ?? true }
+    /// What's left once this install has registered its App IDs.
+    var remainingAfter: Int? { available.map { Swift.max(0, $0 - cost) } }
+}
+
 /// A step failure carrying a user-facing message.
 enum EngineError: LocalizedError {
     case message(String)
@@ -392,6 +411,10 @@ final class Engine: ObservableObject {
     @Published private(set) var isImportingIPA = false
     /// Download progress of a link import (0…1); nil for file imports.
     @Published private(set) var importProgress: Double?
+    /// The App ID cost a custom IPA's run is waiting on the go-ahead for.
+    @Published private(set) var appIDCost: AppIDCost?
+    /// Resumed with the answer to `appIDCost`: true to sign and install.
+    private var appIDCostReply: CheckedContinuation<Bool, Never>?
 
     // 2FA bridge: the FFI callback blocks on this semaphore until the UI answers.
     /// What the two-factor sheet shows; nil while no sign-in is asking.
@@ -526,6 +549,7 @@ final class Engine: ObservableObject {
             self.successClosed = false
             self.liveContainerImportClosed = false
             self.certConflict = false
+            self.appIDCost = nil
             self.madeiraHandoff = MadeiraHandoff()
         }
     }
@@ -612,6 +636,11 @@ final class Engine: ObservableObject {
                 startDevicePreparation()
                 try await signInStep()
                 try await download()
+                // Signing registers App IDs, which a free Apple ID has few of,
+                // so an imported IPA waits for the go-ahead first.
+                if downloadedSource == .custom {
+                    try await confirmAppIDCost()
+                }
                 // Most of the app is the same signed or not, so that part goes
                 // to the device while signing runs.
                 startPrestage()
@@ -676,6 +705,8 @@ final class Engine: ObservableObject {
         case success(String, leads: Bool)
         /// LiveContainer still needs SideStore's certificate imported.
         case liveContainerImport
+        /// What signing an imported IPA costs in App IDs, before it's signed.
+        case appIDCost(AppIDCost)
     }
 
     /// True while the run is held up on the user — joining Wi-Fi, connecting
@@ -689,7 +720,8 @@ final class Engine: ObservableObject {
     var popups: [Popup] {
         if isRunning {
             guard isWaitingOnUser else { return [] }
-            return [pairingPIN.map(Popup.pairingCode), guide.map(Popup.guide)].compactMap { $0 }
+            return [pairingPIN.map(Popup.pairingCode), guide.map(Popup.guide),
+                    appIDCost.map(Popup.appIDCost)].compactMap { $0 }
         }
         if finished { return finishedPopups }
         var shown: [Popup] = []
@@ -717,8 +749,8 @@ final class Engine: ObservableObject {
     /// True for a popup the run is waiting on: closing it cancels the install.
     func blocks(_ popup: Popup) -> Bool {
         switch popup {
-        case .pairingCode, .guide: return isWaitingOnUser
-        default:                   return false
+        case .pairingCode, .guide, .appIDCost: return isWaitingOnUser
+        default:                               return false
         }
     }
 
@@ -741,6 +773,7 @@ final class Engine: ObservableObject {
         case .error:               lastError = nil
         case .success:             successClosed = true
         case .liveContainerImport: liveContainerImportClosed = true
+        case .appIDCost:           appIDCost = nil
         }
     }
 
@@ -1626,6 +1659,80 @@ final class Engine: ObservableObject {
     }
 
     // MARK: Step 6 — sign the IPA
+
+    /// Shows what signing the imported IPA costs in App IDs and how many the
+    /// Apple ID has left, and waits for the go-ahead. Signing registers one for
+    /// the app and each extension the Apple ID doesn't have yet, and a free
+    /// Apple ID gets 10 a week. If Apple can't be asked, signing goes ahead: it
+    /// asks the same thing first and stops on a shortfall itself.
+    @MainActor
+    private func confirmAppIDCost() async throws {
+        guard let session = signSession, let ipa = downloadedIPAPath else { return }
+        let bundleIDs = IPALibrary.bundleIdentifiers(at: URL(fileURLWithPath: ipa))
+        guard !bundleIDs.isEmpty else {
+            log("⚠️ Couldn't read the IPA's bundle IDs, so its App ID cost isn't known; signing goes ahead.")
+            return
+        }
+        setStep(.sign, .active)
+        let cost: AppIDCost
+        do {
+            cost = try await onSignQueue { try self.performAppIDQuota(session: session, bundleIDs: bundleIDs) }
+        } catch {
+            log("⚠️ Couldn't check this Apple ID's App IDs (\(short(error))); signing goes ahead.")
+            return
+        }
+        try Task.checkCancellation()
+        let left = cost.available.map(String.init) ?? "unknown"
+        log("App IDs: this app needs \(cost.cost) new (\(cost.newIDs.joined(separator: ", "))); \(left) left. Waiting for the go-ahead.")
+        appIDCost = cost
+        setStep(.sign, .waiting)
+        let proceed = await withTaskCancellationHandler {
+            await withCheckedContinuation { appIDCostReply = $0 }
+        } onCancel: {
+            Task { @MainActor in self.answerAppIDCost(false) }
+        }
+        appIDCost = nil
+        guard proceed else { throw CancellationError() }
+        log("App IDs: going ahead.")
+        setStep(.sign, .active)
+    }
+
+    /// Answers the App ID cost popup: true signs and installs, false stops the
+    /// run. Does nothing once answered.
+    @MainActor
+    func answerAppIDCost(_ proceed: Bool) {
+        guard let reply = appIDCostReply else { return }
+        appIDCostReply = nil
+        if proceed {
+            reply.resume(returning: true)
+        } else {
+            // The run ends cancelled, the same as closing the popup.
+            reply.resume(returning: false)
+            cancelOneClick()
+        }
+    }
+
+    private func performAppIDQuota(session: OpaquePointer, bundleIDs: [String]) throws -> AppIDCost {
+        struct Quota: Decodable {
+            let new_ids: [String]
+            let available: Int?
+            let max: Int?
+            let next_expiry: Double?
+        }
+        var json: UnsafeMutablePointer<CChar>?
+        var error: UnsafeMutablePointer<CChar>?
+        let rc = si_appid_quota(session, bundleIDs.joined(separator: "\n"), &json, &error)
+        guard rc == 0 else {
+            let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
+            error.map { si_string_free($0) }
+            throw EngineError.message(msg)
+        }
+        let text = json.map { String(cString: $0) } ?? ""
+        json.map { si_string_free($0) }
+        let quota = try JSONDecoder().decode(Quota.self, from: Data(text.utf8))
+        return AppIDCost(newIDs: quota.new_ids, available: quota.available, limit: quota.max,
+                         nextExpiry: quota.next_expiry.map(Date.init(timeIntervalSince1970:)))
+    }
 
     @MainActor
     private func signApp() async throws {

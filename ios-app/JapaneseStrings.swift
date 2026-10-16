@@ -817,4 +817,20 @@ let japaneseStrings: [String: String] = [
         "このペアリングファイルには、%@ が読み取れる唯一の形式である RPPairing レコードがありません。",
     "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
         "Windows 向け PC ゲームを iPhone で動かします。Will Faust 開発、GPL-3.0 ライセンス。",
+
+    // MARK: - App ID cost
+
+    "App IDs for this app": "このアプリの App ID",
+    "Cost": "使用数",
+    "Left now": "現在の残り",
+    "Left after": "インストール後",
+    "New App IDs": "新しい App ID",
+    "This Apple ID doesn't have enough App IDs left: this app needs %d, and %d are left. Each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "この Apple ID には App ID が足りません。このアプリには %d 個必要ですが、残りは %d 個です。それぞれ 7 日間カウントされるので、期限切れを待つか、別の Apple ID でサインインしてください。",
+    "The next one frees up on %@.": "次の 1 個は %@ に空きます。",
+    "Your Apple ID already has every App ID this app needs, so installing it uses none.":
+        "このアプリに必要な App ID はすべて Apple ID に登録済みなので、インストールしても消費しません。",
+    "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
+        "署名すると、アプリと各拡張機能にそれぞれ App ID が 1 個ずつ登録され、それぞれ 7 日間カウントされます。",
+    "This Apple ID can register %d a week.": "この Apple ID で登録できるのは週に %d 個までです。",
 ]

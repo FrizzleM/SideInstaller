@@ -4,6 +4,14 @@ All notable changes to SideInstaller are documented here.
 
 ## 1.5.4
 
+### Added
+- **A custom .ipa shows its App ID cost before it's signed.** Signing registers an App ID for the
+  app and for each of its extensions, and a free Apple ID can register only 10 a week. After
+  sign-in, the install now stops on a popup listing the new App IDs it needs, how many the Apple
+  ID has left now, and how many will be left afterwards, then waits for Install or Cancel. When too
+  few are left, it says so, shows when the next one frees up, and offers only Cancel, since signing
+  would fail anyway.
+
 ### Fixed
 - **Pairing works when SideInstaller runs inside LiveContainer.** Before pairing, SideInstaller
   checks Local Network access by looking for a Bonjour service of its own. Inside LiveContainer,

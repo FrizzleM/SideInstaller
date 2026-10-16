@@ -180,6 +180,20 @@ int32_t si_account_config(SignSession *session,
                           char **out_json,
                           char **out_error);
 
+// What signing an app would cost in App IDs, asked before si_sign_ipa so the
+// user can decide. `bundle_ids` is newline-separated: the main app's bundle id
+// as the IPA has it, then each PlugIns extension's. BLOCKS; lists the team's
+// App IDs and registers nothing. On success *out_json is a heap JSON object:
+// {new_ids: [the App IDs si_sign_ipa would register, team suffix included],
+// available: <how many more Apple allows now, or null>, max: <the limit, or
+// null>, next_expiry: <unix seconds the soonest App ID expires, or null>}.
+// Returns 0 on success, non-zero on error (*out_error set). Free strings with
+// si_string_free.
+int32_t si_appid_quota(SignSession *session,
+                       const char *bundle_ids,
+                       char **out_json,
+                       char **out_error);
+
 // Free a sign session.
 void si_sign_session_free(SignSession *session);
 

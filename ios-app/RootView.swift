@@ -190,6 +190,9 @@ struct RootView: View {
             .installStopped
         case .install(.success), .install(.liveContainerImport):
             .installFinished
+        // Up on its own, waiting for the go-ahead to sign.
+        case .install(.appIDCost):
+            nil
         case .sideBySide(.pairingCode), .sideBySide(.pairInSettings):
             .sideBySidePairing
         case .pairing(.pairingCode), .pairing(.pairInSettings):

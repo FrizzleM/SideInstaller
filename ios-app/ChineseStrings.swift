@@ -817,4 +817,20 @@ let chineseStrings: [String: String] = [
         "这个配对文件没有 RPPairing 记录，而 %@ 只读取这一种。",
     "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
         "在你的 iPhone 上运行 Windows 电脑游戏，由 Will Faust 开发，GPL-3.0 许可证。",
+
+    // MARK: - App ID cost
+
+    "App IDs for this app": "此 App 所需的 App ID",
+    "Cost": "消耗",
+    "Left now": "当前剩余",
+    "Left after": "安装后剩余",
+    "New App IDs": "新 App ID",
+    "This Apple ID doesn't have enough App IDs left: this app needs %d, and %d are left. Each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "此 Apple ID 剩余的 App ID 不够：此 App 需要 %d 个，只剩 %d 个。每个会占用 7 天，请等一些过期，或改用其他 Apple ID 登录。",
+    "The next one frees up on %@.": "下一个将于 %@ 释放。",
+    "Your Apple ID already has every App ID this app needs, so installing it uses none.":
+        "你的 Apple ID 已拥有此 App 需要的所有 App ID，安装它不会消耗任何 App ID。",
+    "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
+        "签名时会为 App 及其每个扩展各注册一个 App ID，每个会占用 7 天。",
+    "This Apple ID can register %d a week.": "此 Apple ID 每周可注册 %d 个。",
 ]

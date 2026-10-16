@@ -970,6 +970,8 @@ struct InstallPopup: View {
             }
         case .liveContainerImport:
             guidePopup(Guides.liveContainerImport)
+        case .appIDCost(let cost):
+            appIDCostPopup(cost)
         }
     }
 
@@ -998,6 +1000,95 @@ struct InstallPopup: View {
                 }
             }
         }
+    }
+
+    // MARK: App ID cost
+
+    /// What signing an imported IPA costs in App IDs and how many are left,
+    /// before the run signs it. With too few left, it can only be cancelled.
+    private func appIDCostPopup(_ cost: AppIDCost) -> some View {
+        PopupCard(title: L("App IDs for this app"), systemImage: "number.square.fill",
+                  tint: cost.isAffordable ? Theme.accent : .orange,
+                  onClose: close) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
+                    appIDTile(L("Cost"), "\(cost.cost)", tint: cost.isAffordable ? .primary : .orange)
+                    appIDTile(L("Left now"), cost.available.map { "\($0)" } ?? "–", tint: .primary)
+                    appIDTile(L("Left after"),
+                              cost.isAffordable ? cost.remainingAfter.map { "\($0)" } ?? "–" : "–",
+                              tint: .primary)
+                }
+                Text(appIDCostMessage(cost))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !cost.newIDs.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L("New App IDs"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        ForEach(cost.newIDs, id: \.self) { id in
+                            Text(id)
+                                .font(.caption.monospaced())
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                }
+                VStack(spacing: 10) {
+                    if cost.isAffordable {
+                        Button { engine.answerAppIDCost(true) } label: {
+                            Label(L("Install"), systemImage: "arrow.down.app.fill")
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                    }
+                    Button(role: .cancel) { engine.answerAppIDCost(false) } label: {
+                        Text(L("Cancel"))
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(cost.isAffordable ? Color.secondary : .orange)
+                }
+            }
+        }
+    }
+
+    /// One number in the App ID cost popup, with what it counts.
+    private func appIDTile(_ label: String, _ value: String, tint: Color) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.title2.weight(.bold).monospacedDigit())
+                .foregroundStyle(tint)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(Color.primary.opacity(0.06)))
+    }
+
+    private func appIDCostMessage(_ cost: AppIDCost) -> String {
+        guard cost.isAffordable else {
+            var text = L("This Apple ID doesn't have enough App IDs left: this app needs %d, and %d are left. Each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.",
+                         cost.cost, cost.available ?? 0)
+            if let next = cost.nextExpiry {
+                let when = next.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened)
+                    .locale(Localizer.locale))
+                text += " " + L("The next one frees up on %@.", when)
+            }
+            return text
+        }
+        if cost.cost == 0 {
+            return L("Your Apple ID already has every App ID this app needs, so installing it uses none.")
+        }
+        let base = L("Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.")
+        guard let limit = cost.limit else { return base }
+        return base + " " + L("This Apple ID can register %d a week.", limit)
     }
 
     // MARK: Certificate conflict (Apple error 7460)
