@@ -116,8 +116,9 @@ struct PairingView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle(L("Install into an app"), systemImage: "tray.and.arrow.down.fill")
 
-                // Scanning and writing only need the tunnel, not Wi-Fi.
-                if !engine.vpnConnected {
+                // Scanning and writing only need the tunnel, not Wi-Fi. No note
+                // when scanning starts LocalDevVPN itself.
+                if !engine.tunnelAvailable {
                     vpnNote
                 }
 
@@ -134,7 +135,7 @@ struct PairingView: View {
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(manager.isBusy || !manager.pairingFileExists || !engine.vpnConnected || engine.isRunning)
+                .disabled(manager.isBusy || !manager.pairingFileExists || !engine.tunnelAvailable || engine.isRunning)
             }
         }
     }

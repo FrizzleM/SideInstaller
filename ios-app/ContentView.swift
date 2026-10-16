@@ -50,7 +50,8 @@ struct ContentView: View {
                         // pairing file never touches the local network.
                         } else if !engine.wifiConnected, engine.needsFreshPairing, engine.canSelfPair {
                             wifiRequirement.cascadeItem(cascade(2))
-                        } else if !engine.vpnConnected {
+                        // Not when Install starts LocalDevVPN itself.
+                        } else if !engine.tunnelAvailable {
                             vpnRequirement.cascadeItem(cascade(2))
                         }
                     }
@@ -177,6 +178,9 @@ struct ContentView: View {
             StatusPill(text: summary, systemImage: "iphone", color: .green)
         } else if engine.vpnConnected {
             StatusPill(text: L("Tunnel connected"), systemImage: "checkmark.shield.fill", color: .green)
+        } else if engine.startsVPNWhenNeeded {
+            // Install starts it, so this isn't a problem to flag.
+            StatusPill(text: L("Tunnel off"), systemImage: "shield.slash.fill", color: .orange, glass: true)
         } else {
             StatusPill(text: L("Tunnel off"), systemImage: "shield.slash.fill", color: .red)
         }

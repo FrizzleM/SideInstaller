@@ -359,8 +359,7 @@ final class SideloadedAppsManager: ObservableObject {
 
     private var engine: Engine { Engine.shared }
 
-    /// Keeps `autoLoad` to a single attempt, so a page opened before the tunnel
-    /// is up doesn't retry on every visit.
+    /// Keeps `autoLoad` to a single attempt.
     private var didAutoLoad = false
 
     /// The refresh in flight, kept so it can be called off between apps.
@@ -381,10 +380,12 @@ final class SideloadedAppsManager: ObservableObject {
         }.count
     }
 
-    /// Loads once when the page opens, without showing errors (e.g. when the VPN
-    /// isn't up yet).
+    /// Loads once when the page opens with the tunnel up, without showing
+    /// errors. Opening the page doesn't start LocalDevVPN; Load does.
     func autoLoad() {
         guard !didAutoLoad, !hasLoaded, !isWorking else { return }
+        engine.refreshNetworkStatus()
+        guard engine.vpnConnected else { return }
         didAutoLoad = true
         load(quiet: true)
     }
