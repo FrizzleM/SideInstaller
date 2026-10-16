@@ -375,12 +375,12 @@ let chineseStrings: [String: String] = [
     "Sign in to their Apple ID": "登录对方的 Apple ID",
     "Download SideInstaller": "下载 SideInstaller",
     "Install on their iPhone": "安装到对方的 iPhone",
-    "Enter the other iPhone's IP address. It's in Settings › Wi-Fi, next to the network it's on.":
-        "输入另一台 iPhone 的 IP 地址。在 设置 › 无线局域网 中，所连网络旁边可以找到。",
     "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
         "“%@”不是 IPv4 地址。它应该形如 192.168.1.42。",
     "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
         "%@ 是这台 iPhone 自己的地址。Side by Side 用于安装到别人的 iPhone 上，请填对方的地址。要安装到这台设备，请使用“安装”标签页。",
+    "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the Install tab.":
+        "完成配对的是这台 iPhone。请在对方 iPhone 的“设置”中配对。要安装到这台 iPhone，请使用“安装”标签页。",
     "Enter the Apple ID to sign with, and its password.": "请输入用于签名的 Apple ID 及其密码。",
     "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
         "无线局域网已关闭。两台 iPhone 必须连接同一个 Wi-Fi 网络才能使用。",
@@ -400,7 +400,9 @@ let chineseStrings: [String: String] = [
     "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
         "对方的 iPhone 需要 iOS %@：装好之后 SideInstaller 会自己配对，更早的版本做不到。",
     "Their iPhone": "对方的 iPhone",
-    "IP address (e.g. 192.168.1.42)": "IP 地址（例如 192.168.1.42）",
+    "IP address (optional)": "IP 地址（可选）",
+    "Optional: leave it empty, and it fills in when their iPhone pairs.":
+        "可选：留空即可，对方的 iPhone 配对后会自动填入。",
     "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
         "在对方的 iPhone 上：设置 › 无线局域网 › 网络旁的 ⓘ，然后查看“IP 地址”。",
     "This iPhone is %@, so theirs will look similar.": "这台 iPhone 是 %@，对方的地址会与之相近。",
@@ -445,6 +447,8 @@ let chineseStrings: [String: String] = [
     "Start the install": "开始安装",
     "Install again": "再次安装",
     "Clear their details": "清除对方的信息",
+    "This iPhone is still paired with theirs. Clearing forgets it.":
+        "这台 iPhone 仍与对方的 iPhone 配对。清除后会忘记这次配对。",
     "Last step: they trust %@": "最后一步：让对方信任 %@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "在对方的 iPhone 上：设置 › 通用 › VPN 与设备管理。",

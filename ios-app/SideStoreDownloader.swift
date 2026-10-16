@@ -1440,12 +1440,35 @@ enum PrivateStore {
         peerPairingsFile(prefix: "remote", host: host)
     }
 
+    /// Where Side by Side pairs another device that has no address typed in.
+    /// The pairing reports the address it connected from, and the file then
+    /// moves to `peerRemotePairing(host:)`.
+    static var unaddressedPeerRemotePairing: URL {
+        peerPairingsDirectory.appendingPathComponent("remote-new.plist")
+    }
+
+    /// True while any pair record for another device is saved.
+    static var hasPeerPairings: Bool {
+        let files = try? FileManager.default.contentsOfDirectory(atPath: peerPairingsDirectory.path)
+        return files?.isEmpty == false
+    }
+
+    /// Deletes every pair record saved for another device, so this iPhone keeps
+    /// no working pairing with someone else's.
+    static func forgetPeerPairings() {
+        try? FileManager.default.removeItem(at: peerPairingsDirectory)
+    }
+
     private static func peerPairingsFile(prefix: String, host: String) -> URL {
-        let dir = directory.appendingPathComponent("peer-pairings", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         // Keep only digits and dots for a safe filename.
         let key = host.filter { $0.isNumber || $0 == "." }
-        return dir.appendingPathComponent("\(prefix)-\(key.isEmpty ? "unknown" : key).plist")
+        return peerPairingsDirectory.appendingPathComponent("\(prefix)-\(key.isEmpty ? "unknown" : key).plist")
+    }
+
+    private static var peerPairingsDirectory: URL {
+        let dir = directory.appendingPathComponent("peer-pairings", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
     }
 
     /// isideload's `FsStorage` root, created on demand as isideload expects.
