@@ -544,11 +544,15 @@ final class SideBySideManager: ObservableObject {
         let dir = PrivateStore.isideload.path
         engine.twoFactorWasCancelled = false
         var lastFailure = "no anisette servers configured"
-        var appleRefusals = 0
+        var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
         var appleUnreachable = 0
 
         for (index, anisette) in servers.enumerated() {
             try Task.checkCancellation()
+            if appleRefusals.rulesOut(anisette) {
+                engine.log("Side by Side: skipping anisette \(index + 1)/\(servers.count): Apple has refused the device sign-in reports through it.")
+                continue
+            }
             do {
                 let summary = try await onSignQueue {
                     try self.performSignIn(id: id, pw: pw, anisette: anisette, dir: dir)
@@ -583,11 +587,12 @@ final class SideBySideManager: ObservableObject {
                     engine.log("Side by Side: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
                     throw EngineError.message(Engine.appleRateLimitMessage)
                 }
-                // Apple refusing the request fails the same on every server.
+                // Apple refuses a reported device through every server alike;
+                // see `AnisetteServer.AppleRefusals`.
                 if Engine.isAppleServiceRefusal(lastFailure) {
-                    appleRefusals += 1
-                    if appleRefusals >= 2 {
-                        engine.log("Side by Side: Apple's sign-in server refused \(appleRefusals) attempts with HTTP 503 — stopping.")
+                    appleRefusals.record(anisette)
+                    if appleRefusals.endsSignIn(remaining: servers[(index + 1)...]) {
+                        engine.log("Side by Side: Apple's sign-in server refused \(appleRefusals.count) attempts with HTTP 503 — stopping.")
                         throw EngineError.message(Engine.appleServiceRefusalMessage)
                     }
                 }

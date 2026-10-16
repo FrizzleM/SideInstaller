@@ -85,9 +85,13 @@ BUNDLED_ANISETTE = [
     "https://anisette.wedotstud.io",
     "https://ani.neoarz.com",
     "https://ani.jaydenha.uk",
+    "https://mac-ani.jkcoxson.com",
+    "https://new.ani.sidestore.io",
 ]
-# Servers known to run Apple's Windows ADI library (the app's
-# AnisetteServer.windowsADIHosts). They're tried right after the preferred one.
+# Servers known to run Apple's macOS and Windows ADI libraries (the app's
+# AnisetteServer.macADIHosts / .windowsADIHosts). The Windows ones are tried
+# right after the preferred one, the macOS ones last (see anisette_candidates).
+MAC_ADI_HOSTS = ("mac-ani.jkcoxson.com", "new.ani.sidestore.io")
 WINDOWS_ADI_HOSTS = ("ani.jkcoxson.com", "win.ani.sidestore.io", "ani2.stikstore.app")
 # Anisette servers are volunteer-run and half of any list is usually down;
 # stop after this many so a bad day doesn't turn into a long wait.
@@ -981,7 +985,8 @@ class GrandSlam:
         # they're asked as a Mac (see auth_request).
         self.auth_as_mac = False
         self.url_bag = self._fetch_bag(self.base_headers())
-        if not self._bag_is_complete() and "<macOS;" not in self.anisette.client_info:
+        client = self.anisette.client_info
+        if not self._bag_is_complete() and "<macOS;" not in client and "<Mac OS X;" not in client:
             warn("Apple's URL bag for this client lacks URLs this script uses; asking as a Mac.")
             self.url_bag = self._fetch_bag(self.mac_headers())
 
@@ -1971,15 +1976,24 @@ def default_anisette():
     return FALLBACK_ANISETTE
 
 
-def is_windows_adi(url):
-    return urllib.parse.urlparse(url).hostname in WINDOWS_ADI_HOSTS
+def adi_library(url):
+    """The ADI library a server runs, "mac", "windows" or "android" (the
+    app's AnisetteServer.library, by host only)."""
+    host = urllib.parse.urlparse(url).hostname
+    if host in MAC_ADI_HOSTS:
+        return "mac"
+    if host in WINDOWS_ADI_HOSTS:
+        return "windows"
+    return "android"
 
 
 def anisette_candidates(preferred):
-    """The user's choice first, then the servers on Apple's Windows ADI
-    library, then the rest of the live community list, then the copy baked in
-    here. As in the app (AnisetteServer.candidates): if Apple refuses the
-    preferred server's library, the next one tried is on the other."""
+    """The user's choice first, then the rest of its library unless that's
+    Android's, then the servers on Apple's Windows ADI library, then the rest
+    of the live community list and the copy baked in here, with the macOS-ADI
+    servers last: through them Apple asked an account with trusted devices
+    for a code by text and refused to send one (HTTP 403, 2026-10-16). As in
+    the app (AnisetteServer.candidates)."""
     urls = [preferred]
     try:
         status, _, body = request("GET", ANISETTE_LIST_URL,
@@ -1993,7 +2007,13 @@ def anisette_candidates(preferred):
         pass
     urls.extend(BUNDLED_ANISETTE)
 
-    urls = urls[:1] + [u for u in urls[1:] if is_windows_adi(u)] + urls[1:]
+    rest = urls[1:]
+    own = adi_library(preferred)
+    urls = (urls[:1]
+            + ([u for u in rest if adi_library(u) == own] if own != "android" else [])
+            + [u for u in rest if adi_library(u) == "windows"]
+            + [u for u in rest if adi_library(u) != "mac"]
+            + rest)
     seen = set()
     unique = []
     for url in urls:

@@ -20,8 +20,11 @@ extension AnisetteServer {
 
     /// The default server for a first sign-in, and the fallback when a saved
     /// one can't be honoured: jkcoxson's, on Apple's Windows ADI library, which
-    /// iLoader also defaults to and which its operator has said he'll keep
-    /// running.
+    /// its operator has said he'll keep running.
+    ///
+    /// Not his macOS-ADI server, which iLoader defaults to since 2.3.9: through
+    /// the macOS servers Apple has asked an account with trusted devices for a
+    /// code by text and then refused to send one (see `candidates`).
     static let fallback = AnisetteServer(name: "jkcoxson (Windows ADI)", address: "https://ani.jkcoxson.com")
 
     /// The default until 1.5.2, on Apple's Android ADI library. It wasn't
@@ -42,7 +45,9 @@ extension AnisetteServer {
         AnisetteServer(name: "SideStore (.app)",          address: "https://ani.sidestore.app"),
         AnisetteServer(name: "SideStore (.zip)",          address: "https://ani.sidestore.zip"),
         AnisetteServer(name: "SideStore (.xyz)",          address: "https://ani.846969.xyz"),
+        AnisetteServer(name: "SideStore (New)",           address: "https://new.ani.sidestore.io"),
         AnisetteServer(name: "SideStore (Windows ADI)",   address: "https://win.ani.sidestore.io"),
+        AnisetteServer(name: "jkcoxson",                  address: "https://mac-ani.jkcoxson.com"),
         AnisetteServer(name: "jkcoxson (Windows ADI)",    address: "https://ani.jkcoxson.com"),
         AnisetteServer(name: "nythepegasus",              address: "https://ani.npeg.us"),
         AnisetteServer(name: "Macley",                    address: "http://5.249.163.88:6969"),
@@ -68,36 +73,73 @@ extension AnisetteServer {
         }
     }
 
-    // MARK: - Order of servers to sign in through
+    // MARK: - ADI libraries
 
-    /// Hosts of the servers known to make anisette data with Apple's Windows
-    /// ADI library. Sign-in tells Apple the client is a Windows PC through
-    /// every server; only on these does that match the machine the data comes
-    /// from. The others run Apple's Android library, which Apple has let pass
-    /// with a Windows PC's client info since it blocked the Android phone
-    /// (2026-10-15), and may stop letting pass. The two kinds keep separate
-    /// anisette identities (isideload's `anisette_slots.json`).
-    static let windowsADIHosts: Set<String> = ["ani.jkcoxson.com", "win.ani.sidestore.io", "ani2.stikstore.app"]
+    /// The Apple ADI library a server makes its anisette data with. An
+    /// anisette identity provisioned through one server works with every
+    /// server on the same library, and the others refuse it (-45061), so
+    /// isideload keeps one per library (`anisette_slots.json`).
+    enum ADILibrary {
+        /// macOS's, the one Xcode signs in with. These servers name the Mac
+        /// they run as, and sign-in reports that Mac.
+        case mac
+        /// Windows's, as iTunes and iCloud for Windows use it. These servers
+        /// name a Windows PC, and sign-in reports it.
+        case windows
+        /// Android's, which every older community server runs. Those servers
+        /// name a stock Mac, which Apple refuses, so sign-in reports a Windows
+        /// PC instead (isideload's `client_info_to_use`): Apple has let that
+        /// pass since it blocked the Android phone (2026-10-15), and may stop.
+        case android
 
-    /// Whether `address` is a server on the Windows ADI library: a known host,
-    /// or one the list names as such ("… (Windows ADI)").
-    static func isWindowsADI(_ address: String, in servers: [AnisetteServer] = bundledDefaults) -> Bool {
-        let key = normalized(address)
-        if let host = URL(string: key)?.host?.lowercased(), windowsADIHosts.contains(host) {
-            return true
-        }
-        return servers.contains { normalized($0.address) == key && $0.name.lowercased().contains("windows") }
+        /// The device sign-in reports to Apple through a server on this
+        /// library. Apple's HTTP 503 refusals have gone by it, whatever the
+        /// server.
+        var client: Client { self == .mac ? .mac : .windows }
+
+        enum Client { case mac, windows }
     }
 
+    /// Hosts of the servers known to run Apple's macOS ADI library. They name
+    /// `<MacBookPro13,3> <Mac OS X;10.12.6;16G29>` and take each other's
+    /// identities (checked 2026-10-16).
+    static let macADIHosts: Set<String> = ["mac-ani.jkcoxson.com", "new.ani.sidestore.io"]
+
+    /// Hosts of the servers known to run Apple's Windows ADI library.
+    static let windowsADIHosts: Set<String> = ["ani.jkcoxson.com", "win.ani.sidestore.io", "ani2.stikstore.app"]
+
+    /// The library `address` runs: a known host's, else what the list's name
+    /// for it says ("… (Windows ADI)", "… (Mac ADI)"), else Android's.
+    static func library(of address: String, in servers: [AnisetteServer] = bundledDefaults) -> ADILibrary {
+        let key = normalized(address)
+        if let host = URL(string: key)?.host?.lowercased() {
+            if macADIHosts.contains(host) { return .mac }
+            if windowsADIHosts.contains(host) { return .windows }
+        }
+        let name = servers.first { normalized($0.address) == key }?.name.lowercased() ?? ""
+        if name.contains("mac adi") { return .mac }
+        if name.contains("windows") { return .windows }
+        return .android
+    }
+
+    // MARK: - Order of servers to sign in through
+
     /// Addresses to sign in through, de-duplicated: `pick` (the one in use)
-    /// first, then the Windows-ADI servers, then the rest in list order.
+    /// first, then the rest of its library unless that is Android's, then the
+    /// Windows-ADI servers, then the Android ones in list order, then the
+    /// macOS ones.
     ///
     /// The pick keeps its anisette identity, and with it the saved developer
-    /// token and Apple's trust in that machine. Windows-ADI servers come next
-    /// because the way Apple most likely closes next is the one where the
-    /// client info doesn't match the library: a server on the same library
-    /// as a refused pick would be refused the same way, and the sign-in loop
-    /// stops after a second HTTP 503.
+    /// token and Apple's trust in that machine, and so do the servers on its
+    /// library. The Windows servers come before the Android ones because on
+    /// them the Windows PC sign-in reports is the machine the data comes
+    /// from: the way Apple most likely closes next is the one where it isn't.
+    /// The macOS servers come last: through them Apple took the password of a
+    /// real account with trusted devices (2026-10-16), then asked for a code by
+    /// text instead of sending one to the devices, and answered the request for
+    /// it with HTTP 403, as iLoader 2.3.9's users reported the same day. Apple
+    /// refusing one reported device doesn't end the sign-in while servers
+    /// reporting the other are left (`AppleRefusals`).
     static func candidates(pick: String, servers: [AnisetteServer]) -> [String] {
         var seen = Set<String>()
         var out: [String] = []
@@ -107,7 +149,12 @@ extension AnisetteServer {
         }
         add(pick)
         let addresses = servers.map(\.address)
-        addresses.filter { isWindowsADI($0, in: servers) }.forEach(add)
+        let pickLibrary = library(of: pick, in: servers)
+        if pickLibrary != .android {
+            addresses.filter { library(of: $0, in: servers) == pickLibrary }.forEach(add)
+        }
+        addresses.filter { library(of: $0, in: servers) == .windows }.forEach(add)
+        addresses.filter { library(of: $0, in: servers) != .mac }.forEach(add)
         addresses.forEach(add)
         return out
     }
@@ -116,8 +163,43 @@ extension AnisetteServer {
     /// the servers that can use the anisette identity the first one used.
     static func sameLibrary(asFirstOf addresses: [String], in servers: [AnisetteServer]) -> [String] {
         guard let first = addresses.first else { return [] }
-        let windows = isWindowsADI(first, in: servers)
-        return addresses.filter { isWindowsADI($0, in: servers) == windows }
+        let kind = library(of: first, in: servers)
+        return addresses.filter { library(of: $0, in: servers) == kind }
+    }
+
+    /// Apple's HTTP 503 refusals during one sign-in loop, counted by the
+    /// device sign-in reported (`ADILibrary.client`).
+    ///
+    /// Apple refuses a reported device the same through every server, so once
+    /// it has refused one twice the servers left that report it are skipped.
+    /// One refusal only moves on to the next server, since Apple has also sent
+    /// a 503 that passed on retry. The loop stops when every server left
+    /// reports a device refused twice.
+    struct AppleRefusals {
+        private let servers: [AnisetteServer]
+        private var byClient: [ADILibrary.Client: Int] = [:]
+        /// Refusals so far.
+        private(set) var count = 0
+
+        init(servers: [AnisetteServer]) { self.servers = servers }
+
+        /// Counts a refusal of the attempt through `address`.
+        mutating func record(_ address: String) {
+            count += 1
+            byClient[AnisetteServer.library(of: address, in: servers).client, default: 0] += 1
+        }
+
+        /// Whether a sign-in through `address` would report a device Apple
+        /// has refused twice already.
+        func rulesOut(_ address: String) -> Bool {
+            byClient[AnisetteServer.library(of: address, in: servers).client, default: 0] >= 2
+        }
+
+        /// Whether, after a refusal, the sign-in should stop: at least two
+        /// refusals, and none of `remaining` worth trying.
+        func endsSignIn(remaining: ArraySlice<String>) -> Bool {
+            count >= 2 && remaining.allSatisfy(rulesOut)
+        }
     }
 
     private static func normalized(_ address: String) -> String {

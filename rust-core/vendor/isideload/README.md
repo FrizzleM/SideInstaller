@@ -280,6 +280,31 @@ iPhone, a fresh install (so a new identity, through ani.jkcoxson.com unless
 it was down), over mobile data; which second-factor route Apple took, and
 whether `/auth` needed the Mac fallback, wasn't logged.
 
+The macOS-ADI servers arrived on 2026-10-16 (iLoader 2.3.9 defaults to
+mac-ani.jkcoxson.com; the community list has it as "jkcoxson" and
+new.ani.sidestore.io as "SideStore (New)") and needed no change here: both
+hand out `<MacBookPro13,3> <Mac OS X;10.12.6;16G29> <com.apple.AuthKit/1
+(com.apple.akd/1.0)>`, which `client_info_to_use` keeps. Measured with made-up
+accounts through this crate and `ish/sideinstaller.py`: provisioning goes
+through, no hsc 434, -20970 at `init`; the two take each other's identity, and
+the Windows-ADI servers answer it with -45061 (a third slot). On that identity
+Apple also gave -20970 to the Windows PC and to a current Mac
+(`<Mac15,7> <macOS;27.0;26A5378j>`). The bag asked as the server's Mac had 122
+URLs, every one this crate uses.
+
+A real account did not get through them (2026-10-16, the app on an iPhone,
+fresh identity): on both Mac servers Apple took the password, then answered
+`complete` with `au` = `secondaryAuth` (a code by text) rather than a push to
+the trusted devices the account has, and both `GET /auth` (trusted numbers)
+and `PUT /auth/verify/phone` answered a bare 403. `send_auth` doesn't retry
+those as `MAC_CLIENT_INFO`, since the client is a Mac already; with a made-up
+identity token both Mac strings get 401 there (the Windows PC gets 403 now),
+so the 403 came from the session, not the client string alone. The app went on
+to win.ani.sidestore.io (Windows identity, one resync), where Apple pushed the
+code to the devices (409) and sign-in finished. iLoader 2.3.9's users reported
+the same "SMS 2FA … 403" that day. So the app keeps ani.jkcoxson.com as the
+first server and tries the macOS ones last.
+
 **3. `src/auth/apple_account.rs`, `builder.rs`, `grandslam.rs` — let the user
 choose how the 2FA code arrives.**
 

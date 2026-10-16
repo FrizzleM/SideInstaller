@@ -1020,12 +1020,16 @@ final class Engine: ObservableObject {
         let id = normalizedAppleID, pw = applePassword, dir = storageDir
         twoFactorWasCancelled = false
         var lastError = "no anisette servers configured"
-        var appleRefusals = 0
+        var appleRefusals = AnisetteServer.AppleRefusals(servers: anisetteServers)
         var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
             try Task.checkCancellation()
             let name = anisetteName(for: ani)
+            if appleRefusals.rulesOut(ani) {
+                log("Skipping anisette \(name): Apple has refused the device sign-in reports through it.")
+                continue
+            }
             signInStatus = servers.count > 1
                 ? "signing in via \(name) (\(idx + 1)/\(servers.count))…"
                 : "signing in…"
@@ -1082,16 +1086,15 @@ final class Engine: ObservableObject {
                     log("Apple is rate-limiting sign-in (HTTP 429) — not trying more anisette servers.")
                     throw EngineError.message(Self.appleRateLimitMessage)
                 }
-                // Apple refusing the request looks the same through every
-                // anisette server, so a second refusal ends the loop. The
-                // second server tried is on the Windows ADI library unless the
-                // first was (`AnisetteServer.candidates`), so a refusal of the
-                // other library alone doesn't end it.
+                // Apple refusing the device sign-in reports looks the same
+                // through every server reporting it: after two refusals those
+                // are skipped, and the loop ends when no other server is left
+                // (`AnisetteServer.AppleRefusals`).
                 if Self.isAppleServiceRefusal(lastError) {
-                    appleRefusals += 1
-                    if appleRefusals >= 2 {
+                    appleRefusals.record(ani)
+                    if appleRefusals.endsSignIn(remaining: servers[(idx + 1)...]) {
                         signInStatus = "sign-in failed"
-                        log("Apple's sign-in server refused \(appleRefusals) attempts with HTTP 503 — not trying more anisette servers.")
+                        log("Apple's sign-in server refused \(appleRefusals.count) attempts with HTTP 503 — not trying more anisette servers.")
                         throw EngineError.message(Self.appleServiceRefusalMessage)
                     }
                 }
@@ -1167,7 +1170,7 @@ final class Engine: ObservableObject {
     }
 
     /// Anisette addresses to try (`AnisetteServer.candidates`): the current
-    /// pick first, then the Windows-ADI servers, then the rest.
+    /// pick first, then the Windows-ADI servers, then the rest, macOS-ADI last.
     func anisetteCandidates() -> [String] {
         AnisetteServer.candidates(pick: anisetteURL, servers: anisetteServers)
     }
