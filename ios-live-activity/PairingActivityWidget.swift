@@ -6,6 +6,7 @@ import WidgetKit
 struct SideInstallerWidgets: WidgetBundle {
     var body: some Widget {
         PairingActivityWidget()
+        InstallActivityWidget()
     }
 }
 
@@ -67,7 +68,7 @@ struct PairingActivityWidget: Widget {
 
 /// The app's colours (`Theme`), repeated here: the extension is its own
 /// binary and takes none of the app's views.
-private enum Brand {
+enum Brand {
     static let accent = Color(red: 0.13, green: 0.44, blue: 0.96)
     static let accent2 = Color(red: 0.30, green: 0.68, blue: 1.0)
     static let glow = Color(red: 1 / 255, green: 26 / 255, blue: 92 / 255)
@@ -75,6 +76,17 @@ private enum Brand {
     static var gradient: LinearGradient {
         LinearGradient(colors: [accent, accent2],
                        startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    /// The app's backdrop in small, behind a Lock Screen card: black, with the
+    /// blue, or `tint`, blooming from a corner.
+    static func backdrop(glow tint: Color = accent) -> some View {
+        ZStack {
+            LinearGradient(colors: [tint == accent ? glow : tint.opacity(0.3), .black],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            RadialGradient(colors: [tint.opacity(0.35), .clear],
+                           center: .topLeading, startRadius: 0, endRadius: 240)
+        }
     }
 }
 
@@ -106,19 +118,9 @@ private struct LockScreenCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity)
-        .background(backdrop)
+        .background(Brand.backdrop())
         .activityBackgroundTint(.black)
         .activitySystemActionForegroundColor(.white)
-    }
-
-    /// The app's backdrop in small: black, with the blue blooming from a corner.
-    private var backdrop: some View {
-        ZStack {
-            LinearGradient(colors: [Brand.glow, .black],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-            RadialGradient(colors: [Brand.accent.opacity(0.35), .clear],
-                           center: .topLeading, startRadius: 0, endRadius: 240)
-        }
     }
 }
 
