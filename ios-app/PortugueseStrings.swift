@@ -500,6 +500,13 @@ let portugueseStrings: [String: String] = [
     "Custom…": "Personalizado…",
     "Server URL": "URL do servidor",
     "Anisette Server": "Servidor Anisette",
+    "Starts with %@": "Começa por %@",
+    "Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.":
+        "O modo Automático começa pelo servidor do último login bem-sucedido e depois tenta os outros, primeiro os com mais chance de funcionar.",
+    "Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others.":
+        "Só este servidor é tentado. Se ele falhar, o login também falha: escolha Automático para o SideInstaller tentar os outros.",
+    "Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.":
+        "Só o servidor escolhido em Ajustes › Servidor Anisette foi tentado. Escolha Automático lá para o SideInstaller tentar os outros quando um falhar.",
     "Device IP": "IP do dispositivo",
     "Advanced": "Avançado",
     "Clear": "Limpar",

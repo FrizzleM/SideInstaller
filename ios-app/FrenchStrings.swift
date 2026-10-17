@@ -503,6 +503,13 @@ let frenchStrings: [String: String] = [
     "Custom…": "Personnalisé…",
     "Server URL": "URL du serveur",
     "Anisette Server": "Serveur Anisette",
+    "Starts with %@": "Commence par %@",
+    "Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.":
+        "Le mode Automatique commence par le serveur de la dernière connexion réussie, puis essaie les autres, en commençant par ceux qui ont le plus de chances de fonctionner.",
+    "Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others.":
+        "Seul ce serveur est essayé. S'il échoue, la connexion échoue aussi : choisissez Automatique pour que SideInstaller essaie les autres.",
+    "Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.":
+        "Seul le serveur choisi dans Réglages › Serveur Anisette a été essayé. Choisissez Automatique à cet endroit pour que SideInstaller essaie les autres quand l'un échoue.",
     "Device IP": "IP de l'appareil",
     "Advanced": "Avancé",
     "Clear": "Effacer",

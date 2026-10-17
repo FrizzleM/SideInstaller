@@ -129,8 +129,8 @@ final class Engine: ObservableObject {
     /// setup, switched in Settings › Account). Views observe the store directly.
     var appleID: String { AccountStore.shared.activeAppleID }
     var applePassword: String { AccountStore.shared.activePassword }
-    /// Anisette server in use. Persisted, and updated to whichever server the
-    /// last successful sign-in used.
+    /// Anisette server in use: the one picked in Settings or, with Auto on,
+    /// the one the last successful sign-in used. Persisted.
     @Published var anisetteURL: String = Engine.savedAnisetteURL() {
         didSet {
             guard anisetteURL != oldValue else { return }
@@ -139,6 +139,20 @@ final class Engine: ObservableObject {
     }
 
     static let anisetteURLKey = "anisetteServerURL"
+
+    /// Settings › Anisette Server › Auto: sign-in tries the servers in order
+    /// of how likely they are to work, from `anisetteURL` (see
+    /// `anisetteCandidates`). Off, the server picked there is the only one
+    /// tried. On by default, as every sign-in tried them all before 1.6.
+    @Published var anisetteAuto: Bool =
+        (UserDefaults.standard.object(forKey: Engine.anisetteAutoKey) as? Bool) ?? true {
+        didSet {
+            guard anisetteAuto != oldValue else { return }
+            UserDefaults.standard.set(anisetteAuto, forKey: Engine.anisetteAutoKey)
+        }
+    }
+
+    static let anisetteAutoKey = "anisetteServerAuto"
 
     /// The saved anisette server, or the one to start with, saved.
     ///
@@ -1071,7 +1085,8 @@ final class Engine: ObservableObject {
         }
         if updatingChecklist { setStep(.signIn, .active) }
 
-        // Anisette servers go down often, so try each one before giving up.
+        // Anisette servers go down often, so with Auto on try each one before
+        // giving up. A server picked in Settings is the only one tried.
         let servers = anisetteCandidates()
         let id = normalizedAppleID, pw = applePassword, dir = storageDir
         twoFactorWasCancelled = false
@@ -1096,8 +1111,7 @@ final class Engine: ObservableObject {
                 let summary = try await onSignQueue {
                     try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, run: run)
                 }
-                // Stick with the server that worked.
-                anisetteURL = ani
+                anisetteSignedIn(ani)
                 signInStatus = "signed in (\(summary))"
                 if updatingChecklist { setStep(.signIn, .done) }
                 return
@@ -1137,6 +1151,7 @@ final class Engine: ObservableObject {
                     throw EngineError.message(Self.credentialErrorMessage)
                 }
                 log("Anisette \(name) failed: \(lastError)")
+                anisetteFailed(ani, error: lastError)
                 if Self.isAppleRateLimit(lastError) {
                     signInStatus = "sign-in failed"
                     log("Apple is rate-limiting sign-in (HTTP 429) — not trying more anisette servers.")
@@ -1170,10 +1185,7 @@ final class Engine: ObservableObject {
         }
 
         signInStatus = "sign-in failed"
-        let tried = servers.count == 1
-            ? L("the anisette server")
-            : L("all %d anisette servers", servers.count)
-        throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, lastError))
+        throw EngineError.message(anisetteSignInFailure(tried: servers.count, lastError: lastError))
     }
 
     /// One sign-in attempt against a specific anisette server.
@@ -1225,10 +1237,44 @@ final class Engine: ObservableObject {
             .trimmingCharacters(in: .whitespaces)
     }
 
-    /// Anisette addresses to try (`AnisetteServer.candidates`): the current
-    /// pick first, then the Windows-ADI servers, then the rest, macOS-ADI last.
+    /// Anisette addresses a sign-in tries. With Auto on, every server, most
+    /// likely to work first (`AnisetteServer.candidates`): the last one that
+    /// signed in, then the Windows-ADI servers, then the rest, macOS-ADI last,
+    /// each group's recent failures after the others. Off, only the server
+    /// picked in Settings.
     func anisetteCandidates() -> [String] {
-        AnisetteServer.candidates(pick: anisetteURL, servers: anisetteServers)
+        guard anisetteAuto else {
+            let pick = anisetteURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            return pick.isEmpty ? [] : [pick]
+        }
+        return AnisetteServer.candidates(pick: anisetteURL, servers: anisetteServers,
+                                         failing: AnisetteServer.RecentFailures.addresses())
+    }
+
+    /// Notes that a sign-in through `address` worked. With Auto on, it's the
+    /// one tried first from now on, since it keeps the anisette identity, and
+    /// with it the saved developer token.
+    func anisetteSignedIn(_ address: String) {
+        if anisetteAuto { anisetteURL = address }
+        AnisetteServer.RecentFailures.clear(address)
+    }
+
+    /// Notes that a sign-in through `address` failed with `error`, so that
+    /// Auto tries it after the others for a while if the server was at fault.
+    func anisetteFailed(_ address: String, error: String) {
+        AnisetteServer.RecentFailures.record(address, error: error)
+    }
+
+    /// The error for a sign-in that failed on each of the `tried` servers.
+    /// With a server picked in Settings, the only one tried, it names that
+    /// server and points to Auto, which would have tried the others.
+    func anisetteSignInFailure(tried: Int, lastError: String) -> String {
+        guard anisetteAuto else {
+            return L("Apple ID sign-in failed on %@. Last error: %@", anisetteName(for: anisetteURL), lastError)
+                + " " + L("Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.")
+        }
+        let servers = tried == 1 ? L("the anisette server") : L("all %d anisette servers", tried)
+        return L("Apple ID sign-in failed on %@. Last error: %@", servers, lastError)
     }
 
     /// Friendly name for an anisette address (falls back to the address itself).

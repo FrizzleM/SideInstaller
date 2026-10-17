@@ -399,6 +399,13 @@ let japaneseStrings: [String: String] = [
     "Custom…": "カスタム…",
     "Server URL": "サーバー URL",
     "Anisette Server": "Anisette サーバー",
+    "Starts with %@": "%@ から開始",
+    "Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.":
+        "「自動」では、前回サインインできたサーバーから始め、次に他のサーバーを成功しやすい順に試します。",
+    "Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others.":
+        "このサーバーだけを試します。失敗するとサインインも失敗します。「自動」を選ぶと、SideInstaller が他のサーバーも試します。",
+    "Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.":
+        "「設定 › Anisette サーバー」で選んだサーバーだけを試しました。そこで「自動」を選ぶと、1 つが失敗したときに SideInstaller が他のサーバーも試します。",
     "Device IP": "デバイス IP",
     "Advanced": "詳細設定",
     "Clear": "消去",

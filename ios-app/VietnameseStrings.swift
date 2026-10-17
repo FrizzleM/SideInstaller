@@ -499,6 +499,13 @@ let vietnameseStrings: [String: String] = [
     "Custom…": "Tùy chỉnh…",
     "Server URL": "URL máy chủ",
     "Anisette Server": "Máy chủ Anisette",
+    "Starts with %@": "Bắt đầu với %@",
+    "Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.":
+        "Chế độ Tự động bắt đầu với máy chủ đã đăng nhập thành công gần nhất, sau đó thử các máy chủ khác, ưu tiên những máy chủ có khả năng hoạt động cao nhất.",
+    "Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others.":
+        "Chỉ máy chủ này được thử. Nếu nó lỗi, đăng nhập cũng thất bại: chọn Tự động để SideInstaller thử các máy chủ khác.",
+    "Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.":
+        "Chỉ máy chủ đã chọn trong Cài đặt › Máy chủ Anisette được thử. Chọn Tự động ở đó để SideInstaller thử các máy chủ khác khi một máy chủ lỗi.",
     "Device IP": "IP thiết bị",
     "Advanced": "Nâng cao",
     "Clear": "Xóa hết",

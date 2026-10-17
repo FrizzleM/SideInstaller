@@ -592,7 +592,8 @@ final class SideBySideManager: ObservableObject {
         }
         setStep(.signIn, .active)
 
-        // Anisette servers go down often, so try each one before giving up.
+        // Anisette servers go down often, so with Auto on try each one before
+        // giving up. A server picked in Settings is the only one tried.
         let servers = anisetteCandidates()
         let dir = PrivateStore.isideload.path
         engine.twoFactorWasCancelled = false
@@ -610,7 +611,7 @@ final class SideBySideManager: ObservableObject {
                 let summary = try await onSignQueue {
                     try self.performSignIn(id: id, pw: pw, anisette: anisette, dir: dir)
                 }
-                engine.anisetteURL = anisette          // stick with what worked
+                engine.anisetteSignedIn(anisette)
                 signedInAs = id
                 engine.log("Side by Side: signed in (\(summary)).")
                 setStep(.signIn, .done)
@@ -636,6 +637,7 @@ final class SideBySideManager: ObservableObject {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
                 engine.log("Side by Side: anisette \(index + 1)/\(servers.count) failed: \(lastFailure)")
+                engine.anisetteFailed(anisette, error: lastFailure)
                 if Engine.isAppleRateLimit(lastFailure) {
                     engine.log("Side by Side: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
                     throw EngineError.message(Engine.appleRateLimitMessage)
@@ -662,10 +664,7 @@ final class SideBySideManager: ObservableObject {
                 }
             }
         }
-        let tried = servers.count == 1
-            ? L("the anisette server")
-            : L("all %d anisette servers", servers.count)
-        throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, lastFailure))
+        throw EngineError.message(engine.anisetteSignInFailure(tried: servers.count, lastError: lastFailure))
     }
 
     /// One sign-in attempt against a specific anisette server. Uses the machine

@@ -49,6 +49,13 @@ All notable changes to SideInstaller are documented here.
   iPhone pairs from its Settings straight away. SideInstaller reaches it at the address it paired
   from and fills that in, so a retry after a failed step uses the same pairing. A typed address
   works as before, and if their iPhone pairs from a different one, that one is used.
+- **The anisette server can be left on Auto, or kept to one.** Settings › Anisette Server has a new
+  Auto choice, the default, which works as sign-in did before: it starts with the server that last
+  signed in, then tries the others, the ones most likely to work first. It now also remembers a
+  server that failed by itself in the last 12 hours and tries it after the others of its kind.
+  Picking a server, or a custom URL, now means only that one is tried: if it fails, sign-in stops
+  with the error and suggests choosing Auto. Before, a picked server was only the first of all of
+  them.
 
 ## 1.5.3
 
