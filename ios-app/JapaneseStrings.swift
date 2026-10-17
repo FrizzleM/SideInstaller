@@ -304,6 +304,49 @@ let japaneseStrings: [String: String] = [
     "Route finished. The device stays at its last point.": "ルートが終了しました。デバイスは最後の地点にとどまります。",
     "Route stopped. The device stays where it got to.": "ルートを停止しました。デバイスは到達した地点にとどまります。",
     "Route playback stopped: %@": "ルートの再生が停止しました: %@",
+    // Location › planned routes (OpenStreetMap).
+    "Add stop": "経由地を追加",
+    "Add as stop": "経由地として追加",
+    "Plan a route": "ルートを計画",
+    "Travel by": "移動手段",
+    "Goes along each street at its speed limit, from OpenStreetMap. A street without one mapped gets the usual limit for its kind of road.":
+        "OpenStreetMap の制限速度で各道路を走ります。制限速度が登録されていない道路では、その種類の道路の一般的な制限速度を使います。",
+    "Rides streets and paths a bike can take, at a cycling pace.": "自転車で通れる道路や小道を、自転車のペースで進みます。",
+    "Walks streets and paths at a walking pace.": "道路や小道を、歩くペースで進みます。",
+    "Start where the device is": "デバイスの現在地から出発",
+    "Move the map so the pin is on a place, then tap Add stop. Add as many as you like: the route goes to each in order.":
+        "ピンが場所の上に来るように地図を動かして、「経由地を追加」をタップします。いくつでも追加でき、ルートは順番にそれぞれを通ります。",
+    "The device's location": "デバイスの位置",
+    "Stop %d": "経由地 %d",
+    "Clear stops": "経由地を消去",
+    "Move up": "上へ移動",
+    "Move down": "下へ移動",
+    "Find route": "ルートを検索",
+    "Finding route": "ルートを検索中",
+    "Add one more stop to plan a route.": "ルートを計画するには、経由地をもう 1 つ追加してください。",
+    "Routes from OpenStreetMap, © OpenStreetMap contributors":
+        "ルートは OpenStreetMap から、© OpenStreetMap 協力者",
+    "Speed limits are mapped for all of it.": "全区間で制限速度が登録されています。",
+    "Speed limits are mapped for %d%% of it; the rest is estimated.":
+        "%d%% の区間で制限速度が登録されています。残りは推定です。",
+    "Average %@": "平均 %@",
+    "Speed limit %@": "制限速度 %@",
+    "No speed limit · going %@": "速度無制限 · %@ で走行中",
+    "No limit mapped · going %@": "制限速度の登録なし · %@ で走行中",
+    "Going %@": "%@ で移動中",
+    "No street name": "名前のない道路",
+    "Estimated speed limit %@": "推定制限速度 %@",
+    "No speed limit": "速度無制限",
+    "No route found between these stops. Move them onto roads or paths, or travel another way.":
+        "これらの経由地を結ぶルートが見つかりません。経由地を道路や小道の上に動かすか、別の移動手段を試してください。",
+    "A stop is too far from any road or path. Move it closer and try again.":
+        "経由地のひとつが道路や小道から遠すぎます。近くに動かしてもう一度お試しください。",
+    "Too many stops for the route server. Take some out and try again.":
+        "経由地が多すぎてルートサーバで処理できません。いくつか削除してもう一度お試しください。",
+    "That route is too long for the route server. Make it shorter, or split it up.":
+        "このルートはルートサーバには長すぎます。短くするか、分割してください。",
+    "The route server is busy. Try again in a minute.": "ルートサーバが混み合っています。1 分ほどしてからもう一度お試しください。",
+    "The route server couldn't plan this route (%@).": "ルートサーバがこのルートを計画できませんでした（%@）。",
 
     // MARK: - Entitlements tab
 

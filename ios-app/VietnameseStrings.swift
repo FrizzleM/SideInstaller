@@ -312,6 +312,54 @@ let vietnameseStrings: [String: String] = [
     "Route stopped. The device stays where it got to.":
         "Đã dừng lộ trình. Thiết bị ở lại vị trí đã đến.",
     "Route playback stopped: %@": "Đã dừng phát lộ trình: %@",
+    // Location › planned routes (OpenStreetMap).
+    "Add stop": "Thêm điểm dừng",
+    "Add as stop": "Thêm làm điểm dừng",
+    "Plan a route": "Lập lộ trình",
+    "Travel by": "Phương tiện",
+    "Goes along each street at its speed limit, from OpenStreetMap. A street without one mapped gets the usual limit for its kind of road.":
+        "Đi trên mỗi con đường đúng giới hạn tốc độ của nó, theo OpenStreetMap. Đường chưa có giới hạn trên bản đồ sẽ dùng giới hạn thường gặp của loại đường đó.",
+    "Rides streets and paths a bike can take, at a cycling pace.":
+        "Đi trên các đường phố và lối đi mà xe đạp đi được, với tốc độ đạp xe.",
+    "Walks streets and paths at a walking pace.":
+        "Đi trên các đường phố và lối đi, với tốc độ đi bộ.",
+    "Start where the device is": "Bắt đầu từ vị trí của thiết bị",
+    "Move the map so the pin is on a place, then tap Add stop. Add as many as you like: the route goes to each in order.":
+        "Di chuyển bản đồ để ghim nằm trên một địa điểm, rồi chạm Thêm điểm dừng. Thêm bao nhiêu cũng được: lộ trình sẽ đi qua từng điểm theo thứ tự.",
+    "The device's location": "Vị trí của thiết bị",
+    "Stop %d": "Điểm dừng %d",
+    "Clear stops": "Xóa các điểm dừng",
+    "Move up": "Chuyển lên",
+    "Move down": "Chuyển xuống",
+    "Find route": "Tìm lộ trình",
+    "Finding route": "Đang tìm lộ trình",
+    "Add one more stop to plan a route.": "Thêm một điểm dừng nữa để lập lộ trình.",
+    "Routes from OpenStreetMap, © OpenStreetMap contributors":
+        "Lộ trình từ OpenStreetMap, © những người đóng góp OpenStreetMap",
+    "Speed limits are mapped for all of it.":
+        "Toàn bộ lộ trình đều có giới hạn tốc độ trên bản đồ.",
+    "Speed limits are mapped for %d%% of it; the rest is estimated.":
+        "%d%% lộ trình có giới hạn tốc độ trên bản đồ; phần còn lại là ước tính.",
+    "Average %@": "Trung bình %@",
+    "Speed limit %@": "Giới hạn tốc độ %@",
+    "No speed limit · going %@": "Không giới hạn tốc độ · đang đi %@",
+    "No limit mapped · going %@": "Chưa có giới hạn trên bản đồ · đang đi %@",
+    "Going %@": "Đang đi %@",
+    "No street name": "Đường không tên",
+    "Estimated speed limit %@": "Giới hạn tốc độ ước tính %@",
+    "No speed limit": "Không giới hạn tốc độ",
+    "No route found between these stops. Move them onto roads or paths, or travel another way.":
+        "Không tìm thấy lộ trình giữa các điểm dừng này. Hãy dời chúng lên đường hoặc lối đi, hoặc chọn phương tiện khác.",
+    "A stop is too far from any road or path. Move it closer and try again.":
+        "Một điểm dừng ở quá xa mọi con đường hoặc lối đi. Hãy dời nó lại gần hơn rồi thử lại.",
+    "Too many stops for the route server. Take some out and try again.":
+        "Quá nhiều điểm dừng cho máy chủ lộ trình. Hãy bớt vài điểm rồi thử lại.",
+    "That route is too long for the route server. Make it shorter, or split it up.":
+        "Lộ trình này quá dài cho máy chủ lộ trình. Hãy rút ngắn hoặc chia nhỏ nó.",
+    "The route server is busy. Try again in a minute.":
+        "Máy chủ lộ trình đang bận. Hãy thử lại sau một phút.",
+    "The route server couldn't plan this route (%@).":
+        "Máy chủ lộ trình không lập được lộ trình này (%@).",
 
     // MARK: - Entitlements tab
 
