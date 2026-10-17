@@ -404,6 +404,29 @@ let japaneseStrings: [String: String] = [
     "Clear": "消去",
     "Activity Log (%d)": "アクティビティログ（%d）",
 
+    // Settings › Developer Mode: AMFI requests over the device link.
+    "Developer Mode": "デベロッパモード",
+    "Show Developer Mode in Settings": "設定にデベロッパモードを表示",
+    "Turn on Developer Mode": "デベロッパモードをオンにする",
+    "Asking this iPhone…": "この iPhone に問い合わせ中…",
+    "Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there.":
+        "どちらも、この iPhone への接続がすでに使えることが前提です。LocalDevVPN とペアリングファイル（iOS 17.4〜26 でインポートしたものなど）が必要です。iOS 27 では接続そのものにデベロッパモードが必要なため、消えた項目を元に戻すことはできません。",
+    "Turn on Developer Mode?": "デベロッパモードをオンにしますか？",
+    "Turn On and Restart": "オンにして再起動",
+    "This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode.":
+        "この iPhone はすぐに再起動します。ロックを解除したら、表示される通知で「オンにする」をタップしてください。iOS がこれを許可するのは、iPhone にパスコードが設定されていない場合だけです。",
+    "Developer Mode is already on.": "デベロッパモードはすでにオンです。",
+    "Developer Mode now shows under Settings › Privacy & Security, near the bottom. Turn it on there, and iOS restarts to finish.":
+        "デベロッパモードが「設定 › プライバシーとセキュリティ」の下のほうに表示されるようになりました。そこでオンにすると、iOS が再起動して完了します。",
+    "Developer Mode is set to turn on, and this iPhone restarts now. Once you unlock it, tap Turn On.":
+        "デベロッパモードがオンになるよう設定しました。この iPhone は今から再起動します。ロックを解除したら「オンにする」をタップしてください。",
+    "An install is already running. Wait for it to finish, then try again.":
+        "インストールがすでに実行中です。終わるまで待ってから、もう一度お試しください。",
+    "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
+        "ここからデベロッパモードをオンにできるのは、この iPhone にパスコードが設定されていない場合だけです。「設定にデベロッパモードを表示」をタップして、そこでオンにしてください。",
+    "This iPhone didn't take the Developer Mode request: %@":
+        "この iPhone はデベロッパモードの要求を受け付けませんでした：%@",
+
     // MARK: - Release channels & downloads
 
     "Stable": "安定版",

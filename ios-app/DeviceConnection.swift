@@ -304,6 +304,28 @@ final class DeviceConnection {
     /// record is needed, so imported pairing files work.
     private func connectCoreDeviceProxy(deviceIP: String, pairingFilePath: String,
                                         hostname: String) throws {
+        let provider = try lockdownProvider(deviceIP: deviceIP,
+                                            pairingFilePath: pairingFilePath,
+                                            hostname: hostname)
+        defer { idevice_provider_free(provider) }
+
+        var newAdapter: OpaquePointer?
+        var newHandshake: OpaquePointer?
+        try check(tunnel_create_usb(provider, &newAdapter, &newHandshake),
+                  "CoreDeviceProxy tunnel failed (is a loopback VPN connected, device IP \(deviceIP), and is this pairing file this iPhone's?)")
+        guard newAdapter != nil, newHandshake != nil else {
+            throw fail("tunnel created without valid handles")
+        }
+        disconnect()
+        adapter = newAdapter
+        handshake = newHandshake
+    }
+
+    /// A provider that reaches lockdownd at `deviceIP` with the classic pair
+    /// record in `pairingFilePath`. The caller frees it with
+    /// `idevice_provider_free`.
+    private func lockdownProvider(deviceIP: String, pairingFilePath: String,
+                                  hostname: String) throws -> OpaquePointer {
         var pf: OpaquePointer?
         try pairingFilePath.withCString { p in
             try check(idevice_pairing_file_read(p, &pf),
@@ -334,18 +356,7 @@ final class DeviceConnection {
         if providerError == nil { pairingFileOwned = false }
         try check(providerError, "idevice_tcp_provider_new failed")
         guard let provider else { throw fail("lockdown provider was null") }
-        defer { idevice_provider_free(provider) }
-
-        var newAdapter: OpaquePointer?
-        var newHandshake: OpaquePointer?
-        try check(tunnel_create_usb(provider, &newAdapter, &newHandshake),
-                  "CoreDeviceProxy tunnel failed (is a loopback VPN connected, device IP \(deviceIP), and is this pairing file this iPhone's?)")
-        guard newAdapter != nil, newHandshake != nil else {
-            throw fail("tunnel created without valid handles")
-        }
-        disconnect()
-        adapter = newAdapter
-        handshake = newHandshake
+        return provider
     }
 
     /// CoreDeviceProxy route for an RPPairing-only file, using a lockdown pair
@@ -1461,6 +1472,77 @@ final class DeviceConnection {
         plist_get_uint_val(value, &chipID)
         guard chipID != 0 else { throw fail("device reported an empty UniqueChipID") }
         return chipID
+    }
+
+    // MARK: Developer Mode (AMFI)
+
+    /// What can be asked of AMFI about Developer Mode.
+    enum DeveloperModeRequest {
+        /// Shows Developer Mode under Settings › Privacy & Security.
+        case reveal
+        /// Turns Developer Mode on. iOS restarts right away, then asks to
+        /// confirm after unlock. Refused while the device has a passcode.
+        case enable
+    }
+
+    /// Whether Developer Mode is on, read from lockdownd's AMFI domain (as
+    /// pymobiledevice3 does). Nil when the device gives no answer.
+    func developerModeEnabled() throws -> Bool? {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var client: OpaquePointer?
+        try check(lockdownd_connect_rsd(adapter, handshake, &client), "lockdownd_connect_rsd failed")
+        guard let client else { throw fail("lockdownd client was null") }
+        defer { lockdownd_client_free(client) }
+
+        var value: plist_t?
+        try check("DeveloperModeStatus".withCString { key in
+            "com.apple.security.mac.amfi".withCString { domain in
+                lockdownd_get_value(client, key, domain, &value)
+            }
+        }, "lockdownd_get_value(DeveloperModeStatus) failed")
+        guard let value else { return nil }
+        defer { plist_free(value) }
+        guard plist_get_node_type(value) == PLIST_BOOLEAN else { return nil }
+        var enabled: UInt8 = 0
+        plist_get_bool_val(value, &enabled)
+        return enabled != 0
+    }
+
+    /// Sends `request` to AMFI's RSD shim over the open tunnel.
+    func requestDeveloperMode(_ request: DeveloperModeRequest) throws {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var client: OpaquePointer?
+        try check(amfi_connect_rsd(adapter, handshake, &client), "amfi_connect_rsd failed")
+        guard let client else { throw fail("AMFI client was null") }
+        defer { amfi_client_free(client) }
+        try send(request, to: client)
+    }
+
+    /// Sends `request` through lockdownd with the classic pair record, without
+    /// a tunnel. Xcode and pymobiledevice3 reach AMFI this way, so it may work
+    /// where the tunnel itself won't open without Developer Mode.
+    func requestDeveloperModeOverLockdown(_ request: DeveloperModeRequest, deviceIP: String,
+                                          pairingFilePath: String,
+                                          hostname: String = "SideInstaller") throws {
+        let provider = try lockdownProvider(deviceIP: deviceIP,
+                                            pairingFilePath: pairingFilePath,
+                                            hostname: hostname)
+        defer { idevice_provider_free(provider) }
+        var client: OpaquePointer?
+        try check(amfi_connect(provider, &client), "amfi_connect failed")
+        guard let client else { throw fail("AMFI client was null") }
+        defer { amfi_client_free(client) }
+        try send(request, to: client)
+    }
+
+    private func send(_ request: DeveloperModeRequest, to client: OpaquePointer) throws {
+        switch request {
+        case .reveal:
+            try check(amfi_reveal_developer_mode_option_in_ui(client),
+                      "amfi_reveal_developer_mode_option_in_ui failed")
+        case .enable:
+            try check(amfi_enable_developer_mode(client), "amfi_enable_developer_mode failed")
+        }
     }
 
     // MARK: Location simulation (DVT over RSD)

@@ -2990,6 +2990,94 @@ final class Engine: ObservableObject {
         log("Simulated location cleared.")
     }
 
+    // MARK: - Developer Mode (Settings)
+    //
+    // AMFI can show Developer Mode in Settings, or turn it on. Both go over a
+    // link to this iPhone that already works, so on iOS 27, where the link
+    // itself needs Developer Mode, they can't bring a missing option back.
+
+    /// What a Developer Mode request did.
+    enum DeveloperModeOutcome {
+        /// Developer Mode was already on, so nothing was sent.
+        case alreadyOn
+        /// The option now shows under Settings › Privacy & Security.
+        case revealed
+        /// Developer Mode is set to turn on, and the iPhone is restarting.
+        case enabling
+    }
+
+    /// Opens the device link and sends `request` to AMFI, unless Developer Mode
+    /// is already on. When the tunnel won't open (it may need Developer Mode
+    /// itself), a classic pair record still reaches AMFI through lockdownd.
+    @MainActor
+    func requestDeveloperMode(_ request: DeviceConnection.DeveloperModeRequest) async throws -> DeveloperModeOutcome {
+        guard !isRunning else {
+            throw EngineError.message(L("An install is already running. Wait for it to finish, then try again."))
+        }
+        let outcome: DeveloperModeOutcome = request == .reveal ? .revealed : .enabling
+        log("Developer Mode: \(request == .reveal ? "showing it in Settings" : "turning it on") …")
+        do {
+            try await ensurePairingConnection()
+        } catch {
+            // No VPN or no pairing file: nothing else to try.
+            let path = pairingFilePath ?? PairingController.pairingFilePath()
+            guard vpnConnected, PairingFileKind.of(path: path).hasLockdown else { throw error }
+            log("Developer Mode: the tunnel didn't open (\(short(error))). Asking lockdownd directly …")
+            let ip = deviceHost
+            do {
+                try await onDeviceQueue {
+                    try self.connection.requestDeveloperModeOverLockdown(request, deviceIP: ip,
+                                                                         pairingFilePath: path)
+                }
+            } catch {
+                throw developerModeFailure(error)
+            }
+            logDeveloperMode(outcome)
+            return outcome
+        }
+
+        // Turning it on restarts the iPhone, so never send that needlessly.
+        let enabled: Bool?
+        do {
+            enabled = try await onDeviceQueue { try self.connection.developerModeEnabled() }
+        } catch {
+            log("Developer Mode: couldn't read whether it's on (\(short(error))). Sending the request anyway.")
+            enabled = nil
+        }
+        if enabled == true {
+            logDeveloperMode(.alreadyOn)
+            return .alreadyOn
+        }
+        if enabled == false { log("Developer Mode is off.") }
+        do {
+            try await onDeviceQueue { try self.connection.requestDeveloperMode(request) }
+        } catch {
+            throw developerModeFailure(error)
+        }
+        logDeveloperMode(outcome)
+        return outcome
+    }
+
+    private func logDeveloperMode(_ outcome: DeveloperModeOutcome) {
+        switch outcome {
+        case .alreadyOn: log("Developer Mode is already on.")
+        case .revealed:  log("Developer Mode: the option now shows under Settings › Privacy & Security.")
+        case .enabling:  log("Developer Mode: set to turn on. This iPhone restarts now.")
+        }
+    }
+
+    /// A failed AMFI request in words. The passcode refusal has a known way
+    /// round it; anything else is passed on as the device said it.
+    private func developerModeFailure(_ error: Error) -> Error {
+        let raw = String(describing: error)
+        log("Developer Mode request failed: \(raw)")
+        // AMFI answers {Error: "Device has a passcode set"}.
+        if raw.localizedCaseInsensitiveContains("passcode") {
+            return EngineError.message(L("iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead."))
+        }
+        return EngineError.message(L("This iPhone didn't take the Developer Mode request: %@", short(error)))
+    }
+
     // MARK: The file other apps actually read
 
     /// Returns the path of the pairing file to write into other apps.

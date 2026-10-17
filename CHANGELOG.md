@@ -11,6 +11,15 @@ All notable changes to SideInstaller are documented here.
   ID has left now, and how many will be left afterwards, then waits for Install or Cancel. When too
   few are left, it says so, shows when the next one frees up, and offers only Cancel, since signing
   would fail anyway.
+- **Settings can show Developer Mode, or turn it on.** A new Developer Mode section asks this iPhone
+  to show the Developer Mode switch under Settings › Privacy & Security, or to turn Developer Mode
+  on, which restarts the iPhone and asks to confirm once it's unlocked. It first checks whether
+  Developer Mode is already on, so it never restarts an iPhone for nothing. iOS turns it on from
+  here only when the iPhone has no passcode; with one, show the switch and turn it on in Settings.
+  Both need a link to the iPhone that already works, such as an imported pairing file on iOS 17.4
+  to 26, and when the tunnel won't open, a pairing file made on a computer is tried straight
+  through lockdownd. On iOS 27 the link itself needs Developer Mode, so this can't bring back a
+  missing switch there (issue #29).
 - **`sideinstaller://` links.** `sideinstaller://install?url=<link to an .ipa>` downloads that IPA
   as the custom .ipa and installs it, so a site or a post can offer a one-tap install.
   `sideinstaller://pairingFile?data=<base64>` imports a pairing file, which is what SideStore sends
