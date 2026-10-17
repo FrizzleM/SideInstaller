@@ -72,6 +72,16 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 6. Wait while your selection installs.
 7. That's it. No PC and no extra steps required.
 
+### Links
+
+SideInstaller opens two kinds of `sideinstaller://` link, and asks before acting on either:
+
+- `sideinstaller://install?url=<percent-encoded https link to an .ipa>` downloads the IPA as the
+  custom .ipa and installs it, for one-tap installs from a website.
+- `sideinstaller://pairingFile?data=<base64 pairing file>` imports a pairing file. SideStore sends
+  one back when asked with `sidestore://pairing?urlname=sideinstaller`, which is what **Get it from
+  SideStore** on the Pairing file card does.
+
 
 ## Compatibility
 

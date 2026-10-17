@@ -833,4 +833,29 @@ let chineseStrings: [String: String] = [
     "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
         "签名时会为 App 及其每个扩展各注册一个 App ID，每个会占用 7 天。",
     "This Apple ID can register %d a week.": "此 Apple ID 每周可注册 %d 个。",
+
+    // MARK: - Links (sideinstaller://install, sideinstaller://pairingFile)
+
+    "Install from a link?": "从链接安装？",
+    "Download and install": "下载并安装",
+    "SideInstaller will download this .ipa, then sign it with your Apple ID and install it. Only go ahead if you trust where the link came from.":
+        "SideInstaller 将下载此 .ipa，用你的 Apple ID 签名后安装。只有在你信任该链接来源时才继续。",
+    "It replaces %@, the custom .ipa you have now.": "它会替换你当前的自定义 .ipa %@。",
+    "Use SideStore's pairing file?": "使用 SideStore 的配对文件？",
+    "Import this pairing file?": "导入此配对文件？",
+    "Import": "导入",
+    "SideStore sent back the pairing file it has. SideInstaller will connect to this iPhone with it.":
+        "SideStore 已发回它现有的配对文件。SideInstaller 将用它连接这台 iPhone。",
+    "A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.":
+        "某个链接向 SideInstaller 发送了配对文件。只有在你主动请求时才导入：SideInstaller 将用它连接这台 iPhone。",
+    "It replaces %@.": "它会替换 %@。",
+    "It replaces the pairing file in use now.": "它会替换当前使用的配对文件。",
+    "Get it from SideStore": "从 SideStore 获取",
+    "SideStore opens and sends back the pairing file it has.": "SideStore 会打开并发回它现有的配对文件。",
+    "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
+        "这台 iPhone 上没有安装 SideStore，因此无法从中获取配对文件。",
+    "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
+        "该安装链接中没有 .ipa。它需要 ?url= 后跟下载 .ipa 的 https:// 地址。",
+    "That link was meant to carry a pairing file, but what it holds can't be read.": "该链接本应包含配对文件，但其内容无法读取。",
+    "That link carries a file, but it isn't a pairing file.": "该链接包含一个文件，但不是配对文件。",
 ]

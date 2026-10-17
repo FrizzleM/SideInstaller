@@ -833,4 +833,30 @@ let japaneseStrings: [String: String] = [
     "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
         "署名すると、アプリと各拡張機能にそれぞれ App ID が 1 個ずつ登録され、それぞれ 7 日間カウントされます。",
     "This Apple ID can register %d a week.": "この Apple ID で登録できるのは週に %d 個までです。",
+
+    // MARK: - Links (sideinstaller://install, sideinstaller://pairingFile)
+
+    "Install from a link?": "リンクからインストールしますか？",
+    "Download and install": "ダウンロードしてインストール",
+    "SideInstaller will download this .ipa, then sign it with your Apple ID and install it. Only go ahead if you trust where the link came from.":
+        "SideInstaller はこの .ipa をダウンロードし、あなたの Apple ID で署名してインストールします。リンクの出どころを信頼できる場合のみ続けてください。",
+    "It replaces %@, the custom .ipa you have now.": "現在のカスタム .ipa（%@）は置き換えられます。",
+    "Use SideStore's pairing file?": "SideStore のペアリングファイルを使いますか？",
+    "Import this pairing file?": "このペアリングファイルをインポートしますか？",
+    "Import": "インポート",
+    "SideStore sent back the pairing file it has. SideInstaller will connect to this iPhone with it.":
+        "SideStore が保持しているペアリングファイルを送り返しました。SideInstaller はこれを使ってこの iPhone に接続します。",
+    "A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.":
+        "リンクから SideInstaller にペアリングファイルが送られてきました。自分で要求した場合のみインポートしてください。SideInstaller はこれを使ってこの iPhone に接続します。",
+    "It replaces %@.": "%@ は置き換えられます。",
+    "It replaces the pairing file in use now.": "現在使用中のペアリングファイルは置き換えられます。",
+    "Get it from SideStore": "SideStore から取得",
+    "SideStore opens and sends back the pairing file it has.": "SideStore が開き、保持しているペアリングファイルを送り返します。",
+    "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
+        "この iPhone には SideStore がインストールされていないため、ペアリングファイルを取得できません。",
+    "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
+        "このインストールリンクには .ipa が含まれていません。?url= の後に .ipa のダウンロード元の https:// アドレスが必要です。",
+    "That link was meant to carry a pairing file, but what it holds can't be read.":
+        "このリンクにはペアリングファイルが含まれているはずですが、内容を読み取れません。",
+    "That link carries a file, but it isn't a pairing file.": "このリンクにはファイルが含まれていますが、ペアリングファイルではありません。",
 ]

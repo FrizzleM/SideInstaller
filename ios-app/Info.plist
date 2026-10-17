@@ -64,6 +64,7 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>localdevvpn</string>
+		<string>sidestore</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>

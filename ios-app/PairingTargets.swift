@@ -120,7 +120,7 @@ enum PairingTargets {
 /// Which records a pairing file contains. Determines the tunnel route
 /// (RPPairing, or CoreDeviceProxy over lockdown) and whether AltStore-family
 /// apps can read the file as-is.
-struct PairingFileKind {
+struct PairingFileKind: Hashable {
 
     /// RPPairing record (`public_key`, `private_key`, `identifier`), used by
     /// `tunnel_create_rppairing`. Created by on-device pairing (iOS 27+), so
