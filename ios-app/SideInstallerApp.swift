@@ -56,11 +56,13 @@ struct SideInstallerApp: App {
             .animation(.smooth(duration: 0.5), value: hasAcceptedTOS)
             .animation(.smooth(duration: 0.5), value: hasCompletedAccountSetup)
             // Files opened in the app (share sheet, "Open with", other apps), as
-            // an alternative to the document picker.
+            // an alternative to the document picker, and `sideinstaller://`
+            // links, which ask before doing anything.
             .onOpenURL { url in
-                // Ignore `sideinstaller://` URLs: LocalDevVPN only uses them to
-                // return to the app.
-                guard url.isFileURL else { return }
+                guard url.isFileURL else {
+                    engine.receiveLink(url)
+                    return
+                }
                 // `.mobiledevicepairing`/`.plist` are pairing files; anything else
                 // is treated as an IPA.
                 if ["mobiledevicepairing", "plist"].contains(url.pathExtension.lowercased()) {

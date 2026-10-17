@@ -850,4 +850,32 @@ let vietnameseStrings: [String: String] = [
         "Khi ký, một App ID được đăng ký cho ứng dụng và cho từng tiện ích mở rộng của nó, và mỗi App ID được tính trong 7 ngày.",
     "This Apple ID can register %d a week.":
         "Apple ID này đăng ký được %d App ID mỗi tuần.",
+
+    // MARK: - Links (sideinstaller://install, sideinstaller://pairingFile)
+
+    "Install from a link?": "Cài đặt từ liên kết?",
+    "Download and install": "Tải xuống và cài đặt",
+    "SideInstaller will download this .ipa, then sign it with your Apple ID and install it. Only go ahead if you trust where the link came from.":
+        "SideInstaller sẽ tải .ipa này xuống, ký bằng Apple ID của bạn rồi cài đặt. Chỉ tiếp tục nếu bạn tin nguồn của liên kết.",
+    "It replaces %@, the custom .ipa you have now.": "Nó sẽ thay %@, IPA tùy chọn bạn đang có.",
+    "Use SideStore's pairing file?": "Dùng tệp ghép nối của SideStore?",
+    "Import this pairing file?": "Nhập tệp ghép nối này?",
+    "Import": "Nhập",
+    "SideStore sent back the pairing file it has. SideInstaller will connect to this iPhone with it.":
+        "SideStore đã gửi lại tệp ghép nối nó đang có. SideInstaller sẽ dùng tệp này để kết nối với iPhone này.",
+    "A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.":
+        "Một liên kết đã gửi cho SideInstaller một tệp ghép nối. Chỉ nhập nếu chính bạn đã yêu cầu: SideInstaller sẽ dùng tệp này để kết nối với iPhone này.",
+    "It replaces %@.": "Nó sẽ thay %@.",
+    "It replaces the pairing file in use now.": "Nó sẽ thay tệp ghép nối đang dùng.",
+    "Get it from SideStore": "Lấy từ SideStore",
+    "SideStore opens and sends back the pairing file it has.":
+        "SideStore sẽ mở ra và gửi lại tệp ghép nối nó đang có.",
+    "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
+        "SideStore chưa được cài trên iPhone này, nên không có tệp ghép nối nào để lấy.",
+    "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
+        "Liên kết cài đặt đó không chứa .ipa nào. Nó cần ?url= theo sau là địa chỉ https:// để tải .ipa.",
+    "That link was meant to carry a pairing file, but what it holds can't be read.":
+        "Liên kết đó lẽ ra chứa một tệp ghép nối, nhưng không đọc được nội dung.",
+    "That link carries a file, but it isn't a pairing file.":
+        "Liên kết đó có chứa một tệp, nhưng không phải tệp ghép nối.",
 ]

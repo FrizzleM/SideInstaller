@@ -853,4 +853,32 @@ let italianStrings: [String: String] = [
         "La firma registra un App ID per l'app e uno per ciascuna delle sue estensioni, e ognuno conta per 7 giorni.",
     "This Apple ID can register %d a week.":
         "Questo Apple ID può registrarne %d a settimana.",
+
+    // MARK: - Links (sideinstaller://install, sideinstaller://pairingFile)
+
+    "Install from a link?": "Installare da un link?",
+    "Download and install": "Scarica e installa",
+    "SideInstaller will download this .ipa, then sign it with your Apple ID and install it. Only go ahead if you trust where the link came from.":
+        "SideInstaller scaricherà questo .ipa, lo firmerà con il tuo Apple ID e lo installerà. Continua solo se ti fidi della provenienza del link.",
+    "It replaces %@, the custom .ipa you have now.": "Sostituisce %@, l'IPA personalizzato che hai ora.",
+    "Use SideStore's pairing file?": "Usare il file di abbinamento di SideStore?",
+    "Import this pairing file?": "Importare questo file di abbinamento?",
+    "Import": "Importa",
+    "SideStore sent back the pairing file it has. SideInstaller will connect to this iPhone with it.":
+        "SideStore ha rimandato il file di abbinamento che ha. SideInstaller lo userà per collegarsi a questo iPhone.",
+    "A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.":
+        "Un link ha inviato a SideInstaller un file di abbinamento. Importalo solo se l'hai chiesto tu: SideInstaller lo userà per collegarsi a questo iPhone.",
+    "It replaces %@.": "Sostituisce %@.",
+    "It replaces the pairing file in use now.": "Sostituisce il file di abbinamento in uso.",
+    "Get it from SideStore": "Prendilo da SideStore",
+    "SideStore opens and sends back the pairing file it has.":
+        "SideStore si apre e rimanda il file di abbinamento che ha.",
+    "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
+        "SideStore non è installato su questo iPhone, quindi non c'è nessun file di abbinamento da prendere.",
+    "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
+        "Quel link di installazione non contiene nessun .ipa. Serve ?url= seguito dall'indirizzo https:// da cui si scarica l'.ipa.",
+    "That link was meant to carry a pairing file, but what it holds can't be read.":
+        "Quel link doveva contenere un file di abbinamento, ma il contenuto non si può leggere.",
+    "That link carries a file, but it isn't a pairing file.":
+        "Quel link contiene un file, ma non è un file di abbinamento.",
 ]

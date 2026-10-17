@@ -546,10 +546,41 @@ struct ContentView: View {
                 }
 
                 pairingImportButton
+                if engine.sideStoreInstalled {
+                    orDivider
+                    sideStorePairingButton
+                }
                 pairingDocsLink
             }
         }
         .disabled(engine.isRunning)
+    }
+
+    /// Asks SideStore for the pairing file it already has. SideStore opens and
+    /// sends it back, and the import asks before replacing anything.
+    private var sideStorePairingButton: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button { engine.requestSideStorePairing() } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.uturn.backward.circle")
+                        .foregroundStyle(.secondary)
+                    Text(L("Get it from SideStore"))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "arrow.up.forward.app")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.accent2)
+                }
+                .fieldBackground()
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(engine.isImportingPairing)
+            Text(L("SideStore opens and sends back the pairing file it has."))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     /// Link to SideStore's guide to making a pairing file.
@@ -972,6 +1003,8 @@ struct InstallPopup: View {
             guidePopup(Guides.liveContainerImport)
         case .appIDCost(let cost):
             appIDCostPopup(cost)
+        case .link(let link):
+            linkPopup(link)
         }
     }
 
@@ -1089,6 +1122,94 @@ struct InstallPopup: View {
         let base = L("Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.")
         guard let limit = cost.limit else { return base }
         return base + " " + L("This Apple ID can register %d a week.", limit)
+    }
+
+    // MARK: Links
+
+    /// A `sideinstaller://` link, with what it would do, waiting for a yes.
+    @ViewBuilder
+    private func linkPopup(_ link: DeepLink) -> some View {
+        switch link {
+        case .install(let url):
+            PopupCard(title: L("Install from a link?"), systemImage: "link.circle.fill",
+                      tint: Theme.accent, onClose: close) {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(url.host ?? url.absoluteString)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Text(url.absoluteString)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                    }
+                    Text(installLinkMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    linkButtons(L("Download and install"), systemImage: "arrow.down.app.fill")
+                }
+            }
+        case .pairingFile(let file):
+            PopupCard(title: file.fromSideStore ? L("Use SideStore's pairing file?")
+                                                : L("Import this pairing file?"),
+                      systemImage: "lock.doc.fill", tint: Theme.accent, onClose: close) {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let udid = file.kind.udid {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("UDID")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Text(udid)
+                                .font(.caption.monospaced())
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                    Text(pairingLinkMessage(file))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    linkButtons(L("Import"), systemImage: "square.and.arrow.down.fill")
+                }
+            }
+        }
+    }
+
+    /// The link popup's go-ahead and Cancel.
+    private func linkButtons(_ title: String, systemImage: String) -> some View {
+        VStack(spacing: 10) {
+            Button { engine.answerLink(true) } label: {
+                Label(title, systemImage: systemImage)
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            Button(role: .cancel) { engine.answerLink(false) } label: {
+                Text(L("Cancel"))
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(.secondary)
+        }
+    }
+
+    private var installLinkMessage: String {
+        let base = L("SideInstaller will download this .ipa, then sign it with your Apple ID and install it. Only go ahead if you trust where the link came from.")
+        guard let current = engine.customIPAName else { return base }
+        return base + " " + L("It replaces %@, the custom .ipa you have now.", current)
+    }
+
+    private func pairingLinkMessage(_ file: LinkedPairingFile) -> String {
+        let base = file.fromSideStore
+            ? L("SideStore sent back the pairing file it has. SideInstaller will connect to this iPhone with it.")
+            : L("A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.")
+        if let current = engine.importedPairingName {
+            return base + " " + L("It replaces %@.", current)
+        }
+        return engine.hasPairingFile ? base + " " + L("It replaces the pairing file in use now.") : base
     }
 
     // MARK: Certificate conflict (Apple error 7460)

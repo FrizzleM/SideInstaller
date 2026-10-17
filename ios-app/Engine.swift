@@ -415,6 +415,11 @@ final class Engine: ObservableObject {
     @Published private(set) var appIDCost: AppIDCost?
     /// Resumed with the answer to `appIDCost`: true to sign and install.
     private var appIDCostReply: CheckedContinuation<Bool, Never>?
+    /// The `sideinstaller://` link waiting for the go-ahead.
+    @Published private(set) var pendingLink: DeepLink?
+    /// When SideStore was last asked for its pairing file, so the file it sends
+    /// back can be told from one some other link brought.
+    private var sideStorePairingRequestedAt: Date?
 
     // 2FA bridge: the FFI callback blocks on this semaphore until the UI answers.
     /// What the two-factor sheet shows; nil while no sign-in is asking.
@@ -707,6 +712,8 @@ final class Engine: ObservableObject {
         case liveContainerImport
         /// What signing an imported IPA costs in App IDs, before it's signed.
         case appIDCost(AppIDCost)
+        /// A `sideinstaller://` link, asking before it's acted on.
+        case link(DeepLink)
     }
 
     /// True while the run is held up on the user — joining Wi-Fi, connecting
@@ -723,8 +730,10 @@ final class Engine: ObservableObject {
             return [pairingPIN.map(Popup.pairingCode), guide.map(Popup.guide),
                     appIDCost.map(Popup.appIDCost)].compactMap { $0 }
         }
-        if finished { return finishedPopups }
-        var shown: [Popup] = []
+        // A link that came in during a run asks once the run is over.
+        let link = pendingLink.map(Popup.link)
+        if finished { return [link].compactMap { $0 } + finishedPopups }
+        var shown: [Popup] = [link].compactMap { $0 }
         if certConflict { shown.append(.certConflict) }
         if let guide { shown.append(.guide(guide)) }
         if let lastError {
@@ -774,6 +783,7 @@ final class Engine: ObservableObject {
         case .success:             successClosed = true
         case .liveContainerImport: liveContainerImportClosed = true
         case .appIDCost:           appIDCost = nil
+        case .link:                answerLink(false)
         }
     }
 
@@ -1544,13 +1554,15 @@ final class Engine: ObservableObject {
     }
 
     /// Downloads an IPA from a pasted link and stores it as the custom import.
+    /// Returns true once it's in.
     @MainActor
-    func importCustomIPA(fromLink text: String) async {
-        guard !isImportingIPA else { return }
+    @discardableResult
+    func importCustomIPA(fromLink text: String) async -> Bool {
+        guard !isImportingIPA else { return false }
         guard let url = Self.downloadLink(text) else {
             lastError = L("That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.")
             log("⛔️ Import: \(lastError ?? "")")
-            return
+            return false
         }
         isImportingIPA = true
         importProgress = 0
@@ -1570,6 +1582,7 @@ final class Engine: ObservableObject {
             if downloadedSource == .custom { downloadedIPAPath = nil }
             setGuide(nil)
             log("Imported \(dest.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(dest.path)), countStyle: .file))).")
+            return true
         } catch IPALibrary.ImportError.notAnIPA {
             refreshCustomIPA()
             lastError = L("That link didn't return an IPA. It has to download the file itself — a page that only links to the .ipa, or one that asks you to sign in first, arrives here as a web page.")
@@ -1582,6 +1595,7 @@ final class Engine: ObservableObject {
             lastError = L("Couldn't download that link: %@", short(error))
             log("⛔️ Import: \(lastError ?? "")")
         }
+        return false
     }
 
     /// Turns pasted text into a download URL: trims whitespace and adds `https://`
@@ -2369,7 +2383,7 @@ final class Engine: ObservableObject {
 
     private static let localDevVPNScheme = "localdevvpn"
     /// The scheme LocalDevVPN is asked to return to, registered in Info.plist.
-    private static let callbackScheme = "sideinstaller"
+    private static let callbackScheme = DeepLink.scheme
 
     /// True when LocalDevVPN is installed. Only answerable because Info.plist
     /// lists its scheme under `LSApplicationQueriesSchemes`.
@@ -2562,26 +2576,117 @@ final class Engine: ObservableObject {
                 log("⛔️ Pairing import: \(lastError ?? "")")
                 return
             }
-            try data.write(to: PrivateStore.pairingFile, options: .atomic)
-            // Drop the cached merged file; it was built from the old record.
-            CompositePairingFile.invalidateMerged()
-            pairingFilePath = PrivateStore.pairingFile.path
-            importedPairingName = url.lastPathComponent
-            UserDefaults.standard.set(url.lastPathComponent, forKey: Engine.importedPairingNameKey)
-            connection.disconnect()
-            deviceSummary = nil
-            pairingStatus = L("imported pairing file")
-            setGuide(nil)
-            let records = [kind.hasLockdown ? "lockdown" : nil,
-                           kind.hasRemotePairing ? "remote-pairing" : nil]
-                .compactMap { $0 }.joined(separator: " + ")
-            log("Imported \(url.lastPathComponent) (\(data.count) bytes, \(records) record\(records.contains("+") ? "s" : "")\(kind.udid.map { ", UDID \($0)" } ?? "")).")
-            if !kind.hasLockdown {
-                log("⚠️ No lockdown record in that file — SideStore and Feather can't read it, though the install itself will work.")
-            }
+            try adoptPairingFile(data, kind: kind, name: url.lastPathComponent)
         } catch {
             lastError = L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
             log("⛔️ Pairing import: \(lastError ?? "")")
+        }
+    }
+
+    /// Makes a checked pairing file the one in use, replacing the one on disk,
+    /// and shows it under `name` as the imported file.
+    @MainActor
+    private func adoptPairingFile(_ data: Data, kind: PairingFileKind, name: String) throws {
+        try data.write(to: PrivateStore.pairingFile, options: .atomic)
+        // Drop the cached merged file; it was built from the old record.
+        CompositePairingFile.invalidateMerged()
+        pairingFilePath = PrivateStore.pairingFile.path
+        importedPairingName = name
+        UserDefaults.standard.set(name, forKey: Engine.importedPairingNameKey)
+        connection.disconnect()
+        deviceSummary = nil
+        pairingStatus = L("imported pairing file")
+        setGuide(nil)
+        let records = [kind.hasLockdown ? "lockdown" : nil,
+                       kind.hasRemotePairing ? "remote-pairing" : nil]
+            .compactMap { $0 }.joined(separator: " + ")
+        log("Imported \(name) (\(data.count) bytes, \(records) record\(records.contains("+") ? "s" : "")\(kind.udid.map { ", UDID \($0)" } ?? "")).")
+        if !kind.hasLockdown {
+            log("⚠️ No lockdown record in that file — SideStore and Feather can't read it, though the install itself will work.")
+        }
+    }
+
+    // MARK: - Links
+    //
+    // `sideinstaller://install?url=` and `sideinstaller://pairingFile?data=`
+    // (see `DeepLink`). Each puts up a popup first; only its yes acts.
+
+    /// How long after asking SideStore a pairing file counts as its reply.
+    private static let sideStoreReplyWindow: TimeInterval = 5 * 60
+
+    /// Reads a `sideinstaller://` link and puts up its popup. Nothing is
+    /// downloaded or imported yet.
+    @MainActor
+    func receiveLink(_ url: URL) {
+        let answersSideStore = sideStorePairingRequestedAt
+            .map { Date().timeIntervalSince($0) < Self.sideStoreReplyWindow } ?? false
+        switch DeepLink.parse(url, answersSideStore: answersSideStore) {
+        case .ignored(let action):
+            // LocalDevVPN comes back with a bare `sideinstaller://`.
+            if let action { log("Ignored a sideinstaller://\(action) link: this version has no such action.") }
+        case .invalid(let message):
+            log("⛔️ Link: \(message)")
+            // A run's own popups come first; the log keeps the reason.
+            if !isRunning { lastError = message }
+        case .link(let link):
+            if case .pairingFile = link { sideStorePairingRequestedAt = nil }
+            pendingLink = link
+            log("Link: \(link.logDescription). \(isRunning ? "It asks once this install ends." : "Waiting for the go-ahead.")")
+        }
+    }
+
+    /// Answers the link popup: true downloads and installs the IPA, or imports
+    /// the pairing file; false drops the link.
+    @MainActor
+    func answerLink(_ accept: Bool) {
+        guard let link = pendingLink else { return }
+        pendingLink = nil
+        guard accept else {
+            log("Link dismissed.")
+            return
+        }
+        lastError = nil
+        switch link {
+        case .install(let url):
+            installSource = .custom
+            Task { @MainActor in
+                // Installs only what the link brought: a failed download leaves
+                // its error up instead of installing the previous import.
+                guard await self.importCustomIPA(fromLink: url.absoluteString) else { return }
+                self.runOneClick()
+            }
+        case .pairingFile(let file):
+            do {
+                try adoptPairingFile(file.data, kind: file.kind, name: file.displayName)
+            } catch {
+                lastError = L("Couldn't import %@: %@", file.displayName, error.localizedDescription)
+                log("⛔️ Pairing import: \(lastError ?? "")")
+            }
+        }
+    }
+
+    /// True when SideStore is installed to ask. Only answerable because
+    /// Info.plist lists its scheme under `LSApplicationQueriesSchemes`.
+    var sideStoreInstalled: Bool {
+        guard let url = URL(string: "sidestore://") else { return false }
+        return UIApplication.shared.canOpenURL(url)
+    }
+
+    /// Opens SideStore, which sends back the pairing file it has as a
+    /// `sideinstaller://pairingFile` link. That link asks before importing.
+    @MainActor
+    func requestSideStorePairing() {
+        guard let url = URL(string: "sidestore://pairing?urlname=\(DeepLink.scheme)") else { return }
+        lastError = nil
+        sideStorePairingRequestedAt = Date()
+        log("Asking SideStore for its pairing file …")
+        UIApplication.shared.open(url) { opened in
+            Task { @MainActor in
+                guard !opened else { return }
+                self.sideStorePairingRequestedAt = nil
+                self.lastError = L("SideStore isn't installed on this iPhone, so there's no pairing file to get from it.")
+                self.log("⛔️ Pairing import: \(self.lastError ?? "")")
+            }
         }
     }
 

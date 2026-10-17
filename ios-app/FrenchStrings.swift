@@ -857,4 +857,32 @@ let frenchStrings: [String: String] = [
         "La signature enregistre un App ID pour l'app et un pour chacune de ses extensions, et chacun compte pendant 7 jours.",
     "This Apple ID can register %d a week.":
         "Cet Apple ID peut en enregistrer %d par semaine.",
+
+    // MARK: - Links (sideinstaller://install, sideinstaller://pairingFile)
+
+    "Install from a link?": "Installer depuis un lien ?",
+    "Download and install": "Télécharger et installer",
+    "SideInstaller will download this .ipa, then sign it with your Apple ID and install it. Only go ahead if you trust where the link came from.":
+        "SideInstaller va télécharger ce .ipa, le signer avec votre Apple ID et l'installer. Ne continuez que si vous faites confiance à la provenance du lien.",
+    "It replaces %@, the custom .ipa you have now.": "Il remplace %@, l'IPA personnalisé actuel.",
+    "Use SideStore's pairing file?": "Utiliser le fichier de jumelage de SideStore ?",
+    "Import this pairing file?": "Importer ce fichier de jumelage ?",
+    "Import": "Importer",
+    "SideStore sent back the pairing file it has. SideInstaller will connect to this iPhone with it.":
+        "SideStore a renvoyé le fichier de jumelage qu'il possède. SideInstaller s'en servira pour se connecter à cet iPhone.",
+    "A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.":
+        "Un lien a envoyé un fichier de jumelage à SideInstaller. Ne l'importez que si vous l'avez demandé : SideInstaller s'en servira pour se connecter à cet iPhone.",
+    "It replaces %@.": "Il remplace %@.",
+    "It replaces the pairing file in use now.": "Il remplace le fichier de jumelage utilisé actuellement.",
+    "Get it from SideStore": "Le récupérer depuis SideStore",
+    "SideStore opens and sends back the pairing file it has.":
+        "SideStore s'ouvre et renvoie le fichier de jumelage qu'il possède.",
+    "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
+        "SideStore n'est pas installé sur cet iPhone, il n'y a donc aucun fichier de jumelage à récupérer.",
+    "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
+        "Ce lien d'installation ne contient aucun .ipa. Il lui faut ?url= suivi de l'adresse https:// d'où se télécharge le .ipa.",
+    "That link was meant to carry a pairing file, but what it holds can't be read.":
+        "Ce lien devait contenir un fichier de jumelage, mais son contenu est illisible.",
+    "That link carries a file, but it isn't a pairing file.":
+        "Ce lien contient un fichier, mais ce n'est pas un fichier de jumelage.",
 ]

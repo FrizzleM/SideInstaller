@@ -94,6 +94,11 @@ struct RootView: View {
         }
         // Animate the backdrop to the new tab's level.
         .onChange(of: page) { _, page in Backdrop.settle(on: page.wash) }
+        // A link's install or pairing file ends up on the Install tab, so its
+        // popup comes up over that.
+        .onChange(of: engine.pendingLink) { _, link in
+            if link != nil { page = .install }
+        }
         // Over the tab bar too, so the whole app dims behind the popups.
         .popupStack(entries, onBackdropTap: backdropTap) { entry in
             card(for: entry)
@@ -190,8 +195,8 @@ struct RootView: View {
             .installStopped
         case .install(.success), .install(.liveContainerImport):
             .installFinished
-        // Up on its own, waiting for the go-ahead to sign.
-        case .install(.appIDCost):
+        // Up on its own, waiting for the go-ahead to sign, or to act on a link.
+        case .install(.appIDCost), .install(.link):
             nil
         case .sideBySide(.pairingCode), .sideBySide(.pairInSettings):
             .sideBySidePairing

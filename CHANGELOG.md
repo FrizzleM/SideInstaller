@@ -11,6 +11,14 @@ All notable changes to SideInstaller are documented here.
   ID has left now, and how many will be left afterwards, then waits for Install or Cancel. When too
   few are left, it says so, shows when the next one frees up, and offers only Cancel, since signing
   would fail anyway.
+- **`sideinstaller://` links.** `sideinstaller://install?url=<link to an .ipa>` downloads that IPA
+  as the custom .ipa and installs it, so a site or a post can offer a one-tap install.
+  `sideinstaller://pairingFile?data=<base64>` imports a pairing file, which is what SideStore sends
+  back when asked with `sidestore://pairing?urlname=sideinstaller`. On iOS 18 to 26 the Pairing
+  file card has a new “Get it from SideStore” button that asks it, so the pairing file SideStore
+  already has comes over in one tap. Neither link does anything until you confirm: the popup shows
+  the link's address and what it would replace, or the pairing file's UDID. A link that comes in
+  during an install asks once the install ends. Links used to be ignored.
 
 ### Fixed
 - **Pairing works when SideInstaller runs inside LiveContainer.** Before pairing, SideInstaller
