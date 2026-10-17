@@ -20,6 +20,8 @@ struct SideInstallerApp: App {
         // A pairing code still up from a run that was killed means nothing now.
         PairingLiveActivity.shared.endLeftovers()
         PairingNotification.shared.reset()
+        // So is an install's progress.
+        InstallActivity.shared.endLeftovers()
     }
 
     var body: some Scene {

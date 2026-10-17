@@ -5,6 +5,20 @@ All notable changes to SideInstaller are documented here.
 ## 1.5.4
 
 ### Added
+- **The install keeps going when you leave SideInstaller.** On iOS 26 and later it runs as a
+  background task: switch apps or lock your iPhone and it carries on, with its step and percentage
+  in the Dynamic Island and on the Lock Screen, where you can also stop it. Below iOS 26, a Live
+  Activity shows the same for the half minute or so iOS gives SideInstaller in the background; when
+  that runs out it says the install is paused, and it carries on once SideInstaller is open again.
+  Neither starts while your iPhone pairs, since the pairing code has the Dynamic Island then.
+- **The Dynamic Island says when the install needs you, or stopped.** A 2FA code, the App IDs a
+  custom .ipa costs, a VPN or Wi-Fi to connect, or a Trust prompt to answer turns SideInstaller's
+  Live Activity orange, with what's needed and what to do; an error turns it red, with the reason,
+  and it stays up until you're back in the app. Either one opens the Dynamic Island, or drops down
+  as a banner on an iPhone without one. On iOS 26 and later, where iOS draws the install's progress
+  itself, its title says the same, and SideInstaller's own activity comes up beside it when you
+  leave the app while the install needs you: iOS lets an app start one only until it has left the
+  screen.
 - **A custom .ipa shows its App ID cost before it's signed.** Signing registers an App ID for the
   app and for each of its extensions, and a free Apple ID can register only 10 a week. After
   sign-in, the install now stops on a popup listing the new App IDs it needs, how many the Apple

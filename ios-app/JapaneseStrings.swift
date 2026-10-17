@@ -570,6 +570,17 @@ let japaneseStrings: [String: String] = [
     "Paired": "ペアリング完了",
     "Tap to return to SideInstaller.": "タップして SideInstaller に戻ります。",
 
+    // The install's progress outside the app
+    "Installing %@": "%@ をインストール中",
+    "Paused": "一時停止中",
+    "Open SideInstaller to finish the install.":
+        "インストールを完了するには SideInstaller を開いてください。",
+    "Check the App IDs it needs, then tap Install.":
+        "必要な App ID を確認してから「インストール」をタップしてください。",
+    "Tap Trust": "「信頼」をタップ",
+    "Unlock this iPhone and tap Trust when it asks.":
+        "この iPhone のロックを解除し、確認されたら「信頼」をタップしてください。",
+
     "A signing certificate already exists": "既に署名用証明書が存在します",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple からエラー 7460 が返されました。この Apple ID には既に iOS 開発用証明書が存在するか、発行のリクエストが処理中です。",

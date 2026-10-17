@@ -437,6 +437,85 @@ the second run; the build with the extension stayed at "not determined"
 throughout. Not verified: a real pairing on a device, an install of a build
 signed through the wildcard path, and a refused prompt.
 
+#### Install progress outside the app
+
+A one-click run left the app's foreground and was suspended within seconds:
+nothing kept it going, and nothing showed where it was. `InstallActivity` does
+both now, started by `runOneClick` and told how the run ended.
+
+**iOS 26 and later: `BGContinuedProcessingTask`.** The run is submitted as one,
+which keeps the app running in the background and has iOS draw the title,
+subtitle and progress in a Live Activity of its own (with a stop button). The
+title is "Installing <build>", the subtitle the checklist's current step (or, while
+the run needs the user, what it needs and what to do; see below), and the progress
+the Install tab's percentage out of 1000 units. Info.plist permits
+`$(PRODUCT_BUNDLE_IDENTIFIER).install.*` (replacing the `.pairing` entry left
+over from StikPair's port, which nothing registered); each run registers and
+submits `<bundle id>.install.<UUID>`, since registering an identifier twice ends
+the app. The header requires the identifier to start with the bundle ID, so a
+build re-signed under another bundle ID without its Info.plist rewritten can't
+have one, and is told so in the log. `strategy = .fail`: a task iOS only queued
+would start after the user stopped waiting. On iOS 27 the submission goes through
+the async `submitTaskRequest(_:)` (the sync one is deprecated there, and the
+header says not to call the new one on the main thread). If iOS ends the task
+while the app is in the background, that's the stop button or iOS reclaiming the
+time, which can't be told apart, and the run is cancelled; in front, the run just
+carries on.
+
+**Below 26, or when iOS turns the task down: a Live Activity.**
+`InstallActivityAttributes` (shared with the extension like the pairing one) and
+`InstallActivityWidget` draw the same title, step and percentage: a bar and a
+percentage on the Lock Screen card, the Install tab's symbol and the percentage in
+the compact island, a ring in the minimal one. A UIKit background task is held through the whole run, on every iOS: it is
+the ~30 s any app gets, and the time to wind down after a cancel. When it runs
+out the activity turns to "Paused · Open SideInstaller to finish the install"
+before the time is handed back (within a second, whatever is still queued: iOS
+kills an app that keeps it past the end), and back to the step once the app is
+in front again. A run that ends in the background leaves "Installed" on the Lock
+Screen, or "Install stopped" up in the Dynamic Island too, until the app is
+opened; one that ends in front takes it down at once. Builds without the
+extension get the background time without the activity.
+
+**When the run needs the user, or stops.** `currentNeed()` reads it off the
+engine: a 2FA prompt (`twoFactor` asking; the generic instruction, without the
+number Apple masks, since this shows on the Lock Screen), the App ID go-ahead
+(`appIDCost`), a Trust prompt (`AttentionGate`, which now posts `didChange` on
+the main queue, below iOS 27), or the network step waiting on its guide (VPN,
+Wi-Fi). Pairing isn't one: its own activity has that. The activity turns orange
+(`waiting`, and `paused`) or red (`stopped`, with `lastError`): the need's own
+symbol in the badge and the compact island, a mark where the percentage was, a
+tinted glow and outline on the Lock Screen card, and "Tap to return to
+SideInstaller" where the bar was. Coming into a need, or stopping, updates it
+with an `AlertConfiguration` (not while the app is in front, where its popup
+says so), which opens the Dynamic Island or drops a banner, and a relevance score
+of 100, against 50 for progress. A stopped run's activity isn't ended, so it stays
+in the Dynamic Island until the app is opened; iOS ends any after 8 hours, and
+launch takes leftovers down.
+
+On iOS 26 and later the task's UI takes only a title and a subtitle: they say the
+need and the instruction, or "Install stopped" and the reason. A task the run
+stopped on in the background isn't completed at once, since that takes its UI
+down: it says so until the app is in front again, or for at most 3 minutes.
+SideInstaller's own activity can't stand in there whenever it likes: iOS lets an
+app start one only while it's in front. On the iPhone 16 (iOS 27, 2026-10-17)
+with the task running, `Activity.request` worked at `willResignActive` and at
+`didEnterBackground`, and failed with `visibility` 4 s and 12 s into the
+background. So it's started at those two moments when the run needs the user
+right then (the user left with the 2FA sheet up, say), comes down once it doesn't
+or the app is in front, and turns red if the run stops meanwhile. A need that
+comes up later in the background is in the task's title only. Running it for the
+whole background stretch instead would put two activities up for every install.
+
+**Not while pairing.** Both can only be started with the app in front, and
+neither is while this iPhone still has to pair (no pairing file and the pair
+step not done, or the pair step waiting): the pairing Live Activity needs the
+Dynamic Island for its code, `KeepAlive` already keeps the app running, and a
+task stuck at "Get pairing file" for a minute looks stalled, which iOS may
+expire. On a first install the surface goes up when the user comes back from
+Settings; the install doesn't carry on in the background before that. A stale
+pairing file re-paired mid-run is the exception: the surface is already up and
+stays, next to the pairing activity.
+
 
 ### Step 3 — Apple ID + signing — code complete; device/account steps unverified
 

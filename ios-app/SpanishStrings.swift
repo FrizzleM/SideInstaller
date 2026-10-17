@@ -676,6 +676,17 @@ let spanishStrings: [String: String] = [
     "Paired": "Emparejado",
     "Tap to return to SideInstaller.": "Toca para volver a SideInstaller.",
 
+    // The install's progress outside the app
+    "Installing %@": "Instalando %@",
+    "Paused": "En pausa",
+    "Open SideInstaller to finish the install.":
+        "Abre SideInstaller para terminar la instalación.",
+    "Check the App IDs it needs, then tap Install.":
+        "Revisa los App ID que necesita y luego toca Instalar.",
+    "Tap Trust": "Toca Confiar",
+    "Unlock this iPhone and tap Trust when it asks.":
+        "Desbloquea este iPhone y toca Confiar cuando te lo pida.",
+
     "A signing certificate already exists": "Ya existe un certificado de firma",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple ha devuelto el error 7460: este Apple ID ya tiene un certificado de desarrollo de iOS, o hay una solicitud pendiente.",

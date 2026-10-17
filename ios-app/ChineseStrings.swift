@@ -657,6 +657,17 @@ let chineseStrings: [String: String] = [
     "Paired": "已配对",
     "Tap to return to SideInstaller.": "轻点以返回 SideInstaller。",
 
+    // The install's progress outside the app
+    "Installing %@": "正在安装 %@",
+    "Paused": "已暂停",
+    "Open SideInstaller to finish the install.":
+        "打开 SideInstaller 以完成安装。",
+    "Check the App IDs it needs, then tap Install.":
+        "查看所需的 App ID，然后轻点“安装”。",
+    "Tap Trust": "轻点“信任”",
+    "Unlock this iPhone and tap Trust when it asks.":
+        "解锁此 iPhone，并在询问时轻点“信任”。",
+
     "A signing certificate already exists": "已存在签名证书",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple 返回错误 7460：此 Apple ID 已有一个 iOS 开发证书，或者有一个申请仍在处理中。",

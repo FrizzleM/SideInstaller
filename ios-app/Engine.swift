@@ -642,8 +642,11 @@ final class Engine: ObservableObject {
         resetRun()
         isRunning = true
         log("=== Starting one-click install ===")
+        // Its progress outside the app, and background time to carry on there.
+        InstallActivity.shared.runStarted()
 
         pipelineTask = Task { @MainActor in
+            var outcome = InstallActivity.Outcome.cancelled
             do {
                 try await ensureNetwork()
                 // The download needs neither the device nor the Apple ID, so it
@@ -674,6 +677,7 @@ final class Engine: ObservableObject {
                 try await install(prestaged: staged)
                 try await writePairing(accountConfig: accountConfig, prepared: prepared)
                 finishSuccess()
+                outcome = .installed
             } catch is CancellationError {
                 log("Install cancelled.")
                 // A cancelled run leaves no progress behind, so the Install
@@ -686,11 +690,13 @@ final class Engine: ObservableObject {
                 lastError = msg
                 log("⛔️ Stopped: \(msg)")
                 failActiveStep(to: .failed)
+                outcome = .stopped
             }
             stopBackgroundWork()
             isRunning = false
             isCancelling = false
             pairingPIN = nil
+            InstallActivity.shared.runEnded(outcome)
         }
     }
 
@@ -3636,20 +3642,41 @@ private let twoFactorCallback: SITwoFactorCb = { ctx, request, outBuf, bufLen in
 /// Counts what currently has the user's attention — a Trust prompt — so a 2FA
 /// sheet can wait for it to finish. Thread-safe.
 final class AttentionGate {
+    /// Posted on the main queue when something starts or stops holding the
+    /// user's attention, for the install's Live Activity (`InstallActivity`).
+    static let didChange = Notification.Name("AttentionGateDidChange")
+
     private let condition = NSCondition()
     private var holders = 0
+
+    /// True while something holds the user's attention.
+    var isHeld: Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        return holders > 0
+    }
 
     func begin() {
         condition.lock()
         holders += 1
+        let changed = holders == 1
         condition.unlock()
+        if changed { announce() }
     }
 
     func end() {
         condition.lock()
+        let changed = holders == 1
         holders = max(0, holders - 1)
         if holders == 0 { condition.broadcast() }
         condition.unlock()
+        if changed { announce() }
+    }
+
+    private func announce() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Self.didChange, object: self)
+        }
     }
 
     /// Blocks until nothing holds the user's attention. Never on the main thread.

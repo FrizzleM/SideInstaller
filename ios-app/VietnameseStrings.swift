@@ -671,6 +671,17 @@ let vietnameseStrings: [String: String] = [
     "Paired": "Đã ghép nối",
     "Tap to return to SideInstaller.": "Chạm để quay lại SideInstaller.",
 
+    // The install's progress outside the app
+    "Installing %@": "Đang cài đặt %@",
+    "Paused": "Đã tạm dừng",
+    "Open SideInstaller to finish the install.":
+        "Mở SideInstaller để hoàn tất cài đặt.",
+    "Check the App IDs it needs, then tap Install.":
+        "Kiểm tra các App ID cần dùng, rồi chạm vào Cài ứng dụng.",
+    "Tap Trust": "Chạm vào Tin cậy",
+    "Unlock this iPhone and tap Trust when it asks.":
+        "Mở khóa iPhone này và chạm vào Tin cậy khi được hỏi.",
+
     "A signing certificate already exists": "Đã có một chứng chỉ ký",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple trả về lỗi 7460: Apple ID này đã có chứng chỉ phát triển iOS, hoặc một yêu cầu vẫn đang chờ xử lý.",

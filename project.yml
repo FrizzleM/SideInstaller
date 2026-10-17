@@ -46,13 +46,15 @@ targets:
   # Draws the pairing Live Activity: the code Settings asks for, in the Dynamic
   # Island and on the Lock Screen. A Live Activity's views have to live in a
   # widget extension; the app starts and updates it (PairingLiveActivity.swift).
+  # Also draws an install's progress below iOS 26 (InstallActivity.swift).
   SideInstallerLiveActivity:
     type: app-extension
     platform: iOS
     sources:
       - path: ios-live-activity
-      # What the activity shows, shared with the app.
+      # What the activities show, shared with the app.
       - path: ios-app/PairingActivityAttributes.swift
+      - path: ios-app/InstallActivityAttributes.swift
     settings:
       base:
         # Has to stay the app's identifier plus a suffix, or iOS refuses to
