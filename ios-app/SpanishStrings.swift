@@ -288,6 +288,34 @@ let spanishStrings: [String: String] = [
     "Couldn't build the download URL for %@.":
         "No se ha podido construir la URL de descarga de %@.",
 
+    // Location › saved places and GPX routes.
+    "Saved places": "Lugares guardados",
+    "Save this place": "Guardar este lugar",
+    "Name": "Nombre",
+    "Show on map": "Ver en el mapa",
+    "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
+        "Toca Guardar bajo el mapa para conservar el punto bajo el pin. Al tocar un lugar guardado, se fija al instante.",
+    "Play a GPX route": "Reproducir una ruta GPX",
+    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
+        "Importa un archivo .gpx y el dispositivo lo recorrerá a la velocidad que elijas; al final se queda en el último punto.",
+    "Import GPX file": "Importar archivo GPX",
+    "Couldn't read %@ as a GPX file.": "No se ha podido leer %@ como archivo GPX.",
+    "%@ has no track, route or waypoints in it.": "%@ no contiene ningún track, ruta ni waypoint.",
+    "As recorded": "Como se grabó",
+    "Walk": "A pie",
+    "Cycle": "En bici",
+    "Drive": "En coche",
+    "Speed": "Velocidad",
+    "Play route": "Reproducir ruta",
+    "Playing route · %d%%": "Reproduciendo ruta · %d%%",
+    "Stop here": "Parar aquí",
+    "%@ of %@": "%@ de %@",
+    "Route finished. The device stays at its last point.":
+        "Ruta terminada. El dispositivo se queda en el último punto.",
+    "Route stopped. The device stays where it got to.":
+        "Ruta detenida. El dispositivo se queda donde había llegado.",
+    "Route playback stopped: %@": "Se ha detenido la reproducción de la ruta: %@",
+
     // MARK: - Entitlements tab
 
     "Entitlements": "Permisos",

@@ -42,6 +42,12 @@ All notable changes to SideInstaller are documented here.
   already has comes over in one tap. Neither link does anything until you confirm: the popup shows
   the link's address and what it would replace, or the pairing file's UDID. A link that comes in
   during an install asks once the install ends. Links used to be ignored.
+- **Location spoofing has saved places and GPX routes**, ported from StikDebug. Save under the map
+  keeps the spot under the pin with a name, and tapping a saved place sets it straight away. Import
+  a .gpx file and the device moves along its track (or route, or waypoints) on the map, as recorded
+  when the file has timestamps, or walking, cycling or driving. A new point goes out every half
+  second, a progress bar shows how far it has got, Stop here holds the current point, and at the
+  end the device stays on the last one.
 
 ### Fixed
 - **Pairing works when SideInstaller runs inside LiveContainer.** Before pairing, SideInstaller

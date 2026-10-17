@@ -279,6 +279,32 @@ let chineseStrings: [String: String] = [
     "Downloading %@ failed (HTTP %d).": "下载 %@ 失败（HTTP %d）。",
     "Couldn't build the download URL for %@.": "无法为 %@ 构建下载链接。",
 
+    // Location › saved places and GPX routes.
+    "Saved places": "已存储的地点",
+    "Save this place": "存储此地点",
+    "Name": "名称",
+    "Show on map": "在地图上显示",
+    "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
+        "轻点地图下方的“存储”即可保留图钉下的位置。轻点已存储的地点会立即设置该位置。",
+    "Play a GPX route": "播放 GPX 路线",
+    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
+        "导入 .gpx 文件后，设备会按你选择的速度沿路线移动，结束后停在最后一个点。",
+    "Import GPX file": "导入 GPX 文件",
+    "Couldn't read %@ as a GPX file.": "无法将 %@ 读取为 GPX 文件。",
+    "%@ has no track, route or waypoints in it.": "%@ 中没有轨迹、路线或航点。",
+    "As recorded": "按记录时间",
+    "Walk": "步行",
+    "Cycle": "骑行",
+    "Drive": "驾车",
+    "Speed": "速度",
+    "Play route": "播放路线",
+    "Playing route · %d%%": "正在播放路线 · %d%%",
+    "Stop here": "停在此处",
+    "%@ of %@": "%@ / %@",
+    "Route finished. The device stays at its last point.": "路线已结束。设备停留在最后一个点。",
+    "Route stopped. The device stays where it got to.": "路线已停止。设备停留在当前所到位置。",
+    "Route playback stopped: %@": "路线播放已停止：%@",
+
     // MARK: - Entitlements tab
 
     "Entitlements": "权限",

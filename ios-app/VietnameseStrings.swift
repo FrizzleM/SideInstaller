@@ -285,6 +285,34 @@ let vietnameseStrings: [String: String] = [
     "Downloading %@ failed (HTTP %d).": "Tải %@ thất bại (HTTP %d).",
     "Couldn't build the download URL for %@.": "Không thể tạo URL tải cho %@.",
 
+    // Location › saved places and GPX routes.
+    "Saved places": "Địa điểm đã lưu",
+    "Save this place": "Lưu địa điểm này",
+    "Name": "Tên",
+    "Show on map": "Xem trên bản đồ",
+    "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
+        "Chạm Lưu bên dưới bản đồ để giữ lại điểm dưới ghim. Chạm vào một địa điểm đã lưu để đặt ngay.",
+    "Play a GPX route": "Phát lộ trình GPX",
+    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
+        "Nhập tệp .gpx và thiết bị sẽ di chuyển theo nó với tốc độ bạn chọn, rồi dừng ở điểm cuối.",
+    "Import GPX file": "Nhập tệp GPX",
+    "Couldn't read %@ as a GPX file.": "Không thể đọc %@ dưới dạng tệp GPX.",
+    "%@ has no track, route or waypoints in it.": "%@ không có track, route hay waypoint nào.",
+    "As recorded": "Như đã ghi",
+    "Walk": "Đi bộ",
+    "Cycle": "Đạp xe",
+    "Drive": "Lái xe",
+    "Speed": "Tốc độ",
+    "Play route": "Phát lộ trình",
+    "Playing route · %d%%": "Đang phát lộ trình · %d%%",
+    "Stop here": "Dừng tại đây",
+    "%@ of %@": "%@ / %@",
+    "Route finished. The device stays at its last point.":
+        "Đã hết lộ trình. Thiết bị ở lại điểm cuối.",
+    "Route stopped. The device stays where it got to.":
+        "Đã dừng lộ trình. Thiết bị ở lại vị trí đã đến.",
+    "Route playback stopped: %@": "Đã dừng phát lộ trình: %@",
+
     // MARK: - Entitlements tab
 
     "Entitlements": "Quyền",
