@@ -504,6 +504,29 @@ let vietnameseStrings: [String: String] = [
     "Clear": "Xóa hết",
     "Activity Log (%d)": "Nhật ký hoạt động (%d)",
 
+    // Settings › Developer Mode: AMFI requests over the device link.
+    "Developer Mode": "Chế độ nhà phát triển",
+    "Show Developer Mode in Settings": "Hiện Chế độ nhà phát triển trong Cài đặt",
+    "Turn on Developer Mode": "Bật Chế độ nhà phát triển",
+    "Asking this iPhone…": "Đang hỏi iPhone này…",
+    "Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there.":
+        "Cả hai đều cần một kết nối tới iPhone này đã hoạt động sẵn: LocalDevVPN cùng một tệp ghép nối, chẳng hạn tệp được nhập trên iOS 17.4 đến 26. Trên iOS 27, chính kết nối đó cần Chế độ nhà phát triển, nên chúng không thể khôi phục tùy chọn đã biến mất.",
+    "Turn on Developer Mode?": "Bật Chế độ nhà phát triển?",
+    "Turn On and Restart": "Bật và khởi động lại",
+    "This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode.":
+        "iPhone này sẽ khởi động lại ngay. Sau khi mở khóa, hãy chạm Bật trong cảnh báo hiện ra. iOS chỉ cho phép việc này khi iPhone không có mật mã.",
+    "Developer Mode is already on.": "Chế độ nhà phát triển đã bật sẵn.",
+    "Developer Mode now shows under Settings › Privacy & Security, near the bottom. Turn it on there, and iOS restarts to finish.":
+        "Chế độ nhà phát triển giờ đã hiện trong Cài đặt › Quyền riêng tư & Bảo mật, gần cuối danh sách. Hãy bật nó ở đó, iOS sẽ khởi động lại để hoàn tất.",
+    "Developer Mode is set to turn on, and this iPhone restarts now. Once you unlock it, tap Turn On.":
+        "Chế độ nhà phát triển sẽ được bật và iPhone này khởi động lại ngay bây giờ. Sau khi mở khóa, hãy chạm Bật.",
+    "An install is already running. Wait for it to finish, then try again.":
+        "Đang có một lượt cài đặt chạy. Hãy đợi xong rồi thử lại.",
+    "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
+        "iOS chỉ bật Chế độ nhà phát triển từ đây khi iPhone này không có mật mã. Hãy chạm “Hiện Chế độ nhà phát triển trong Cài đặt” rồi bật nó ở đó.",
+    "This iPhone didn't take the Developer Mode request: %@":
+        "iPhone này không nhận yêu cầu về Chế độ nhà phát triển: %@",
+
     // MARK: - Release channels & downloads
 
     "Stable": "Ổn định",

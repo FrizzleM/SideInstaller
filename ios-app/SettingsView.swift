@@ -23,12 +23,25 @@ struct SettingsView: View {
     /// True once "Custom…" is picked, revealing the free-form URL field.
     @State private var anisetteIsCustom = false
 
+    /// Set while a Developer Mode request runs.
+    @State private var developerModeBusy = false
+    /// How the last Developer Mode request went.
+    @State private var developerModeNote: DeveloperModeNote?
+    /// Set while the restart warning is up, before Developer Mode is turned on.
+    @State private var confirmEnableDeveloperMode = false
+
+    private struct DeveloperModeNote {
+        let text: String
+        let failed: Bool
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 accountSection
                 languageSection
                 tunnelSection
+                developerModeSection
                 downloadsSection
                 anisetteSection
                 advancedSection
@@ -190,6 +203,77 @@ struct SettingsView: View {
             if !engine.localDevVPNInstalled {
                 Text(L("LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you."))
             }
+        }
+    }
+
+    // MARK: Developer Mode
+
+    /// Asks this iPhone to show Developer Mode in Settings, or to turn it on.
+    /// Both need a link that already works, so they can't help where the link
+    /// itself needs Developer Mode (iOS 27).
+    private var developerModeSection: some View {
+        Section {
+            Button {
+                runDeveloperMode(.reveal)
+            } label: {
+                Label(L("Show Developer Mode in Settings"), systemImage: "eye")
+            }
+            .disabled(developerModeBusy || engine.isRunning)
+            Button {
+                confirmEnableDeveloperMode = true
+            } label: {
+                Label(L("Turn on Developer Mode"), systemImage: "hammer")
+            }
+            .disabled(developerModeBusy || engine.isRunning)
+            if developerModeBusy {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(L("Asking this iPhone…"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if let note = developerModeNote {
+                Label(note.text, systemImage: note.failed ? "exclamationmark.triangle.fill"
+                                                          : "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(note.failed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            }
+        } header: {
+            Text(L("Developer Mode"))
+        } footer: {
+            Text(L("Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there."))
+        }
+        // On the section, apart from the Form's alerts, so they don't conflict.
+        .alert(L("Turn on Developer Mode?"), isPresented: $confirmEnableDeveloperMode) {
+            Button(L("Turn On and Restart"), role: .destructive) { runDeveloperMode(.enable) }
+            Button(L("Cancel"), role: .cancel) {}
+        } message: {
+            Text(L("This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode."))
+        }
+    }
+
+    private func runDeveloperMode(_ request: DeviceConnection.DeveloperModeRequest) {
+        guard !developerModeBusy else { return }
+        developerModeBusy = true
+        developerModeNote = nil
+        Task {
+            do {
+                let text: String
+                switch try await engine.requestDeveloperMode(request) {
+                case .alreadyOn:
+                    text = L("Developer Mode is already on.")
+                case .revealed:
+                    text = L("Developer Mode now shows under Settings › Privacy & Security, near the bottom. Turn it on there, and iOS restarts to finish.")
+                case .enabling:
+                    text = L("Developer Mode is set to turn on, and this iPhone restarts now. Once you unlock it, tap Turn On.")
+                }
+                developerModeNote = DeveloperModeNote(text: text, failed: false)
+            } catch {
+                developerModeNote = DeveloperModeNote(
+                    text: (error as? LocalizedError)?.errorDescription ?? String(describing: error),
+                    failed: true)
+            }
+            developerModeBusy = false
         }
     }
 

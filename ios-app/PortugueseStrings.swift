@@ -505,6 +505,29 @@ let portugueseStrings: [String: String] = [
     "Clear": "Limpar",
     "Activity Log (%d)": "Registro de atividade (%d)",
 
+    // Settings › Developer Mode: AMFI requests over the device link.
+    "Developer Mode": "Modo de Desenvolvedor",
+    "Show Developer Mode in Settings": "Mostrar o Modo de Desenvolvedor nos Ajustes",
+    "Turn on Developer Mode": "Ativar o Modo de Desenvolvedor",
+    "Asking this iPhone…": "Consultando este iPhone…",
+    "Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there.":
+        "Os dois precisam de uma conexão com este iPhone que já funcione: o LocalDevVPN e um arquivo de pareamento, como um importado no iOS 17.4 a 26. No iOS 27 a própria conexão precisa do Modo de Desenvolvedor, então eles não conseguem trazer de volta a opção que sumiu.",
+    "Turn on Developer Mode?": "Ativar o Modo de Desenvolvedor?",
+    "Turn On and Restart": "Ativar e reiniciar",
+    "This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode.":
+        "Este iPhone reinicia na hora. Depois de desbloquear, toque em Ativar no alerta que aparecer. O iOS só permite isso quando o iPhone não tem código.",
+    "Developer Mode is already on.": "O Modo de Desenvolvedor já está ativado.",
+    "Developer Mode now shows under Settings › Privacy & Security, near the bottom. Turn it on there, and iOS restarts to finish.":
+        "O Modo de Desenvolvedor agora aparece em Ajustes › Privacidade e Segurança, perto do fim. Ative por lá, e o iOS reinicia para concluir.",
+    "Developer Mode is set to turn on, and this iPhone restarts now. Once you unlock it, tap Turn On.":
+        "O Modo de Desenvolvedor vai ser ativado, e este iPhone reinicia agora. Depois de desbloquear, toque em Ativar.",
+    "An install is already running. Wait for it to finish, then try again.":
+        "Já tem uma instalação em andamento. Espere ela terminar e tente de novo.",
+    "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
+        "O iOS só ativa o Modo de Desenvolvedor daqui quando este iPhone não tem código. Toque em “Mostrar o Modo de Desenvolvedor nos Ajustes” e ative por lá.",
+    "This iPhone didn't take the Developer Mode request: %@":
+        "Este iPhone não aceitou o pedido do Modo de Desenvolvedor: %@",
+
     // MARK: - Release channels & downloads
 
     "Stable": "Estável",

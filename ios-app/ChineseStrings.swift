@@ -493,6 +493,27 @@ let chineseStrings: [String: String] = [
     "Clear": "清除",
     "Activity Log (%d)": "活动日志（%d）",
 
+    // Settings › Developer Mode: AMFI requests over the device link.
+    "Developer Mode": "开发者模式",
+    "Show Developer Mode in Settings": "在设置中显示开发者模式",
+    "Turn on Developer Mode": "打开开发者模式",
+    "Asking this iPhone…": "正在询问这台 iPhone…",
+    "Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there.":
+        "这两项都需要一条已经可用、通往这台 iPhone 的连接：LocalDevVPN 加上配对文件，例如在 iOS 17.4 至 26 上导入的配对文件。在 iOS 27 上，连接本身就需要开发者模式，因此无法找回已经消失的选项。",
+    "Turn on Developer Mode?": "要打开开发者模式吗？",
+    "Turn On and Restart": "打开并重新启动",
+    "This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode.":
+        "这台 iPhone 会立即重新启动。解锁后，在弹出的提示中点按“打开”。只有在 iPhone 未设置密码时，iOS 才允许这样做。",
+    "Developer Mode is already on.": "开发者模式已经打开。",
+    "Developer Mode now shows under Settings › Privacy & Security, near the bottom. Turn it on there, and iOS restarts to finish.":
+        "开发者模式现在显示在 设置 › 隐私与安全性 的底部附近。在那里打开它，iOS 会重新启动以完成设置。",
+    "Developer Mode is set to turn on, and this iPhone restarts now. Once you unlock it, tap Turn On.":
+        "开发者模式即将打开，这台 iPhone 现在会重新启动。解锁后，点按“打开”。",
+    "An install is already running. Wait for it to finish, then try again.": "已有安装正在进行。请等它完成后再试一次。",
+    "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
+        "只有在这台 iPhone 未设置密码时，iOS 才能从这里打开开发者模式。请点按“在设置中显示开发者模式”，然后在设置里打开它。",
+    "This iPhone didn't take the Developer Mode request: %@": "这台 iPhone 没有接受开发者模式请求：%@",
+
     // MARK: - Release channels & downloads
 
     "Stable": "稳定版",
