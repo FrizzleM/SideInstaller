@@ -287,6 +287,35 @@ let frenchStrings: [String: String] = [
     "Couldn't build the download URL for %@.":
         "Impossible de construire l'URL de téléchargement pour %@.",
 
+    // Location › saved places and GPX routes.
+    "Saved places": "Lieux enregistrés",
+    "Save this place": "Enregistrer ce lieu",
+    "Name": "Nom",
+    "Show on map": "Voir sur la carte",
+    "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
+        "Touche Enregistrer sous la carte pour garder le point sous l'épingle. Toucher un lieu enregistré le définit aussitôt.",
+    "Play a GPX route": "Lire un itinéraire GPX",
+    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
+        "Importe un fichier .gpx : l'appareil le parcourt à la vitesse choisie, puis reste sur le dernier point.",
+    "Import GPX file": "Importer un fichier GPX",
+    "Couldn't read %@ as a GPX file.": "Impossible de lire %@ comme fichier GPX.",
+    "%@ has no track, route or waypoints in it.":
+        "%@ ne contient ni trace, ni itinéraire, ni waypoint.",
+    "As recorded": "Comme enregistré",
+    "Walk": "À pied",
+    "Cycle": "À vélo",
+    "Drive": "En voiture",
+    "Speed": "Vitesse",
+    "Play route": "Lire l'itinéraire",
+    "Playing route · %d%%": "Itinéraire en cours · %d %%",
+    "Stop here": "Arrêter ici",
+    "%@ of %@": "%@ sur %@",
+    "Route finished. The device stays at its last point.":
+        "Itinéraire terminé. L'appareil reste sur le dernier point.",
+    "Route stopped. The device stays where it got to.":
+        "Itinéraire arrêté. L'appareil reste là où il en était.",
+    "Route playback stopped: %@": "Lecture de l'itinéraire interrompue : %@",
+
     // MARK: - Entitlements tab
 
     "Entitlements": "Droits",

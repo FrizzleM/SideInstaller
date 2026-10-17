@@ -286,6 +286,34 @@ let portugueseStrings: [String: String] = [
     "Couldn't build the download URL for %@.":
         "Não foi possível montar o endereço de download de %@.",
 
+    // Location › saved places and GPX routes.
+    "Saved places": "Lugares salvos",
+    "Save this place": "Salvar este lugar",
+    "Name": "Nome",
+    "Show on map": "Mostrar no mapa",
+    "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
+        "Toque em Salvar abaixo do mapa para guardar o ponto sob o alfinete. Ao tocar em um lugar salvo, ele é definido na hora.",
+    "Play a GPX route": "Reproduzir uma rota GPX",
+    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
+        "Importe um arquivo .gpx e o dispositivo o percorre na velocidade que você escolher; no fim, fica no último ponto.",
+    "Import GPX file": "Importar arquivo GPX",
+    "Couldn't read %@ as a GPX file.": "Não foi possível ler %@ como arquivo GPX.",
+    "%@ has no track, route or waypoints in it.": "%@ não tem trilhas, rotas nem waypoints.",
+    "As recorded": "Como gravado",
+    "Walk": "A pé",
+    "Cycle": "De bicicleta",
+    "Drive": "De carro",
+    "Speed": "Velocidade",
+    "Play route": "Reproduzir rota",
+    "Playing route · %d%%": "Reproduzindo rota · %d%%",
+    "Stop here": "Parar aqui",
+    "%@ of %@": "%@ de %@",
+    "Route finished. The device stays at its last point.":
+        "Rota concluída. O dispositivo fica no último ponto.",
+    "Route stopped. The device stays where it got to.":
+        "Rota interrompida. O dispositivo fica onde chegou.",
+    "Route playback stopped: %@": "A reprodução da rota parou: %@",
+
     // MARK: - Entitlements tab
 
     "Entitlements": "Entitlements",

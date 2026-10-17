@@ -279,6 +279,32 @@ let japaneseStrings: [String: String] = [
     "Downloading %@ failed (HTTP %d).": "%@ のダウンロードに失敗しました（HTTP %d）。",
     "Couldn't build the download URL for %@.": "%@ のダウンロード URL を作成できませんでした。",
 
+    // Location › saved places and GPX routes.
+    "Saved places": "保存した場所",
+    "Save this place": "この場所を保存",
+    "Name": "名前",
+    "Show on map": "地図で表示",
+    "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
+        "地図の下の「保存」をタップすると、ピンの位置を保存できます。保存した場所をタップすると、すぐにその位置に設定されます。",
+    "Play a GPX route": "GPX ルートを再生",
+    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
+        ".gpx ファイルを読み込むと、デバイスが選んだ速度でルートに沿って移動し、最後の地点で止まります。",
+    "Import GPX file": "GPX ファイルを読み込む",
+    "Couldn't read %@ as a GPX file.": "%@ を GPX ファイルとして読み込めませんでした。",
+    "%@ has no track, route or waypoints in it.": "%@ にはトラック、ルート、ウェイポイントがありません。",
+    "As recorded": "記録どおり",
+    "Walk": "徒歩",
+    "Cycle": "自転車",
+    "Drive": "車",
+    "Speed": "速度",
+    "Play route": "ルートを再生",
+    "Playing route · %d%%": "ルートを再生中 · %d%%",
+    "Stop here": "ここで停止",
+    "%@ of %@": "%@ / %@",
+    "Route finished. The device stays at its last point.": "ルートが終了しました。デバイスは最後の地点にとどまります。",
+    "Route stopped. The device stays where it got to.": "ルートを停止しました。デバイスは到達した地点にとどまります。",
+    "Route playback stopped: %@": "ルートの再生が停止しました: %@",
+
     // MARK: - Entitlements tab
 
     "Entitlements": "エンタイトルメント",

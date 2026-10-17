@@ -1,6 +1,7 @@
 import SwiftUI
 import MapKit
 import CoreLocation
+import UniformTypeIdentifiers
 
 // MARK: - Developer disk image
 
@@ -68,6 +69,270 @@ enum DeveloperDiskImage {
     }
 }
 
+// MARK: - Saved places
+
+/// A spot saved on the Location page so it can be set again in one tap.
+/// Stored as JSON in UserDefaults, as StikDebug stores its bookmarks.
+struct SavedPlace: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var name: String
+    var latitude: Double
+    var longitude: Double
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
+// MARK: - GPX routes
+
+extension UTType {
+    /// GPX, declared in Info.plist under the identifier other apps use for it.
+    /// Without the declaration the picker shows .gpx files but won't let them
+    /// be selected.
+    static let gpx = UTType(importedAs: "com.topografix.gpx", conformingTo: .xml)
+}
+
+/// A route read from a GPX file.
+///
+/// StikDebug takes every `trkpt`, `rtept` and `wpt` in file order. Here a
+/// file's track wins, then its route, then its waypoints, so the points of
+/// interest a track file often carries don't end up in the path.
+struct GPXRoute {
+    let name: String
+    /// The points in file order, invalid ones dropped.
+    let points: [CLLocationCoordinate2D]
+    /// When each point was recorded, if every one has a `<time>` and they never
+    /// go backwards. Playing "as recorded" follows these.
+    let times: [Date]?
+    /// Length along the points, in meters.
+    let distance: CLLocationDistance
+
+    /// One spot rather than a path (a lone waypoint, or a track that never
+    /// moved). The page moves the map there instead of keeping a route, as
+    /// StikDebug does with a single coordinate.
+    var isSinglePlace: Bool { distance == 0 }
+
+    var recordedDuration: TimeInterval? {
+        guard let times, let first = times.first, let last = times.last else { return nil }
+        return last.timeIntervalSince(first)
+    }
+
+    /// The speeds this route can play at: "as recorded" needs times.
+    var speeds: [RouteSpeed] {
+        RouteSpeed.allCases.filter { $0 != .recorded || times != nil }
+    }
+
+    /// How long playing at `speed` takes, without building the timeline.
+    func duration(at speed: RouteSpeed) -> TimeInterval {
+        if speed == .recorded, let recordedDuration { return recordedDuration }
+        return distance / (speed.metersPerSecond ?? RouteSpeed.fallbackMetersPerSecond)
+    }
+
+    init(contentsOf url: URL) throws {
+        let fileName = url.lastPathComponent
+        let data = try Data(contentsOf: url)
+        let reader = GPXReader()
+        let parser = XMLParser(data: data)
+        parser.delegate = reader
+        guard parser.parse() else {
+            throw EngineError.message(L("Couldn't read %@ as a GPX file.", fileName))
+        }
+        let found = [reader.trackPoints, reader.routePoints, reader.waypoints]
+            .first { !$0.isEmpty } ?? []
+        guard !found.isEmpty else {
+            throw EngineError.message(L("%@ has no track, route or waypoints in it.", fileName))
+        }
+
+        name = url.deletingPathExtension().lastPathComponent
+        points = found.map(\.coordinate)
+        distance = Self.distanceAlong(points)
+        let times = found.compactMap(\.time)
+        let inOrder = zip(times, times.dropFirst()).allSatisfy { $0 <= $1 }
+        if times.count == found.count, inOrder, let first = times.first, let last = times.last,
+           last > first {
+            self.times = times
+        } else {
+            self.times = nil
+        }
+    }
+
+    private static func distanceAlong(_ points: [CLLocationCoordinate2D]) -> CLLocationDistance {
+        zip(points, points.dropFirst()).reduce(0) { total, pair in
+            total + CLLocation(latitude: pair.0.latitude, longitude: pair.0.longitude)
+                .distance(from: CLLocation(latitude: pair.1.latitude, longitude: pair.1.longitude))
+        }
+    }
+}
+
+/// Collects a GPX file's points, each with its `<time>` if it has one.
+private final class GPXReader: NSObject, XMLParserDelegate {
+    struct Point {
+        var coordinate: CLLocationCoordinate2D
+        var time: Date?
+    }
+
+    private(set) var trackPoints: [Point] = []
+    private(set) var routePoints: [Point] = []
+    private(set) var waypoints: [Point] = []
+
+    /// The point being read and the element it came from.
+    private var current: (element: String, point: Point)?
+    private var timeText: String?
+
+    // Not `ISO8601DateFormatter`, which took 4 of the 5 seconds a
+    // 50,000-point track needed to load.
+    private let timeStyle = Date.ISO8601FormatStyle()
+    private let fractionalTimeStyle = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+
+    /// Element names without a namespace prefix (`gpx:trkpt` → `trkpt`).
+    private func localName(_ name: String) -> String {
+        String(name.split(separator: ":").last ?? Substring(name)).lowercased()
+    }
+
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?,
+                qualifiedName qName: String?, attributes: [String: String] = [:]) {
+        let name = localName(elementName)
+        switch name {
+        case "trkpt", "rtept", "wpt":
+            guard let latitude = Double(attributes["lat"] ?? ""),
+                  let longitude = Double(attributes["lon"] ?? "") else { return }
+            let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            guard CLLocationCoordinate2DIsValid(coordinate) else { return }
+            current = (name, Point(coordinate: coordinate))
+        case "time" where current != nil:
+            timeText = ""
+        default:
+            break
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        timeText? += string
+    }
+
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?,
+                qualifiedName qName: String?) {
+        switch localName(elementName) {
+        case "time":
+            if let text = timeText?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                current?.point.time = (try? timeStyle.parse(text))
+                    ?? (try? fractionalTimeStyle.parse(text))
+            }
+            timeText = nil
+        case "trkpt":
+            if let current { trackPoints.append(current.point) }
+            current = nil
+        case "rtept":
+            if let current { routePoints.append(current.point) }
+            current = nil
+        case "wpt":
+            if let current { waypoints.append(current.point) }
+            current = nil
+        default:
+            break
+        }
+    }
+}
+
+/// How fast a route plays.
+enum RouteSpeed: String, CaseIterable, Identifiable {
+    /// The file's own timestamps.
+    case recorded
+    case walk
+    case cycle
+    case drive
+
+    var id: Self { self }
+
+    /// Walking pace (about 5 km/h), also used if `.recorded` is asked of a
+    /// route without times, which the page doesn't offer.
+    static let fallbackMetersPerSecond: CLLocationSpeed = 1.4
+
+    /// Nil for `.recorded`, which follows the file's times.
+    var metersPerSecond: CLLocationSpeed? {
+        switch self {
+        case .recorded: return nil
+        case .walk:     return Self.fallbackMetersPerSecond
+        case .cycle:    return 5.5
+        // StikDebug's speed for imported routes (about 48 km/h).
+        case .drive:    return 13.4
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .recorded: return L("As recorded")
+        case .walk:     return L("Walk")
+        case .cycle:    return L("Cycle")
+        case .drive:    return L("Drive")
+        }
+    }
+}
+
+/// When playback reaches each point of a route, in seconds from the start.
+///
+/// StikDebug cuts the route into half-second steps up front and sleeps between
+/// them, which drifts by however long each send takes. Here each tick asks
+/// where the route should be at the time that has actually passed.
+struct RouteTimeline {
+    let points: [CLLocationCoordinate2D]
+    /// `offsets[i]` is when `points[i]` is reached; never decreasing.
+    let offsets: [TimeInterval]
+
+    var duration: TimeInterval { offsets.last ?? 0 }
+
+    init(route: GPXRoute, speed: RouteSpeed) {
+        points = route.points
+        if let times = route.times, let first = times.first, speed == .recorded {
+            offsets = times.map { $0.timeIntervalSince(first) }
+            return
+        }
+        let metersPerSecond = speed.metersPerSecond ?? RouteSpeed.fallbackMetersPerSecond
+        var elapsed: TimeInterval = 0
+        var offsets: [TimeInterval] = [0]
+        for (start, end) in zip(route.points, route.points.dropFirst()) {
+            let meters = CLLocation(latitude: start.latitude, longitude: start.longitude)
+                .distance(from: CLLocation(latitude: end.latitude, longitude: end.longitude))
+            elapsed += meters / metersPerSecond
+            offsets.append(elapsed)
+        }
+        self.offsets = offsets
+    }
+
+    /// Where the route is `elapsed` seconds in, between the two points around
+    /// that time.
+    func coordinate(at elapsed: TimeInterval) -> CLLocationCoordinate2D {
+        guard let first = points.first, let last = points.last else {
+            return CLLocationCoordinate2D()
+        }
+        guard elapsed > 0 else { return first }
+        guard elapsed < duration else { return last }
+        // The first point reached after `elapsed`.
+        var low = 1
+        var high = offsets.count - 1
+        while low < high {
+            let middle = (low + high) / 2
+            if offsets[middle] > elapsed { high = middle } else { low = middle + 1 }
+        }
+        let start = points[low - 1]
+        let end = points[low]
+        let span = offsets[low] - offsets[low - 1]
+        let fraction = span > 0 ? (elapsed - offsets[low - 1]) / span : 1
+        return CLLocationCoordinate2D(
+            latitude: start.latitude + (end.latitude - start.latitude) * fraction,
+            longitude: start.longitude + (end.longitude - start.longitude) * fraction)
+    }
+}
+
+/// How far a playing route has got.
+struct RouteProgress: Equatable {
+    var elapsed: TimeInterval
+    var duration: TimeInterval
+
+    var fraction: Double { duration > 0 ? min(1, elapsed / duration) : 1 }
+}
+
 // MARK: - Manager
 
 /// Drives the Location page: fetch and mount the developer disk image, then
@@ -91,6 +356,13 @@ final class LocationManager: ObservableObject {
     @Published private(set) var simulated: CLLocationCoordinate2D?
     @Published var lastError: String?
     @Published var lastSuccess: String?
+    @Published private(set) var savedPlaces: [SavedPlace] = LocationManager.loadSavedPlaces()
+    /// The imported GPX route, drawn on the map until it's removed.
+    @Published private(set) var route: GPXRoute?
+    @Published var routeSpeed: RouteSpeed = .walk
+    /// Set while a route is playing.
+    @Published private(set) var routeProgress: RouteProgress?
+    @Published private(set) var isImportingRoute = false
 
     private var engine: Engine { Engine.shared }
     /// Silent audio, so backgrounding the app doesn't close the DVT session.
@@ -99,8 +371,15 @@ final class LocationManager: ObservableObject {
     /// every 4s (as StikDebug does).
     private var resendTimer: Timer?
     private static let resendInterval: TimeInterval = 4
+    /// Moves the location along `route`. The resend timer is off meanwhile,
+    /// since this sends more often.
+    private var playbackTask: Task<Void, Never>?
+    /// How often a playing route sends a new point (StikDebug's step).
+    private static let playbackTick: TimeInterval = 0.5
+    private static let savedPlacesKey = "locationSavedPlaces"
 
     var isSimulating: Bool { simulated != nil }
+    var isPlayingRoute: Bool { routeProgress != nil }
 
     // MARK: Popups
 
@@ -172,16 +451,18 @@ final class LocationManager: ObservableObject {
     // MARK: Simulating
 
     /// Sets the device's location to `coordinate` and keeps re-sending it.
+    /// `name` is a saved place's, for the confirmation. Stops a playing route.
     ///
     /// Runs setup first if it hasn't finished (often the tunnel wasn't up when
     /// the page opened). Setup errors are shown to the user here.
-    func simulate(_ coordinate: CLLocationCoordinate2D) {
+    func simulate(_ coordinate: CLLocationCoordinate2D, name: String? = nil) {
         guard !isBusy else { return }
         guard (-90...90).contains(coordinate.latitude),
               (-180...180).contains(coordinate.longitude) else {
             lastError = L("That isn't a valid coordinate.")
             return
         }
+        cancelPlayback()
         isBusy = true
         lastError = nil
         lastSuccess = nil
@@ -193,7 +474,7 @@ final class LocationManager: ObservableObject {
                 simulated = coordinate
                 keepAlive.startAudio()
                 startResending()
-                lastSuccess = L("Location set to %@.", Self.format(coordinate))
+                lastSuccess = L("Location set to %@.", name ?? Self.format(coordinate))
                 engine.log("Location: simulating \(Self.format(coordinate)).")
             } catch {
                 // A dropped session can't be re-used; setup has to run again.
@@ -212,6 +493,7 @@ final class LocationManager: ObservableObject {
         isBusy = true
         lastError = nil
         lastSuccess = nil
+        cancelPlayback()
         stopResending()
         Task {
             do {
@@ -250,6 +532,7 @@ final class LocationManager: ObservableObject {
 
     /// The session went away underneath us; setup has to run again.
     private func sessionClosed() {
+        cancelPlayback()
         stopResending()
         simulated = nil
         stage = .notReady
@@ -261,6 +544,157 @@ final class LocationManager: ObservableObject {
     private func stopResending() {
         resendTimer?.invalidate()
         resendTimer = nil
+    }
+
+    // MARK: Saved places
+
+    /// Saves `coordinate` under `name`, or under the coordinate itself when the
+    /// name is left blank (as StikDebug does).
+    func savePlace(named name: String, at coordinate: CLLocationCoordinate2D) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        savedPlaces.append(SavedPlace(name: trimmed.isEmpty ? Self.format(coordinate) : trimmed,
+                                      latitude: coordinate.latitude,
+                                      longitude: coordinate.longitude))
+        storeSavedPlaces()
+    }
+
+    func deletePlace(_ place: SavedPlace) {
+        savedPlaces.removeAll { $0.id == place.id }
+        storeSavedPlaces()
+    }
+
+    private static func loadSavedPlaces() -> [SavedPlace] {
+        guard let data = UserDefaults.standard.data(forKey: savedPlacesKey) else { return [] }
+        return (try? JSONDecoder().decode([SavedPlace].self, from: data)) ?? []
+    }
+
+    private func storeSavedPlaces() {
+        guard let data = try? JSONEncoder().encode(savedPlaces) else { return }
+        UserDefaults.standard.set(data, forKey: Self.savedPlacesKey)
+    }
+
+    // MARK: Routes
+
+    /// Reads a GPX file off the main thread. A path is kept as `route`; a
+    /// single place is only returned, for the page to move the map to.
+    func importRoute(from url: URL) async -> GPXRoute? {
+        guard !isImportingRoute, !isPlayingRoute else { return nil }
+        isImportingRoute = true
+        defer { isImportingRoute = false }
+        lastError = nil
+        do {
+            let imported = try await Task.detached(priority: .userInitiated) {
+                try GPXRoute(contentsOf: url)
+            }.value
+            if !imported.isSinglePlace {
+                route = imported
+                routeSpeed = imported.times == nil ? .walk : .recorded
+                engine.log("Location: loaded route \(imported.name) "
+                           + "(\(imported.points.count) points, \(Int(imported.distance)) m).")
+            }
+            return imported
+        } catch {
+            lastError = message(error)
+            return nil
+        }
+    }
+
+    func removeRoute() {
+        guard !isPlayingRoute else { return }
+        route = nil
+    }
+
+    /// Sets the location to the route's first point, then moves it along the
+    /// route at `routeSpeed`. At the end it stays on the last point.
+    ///
+    /// Sets up first, like `simulate`.
+    func playRoute() {
+        guard let route, !isBusy, !isPlayingRoute else { return }
+        let timeline = RouteTimeline(route: route, speed: routeSpeed)
+        guard let start = timeline.points.first else { return }
+        isBusy = true
+        lastError = nil
+        lastSuccess = nil
+        Task {
+            do {
+                try await ensureReady()
+                try await engine.simulateLocation(latitude: start.latitude,
+                                                  longitude: start.longitude)
+                simulated = start
+                keepAlive.startAudio()
+                startPlayback(timeline)
+                engine.log("Location: playing \(route.name) over \(Int(timeline.duration)) s.")
+            } catch {
+                stage = .notReady
+                simulated = nil
+                stopResending()
+                lastError = message(error)
+            }
+            isBusy = false
+        }
+    }
+
+    /// Stops a playing route where it is, and keeps the device there.
+    func stopRoute() {
+        guard isPlayingRoute else { return }
+        endPlayback()
+        lastError = nil
+        lastSuccess = L("Route stopped. The device stays where it got to.")
+        engine.log("Location: route stopped.")
+    }
+
+    /// Sends where the route should be every `playbackTick`, going by the time
+    /// that has actually passed. Stops at the first failed send and holds the
+    /// last point that went through, as StikDebug does.
+    private func startPlayback(_ timeline: RouteTimeline) {
+        stopResending()
+        let started = Date()
+        routeProgress = RouteProgress(elapsed: 0, duration: timeline.duration)
+        playbackTask = Task { [weak self] in
+            while true {
+                try? await Task.sleep(for: .seconds(Self.playbackTick))
+                guard let self, !Task.isCancelled else { return }
+                guard self.engine.connection.isSimulatingLocation else {
+                    self.sessionClosed()
+                    return
+                }
+                let elapsed = min(Date().timeIntervalSince(started), timeline.duration)
+                let coordinate = timeline.coordinate(at: elapsed)
+                do {
+                    try await self.engine.simulateLocation(latitude: coordinate.latitude,
+                                                           longitude: coordinate.longitude)
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    self.endPlayback()
+                    self.lastSuccess = nil
+                    self.lastError = L("Route playback stopped: %@", self.message(error))
+                    return
+                }
+                // Stopped or replaced while that was sending.
+                guard !Task.isCancelled else { return }
+                self.simulated = coordinate
+                self.routeProgress = RouteProgress(elapsed: elapsed, duration: timeline.duration)
+                if elapsed >= timeline.duration {
+                    self.endPlayback()
+                    self.lastError = nil
+                    self.lastSuccess = L("Route finished. The device stays at its last point.")
+                    self.engine.log("Location: route finished.")
+                    return
+                }
+            }
+        }
+    }
+
+    /// Stops moving and goes back to re-sending wherever playback got to.
+    private func endPlayback() {
+        cancelPlayback()
+        if simulated != nil { startResending() }
+    }
+
+    private func cancelPlayback() {
+        playbackTask?.cancel()
+        playbackTask = nil
+        routeProgress = nil
     }
 
     // MARK: Helpers
@@ -293,28 +727,75 @@ struct LocationView: View {
     @State private var target = CLLocationCoordinate2D(latitude: 37.3349, longitude: -122.0090)
     @State private var query = ""
     @State private var isSearching = false
+    /// The crosshair's coordinate when Save was tapped, while the name prompt
+    /// is up.
+    @State private var placeToSave: CLLocationCoordinate2D?
+    @State private var placeName = ""
+    @State private var showRouteImporter = false
+    /// Bumped to scroll the map into view after moving it from further down.
+    @State private var mapRequests = 0
+    private static let mapCardID = "map"
+
+    /// Set location and the saved places need the same things.
+    private var canSetLocation: Bool {
+        !manager.isBusy && engine.tunnelAvailable && !engine.isRunning
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                header.cascadeItem(0)
-                // No note when Set location starts LocalDevVPN itself.
-                if !engine.tunnelAvailable {
-                    vpnNote.cascadeItem(1)
+        ScrollViewReader { scroller in
+            ScrollView {
+                VStack(spacing: 18) {
+                    header.cascadeItem(0)
+                    // No note when Set location starts LocalDevVPN itself.
+                    if !engine.tunnelAvailable {
+                        vpnNote.cascadeItem(1)
+                    }
+                    mapCard.cascadeItem(2)
+                        .id(Self.mapCardID)
+                    savedPlacesCard.cascadeItem(3)
+                    routeCard.cascadeItem(4)
+                    // Errors and confirmations show as popups, which `RootView`
+                    // lays over the app.
                 }
-                mapCard.cascadeItem(2)
-                // Errors and confirmations show as popups, which `RootView`
-                // lays over the app.
+                .padding(20)
+                .animation(.smooth(duration: 0.35), value: manager.stage)
+                .animation(.smooth(duration: 0.3), value: manager.isBusy)
+                .animation(.smooth(duration: 0.3), value: engine.vpnConnected)
+                .animation(.smooth(duration: 0.3), value: manager.savedPlaces)
+                .animation(.smooth(duration: 0.3), value: manager.isPlayingRoute)
+                .animation(.smooth(duration: 0.3), value: manager.route?.name)
             }
-            .padding(20)
-            .animation(.smooth(duration: 0.35), value: manager.stage)
-            .animation(.smooth(duration: 0.3), value: manager.isBusy)
-            .animation(.smooth(duration: 0.3), value: engine.vpnConnected)
+            .onChange(of: mapRequests) {
+                withAnimation(.smooth(duration: 0.4)) {
+                    scroller.scrollTo(Self.mapCardID, anchor: .top)
+                }
+            }
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showRouteImporter) {
+            FileImporterRepresentableView(allowedContentTypes: [.gpx, .xml]) { urls in
+                guard let url = urls.first else { return }   // empty means cancelled
+                importRoute(from: url)
+            }
+            .ignoresSafeArea()
+        }
+        .alert(L("Save this place"),
+               isPresented: Binding(get: { placeToSave != nil },
+                                    set: { if !$0 { placeToSave = nil } })) {
+            TextField(L("Name"), text: $placeName)
+            Button(L("Save")) {
+                if let placeToSave { manager.savePlace(named: placeName, at: placeToSave) }
+                placeToSave = nil
+            }
+            Button(L("Cancel"), role: .cancel) { placeToSave = nil }
+        } message: {
+            if let placeToSave {
+                Text(LocationManager.format(placeToSave))
+            }
+        }
         // Start setup in the background so it's ready when the user picks a
         // place. See `prepareQuietly`.
         .onAppear { manager.prepareQuietly() }
@@ -332,7 +813,11 @@ struct LocationView: View {
 
     @ViewBuilder
     private var statusPill: some View {
-        if let simulated = manager.simulated {
+        if let progress = manager.routeProgress {
+            StatusPill(text: L("Playing route · %d%%", Int(progress.fraction * 100)),
+                       systemImage: "point.topleft.down.to.point.bottomright.curvepath.fill",
+                       color: .green)
+        } else if let simulated = manager.simulated {
             StatusPill(text: LocationManager.format(simulated),
                        systemImage: "location.fill", color: .green)
         } else {
@@ -365,6 +850,10 @@ struct LocationView: View {
 
                 ZStack {
                     Map(position: $camera) {
+                        if let route = manager.route {
+                            MapPolyline(coordinates: route.points)
+                                .stroke(Theme.accent.opacity(0.8), lineWidth: 4)
+                        }
                         if let simulated = manager.simulated {
                             Marker(L("Simulated"), systemImage: "location.fill",
                                    coordinate: simulated)
@@ -389,6 +878,16 @@ struct LocationView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Spacer()
+                    Button {
+                        placeName = ""
+                        placeToSave = target
+                    } label: {
+                        Label(L("Save"), systemImage: "bookmark")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(Theme.accent)
                 }
 
                 // On first use, the spinner also covers disk image setup.
@@ -404,7 +903,7 @@ struct LocationView: View {
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(manager.isBusy || !engine.tunnelAvailable || engine.isRunning)
+                .disabled(!canSetLocation)
 
                 if manager.isSimulating {
                     Button { manager.stop() } label: {
@@ -472,13 +971,271 @@ struct LocationView: View {
             } else {
                 coordinate = first.placemark.coordinate
             }
-            withAnimation(.smooth(duration: 0.4)) {
-                camera = .region(MKCoordinateRegion(
-                    center: coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)))
-            }
-            target = coordinate
+            moveMap(to: coordinate)
         }
+    }
+
+    /// Centers the map, and so the crosshair, on `coordinate`.
+    private func moveMap(to coordinate: CLLocationCoordinate2D) {
+        withAnimation(.smooth(duration: 0.4)) {
+            camera = .region(MKCoordinateRegion(
+                center: coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)))
+        }
+        target = coordinate
+    }
+
+    // MARK: Saved places
+
+    private var savedPlacesCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionTitle(L("Saved places"), systemImage: "bookmark.fill")
+                if manager.savedPlaces.isEmpty {
+                    Text(L("Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    VStack(spacing: 2) {
+                        ForEach(manager.savedPlaces) { place in
+                            savedPlaceRow(place)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Tap to set the place; the menu shows it on the map or deletes it.
+    private func savedPlaceRow(_ place: SavedPlace) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                moveMap(to: place.coordinate)
+                manager.simulate(place.coordinate, name: place.name)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.white, Theme.accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(place.name)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Text(LocationManager.format(place.coordinate))
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSetLocation)
+            // `.plain` doesn't dim a disabled row on its own.
+            .opacity(canSetLocation ? 1 : 0.5)
+
+            Menu {
+                Button {
+                    moveMap(to: place.coordinate)
+                    mapRequests += 1
+                } label: {
+                    Label(L("Show on map"), systemImage: "map")
+                }
+                Button(role: .destructive) {
+                    manager.deletePlace(place)
+                } label: {
+                    Label(L("Delete"), systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+        }
+    }
+
+    // MARK: Route
+
+    private var routeCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 14) {
+                sectionTitle(L("Play a GPX route"),
+                             systemImage: "point.topleft.down.to.point.bottomright.curvepath.fill")
+                if let route = manager.route {
+                    loadedRoute(route)
+                } else {
+                    Text(L("Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button { showRouteImporter = true } label: {
+                        HStack(spacing: 8) {
+                            if manager.isImportingRoute {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "square.and.arrow.down")
+                            }
+                            Text(L("Import GPX file"))
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .tint(Theme.accent)
+                    .disabled(manager.isImportingRoute)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func loadedRoute(_ route: GPXRoute) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(route.name)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Text("\(Self.formatDistance(route.distance)) · "
+                     + Self.formatDuration(route.duration(at: manager.routeSpeed)))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            Button {
+                fitMap(to: route)
+                mapRequests += 1
+            } label: {
+                Image(systemName: "map")
+                    .frame(width: 32, height: 32)
+            }
+            .accessibilityLabel(L("Show on map"))
+            Button { manager.removeRoute() } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+            }
+            .accessibilityLabel(L("Remove"))
+            .disabled(manager.isPlayingRoute)
+        }
+
+        Menu {
+            Picker(L("Speed"), selection: $manager.routeSpeed) {
+                ForEach(route.speeds) { speed in
+                    Text(Self.speedTitle(speed)).tag(speed)
+                }
+            }
+        } label: {
+            HStack {
+                Text(Self.speedTitle(manager.routeSpeed))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .fieldBackground()
+            .contentShape(Rectangle())
+        }
+        .disabled(manager.isPlayingRoute)
+
+        if let progress = manager.routeProgress {
+            VStack(alignment: .leading, spacing: 6) {
+                ProgressView(value: progress.fraction)
+                    .tint(Theme.accent)
+                Text(L("%@ of %@",
+                       Self.formatClock(progress.elapsed, total: progress.duration),
+                       Self.formatClock(progress.duration, total: progress.duration)))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            .transition(.opacity)
+
+            Button { manager.stopRoute() } label: {
+                Label(L("Stop here"), systemImage: "pause.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .tint(.orange)
+        } else {
+            Button { manager.playRoute() } label: {
+                HStack(spacing: 10) {
+                    if manager.isBusy {
+                        ProgressView().tint(.white)
+                        Text(L("Setting"))
+                    } else {
+                        Image(systemName: "play.fill")
+                        Text(L("Play route"))
+                    }
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(!canSetLocation)
+        }
+    }
+
+    /// Reads the picked file. A route is fitted on the map; a file that's one
+    /// place moves the crosshair there. Either way the map scrolls into view.
+    private func importRoute(from url: URL) {
+        Task {
+            guard let route = await manager.importRoute(from: url),
+                  let first = route.points.first else { return }
+            if route.isSinglePlace {
+                moveMap(to: first)
+            } else {
+                fitMap(to: route)
+            }
+            mapRequests += 1
+        }
+    }
+
+    private func fitMap(to route: GPXRoute) {
+        let rect = MKPolyline(coordinates: route.points, count: route.points.count).boundingMapRect
+        // A margin so the ends aren't under the card's rounded corners.
+        let margin = max(rect.width, rect.height) * 0.15 + 200
+        withAnimation(.smooth(duration: 0.4)) {
+            camera = .rect(rect.insetBy(dx: -margin, dy: -margin))
+        }
+    }
+
+    // MARK: Formatting
+
+    /// A speed choice as the menu lists it, e.g. "Walk · 5 km/h".
+    private static func speedTitle(_ speed: RouteSpeed) -> String {
+        guard let metersPerSecond = speed.metersPerSecond else { return speed.title }
+        let rate = Measurement(value: metersPerSecond, unit: UnitSpeed.metersPerSecond)
+            .formatted(.measurement(width: .abbreviated, usage: .general,
+                                    numberFormatStyle: .number.precision(.fractionLength(0)))
+                .locale(Localizer.locale))
+        return "\(speed.title) · \(rate)"
+    }
+
+    private static func formatDistance(_ meters: CLLocationDistance) -> String {
+        Measurement(value: meters, unit: UnitLength.meters)
+            .formatted(.measurement(width: .abbreviated, usage: .road).locale(Localizer.locale))
+    }
+
+    private static func formatDuration(_ seconds: TimeInterval) -> String {
+        Duration.seconds(seconds.rounded())
+            .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated,
+                              maximumUnitCount: 2)
+                .locale(Localizer.locale))
+    }
+
+    /// A playback position like "12:03", with hours once the route needs them.
+    /// Rounded like `formatDuration`, so the total matches the summary.
+    private static func formatClock(_ seconds: TimeInterval, total: TimeInterval) -> String {
+        Duration.seconds(seconds.rounded())
+            .formatted(.time(pattern: total >= 3600 ? .hourMinuteSecond : .minuteSecond))
     }
 
     // MARK: Helpers
