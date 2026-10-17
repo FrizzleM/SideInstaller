@@ -124,10 +124,11 @@ extension AnisetteServer {
 
     // MARK: - Order of servers to sign in through
 
-    /// Addresses to sign in through, de-duplicated: `pick` (the one in use)
-    /// first, then the rest of its library unless that is Android's, then the
-    /// Windows-ADI servers, then the Android ones in list order, then the
-    /// macOS ones.
+    /// Addresses to sign in through with Auto on, de-duplicated and most likely
+    /// to work first: `pick` (the last one that signed in) first, then the rest
+    /// of its library unless that is Android's, then the Windows-ADI servers,
+    /// then the Android ones in list order, then the macOS ones. Within each of
+    /// those groups, the servers in `failing` (`RecentFailures`) go last.
     ///
     /// The pick keeps its anisette identity, and with it the saved developer
     /// token and Apple's trust in that machine, and so do the servers on its
@@ -140,23 +141,78 @@ extension AnisetteServer {
     /// it with HTTP 403, as iLoader 2.3.9's users reported the same day. Apple
     /// refusing one reported device doesn't end the sign-in while servers
     /// reporting the other are left (`AppleRefusals`).
-    static func candidates(pick: String, servers: [AnisetteServer]) -> [String] {
+    ///
+    /// A server that just failed by itself is most often down, and the others
+    /// of its group are as likely as it was otherwise, so it waits behind them.
+    /// It stays in its group: moving to another library makes a new identity,
+    /// which costs a second factor, and its servers are less likely to work.
+    static func candidates(pick: String, servers: [AnisetteServer],
+                           failing: Set<String> = []) -> [String] {
         var seen = Set<String>()
         var out: [String] = []
-        func add(_ address: String) {
-            let a = address.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !a.isEmpty, seen.insert(normalized(a)).inserted { out.append(a) }
+        func add(_ group: [String]) {
+            var failed: [String] = []
+            for address in group {
+                let a = address.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !a.isEmpty, seen.insert(normalized(a)).inserted else { continue }
+                if failing.contains(normalized(a)) { failed.append(a) } else { out.append(a) }
+            }
+            out += failed
         }
-        add(pick)
         let addresses = servers.map(\.address)
         let pickLibrary = library(of: pick, in: servers)
-        if pickLibrary != .android {
-            addresses.filter { library(of: $0, in: servers) == pickLibrary }.forEach(add)
-        }
-        addresses.filter { library(of: $0, in: servers) == .windows }.forEach(add)
-        addresses.filter { library(of: $0, in: servers) != .mac }.forEach(add)
-        addresses.forEach(add)
+        add([pick] + (pickLibrary == .android ? []
+                      : addresses.filter { library(of: $0, in: servers) == pickLibrary }))
+        add(addresses.filter { library(of: $0, in: servers) == .windows })
+        add(addresses.filter { library(of: $0, in: servers) != .mac })
+        add(addresses)
         return out
+    }
+
+    /// Servers that failed a sign-in by themselves lately, kept across launches
+    /// so Auto tries them after the others of their group (`candidates`).
+    /// A failure is forgotten when the server next signs in, or after `window`.
+    enum RecentFailures {
+        private static let key = "anisetteServerFailures"
+        /// How long a failure keeps a server back. Servers that go down often
+        /// come back within hours.
+        static let window: TimeInterval = 12 * 60 * 60
+
+        /// The normalized addresses of the servers still held back.
+        static func addresses(now: Date = Date()) -> Set<String> {
+            Set(stored().filter { now.timeIntervalSince1970 - $0.value < window }.keys)
+        }
+
+        /// Notes that a sign-in through `address` failed with `error`, if the
+        /// error came from the server: Apple refusing, limiting or not being
+        /// reached would have failed through any server.
+        static func record(_ address: String, error: String, now: Date = Date()) {
+            guard isServerFault(error) else { return }
+            var failures = stored().filter { now.timeIntervalSince1970 - $0.value < window }
+            failures[AnisetteServer.normalized(address)] = now.timeIntervalSince1970
+            UserDefaults.standard.set(failures, forKey: key)
+        }
+
+        /// Forgets a failure of `address`, once it has signed in.
+        static func clear(_ address: String) {
+            var failures = stored()
+            guard failures.removeValue(forKey: AnisetteServer.normalized(address)) != nil else { return }
+            UserDefaults.standard.set(failures, forKey: key)
+        }
+
+        /// Whether a sign-in error is the anisette server's own: isideload names
+        /// the server in every error about it ("Failed to get anisette headers",
+        /// "The anisette server refused …", "Anisette provisioning timed out").
+        static func isServerFault(_ error: String) -> Bool {
+            error.lowercased().contains("anisette")
+                && !Engine.isAppleServiceRefusal(error)
+                && !Engine.isAppleRateLimit(error)
+                && !Engine.isAppleUnreachable(error)
+        }
+
+        private static func stored() -> [String: Double] {
+            UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
+        }
     }
 
     /// `addresses` on the same ADI library as the first of them, in order:

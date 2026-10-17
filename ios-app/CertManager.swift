@@ -194,7 +194,8 @@ final class CertManager: ObservableObject {
 
     @MainActor
     private func signIn(id: String, pw: String) async throws {
-        // Try each anisette server; a credential or 2FA error stops the loop.
+        // Try each anisette server (only the one picked in Settings with Auto
+        // off); a credential or 2FA error stops the loop.
         let servers = anisetteCandidates()
         let dir = storageDir
         engine.twoFactorWasCancelled = false
@@ -211,7 +212,7 @@ final class CertManager: ObservableObject {
                 let summary = try await onQueue {
                     try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir)
                 }
-                engine.anisetteURL = ani               // stick with what worked
+                engine.anisetteSignedIn(ani)
                 teamSummary = summary
                 isSignedIn = true
                 engine.log("Certificates: signed in (\(summary)).")
@@ -235,6 +236,7 @@ final class CertManager: ObservableObject {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
                 engine.log("Certificates: anisette \(idx + 1)/\(servers.count) failed: \(lastError)")
+                engine.anisetteFailed(ani, error: lastError)
                 if Engine.isAppleRateLimit(lastError) {
                     engine.log("Certificates: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
                     throw EngineError.message(Engine.appleRateLimitMessage)
@@ -261,10 +263,7 @@ final class CertManager: ObservableObject {
                 }
             }
         }
-        let tried = servers.count == 1
-            ? L("the anisette server")
-            : L("all %d anisette servers", servers.count)
-        throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, lastError))
+        throw EngineError.message(engine.anisetteSignInFailure(tried: servers.count, lastError: lastError))
     }
 
     /// One sign-in attempt against a specific anisette server.

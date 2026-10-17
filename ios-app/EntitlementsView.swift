@@ -253,7 +253,7 @@ final class EntitlementsManager: ObservableObject {
                 let summary = try await onQueue {
                     try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir)
                 }
-                engine.anisetteURL = ani
+                engine.anisetteSignedIn(ani)
                 teamSummary = summary
                 engine.log("Entitlements: signed in (\(summary)).")
                 return
@@ -272,6 +272,7 @@ final class EntitlementsManager: ObservableObject {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
                 engine.log("Entitlements: anisette \(idx + 1)/\(servers.count) failed: \(lastError)")
+                engine.anisetteFailed(ani, error: lastError)
                 if Engine.isAppleRateLimit(lastError) {
                     engine.log("Entitlements: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
                     throw EngineError.message(Engine.appleRateLimitMessage)
@@ -298,10 +299,7 @@ final class EntitlementsManager: ObservableObject {
                 }
             }
         }
-        let tried = servers.count == 1
-            ? L("the anisette server")
-            : L("all %d anisette servers", servers.count)
-        throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, lastError))
+        throw EngineError.message(engine.anisetteSignInFailure(tried: servers.count, lastError: lastError))
     }
 
     private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {

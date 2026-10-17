@@ -488,6 +488,13 @@ let chineseStrings: [String: String] = [
     "Custom…": "自定义…",
     "Server URL": "服务器 URL",
     "Anisette Server": "Anisette 服务器",
+    "Starts with %@": "从 %@ 开始",
+    "Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.":
+        "“自动”会先使用上次成功登录的服务器，然后按成功可能性从高到低尝试其他服务器。",
+    "Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others.":
+        "只会尝试这个服务器。它失败时登录也会失败：选择“自动”，让 SideInstaller 尝试其他服务器。",
+    "Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.":
+        "只尝试了在“设置 › Anisette 服务器”中选择的服务器。在那里选择“自动”，SideInstaller 就会在一个服务器失败时尝试其他服务器。",
     "Device IP": "设备 IP",
     "Advanced": "高级",
     "Clear": "清除",

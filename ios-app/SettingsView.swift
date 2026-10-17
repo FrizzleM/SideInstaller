@@ -23,6 +23,13 @@ struct SettingsView: View {
     /// True once "Custom…" is picked, revealing the free-form URL field.
     @State private var anisetteIsCustom = false
 
+    /// What the anisette Server menu shows as picked.
+    private enum AnisetteChoice: Hashable {
+        case auto
+        case server(String)
+        case custom
+    }
+
     /// Set while a Developer Mode request runs.
     @State private var developerModeBusy = false
     /// How the last Developer Mode request went.
@@ -346,13 +353,21 @@ struct SettingsView: View {
     private var anisetteSection: some View {
         Section {
             Picker(L("Server"), selection: anisetteSelection) {
+                Text(L("Auto")).tag(AnisetteChoice.auto)
+                Divider()
                 ForEach(engine.anisetteServers) { server in
-                    Text(server.name).tag(Optional(server.address))
+                    Text(server.name).tag(AnisetteChoice.server(server.address))
                 }
                 Divider()
-                Text(L("Custom…")).tag(String?.none)
+                Text(L("Custom…")).tag(AnisetteChoice.custom)
             }
-            if anisetteIsCustom {
+            if engine.anisetteAuto {
+                Text(L("Starts with %@", anisetteName))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            } else if anisetteIsCustom {
                 TextField(L("Server URL"), text: $engine.anisetteURL)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -366,18 +381,36 @@ struct SettingsView: View {
             }
         } header: {
             Text(L("Anisette Server"))
+        } footer: {
+            Text(engine.anisetteAuto
+                 ? L("Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.")
+                 : L("Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others."))
         }
     }
 
-    /// The menu's selection: a server's address, or nil for "Custom…".
-    private var anisetteSelection: Binding<String?> {
+    /// The server Auto starts with, by its name on the list if it has one.
+    private var anisetteName: String {
+        engine.anisetteServers.first { $0.address == engine.anisetteURL }?.name ?? engine.anisetteURL
+    }
+
+    /// The menu's selection. Picking a server or "Custom…" turns Auto off;
+    /// picking Auto keeps the server in use, as the one it starts with.
+    private var anisetteSelection: Binding<AnisetteChoice> {
         Binding(
-            get: { anisetteIsCustom ? nil : engine.anisetteURL },
-            set: { newValue in
-                if let address = newValue {
+            get: {
+                if engine.anisetteAuto { return .auto }
+                return anisetteIsCustom ? .custom : .server(engine.anisetteURL)
+            },
+            set: { choice in
+                switch choice {
+                case .auto:
+                    engine.anisetteAuto = true
+                case .server(let address):
+                    engine.anisetteAuto = false
                     anisetteIsCustom = false
                     engine.anisetteURL = address
-                } else {
+                case .custom:
+                    engine.anisetteAuto = false
                     anisetteIsCustom = true
                 }
             }
