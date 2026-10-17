@@ -10,18 +10,18 @@
       "iconURL": "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon~ios-marketing.png",
       "subtitle": "An an app that installs Sidestore on iOS 27, fully on-device",
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
-      "version": "1.5.2",
-      "versionDate": "2026-10-15T07:49:16Z",
-      "versionDescription": "Apple fixed the patch v1.5.0, so I switched the login device to Windows and it now works\r\n- Fixed the Apple ID login error\r\n- This is a temporary fix, and will likely be patched by Apple as well, just like the Android in v1.5. A permanent one is in the works.",
-      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.2/SideInstaller.ipa",
-      "size": 9150282,
+      "version": "1.5.3",
+      "versionDate": "2026-10-16T17:52:51Z",
+      "versionDescription": "Strengthened the Anisette servers by adding new ones that use a Windows protocol. Also improved LocalDevVPN compatibility.\r\n\r\n\r\n### Fixed\r\n- **Switching between anisette servers no longer breaks sign-in.** SideInstaller now keeps a separate anisette identity for each kind of server (Android, Windows, Mac). If a server goes down, sign-in can move to another kind without making a new identity and asking for your verification code again.\r\n\r\n### Changed\r\n- LocalDevVPN's auto launch now occurs only when it is needed, rather than on the app's launch.\r\n- **New sign-ins start on a Windows anisette server** (\"jkcoxson (Windows ADI)\"). If you have signed in before, SideInstaller stays on the server you used and keeps your saved sign-in. If that server fails, the Windows servers are tried next. \"StikStore (Windows ADI)\" has been added to the list.\r\n- **The Mac anisette servers are supported but tried last.** Through \"jkcoxson\" and \"SideStore (New)\", Apple has asked accounts that have trusted devices for a code by text and then refused to send it.\r\n- **Apple refusing one kind of device no longer ends sign-in.** If Apple refuses the Mac or the Windows PC twice (HTTP 503), SideInstaller tries the servers that sign in as the other one.\r\n- **The anisette server now decides which device SideInstaller signs in as**, when the server names its own device. Servers that still name the old Mac, which Apple refuses, get the Windows PC instead.\r\n- **Sign-in reports the same device from start to finish**, including the verification-code requests. If Apple turns those away, they are sent again as a Mac.",
+      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.3/SideInstaller.ipa",
+      "size": 9208665,
       "versions": [
         {
-          "version": "1.5.2",
-          "date": "2026-10-15T07:49:16Z",
-          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.2/SideInstaller.ipa",
-          "localizedDescription": "Apple fixed the patch v1.5.0, so I switched the login device to Windows and it now works\r\n- Fixed the Apple ID login error\r\n- This is a temporary fix, and will likely be patched by Apple as well, just like the Android in v1.5. A permanent one is in the works.",
-          "size": 9150282
+          "version": "1.5.3",
+          "date": "2026-10-16T17:52:51Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.5.3/SideInstaller.ipa",
+          "localizedDescription": "Strengthened the Anisette servers by adding new ones that use a Windows protocol. Also improved LocalDevVPN compatibility.\r\n\r\n\r\n### Fixed\r\n- **Switching between anisette servers no longer breaks sign-in.** SideInstaller now keeps a separate anisette identity for each kind of server (Android, Windows, Mac). If a server goes down, sign-in can move to another kind without making a new identity and asking for your verification code again.\r\n\r\n### Changed\r\n- LocalDevVPN's auto launch now occurs only when it is needed, rather than on the app's launch.\r\n- **New sign-ins start on a Windows anisette server** (\"jkcoxson (Windows ADI)\"). If you have signed in before, SideInstaller stays on the server you used and keeps your saved sign-in. If that server fails, the Windows servers are tried next. \"StikStore (Windows ADI)\" has been added to the list.\r\n- **The Mac anisette servers are supported but tried last.** Through \"jkcoxson\" and \"SideStore (New)\", Apple has asked accounts that have trusted devices for a code by text and then refused to send it.\r\n- **Apple refusing one kind of device no longer ends sign-in.** If Apple refuses the Mac or the Windows PC twice (HTTP 503), SideInstaller tries the servers that sign in as the other one.\r\n- **The anisette server now decides which device SideInstaller signs in as**, when the server names its own device. Servers that still name the old Mac, which Apple refuses, get the Windows PC instead.\r\n- **Sign-in reports the same device from start to finish**, including the verification-code requests. If Apple turns those away, they are sent again as a Mac.",
+          "size": 9208665
         }
       ]
     },
