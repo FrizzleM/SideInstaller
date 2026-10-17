@@ -304,6 +304,48 @@ let chineseStrings: [String: String] = [
     "Route finished. The device stays at its last point.": "路线已结束。设备停留在最后一个点。",
     "Route stopped. The device stays where it got to.": "路线已停止。设备停留在当前所到位置。",
     "Route playback stopped: %@": "路线播放已停止：%@",
+    // Location › planned routes (OpenStreetMap).
+    "Add stop": "添加停靠点",
+    "Add as stop": "添加为停靠点",
+    "Plan a route": "规划路线",
+    "Travel by": "出行方式",
+    "Goes along each street at its speed limit, from OpenStreetMap. A street without one mapped gets the usual limit for its kind of road.":
+        "按 OpenStreetMap 中每条街道的限速行驶。未标注限速的街道采用该类道路的常见限速。",
+    "Rides streets and paths a bike can take, at a cycling pace.": "沿自行车可通行的街道和小路，以骑行速度前进。",
+    "Walks streets and paths at a walking pace.": "沿街道和小路，以步行速度前进。",
+    "Start where the device is": "从设备所在位置出发",
+    "Move the map so the pin is on a place, then tap Add stop. Add as many as you like: the route goes to each in order.":
+        "移动地图，让图钉落在某个地点上，然后轻点“添加停靠点”。想加多少个都可以：路线会按顺序经过每一个。",
+    "The device's location": "设备位置",
+    "Stop %d": "停靠点 %d",
+    "Clear stops": "清除停靠点",
+    "Move up": "上移",
+    "Move down": "下移",
+    "Find route": "查找路线",
+    "Finding route": "正在查找路线",
+    "Add one more stop to plan a route.": "再添加一个停靠点即可规划路线。",
+    "Routes from OpenStreetMap, © OpenStreetMap contributors":
+        "路线来自 OpenStreetMap，© OpenStreetMap 贡献者",
+    "Speed limits are mapped for all of it.": "全程均已标注限速。",
+    "Speed limits are mapped for %d%% of it; the rest is estimated.": "%d%% 的路段已标注限速，其余为估算值。",
+    "Average %@": "平均 %@",
+    "Speed limit %@": "限速 %@",
+    "No speed limit · going %@": "不限速 · 当前 %@",
+    "No limit mapped · going %@": "未标注限速 · 当前 %@",
+    "Going %@": "当前 %@",
+    "No street name": "无名道路",
+    "Estimated speed limit %@": "估算限速 %@",
+    "No speed limit": "不限速",
+    "No route found between these stops. Move them onto roads or paths, or travel another way.":
+        "未找到这些停靠点之间的路线。请将它们移到道路或小路上，或换一种出行方式。",
+    "A stop is too far from any road or path. Move it closer and try again.":
+        "有一个停靠点离道路或小路太远。请将它移近一些后重试。",
+    "Too many stops for the route server. Take some out and try again.":
+        "停靠点太多，路线服务器无法处理。请删除一些后重试。",
+    "That route is too long for the route server. Make it shorter, or split it up.":
+        "这条路线对路线服务器来说太长了。请缩短或分段。",
+    "The route server is busy. Try again in a minute.": "路线服务器繁忙。请一分钟后重试。",
+    "The route server couldn't plan this route (%@).": "路线服务器无法规划这条路线（%@）。",
 
     // MARK: - Entitlements tab
 

@@ -48,6 +48,17 @@ All notable changes to SideInstaller are documented here.
   when the file has timestamps, or walking, cycling or driving. A new point goes out every half
   second, a progress bar shows how far it has got, Stop here holds the current point, and at the
   end the device stays on the last one.
+- **Location spoofing plans routes over OpenStreetMap and drives them at each street's speed
+  limit.** Add stops with Add stop under the map (or Add as stop on a saved place), pick Drive,
+  Cycle or Walk, and Find route plans a route through them in order, from where the device is when
+  it's already simulating. FOSSGIS's public Valhalla server plans it from OpenStreetMap data and
+  gives each road's mapped speed limit. A drive goes along every road at its limit (130 km/h where
+  there's none, as on parts of the Autobahn); a road with no limit mapped takes the one mapped on
+  the rest of the same street or, failing that, a cautious usual limit for its kind of road, and
+  the route says how much of it has mapped limits. While it plays, a sign shows the current road's
+  limit as it's posted there, in km/h or mph. Walking and cycling go at Valhalla's pace for each
+  street. One route is on the map at a time, so planning one removes a GPX route and the other way
+  round.
 
 ### Fixed
 - **Pairing works when SideInstaller runs inside LiveContainer.** Before pairing, SideInstaller

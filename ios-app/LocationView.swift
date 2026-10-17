@@ -289,15 +289,47 @@ struct RouteTimeline {
             return
         }
         let metersPerSecond = speed.metersPerSecond ?? RouteSpeed.fallbackMetersPerSecond
+        offsets = Self.offsets(along: route.points) { _ in metersPerSecond }
+    }
+
+    /// A route that goes at `metersPerSecond[i]` from `points[i]` to
+    /// `points[i + 1]`, as a planned route keeps to each road's limit.
+    init(points: [CLLocationCoordinate2D], metersPerSecond: [CLLocationSpeed]) {
+        self.points = points
+        offsets = Self.offsets(along: points) { segment in
+            metersPerSecond.indices.contains(segment) ? metersPerSecond[segment]
+                                                      : RouteSpeed.fallbackMetersPerSecond
+        }
+    }
+
+    private static func offsets(along points: [CLLocationCoordinate2D],
+                                speed: (Int) -> CLLocationSpeed) -> [TimeInterval] {
         var elapsed: TimeInterval = 0
         var offsets: [TimeInterval] = [0]
-        for (start, end) in zip(route.points, route.points.dropFirst()) {
+        for (segment, (start, end)) in zip(points, points.dropFirst()).enumerated() {
             let meters = CLLocation(latitude: start.latitude, longitude: start.longitude)
                 .distance(from: CLLocation(latitude: end.latitude, longitude: end.longitude))
-            elapsed += meters / metersPerSecond
+            elapsed += meters / max(speed(segment), 0.1)
             offsets.append(elapsed)
         }
-        self.offsets = offsets
+        return offsets
+    }
+
+    /// The segment (from `points[i]` to `points[i + 1]`) the route is on
+    /// `elapsed` seconds in.
+    func segment(at elapsed: TimeInterval) -> Int {
+        max(0, firstReached(after: elapsed) - 1)
+    }
+
+    /// The first point reached after `elapsed`, at least 1.
+    private func firstReached(after elapsed: TimeInterval) -> Int {
+        var low = 1
+        var high = max(1, offsets.count - 1)
+        while low < high {
+            let middle = (low + high) / 2
+            if offsets[middle] > elapsed { high = middle } else { low = middle + 1 }
+        }
+        return low
     }
 
     /// Where the route is `elapsed` seconds in, between the two points around
@@ -308,13 +340,7 @@ struct RouteTimeline {
         }
         guard elapsed > 0 else { return first }
         guard elapsed < duration else { return last }
-        // The first point reached after `elapsed`.
-        var low = 1
-        var high = offsets.count - 1
-        while low < high {
-            let middle = (low + high) / 2
-            if offsets[middle] > elapsed { high = middle } else { low = middle + 1 }
-        }
+        let low = firstReached(after: elapsed)
         let start = points[low - 1]
         let end = points[low]
         let span = offsets[low] - offsets[low - 1]
@@ -329,6 +355,8 @@ struct RouteTimeline {
 struct RouteProgress: Equatable {
     var elapsed: TimeInterval
     var duration: TimeInterval
+    /// The timeline segment it's on, for a planned route's current road.
+    var segment = 0
 
     var fraction: Double { duration > 0 ? min(1, elapsed / duration) : 1 }
 }
@@ -363,6 +391,22 @@ final class LocationManager: ObservableObject {
     /// Set while a route is playing.
     @Published private(set) var routeProgress: RouteProgress?
     @Published private(set) var isImportingRoute = false
+    /// Where a planned route goes, in order.
+    @Published private(set) var stops: [RouteStop] = []
+    @Published var travelMode: TravelMode = .drive {
+        didSet { if travelMode != oldValue { dropPlannedRoute() } }
+    }
+    /// While simulating, a planned route starts where the device is, not at
+    /// the first stop.
+    @Published var startsFromDevice = true {
+        didSet { if startsFromDevice != oldValue { dropPlannedRoute() } }
+    }
+    /// The route planned through `stops`, until they change. Only one route
+    /// is loaded at a time: planning one removes the GPX route, and the other
+    /// way round.
+    @Published private(set) var plannedRoute: PlannedRoute?
+    @Published private(set) var isPlanningRoute = false
+    private var planningTask: Task<Void, Never>?
 
     private var engine: Engine { Engine.shared }
     /// Silent audio, so backgrounding the app doesn't close the DVT session.
@@ -380,6 +424,19 @@ final class LocationManager: ObservableObject {
 
     var isSimulating: Bool { simulated != nil }
     var isPlayingRoute: Bool { routeProgress != nil }
+    var isPlayingPlannedRoute: Bool { isPlayingRoute && plannedRoute != nil }
+    /// True when a planned route would start where the device is.
+    var startsAtDevice: Bool { startsFromDevice && simulated != nil }
+    /// What a route would be planned through: the device's spot, then the
+    /// stops.
+    var routeWaypoints: [CLLocationCoordinate2D] {
+        let stopCoordinates = stops.map(\.coordinate)
+        if startsAtDevice, let simulated { return [simulated] + stopCoordinates }
+        return stopCoordinates
+    }
+    var canPlanRoute: Bool {
+        routeWaypoints.count >= 2 && !isPlanningRoute && !isPlayingRoute
+    }
 
     // MARK: Popups
 
@@ -474,6 +531,8 @@ final class LocationManager: ObservableObject {
                 simulated = coordinate
                 keepAlive.startAudio()
                 startResending()
+                // A planned route starting at the device would start elsewhere now.
+                if startsFromDevice { dropPlannedRoute() }
                 lastSuccess = L("Location set to %@.", name ?? Self.format(coordinate))
                 engine.log("Location: simulating \(Self.format(coordinate)).")
             } catch {
@@ -503,6 +562,7 @@ final class LocationManager: ObservableObject {
                 lastError = message(error)
             }
             simulated = nil
+            if startsFromDevice { dropPlannedRoute() }
             stage = .notReady
             keepAlive.stopAll()
             isBusy = false
@@ -587,6 +647,7 @@ final class LocationManager: ObservableObject {
                 try GPXRoute(contentsOf: url)
             }.value
             if !imported.isSinglePlace {
+                dropPlannedRoute()
                 route = imported
                 routeSpeed = imported.times == nil ? .walk : .recorded
                 engine.log("Location: loaded route \(imported.name) "
@@ -605,12 +666,23 @@ final class LocationManager: ObservableObject {
     }
 
     /// Sets the location to the route's first point, then moves it along the
-    /// route at `routeSpeed`. At the end it stays on the last point.
+    /// route: a GPX route at `routeSpeed`, a planned one at each road's speed.
+    /// At the end it stays on the last point.
     ///
     /// Sets up first, like `simulate`.
     func playRoute() {
-        guard let route, !isBusy, !isPlayingRoute else { return }
-        let timeline = RouteTimeline(route: route, speed: routeSpeed)
+        guard !isBusy, !isPlayingRoute else { return }
+        let timeline: RouteTimeline
+        let name: String
+        if let plannedRoute {
+            timeline = plannedRoute.timeline
+            name = "the planned \(plannedRoute.mode.rawValue) route"
+        } else if let route {
+            timeline = RouteTimeline(route: route, speed: routeSpeed)
+            name = route.name
+        } else {
+            return
+        }
         guard let start = timeline.points.first else { return }
         isBusy = true
         lastError = nil
@@ -623,7 +695,7 @@ final class LocationManager: ObservableObject {
                 simulated = start
                 keepAlive.startAudio()
                 startPlayback(timeline)
-                engine.log("Location: playing \(route.name) over \(Int(timeline.duration)) s.")
+                engine.log("Location: playing \(name) over \(Int(timeline.duration)) s.")
             } catch {
                 stage = .notReady
                 simulated = nil
@@ -673,7 +745,8 @@ final class LocationManager: ObservableObject {
                 // Stopped or replaced while that was sending.
                 guard !Task.isCancelled else { return }
                 self.simulated = coordinate
-                self.routeProgress = RouteProgress(elapsed: elapsed, duration: timeline.duration)
+                self.routeProgress = RouteProgress(elapsed: elapsed, duration: timeline.duration,
+                                                   segment: timeline.segment(at: elapsed))
                 if elapsed >= timeline.duration {
                     self.endPlayback()
                     self.lastError = nil
@@ -695,6 +768,90 @@ final class LocationManager: ObservableObject {
         playbackTask?.cancel()
         playbackTask = nil
         routeProgress = nil
+    }
+
+    // MARK: Planned routes
+
+    /// Adds a stop at the end. Without a `name`, it's looked up and filled in
+    /// when the geocoder answers.
+    func addStop(at coordinate: CLLocationCoordinate2D, name: String? = nil) {
+        guard !isPlayingPlannedRoute else { return }
+        let stop = RouteStop(coordinate: coordinate, name: name)
+        stops.append(stop)
+        dropPlannedRoute()
+        guard name == nil else { return }
+        Task {
+            guard let found = await RoutePlanner.placeName(at: coordinate),
+                  let index = stops.firstIndex(where: { $0.id == stop.id }) else { return }
+            stops[index].name = found
+        }
+    }
+
+    func removeStop(_ stop: RouteStop) {
+        guard !isPlayingPlannedRoute else { return }
+        stops.removeAll { $0.id == stop.id }
+        dropPlannedRoute()
+    }
+
+    /// Moves a stop `offset` places earlier (negative) or later in the order.
+    func moveStop(_ stop: RouteStop, by offset: Int) {
+        guard !isPlayingPlannedRoute, let index = stops.firstIndex(where: { $0.id == stop.id }) else { return }
+        let destination = index + offset
+        guard stops.indices.contains(destination) else { return }
+        stops.swapAt(index, destination)
+        dropPlannedRoute()
+    }
+
+    func removeAllStops() {
+        guard !isPlayingPlannedRoute else { return }
+        stops.removeAll()
+        dropPlannedRoute()
+    }
+
+    /// Plans a route through `routeWaypoints` over OpenStreetMap. It replaces
+    /// the GPX route, if there is one.
+    func planRoute() {
+        let waypoints = routeWaypoints
+        guard canPlanRoute else { return }
+        let mode = travelMode
+        let deviceStart = startsAtDevice ? waypoints.first : nil
+        isPlanningRoute = true
+        lastError = nil
+        lastSuccess = nil
+        planningTask = Task {
+            do {
+                var planned = try await RoutePlanner.plan(through: waypoints, mode: mode)
+                planned.deviceStart = deviceStart
+                try Task.checkCancellation()
+                route = nil
+                plannedRoute = planned
+                let mapped = planned.mappedLimitShare.map { ", \(Int($0 * 100))% of limits mapped" } ?? ""
+                engine.log("Location: planned a \(mode.rawValue) route over OpenStreetMap "
+                           + "(\(waypoints.count) places, \(planned.points.count) points, "
+                           + "\(Int(planned.distance)) m, \(Int(planned.duration)) s\(mapped)).")
+            } catch {
+                // Changing the stops or the mode cancels a plan on its way.
+                guard !Task.isCancelled else { return }
+                lastError = message(error)
+            }
+            isPlanningRoute = false
+            planningTask = nil
+        }
+    }
+
+    func removePlannedRoute() {
+        guard !isPlayingRoute else { return }
+        dropPlannedRoute()
+    }
+
+    /// Forgets the planned route, and any plan on its way, after the stops or
+    /// the mode change. A route that's playing is left alone.
+    private func dropPlannedRoute() {
+        guard !isPlayingPlannedRoute else { return }
+        planningTask?.cancel()
+        planningTask = nil
+        isPlanningRoute = false
+        plannedRoute = nil
     }
 
     // MARK: Helpers
@@ -727,6 +884,8 @@ struct LocationView: View {
     @State private var target = CLLocationCoordinate2D(latitude: 37.3349, longitude: -122.0090)
     @State private var query = ""
     @State private var isSearching = false
+    /// The last search's match, so a stop added there takes its name.
+    @State private var searchMatch: (name: String, coordinate: CLLocationCoordinate2D)?
     /// The crosshair's coordinate when Save was tapped, while the name prompt
     /// is up.
     @State private var placeToSave: CLLocationCoordinate2D?
@@ -752,8 +911,9 @@ struct LocationView: View {
                     }
                     mapCard.cascadeItem(2)
                         .id(Self.mapCardID)
-                    savedPlacesCard.cascadeItem(3)
-                    routeCard.cascadeItem(4)
+                    plannerCard.cascadeItem(3)
+                    savedPlacesCard.cascadeItem(4)
+                    routeCard.cascadeItem(5)
                     // Errors and confirmations show as popups, which `RootView`
                     // lays over the app.
                 }
@@ -764,11 +924,19 @@ struct LocationView: View {
                 .animation(.smooth(duration: 0.3), value: manager.savedPlaces)
                 .animation(.smooth(duration: 0.3), value: manager.isPlayingRoute)
                 .animation(.smooth(duration: 0.3), value: manager.route?.name)
+                .animation(.smooth(duration: 0.3), value: manager.stops)
+                .animation(.smooth(duration: 0.3), value: manager.plannedRoute?.id)
+                .animation(.smooth(duration: 0.3), value: manager.isPlanningRoute)
             }
             .onChange(of: mapRequests) {
                 withAnimation(.smooth(duration: 0.4)) {
                     scroller.scrollTo(Self.mapCardID, anchor: .top)
                 }
+            }
+            // Show a newly planned route whole. The page stays where it is,
+            // by the Play button.
+            .onChange(of: manager.plannedRoute?.id) {
+                if let planned = manager.plannedRoute { fitMap(to: planned.points) }
             }
         }
         .scrollDismissesKeyboard(.interactively)
@@ -854,6 +1022,16 @@ struct LocationView: View {
                             MapPolyline(coordinates: route.points)
                                 .stroke(Theme.accent.opacity(0.8), lineWidth: 4)
                         }
+                        if let planned = manager.plannedRoute {
+                            MapPolyline(coordinates: planned.points)
+                                .stroke(Theme.accent.opacity(0.85), lineWidth: 5)
+                        }
+                        ForEach(Array(manager.stops.enumerated()), id: \.element.id) { index, stop in
+                            Marker(stop.name ?? LocationManager.format(stop.coordinate),
+                                   monogram: Text(verbatim: "\(index + 1)"),
+                                   coordinate: stop.coordinate)
+                                .tint(.orange)
+                        }
                         if let simulated = manager.simulated {
                             Marker(L("Simulated"), systemImage: "location.fill",
                                    coordinate: simulated)
@@ -872,22 +1050,10 @@ struct LocationView: View {
                 .frame(height: 280)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-                HStack {
-                    Label(LocationManager.format(target), systemImage: "scope")
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    Spacer()
-                    Button {
-                        placeName = ""
-                        placeToSave = target
-                    } label: {
-                        Label(L("Save"), systemImage: "bookmark")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .tint(Theme.accent)
+                // Icons only where the coordinate and both labels don't fit.
+                ViewThatFits(in: .horizontal) {
+                    pinActions(labelled: true)
+                    pinActions(labelled: false)
                 }
 
                 // On first use, the spinner also covers disk image setup.
@@ -918,6 +1084,55 @@ struct LocationView: View {
                 }
             }
         }
+    }
+
+    /// The crosshair's coordinate, with Add stop and Save for it.
+    private func pinActions(labelled: Bool) -> some View {
+        HStack(spacing: 8) {
+            Label(LocationManager.format(target), systemImage: "scope")
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Button { addStopAtPin() } label: {
+                pinActionLabel(L("Add stop"), systemImage: "plus", labelled: labelled)
+            }
+            .disabled(manager.isPlayingPlannedRoute)
+            Button {
+                placeName = ""
+                placeToSave = target
+            } label: {
+                pinActionLabel(L("Save"), systemImage: "bookmark", labelled: labelled)
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .tint(Theme.accent)
+    }
+
+    @ViewBuilder
+    private func pinActionLabel(_ title: String, systemImage: String, labelled: Bool) -> some View {
+        if labelled {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold))
+        } else {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.semibold))
+                .accessibilityLabel(title)
+        }
+    }
+
+    /// Adds the crosshair's spot as a stop, named after the search match when
+    /// the map is still on it.
+    private func addStopAtPin() {
+        var name: String?
+        if let searchMatch {
+            let meters = CLLocation(latitude: target.latitude, longitude: target.longitude)
+                .distance(from: CLLocation(latitude: searchMatch.coordinate.latitude,
+                                           longitude: searchMatch.coordinate.longitude))
+            if meters < 15 { name = searchMatch.name }
+        }
+        manager.addStop(at: target, name: name)
     }
 
     private var crosshair: some View {
@@ -971,6 +1186,7 @@ struct LocationView: View {
             } else {
                 coordinate = first.placemark.coordinate
             }
+            searchMatch = (first.name ?? text, coordinate)
             moveMap(to: coordinate)
         }
     }
@@ -983,6 +1199,257 @@ struct LocationView: View {
                 span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)))
         }
         target = coordinate
+    }
+
+    // MARK: Planned route
+
+    /// Stops, a way of travelling, and the route OpenStreetMap gives through
+    /// them, played at each road's speed limit when driving.
+    private var plannerCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 14) {
+                sectionTitle(L("Plan a route"), systemImage: "signpost.right.and.left.fill")
+
+                Picker(L("Travel by"), selection: $manager.travelMode) {
+                    ForEach(TravelMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .disabled(manager.isPlayingPlannedRoute)
+
+                Text(Self.modeExplanation(manager.travelMode))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // Playing moves the device, which isn't where the route started.
+                if manager.isSimulating, !manager.isPlayingPlannedRoute {
+                    Toggle(L("Start where the device is"), isOn: $manager.startsFromDevice)
+                        .font(.subheadline)
+                        .tint(Theme.accent)
+                }
+
+                stopList
+
+                if let planned = manager.plannedRoute {
+                    plannedRouteSummary(planned)
+                    playbackControls { progress in
+                        if let stretch = planned.stretch(atSegment: progress.segment) {
+                            currentRoad(stretch, mode: planned.mode)
+                        }
+                    }
+                } else {
+                    findRouteButton
+                }
+
+                Link(destination: URL(string: "https://www.openstreetmap.org/copyright")!) {
+                    Text(L("Routes from OpenStreetMap, © OpenStreetMap contributors"))
+                        .multilineTextAlignment(.leading)
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var stopList: some View {
+        if manager.stops.isEmpty {
+            Text(L("Move the map so the pin is on a place, then tap Add stop. Add as many as you like: the route goes to each in order."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            VStack(spacing: 2) {
+                if let deviceStart = routeDeviceStart {
+                    stopRow(title: L("The device's location"), coordinate: deviceStart) {
+                        Image(systemName: "location.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 26, height: 26)
+                            .background(Circle().fill(Color.green))
+                    } trailing: {
+                        EmptyView()
+                    }
+                }
+                ForEach(Array(manager.stops.enumerated()), id: \.element.id) { index, stop in
+                    stopRow(title: stop.name ?? L("Stop %d", index + 1), coordinate: stop.coordinate) {
+                        Text(verbatim: "\(index + 1)")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 26, height: 26)
+                            .background(Circle().fill(Color.orange))
+                    } trailing: {
+                        Menu { stopMenu(stop, index: index) } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.title3)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 36, height: 36)
+                                .contentShape(Rectangle())
+                        }
+                        .disabled(manager.isPlayingPlannedRoute)
+                    }
+                }
+            }
+
+            HStack {
+                Button { addStopAtPin() } label: {
+                    Label(L("Add stop"), systemImage: "plus")
+                        .font(.caption.weight(.semibold))
+                }
+                Spacer()
+                Button(role: .destructive) { manager.removeAllStops() } label: {
+                    Label(L("Clear stops"), systemImage: "trash")
+                        .font(.caption.weight(.semibold))
+                }
+                .tint(.red)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .tint(Theme.accent)
+            .disabled(manager.isPlayingPlannedRoute)
+        }
+    }
+
+    /// The device's spot heading the stops: where a planned route started, or
+    /// where the next one would.
+    private var routeDeviceStart: CLLocationCoordinate2D? {
+        if let planned = manager.plannedRoute { return planned.deviceStart }
+        return manager.startsAtDevice ? manager.simulated : nil
+    }
+
+    private func stopRow<Badge: View, Trailing: View>(
+        title: String, coordinate: CLLocationCoordinate2D,
+        @ViewBuilder badge: () -> Badge, @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(spacing: 12) {
+            badge()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Text(LocationManager.format(coordinate))
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            trailing()
+        }
+        .frame(minHeight: 36)
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func stopMenu(_ stop: RouteStop, index: Int) -> some View {
+        Button {
+            moveMap(to: stop.coordinate)
+            mapRequests += 1
+        } label: {
+            Label(L("Show on map"), systemImage: "map")
+        }
+        if index > 0 {
+            Button { manager.moveStop(stop, by: -1) } label: {
+                Label(L("Move up"), systemImage: "arrow.up")
+            }
+        }
+        if index < manager.stops.count - 1 {
+            Button { manager.moveStop(stop, by: 1) } label: {
+                Label(L("Move down"), systemImage: "arrow.down")
+            }
+        }
+        Button(role: .destructive) { manager.removeStop(stop) } label: {
+            Label(L("Remove"), systemImage: "trash")
+        }
+    }
+
+    @ViewBuilder
+    private var findRouteButton: some View {
+        Button { manager.planRoute() } label: {
+            HStack(spacing: 10) {
+                if manager.isPlanningRoute {
+                    ProgressView().tint(.white)
+                    Text(L("Finding route"))
+                } else {
+                    Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                    Text(L("Find route"))
+                }
+            }
+        }
+        .buttonStyle(PrimaryButtonStyle())
+        .disabled(!manager.canPlanRoute)
+
+        if manager.routeWaypoints.count == 1 {
+            Text(L("Add one more stop to plan a route."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Length and time, how much of a drive has mapped limits, and buttons to
+    /// show it or take it away.
+    private func plannedRouteSummary(_ planned: PlannedRoute) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: planned.mode.systemImage)
+                .font(.title3)
+                .foregroundStyle(Theme.accent)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("\(Self.formatDistance(planned.distance)) · "
+                     + Self.formatDuration(planned.duration))
+                    .font(.subheadline.weight(.semibold))
+                Text(Self.routeDetail(planned))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button {
+                fitMap(to: planned.points)
+                mapRequests += 1
+            } label: {
+                Image(systemName: "map")
+                    .frame(width: 32, height: 32)
+            }
+            .accessibilityLabel(L("Show on map"))
+            Button { manager.removePlannedRoute() } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+            }
+            .accessibilityLabel(L("Remove"))
+            .disabled(manager.isPlayingRoute)
+        }
+    }
+
+    /// The road a playing route is on, with its limit sign when driving.
+    private func currentRoad(_ stretch: PlannedRoute.Stretch, mode: TravelMode) -> some View {
+        HStack(spacing: 12) {
+            if let limit = stretch.limit {
+                SpeedLimitSign(limit: limit)
+            } else {
+                Image(systemName: mode.systemImage)
+                    .font(.headline)
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(.white.opacity(0.08)))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(stretch.name ?? L("No street name"))
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Text(Self.roadDetail(stretch))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(.white.opacity(0.06)))
+        .animation(.smooth(duration: 0.3), value: stretch)
     }
 
     // MARK: Saved places
@@ -1045,6 +1512,12 @@ struct LocationView: View {
                 } label: {
                     Label(L("Show on map"), systemImage: "map")
                 }
+                Button {
+                    manager.addStop(at: place.coordinate, name: place.name)
+                } label: {
+                    Label(L("Add as stop"), systemImage: "plus")
+                }
+                .disabled(manager.isPlayingPlannedRoute)
                 Button(role: .destructive) {
                     manager.deletePlace(place)
                 } label: {
@@ -1109,7 +1582,7 @@ struct LocationView: View {
             }
             Spacer(minLength: 0)
             Button {
-                fitMap(to: route)
+                fitMap(to: route.points)
                 mapRequests += 1
             } label: {
                 Image(systemName: "map")
@@ -1146,6 +1619,14 @@ struct LocationView: View {
         }
         .disabled(manager.isPlayingRoute)
 
+        playbackControls { _ in EmptyView() }
+    }
+
+    /// Play, or while playing the progress, `current` (what the route is on
+    /// now) and Stop here. Shared by both kinds of route.
+    @ViewBuilder
+    private func playbackControls<Current: View>(
+        @ViewBuilder current: (RouteProgress) -> Current) -> some View {
         if let progress = manager.routeProgress {
             VStack(alignment: .leading, spacing: 6) {
                 ProgressView(value: progress.fraction)
@@ -1157,6 +1638,8 @@ struct LocationView: View {
                     .foregroundStyle(.secondary)
             }
             .transition(.opacity)
+
+            current(progress)
 
             Button { manager.stopRoute() } label: {
                 Label(L("Stop here"), systemImage: "pause.fill")
@@ -1192,14 +1675,14 @@ struct LocationView: View {
             if route.isSinglePlace {
                 moveMap(to: first)
             } else {
-                fitMap(to: route)
+                fitMap(to: route.points)
             }
             mapRequests += 1
         }
     }
 
-    private func fitMap(to route: GPXRoute) {
-        let rect = MKPolyline(coordinates: route.points, count: route.points.count).boundingMapRect
+    private func fitMap(to points: [CLLocationCoordinate2D]) {
+        let rect = MKPolyline(coordinates: points, count: points.count).boundingMapRect
         // A margin so the ends aren't under the card's rounded corners.
         let margin = max(rect.width, rect.height) * 0.15 + 200
         withAnimation(.smooth(duration: 0.4)) {
@@ -1208,6 +1691,59 @@ struct LocationView: View {
     }
 
     // MARK: Formatting
+
+    private static func modeExplanation(_ mode: TravelMode) -> String {
+        switch mode {
+        case .drive:
+            return L("Goes along each street at its speed limit, from OpenStreetMap. A street without one mapped gets the usual limit for its kind of road.")
+        case .cycle:
+            return L("Rides streets and paths a bike can take, at a cycling pace.")
+        case .walk:
+            return L("Walks streets and paths at a walking pace.")
+        }
+    }
+
+    /// Under a planned route's length: how much of a drive has mapped limits,
+    /// or the average pace on foot or by bike.
+    private static func routeDetail(_ planned: PlannedRoute) -> String {
+        if let share = planned.mappedLimitShare {
+            let percent = Int((share * 100).rounded(.down))
+            return percent >= 100 ? L("Speed limits are mapped for all of it.")
+                                  : L("Speed limits are mapped for %d%% of it; the rest is estimated.", percent)
+        }
+        let average = planned.duration > 0 ? planned.distance / planned.duration : 0
+        return L("Average %@", formatSpeed(average))
+    }
+
+    /// Limits read as their signs do (30 km/h in Milan, 25 mph in San
+    /// Francisco); other speeds go in the app's units.
+    private static func roadDetail(_ stretch: PlannedRoute.Stretch) -> String {
+        switch stretch.limit {
+        case .posted(let speed)?:
+            return L("Speed limit %@", speed.text)
+        case .unlimited?:
+            return L("No speed limit · going %@", formatSpeed(stretch.metersPerSecond))
+        case .estimated(let speed)?:
+            return L("No limit mapped · going %@", speed.text)
+        case nil:
+            return L("Going %@", formatSpeed(stretch.metersPerSecond))
+        }
+    }
+
+    /// km/h, or mph where the app's region drives in miles, for speeds that
+    /// aren't a road's limit.
+    private static var roadSpeedUnit: UnitSpeed {
+        Localizer.locale.measurementSystem == .metric ? .kilometersPerHour : .milesPerHour
+    }
+
+    /// A road speed, e.g. "50 km/h", in `roadSpeedUnit`.
+    private static func formatSpeed(_ metersPerSecond: CLLocationSpeed) -> String {
+        Measurement(value: metersPerSecond, unit: UnitSpeed.metersPerSecond)
+            .converted(to: roadSpeedUnit)
+            .formatted(.measurement(width: .abbreviated, usage: .asProvided,
+                                    numberFormatStyle: .number.precision(.fractionLength(0)))
+                .locale(Localizer.locale))
+    }
 
     /// A speed choice as the menu lists it, e.g. "Walk · 5 km/h".
     private static func speedTitle(_ speed: RouteSpeed) -> String {
@@ -1247,5 +1783,80 @@ struct LocationView: View {
             Image(systemName: systemImage)
                 .foregroundStyle(Theme.brand)
         }
+    }
+}
+
+// MARK: - Speed limit sign
+
+/// A round limit sign as most of the world posts them: a red ring round the
+/// number, gray when the limit is only estimated, and the struck-through white
+/// disc of an end-of-limits sign where there's none. White in dark mode too,
+/// like the real thing.
+private struct SpeedLimitSign: View {
+    var limit: SpeedLimit
+
+    var body: some View {
+        ZStack {
+            Circle().fill(.white)
+            switch limit {
+            case .posted(let speed), .estimated(let speed):
+                Circle()
+                    .strokeBorder(limit.isEstimated ? Color.gray : Color.red, lineWidth: 4.5)
+                Text(verbatim: "\(speed.value)")
+                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.black)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .padding(7)
+            case .unlimited:
+                Stripes()
+                    .stroke(.black, lineWidth: 1.6)
+                    .clipShape(Circle())
+                    .padding(6)
+                Circle()
+                    .strokeBorder(.black.opacity(0.2), lineWidth: 1)
+            }
+        }
+        .frame(width: 44, height: 44)
+        .accessibilityElement()
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        switch limit {
+        case .posted(let speed):    return L("Speed limit %@", speed.text)
+        case .estimated(let speed): return L("Estimated speed limit %@", speed.text)
+        case .unlimited:            return L("No speed limit")
+        }
+    }
+
+    /// Five parallel lines rising to the right, as across an end-of-limits
+    /// sign.
+    private struct Stripes: Shape {
+        func path(in rect: CGRect) -> Path {
+            var path = Path()
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let spacing = rect.width * 0.12
+            let reach = rect.width
+            for line in -2...2 {
+                // Stepped across the lines, which run up and to the right.
+                let offset = CGFloat(line) * spacing / 2.squareRoot()
+                let middle = CGPoint(x: center.x + offset, y: center.y + offset)
+                path.move(to: CGPoint(x: middle.x - reach, y: middle.y + reach))
+                path.addLine(to: CGPoint(x: middle.x + reach, y: middle.y - reach))
+            }
+            return path
+        }
+    }
+}
+
+extension RoadSpeed {
+    /// As its sign reads, with the unit: "30 km/h", "25 mph".
+    var text: String {
+        Measurement(value: Double(value), unit: inMiles ? UnitSpeed.milesPerHour : .kilometersPerHour)
+            .formatted(.measurement(width: .abbreviated, usage: .asProvided,
+                                    numberFormatStyle: .number.precision(.fractionLength(0)))
+                .locale(Localizer.locale))
     }
 }

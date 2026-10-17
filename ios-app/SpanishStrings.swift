@@ -315,6 +315,53 @@ let spanishStrings: [String: String] = [
     "Route stopped. The device stays where it got to.":
         "Ruta detenida. El dispositivo se queda donde había llegado.",
     "Route playback stopped: %@": "Se ha detenido la reproducción de la ruta: %@",
+    // Location › planned routes (OpenStreetMap).
+    "Add stop": "Añadir parada",
+    "Add as stop": "Añadir como parada",
+    "Plan a route": "Planificar una ruta",
+    "Travel by": "Medio de transporte",
+    "Goes along each street at its speed limit, from OpenStreetMap. A street without one mapped gets the usual limit for its kind of road.":
+        "Recorre cada calle a su límite de velocidad, según OpenStreetMap. Una calle sin límite registrado toma el habitual para su tipo de vía.",
+    "Rides streets and paths a bike can take, at a cycling pace.":
+        "Recorre calles y caminos aptos para bici, a ritmo de ciclista.",
+    "Walks streets and paths at a walking pace.": "Recorre calles y caminos a paso de peatón.",
+    "Start where the device is": "Empezar donde está el dispositivo",
+    "Move the map so the pin is on a place, then tap Add stop. Add as many as you like: the route goes to each in order.":
+        "Mueve el mapa para que el pin quede sobre un lugar y toca Añadir parada. Añade todas las que quieras: la ruta pasa por cada una en orden.",
+    "The device's location": "Ubicación del dispositivo",
+    "Stop %d": "Parada %d",
+    "Clear stops": "Borrar paradas",
+    "Move up": "Subir",
+    "Move down": "Bajar",
+    "Find route": "Buscar ruta",
+    "Finding route": "Buscando ruta",
+    "Add one more stop to plan a route.": "Añade una parada más para planificar una ruta.",
+    "Routes from OpenStreetMap, © OpenStreetMap contributors":
+        "Rutas de OpenStreetMap, © colaboradores de OpenStreetMap",
+    "Speed limits are mapped for all of it.":
+        "Los límites de velocidad están registrados en todo el recorrido.",
+    "Speed limits are mapped for %d%% of it; the rest is estimated.":
+        "Los límites de velocidad están registrados en el %d%% del recorrido; el resto es estimado.",
+    "Average %@": "Media de %@",
+    "Speed limit %@": "Límite de velocidad %@",
+    "No speed limit · going %@": "Sin límite de velocidad · a %@",
+    "No limit mapped · going %@": "Sin límite registrado · a %@",
+    "Going %@": "A %@",
+    "No street name": "Calle sin nombre",
+    "Estimated speed limit %@": "Límite de velocidad estimado %@",
+    "No speed limit": "Sin límite de velocidad",
+    "No route found between these stops. Move them onto roads or paths, or travel another way.":
+        "No se ha encontrado ninguna ruta entre estas paradas. Muévelas a calles o caminos, o prueba otro medio de transporte.",
+    "A stop is too far from any road or path. Move it closer and try again.":
+        "Una parada está demasiado lejos de cualquier calle o camino. Acércala y vuelve a intentarlo.",
+    "Too many stops for the route server. Take some out and try again.":
+        "Demasiadas paradas para el servidor de rutas. Quita algunas y vuelve a intentarlo.",
+    "That route is too long for the route server. Make it shorter, or split it up.":
+        "Esa ruta es demasiado larga para el servidor de rutas. Acórtala o divídela.",
+    "The route server is busy. Try again in a minute.":
+        "El servidor de rutas está ocupado. Vuelve a intentarlo en un minuto.",
+    "The route server couldn't plan this route (%@).":
+        "El servidor de rutas no ha podido planificar esta ruta (%@).",
 
     // MARK: - Entitlements tab
 

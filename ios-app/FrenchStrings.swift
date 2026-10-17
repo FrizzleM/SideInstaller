@@ -315,6 +315,54 @@ let frenchStrings: [String: String] = [
     "Route stopped. The device stays where it got to.":
         "Itinéraire arrêté. L'appareil reste là où il en était.",
     "Route playback stopped: %@": "Lecture de l'itinéraire interrompue : %@",
+    // Location › planned routes (OpenStreetMap).
+    "Add stop": "Ajouter une étape",
+    "Add as stop": "Ajouter comme étape",
+    "Plan a route": "Planifier un itinéraire",
+    "Travel by": "Mode de déplacement",
+    "Goes along each street at its speed limit, from OpenStreetMap. A street without one mapped gets the usual limit for its kind of road.":
+        "Parcourt chaque rue à sa limitation de vitesse, d'après OpenStreetMap. Une rue sans limitation cartographiée prend celle habituelle pour son type de route.",
+    "Rides streets and paths a bike can take, at a cycling pace.":
+        "Emprunte les rues et chemins praticables à vélo, à une allure de cycliste.",
+    "Walks streets and paths at a walking pace.":
+        "Emprunte les rues et chemins à une allure de marche.",
+    "Start where the device is": "Partir de la position de l'appareil",
+    "Move the map so the pin is on a place, then tap Add stop. Add as many as you like: the route goes to each in order.":
+        "Déplace la carte pour placer l'épingle sur un lieu, puis touche Ajouter une étape. Ajoutes-en autant que tu veux : l'itinéraire passe par chacune dans l'ordre.",
+    "The device's location": "Position de l'appareil",
+    "Stop %d": "Étape %d",
+    "Clear stops": "Effacer les étapes",
+    "Move up": "Monter",
+    "Move down": "Descendre",
+    "Find route": "Trouver l'itinéraire",
+    "Finding route": "Recherche de l'itinéraire",
+    "Add one more stop to plan a route.": "Ajoute une étape de plus pour planifier un itinéraire.",
+    "Routes from OpenStreetMap, © OpenStreetMap contributors":
+        "Itinéraires d'OpenStreetMap, © contributeurs d'OpenStreetMap",
+    "Speed limits are mapped for all of it.":
+        "Les limitations de vitesse sont cartographiées sur tout le trajet.",
+    "Speed limits are mapped for %d%% of it; the rest is estimated.":
+        "Les limitations de vitesse sont cartographiées sur %d %% du trajet ; le reste est estimé.",
+    "Average %@": "Moyenne : %@",
+    "Speed limit %@": "Limitation de vitesse %@",
+    "No speed limit · going %@": "Pas de limitation · à %@",
+    "No limit mapped · going %@": "Aucune limitation cartographiée · à %@",
+    "Going %@": "À %@",
+    "No street name": "Rue sans nom",
+    "Estimated speed limit %@": "Limitation de vitesse estimée %@",
+    "No speed limit": "Pas de limitation de vitesse",
+    "No route found between these stops. Move them onto roads or paths, or travel another way.":
+        "Aucun itinéraire trouvé entre ces étapes. Place-les sur des routes ou des chemins, ou change de mode de déplacement.",
+    "A stop is too far from any road or path. Move it closer and try again.":
+        "Une étape est trop loin de toute route ou de tout chemin. Rapproche-la et réessaie.",
+    "Too many stops for the route server. Take some out and try again.":
+        "Trop d'étapes pour le serveur d'itinéraires. Retires-en quelques-unes et réessaie.",
+    "That route is too long for the route server. Make it shorter, or split it up.":
+        "Cet itinéraire est trop long pour le serveur d'itinéraires. Raccourcis-le ou découpe-le.",
+    "The route server is busy. Try again in a minute.":
+        "Le serveur d'itinéraires est occupé. Réessaie dans une minute.",
+    "The route server couldn't plan this route (%@).":
+        "Le serveur d'itinéraires n'a pas pu planifier cet itinéraire (%@).",
 
     // MARK: - Entitlements tab
 
