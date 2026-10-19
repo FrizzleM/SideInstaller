@@ -87,6 +87,10 @@ All notable changes to SideInstaller are documented here.
   Picking a server, or a custom URL, now means only that one is tried: if it fails, sign-in stops
   with the error and suggests choosing Auto. Before, a picked server was only the first of all of
   them.
+- **“StikStore (Mac ADI)” is on the anisette server list**, as in iLoader 2.3.10. It's a Mac
+  server like “jkcoxson” and “SideStore (New)”, shares their anisette identity, and is tried with
+  them, last. iLoader now starts on “SideStore (New)”, but its users still report the code being
+  asked for by text and then refused, so SideInstaller keeps starting on the Windows servers.
 
 ## 1.5.3
 

@@ -305,6 +305,20 @@ code to the devices (409) and sign-in finished. iLoader 2.3.9's users reported
 the same "SMS 2FA … 403" that day. So the app keeps ani.jkcoxson.com as the
 first server and tries the macOS ones last.
 
+iLoader 2.3.10 (2026-10-18) added ani3.stikstore.app ("StikStore (Mac)") and
+made new.ani.sidestore.io its default, with a note that ani.jkcoxson.com "works
+~50% of the time". Measured 2026-10-19 with made-up accounts through
+`ish/sideinstaller.py`: ani3.stikstore.app names the same `<MacBookPro13,3>`
+Mac, an identity provisioned through it works on mac-ani.jkcoxson.com and gets
+-45061 from the Windows-ADI servers, and `init` reaches -20970. Four `init`s
+each: ani3, mac-ani and ani2.stikstore.app 4/4; ani.jkcoxson.com 3/4 (one
+-22421); new.ani.sidestore.io 2/4 (HTTP 502, no `/v3/client_info`);
+win.ani.sidestore.io 0/4 ("spawn engine worker: Resource temporarily
+unavailable"). iLoader 2.3.10's issues still report the `/auth` 403 (#995),
+also for an account with trusted devices (#994; 2.3.10's new store key puts
+everyone on new.ani.sidestore.io unless they pick again), so the app adds ani3
+to the macOS group and keeps its order.
+
 **3. `src/auth/apple_account.rs`, `builder.rs`, `grandslam.rs` — let the user
 choose how the 2FA code arrives.**
 

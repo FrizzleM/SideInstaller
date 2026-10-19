@@ -87,11 +87,12 @@ BUNDLED_ANISETTE = [
     "https://ani.jaydenha.uk",
     "https://mac-ani.jkcoxson.com",
     "https://new.ani.sidestore.io",
+    "https://ani3.stikstore.app",
 ]
 # Servers known to run Apple's macOS and Windows ADI libraries (the app's
 # AnisetteServer.macADIHosts / .windowsADIHosts). The Windows ones are tried
 # right after the preferred one, the macOS ones last (see anisette_candidates).
-MAC_ADI_HOSTS = ("mac-ani.jkcoxson.com", "new.ani.sidestore.io")
+MAC_ADI_HOSTS = ("mac-ani.jkcoxson.com", "new.ani.sidestore.io", "ani3.stikstore.app")
 WINDOWS_ADI_HOSTS = ("ani.jkcoxson.com", "win.ani.sidestore.io", "ani2.stikstore.app")
 # Anisette servers are volunteer-run and half of any list is usually down;
 # stop after this many so a bad day doesn't turn into a long wait.

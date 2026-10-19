@@ -22,9 +22,10 @@ extension AnisetteServer {
     /// one can't be honoured: jkcoxson's, on Apple's Windows ADI library, which
     /// its operator has said he'll keep running.
     ///
-    /// Not his macOS-ADI server, which iLoader defaults to since 2.3.9: through
-    /// the macOS servers Apple has asked an account with trusted devices for a
-    /// code by text and then refused to send one (see `candidates`).
+    /// Not a macOS-ADI server, which iLoader defaults to since 2.3.9
+    /// (new.ani.sidestore.io since 2.3.10): through the macOS servers Apple has
+    /// asked an account with trusted devices for a code by text and then
+    /// refused to send one (see `candidates`).
     static let fallback = AnisetteServer(name: "jkcoxson (Windows ADI)", address: "https://ani.jkcoxson.com")
 
     /// The default until 1.5.2, on Apple's Android ADI library. It wasn't
@@ -32,10 +33,11 @@ extension AnisetteServer {
     /// with an unsaved pick signed in through (see `Engine.savedAnisetteURL`).
     static let legacyDefault = AnisetteServer(name: "SideStore", address: "https://ani.sidestore.io")
 
-    /// Servers on Apple's Windows ADI library that aren't on the community
-    /// list, added to it. iLoader lists this one next to jkcoxson's.
+    /// Servers on Apple's Windows and macOS ADI libraries that aren't on the
+    /// community list, added to it. iLoader lists both next to jkcoxson's.
     static let extras: [AnisetteServer] = [
         AnisetteServer(name: "StikStore (Windows ADI)", address: "https://ani2.stikstore.app"),
+        AnisetteServer(name: "StikStore (Mac ADI)", address: "https://ani3.stikstore.app"),
     ]
 
     /// Snapshot of the community list, shown on launch and used when the live
@@ -102,8 +104,8 @@ extension AnisetteServer {
 
     /// Hosts of the servers known to run Apple's macOS ADI library. They name
     /// `<MacBookPro13,3> <Mac OS X;10.12.6;16G29>` and take each other's
-    /// identities (checked 2026-10-16).
-    static let macADIHosts: Set<String> = ["mac-ani.jkcoxson.com", "new.ani.sidestore.io"]
+    /// identities (checked 2026-10-16, ani3.stikstore.app 2026-10-19).
+    static let macADIHosts: Set<String> = ["mac-ani.jkcoxson.com", "new.ani.sidestore.io", "ani3.stikstore.app"]
 
     /// Hosts of the servers known to run Apple's Windows ADI library.
     static let windowsADIHosts: Set<String> = ["ani.jkcoxson.com", "win.ani.sidestore.io", "ani2.stikstore.app"]
@@ -138,7 +140,8 @@ extension AnisetteServer {
     /// The macOS servers come last: through them Apple took the password of a
     /// real account with trusted devices (2026-10-16), then asked for a code by
     /// text instead of sending one to the devices, and answered the request for
-    /// it with HTTP 403, as iLoader 2.3.9's users reported the same day. Apple
+    /// it with HTTP 403, as iLoader 2.3.9's users reported the same day and
+    /// 2.3.10's still do with new.ani.sidestore.io as the default. Apple
     /// refusing one reported device doesn't end the sign-in while servers
     /// reporting the other are left (`AppleRefusals`).
     ///
