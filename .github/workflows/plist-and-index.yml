@@ -178,6 +178,8 @@ jobs:
           if [[ -f SideInstallerDNS.mobileconfig ]]; then cp SideInstallerDNS.mobileconfig _site/SideInstallerDNS.mobileconfig; fi
           # Terms of Service linked from the page footer.
           if [[ -f terms.html ]]; then cp terms.html _site/terms.html; fi
+          # https:// form of the app's install link, for chat apps (README, Links).
+          if [[ -f open.html ]]; then cp open.html _site/open.html; fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
