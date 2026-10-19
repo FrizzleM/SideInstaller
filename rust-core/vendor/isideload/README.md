@@ -520,6 +520,20 @@ signature made with one. `DeveloperSession::token()` and `adsid()` expose what
 the session is signed in with, for `si_signing_account` to hand to Madeira.
 Local; upstream has neither. Not testable without an Apple ID.
 
+**11. `src/sideload/cert_identity.rs` — use the certificate that has the key,
+whatever its machine name.**
+
+`find_matching` took only a certificate whose machine name was the
+`Sideloader`'s (`SideInstaller`) and whose public key matched the stored key.
+SideInstaller can now put SideStore's key in that file (`si_cert_import` in
+`rust-core/src/certs.rs`), and SideStore names its certificates `SideStore -
+<account>'s <device>`, so the match would miss and `retrieve` would ask Apple
+for a new certificate, which a free account refuses with 7460. The key alone
+decides now: two certificates only share a public key when they were requested
+with the same key. `find_matching` is public, so the import checks a key the
+same way signing will, and `retrieve_existing` no longer takes a machine name.
+Local; upstream still matches on both. Not testable without an Apple ID.
+
 ## Re-vendoring
 
 Upstream fixed change 1 its own way in `baca89d` (per-extension profiles). A

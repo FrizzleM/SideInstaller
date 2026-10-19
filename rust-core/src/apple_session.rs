@@ -111,11 +111,16 @@ pub(crate) fn stated_expiry(expiry: u64) -> Option<u64> {
     }
 }
 
+/// An account's folder in isideload's storage, `<sha256(email)>/`, where
+/// isideload keeps its signing key as `key`.
+pub(crate) fn account_dir(storage_dir: &Path, apple_id: &str) -> PathBuf {
+    storage_dir.join(hex::encode(Sha256::digest(apple_id.as_bytes())))
+}
+
 /// Path of an account's saved session: `<sha256(email)>/developer_session.json`,
 /// next to isideload's `<sha256(email)>/key`.
 fn session_path(storage_dir: &Path, apple_id: &str) -> PathBuf {
-    let hash = hex::encode(Sha256::digest(apple_id.as_bytes()));
-    storage_dir.join(hash).join("developer_session.json")
+    account_dir(storage_dir, apple_id).join("developer_session.json")
 }
 
 fn load(storage_dir: &Path, apple_id: &str) -> Option<SavedSession> {

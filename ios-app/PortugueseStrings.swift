@@ -265,6 +265,31 @@ let portugueseStrings: [String: String] = [
     "This certificate has no serial number, so it can't be revoked.":
         "Este certificado não tem número de série, então não pode ser revogado.",
 
+    // MARK: - SideStore's certificate (sidestore://certificate)
+
+    "Use SideStore's certificate": "Usar o certificado do SideStore",
+    "Checking the certificate": "Verificando o certificado",
+    "SideStore opens and sends back its certificate. SideInstaller then signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "O SideStore abre e devolve o certificado dele. Depois o SideInstaller também assina com ele, então com um Apple ID gratuito nenhum dos dois apps precisa revogar o do outro.",
+    "Apple won't issue a second signing certificate for this Apple ID. If SideStore made the one it has, SideInstaller can sign with that one too, and nothing is revoked. Revoking it lets the install continue as well — but it can't be undone.":
+        "A Apple não emite um segundo certificado de assinatura para este Apple ID. Se o que existe foi criado pelo SideStore, o SideInstaller também pode assinar com ele, sem revogar nada. Revogá-lo também deixa a instalação seguir — mas isso não pode ser desfeito.",
+    "If SideStore made it, tap “Use SideStore's certificate” above: SideInstaller signs with that one too, and nothing is revoked.":
+        "Se foi o SideStore que o criou, toque em “Usar o certificado do SideStore” acima: o SideInstaller também assina com ele, e nada é revogado.",
+    "SideInstaller signs with “%@” from now on. Nothing was revoked, so the apps already signed with it keep working.":
+        "A partir de agora o SideInstaller assina com “%@”. Nada foi revogado, então os apps já assinados com ele continuam funcionando.",
+    "SideInstaller already signs with “%@”.": "O SideInstaller já assina com “%@”.",
+    "That certificate isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID (SideStore may be signed in with a different one). Nothing was changed.":
+        "Esse certificado não é deste Apple ID: ele foi revogado ou pertence a outro Apple ID (talvez o SideStore esteja conectado com outro). Nada foi alterado.",
+    "Couldn't use that certificate: %@": "Não foi possível usar esse certificado: %@",
+    "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
+        "O SideStore não está instalado neste iPhone, então não há certificado para pegar dele.",
+    "Sign with this certificate?": "Assinar com este certificado?",
+    "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
+        "Um link enviou ao SideInstaller um certificado de assinatura. Só use se você pediu um: a partir de agora o SideInstaller vai assinar os apps com ele, no lugar do próprio. Ele só é usado se for um dos certificados do seu Apple ID.",
+    "Use it": "Usar",
+    "That link was meant to carry a signing certificate, but what it holds can't be read.":
+        "Esse link deveria trazer um certificado de assinatura, mas o conteúdo não pode ser lido.",
+
     // MARK: - Location tab
 
     "Location spoofing": "Simulação de localização",
@@ -390,8 +415,8 @@ let portugueseStrings: [String: String] = [
     // Refresh all: signing the installed apps again.
     "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
         "O iOS %@ não é compatível: o SideInstaller precisa do iOS %@ ou posterior.",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.":
-        "A Apple não emite um certificado de assinatura para este Apple ID: ela informa que já existe um (erro 7460). Revogue-o em Ferramentas › Certificados e renove de novo.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Under Tools › Certificates, use SideStore's certificate or revoke that one, then refresh again.":
+        "A Apple não emite um certificado de assinatura para este Apple ID: ela informa que já existe um (erro 7460). Em Ferramentas › Certificados, use o certificado do SideStore ou revogue esse, e renove de novo.",
     "An install is already running. Wait for it to finish, then refresh.":
         "Já tem uma instalação em andamento. Espere ela terminar e renove depois.",
     "Getting ready": "Preparando",

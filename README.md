@@ -74,13 +74,20 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 
 ### Links
 
-SideInstaller opens two kinds of `sideinstaller://` link, and asks before acting on either:
+SideInstaller opens three kinds of `sideinstaller://` link, and asks before acting on any of them:
 
 - `sideinstaller://install?url=<percent-encoded https link to an .ipa>` downloads the IPA as the
   custom .ipa and installs it, for one-tap installs from a website.
 - `sideinstaller://pairingFile?data=<base64 pairing file>` imports a pairing file. SideStore sends
   one back when asked with `sidestore://pairing?urlname=sideinstaller`, which is what **Get it from
   SideStore** on the Pairing file card does.
+- `sideinstaller://certificate?data=<base64 PKCS#12>&password=<password>` makes SideInstaller sign
+  with that certificate from then on, once Apple lists it among your Apple ID's certificates.
+  **Use SideStore's certificate** (on the “A certificate already exists” popup and the Certificates
+  page) asks SideStore for its own with
+  `sidestore://certificate?callback_template=sideinstaller://certificate?data=$(BASE64_CERT)&password=$(PASSWORD)`
+  (percent-encoded), so a free Apple ID's one certificate serves both apps. That reply is the one
+  link that doesn't ask again: SideStore has just asked whether to export it.
 
 
 ## Compatibility

@@ -1176,6 +1176,19 @@ struct InstallPopup: View {
                     linkButtons(L("Import"), systemImage: "square.and.arrow.down.fill")
                 }
             }
+        case .certificate:
+            // Only an unasked-for one asks here; SideStore's reply is imported
+            // straight away.
+            PopupCard(title: L("Sign with this certificate?"), systemImage: "checkmark.seal.fill",
+                      tint: Theme.accent, onClose: close) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(L("A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates."))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    linkButtons(L("Use it"), systemImage: "checkmark.seal.fill")
+                }
+            }
         }
     }
 
@@ -1214,18 +1227,40 @@ struct InstallPopup: View {
 
     // MARK: Certificate conflict (Apple error 7460)
 
-    /// Shown on error 7460. The button loads the certificates; the dialog asks
-    /// which one to revoke, then retries the install.
+    /// Shown on error 7460. With SideStore on the iPhone, the first button
+    /// asks it for its certificate, signs with that and retries the install.
+    /// The other loads the certificates; the dialog asks which one to revoke,
+    /// then retries the install.
     private var certConflictPopup: some View {
-        PopupCard(title: L("A certificate already exists"),
-                  systemImage: "exclamationmark.shield.fill",
-                  tint: .orange,
-                  onClose: close) {
+        let sideStoreInstalled = engine.sideStoreInstalled
+        return PopupCard(title: L("A certificate already exists"),
+                         systemImage: "exclamationmark.shield.fill",
+                         tint: .orange,
+                         onClose: close) {
             VStack(alignment: .leading, spacing: 14) {
-                Text(L("Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone."))
+                Text(sideStoreInstalled
+                     ? L("Apple won't issue a second signing certificate for this Apple ID. If SideStore made the one it has, SideInstaller can sign with that one too, and nothing is revoked. Revoking it lets the install continue as well — but it can't be undone.")
+                     : L("Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if sideStoreInstalled {
+                    Button {
+                        certManager.requestSideStoreCertificate(retryInstall: true)
+                    } label: {
+                        HStack(spacing: 8) {
+                            if certManager.isImporting {
+                                ProgressView().tint(.white)
+                                Text(L("Checking the certificate"))
+                            } else {
+                                Image(systemName: "checkmark.seal.fill")
+                                Text(L("Use SideStore's certificate"))
+                            }
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(certManager.isBusy)
+                }
                 Button {
                     // Load first, so the chooser can name the certificates.
                     certManager.ensureLoaded { showRevokeChooser = true }
@@ -1244,11 +1279,12 @@ struct InstallPopup: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(.orange)
-                .disabled(certManager.isWorking || certManager.revokingID != nil)
-                // A failed load or revoke shows as the Certificates popup, under
-                // this one.
+                .disabled(certManager.isBusy)
+                // A failed load, revoke or import shows as the Certificates
+                // popup, under this one.
             }
             .animation(.smooth(duration: 0.3), value: certManager.isWorking)
+            .animation(.smooth(duration: 0.3), value: certManager.isImporting)
         }
         .confirmationDialog(L("Which certificate should be revoked?"),
                             isPresented: $showRevokeChooser,

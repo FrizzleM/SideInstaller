@@ -238,6 +238,19 @@ int32_t si_cert_revoke(CertSession *session,
                        const char *serial_number,
                        char **out_error);
 
+// Sign with the certificate in a PKCS#12 archive (SideStore's export, from
+// sidestore://certificate) from now on: its private key becomes the Apple ID's
+// signing key, once the portal lists a certificate for it on the session's team.
+// BLOCKS. Returns 0 on success (*out_json = {"certificate": <cert>,
+// "replaced_key": bool}), 3 when no certificate on the team has the archive's
+// key (nothing written), other non-zero on error (*out_error set).
+int32_t si_cert_import(CertSession *session,
+                       const uint8_t *p12,
+                       size_t p12_len,
+                       const char *password,
+                       char **out_json,
+                       char **out_error);
+
 // Free a certificate session.
 void si_cert_session_free(CertSession *session);
 

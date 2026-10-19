@@ -3141,18 +3141,23 @@ name = "sideinstaller_ffi"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "der 0.8.1",
  "hex",
  "idevice 0.1.63",
  "idevice-ffi",
  "isideload",
+ "isideload-p12-keystore",
+ "pkcs12",
  "plist",
  "rootcause",
+ "rsa",
  "serde",
  "serde_json",
  "sha2 0.11.0",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "x509-cert 0.3.0",
 ]
 
 [[package]]
@@ -4302,6 +4307,7 @@ dependencies = [
  "const-oid 0.10.2",
  "der 0.8.1",
  "spki 0.8.0",
+ "tls_codec",
 ]
 
 [[package]]

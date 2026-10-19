@@ -101,6 +101,16 @@ rootcause = "0.12"
 sha2 = "0.11"
 hex = "0.4"
 
+# Reading the PKCS#12 archive SideStore exports its certificate in (`p12.rs`):
+# isideload's p12 reader for encrypted archives, and the `pkcs12` types under it
+# for SideSign's unencrypted ones; `rsa` for the key isideload stores. All
+# already in the tree via isideload at these versions.
+p12-keystore = { version = "0.3.0-rc4", package = "isideload-p12-keystore" }
+pkcs12 = "0.2.0-pre.0"
+der = { version = "0.8", features = ["oid"] }
+x509-cert = "0.3"
+rsa = "0.9.10"
+
 # Logging spine: forward idevice's `tracing` events (and any `log` records via
 # the tracing-log compat layer, enabled by default) through the FFI callback.
 tracing = "0.1"
