@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Install with SideInstaller</title>
+<!-- The target link only ever comes from this page's own query string and is
+     only ever written with textContent / as the button's href, so nothing here
+     needs to load anything beyond the icon. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https://raw.githubusercontent.com; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" sizes="32x32" href="https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/favicon-192.png">
+<link rel="apple-touch-icon" href="https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/app-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#011a5c">
+<!-- What Discord and other chat apps show under a posted link. -->
+<meta property="og:site_name" content="SideInstaller">
+<meta property="og:title" content="Install with SideInstaller">
+<meta property="og:description" content="Tap to open this .ipa in SideInstaller. The app shows where it comes from and asks before downloading anything.">
+<meta property="og:image" content="https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/app-icon.png">
+<style>
+  /* Same palette and buttons as the install page (scripts/template.html). */
+  :root{
+    --page:#011a5c;
+    --card:rgba(15,22,40,.62);
+    --stroke:rgba(255,255,255,.10); --stroke-strong:rgba(255,255,255,.18);
+    --text:#f4f6fb; --muted:#c6cee0; --faint:#a5aec4;
+    --accent:#2170f5; --accent2:#4dadff;
+    --brand:linear-gradient(135deg,var(--accent),var(--accent2));
+    --warn:#fbbf24; --bad:#f87171;
+    --radius:22px; --radius-btn:18px;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html{-webkit-text-size-adjust:100%; overflow-x:clip; background:var(--page)}
+  body{
+    margin:0; min-height:100vh; color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    line-height:1.55; background:var(--page); overflow-x:clip;
+    padding:max(20px,env(safe-area-inset-top)) 18px 64px;
+  }
+  .wrap{max-width:560px; margin:0 auto}
+
+  .hero,.panel,.footer{animation:rise .5s cubic-bezier(.22,.9,.35,1) both}
+  .panel{animation-delay:.06s}
+  .footer{animation-delay:.12s}
+  @keyframes rise{from{opacity:0; transform:translateY(16px) scale(.98)}}
+  @media (prefers-reduced-motion:reduce){ .hero,.panel,.footer{animation:none} }
+
+  /* ---- hero ---- */
+  .hero{text-align:center; padding:18px 8px 8px}
+  .logo{
+    width:84px; height:84px; margin:0 auto 18px; display:block;
+    border-radius:20px; border:1px solid var(--stroke-strong);
+    background:linear-gradient(150deg,#0d1530,#05070f);
+    box-shadow:0 12px 40px rgba(33,112,245,.32), 0 18px 60px rgba(1,26,92,.85);
+  }
+  h1{margin:0; color:#fff; font-size:clamp(26px,6vw,34px); font-weight:800; letter-spacing:-.02em}
+  .tagline{margin:8px auto 0; max-width:460px; color:var(--muted); font-size:15.5px}
+
+  /* ---- the link ---- */
+  .panel{margin-top:28px}
+  .card{
+    padding:18px 20px; color:var(--muted); font-size:14.5px;
+    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius);
+    -webkit-backdrop-filter:blur(20px) saturate(140%); backdrop-filter:blur(20px) saturate(140%);
+  }
+  .card.error{border-color:rgba(248,113,113,.35)}
+  .card p{margin:0}
+  .card p + p{margin-top:10px}
+  .label{
+    margin:0 0 4px; color:var(--faint);
+    font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+  }
+  .host-row + .label{margin-top:16px}
+  .host-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .host{margin:0; color:#fff; font-size:22px; font-weight:800; letter-spacing:-.01em; overflow-wrap:anywhere}
+  .pill{
+    font-size:12px; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap;
+    color:var(--warn); background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.25);
+  }
+  .url{
+    display:block; margin:0; padding:10px 12px; border-radius:12px;
+    background:rgba(255,255,255,.06); color:var(--text);
+    font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    overflow-wrap:anywhere; word-break:break-all;
+  }
+  .error-title{margin:0 0 6px; color:var(--bad); font-size:17px; font-weight:800}
+  .card code{
+    background:rgba(255,255,255,.07); padding:1px 6px; border-radius:6px;
+    font-size:13px; color:var(--text); overflow-wrap:anywhere;
+  }
+  .card .url + p, .card p + .url{margin-top:10px}
+
+  /* ---- open button ---- */
+  .open-btn{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; margin-top:16px; padding:17px 18px;
+    font-size:17px; font-weight:800; text-decoration:none; color:#fff;
+    border-radius:var(--radius-btn); background:var(--brand);
+    box-shadow:0 8px 24px rgba(33,112,245,.4);
+    transition:transform .14s, box-shadow .14s, filter .14s;
+  }
+  .open-btn svg{width:20px; height:20px; flex:none}
+  .open-btn:hover{filter:brightness(1.08); box-shadow:0 12px 30px rgba(77,173,255,.45)}
+  .open-btn:active{transform:scale(.97)}
+  .status{margin:12px 4px 0; text-align:center; color:var(--faint); font-size:13.5px}
+
+  .get-app{margin:22px 4px 0; text-align:center; color:var(--muted); font-size:14.5px}
+  .get-app a, .status a{color:var(--accent2); font-weight:700; text-decoration:none}
+  .get-app a:hover, .status a:hover{text-decoration:underline}
+
+  .footer{margin-top:40px; text-align:center; color:var(--faint); font-size:13px}
+  .footer a{color:var(--muted); text-decoration:none}
+  .footer a:hover{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <img class="logo" src="https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/app-icon.png" alt="SideInstaller">
+    <h1 id="title">Install with SideInstaller</h1>
+    <p class="tagline" id="tagline">SideInstaller shows you this link and asks before it downloads anything.</p>
+  </header>
+
+  <main class="panel">
+    <noscript>
+      <div class="card error">
+        <p class="error-title">JavaScript is off</p>
+        <p>This page needs JavaScript to read the link it was given.</p>
+      </div>
+    </noscript>
+
+    <!-- A valid link: where it downloads from, the whole link, and the button. -->
+    <div id="ok" hidden>
+      <div class="card">
+        <p class="label">Downloads from</p>
+        <div class="host-row">
+          <p class="host" id="host"></p>
+          <span class="pill" id="insecure" hidden>Not encrypted (http)</span>
+        </div>
+        <p class="label">Full link</p>
+        <code class="url" id="url"></code>
+      </div>
+      <a class="open-btn" id="open" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+        <span>Open in SideInstaller</span>
+      </a>
+      <p class="status" id="status"></p>
+    </div>
+
+    <!-- No link, or one this page won't hand on. -->
+    <div class="card error" id="error" hidden>
+      <p class="error-title" id="error-title"></p>
+      <p id="error-text"></p>
+      <code class="url" id="error-value" hidden></code>
+      <p id="error-usage" hidden>Links to this page look like <code>https://sideinstaller.net/open.html?url=</code> followed by the <code>https://</code> address the .ipa downloads from.</p>
+    </div>
+
+    <p class="get-app">Don't have SideInstaller yet? <a href="index.html">Get it from the install page</a></p>
+  </main>
+
+  <footer class="footer">
+    SideInstaller
+    <br><a href="index.html">Install page</a> · <a href="terms.html">Terms of Service</a>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // The `url` parameter as written, or null. Taken from the raw query rather
+  // than URLSearchParams so a "+" in the link stays a "+". A link pasted in
+  // without encoding (…?url=https://host/App.ipa?token=a&b=c) keeps its own
+  // "?" and "&", so everything after "url=" is the link.
+  function readTarget() {
+    var query = location.search.replace(/^\?/, "");
+    if (!query) return null;
+    var parts = query.split("&");
+    for (var i = 0; i < parts.length; i++) {
+      var eq = parts[i].indexOf("=");
+      var name = eq < 0 ? parts[i] : parts[i].slice(0, eq);
+      if (name.toLowerCase() !== "url") continue;
+      var raw = eq < 0 ? "" : parts.slice(i).join("&").slice(eq + 1);
+      if (/^https?:\/\//i.test(raw)) return raw;
+      raw = eq < 0 ? "" : parts[i].slice(eq + 1);
+      try {
+        return decodeURIComponent(raw);
+      } catch (e) {
+        return { malformed: raw };
+      }
+    }
+    return null;
+  }
+
+  function show(id) { document.getElementById(id).hidden = false; }
+  function setText(id, text) { document.getElementById(id).textContent = text; }
+
+  function clip(text) {
+    return text.length > 300 ? text.slice(0, 300) + "…" : text;
+  }
+
+  function fail(title, text, value, usage) {
+    document.title = "SideInstaller: link can't be opened";
+    setText("title", "Can't open this link");
+    setText("tagline", "Nothing was sent to SideInstaller.");
+    setText("error-title", title);
+    setText("error-text", text);
+    if (value) {
+      setText("error-value", clip(value));
+      show("error-value");
+    }
+    if (usage) show("error-usage");
+    show("error");
+  }
+
+  var target = readTarget();
+  if (target === null || (typeof target === "string" && !target.trim())) {
+    fail("No link to open",
+      "This page passes a link to an .ipa on to SideInstaller, but it wasn't given one.",
+      null, true);
+    return;
+  }
+  if (typeof target !== "string") {
+    fail("That link is garbled",
+      "Its percent-encoding is broken, so it can't be read back.",
+      target.malformed, true);
+    return;
+  }
+
+  target = target.trim();
+  var link;
+  try {
+    link = new URL(target);
+  } catch (e) {
+    link = null;
+  }
+  if (!link || (link.protocol !== "https:" && link.protocol !== "http:")) {
+    var scheme = link ? link.protocol : (target.match(/^[a-z][a-z0-9+.\-]*:/i) || [""])[0];
+    fail("Only web links can be opened",
+      scheme
+        ? "This page only opens http:// and https:// links, not " + scheme + " ones."
+        : "This page only opens http:// and https:// links, and this isn't one.",
+      target, true);
+    return;
+  }
+  if (!link.hostname) {
+    fail("That link has no host", "There's no server name in it to download from.", target, true);
+    return;
+  }
+
+  // What SideInstaller is given is exactly what's shown: the parsed link.
+  var appLink = "sideinstaller://install?url=" + encodeURIComponent(link.href);
+  setText("host", link.host);
+  setText("url", link.href);
+  if (link.protocol === "http:") show("insecure");
+  document.getElementById("open").href = appLink;
+  show("ok");
+
+  // SideInstaller only runs on iPhone and iPad (iPadOS reports itself as a
+  // Mac, so count touch points), so only try opening it there. iOS often
+  // ignores this without a tap, which is what the button is for.
+  var ua = navigator.userAgent;
+  var appleTouch = /iPhone|iPad|iPod/.test(ua) ||
+    (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  if (!appleTouch) {
+    setText("status", "SideInstaller runs on iPhone and iPad. Open this page there to install.");
+    return;
+  }
+  setText("status", "Opening SideInstaller… If nothing happens, tap the button.");
+
+  var tried = false;
+  function tryOpen() {
+    if (tried || document.visibilityState === "hidden") return;
+    tried = true;
+    setTimeout(function () { location.href = appLink; }, 300);
+  }
+  tryOpen();
+  if (!tried) document.addEventListener("visibilitychange", tryOpen);
+})();
+</script>
+</body>
+</html>

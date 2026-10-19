@@ -89,6 +89,11 @@ SideInstaller opens three kinds of `sideinstaller://` link, and asks before acti
   (percent-encoded), so a free Apple ID's one certificate serves both apps. That reply is the one
   link that doesn't ask again: SideStore has just asked whether to export it.
 
+Discord and most chat apps only make `https://` links tappable, so to post an install link there use
+`https://sideinstaller.net/open.html?url=<percent-encoded https link to an .ipa>`. That page shows
+where the IPA downloads from and hands it to `sideinstaller://install`, with a button for when iOS
+doesn't open the app on its own.
+
 
 ## Compatibility
 
