@@ -32,5 +32,6 @@ cert	Rural	unknown	unknown	[WARN] Certificate Checker could not check ._Rural.mo
 cert	Simcere	121FAB5BFCF826AD1FCE426D8BEFB28B72DE32FD	2028-03-06	revoked
 cert	Simcere	unknown	unknown	[WARN] Certificate Checker could not check ._Simcere.mobileprovision
 cert	VINWASH-COMPANY-LIMITED	C0A5093A8EF7EDB8FFFC6E08956559A36CC52674	2028-12-01	revoked
+cert	Vietnam-Electricity	9AE016E55AF70122F4A83AC9186C2750AB202F41	2028-12-09	revoked
 cert	XL	DAE4476E22160B0BA19D1B406E8B82D99BC00E00	2029-02-17	revoked
 cert	XL	unknown	unknown	[WARN] Certificate Checker could not check ._XL.mobileprovision
