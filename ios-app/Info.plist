@@ -65,6 +65,7 @@
 	<array>
 		<string>localdevvpn</string>
 		<string>sidestore</string>
+		<string>livecontainer</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>

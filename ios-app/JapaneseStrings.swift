@@ -124,6 +124,10 @@ let japaneseStrings: [String: String] = [
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ が公開されています（現在お使いのバージョン：%@）。",
     "Get the latest version": "最新バージョンを取得",
+    "From the website": "Web サイトから",
+    "Sign it with your Apple ID": "Apple ID で署名",
+    "Install it in LiveContainer": "LiveContainer にインストール",
+    "LiveContainer isn't installed on this iPhone.": "この iPhone には LiveContainer がインストールされていません。",
     "Release": "チャンネル",
     "Reinstall": "再インストール",
     "Install %@": "%@ をインストール",

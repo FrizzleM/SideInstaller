@@ -9,8 +9,12 @@ final class UpdateChecker: ObservableObject {
     /// Raw contents of the version file on the default branch.
     static let versionFileURL =
         "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/latest_version.txt"
-    /// The install page the banner opens, which carries the OTA links.
-    static let installPageURL = "https://frizzlem.github.io/SideInstaller/"
+    /// The install page the banner offers first, which carries the OTA links.
+    static let installPageURL = "https://sideinstaller.net/"
+    /// The latest release's unsigned IPA, for the banner's other two ways:
+    /// signed with the Apple ID's certificate, or installed in LiveContainer.
+    static let releaseIPAURL =
+        "https://github.com/FrizzleM/SideInstaller/releases/latest/download/SideInstaller.ipa"
 
     /// The newest version GitHub advertises, once fetched.
     @Published private(set) var latestVersion: String?

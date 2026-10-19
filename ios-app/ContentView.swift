@@ -228,17 +228,41 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                Button {
-                    if let url = URL(string: UpdateChecker.installPageURL) { openURL(url) }
+                Menu {
+                    updateOptions
                 } label: {
                     HStack(spacing: 4) {
                         Text(L("Get the latest version"))
-                        Image(systemName: "arrow.up.right")
+                        Image(systemName: "chevron.down")
                     }
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.accent2)
                 }
-                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// The ways to get the new version: the website's signed build, the
+    /// release signed and installed here with the Apple ID's certificate, or,
+    /// with LiveContainer on this iPhone, the release installed inside it.
+    @ViewBuilder
+    private var updateOptions: some View {
+        Button {
+            if let url = URL(string: UpdateChecker.installPageURL) { openURL(url) }
+        } label: {
+            Label(L("From the website"), systemImage: "safari")
+        }
+        Button {
+            if let url = URL(string: UpdateChecker.releaseIPAURL) { engine.installLinkedIPA(url) }
+        } label: {
+            Label(L("Sign it with your Apple ID"), systemImage: "signature")
+        }
+        .disabled(engine.isRunning || engine.isImportingIPA)
+        if engine.liveContainerInstalled {
+            Button {
+                if let url = URL(string: UpdateChecker.releaseIPAURL) { engine.installInLiveContainer(url) }
+            } label: {
+                Label(L("Install it in LiveContainer"), systemImage: "shippingbox")
             }
         }
     }
