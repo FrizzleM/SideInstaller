@@ -2719,13 +2719,7 @@ final class Engine: ObservableObject {
         lastError = nil
         switch link {
         case .install(let url):
-            installSource = .custom
-            Task { @MainActor in
-                // Installs only what the link brought: a failed download leaves
-                // its error up instead of installing the previous import.
-                guard await self.importCustomIPA(fromLink: url.absoluteString) else { return }
-                self.runOneClick()
-            }
+            installLinkedIPA(url)
         case .pairingFile(let file):
             do {
                 try adoptPairingFile(file.data, kind: file.kind, name: file.displayName)
@@ -2738,11 +2732,53 @@ final class Engine: ObservableObject {
         }
     }
 
+    /// Downloads the IPA at `url` as the custom build, then installs it signed
+    /// with the Apple ID's certificate. Used by `sideinstaller://install` links
+    /// and the update banner.
+    @MainActor
+    func installLinkedIPA(_ url: URL) {
+        guard !isRunning, !isImportingIPA else { return }
+        lastError = nil
+        installSource = .custom
+        Task { @MainActor in
+            // Installs only what the link brought: a failed download leaves
+            // its error up instead of installing the previous import.
+            guard await self.importCustomIPA(fromLink: url.absoluteString) else { return }
+            self.runOneClick()
+        }
+    }
+
     /// True when SideStore is installed to ask. Only answerable because
     /// Info.plist lists its scheme under `LSApplicationQueriesSchemes`.
     var sideStoreInstalled: Bool {
         guard let url = URL(string: "sidestore://") else { return false }
         return UIApplication.shared.canOpenURL(url)
+    }
+
+    /// True when LiveContainer is installed. Only answerable because
+    /// Info.plist lists its scheme under `LSApplicationQueriesSchemes`.
+    var liveContainerInstalled: Bool {
+        guard let url = URL(string: "livecontainer://") else { return false }
+        return UIApplication.shared.canOpenURL(url)
+    }
+
+    /// Opens `livecontainer://install?url=`, which has LiveContainer download
+    /// the IPA and install it inside itself. LiveContainer asks before
+    /// replacing an app with the same bundle ID.
+    @MainActor
+    func installInLiveContainer(_ ipa: URL) {
+        // LiveContainer takes the link percent-decoded, so all of it is encoded.
+        let link = ipa.absoluteString.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
+        guard let url = URL(string: "livecontainer://install?url=\(link)") else { return }
+        lastError = nil
+        log("Asking LiveContainer to install \(ipa.lastPathComponent) …")
+        UIApplication.shared.open(url) { opened in
+            Task { @MainActor in
+                guard !opened else { return }
+                self.lastError = L("LiveContainer isn't installed on this iPhone.")
+                self.log("⛔️ LiveContainer: \(self.lastError ?? "")")
+            }
+        }
     }
 
     /// Opens SideStore, which sends back the pairing file it has as a

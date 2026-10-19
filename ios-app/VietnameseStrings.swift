@@ -126,6 +126,10 @@ let vietnameseStrings: [String: String] = [
     "SideInstaller %@ is available — you're on %@.":
         "Đã có SideInstaller %@ — bạn đang dùng bản %@.",
     "Get the latest version": "Tải phiên bản mới nhất",
+    "From the website": "Từ trang web",
+    "Sign it with your Apple ID": "Ký bằng Apple ID của bạn",
+    "Install it in LiveContainer": "Cài vào LiveContainer",
+    "LiveContainer isn't installed on this iPhone.": "LiveContainer chưa được cài trên iPhone này.",
     "Release": "Kênh",
     "Reinstall": "Cài đặt lại",
     "Install %@": "Cài đặt %@",

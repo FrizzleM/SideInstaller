@@ -125,6 +125,10 @@ let italianStrings: [String: String] = [
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ è disponibile — tu hai la %@.",
     "Get the latest version": "Scarica l'aggiornamento",
+    "From the website": "Dal sito web",
+    "Sign it with your Apple ID": "Firmala con il tuo Apple ID",
+    "Install it in LiveContainer": "Installala in LiveContainer",
+    "LiveContainer isn't installed on this iPhone.": "LiveContainer non è installato su questo iPhone.",
     "Release": "Canale",
     "Reinstall": "Reinstalla",
     "Install %@": "Installa %@",

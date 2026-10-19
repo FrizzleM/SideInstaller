@@ -79,6 +79,13 @@ All notable changes to SideInstaller are documented here.
   SideStore, LiveContainer and Madeira are read from this iPhone over LocalDevVPN, the newest
   three each from the last 30 days, with the device's crash reporter key and vendor ID taken out.
   Each crash log can be left out.
+- **The update banner offers three ways to update.** “Get the latest version” now opens a menu:
+  from sideinstaller.net, as before; signed with your Apple ID, where SideInstaller downloads the
+  latest release and installs it like a custom .ipa (App ID cost popup included); or, with
+  LiveContainer on the iPhone, in LiveContainer, which downloads the release and installs it
+  inside itself (`livecontainer://install`), asking first before it replaces a copy already there.
+  Signing adds your team ID to the bundle ID, so the Apple ID copy installs next to the website's
+  build rather than over it.
 
 ### Fixed
 - **Pairing works when SideInstaller runs inside LiveContainer.** Before pairing, SideInstaller
