@@ -1020,4 +1020,46 @@ let vietnameseStrings: [String: String] = [
         "Liên kết đó lẽ ra chứa một tệp ghép nối, nhưng không đọc được nội dung.",
     "That link carries a file, but it isn't a pairing file.":
         "Liên kết đó có chứa một tệp, nhưng không phải tệp ghép nối.",
+
+    // MARK: - Report a problem
+
+    "Report a problem": "Báo cáo sự cố",
+    "Report this problem": "Báo cáo sự cố này",
+    "Opens a GitHub issue with this app's details, its log and crash logs.":
+        "Mở một issue trên GitHub kèm thông tin ứng dụng, nhật ký và nhật ký sự cố.",
+    "What happened?": "Đã xảy ra chuyện gì?",
+    "What were you doing, and what went wrong?": "Bạn đang làm gì, và điều gì đã bị lỗi?",
+    "Say what you tapped, what you expected and what happened instead. English is best, but any language is fine.":
+        "Hãy kể bạn đã nhấn gì, bạn mong đợi điều gì và điều gì đã xảy ra. Tiếng Anh là tốt nhất, nhưng ngôn ngữ nào cũng được.",
+    "Included": "Đính kèm",
+    "Device": "Thiết bị",
+    "App": "Ứng dụng",
+    "Stopped at": "Dừng ở",
+    "not connected": "chưa kết nối",
+    "none": "không có",
+    "made on this iPhone": "tạo trên iPhone này",
+    "latest": "mới nhất",
+    "custom server": "máy chủ tùy chỉnh",
+    "Auto, starts with %@": "Tự động, bắt đầu với %@",
+    "Error": "Lỗi",
+    "Activity log": "Nhật ký hoạt động",
+    "%d lines": "%d dòng",
+    "Your Apple ID, device name, serial numbers and keys are taken out of the log first.":
+        "Apple ID, tên thiết bị, số sê-ri và khóa được xóa khỏi nhật ký trước.",
+    "Crash logs": "Nhật ký sự cố",
+    "Looking for crash logs …": "Đang tìm nhật ký sự cố …",
+    "Look for crash logs on this iPhone": "Tìm nhật ký sự cố trên iPhone này",
+    "Look again": "Tìm lại",
+    "No crash logs from SideStore, LiveContainer or Madeira in the last %d days.":
+        "Không có nhật ký sự cố nào của SideStore, LiveContainer hoặc Madeira trong %d ngày qua.",
+    "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
+        "iOS chuyển các sự cố của chính SideInstaller cho ứng dụng vào lần mở tiếp theo. Nhật ký sự cố của SideStore, LiveContainer và Madeira được đọc từ iPhone này qua LocalDevVPN.",
+    "Open a GitHub issue": "Mở issue trên GitHub",
+    "Share the report": "Chia sẻ báo cáo",
+    "Preview the report": "Xem trước báo cáo",
+    "Report": "Báo cáo",
+    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
+        "Báo cáo được lưu trong Tệp › Trên iPhone của tôi › SideInstaller › Reports. Trên GitHub, đính kèm bằng “Paste, drop, or click to add files” bên dưới ô văn bản, rồi gửi issue.",
+    "Describe the problem above first.": "Hãy mô tả sự cố ở trên trước.",
+    "Couldn't save the report: %@": "Không thể lưu báo cáo: %@",
 ]

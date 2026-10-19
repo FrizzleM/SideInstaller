@@ -990,4 +990,46 @@ let chineseStrings: [String: String] = [
         "该安装链接中没有 .ipa。它需要 ?url= 后跟下载 .ipa 的 https:// 地址。",
     "That link was meant to carry a pairing file, but what it holds can't be read.": "该链接本应包含配对文件，但其内容无法读取。",
     "That link carries a file, but it isn't a pairing file.": "该链接包含一个文件，但不是配对文件。",
+
+    // MARK: - Report a problem
+
+    "Report a problem": "报告问题",
+    "Report this problem": "报告此问题",
+    "Opens a GitHub issue with this app's details, its log and crash logs.":
+        "在 GitHub 上新建 Issue，附带本应用的详细信息、日志和崩溃日志。",
+    "What happened?": "发生了什么？",
+    "What were you doing, and what went wrong?": "你当时在做什么，出了什么问题？",
+    "Say what you tapped, what you expected and what happened instead. English is best, but any language is fine.":
+        "请说明你点了什么、预期会发生什么、实际发生了什么。最好用英文，但任何语言都可以。",
+    "Included": "包含内容",
+    "Device": "设备",
+    "App": "应用",
+    "Stopped at": "停止于",
+    "not connected": "未连接",
+    "none": "无",
+    "made on this iPhone": "在此 iPhone 上生成",
+    "latest": "最新",
+    "custom server": "自定义服务器",
+    "Auto, starts with %@": "自动，从 %@ 开始",
+    "Error": "错误",
+    "Activity log": "活动日志",
+    "%d lines": "%d 行",
+    "Your Apple ID, device name, serial numbers and keys are taken out of the log first.":
+        "Apple ID、设备名称、序列号和密钥会先从日志中移除。",
+    "Crash logs": "崩溃日志",
+    "Looking for crash logs …": "正在查找崩溃日志 …",
+    "Look for crash logs on this iPhone": "在此 iPhone 上查找崩溃日志",
+    "Look again": "重新查找",
+    "No crash logs from SideStore, LiveContainer or Madeira in the last %d days.":
+        "最近 %d 天内没有 SideStore、LiveContainer 或 Madeira 的崩溃日志。",
+    "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
+        "SideInstaller 自身的崩溃会在下次打开时由 iOS 交给它。SideStore、LiveContainer 和 Madeira 的崩溃日志通过 LocalDevVPN 从此 iPhone 读取。",
+    "Open a GitHub issue": "在 GitHub 上新建 Issue",
+    "Share the report": "分享报告",
+    "Preview the report": "预览报告",
+    "Report": "报告",
+    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
+        "报告保存在“文件” › 我的 iPhone › SideInstaller › Reports。在 GitHub 上，用文本框下方的“Paste, drop, or click to add files”附上它，然后提交 Issue。",
+    "Describe the problem above first.": "请先在上方描述问题。",
+    "Couldn't save the report: %@": "无法保存报告：%@",
 ]

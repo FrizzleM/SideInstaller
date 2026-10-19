@@ -994,4 +994,46 @@ let japaneseStrings: [String: String] = [
     "That link was meant to carry a pairing file, but what it holds can't be read.":
         "このリンクにはペアリングファイルが含まれているはずですが、内容を読み取れません。",
     "That link carries a file, but it isn't a pairing file.": "このリンクにはファイルが含まれていますが、ペアリングファイルではありません。",
+
+    // MARK: - Report a problem
+
+    "Report a problem": "問題を報告",
+    "Report this problem": "この問題を報告",
+    "Opens a GitHub issue with this app's details, its log and crash logs.":
+        "アプリの情報、ログ、クラッシュログを添えて GitHub に Issue を作成します。",
+    "What happened?": "何が起きましたか？",
+    "What were you doing, and what went wrong?": "何をしていて、何がうまくいきませんでしたか？",
+    "Say what you tapped, what you expected and what happened instead. English is best, but any language is fine.":
+        "何をタップしたか、何が起きると思ったか、実際に何が起きたかを書いてください。英語が望ましいですが、どの言語でも構いません。",
+    "Included": "含まれる内容",
+    "Device": "デバイス",
+    "App": "アプリ",
+    "Stopped at": "停止したステップ",
+    "not connected": "未接続",
+    "none": "なし",
+    "made on this iPhone": "この iPhone で作成",
+    "latest": "最新",
+    "custom server": "カスタムサーバー",
+    "Auto, starts with %@": "自動、%@ から開始",
+    "Error": "エラー",
+    "Activity log": "アクティビティログ",
+    "%d lines": "%d 行",
+    "Your Apple ID, device name, serial numbers and keys are taken out of the log first.":
+        "Apple ID、デバイス名、シリアル番号、キーは先にログから取り除かれます。",
+    "Crash logs": "クラッシュログ",
+    "Looking for crash logs …": "クラッシュログを探しています …",
+    "Look for crash logs on this iPhone": "この iPhone のクラッシュログを探す",
+    "Look again": "もう一度探す",
+    "No crash logs from SideStore, LiveContainer or Madeira in the last %d days.":
+        "過去 %d 日間に SideStore、LiveContainer、Madeira のクラッシュログはありません。",
+    "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
+        "SideInstaller 自身のクラッシュは、次に開いたときに iOS から渡されます。SideStore、LiveContainer、Madeira のクラッシュログは LocalDevVPN 経由でこの iPhone から読み取ります。",
+    "Open a GitHub issue": "GitHub で Issue を作成",
+    "Share the report": "レポートを共有",
+    "Preview the report": "レポートをプレビュー",
+    "Report": "レポート",
+    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
+        "レポートは「ファイル」›「この iPhone 内」› SideInstaller › Reports に保存されます。GitHub ではテキスト欄の下の “Paste, drop, or click to add files” で添付してから Issue を送信してください。",
+    "Describe the problem above first.": "先に上で問題を説明してください。",
+    "Couldn't save the report: %@": "レポートを保存できませんでした：%@",
 ]

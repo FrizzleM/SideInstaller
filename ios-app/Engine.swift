@@ -3084,6 +3084,27 @@ final class Engine: ObservableObject {
         log("Simulated location cleared.")
     }
 
+    // MARK: - Crash logs (Report a problem)
+
+    /// The crash logs this iPhone kept for SideStore, LiveContainer and
+    /// Madeira (see `DeviceCrashLog.select`), redacted like the log. Opens the
+    /// device link first.
+    @MainActor
+    func deviceCrashLogs() async throws -> [DeviceCrashLog] {
+        guard !isRunning else {
+            throw EngineError.message(L("An install is already running. Wait for it to finish, then try again."))
+        }
+        try await ensurePairingConnection()
+        log("Crash logs: looking for SideStore's, LiveContainer's and Madeira's …")
+        let logs = try await onDeviceQueue {
+            try self.connection.crashReports(select: DeviceCrashLog.select)
+                .map { DeviceCrashLog(path: $0.path, data: $0.data) }
+        }
+        log(logs.isEmpty ? "Crash logs: none on this iPhone from the last \(DeviceCrashLog.maxAgeDays) days."
+                         : "Crash logs: \(logs.map(\.name).joined(separator: ", ")).")
+        return logs
+    }
+
     // MARK: - Developer Mode (Settings)
     //
     // AMFI can show Developer Mode in Settings, or turn it on. Both go over a

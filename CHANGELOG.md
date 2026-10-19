@@ -69,6 +69,16 @@ All notable changes to SideInstaller are documented here.
   limit as it's posted there, in km/h or mph. Walking and cycling go at Valhalla's pace for each
   street. One route is on the map at a time, so planning one removes a GPX route and the other way
   round.
+- **Report a problem.** Under About, in Settings next to the activity log, and on the popup when
+  an install stops. It asks what happened (an issue can't be sent empty), shows what goes along
+  (SideInstaller's version, iOS, the iPhone model, the app being installed, the step that failed
+  and its error), and opens a GitHub issue with all of that filled in. The redacted activity log
+  and crash logs go into a report file saved in Files › On My iPhone › SideInstaller › Reports,
+  which the issue says to attach; Share the report sends the same file elsewhere. SideInstaller's
+  own crashes come from MetricKit, which hands them over the next time it opens. Crash logs from
+  SideStore, LiveContainer and Madeira are read from this iPhone over LocalDevVPN, the newest
+  three each from the last 30 days, with the device's crash reporter key and vendor ID taken out.
+  Each crash log can be left out.
 
 ### Fixed
 - **Pairing works when SideInstaller runs inside LiveContainer.** Before pairing, SideInstaller

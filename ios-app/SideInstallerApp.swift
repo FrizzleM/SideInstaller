@@ -22,6 +22,8 @@ struct SideInstallerApp: App {
         PairingNotification.shared.reset()
         // So is an install's progress.
         InstallActivity.shared.endLeftovers()
+        // iOS hands over the last crash's diagnostic now, for Report a problem.
+        CrashDiagnostics.shared.start()
     }
 
     var body: some Scene {
