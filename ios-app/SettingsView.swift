@@ -247,8 +247,6 @@ struct SettingsView: View {
             }
         } header: {
             Text(L("Developer Mode"))
-        } footer: {
-            Text(L("Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there."))
         }
         // On the section, apart from the Form's alerts, so they don't conflict.
         .alert(L("Turn on Developer Mode?"), isPresented: $confirmEnableDeveloperMode) {
