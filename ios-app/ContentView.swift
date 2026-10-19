@@ -972,6 +972,8 @@ struct InstallPopup: View {
     @Environment(\.openURL) private var openURL
     /// Shows the dialog for choosing which certificate to revoke.
     @State private var showRevokeChooser = false
+    /// Shows the Report a problem sheet from the error popup.
+    @State private var showReport = false
 
     var body: some View {
         switch popup {
@@ -987,10 +989,19 @@ struct InstallPopup: View {
                       systemImage: "exclamationmark.triangle.fill",
                       tint: .red,
                       onClose: close) {
-                Text(message)
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(message)
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button { showReport = true } label: {
+                        Label(L("Report this problem"), systemImage: "exclamationmark.bubble")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                }
             }
+            .sheet(isPresented: $showReport) { ReportProblemView() }
         case .success(let name, let leads):
             PopupCard(title: L("Installed"), systemImage: "checkmark.seal.fill", tint: .green,
                       onClose: close) {

@@ -1545,6 +1545,55 @@ final class DeviceConnection {
         }
     }
 
+    // MARK: Crash reports
+
+    /// The crash reports iOS keeps for Analytics Data (its CrashReporter folder
+    /// and the Retired folder older ones move to), read through
+    /// crashreportcopymobile's RSD shim. `select` picks which of the listed
+    /// paths to pull. Nothing is removed from the device.
+    func crashReports(select: ([String]) -> [String]) throws -> [(path: String, data: Data)] {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var client: OpaquePointer?
+        try check(crash_report_client_connect_rsd(adapter, handshake, &client),
+                  "crash_report_client_connect_rsd failed")
+        guard let client else { throw fail("crash report client was null") }
+        defer { crash_report_client_free(client) }
+
+        var paths = try crashReportNames(client, in: nil)
+        // A device with no Retired folder just has nothing retired yet.
+        if let retired = try? crashReportNames(client, in: "Retired") {
+            paths += retired.map { "Retired/\($0)" }
+        }
+        return try select(paths).map { path in
+            var bytes: UnsafeMutablePointer<UInt8>?
+            var length = 0
+            try check(path.withCString { crash_report_client_pull(client, $0, &bytes, &length) },
+                      "crash_report_client_pull(\(path)) failed")
+            defer { if let bytes { idevice_data_free(bytes, UInt(length)) } }
+            return (path, bytes.map { Data(bytes: $0, count: length) } ?? Data())
+        }
+    }
+
+    /// One folder's entries. The array and its strings are freed as idevice's
+    /// own C++ wrapper does: each string through idevice, the array with free.
+    private func crashReportNames(_ client: OpaquePointer, in directory: String?) throws -> [String] {
+        var entries: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+        var count = 0
+        let error = directory.map { dir in
+            dir.withCString { crash_report_client_ls(client, $0, &entries, &count) }
+        } ?? crash_report_client_ls(client, nil, &entries, &count)
+        try check(error, "crash_report_client_ls(\(directory ?? "/")) failed")
+        guard let entries else { return [] }
+        defer { free(entries) }
+        var names: [String] = []
+        for i in 0..<count {
+            guard let entry = entries[i] else { continue }
+            names.append(String(cString: entry))
+            idevice_string_free(entry)
+        }
+        return names.filter { $0 != "." && $0 != ".." }
+    }
+
     // MARK: Location simulation (DVT over RSD)
 
     /// The DVT remote server, and the location client that borrows it. Kept

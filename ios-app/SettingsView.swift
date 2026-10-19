@@ -36,6 +36,8 @@ struct SettingsView: View {
     @State private var developerModeNote: DeveloperModeNote?
     /// Set while the restart warning is up, before Developer Mode is turned on.
     @State private var confirmEnableDeveloperMode = false
+    /// Set while the Report a problem sheet is up.
+    @State private var showReport = false
 
     private struct DeveloperModeNote {
         let text: String
@@ -55,6 +57,7 @@ struct SettingsView: View {
                 logSection
             }
             .sheet(item: $editorTarget) { AccountEditor(target: $0) }
+            .sheet(isPresented: $showReport) { ReportProblemView() }
             // Attached to the Form, apart from the download alert below, so the
             // two alerts don't conflict.
             .alert(L("Remove this Apple ID?"),
@@ -468,6 +471,10 @@ struct SettingsView: View {
                 } label: {
                     Label(L("Clear"), systemImage: "trash")
                 }
+            }
+            .font(.subheadline)
+            Button { showReport = true } label: {
+                Label(L("Report a problem"), systemImage: "exclamationmark.bubble")
             }
             .font(.subheadline)
         } header: {

@@ -10,6 +10,7 @@ struct AboutView: View {
 
     @State private var showSettings = false
     @State private var showCrypto = false
+    @State private var showReport = false
 
     var body: some View {
         NavigationStack {
@@ -28,6 +29,7 @@ struct AboutView: View {
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showCrypto) { CryptoDonationsView() }
+            .sheet(isPresented: $showReport) { ReportProblemView() }
         }
     }
 
@@ -70,6 +72,11 @@ struct AboutView: View {
                          tint: Theme.accent2,
                          title: L("Source code"),
                          urlString: "https://github.com/FrizzleM/SideInstaller/tree/main")
+                AboutRow(systemImage: "exclamationmark.bubble.fill",
+                         tint: .orange,
+                         title: L("Report a problem"),
+                         detail: L("Opens a GitHub issue with this app's details, its log and crash logs."),
+                         action: { showReport = true })
                 AboutRow(systemImage: "bubble.left.and.bubble.right.fill",
                          tint: Color(red: 0.35, green: 0.40, blue: 0.95),
                          title: L("Discord"),

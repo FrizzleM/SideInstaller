@@ -1028,4 +1028,46 @@ let frenchStrings: [String: String] = [
         "Ce lien devait contenir un fichier de jumelage, mais son contenu est illisible.",
     "That link carries a file, but it isn't a pairing file.":
         "Ce lien contient un fichier, mais ce n'est pas un fichier de jumelage.",
+
+    // MARK: - Report a problem
+
+    "Report a problem": "Signaler un problème",
+    "Report this problem": "Signaler ce problème",
+    "Opens a GitHub issue with this app's details, its log and crash logs.":
+        "Ouvre un ticket GitHub avec les infos de l'app, son journal et les rapports de plantage.",
+    "What happened?": "Que s'est-il passé ?",
+    "What were you doing, and what went wrong?": "Que faisais-tu, et qu'est-ce qui n'a pas marché ?",
+    "Say what you tapped, what you expected and what happened instead. English is best, but any language is fine.":
+        "Dis ce que tu as touché, ce que tu attendais et ce qui s'est passé à la place. L'anglais est préférable, mais toute langue convient.",
+    "Included": "Inclus",
+    "Device": "Appareil",
+    "App": "App",
+    "Stopped at": "Arrêtée à",
+    "not connected": "non connecté",
+    "none": "aucun",
+    "made on this iPhone": "créé sur cet iPhone",
+    "latest": "la plus récente",
+    "custom server": "serveur personnalisé",
+    "Auto, starts with %@": "Auto, commence par %@",
+    "Error": "Erreur",
+    "Activity log": "Journal d'activité",
+    "%d lines": "%d lignes",
+    "Your Apple ID, device name, serial numbers and keys are taken out of the log first.":
+        "L'identifiant Apple, le nom de l'appareil, les numéros de série et les clés sont d'abord retirés du journal.",
+    "Crash logs": "Rapports de plantage",
+    "Looking for crash logs …": "Recherche des rapports de plantage …",
+    "Look for crash logs on this iPhone": "Chercher les rapports de plantage sur cet iPhone",
+    "Look again": "Chercher à nouveau",
+    "No crash logs from SideStore, LiveContainer or Madeira in the last %d days.":
+        "Aucun rapport de plantage de SideStore, LiveContainer ou Madeira ces %d derniers jours.",
+    "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
+        "iOS transmet à SideInstaller ses propres plantages à sa prochaine ouverture. Les rapports de plantage de SideStore, LiveContainer et Madeira sont lus sur cet iPhone via LocalDevVPN.",
+    "Open a GitHub issue": "Ouvrir un ticket GitHub",
+    "Share the report": "Partager le rapport",
+    "Preview the report": "Aperçu du rapport",
+    "Report": "Rapport",
+    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
+        "Le rapport est enregistré dans Fichiers › Sur mon iPhone › SideInstaller › Reports. Sur GitHub, joins-le avec « Paste, drop, or click to add files » sous le texte, puis envoie le ticket.",
+    "Describe the problem above first.": "Décris d'abord le problème ci-dessus.",
+    "Couldn't save the report: %@": "Impossible d'enregistrer le rapport : %@",
 ]

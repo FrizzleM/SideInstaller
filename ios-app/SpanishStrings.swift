@@ -1025,4 +1025,46 @@ let spanishStrings: [String: String] = [
         "Ese enlace debía traer un archivo de emparejamiento, pero su contenido no se puede leer.",
     "That link carries a file, but it isn't a pairing file.":
         "Ese enlace trae un archivo, pero no es un archivo de emparejamiento.",
+
+    // MARK: - Report a problem
+
+    "Report a problem": "Informar de un problema",
+    "Report this problem": "Informar de este problema",
+    "Opens a GitHub issue with this app's details, its log and crash logs.":
+        "Abre una incidencia en GitHub con los datos de la app, su registro y los registros de fallos.",
+    "What happened?": "¿Qué ha pasado?",
+    "What were you doing, and what went wrong?": "¿Qué estabas haciendo y qué ha fallado?",
+    "Say what you tapped, what you expected and what happened instead. English is best, but any language is fine.":
+        "Cuenta qué tocaste, qué esperabas y qué pasó en su lugar. Mejor en inglés, pero cualquier idioma sirve.",
+    "Included": "Incluido",
+    "Device": "Dispositivo",
+    "App": "App",
+    "Stopped at": "Detenida en",
+    "not connected": "no conectado",
+    "none": "ninguno",
+    "made on this iPhone": "creado en este iPhone",
+    "latest": "la más reciente",
+    "custom server": "servidor personalizado",
+    "Auto, starts with %@": "Auto, empieza por %@",
+    "Error": "Error",
+    "Activity log": "Registro de actividad",
+    "%d lines": "%d líneas",
+    "Your Apple ID, device name, serial numbers and keys are taken out of the log first.":
+        "Antes se quitan del registro el Apple ID, el nombre del dispositivo, los números de serie y las claves.",
+    "Crash logs": "Registros de fallos",
+    "Looking for crash logs …": "Buscando registros de fallos …",
+    "Look for crash logs on this iPhone": "Buscar registros de fallos en este iPhone",
+    "Look again": "Buscar de nuevo",
+    "No crash logs from SideStore, LiveContainer or Madeira in the last %d days.":
+        "No hay registros de fallos de SideStore, LiveContainer ni Madeira de los últimos %d días.",
+    "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
+        "iOS entrega a SideInstaller sus propios fallos la próxima vez que se abre. Los registros de fallos de SideStore, LiveContainer y Madeira se leen de este iPhone a través de LocalDevVPN.",
+    "Open a GitHub issue": "Abrir una incidencia en GitHub",
+    "Share the report": "Compartir el informe",
+    "Preview the report": "Ver el informe",
+    "Report": "Informe",
+    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
+        "El informe se guarda en Archivos › En mi iPhone › SideInstaller › Reports. En GitHub, adjúntalo con “Paste, drop, or click to add files” debajo del texto y envía la incidencia.",
+    "Describe the problem above first.": "Primero describe el problema arriba.",
+    "Couldn't save the report: %@": "No se ha podido guardar el informe: %@",
 ]
