@@ -123,9 +123,8 @@ impl From<TwoFactorAnswer> for TwoFactorCallbackResponse {
 pub struct SignSession {
     rt: tokio::runtime::Runtime,
     sideloader: Sideloader,
-    /// Stored because `Sideloader` doesn't expose them; `account_config` needs
-    /// both to look up the signing identity the same way `sign_app` does.
-    machine_name: String,
+    /// Stored because `Sideloader` doesn't expose it; `account_config` needs it
+    /// to look up the signing identity the same way `sign_app` does.
     storage_dir: PathBuf,
     /// The anisette server signed in through. Each server family keeps its
     /// own identity, and the hand-offs carry the one this session's token
@@ -291,7 +290,6 @@ pub unsafe fn apple_signin(
             let session = Box::new(SignSession {
                 rt,
                 sideloader,
-                machine_name,
                 storage_dir: PathBuf::from(&storage_dir),
                 anisette_url,
             });
@@ -467,7 +465,6 @@ pub unsafe fn account_config(
     let session = &mut *session;
 
     let result = catch_unwind(AssertUnwindSafe(|| {
-        let machine_name = session.machine_name.clone();
         let storage = FsStorage::new(session.storage_dir.clone());
 
         // SideStore wants the same two values isideload hands the anisette
@@ -490,9 +487,8 @@ pub unsafe fn account_config(
                 .map_err(|e| format!("get_team: {}", report_text(&e)))?;
             let email = session.sideloader.get_email().to_string();
 
-            tracing::info!("Looking up the '{machine_name}' certificate to hand over");
+            tracing::info!("Looking up the signing certificate to hand over");
             let identity = CertificateIdentity::retrieve_existing(
-                &machine_name,
                 &email,
                 session.sideloader.get_dev_session(),
                 &team,
@@ -501,10 +497,9 @@ pub unsafe fn account_config(
             .await
             .map_err(|e| format!("certificate lookup failed: {}", report_text(&e)))?
             .ok_or_else(|| {
-                format!(
-                    "no '{machine_name}' certificate on this Apple ID yet — install \
-                     an app first, which is what creates it"
-                )
+                "no certificate for SideInstaller's signing key on this Apple ID yet — \
+                 install an app first, which is what creates it"
+                    .to_string()
             })?;
 
             // The machine id is the password AltStore-family apps expect a

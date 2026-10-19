@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Lists and revokes the Apple ID's development certificates (e.g. to fix error
-/// 7460). Pushed from Tools (relies on its `NavigationStack`).
+/// 7460), or signs with SideStore's instead. Pushed from Tools (relies on its
+/// `NavigationStack`).
 struct CertsView: View {
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
@@ -16,12 +17,16 @@ struct CertsView: View {
             VStack(spacing: 18) {
                 header.cascadeItem(0)
                 loadButton.cascadeItem(1)
+                if manager.sideStoreInstalled {
+                    sideStoreCard.cascadeItem(2)
+                }
                 // Errors show as a popup, which `RootView` lays over the app.
                 certList
             }
             .padding(20)
             .animation(.smooth(duration: 0.35), value: manager.certs)
             .animation(.smooth(duration: 0.3), value: manager.isWorking)
+            .animation(.smooth(duration: 0.3), value: manager.isImporting)
             .animation(.smooth(duration: 0.35), value: manager.teamSummary)
         }
         .background(AppBackground())
@@ -73,7 +78,40 @@ struct CertsView: View {
             }
         }
         .buttonStyle(PrimaryButtonStyle())
-        .disabled(manager.isWorking || manager.revokingID != nil)
+        .disabled(manager.isBusy)
+    }
+
+    // MARK: SideStore's certificate
+
+    /// Signs with SideStore's certificate instead of a certificate of its own,
+    /// which a free Apple ID can't have alongside SideStore's.
+    private var sideStoreCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(L("SideStore opens and sends back its certificate. SideInstaller then signs with it too, so on a free Apple ID neither app has to revoke the other's."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    manager.requestSideStoreCertificate(retryInstall: false)
+                } label: {
+                    HStack(spacing: 6) {
+                        if manager.isImporting {
+                            ProgressView().controlSize(.small)
+                            Text(L("Checking the certificate"))
+                        } else {
+                            Image(systemName: "checkmark.seal")
+                            Text(L("Use SideStore's certificate"))
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(Theme.accent)
+                .disabled(manager.isBusy)
+            }
+        }
     }
 
     // MARK: Certificate list
@@ -91,9 +129,9 @@ struct CertsView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
-                .cascadeItem(2)
+                .cascadeItem(3)
                 ForEach(Array(manager.certs.enumerated()), id: \.element.id) { idx, cert in
-                    certRow(cert).cascadeItem(3 + idx)
+                    certRow(cert).cascadeItem(4 + idx)
                 }
             }
         }

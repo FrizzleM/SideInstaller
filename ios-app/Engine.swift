@@ -434,6 +434,12 @@ final class Engine: ObservableObject {
     /// When SideStore was last asked for its pairing file, so the file it sends
     /// back can be told from one some other link brought.
     private var sideStorePairingRequestedAt: Date?
+    /// When SideStore was last asked for its certificate, and whether the
+    /// install that stopped on error 7460 runs again once it's in.
+    private var sideStoreCertificateRequest: (at: Date, retryInstall: Bool)?
+    /// A certificate a link brought, for `RootView` to hand to the Certificates
+    /// manager, which checks it against the Apple ID's own before using it.
+    @Published var certificateToImport: CertificateImport?
 
     // 2FA bridge: the FFI callback blocks on this semaphore until the UI answers.
     /// What the two-factor sheet shows; nil while no sign-in is asking.
@@ -1830,7 +1836,7 @@ final class Engine: ObservableObject {
             // User-fixable failures get an explanatory card. A certificate that
             // already exists offers revoke-and-retry, never revoked automatically.
             if case EngineError.certExists = error {
-                setGuide(Guides.certExists)
+                setGuide(Guides.certExists(sideStoreInstalled: sideStoreInstalled))
                 certConflict = true
             }
             if case let EngineError.deviceRegistration(udid, raw) = error {
@@ -2660,8 +2666,11 @@ final class Engine: ObservableObject {
 
     // MARK: - Links
     //
-    // `sideinstaller://install?url=` and `sideinstaller://pairingFile?data=`
-    // (see `DeepLink`). Each puts up a popup first; only its yes acts.
+    // `sideinstaller://install?url=`, `sideinstaller://pairingFile?data=` and
+    // `sideinstaller://certificate?data=` (see `DeepLink`). Each puts up a popup
+    // first; only its yes acts. SideStore's certificate, sent back because
+    // SideInstaller asked for it, is the exception: SideStore has just asked
+    // whether to export it.
 
     /// How long after asking SideStore a pairing file counts as its reply.
     private static let sideStoreReplyWindow: TimeInterval = 5 * 60
@@ -2672,7 +2681,10 @@ final class Engine: ObservableObject {
     func receiveLink(_ url: URL) {
         let answersSideStore = sideStorePairingRequestedAt
             .map { Date().timeIntervalSince($0) < Self.sideStoreReplyWindow } ?? false
-        switch DeepLink.parse(url, answersSideStore: answersSideStore) {
+        let answersCertificateRequest = sideStoreCertificateRequest
+            .map { Date().timeIntervalSince($0.at) < Self.sideStoreReplyWindow } ?? false
+        switch DeepLink.parse(url, answersSideStore: answersSideStore,
+                              answersCertificateRequest: answersCertificateRequest) {
         case .ignored(let action):
             // LocalDevVPN comes back with a bare `sideinstaller://`.
             if let action { log("Ignored a sideinstaller://\(action) link: this version has no such action.") }
@@ -2682,6 +2694,13 @@ final class Engine: ObservableObject {
             if !isRunning { lastError = message }
         case .link(let link):
             if case .pairingFile = link { sideStorePairingRequestedAt = nil }
+            if case .certificate(let cert) = link, cert.fromSideStore {
+                let retryInstall = sideStoreCertificateRequest?.retryInstall ?? false
+                sideStoreCertificateRequest = nil
+                log("Link: \(link.logDescription).")
+                certificateToImport = CertificateImport(certificate: cert, retryInstall: retryInstall)
+                return
+            }
             pendingLink = link
             log("Link: \(link.logDescription). \(isRunning ? "It asks once this install ends." : "Waiting for the go-ahead.")")
         }
@@ -2714,6 +2733,8 @@ final class Engine: ObservableObject {
                 lastError = L("Couldn't import %@: %@", file.displayName, error.localizedDescription)
                 log("⛔️ Pairing import: \(lastError ?? "")")
             }
+        case .certificate(let cert):
+            certificateToImport = CertificateImport(certificate: cert, retryInstall: false)
         }
     }
 
@@ -2738,6 +2759,27 @@ final class Engine: ObservableObject {
                 self.sideStorePairingRequestedAt = nil
                 self.lastError = L("SideStore isn't installed on this iPhone, so there's no pairing file to get from it.")
                 self.log("⛔️ Pairing import: \(self.lastError ?? "")")
+            }
+        }
+    }
+
+    /// Opens SideStore, which asks whether to export its certificate and sends
+    /// it back as a `sideinstaller://certificate` link. `retryInstall` runs the
+    /// install again once the certificate is in. Calls `failed` when SideStore
+    /// can't be opened.
+    @MainActor
+    func requestSideStoreCertificate(retryInstall: Bool, failed: @escaping @MainActor () -> Void) {
+        // SideStore takes the template percent-decoded, so all of it is encoded.
+        let template = DeepLink.certificateCallbackTemplate
+            .addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
+        guard let url = URL(string: "sidestore://certificate?callback_template=\(template)") else { return }
+        sideStoreCertificateRequest = (Date(), retryInstall)
+        log("Asking SideStore for its certificate …")
+        UIApplication.shared.open(url) { opened in
+            Task { @MainActor in
+                guard !opened else { return }
+                self.sideStoreCertificateRequest = nil
+                failed()
             }
         }
     }
@@ -2956,7 +2998,7 @@ final class Engine: ObservableObject {
         } catch EngineError.certExists {
             // Don't set `certConflict`: its retry button starts a full install
             // from the Install tab. Point to the Certificates page instead.
-            throw EngineError.message(L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again."))
+            throw EngineError.message(L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Under Tools › Certificates, use SideStore's certificate or revoke that one, then refresh again."))
         }
         defer { Self.discardSignedBundle(at: signed) }
         installProgress = 0
@@ -3542,17 +3584,21 @@ enum Guides {
     }
 
     /// Shown when Apple refuses a certificate because one exists (error 7460).
-    static var certExists: Guide {
+    /// With SideStore on the iPhone, using its certificate comes first.
+    static func certExists(sideStoreInstalled: Bool) -> Guide {
         Guide(
             title: L("A signing certificate already exists"),
             systemImage: "exclamationmark.shield",
             steps: [
                 L("Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending."),
                 L("SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone."),
+                sideStoreInstalled
+                    ? L("If SideStore made it, tap “Use SideStore's certificate” above: SideInstaller signs with that one too, and nothing is revoked.")
+                    : nil,
                 L("Use “Revoke and retry” above, or open Certificates in the Tools tab, tap “Load certificates”, and revoke it there."),
                 L("Revoking is permanent: every app already signed with that certificate stops launching, on every device."),
                 L("Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again."),
-            ],
+            ].compactMap { $0 },
             actionLabel: nil, actionURLString: nil)
     }
 

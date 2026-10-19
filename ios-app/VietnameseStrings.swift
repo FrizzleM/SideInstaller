@@ -266,6 +266,31 @@ let vietnameseStrings: [String: String] = [
     "This certificate has no serial number, so it can't be revoked.":
         "Chứng chỉ này không có số sê-ri nên không thể thu hồi.",
 
+    // MARK: - SideStore's certificate (sidestore://certificate)
+
+    "Use SideStore's certificate": "Dùng chứng chỉ của SideStore",
+    "Checking the certificate": "Đang kiểm tra chứng chỉ",
+    "SideStore opens and sends back its certificate. SideInstaller then signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "SideStore sẽ mở ra và gửi lại chứng chỉ của nó. Sau đó SideInstaller cũng ký bằng chứng chỉ này, nên với Apple ID miễn phí, không ứng dụng nào phải thu hồi chứng chỉ của ứng dụng kia.",
+    "Apple won't issue a second signing certificate for this Apple ID. If SideStore made the one it has, SideInstaller can sign with that one too, and nothing is revoked. Revoking it lets the install continue as well — but it can't be undone.":
+        "Apple sẽ không cấp chứng chỉ ký thứ hai cho Apple ID này. Nếu chứng chỉ sẵn có do SideStore tạo, SideInstaller cũng có thể ký bằng nó mà không thu hồi gì cả. Thu hồi nó cũng giúp quá trình cài đặt tiếp tục — nhưng không thể hoàn tác.",
+    "If SideStore made it, tap “Use SideStore's certificate” above: SideInstaller signs with that one too, and nothing is revoked.":
+        "Nếu chứng chỉ đó do SideStore tạo, hãy chạm “Dùng chứng chỉ của SideStore” ở trên: SideInstaller cũng ký bằng chứng chỉ đó, và không có gì bị thu hồi.",
+    "SideInstaller signs with “%@” from now on. Nothing was revoked, so the apps already signed with it keep working.":
+        "Từ giờ SideInstaller ký bằng “%@”. Không có gì bị thu hồi, nên các ứng dụng đã được ký bằng chứng chỉ này vẫn hoạt động.",
+    "SideInstaller already signs with “%@”.": "SideInstaller đã ký bằng “%@” rồi.",
+    "That certificate isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID (SideStore may be signed in with a different one). Nothing was changed.":
+        "Chứng chỉ đó không thuộc Apple ID này: nó đã bị thu hồi, hoặc thuộc một Apple ID khác (có thể SideStore đang đăng nhập bằng Apple ID khác). Không có gì bị thay đổi.",
+    "Couldn't use that certificate: %@": "Không thể dùng chứng chỉ đó: %@",
+    "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
+        "SideStore chưa được cài trên iPhone này, nên không có chứng chỉ nào để lấy.",
+    "Sign with this certificate?": "Ký bằng chứng chỉ này?",
+    "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
+        "Một liên kết đã gửi cho SideInstaller một chứng chỉ ký. Chỉ dùng nếu chính bạn đã yêu cầu: từ giờ SideInstaller sẽ ký ứng dụng bằng chứng chỉ này thay cho chứng chỉ của nó. Chứng chỉ chỉ được dùng nếu là một trong các chứng chỉ của Apple ID của bạn.",
+    "Use it": "Dùng",
+    "That link was meant to carry a signing certificate, but what it holds can't be read.":
+        "Liên kết đó lẽ ra chứa một chứng chỉ ký, nhưng không đọc được nội dung.",
+
     // MARK: - Location tab
 
     "Location spoofing": "Giả lập vị trí",
@@ -389,8 +414,8 @@ let vietnameseStrings: [String: String] = [
     // Refresh all: signing the installed apps again.
     "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
         "iOS %@ không được hỗ trợ — SideInstaller cần iOS %@ trở lên.",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.":
-        "Apple không cấp chứng chỉ ký cho Apple ID này: nó báo rằng đã có một chứng chỉ (lỗi 7460). Hãy thu hồi trong Công cụ › Chứng chỉ, rồi gia hạn lại.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Under Tools › Certificates, use SideStore's certificate or revoke that one, then refresh again.":
+        "Apple không cấp chứng chỉ ký cho Apple ID này: nó báo rằng đã có một chứng chỉ (lỗi 7460). Trong Công cụ › Chứng chỉ, hãy dùng chứng chỉ của SideStore hoặc thu hồi chứng chỉ đó, rồi gia hạn lại.",
     "An install is already running. Wait for it to finish, then refresh.":
         "Đang có một lượt cài đặt chạy. Hãy đợi xong rồi gia hạn.",
     "Getting ready": "Đang chuẩn bị",

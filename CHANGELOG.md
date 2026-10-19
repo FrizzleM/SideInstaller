@@ -42,6 +42,16 @@ All notable changes to SideInstaller are documented here.
   already has comes over in one tap. Neither link does anything until you confirm: the popup shows
   the link's address and what it would replace, or the pairing file's UDID. A link that comes in
   during an install asks once the install ends. Links used to be ignored.
+- **SideInstaller can sign with SideStore's certificate instead of competing with it.** A free
+  Apple ID gets one development certificate, so when SideStore had made it, SideInstaller stopped
+  on “A certificate already exists” and the only way on was revoking it, which stopped every app
+  SideStore had signed. With SideStore on the iPhone, that popup now offers “Use SideStore's
+  certificate” first: SideStore asks whether to export its certificate
+  (`sidestore://certificate`), sends it back, and SideInstaller signs with it from then on and
+  retries the install, with nothing revoked. The Certificates page has the same button. The
+  certificate is used only once Apple lists it among the signed-in Apple ID's certificates, and the
+  key SideInstaller signed with before is kept. SideStore 0.6.4 and the nightlies send it
+  unencrypted, and the encrypted one an older SideStore kept works too.
 - **Location spoofing has saved places and GPX routes**, ported from StikDebug. Save under the map
   keeps the spot under the pin with a name, and tapping a saved place sets it straight away. Import
   a .gpx file and the device moves along its track (or route, or waypoints) on the map, as recorded

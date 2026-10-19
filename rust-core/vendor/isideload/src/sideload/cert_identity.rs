@@ -121,9 +121,12 @@ impl CertificateIdentity {
     ) -> Result<Self, Report> {
         let pr = Self::retrieve_private_key(apple_email, storage).await?;
 
-        let found = Self::find_matching(&pr, machine_name, developer_session, team).await;
+        let found = Self::find_matching(&pr, developer_session, team).await;
         if let Ok(Some((cert, x509_cert))) = found {
-            info!("Found matching certificate");
+            info!(
+                "Found matching certificate ({})",
+                cert.machine_name.as_deref().unwrap_or("no machine name")
+            );
             return Ok(Self {
                 machine_id: cert.machine_id.clone().unwrap_or_default(),
                 machine_name: cert.machine_name.clone().unwrap_or_default(),
@@ -156,11 +159,10 @@ impl CertificateIdentity {
     }
 
     /// Like [`Self::retrieve`], but never asks Apple for a new certificate:
-    /// returns `Ok(None)` when the portal holds none matching this private key
-    /// and machine name. Reading the identity must not be able to trigger the
-    /// revoke-and-replace that minting a certificate implies on a free account.
+    /// returns `Ok(None)` when the portal holds none matching this private key.
+    /// Reading the identity must not be able to trigger the revoke-and-replace
+    /// that minting a certificate implies on a free account.
     pub async fn retrieve_existing(
-        machine_name: &str,
         apple_email: &str,
         developer_session: &mut DeveloperSession,
         team: &DeveloperTeam,
@@ -168,7 +170,7 @@ impl CertificateIdentity {
     ) -> Result<Option<Self>, Report> {
         let pr = Self::retrieve_private_key(apple_email, storage).await?;
 
-        match Self::find_matching(&pr, machine_name, developer_session, team).await {
+        match Self::find_matching(&pr, developer_session, team).await {
             Ok(Some((cert, x509_cert))) => Ok(Some(Self {
                 machine_id: cert.machine_id.clone().unwrap_or_default(),
                 machine_name: cert.machine_name.clone().unwrap_or_default(),
@@ -276,9 +278,11 @@ impl CertificateIdentity {
         Ok(private_key)
     }
 
-    async fn find_matching(
+    /// The team's certificate for `private_key`, whatever machine name it was
+    /// requested under: a certificate SideStore made and handed over keeps
+    /// SideStore's name, and only the key decides whether it can sign.
+    pub async fn find_matching(
         private_key: &RsaPrivateKey,
-        machine_name: &str,
         developer_session: &mut DeveloperSession,
         team: &DeveloperTeam,
     ) -> Result<Option<(DevelopmentCertificate, Certificate)>, Report> {
@@ -291,11 +295,7 @@ impl CertificateIdentity {
             .list_ios_certs(team)
             .await?
             .iter()
-            .filter(|c| {
-                c.cert_content.is_some()
-                    && c.machine_name.as_deref().unwrap_or("") == machine_name
-                    && c.machine_id.is_some()
-            })
+            .filter(|c| c.cert_content.is_some() && c.machine_id.is_some())
         {
             let x509_cert =
                 Certificate::from_der(cert.cert_content.as_ref().ok_or_report()?.as_ref())?;

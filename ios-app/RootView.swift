@@ -99,6 +99,13 @@ struct RootView: View {
         .onChange(of: engine.pendingLink) { _, link in
             if link != nil { page = .install }
         }
+        // A certificate a link brought is checked and imported by the same
+        // manager as the Certificates page.
+        .onChange(of: engine.certificateToImport) { _, request in
+            guard let request else { return }
+            engine.certificateToImport = nil
+            certManager.importCertificate(request)
+        }
         // Over the tab bar too, so the whole app dims behind the popups.
         .popupStack(entries, onBackdropTap: backdropTap) { entry in
             card(for: entry)

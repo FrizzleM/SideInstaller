@@ -261,6 +261,31 @@ let japaneseStrings: [String: String] = [
     "This certificate has no serial number, so it can't be revoked.":
         "この証明書にはシリアル番号がないため、失効させることができません。",
 
+    // MARK: - SideStore's certificate (sidestore://certificate)
+
+    "Use SideStore's certificate": "SideStore の証明書を使う",
+    "Checking the certificate": "証明書を確認中",
+    "SideStore opens and sends back its certificate. SideInstaller then signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "SideStore が開き、証明書を送り返します。その後は SideInstaller もその証明書で署名するので、無料の Apple ID でもどちらのアプリも相手の証明書を失効させる必要がなくなります。",
+    "Apple won't issue a second signing certificate for this Apple ID. If SideStore made the one it has, SideInstaller can sign with that one too, and nothing is revoked. Revoking it lets the install continue as well — but it can't be undone.":
+        "Apple はこの Apple ID に 2 つ目の署名用証明書を発行しません。既存の証明書を SideStore が作成した場合は、SideInstaller もその証明書で署名でき、何も失効しません。失効させてもインストールを続行できますが、この操作は取り消せません。",
+    "If SideStore made it, tap “Use SideStore's certificate” above: SideInstaller signs with that one too, and nothing is revoked.":
+        "SideStore が作成した証明書なら、上の「SideStore の証明書を使う」をタップしてください。SideInstaller もその証明書で署名し、何も失効しません。",
+    "SideInstaller signs with “%@” from now on. Nothing was revoked, so the apps already signed with it keep working.":
+        "今後 SideInstaller は「%@」で署名します。何も失効していないため、この証明書で署名済みのアプリはそのまま使えます。",
+    "SideInstaller already signs with “%@”.": "SideInstaller はすでに「%@」で署名しています。",
+    "That certificate isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID (SideStore may be signed in with a different one). Nothing was changed.":
+        "この証明書はこの Apple ID のものではありません。失効しているか、別の Apple ID のものです（SideStore が別の Apple ID でサインインしている可能性があります）。何も変更されていません。",
+    "Couldn't use that certificate: %@": "その証明書を使用できませんでした：%@",
+    "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
+        "この iPhone には SideStore がインストールされていないため、証明書を取得できません。",
+    "Sign with this certificate?": "この証明書で署名しますか？",
+    "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
+        "リンクから SideInstaller に署名用証明書が送られてきました。自分で要求した場合のみ使ってください。今後 SideInstaller は自身の証明書の代わりにこの証明書でアプリに署名します。あなたの Apple ID の証明書である場合にのみ使用されます。",
+    "Use it": "使う",
+    "That link was meant to carry a signing certificate, but what it holds can't be read.":
+        "このリンクには署名用証明書が含まれているはずですが、内容を読み取れません。",
+
     // MARK: - Location tab
 
     "Location spoofing": "位置情報の偽装",
@@ -376,8 +401,8 @@ let japaneseStrings: [String: String] = [
     // Refresh all: signing the installed apps again.
     "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
         "iOS %@ はサポートされていません。SideInstaller には iOS %@ 以降が必要です。",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.":
-        "Apple はこの Apple ID に署名証明書を発行しません。すでに存在すると報告されています（エラー 7460）。「ツール › 証明書」で失効させてから、もう一度更新してください。",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Under Tools › Certificates, use SideStore's certificate or revoke that one, then refresh again.":
+        "Apple はこの Apple ID に署名証明書を発行しません。すでに存在すると報告されています（エラー 7460）。「ツール › 証明書」で SideStore の証明書を使うか、その証明書を失効させてから、もう一度更新してください。",
     "An install is already running. Wait for it to finish, then refresh.":
         "インストールがすでに実行中です。終わるまで待ってから更新してください。",
     "Getting ready": "準備中",

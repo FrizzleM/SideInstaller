@@ -14,6 +14,7 @@ mod entitlements;
 mod error_text;
 mod ffi_util;
 mod logging;
+mod p12;
 mod pairing;
 
 use std::ffi::{c_char, c_void};
@@ -247,7 +248,7 @@ pub unsafe extern "C" fn si_forget_apple_session(
 }
 
 // ---------------------------------------------------------------------------
-// Certificates — list and revoke
+// Certificates — list, revoke and import
 // ---------------------------------------------------------------------------
 
 /// Open a developer session on the first team for certificate management.
@@ -299,6 +300,24 @@ pub unsafe extern "C" fn si_cert_revoke(
     out_error: *mut *mut c_char,
 ) -> i32 {
     certs::cert_revoke(session, serial_number, out_error)
+}
+
+/// Sign with the certificate in a PKCS#12 archive (SideStore's export) from
+/// now on, once the portal lists it on the session's team; JSON in
+/// `*out_json`. Returns 3 when no certificate on the team has its key. Blocks.
+///
+/// # Safety
+/// See `certs::cert_import`.
+#[no_mangle]
+pub unsafe extern "C" fn si_cert_import(
+    session: *mut CertSession,
+    p12: *const u8,
+    p12_len: usize,
+    password: *const c_char,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    certs::cert_import(session, p12, p12_len, password, out_json, out_error)
 }
 
 /// Free a certificate session.

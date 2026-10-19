@@ -261,6 +261,31 @@ let chineseStrings: [String: String] = [
     "This certificate has no serial number, so it can't be revoked.":
         "此证书没有序列号，因此无法吊销。",
 
+    // MARK: - SideStore's certificate (sidestore://certificate)
+
+    "Use SideStore's certificate": "使用 SideStore 的证书",
+    "Checking the certificate": "正在检查证书",
+    "SideStore opens and sends back its certificate. SideInstaller then signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "SideStore 会打开并发回它的证书。之后 SideInstaller 也用它签名，这样在免费 Apple ID 上两个 App 都不必吊销对方的证书。",
+    "Apple won't issue a second signing certificate for this Apple ID. If SideStore made the one it has, SideInstaller can sign with that one too, and nothing is revoked. Revoking it lets the install continue as well — but it can't be undone.":
+        "Apple 不会为此 Apple ID 签发第二个签名证书。如果已有的证书是 SideStore 创建的，SideInstaller 也可以用它签名，无需吊销任何证书。吊销它同样可以让安装继续——但此操作无法撤回。",
+    "If SideStore made it, tap “Use SideStore's certificate” above: SideInstaller signs with that one too, and nothing is revoked.":
+        "如果它是 SideStore 创建的，请点按上方的“使用 SideStore 的证书”：SideInstaller 也会用它签名，不会吊销任何证书。",
+    "SideInstaller signs with “%@” from now on. Nothing was revoked, so the apps already signed with it keep working.":
+        "从现在起 SideInstaller 使用“%@”签名。没有吊销任何证书，因此已用它签名的 App 会继续正常运行。",
+    "SideInstaller already signs with “%@”.": "SideInstaller 已经在使用“%@”签名。",
+    "That certificate isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID (SideStore may be signed in with a different one). Nothing was changed.":
+        "该证书不属于此 Apple ID：它已被吊销，或属于另一个 Apple ID（SideStore 可能登录了其他 Apple ID）。未做任何更改。",
+    "Couldn't use that certificate: %@": "无法使用该证书：%@",
+    "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
+        "这台 iPhone 上没有安装 SideStore，因此无法从中获取证书。",
+    "Sign with this certificate?": "使用此证书签名？",
+    "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
+        "某个链接向 SideInstaller 发送了签名证书。只有在你主动请求时才使用：从现在起 SideInstaller 将用它代替自己的证书为 App 签名。只有当它是你 Apple ID 的证书时才会被使用。",
+    "Use it": "使用",
+    "That link was meant to carry a signing certificate, but what it holds can't be read.":
+        "该链接本应包含签名证书，但其内容无法读取。",
+
     // MARK: - Location tab
 
     "Location spoofing": "位置模拟",
@@ -375,8 +400,8 @@ let chineseStrings: [String: String] = [
     // Refresh all: signing the installed apps again.
     "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
         "不支持 iOS %@：SideInstaller 需要 iOS %@ 或更高版本。",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.":
-        "Apple 不会为此 Apple ID 签发签名证书：它报告已经存在一个（错误 7460）。请在“工具 › 证书”中吊销它，然后重新续签。",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Under Tools › Certificates, use SideStore's certificate or revoke that one, then refresh again.":
+        "Apple 不会为此 Apple ID 签发签名证书：它报告已经存在一个（错误 7460）。请在“工具 › 证书”中使用 SideStore 的证书或吊销该证书，然后重新续签。",
     "An install is already running. Wait for it to finish, then refresh.":
         "已有安装正在进行。请等它完成后再续签。",
     "Getting ready": "正在准备",
