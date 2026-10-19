@@ -82,6 +82,11 @@ SideInstaller opens two kinds of `sideinstaller://` link, and asks before acting
   one back when asked with `sidestore://pairing?urlname=sideinstaller`, which is what **Get it from
   SideStore** on the Pairing file card does.
 
+Discord and most chat apps only make `https://` links tappable, so to post an install link there use
+`https://sideinstaller.net/open.html?url=<percent-encoded https link to an .ipa>`. That page shows
+where the IPA downloads from and hands it to `sideinstaller://install`, with a button for when iOS
+doesn't open the app on its own.
+
 
 ## Compatibility
 
