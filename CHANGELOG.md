@@ -2,7 +2,7 @@
 
 All notable changes to SideInstaller are documented here.
 
-## 1.5.4
+## 1.6.0
 
 ### Added
 - **The install keeps going when you leave SideInstaller.** On iOS 26 and later it runs as a
