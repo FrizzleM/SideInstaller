@@ -74,6 +74,10 @@ All notable changes to SideInstaller are documented here.
   people's iPhones were kept for good, so the iPhone that helped could still reach a friend's long
   after. They're now deleted after a successful install, and “Clear their details” deletes them
   too, along with the address. While one is kept, a note under that button says so.
+- **Dates and units follow the app's language on Automatic.** With the language left on
+  Automatic, SideInstaller formatted them in English with the iPhone's region, so an iPhone in
+  Italian showed Italian text next to English month and unit names. They now use the language the
+  text is in, still with the iPhone's region.
 
 ### Changed
 - **Side by Side doesn't need the other iPhone's IP address.** Leave the field empty and their
