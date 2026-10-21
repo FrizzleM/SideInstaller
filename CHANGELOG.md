@@ -24,12 +24,16 @@ All notable changes to SideInstaller are documented here.
   itself, its title says the same, and SideInstaller's own activity comes up beside it when you
   leave the app while the install needs you: iOS lets an app start one only until it has left the
   screen.
-- **A custom .ipa shows its App ID cost before it's signed.** Signing registers an App ID for the
-  app unless the Apple ID has it already, and a free Apple ID can register only 10 a week. After
-  sign-in, the install now stops on a popup showing the new App ID it needs, how many the Apple
-  ID has left now, and how many will be left afterwards, then waits for Install or Cancel. When too
-  few are left, it says so, shows when the next one frees up, and offers only Cancel, since signing
-  would fail anyway.
+- **SideInstaller can sign with SideStore's certificate instead of competing with it.** A free
+  Apple ID gets one development certificate, so when SideStore had made it, SideInstaller stopped
+  on “A certificate already exists” and the only way on was revoking it, which stopped every app
+  SideStore had signed. With SideStore on the iPhone, that popup now offers “Use SideStore's
+  certificate” first: SideStore asks whether to export its certificate
+  (`sidestore://certificate`), sends it back, and SideInstaller signs with it from then on and
+  retries the install, with nothing revoked. The Certificates page has the same button. The
+  certificate is used only once Apple lists it among the signed-in Apple ID's certificates, and the
+  key SideInstaller signed with before is kept. SideStore 0.6.4 and the nightlies send it
+  unencrypted, and the encrypted one an older SideStore kept works too.
 - **Settings can show Developer Mode, or turn it on.** A new Developer Mode section asks this iPhone
   to show the Developer Mode switch under Settings › Privacy & Security, or to turn Developer Mode
   on, which restarts the iPhone and asks to confirm once it's unlocked. It first checks whether
@@ -47,33 +51,12 @@ All notable changes to SideInstaller are documented here.
   already has comes over in one tap. Neither link does anything until you confirm: the popup shows
   the link's address and what it would replace, or the pairing file's UDID. A link that comes in
   during an install asks once the install ends. Links used to be ignored.
-- **SideInstaller can sign with SideStore's certificate instead of competing with it.** A free
-  Apple ID gets one development certificate, so when SideStore had made it, SideInstaller stopped
-  on “A certificate already exists” and the only way on was revoking it, which stopped every app
-  SideStore had signed. With SideStore on the iPhone, that popup now offers “Use SideStore's
-  certificate” first: SideStore asks whether to export its certificate
-  (`sidestore://certificate`), sends it back, and SideInstaller signs with it from then on and
-  retries the install, with nothing revoked. The Certificates page has the same button. The
-  certificate is used only once Apple lists it among the signed-in Apple ID's certificates, and the
-  key SideInstaller signed with before is kept. SideStore 0.6.4 and the nightlies send it
-  unencrypted, and the encrypted one an older SideStore kept works too.
-- **Location spoofing has saved places and GPX routes**, ported from StikDebug. Save under the map
-  keeps the spot under the pin with a name, and tapping a saved place sets it straight away. Import
-  a .gpx file and the device moves along its track (or route, or waypoints) on the map, as recorded
-  when the file has timestamps, or walking, cycling or driving. A new point goes out every half
-  second, a progress bar shows how far it has got, Stop here holds the current point, and at the
-  end the device stays on the last one.
-- **Location spoofing plans routes over OpenStreetMap and drives them at each street's speed
-  limit.** Add stops with Add stop under the map (or Add as stop on a saved place), pick Drive,
-  Cycle or Walk, and Find route plans a route through them in order, from where the device is when
-  it's already simulating. FOSSGIS's public Valhalla server plans it from OpenStreetMap data and
-  gives each road's mapped speed limit. A drive goes along every road at its limit (130 km/h where
-  there's none, as on parts of the Autobahn); a road with no limit mapped takes the one mapped on
-  the rest of the same street or, failing that, a cautious usual limit for its kind of road, and
-  the route says how much of it has mapped limits. While it plays, a sign shows the current road's
-  limit as it's posted there, in km/h or mph. Walking and cycling go at Valhalla's pace for each
-  street. One route is on the map at a time, so planning one removes a GPX route and the other way
-  round.
+- **A custom .ipa shows its App ID cost before it's signed.** Signing registers an App ID for the
+  app unless the Apple ID has it already, and a free Apple ID can register only 10 a week. After
+  sign-in, the install now stops on a popup showing the new App ID it needs, how many the Apple
+  ID has left now, and how many will be left afterwards, then waits for Install or Cancel. When too
+  few are left, it says so, shows when the next one frees up, and offers only Cancel, since signing
+  would fail anyway.
 - **Report a problem.** Under About, in Settings next to the activity log, and on the popup when
   an install stops. It asks what happened (an issue can't be sent empty), shows what goes along
   (SideInstaller's version, iOS, the iPhone model, the app being installed, the step that failed
@@ -91,6 +74,23 @@ All notable changes to SideInstaller are documented here.
   inside itself (`livecontainer://install`), asking first before it replaces a copy already there.
   Signing adds your team ID to the bundle ID, so the Apple ID copy installs next to the website's
   build rather than over it.
+- **Location spoofing has saved places and GPX routes**, ported from StikDebug. Save under the map
+  keeps the spot under the pin with a name, and tapping a saved place sets it straight away. Import
+  a .gpx file and the device moves along its track (or route, or waypoints) on the map, as recorded
+  when the file has timestamps, or walking, cycling or driving. A new point goes out every half
+  second, a progress bar shows how far it has got, Stop here holds the current point, and at the
+  end the device stays on the last one.
+- **Location spoofing plans routes over OpenStreetMap and drives them at each street's speed
+  limit.** Add stops with Add stop under the map (or Add as stop on a saved place), pick Drive,
+  Cycle or Walk, and Find route plans a route through them in order, from where the device is when
+  it's already simulating. FOSSGIS's public Valhalla server plans it from OpenStreetMap data and
+  gives each road's mapped speed limit. A drive goes along every road at its limit (130 km/h where
+  there's none, as on parts of the Autobahn); a road with no limit mapped takes the one mapped on
+  the rest of the same street or, failing that, a cautious usual limit for its kind of road, and
+  the route says how much of it has mapped limits. While it plays, a sign shows the current road's
+  limit as it's posted there, in km/h or mph. Walking and cycling go at Valhalla's pace for each
+  street. One route is on the map at a time, so planning one removes a GPX route and the other way
+  round.
 
 ### Fixed
 - **Pairing works when SideInstaller runs inside LiveContainer.** Before pairing, SideInstaller
@@ -99,23 +99,19 @@ All notable changes to SideInstaller are documented here.
   them, so the check always failed and pairing stopped at “Local Network denied” even with access
   turned on for LiveContainer (issue #38). The check now uses StikPair's service type, which
   LiveContainer lists.
-- **Side by Side's IP field has a dot key.** It used a number pad whose separator is a comma in
-  many regions, so an address could only be pasted in (issue #54). It now uses the keyboard of the
-  Device IP field in Settings.
 - **Side by Side forgets the other iPhone once SideInstaller is on it.** Pairings with other
   people's iPhones were kept for good, so the iPhone that helped could still reach a friend's long
   after. They're now deleted after a successful install, and “Clear their details” deletes them
   too, along with the address. While one is kept, a note under that button says so.
+- **Side by Side's IP field has a dot key.** It used a number pad whose separator is a comma in
+  many regions, so an address could only be pasted in (issue #54). It now uses the keyboard of the
+  Device IP field in Settings.
 - **Dates and units follow the app's language on Automatic.** With the language left on
   Automatic, SideInstaller formatted them in English with the iPhone's region, so an iPhone in
   Italian showed Italian text next to English month and unit names. They now use the language the
   text is in, still with the iPhone's region.
 
 ### Changed
-- **Side by Side doesn't need the other iPhone's IP address.** Leave the field empty and their
-  iPhone pairs from its Settings straight away. SideInstaller reaches it at the address it paired
-  from and fills that in, so a retry after a failed step uses the same pairing. A typed address
-  works as before, and if their iPhone pairs from a different one, that one is used.
 - **The anisette server can be left on Auto, or kept to one.** Settings › Anisette Server has a new
   Auto choice, the default, which works as sign-in did before: it starts with the server that last
   signed in, then tries the others, the ones most likely to work first. It now also remembers a
@@ -123,6 +119,10 @@ All notable changes to SideInstaller are documented here.
   Picking a server, or a custom URL, now means only that one is tried: if it fails, sign-in stops
   with the error and suggests choosing Auto. Before, a picked server was only the first of all of
   them.
+- **Side by Side doesn't need the other iPhone's IP address.** Leave the field empty and their
+  iPhone pairs from its Settings straight away. SideInstaller reaches it at the address it paired
+  from and fills that in, so a retry after a failed step uses the same pairing. A typed address
+  works as before, and if their iPhone pairs from a different one, that one is used.
 - **“StikStore (Mac ADI)” is on the anisette server list**, as in iLoader 2.3.10. It's a Mac
   server like “jkcoxson” and “SideStore (New)”, shares their anisette identity, and is tried with
   them, last. iLoader now starts on “SideStore (New)”, but its users still report the code being
