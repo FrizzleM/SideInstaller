@@ -1,0 +1,269 @@
+name: release-sideinstaller
+
+# Builds SideInstaller's unsigned IPA on GitHub and ships it as a release:
+#
+#   1. asks for the version and the changelog (Actions › release-sideinstaller
+#      › Run workflow),
+#   2. builds the IPA from the branch it's run on, unsigned
+#      (scripts/build-ipa.sh: Rust library, Xcode project from project.yml,
+#      Release build), with that version,
+#   3. publishes release v<version> with the IPA attached as SideInstaller.ipa
+#      and the changelog as its notes,
+#   4. runs sign-sideinstaller on it: every certificate in the pool signs it,
+#      and the install page is rebuilt and deployed,
+#   5. on the stable channel, runs update-altsource, so frizzlem.json lists it.
+#
+# Steps 4 and 5 are what publishing a release by hand sets off. A release this
+# workflow makes can't set them off itself (GitHub starts no workflows for
+# events made with a run's own token), so they're called from here instead.
+#
+# The changelog is Markdown: # / ## / ### for heading sizes, **bold**, *italic*,
+# - for a list. The box on the Run workflow form is a single line, so type \n
+# where a line break goes and \n\n for a blank line (scripts/release_notes.py).
+# From the command line the notes can keep their line breaks as they are:
+#
+#   gh workflow run release-sideinstaller.yml -f version=1.6.0 -f changelog="$(cat notes.md)"
+#
+# Tick "dry_run" to build the IPA only: it's kept on the run page for 14 days,
+# the notes are previewed in the run summary, and nothing is published.
+#
+# A version that already has a release or tag is refused, so a release can't
+# be overwritten. latest_version.txt (the in-app update banner) is left alone.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, e.g. 1.6.0 (released as v1.6.0). A beta may add a suffix: 1.6.0-beta.1"
+        required: true
+        type: string
+      changelog:
+        description: 'Changelog in Markdown: # / ## / ### for headings, **bold**, *italic*, - for a list. Type \n for a line break, \n\n for a blank line.'
+        required: true
+        type: string
+      channel:
+        description: "stable: public release, index.html and the AltSource. beta: prerelease and beta.html"
+        required: true
+        type: choice
+        default: stable
+        options:
+          - stable
+          - beta
+      dry_run:
+        description: "Only build the IPA (kept on the run page): no release, no signing"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-sideinstaller
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # The Xcode to build with: the one the app is developed on. The code needs
+  # the iOS 27 SDK, which only the xcode-27 runner has for now; when GitHub's
+  # macos-latest gets Xcode 27, `runs-on` below can move to it.
+  XCODE_VERSION: "27.1"
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+
+jobs:
+  build:
+    name: Build the unsigned IPA
+    runs-on: xcode-27
+    # A cold build (Rust from scratch) takes the longest; this also stops the
+    # run if the xcode-27 label goes away and no runner ever picks it up.
+    timeout-minutes: 90
+    permissions:
+      contents: write   # create the release and its tag
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      ipa_url: ${{ steps.meta.outputs.ipa_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # Inputs reach the scripts through env only, never pasted into a script,
+      # so #, *, quotes, backticks and $ in the changelog stay plain text.
+      - name: Check the version and changelog
+        id: meta
+        shell: bash
+        env:
+          VERSION_INPUT: ${{ inputs.version }}
+          CHANGELOG: ${{ inputs.changelog }}
+          CHANNEL: ${{ inputs.channel }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          version="$(printf '%s' "$VERSION_INPUT" | tr -d '[:space:]')"
+          version="${version#[vV]}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z][0-9A-Za-z.]*)?$ ]]; then
+            echo "::error::Version must look like 1.6.0, or 1.6.0-beta.1 for a beta (got: $VERSION_INPUT)"
+            exit 1
+          fi
+          # The app reports the numbers only; a suffix goes on the tag.
+          marketing="${version%%-*}"
+          tag="v$version"
+
+          # GitHub Pages only deploys from the default branch, so a release
+          # from anywhere else would stop halfway, after it was published.
+          if [[ "$DRY_RUN" != "true" && "$GITHUB_REF_NAME" != "$DEFAULT_BRANCH" ]]; then
+            echo "::error::Run releases from $DEFAULT_BRANCH (this run is on $GITHUB_REF_NAME). A dry run works on any branch."
+            exit 1
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1 ||
+             git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "::warning::$tag already exists; a real run would stop here."
+            else
+              echo "::error::$tag already has a release or tag. Pick another version, or delete that release and its tag first."
+              exit 1
+            fi
+          fi
+
+          notes="$RUNNER_TEMP/release-notes.md"
+          python3 scripts/release_notes.py "$notes"
+
+          {
+            echo "tag=$tag"
+            echo "marketing_version=$marketing"
+            echo "notes_file=$notes"
+            echo "ipa_url=https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/SideInstaller.ipa"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            if [[ "$DRY_RUN" == "true" ]]; then
+              echo "## $tag ($CHANNEL), dry run: nothing is published"
+            else
+              echo "## $tag ($CHANNEL)"
+            fi
+            echo
+            echo "App version $marketing, built from \`${GITHUB_SHA:0:7}\` on $GITHUB_REF_NAME. The release notes, as they'll show:"
+            echo
+            echo "---"
+            echo
+            cat "$notes"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Release $tag ($CHANNEL), app version $marketing. Notes:"
+          cat "$notes"
+
+      - name: Select Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          app=""
+          for candidate in "/Applications/Xcode_${XCODE_VERSION}.app" /Applications/Xcode_"${XCODE_VERSION}"_*.app; do
+            if [[ -d "$candidate" ]]; then app="$candidate"; break; fi
+          done
+          if [[ -z "$app" ]]; then
+            app="$(xcode-select -p)"
+            app="${app%/Contents/Developer}"
+            echo "::warning::Xcode $XCODE_VERSION isn't on this runner; building with $app"
+            ls -d /Applications/Xcode*.app
+          fi
+          echo "DEVELOPER_DIR=$app/Contents/Developer" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$app/Contents/Developer" xcodebuild -version
+
+      - name: Install build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v xcodegen >/dev/null || brew install xcodegen
+          rustup target add aarch64-apple-ios
+          echo "xcodegen $(xcodegen --version 2>/dev/null | tail -1)"
+          rustc --version
+          cargo --version
+
+      # The Rust library only changes with rust-core/, so it's kept between
+      # runs and the Rust build is skipped when nothing there moved. This has
+      # to come before the build-folder cache below, which puts rust-core/target
+      # in place and would end up in the hash.
+      - name: Restore the Rust library
+        id: ffi-cache
+        uses: actions/cache@v4
+        with:
+          path: SideInstallerFFI.xcframework
+          key: ffi-ios-${{ env.XCODE_VERSION }}-${{ hashFiles('rust-core/**', 'build-rust.sh') }}
+
+      - name: Restore the Rust build folder
+        if: steps.ffi-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            rust-core/target
+          key: cargo-ios-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: cargo-ios-
+
+      - name: Build the IPA
+        shell: bash
+        env:
+          VERSION: ${{ steps.meta.outputs.marketing_version }}
+          OUTPUT: ${{ runner.temp }}/ipa/SideInstaller.ipa
+          DERIVED_DATA: ${{ runner.temp }}/DerivedData
+        run: bash scripts/build-ipa.sh
+
+      - name: Keep the IPA on the run page
+        uses: actions/upload-artifact@v4
+        with:
+          name: SideInstaller-${{ steps.meta.outputs.tag }}-unsigned
+          path: ${{ runner.temp }}/ipa/SideInstaller.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish the release
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          NOTES: ${{ steps.meta.outputs.notes_file }}
+          CHANNEL: ${{ inputs.channel }}
+          IPA: ${{ runner.temp }}/ipa/SideInstaller.ipa
+        run: |
+          set -euo pipefail
+          if [[ "$CHANNEL" == "beta" ]]; then
+            kind=(--prerelease)
+          else
+            kind=(--latest)
+          fi
+          # The tag is made on the commit that was just built.
+          gh release create "$TAG" "$IPA" --title "$TAG" --notes-file "$NOTES" \
+            --target "$GITHUB_SHA" "${kind[@]}"
+          echo "Published $(gh release view "$TAG" --json url -q .url)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # Same run as a release published by hand: re-sign with every certificate,
+  # rebuild the install page and deploy it. Pinned to the IPA just released, so
+  # the page can't pick up an older release while GitHub catches up.
+  sign:
+    name: Sign and publish the install page
+    needs: build
+    if: ${{ !inputs.dry_run }}
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/sign-sideinstaller.yml
+    with:
+      channel: ${{ inputs.channel }}
+      ipa_url: ${{ needs.build.outputs.ipa_url }}
+      force: true
+
+  # The AltSource lists stable releases only.
+  altsource:
+    name: Update the AltSource
+    needs: build
+    if: ${{ !inputs.dry_run && inputs.channel == 'stable' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/update-altsource.yml

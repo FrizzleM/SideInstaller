@@ -2,7 +2,12 @@
 # Builds the Rust FFI for device and simulator and repackages
 # SideInstallerFFI.xcframework. Run on any rust-core/ change, then regenerate
 # the project with `xcodegen generate`.
+#
+# SIMULATOR=0 builds the device slice only, which is all an IPA needs
+# (scripts/build-ipa.sh does that).
 set -euo pipefail
+
+SIMULATOR="${SIMULATOR:-1}"
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
 # Match the app's deployment floor, or cc-rs objects trip linker warnings.
@@ -22,14 +27,15 @@ cd "$ROOT/rust-core"
 
 echo "==> Building Rust static libs (release)"
 cargo build --release --target aarch64-apple-ios
-cargo build --release --target aarch64-apple-ios-sim
+slices=(-library rust-core/target/aarch64-apple-ios/release/libsideinstaller_ffi.a -headers rust-core/include)
+if [ "$SIMULATOR" != 0 ]; then
+  cargo build --release --target aarch64-apple-ios-sim
+  slices+=(-library rust-core/target/aarch64-apple-ios-sim/release/libsideinstaller_ffi.a -headers rust-core/include)
+fi
 
 cd "$ROOT"
 echo "==> Repackaging SideInstallerFFI.xcframework"
 rm -rf "$ROOT/SideInstallerFFI.xcframework"
-xcodebuild -create-xcframework \
-  -library rust-core/target/aarch64-apple-ios/release/libsideinstaller_ffi.a -headers rust-core/include \
-  -library rust-core/target/aarch64-apple-ios-sim/release/libsideinstaller_ffi.a -headers rust-core/include \
-  -output "$ROOT/SideInstallerFFI.xcframework"
+xcodebuild -create-xcframework "${slices[@]}" -output "$ROOT/SideInstallerFFI.xcframework"
 
 echo "==> Done. (Re)generate the project with: xcodegen generate"

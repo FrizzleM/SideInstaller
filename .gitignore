@@ -13,3 +13,6 @@ xcuserdata/
 DerivedData/
 .DS_Store
 SideInstaller.ipa
+
+# scripts/build-ipa.sh output
+/build/
