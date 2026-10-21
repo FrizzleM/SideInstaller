@@ -123,8 +123,9 @@ enum PairingTargets {
 struct PairingFileKind: Hashable {
 
     /// RPPairing record (`public_key`, `private_key`, `identifier`), used by
-    /// `tunnel_create_rppairing`. Created by on-device pairing (iOS 27+), so
-    /// imported files rarely have it.
+    /// `tunnel_create_rppairing`. Created by on-device pairing (iOS 27+), and
+    /// on a computer by idevice_pair's “Remote pairing” and iLoader: from iOS
+    /// 26.4 on, the only kind that connects through the loopback VPN.
     let hasRemotePairing: Bool
     /// Lockdown record (`HostCertificate`, `HostPrivateKey`, `DeviceCertificate`),
     /// as written by jitterbugpair, pymobiledevice3 and idevicepair. Used by the

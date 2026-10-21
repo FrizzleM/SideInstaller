@@ -867,6 +867,18 @@ let frenchStrings: [String: String] = [
     "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
         "Revenez ici, touchez « Importer le fichier de jumelage » et choisissez-le. Ensuite, tout fonctionne comme sur iOS %@.",
     "Get jitterbugpair": "Télécharger jitterbugpair",
+    "From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.":
+        "Depuis iOS 26.4, ce doit être un fichier « Remote pairing » : cet iPhone coupe la connexion avec les fichiers lockdown, comme celui de jitterbugpair, quand ils passent par LocalDevVPN.",
+    "Get idevice_pair": "Télécharger idevice_pair",
+    "Make a remote pairing file": "Créer un fichier « Remote pairing »",
+    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
+        "Le fichier de jumelage que vous avez importé est de type lockdown. Depuis iOS 26.4, cet iPhone coupe la connexion avec ces fichiers quand ils passent par LocalDevVPN : il ne peut donc pas se connecter, et un nouveau fichier du même type non plus.",
+    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
+        "Revenez ici, touchez « Remplacer » sur la carte « Fichier de jumelage » et choisissez-le.",
+    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
+        "Sur un Mac, un PC Windows ou Linux, ouvrez idevice_pair, branchez cet iPhone et faites confiance à l'ordinateur s'il le demande. Sélectionnez-le, choisissez « Remote pairing », cliquez sur « Create » et gardez cet iPhone déverrouillé jusqu'à la fin.",
+    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
+        "Cliquez sur « Save to file… » et envoyez le fichier vers cet iPhone, par AirDrop, iCloud Drive ou un câble. Un fichier de jumelage exporté depuis iLoader fonctionne aussi.",
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
@@ -920,6 +932,12 @@ let frenchStrings: [String: String] = [
         "L’IP de l’appareil est %@, l’une des adresses de cet iPhone, et iOS ne laisse aucune app s’y connecter. Dans Réglages › Avancé, indiquez comme IP de l’appareil l’adresse sous Réglages › Device IP dans LocalDevVPN (10.7.0.1 par défaut), et non celle qui suit « Connecté à » sur son écran principal.",
     "iOS refused the connection to %@ on this iPhone, before anything was sent. It does that for this iPhone's own addresses, like the “Connected to” address on LocalDevVPN's main screen. Device IP, in Settings › Advanced, has to be the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off and on again, then try again.":
         "iOS a refusé la connexion à %@ sur cet iPhone, avant que quoi que ce soit ne soit envoyé. Il le fait pour les adresses de cet iPhone lui-même, comme celle qui suit « Connecté à » sur l’écran principal de LocalDevVPN. L’IP de l’appareil, dans Réglages › Avancé, doit être l’adresse sous Réglages › Device IP dans LocalDevVPN (10.7.0.1 par défaut). Si c’est déjà le cas, désactivez puis réactivez LocalDevVPN, puis réessayez.",
+    "This iPhone hung up on the connection as soon as it opened. From iOS 26.4 on it does that to lockdown pairing files, like this one, when they come through LocalDevVPN. Pair this iPhone with itself instead: tap “Regenerate” under Tools › Pairing, or tap Install, which pairs it first.":
+        "Cet iPhone a coupé la connexion dès son ouverture. Depuis iOS 26.4, il le fait avec les fichiers de jumelage lockdown, comme celui-ci, quand ils passent par LocalDevVPN. Jumelez plutôt cet iPhone avec lui-même : touchez « Régénérer » dans Outils › Jumelage, ou touchez Installer, qui le jumelle d'abord.",
+    "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
+        "Cet iPhone a coupé la connexion dès son ouverture. Depuis iOS 26.4, il le fait avec les fichiers de jumelage lockdown, comme celui-ci, quand ils passent par LocalDevVPN : en refaire un du même type n'y changera rien. Un fichier de jumelage « Remote pairing » fonctionne toujours : sur un ordinateur, ouvrez idevice_pair, choisissez « Remote pairing », cliquez sur « Create » puis sur « Save to file… », et importez le fichier dans « Fichier de jumelage ».",
+    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
+        "Cet iPhone a coupé la connexion : depuis iOS 26.4, il le fait avec les fichiers de jumelage lockdown comme celui-ci quand ils passent par LocalDevVPN. Voir les étapes ci-dessus.",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "L’appairage de cet iPhone en a besoin : SideInstaller s’annonce sur le réseau local pour que Réglages le trouve.",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":

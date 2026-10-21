@@ -857,6 +857,18 @@ let portugueseStrings: [String: String] = [
     "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
         "Volte para cá, toque em “Importar arquivo de pareamento” e escolha-o. Daí em diante tudo funciona como no iOS %@.",
     "Get jitterbugpair": "Baixar o jitterbugpair",
+    "From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.":
+        "A partir do iOS 26.4, precisa ser um arquivo “Remote pairing”: este iPhone derruba a conexão com arquivos lockdown, como o do jitterbugpair, quando chegam pelo LocalDevVPN.",
+    "Get idevice_pair": "Baixar o idevice_pair",
+    "Make a remote pairing file": "Faça um arquivo “Remote pairing”",
+    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
+        "O arquivo de pareamento que você importou é do tipo lockdown. A partir do iOS 26.4, este iPhone derruba a conexão com esses arquivos quando chegam pelo LocalDevVPN, então ele não consegue conectar, e um novo do mesmo tipo também não.",
+    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
+        "Volte para cá, toque em “Substituir” no cartão “Arquivo de pareamento” e escolha-o.",
+    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
+        "Num Mac, PC com Windows ou máquina Linux, abra o idevice_pair, conecte este iPhone e toque em Confiar se ele pedir. Selecione-o, escolha “Remote pairing”, clique em “Create” e mantenha este iPhone desbloqueado até terminar.",
+    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
+        "Clique em “Save to file…” e envie o arquivo para este iPhone, por AirDrop, iCloud Drive ou cabo. Um arquivo de pareamento exportado do iLoader também funciona.",
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
@@ -908,6 +920,12 @@ let portugueseStrings: [String: String] = [
         "O IP do dispositivo é %@, um dos endereços deste iPhone, e o iOS não deixa apps se conectarem a eles. Em Ajustes › Avançado, coloque como IP do dispositivo o endereço em Settings › Device IP do LocalDevVPN (o padrão é 10.7.0.1), não o que aparece depois de “Connected to” na tela principal dele.",
     "iOS refused the connection to %@ on this iPhone, before anything was sent. It does that for this iPhone's own addresses, like the “Connected to” address on LocalDevVPN's main screen. Device IP, in Settings › Advanced, has to be the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off and on again, then try again.":
         "O iOS recusou a conexão com %@ neste iPhone, antes de qualquer coisa ser enviada. Ele faz isso com os endereços do próprio iPhone, como o que aparece depois de “Connected to” na tela principal do LocalDevVPN. O IP do dispositivo, em Ajustes › Avançado, precisa ser o endereço em Settings › Device IP do LocalDevVPN (o padrão é 10.7.0.1). Se já for, desligue e ligue o LocalDevVPN de novo e tente outra vez.",
+    "This iPhone hung up on the connection as soon as it opened. From iOS 26.4 on it does that to lockdown pairing files, like this one, when they come through LocalDevVPN. Pair this iPhone with itself instead: tap “Regenerate” under Tools › Pairing, or tap Install, which pairs it first.":
+        "Este iPhone derrubou a conexão assim que ela abriu. A partir do iOS 26.4, ele faz isso com arquivos de pareamento lockdown, como este, quando chegam pelo LocalDevVPN. Em vez disso, pareie este iPhone consigo mesmo: toque em “Gerar de novo” em Ferramentas › Pareamento, ou toque em Instalar, que pareia primeiro.",
+    "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
+        "Este iPhone derrubou a conexão assim que ela abriu. A partir do iOS 26.4, ele faz isso com arquivos de pareamento lockdown, como este, quando chegam pelo LocalDevVPN, então fazer outro do mesmo tipo não vai adiantar. Um arquivo de pareamento “Remote pairing” continua funcionando: num computador, abra o idevice_pair, escolha “Remote pairing”, clique em “Create” e depois em “Save to file…”, e importe o arquivo em “Arquivo de pareamento”.",
+    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
+        "Este iPhone derrubou a conexão: a partir do iOS 26.4, ele faz isso com arquivos de pareamento lockdown como este quando chegam pelo LocalDevVPN. Veja as etapas acima.",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "Parear este iPhone depende disso: o SideInstaller se anuncia na rede local para os Ajustes o encontrarem.",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
