@@ -1061,4 +1061,29 @@ let portugueseStrings: [String: String] = [
         "O relatório fica salvo em Arquivos › No Meu iPhone › SideInstaller › Reports. No GitHub, anexe-o com “Paste, drop, or click to add files” abaixo do texto e envie a issue.",
     "Describe the problem above first.": "Descreva o problema acima primeiro.",
     "Couldn't save the report: %@": "Não foi possível salvar o relatório: %@",
+
+    // MARK: - Official download check
+
+    "Did you download SideInstaller from sideinstaller.net?":
+        "Você baixou o SideInstaller de sideinstaller.net?",
+    "SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official.":
+        "O SideInstaller é de código aberto, então qualquer pessoa pode publicar uma cópia modificada que rouba o Apple ID digitado nela. Somente sideinstaller.net é oficial.",
+    "Yes, from sideinstaller.net":
+        "Sim, de sideinstaller.net",
+    "No, or I'm not sure":
+        "Não, ou não tenho certeza",
+    "Don't sign in with this copy":
+        "Não entre com esta cópia",
+    "Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there.":
+        "Cópias de qualquer lugar que não seja sideinstaller.net não são oficiais e podem ter sido alteradas para roubar seu Apple ID. Apague esta, instale o SideInstaller de sideinstaller.net e entre por lá.",
+    "Open sideinstaller.net":
+        "Abrir sideinstaller.net",
+    "Back":
+        "Voltar",
+    "I understand the risks":
+        "Eu entendo os riscos",
+    "Use an unofficial copy?":
+        "Usar uma cópia não oficial?",
+    "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
+        "Se esta cópia foi alterada, ela pode enviar seu Apple ID e sua senha para outra pessoa. Continue apenas se você confia na origem dela.",
 ]

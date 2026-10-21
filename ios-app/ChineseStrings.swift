@@ -1036,4 +1036,29 @@ let chineseStrings: [String: String] = [
         "报告保存在“文件” › 我的 iPhone › SideInstaller › Reports。在 GitHub 上，用文本框下方的“Paste, drop, or click to add files”附上它，然后提交 Issue。",
     "Describe the problem above first.": "请先在上方描述问题。",
     "Couldn't save the report: %@": "无法保存报告：%@",
+
+    // MARK: - Official download check
+
+    "Did you download SideInstaller from sideinstaller.net?":
+        "你是从 sideinstaller.net 下载的 SideInstaller 吗？",
+    "SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official.":
+        "SideInstaller 是开源的，任何人都可以发布经过修改、会窃取所输入 Apple ID 的副本。只有 sideinstaller.net 是官方来源。",
+    "Yes, from sideinstaller.net":
+        "是，来自 sideinstaller.net",
+    "No, or I'm not sure":
+        "不是，或不确定",
+    "Don't sign in with this copy":
+        "请勿用此副本登录",
+    "Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there.":
+        "来自 sideinstaller.net 以外的副本均非官方，可能已被修改以窃取你的 Apple ID。请删除此副本，从 sideinstaller.net 安装 SideInstaller，然后在那里登录。",
+    "Open sideinstaller.net":
+        "打开 sideinstaller.net",
+    "Back":
+        "返回",
+    "I understand the risks":
+        "我了解风险",
+    "Use an unofficial copy?":
+        "使用非官方副本？",
+    "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
+        "如果此副本被修改过，它可能会把你的 Apple ID 和密码发送给他人。只有在你信任其来源时才继续。",
 ]

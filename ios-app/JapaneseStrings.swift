@@ -1040,4 +1040,29 @@ let japaneseStrings: [String: String] = [
         "レポートは「ファイル」›「この iPhone 内」› SideInstaller › Reports に保存されます。GitHub ではテキスト欄の下の “Paste, drop, or click to add files” で添付してから Issue を送信してください。",
     "Describe the problem above first.": "先に上で問題を説明してください。",
     "Couldn't save the report: %@": "レポートを保存できませんでした：%@",
+
+    // MARK: - Official download check
+
+    "Did you download SideInstaller from sideinstaller.net?":
+        "SideInstaller を sideinstaller.net からダウンロードしましたか？",
+    "SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official.":
+        "SideInstaller はオープンソースのため、入力された Apple ID を盗むように改変したコピーを誰でも公開できます。公式は sideinstaller.net だけです。",
+    "Yes, from sideinstaller.net":
+        "はい、sideinstaller.net から",
+    "No, or I'm not sure":
+        "いいえ、またはわからない",
+    "Don't sign in with this copy":
+        "このコピーではサインインしないでください",
+    "Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there.":
+        "sideinstaller.net 以外から入手したコピーは非公式で、Apple ID を盗むように改変されている可能性があります。このコピーを削除し、sideinstaller.net から SideInstaller をインストールしてからサインインしてください。",
+    "Open sideinstaller.net":
+        "sideinstaller.net を開く",
+    "Back":
+        "戻る",
+    "I understand the risks":
+        "リスクを理解しました",
+    "Use an unofficial copy?":
+        "非公式のコピーを使用しますか？",
+    "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
+        "このコピーが改変されている場合、Apple ID とパスワードが第三者に送信される可能性があります。入手元を信頼できる場合のみ続行してください。",
 ]

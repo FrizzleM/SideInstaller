@@ -1066,4 +1066,29 @@ let vietnameseStrings: [String: String] = [
         "Báo cáo được lưu trong Tệp › Trên iPhone của tôi › SideInstaller › Reports. Trên GitHub, đính kèm bằng “Paste, drop, or click to add files” bên dưới ô văn bản, rồi gửi issue.",
     "Describe the problem above first.": "Hãy mô tả sự cố ở trên trước.",
     "Couldn't save the report: %@": "Không thể lưu báo cáo: %@",
+
+    // MARK: - Official download check
+
+    "Did you download SideInstaller from sideinstaller.net?":
+        "Bạn đã tải SideInstaller từ sideinstaller.net phải không?",
+    "SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official.":
+        "SideInstaller là mã nguồn mở, nên bất kỳ ai cũng có thể phát hành một bản đã chỉnh sửa để đánh cắp Apple ID được nhập vào. Chỉ sideinstaller.net là chính thức.",
+    "Yes, from sideinstaller.net":
+        "Có, từ sideinstaller.net",
+    "No, or I'm not sure":
+        "Không, hoặc tôi không chắc",
+    "Don't sign in with this copy":
+        "Đừng đăng nhập bằng bản này",
+    "Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there.":
+        "Các bản tải từ nơi khác ngoài sideinstaller.net không chính thức và có thể đã bị chỉnh sửa để đánh cắp Apple ID của bạn. Hãy xoá bản này, cài SideInstaller từ sideinstaller.net rồi đăng nhập ở đó.",
+    "Open sideinstaller.net":
+        "Mở sideinstaller.net",
+    "Back":
+        "Quay lại",
+    "I understand the risks":
+        "Tôi hiểu các rủi ro",
+    "Use an unofficial copy?":
+        "Dùng bản không chính thức?",
+    "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
+        "Nếu bản này đã bị chỉnh sửa, nó có thể gửi Apple ID và mật khẩu của bạn cho người khác. Chỉ tiếp tục nếu bạn tin tưởng nguồn tải.",
 ]
