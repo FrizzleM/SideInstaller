@@ -10,6 +10,7 @@ let spanishStrings: [String: String] = [
 
     "Cancel": "Cancelar",
     "Copy": "Copiar",
+    "Copy logs": "Copiar registros",
     "Email": "Correo electrónico",
     "Password": "Contraseña",
     "Install": "Instalar",

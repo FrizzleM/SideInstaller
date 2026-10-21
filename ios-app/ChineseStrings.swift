@@ -10,6 +10,7 @@ let chineseStrings: [String: String] = [
 
     "Cancel": "取消",
     "Copy": "复制",
+    "Copy logs": "复制日志",
     "Email": "电子邮件",
     "Password": "密码",
     "Install": "安装",

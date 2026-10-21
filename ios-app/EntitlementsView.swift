@@ -171,7 +171,7 @@ final class EntitlementsManager: ObservableObject {
         guard !isBusy else { return }
         let id = engine.normalizedAppleID, pw = engine.applePassword
         guard !id.isEmpty, !pw.isEmpty else {
-            lastError = L("No Apple ID saved. Add one in Settings › Account.")
+            lastError = ErrorHelp.explained(L("No Apple ID saved. Add one in Settings › Account."))
             return
         }
         isWorking = true
