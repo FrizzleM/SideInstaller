@@ -9,6 +9,9 @@ name: update-altsource
 # repo, whose releases can't fire a workflow here, so the schedule picks those
 # up — and also any release here that was published before its .ipa finished
 # uploading, or whose tag points at a commit older than this workflow.
+#
+# release-sideinstaller calls it too (workflow_call): a release made by a
+# workflow doesn't fire the release trigger below.
 
 on:
   release:
@@ -16,6 +19,7 @@ on:
   schedule:
     - cron: "17 */6 * * *"     # every 6 hours, for Nightflix and late uploads
   workflow_dispatch:
+  workflow_call:
   push:
     # main only. Publishing a release pushes its tag, and GitHub ignores the
     # path filters on tag pushes, so without this every release ran twice.

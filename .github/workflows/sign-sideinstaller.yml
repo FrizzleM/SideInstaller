@@ -13,6 +13,11 @@ name: sign-sideinstaller
 # the last run recorded in <output>/sign-state.tsv. If a re-run would rebuild
 # the same page, the job stops there: nothing is signed, nothing is committed
 # and the published page is left as it is. Tick "force" to override that.
+#
+# release-sideinstaller calls this (workflow_call) right after it publishes a
+# release, since a release made by a workflow can't trigger it the usual way.
+# The inputs are read from the `inputs` context, which holds the dispatch
+# form's values and the caller's alike.
 
 on:
   workflow_dispatch:
@@ -51,6 +56,24 @@ on:
       - "certs/**"                        # ...and when you upload/remove your own certificates
   release:
     types: [published]                    # a new release ships a new unsigned IPA
+  workflow_call:                          # release-sideinstaller, after its release
+    inputs:
+      channel:
+        type: string
+        required: false
+        default: stable
+      ipa_url:
+        type: string
+        required: false
+        default: ""
+      cert_zip_url:
+        type: string
+        required: false
+        default: ""
+      force:
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: sign-sideinstaller
@@ -88,7 +111,7 @@ jobs:
       - name: Resolve release channel
         shell: bash
         env:
-          CHANNEL_INPUT: ${{ github.event.inputs.channel }}
+          CHANNEL_INPUT: ${{ inputs.channel }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           channel="${CHANNEL_INPUT:-stable}"
@@ -128,9 +151,9 @@ jobs:
       - name: Check whether anything changed
         id: precheck
         env:
-          UNSIGNED_IPA_URL: ${{ github.event.inputs.ipa_url }}
-          CERT_ZIP_URL: ${{ github.event.inputs.cert_zip_url }}
-          FORCE_RUN: ${{ github.event.inputs.force }}
+          UNSIGNED_IPA_URL: ${{ inputs.ipa_url }}
+          CERT_ZIP_URL: ${{ inputs.cert_zip_url }}
+          FORCE_RUN: ${{ inputs.force }}
           GITHUB_TOKEN: ${{ github.token }}
         run: ./scripts/check_for_changes.sh
 
@@ -139,8 +162,8 @@ jobs:
         env:
           # Dispatch overrides win; otherwise the scripts fall back to the
           # ipa-url.txt / cert-url.txt files in the repo, then the latest release.
-          UNSIGNED_IPA_URL: ${{ github.event.inputs.ipa_url }}
-          CERT_ZIP_URL: ${{ github.event.inputs.cert_zip_url }}
+          UNSIGNED_IPA_URL: ${{ inputs.ipa_url }}
+          CERT_ZIP_URL: ${{ inputs.cert_zip_url }}
           # Authenticates the Releases API lookup for the unsigned IPA.
           GITHUB_TOKEN: ${{ github.token }}
         run: ./scripts/sign_with_all_certs.sh
@@ -167,7 +190,7 @@ jobs:
         env:
           # Points the page's "Download IPA" button at the overridden build when
           # this run was dispatched with one; blank leaves it on the latest release.
-          UNSIGNED_IPA_URL: ${{ github.event.inputs.ipa_url }}
+          UNSIGNED_IPA_URL: ${{ inputs.ipa_url }}
         run: ./scripts/generate_index.sh
 
       # Commit the state the precheck computed, not a fresh one, so the next run's
