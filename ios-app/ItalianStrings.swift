@@ -1068,4 +1068,29 @@ let italianStrings: [String: String] = [
         "La segnalazione viene salvata in File › Sul mio iPhone › SideInstaller › Reports. Su GitHub allegala con “Paste, drop, or click to add files” sotto il testo, poi invia la segnalazione.",
     "Describe the problem above first.": "Prima descrivi il problema qui sopra.",
     "Couldn't save the report: %@": "Impossibile salvare la segnalazione: %@",
+
+    // MARK: - Official download check
+
+    "Did you download SideInstaller from sideinstaller.net?":
+        "Hai scaricato SideInstaller da sideinstaller.net?",
+    "SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official.":
+        "SideInstaller è open source, quindi chiunque può pubblicarne una copia modificata che ruba l'Apple ID inserito. Solo sideinstaller.net è ufficiale.",
+    "Yes, from sideinstaller.net":
+        "Sì, da sideinstaller.net",
+    "No, or I'm not sure":
+        "No, o non ne sono sicuro",
+    "Don't sign in with this copy":
+        "Non accedere con questa copia",
+    "Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there.":
+        "Le copie scaricate da siti diversi da sideinstaller.net non sono ufficiali e potrebbero essere state modificate per rubare il tuo Apple ID. Elimina questa, installa SideInstaller da sideinstaller.net e accedi da lì.",
+    "Open sideinstaller.net":
+        "Apri sideinstaller.net",
+    "Back":
+        "Indietro",
+    "I understand the risks":
+        "Comprendo i rischi",
+    "Use an unofficial copy?":
+        "Usare una copia non ufficiale?",
+    "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
+        "Se questa copia è stata modificata, può inviare il tuo Apple ID e la password a qualcun altro. Continua solo se ti fidi della sua provenienza.",
 ]

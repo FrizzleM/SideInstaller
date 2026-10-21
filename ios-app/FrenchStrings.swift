@@ -1074,4 +1074,29 @@ let frenchStrings: [String: String] = [
         "Le rapport est enregistré dans Fichiers › Sur mon iPhone › SideInstaller › Reports. Sur GitHub, joins-le avec « Paste, drop, or click to add files » sous le texte, puis envoie le ticket.",
     "Describe the problem above first.": "Décris d'abord le problème ci-dessus.",
     "Couldn't save the report: %@": "Impossible d'enregistrer le rapport : %@",
+
+    // MARK: - Official download check
+
+    "Did you download SideInstaller from sideinstaller.net?":
+        "Avez-vous téléchargé SideInstaller depuis sideinstaller.net ?",
+    "SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official.":
+        "SideInstaller est open source : n'importe qui peut publier une copie modifiée qui vole l'identifiant Apple saisi. Seul sideinstaller.net est officiel.",
+    "Yes, from sideinstaller.net":
+        "Oui, depuis sideinstaller.net",
+    "No, or I'm not sure":
+        "Non, ou je ne suis pas sûr",
+    "Don't sign in with this copy":
+        "Ne vous connectez pas avec cette copie",
+    "Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there.":
+        "Les copies provenant d'ailleurs que sideinstaller.net ne sont pas officielles et ont pu être modifiées pour voler votre identifiant Apple. Supprimez celle-ci, installez SideInstaller depuis sideinstaller.net, puis connectez-vous dans cette version.",
+    "Open sideinstaller.net":
+        "Ouvrir sideinstaller.net",
+    "Back":
+        "Retour",
+    "I understand the risks":
+        "Je comprends les risques",
+    "Use an unofficial copy?":
+        "Utiliser une copie non officielle ?",
+    "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
+        "Si cette copie a été modifiée, elle peut envoyer votre identifiant Apple et votre mot de passe à quelqu'un d'autre. Ne continuez que si vous faites confiance à sa provenance.",
 ]

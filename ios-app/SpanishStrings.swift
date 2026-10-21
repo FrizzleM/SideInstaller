@@ -1071,4 +1071,29 @@ let spanishStrings: [String: String] = [
         "El informe se guarda en Archivos › En mi iPhone › SideInstaller › Reports. En GitHub, adjúntalo con “Paste, drop, or click to add files” debajo del texto y envía la incidencia.",
     "Describe the problem above first.": "Primero describe el problema arriba.",
     "Couldn't save the report: %@": "No se ha podido guardar el informe: %@",
+
+    // MARK: - Official download check
+
+    "Did you download SideInstaller from sideinstaller.net?":
+        "¿Descargaste SideInstaller desde sideinstaller.net?",
+    "SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official.":
+        "SideInstaller es de código abierto, así que cualquiera puede publicar una copia modificada que robe el Apple ID que se escriba en ella. Solo sideinstaller.net es oficial.",
+    "Yes, from sideinstaller.net":
+        "Sí, desde sideinstaller.net",
+    "No, or I'm not sure":
+        "No, o no estoy seguro",
+    "Don't sign in with this copy":
+        "No inicies sesión con esta copia",
+    "Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there.":
+        "Las copias de cualquier sitio que no sea sideinstaller.net no son oficiales y pueden haber sido modificadas para robar tu Apple ID. Elimina esta e instala SideInstaller desde sideinstaller.net, y luego inicia sesión allí.",
+    "Open sideinstaller.net":
+        "Abrir sideinstaller.net",
+    "Back":
+        "Atrás",
+    "I understand the risks":
+        "Entiendo los riesgos",
+    "Use an unofficial copy?":
+        "¿Usar una copia no oficial?",
+    "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
+        "Si esta copia fue modificada, puede enviar tu Apple ID y tu contraseña a otra persona. Continúa solo si confías en su origen.",
 ]

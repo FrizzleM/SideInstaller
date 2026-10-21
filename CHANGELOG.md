@@ -5,6 +5,11 @@ All notable changes to SideInstaller are documented here.
 ## 1.6.0
 
 ### Added
+- **SideInstaller asks where it came from before your Apple ID goes in.** The first time you add an
+  Apple ID, at setup or later in Settings, it asks whether you downloaded it from sideinstaller.net.
+  It's open source, so anyone can publish a copy changed to steal the Apple ID typed into it; “No,
+  or I'm not sure” says not to sign in with that copy and links to sideinstaller.net, with a small
+  “I understand the risks” below for anyone who wants to go on anyway.
 - **The install keeps going when you leave SideInstaller.** On iOS 26 and later it runs as a
   background task: switch apps or lock your iPhone and it carries on, with its step and percentage
   in the Dynamic Island and on the Lock Screen, where you can also stop it. Below iOS 26, a Live
