@@ -146,8 +146,9 @@ final class DeviceConnection {
             }
             return """
                 Couldn't reach the device at \(deviceIP):\(Self.rsdPort) at all. The \
-                loopback VPN is most likely off, or is handing out a different address \
-                than the one configured here.
+                loopback VPN is most likely off, or Device IP isn't the address it \
+                carries: in LocalDevVPN that's the one under Settings › Device IP \
+                (10.7.0.1 by default), not the “Connected to” address on its main screen.
                 """
         default:
             return """
@@ -162,6 +163,28 @@ final class DeviceConnection {
     static func wasRefused(_ raw: FFIError?) -> Bool {
         guard let message = raw?.message.lowercased() else { return false }
         return message.contains("connection refused") || message.contains("os error 61")
+    }
+
+    /// True when iOS itself refused the connection (EPERM), before anything
+    /// left this iPhone. It does that for the iPhone's own addresses: loopback,
+    /// its Wi-Fi address, and a loopback VPN's own end of the tunnel.
+    static func wasBlockedLocally(_ error: Error) -> Bool {
+        let raw = (error as? FFIError) ?? (error as? TunnelError)?.underlying
+        guard let message = raw?.message.lowercased() else { return false }
+        return message.contains("operation not permitted") || message.contains("os error 1)")
+    }
+
+    /// `error` as a tunnel failure iOS refused itself, with advice instead of
+    /// the raw errno. Reported as unreachable, so nothing tries to pair again:
+    /// a new pairing file would be refused the same way.
+    private func blockedLocally(_ error: Error, deviceIP: String) -> TunnelError {
+        let raw = (error as? FFIError) ?? (error as? TunnelError)?.underlying
+            ?? fail(String(describing: error))
+        return TunnelError(
+            kind: TunnelFailureRsdUnreachable,
+            advice: L("iOS refused the connection to %@ on this iPhone, before anything was sent. It does that for this iPhone's own addresses, like the “Connected to” address on LocalDevVPN's main screen. Device IP, in Settings › Advanced, has to be the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off and on again, then try again.",
+                      deviceIP),
+            underlying: raw)
     }
 
     // MARK: Connect / disconnect
@@ -235,7 +258,11 @@ final class DeviceConnection {
                 Engine.shared.log("Pairing with lockdown didn't open a tunnel either (\(error)).")
             }
         }
-        throw firstFailure ?? fail("no tunnel route available for this pairing file")
+        guard let firstFailure else { throw fail("no tunnel route available for this pairing file") }
+        if Self.wasBlockedLocally(firstFailure) {
+            throw blockedLocally(firstFailure, deviceIP: deviceIP)
+        }
+        throw firstFailure
     }
 
     /// The RPPairing route: straight to the device's remote-pairing listener.
