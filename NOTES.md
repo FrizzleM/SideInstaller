@@ -162,6 +162,25 @@ with no migration, so upgrading users silently land on those defaults. Two thing
   suffix. Untreated, that string failed `ipv4Value`, fell through to the broad
   tunnel-name check — which iOS's own always-up `utun` satisfies — and reported a tunnel
   that wasn't there, before failing much later in `inet_pton`.
+- Its **main screen shows the wrong address to copy**: the status line is
+  `connected_to_ip` filled with `TunnelIfaceIP`, i.e. “Connected to 10.7.1.1/32”, this
+  iPhone's own end. Only its Settings label the peer (“Device IP 10.7.0.1/32”). Users
+  copy the status line into our Device IP, and iOS answers an app's `connect` to any of
+  the iPhone's own addresses with **EPERM** at once (`Socket(Os { code: 1, kind:
+  PermissionDenied })`, as with `127.0.0.1` and the Wi-Fi address in
+  [iOS 27: lockdownd won't pair on-device](#ios-27-lockdownd-wont-pair-on-device-over-any-route)).
+  `Engine.deviceIPIsUsable` runs before every tunnel use (Install,
+  `ensureNetwork`, `ensurePairingConnection`): when the tunnel carries 10.7.0.1 it switches
+  Device IP back to it, otherwise it stops with the address to use.
+  `DeviceConnection.connect` turns any remaining EPERM into a `TunnelError` (kind
+  `RsdUnreachable`, so nothing re-pairs) with plain advice. Device-tested 2026-10-21
+  (iPhone 16, iOS 27, LocalDevVPN up as `utun6` = 10.7.1.1/32): a raw `connect` to
+  10.7.1.1:62078 or 127.0.0.1:62078 fails with EPERM in 0 ms, while 10.7.0.1:62078
+  connects in 1 ms; with Device IP set to 10.7.1.1 the Pairing scan switched to 10.7.0.1
+  and found its apps. The RPPairing route behaves differently on the own address:
+  10.7.1.1:49152 accepts, then resets (ECONNRESET), which the Rust side classifies as
+  `PairVerify` — “The device rejected this pairing file … pair again”, wrong advice that
+  would also make an install re-pair. Another reason the check runs before any dial.
 
 Two further consequences of the shape itself:
 

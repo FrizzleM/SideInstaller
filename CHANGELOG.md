@@ -93,6 +93,18 @@ All notable changes to SideInstaller are documented here.
   round.
 
 ### Fixed
+- **A Device IP copied from LocalDevVPN's main screen no longer fails with “Operation not
+  permitted”.** LocalDevVPN's main screen says “Connected to 10.7.1.1/32”, but that's this
+  iPhone's own end of the tunnel; the address to connect to is the 10.7.0.1 under its Settings ›
+  Device IP. iOS won't let an app connect to the iPhone's own addresses, so with 10.7.1.1 in
+  Device IP every connection failed at once: with a raw “Socket(Os { code: 1, kind:
+  PermissionDenied })” error for an imported pairing file, or with a wrong “The device rejected
+  this pairing file” for one this iPhone made. Install already caught this, but the Pairing,
+  Apps and Location pages, crash reports and Developer Mode went straight to the connection. All
+  of them now check first, and when the tunnel carries 10.7.0.1 SideInstaller switches back to it
+  and carries on; otherwise it says which address to use. A connection iOS refuses for any other
+  reason now says so in plain words instead of the raw error, and no longer makes an iOS 27
+  iPhone pair again.
 - **Pairing works when SideInstaller runs inside LiveContainer.** Before pairing, SideInstaller
   checks Local Network access by looking for a Bonjour service of its own. Inside LiveContainer,
   iOS only allows the service types listed by LiveContainer, and SideInstaller's wasn't one of

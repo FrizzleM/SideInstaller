@@ -193,7 +193,9 @@ final class Engine: ObservableObject {
     static let autoStartVPNKey = "autoStartLocalDevVPN"
 
     // The loopback VPN's device-side IP; configurable in Advanced.
-    @Published var deviceIP: String = "10.7.0.1"
+    @Published var deviceIP: String = Engine.defaultDeviceIP
+    /// Device IP's default: LocalDevVPN's far end of the tunnel.
+    static let defaultDeviceIP = "10.7.0.1"
     /// `deviceIP` normalized to a dialable host, e.g. `10.7.0.1/32` → `10.7.0.1`.
     var deviceHost: String { NetworkStatus.host(deviceIP) }
     // Which build to install (SideStore, LiveContainer + SideStore, Madeira, or
@@ -640,9 +642,8 @@ final class Engine: ObservableObject {
             return
         }
         // A tunnel pointed at this iPhone's own address can never connect.
-        if NetworkStatus.isOwnAddress(deviceHost) {
+        guard deviceIPIsUsable() else {
             setGuide(Guides.deviceIPMismatch)
-            log("⛔️ Device IP \(deviceHost) is an address this iPhone already holds — that's the tunnel's own end, not the one to connect to. Check Settings › Advanced › Device IP (the default is 10.7.0.1).")
             return
         }
         resetRun()
@@ -852,7 +853,7 @@ final class Engine: ObservableObject {
             if wifiSatisfied && vpn {
                 // Install checks this too, but only while a tunnel is up, and
                 // this run may have started it.
-                if NetworkStatus.isOwnAddress(deviceHost) {
+                guard deviceIPIsUsable() else {
                     setGuide(Guides.deviceIPMismatch)
                     throw EngineError.message(L("Wrong device IP"))
                 }
@@ -2506,6 +2507,27 @@ final class Engine: ObservableObject {
         return false
     }
 
+    /// False when Device IP is one of this iPhone's own addresses, which iOS
+    /// won't let an app connect to (EPERM). LocalDevVPN shows one on its main
+    /// screen: “Connected to 10.7.1.1/32” is its own end of the tunnel, while
+    /// the address to connect to is the 10.7.0.1 under its Settings › Device
+    /// IP. When the tunnel carries the default address, Device IP goes back to
+    /// it instead. Only tells anything while the tunnel is up.
+    @MainActor
+    func deviceIPIsUsable() -> Bool {
+        let host = deviceHost
+        guard NetworkStatus.isOwnAddress(host) else { return true }
+        let fallback = Self.defaultDeviceIP
+        if host != fallback, !NetworkStatus.isOwnAddress(fallback),
+           NetworkStatus.loopbackTunnelUp(deviceIP: fallback) {
+            log("Device IP \(host) is one of this iPhone's own addresses (LocalDevVPN's “Connected to” address is its own end of the tunnel), and iOS won't let an app connect to those. Using \(fallback), the address the tunnel carries.")
+            deviceIP = fallback
+            return true
+        }
+        log("⛔️ Device IP \(host) is an address this iPhone already holds — that's the tunnel's own end, not the one to connect to. Check Settings › Advanced › Device IP (the default is \(fallback)).")
+        return false
+    }
+
     /// Start the RPPairing host; it reports back through the shared engine.
     func generatePairingFile() {
         Task { @MainActor in PairingController.shared.start() }
@@ -2894,6 +2916,11 @@ final class Engine: ObservableObject {
         guard await tunnelUp() else {
             throw EngineError.message(L("LocalDevVPN isn't connected. Connect it, then try again."))
         }
+        // Install checks this before it starts; every other page comes here.
+        guard deviceIPIsUsable() else {
+            throw EngineError.message(ErrorHelp.explained(L("Device IP is %@, one of this iPhone's own addresses, and iOS won't let an app connect to those. In Settings › Advanced, set Device IP to the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default, not the “Connected to” address on its main screen.",
+                                                            deviceHost)))
+        }
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         guard fileExistsNonEmpty(path) else {
             throw EngineError.message(canSelfPair
@@ -3170,9 +3197,11 @@ final class Engine: ObservableObject {
         do {
             try await ensurePairingConnection()
         } catch {
-            // No VPN or no pairing file: nothing else to try.
+            // No VPN, no pairing file, or a Device IP lockdownd can't be
+            // reached on either: nothing else to try.
             let path = pairingFilePath ?? PairingController.pairingFilePath()
-            guard vpnConnected, PairingFileKind.of(path: path).hasLockdown else { throw error }
+            guard vpnConnected, PairingFileKind.of(path: path).hasLockdown,
+                  !NetworkStatus.isOwnAddress(deviceHost) else { throw error }
             log("Developer Mode: the tunnel didn't open (\(short(error))). Asking lockdownd directly …")
             let ip = deviceHost
             do {
