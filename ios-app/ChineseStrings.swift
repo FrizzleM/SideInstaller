@@ -837,6 +837,18 @@ let chineseStrings: [String: String] = [
     "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
         "回到这里，点按“导入配对文件”并选中它。之后的步骤与 iOS %@ 上完全一致。",
     "Get jitterbugpair": "获取 jitterbugpair",
+    "From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.":
+        "从 iOS 26.4 起，必须使用“Remote pairing”配对文件：通过 LocalDevVPN 连接时，这台 iPhone 会断开 lockdown 配对文件（例如 jitterbugpair 生成的）的连接。",
+    "Get idevice_pair": "获取 idevice_pair",
+    "Make a remote pairing file": "生成“Remote pairing”配对文件",
+    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
+        "你导入的配对文件是 lockdown 类型。从 iOS 26.4 起，这类文件通过 LocalDevVPN 连接时，这台 iPhone 会断开连接，所以它无法连接，重新生成一个同类文件也一样。",
+    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
+        "回到这里，在“配对文件”卡片上轻点“更换”，然后选中它。",
+    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
+        "在 Mac、Windows 电脑或 Linux 上打开 idevice_pair，插上本机，如有提示就轻点“信任”。选中本机，选择“Remote pairing”，点击“Create”，在完成前保持本机解锁。",
+    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
+        "点击“Save to file…”，再通过隔空投送、iCloud 云盘或数据线把文件传到本机。从 iLoader 导出的配对文件也可以用。",
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
@@ -889,6 +901,12 @@ let chineseStrings: [String: String] = [
         "设备 IP 填的是 %@，这是本机自己的地址之一，iOS 不允许 App 连接到这类地址。请在“设置 › 高级”中，把设备 IP 改为 LocalDevVPN“设置 › Device IP”里的地址（默认是 10.7.0.1），而不是它主界面上“Connected to”（或“已連接至”）后面的地址。",
     "iOS refused the connection to %@ on this iPhone, before anything was sent. It does that for this iPhone's own addresses, like the “Connected to” address on LocalDevVPN's main screen. Device IP, in Settings › Advanced, has to be the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off and on again, then try again.":
         "iOS 在本机上拒绝了到 %@ 的连接，还没有发出任何数据。iOS 会拒绝连接本机自己的地址，比如 LocalDevVPN 主界面上“Connected to”（或“已連接至”）后面的那个地址。“设置 › 高级”中的设备 IP 必须是 LocalDevVPN“设置 › Device IP”里的地址（默认是 10.7.0.1）。如果已经是了，请把 LocalDevVPN 关掉再打开，然后重试。",
+    "This iPhone hung up on the connection as soon as it opened. From iOS 26.4 on it does that to lockdown pairing files, like this one, when they come through LocalDevVPN. Pair this iPhone with itself instead: tap “Regenerate” under Tools › Pairing, or tap Install, which pairs it first.":
+        "这台 iPhone 在连接刚建立时就把它断开了。从 iOS 26.4 起，通过 LocalDevVPN 连接的 lockdown 配对文件（比如这个）都会被这样断开。请改为让这台 iPhone 与自身配对：在 工具 › 配对 中轻点“重新生成”，或者轻点“安装”，它会先完成配对。",
+    "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
+        "这台 iPhone 在连接刚建立时就把它断开了。从 iOS 26.4 起，通过 LocalDevVPN 连接的 lockdown 配对文件（比如这个）都会被这样断开，所以重新生成一个同类文件也没用。“Remote pairing”配对文件仍然可用：在电脑上打开 idevice_pair，选择“Remote pairing”，点击“Create”，再点击“Save to file…”，然后在“配对文件”中导入这个文件。",
+    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
+        "这台 iPhone 断开了连接：从 iOS 26.4 起，通过 LocalDevVPN 连接的 lockdown 配对文件（比如这个）都会被这样断开。请参见上面的步骤。",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "配对这台 iPhone 需要它：SideInstaller 会在本地网络上广播自己，供“设置”发现。",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":

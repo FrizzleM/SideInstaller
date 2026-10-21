@@ -869,7 +869,8 @@ lockdownd's own port (`lockdownPairRecordDirect`) is closed too:
   lockdownd resets it on the first request, `QueryType`, which normally needs no
   pairing. `EnableWifiDebugging` and `EnableWifiConnections` were both already
   true (read over RSD from `com.apple.mobile.wireless_lockdown`), so they aren't
-  the cause.
+  the cause. This reset isn't new in iOS 27: it started with 26.4, see
+  [iOS 26.4+: lockdownd hangs up on loopback connections](#ios-264-lockdownd-hangs-up-on-loopback-connections).
 - `127.0.0.1:62078` and the phone's own Wi-Fi address: `connect` fails with EPERM
   (os error 1). iOS doesn't let an app reach them.
 
@@ -879,7 +880,8 @@ minimuxer and Feather reach lockdownd at `10.7.0.1:62078`, and
 exactly this with a complete computer-made record on iOS 27: every connection
 closed within 1–2 ms. Side by Side sees the same reset over Wi-Fi.
 
-**What changed:** `Engine.canMintLockdownRecord` is false on iOS 27 and later.
+**What changed:** `Engine.canMintLockdownRecord` is false on iOS 27 and later
+(since 2026-10-21 from iOS 26.4, see the next section).
 There, `placementPairingFile` no longer attempts `Pair`: it hands over the
 RPPairing record and logs one plain line, with no round trip and no ⚠️. And
 `DeviceConnection.connect` no longer falls back to
@@ -887,10 +889,132 @@ RPPairing record and logs one plain line, with no round trip and no ⚠️. And
 that already carries a lockdown record (imported) still goes over as it is. On
 iOS 27, apps that only read a classic record can't be served: SideStore before
 nightly 0.7.0-20260920, LiveContainer's built-in SideStore (0.7.0-20260918), and
-Feather. They need a build that reads the RPPairing record. Before iOS 27 the
+Feather. They need a build that reads the RPPairing record. Before iOS 26.4 the
 attempt still runs; it is only reachable with an imported RPPairing-only file,
 and whether it works there is unverified (pymobiledevice3's refusal suggests it
 doesn't).
+
+#### iOS 26.4+: lockdownd hangs up on loopback connections
+
+From iOS 26.4 beta 1 (February 2026) on, lockdownd hangs up on a connection that
+reaches it through a loopback VPN, on its first request. A classic lockdown pair
+record (jitterbugpair, `pymobiledevice3 lockdown pair`, idevice_pair's “Lockdown”)
+can't open the CoreDeviceProxy route there, however fresh; re-pairing on a
+computer only makes another one that fails the same way. It's the reset measured
+at `10.7.0.1:62078` on iOS 27 above, which began with 26.4. An RPPairing record
+connects, over `connectRemotePairing`.
+
+**What the lockdown route sees (verified on the Mac, 2026-10-21).**
+`tunnel_create_usb` → `CoreDeviceProxy::connect` → TCP to :62078 → `start_session`,
+whose first request is a `GetValue(ProductVersion)` it doesn't check (`.ok()`),
+then `StartSession`. A scratch probe (not committed) ran exactly that with the
+vendored idevice against a stand-in lockdownd on 127.0.0.1:62078:
+
+| stand-in | FFI message |
+|---|---|
+| RST on the first request (`GetValue`) | `Socket(Os { code: 32, kind: BrokenPipe, message: "Broken pipe" })` |
+| FIN on the first request | `Socket(Custom { kind: UnexpectedEof, error: "early eof" })` |
+| RST or FIN right after accept | `Socket(Os { code: 32, kind: BrokenPipe, … })` |
+
+A reset that lands between a write and its read reads `ConnectionReset` instead,
+as in AirCard's log below. `DeviceConnection.lockdownHungUp` matches all of them.
+
+**Reported, not verified here (no iOS 26.x device; the iPhone 16 runs 27):**
+
+- [StikDebug](https://github.com/StikDebug/StikDebug)'s README from 2026-02-26:
+  on 26.4 beta 1 lockdownd “appears to be dropping connections”, breaking the
+  device's loopback connection to itself. Dropped on 2026-03-30 with
+  3.1.0, after jkcoxson's “Replace lockdown code with rppairing” (StikDebug#354,
+  “tested it on my device”): `rp_pairing_file_read` +
+  `tunnel_create_rppairing(10.7.0.1:49152)`, i.e. our `connectRemotePairing`, whose
+  first candidate is the same address.
+- [LiveContainer#1152](https://github.com/LiveContainer/LiveContainer/issues/1152)
+  (hugeBlack, member, 2026-03-29): nightly LC+SS reads RPPairing files, which
+  “bypasses 26.4 lockdownd connection limits”; users then refresh with LocalDevVPN
+  alone on 26.4.
+- [SideStore#1174](https://github.com/SideStore/SideStore/issues/1174) and
+  [#1222](https://github.com/SideStore/SideStore/issues/1222) (26.4; members: the
+  nightly “should work with no changes to LocalDevVPN”),
+  [#1460](https://github.com/SideStore/SideStore/issues/1460) (26.6.1: a misagent
+  BrokenPipe went away once a lockdown file was swapped for an RPPairing one from
+  idevice_pair 0.1.14),
+  [#1656](https://github.com/SideStore/SideStore/issues/1656) (“On versions iOS 26.4+,
+  Lockdown is not supported”).
+- [AirCard-iOS#67](https://github.com/Mak5er/AirCard-iOS/issues/67) (26.6.2,
+  official LocalDevVPN 1.3.0 at 10.7.1.1/32 ↔ 10.7.0.1/32, fresh jitterbugpair file):
+  `QueryType` gets `Socket(Os { code: 54, kind: ConnectionReset, … })`, then
+  `StartSession` `Socket(Os { code: 32, kind: BrokenPipe, … })`; SideStore on the
+  same phone, “Broken pipe / early eof”.
+
+So the cutoff is 26.4 and it holds through 26.6.2 at least; nothing says why.
+
+**Making an RPPairing record on a computer** (read in each tool's source, not run):
+
+- idevice_pair from v0.1.9-rppairing (2026-03-28); in 1.x, Remote pairing → Create →
+  Save to file… writes `pairingFile.plist` with `RpPairingFile::to_bytes`
+  (`public_key`, `private_key`, `identifier`, `alt_irk`), which is what
+  `rp_pairing_file_read` and `PairingFileKind` read. It pairs over USB through
+  remotepairingdeviced's lockdown channel, for iOS 17.4+.
+- iLoader from PR #360 (2026-04-04): Manage Pairing File › Export (Not Recommended)
+  writes `pairingFile.plist` with its lockdown and RPPairing dicts merged (iOS 17.4+),
+  the same shape as `CompositePairingFile`.
+- pymobiledevice3 `remote pair`: its record holds `public_key`, `private_key` and
+  `remote_unlock_host_key` but no `identifier` (the host id is `generate_host_id()`,
+  never stored), so idevice refuses it (`missing_field("identifier")`). Not suggested.
+- Neither idevice_pair nor iLoader writes into SideInstaller (both look apps up by
+  display name in fixed lists), hence Save/Export and an import.
+- SideStore answers `sidestore://pairing` with its active pairing file
+  (`ExportPairingFileHandler` → `PairingFileManager.fetchPairingFile()`), so a
+  SideStore nightly set up with an RPPairing file hands that over through “Get it
+  from SideStore”.
+
+**Workarounds for a lockdown record, not offered in the app:**
+
+- An IKEv2 “Personal VPN” connected first, then LocalDevVPN (SideStore#1174, #1222,
+  March–April 2026): many confirmations on 26.4 with SideStore stable, some
+  failures, no explanation. It needs a third-party VPN carrying all traffic, and
+  SideStore's members call it “just a workaround”.
+- LocalDevVPN's addresses inside the Wi-Fi subnet: the fork
+  [SiamSadik/LocalDevVPN](https://github.com/SiamSadik/LocalDevVPN) (cdbc3299,
+  1b9ff7a2, 2026-08-15/16, AI-assisted) says 26.4+ lockdownd “resets connections
+  whose source IP is outside the WiFi subnet”, and puts the tunnel's own address and
+  the peer on unused Wi-Fi addresses as /32s, the peer as a /32 included route so it
+  beats the Wi-Fi /24. Its one release (v1.1.6-custom, 234 downloads, built on the
+  pre-rewrite app) has no issues and no confirmations; a blog repeats it as early
+  reports on 26.4 beta 2. Official LocalDevVPN 1.3.0 can make the same layout with no
+  fork: its `PacketTunnelProvider` gives the utun `TunnelIfaceIP` with that address's
+  own prefix and routes only `TunnelPeerIP`, and `CIDRValidator` takes any unicast
+  address with an explicit prefix. In its Settings › Network Configuration, Tunnel IP
+  and Device IP would be two unused Wi-Fi addresses with /32, and our Device IP the
+  second one (`NetworkStatus` accepts it: the routing-table check sees a utun source).
+  The first edit there raises a one-time Warning whose “I Understand” resets both
+  fields to the defaults, so they have to be typed again after it. Not offered: it's
+  unconfirmed, and the addresses would change with every Wi-Fi network.
+
+**What changed:**
+
+- `Engine.lockdownWorksOverLoopback`, false from 26.4.
+- `DeviceConnection.connect`: with both records, RPPairing goes first from 26.4. A
+  lockdown-route failure that `lockdownHungUp` matches becomes a `TunnelError` with
+  `lockdownRouteClosed` and advice (`ErrorHelp.explained`), only for this iPhone's
+  own link: Side by Side (`allowLockdownMinting: false`) reaches another iPhone,
+  whose iOS may be anything, and still falls through to pairing again.
+  `repairingCouldHelp` is `Engine.deviceCanSelfPair` for it: on iOS 27 Install's
+  re-pair makes the RPPairing record that fixes it, and below 27 nothing pairs.
+- `Engine.pairAndConnect`, below 27: `Guides.remotePairingNeeded` (idevice_pair's
+  Remote pairing steps, “Get idevice_pair”) and a short error. On 27, a log line
+  saying why, then the re-pair as before.
+- `Guides.importPairing` from 26.4: the same idevice_pair steps instead of
+  jitterbugpair's.
+- `canMintLockdownRecord` false from 26.4 (was 27): no minting fallback in `connect`
+  (its stored record and `lockdownPairRecordDirect` both go through :62078), and
+  `placementPairingFile` hands over the RPPairing record alone, since other apps
+  read a lockdown record through the loopback too.
+- Developer Mode's lockdownd fallback is skipped from 26.4, and `adoptPairingFile`
+  logs a warning for a lockdown-only import.
+
+None of this has run on a 26.x device, and the new copy hasn't been seen on
+screen.
 
 ## Madeira
 
