@@ -219,9 +219,13 @@ jobs:
           # Publish whichever channel pages exist so a beta deploy never drops the
           # public index.html (and vice versa). Install links inside each page point
           # at committed raw-githubusercontent manifests, so the pages work
-          # standalone; Pages just needs the HTML itself.
+          # standalone; Pages just needs the HTML and the icons it links.
           if [[ -f index.html ]]; then cp index.html _site/index.html; fi
           if [[ -f beta.html ]]; then cp beta.html _site/beta.html; fi
+          # Tab and home-screen icons the pages' <link rel="icon"> tags point at.
+          for f in favicon-32.png favicon-192.png app-icon.png; do
+            if [[ -f "$f" ]]; then cp "$f" "_site/$f"; fi
+          done
           # DNS profile linked from the page's Setup step — must ship with the site.
           if [[ -f SideInstallerDNS.mobileconfig ]]; then cp SideInstallerDNS.mobileconfig _site/SideInstallerDNS.mobileconfig; fi
           # Terms of Service linked from the page footer.
