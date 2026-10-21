@@ -1154,7 +1154,7 @@ struct InstallPopup: View {
         if cost.cost == 0 {
             return L("Your Apple ID already has every App ID this app needs, so installing it uses none.")
         }
-        let base = L("Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.")
+        let base = L("Signing registers one App ID for the app, and its extensions share it. It counts for 7 days.")
         guard let limit = cost.limit else { return base }
         return base + " " + L("This Apple ID can register %d a week.", limit)
     }

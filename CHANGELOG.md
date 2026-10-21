@@ -25,8 +25,8 @@ All notable changes to SideInstaller are documented here.
   leave the app while the install needs you: iOS lets an app start one only until it has left the
   screen.
 - **A custom .ipa shows its App ID cost before it's signed.** Signing registers an App ID for the
-  app and for each of its extensions, and a free Apple ID can register only 10 a week. After
-  sign-in, the install now stops on a popup listing the new App IDs it needs, how many the Apple
+  app unless the Apple ID has it already, and a free Apple ID can register only 10 a week. After
+  sign-in, the install now stops on a popup showing the new App ID it needs, how many the Apple
   ID has left now, and how many will be left afterwards, then waits for Install or Cancel. When too
   few are left, it says so, shows when the next one frees up, and offers only Cancel, since signing
   would fail anyway.
@@ -127,6 +127,10 @@ All notable changes to SideInstaller are documented here.
   server like “jkcoxson” and “SideStore (New)”, shares their anisette identity, and is tried with
   them, last. iLoader now starts on “SideStore (New)”, but its users still report the code being
   asked for by text and then refused, so SideInstaller keeps starting on the Windows servers.
+- **App extensions no longer use up App IDs.** SideInstaller signs an app's extensions with the
+  app's own provisioning profile, yet it still registered an App ID for each of them that nothing
+  used, out of the 10 a free Apple ID gets a week. Now only the app gets one, as in iLoader 2.4.0:
+  SideStore with its widget costs 1 App ID instead of 2, and signing sends fewer requests to Apple.
 
 ## 1.5.3
 

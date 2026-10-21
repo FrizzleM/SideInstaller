@@ -47,8 +47,8 @@ struct Guide: Hashable {
 
 /// What signing a custom IPA costs in App IDs, shown before it's signed.
 struct AppIDCost: Hashable {
-    /// The App IDs signing would register: one for the app and one for each
-    /// extension that the Apple ID doesn't have yet.
+    /// The App IDs signing would register: the app's, if the Apple ID doesn't
+    /// have it yet. Extensions are signed with the app's profile and need none.
     let newIDs: [String]
     /// How many more Apple allows now; nil when it doesn't say.
     let available: Int?
@@ -1734,21 +1734,21 @@ final class Engine: ObservableObject {
 
     /// Shows what signing the imported IPA costs in App IDs and how many the
     /// Apple ID has left, and waits for the go-ahead. Signing registers one for
-    /// the app and each extension the Apple ID doesn't have yet, and a free
-    /// Apple ID gets 10 a week. If Apple can't be asked, signing goes ahead: it
-    /// asks the same thing first and stops on a shortfall itself.
+    /// the app if the Apple ID doesn't have it yet (its extensions are signed
+    /// with the app's profile and need none), and a free Apple ID gets 10 a
+    /// week. If Apple can't be asked, signing goes ahead: it asks the same
+    /// thing first and stops on a shortfall itself.
     @MainActor
     private func confirmAppIDCost() async throws {
         guard let session = signSession, let ipa = downloadedIPAPath else { return }
-        let bundleIDs = IPALibrary.bundleIdentifiers(at: URL(fileURLWithPath: ipa))
-        guard !bundleIDs.isEmpty else {
-            log("⚠️ Couldn't read the IPA's bundle IDs, so its App ID cost isn't known; signing goes ahead.")
+        guard let bundleID = IPALibrary.appInfo(at: URL(fileURLWithPath: ipa))?.bundleID else {
+            log("⚠️ Couldn't read the IPA's bundle ID, so its App ID cost isn't known; signing goes ahead.")
             return
         }
         setStep(.sign, .active)
         let cost: AppIDCost
         do {
-            cost = try await onSignQueue { try self.performAppIDQuota(session: session, bundleIDs: bundleIDs) }
+            cost = try await onSignQueue { try self.performAppIDQuota(session: session, bundleID: bundleID) }
         } catch {
             log("⚠️ Couldn't check this Apple ID's App IDs (\(short(error))); signing goes ahead.")
             return
@@ -1784,7 +1784,7 @@ final class Engine: ObservableObject {
         }
     }
 
-    private func performAppIDQuota(session: OpaquePointer, bundleIDs: [String]) throws -> AppIDCost {
+    private func performAppIDQuota(session: OpaquePointer, bundleID: String) throws -> AppIDCost {
         struct Quota: Decodable {
             let new_ids: [String]
             let available: Int?
@@ -1793,7 +1793,7 @@ final class Engine: ObservableObject {
         }
         var json: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        let rc = si_appid_quota(session, bundleIDs.joined(separator: "\n"), &json, &error)
+        let rc = si_appid_quota(session, bundleID, &json, &error)
         guard rc == 0 else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
@@ -3538,7 +3538,7 @@ enum Guides {
             title: L("No App IDs left this week"),
             systemImage: "number.circle",
             steps: [
-                L("Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days."),
+                L("Every app SideInstaller signs needs an App ID, which its extensions share. A free Apple ID can register 10 a week, and each one counts for 7 days."),
                 L("They can't be deleted sooner. Wait until some expire, then tap Install again."),
                 L("Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again."),
             ],

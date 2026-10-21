@@ -148,10 +148,7 @@ impl Sideloader {
             );
 
             let (mut app_ids, app_group) = try_join(
-                app.register_app_ids(
-                    /*&self.extensions_behavior, */ &mut app_id_session,
-                    &team,
-                ),
+                app.register_app_ids(&mut app_id_session, &team),
                 async {
                     if !app_group {
                         return Ok(None);

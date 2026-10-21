@@ -168,15 +168,17 @@ impl Application {
         Ok(())
     }
 
+    /// Registers the main app's App ID if the team doesn't have it yet. App
+    /// extensions get none: `sign` signs each one with the main app's profile
+    /// and entitlements, so an App ID of their own would go unused and still
+    /// count against a free Apple ID's 10 a week. Upstream's
+    /// `ExtensionsBehavior::ReuseMain` (fc7a81a, iLoader 2.4.0).
     pub async fn register_app_ids(
         &self,
-        //mode: &ExtensionsBehavior,
         dev_session: &mut DeveloperSession,
         team: &DeveloperTeam,
     ) -> Result<Vec<AppId>, Report> {
-        let extension_refs: Vec<_> = self.bundle.app_extensions().iter().collect();
-        let mut bundles_with_app_id = vec![&self.bundle];
-        bundles_with_app_id.extend(extension_refs);
+        let bundles_with_app_id = [&self.bundle];
 
         let list_app_ids_response = dev_session
             .list_app_ids(team, None)
