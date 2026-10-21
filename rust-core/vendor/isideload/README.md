@@ -16,8 +16,8 @@ dependency here.
 
 `sign_app` downloaded a single provisioning profile (for `main_app_id`) and wrote
 it only to the main `.app`. App extensions got nothing, even though
-`register_app_ids` already registers an App ID for each of them and `sign::sign`
-signs every nested bundle with the *main* app's entitlements
+`register_app_ids` registered an App ID for each of them (it no longer does,
+change 12) and `sign::sign` signs every nested bundle with the *main* app's entitlements
 (`SettingsScope::Main`) — AltStore's "use main profile" arrangement. So the
 signature was fine and only the file was missing.
 
@@ -534,11 +534,36 @@ with the same key. `find_matching` is public, so the import checks a key the
 same way signing will, and `retrieve_existing` no longer takes a machine name.
 Local; upstream still matches on both. Not testable without an Apple ID.
 
+**12. `src/sideload/application.rs`, `sideloader.rs` — register no App IDs for
+app extensions (isideload 0.5.0, iLoader 2.4.0).**
+
+`register_app_ids` registered an App ID for the app and for each `.appex` in its
+`PlugIns`, and `sign_app` then gave every one of them the app group (feature,
+then assignment) and, when asked, the increased memory limit. Only the main
+App ID's profile is ever downloaded, though: change 1 signs every extension
+with it and with the main entitlements. So each extension cost one of a free
+Apple ID's 10 App IDs a week for nothing, plus its registration and group
+feature requests the first time and an app group assignment on every install.
+SideStore and its `AltWidgetExtension` took 2 instead of 1.
+
+Now only the main bundle gets an App ID, which is what upstream's new
+`ExtensionsBehavior::ReuseMain` does (`fc7a81a`), and iLoader 2.4.0 picks it for
+every app (`9f5bddb`, "Use main profile"). Upstream keeps `RegisterAll` as the
+builder's default, with per-extension profiles; the `ExtensionsBehaviorSelection`
+option and its callback type parameter aren't ported, since there is nothing
+else to choose here. `si_appid_quota` (`rust-core/src/account.rs`) counts the
+main App ID alone to match. App IDs registered for extensions before stay on the
+team until they expire.
+
 ## Re-vendoring
 
-Upstream fixed change 1 its own way in `baca89d` (per-extension profiles). A
-re-vendor either keeps the main-profile arrangement in `sign.rs` or takes
-upstream's, which adds a profile download per extension to `sign_app`.
+Upstream fixed change 1 its own way in `baca89d` (per-extension profiles). Since
+isideload 0.5.0 (`fc7a81a`) it can also do what change 1 and change 12 do:
+`.extensions_behavior(ExtensionsBehaviorSelection::Fixed(ExtensionsBehavior::ReuseMain))`
+on the builder gives each extension the main profile and entitlements and
+registers no App ID for it. Its default is still `RegisterAll`, so a re-vendor
+has to set `ReuseMain`, as iLoader 2.4.0 does, or SideStore goes back to costing
+2 App IDs.
 
 Change 7 is upstream on `main` from `5992f00` (isideload 0.4.0), without the
 `_CodeSignature` cleanup.

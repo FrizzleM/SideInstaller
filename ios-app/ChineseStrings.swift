@@ -812,8 +812,8 @@ let chineseStrings: [String: String] = [
     "Open Apple Account":
         "打开 Apple 账户",
     "No App IDs left this week": "本周已没有可用的 App ID",
-    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
-        "SideInstaller 签名的每个 App 和 App 扩展都需要一个 App ID。免费 Apple ID 每周可注册 10 个，每个会占用 7 天。",
+    "Every app SideInstaller signs needs an App ID, which its extensions share. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "SideInstaller 签名的每个 App 都需要一个 App ID，其扩展共用这个 App ID。免费 Apple ID 每周可注册 10 个，每个会占用 7 天。",
     "They can't be deleted sooner. Wait until some expire, then tap Install again.":
         "它们无法提前删除。等一些过期后，再次轻点“安装”。",
     "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
@@ -966,8 +966,8 @@ let chineseStrings: [String: String] = [
     "The next one frees up on %@.": "下一个将于 %@ 释放。",
     "Your Apple ID already has every App ID this app needs, so installing it uses none.":
         "你的 Apple ID 已拥有此 App 需要的所有 App ID，安装它不会消耗任何 App ID。",
-    "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
-        "签名时会为 App 及其每个扩展各注册一个 App ID，每个会占用 7 天。",
+    "Signing registers one App ID for the app, and its extensions share it. It counts for 7 days.":
+        "签名时只为 App 注册一个 App ID，其扩展共用它。它会占用 7 天。",
     "This Apple ID can register %d a week.": "此 Apple ID 每周可注册 %d 个。",
 
     // MARK: - Links (sideinstaller://install, sideinstaller://pairingFile)

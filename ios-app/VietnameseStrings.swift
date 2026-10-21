@@ -835,8 +835,8 @@ let vietnameseStrings: [String: String] = [
     "Open Apple Account":
         "Mở Apple Account",
     "No App IDs left this week": "Đã hết App ID trong tuần này",
-    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
-        "Mỗi ứng dụng và tiện ích mở rộng mà SideInstaller ký đều cần một App ID. Apple ID miễn phí chỉ đăng ký được 10 App ID mỗi tuần, và mỗi App ID được tính trong 7 ngày.",
+    "Every app SideInstaller signs needs an App ID, which its extensions share. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "Mỗi ứng dụng mà SideInstaller ký đều cần một App ID, và các tiện ích mở rộng của nó dùng chung App ID đó. Apple ID miễn phí chỉ đăng ký được 10 App ID mỗi tuần, và mỗi App ID được tính trong 7 ngày.",
     "They can't be deleted sooner. Wait until some expire, then tap Install again.":
         "Không thể xóa chúng sớm hơn. Hãy đợi một số hết hạn, rồi chạm vào Cài ứng dụng lần nữa.",
     "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
@@ -992,8 +992,8 @@ let vietnameseStrings: [String: String] = [
     "The next one frees up on %@.": "App ID tiếp theo được giải phóng vào %@.",
     "Your Apple ID already has every App ID this app needs, so installing it uses none.":
         "Apple ID của bạn đã có mọi App ID mà ứng dụng này cần, nên cài nó không tốn App ID nào.",
-    "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
-        "Khi ký, một App ID được đăng ký cho ứng dụng và cho từng tiện ích mở rộng của nó, và mỗi App ID được tính trong 7 ngày.",
+    "Signing registers one App ID for the app, and its extensions share it. It counts for 7 days.":
+        "Khi ký, chỉ một App ID được đăng ký cho ứng dụng, và các tiện ích mở rộng của nó dùng chung App ID này. App ID đó được tính trong 7 ngày.",
     "This Apple ID can register %d a week.":
         "Apple ID này đăng ký được %d App ID mỗi tuần.",
 

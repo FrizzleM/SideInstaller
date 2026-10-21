@@ -836,8 +836,8 @@ let italianStrings: [String: String] = [
     "Open Apple Account":
         "Apri Apple Account",
     "No App IDs left this week": "App ID esauriti per questa settimana",
-    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
-        "Ogni app ed estensione che SideInstaller firma ha bisogno di un App ID. Un Apple ID gratuito può registrarne 10 a settimana e ognuno conta per 7 giorni.",
+    "Every app SideInstaller signs needs an App ID, which its extensions share. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "Ogni app che SideInstaller firma ha bisogno di un App ID, condiviso dalle sue estensioni. Un Apple ID gratuito può registrarne 10 a settimana e ognuno conta per 7 giorni.",
     "They can't be deleted sooner. Wait until some expire, then tap Install again.":
         "Non si possono eliminare prima. Aspetta che alcuni scadano, poi tocca di nuovo Installa.",
     "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
@@ -994,8 +994,8 @@ let italianStrings: [String: String] = [
     "The next one frees up on %@.": "Il prossimo si libera il %@.",
     "Your Apple ID already has every App ID this app needs, so installing it uses none.":
         "Il tuo Apple ID ha già tutti gli App ID che servono a questa app, quindi installarla non ne usa nessuno.",
-    "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
-        "La firma registra un App ID per l'app e uno per ciascuna delle sue estensioni, e ognuno conta per 7 giorni.",
+    "Signing registers one App ID for the app, and its extensions share it. It counts for 7 days.":
+        "La firma registra un solo App ID per l'app, condiviso dalle sue estensioni. Conta per 7 giorni.",
     "This Apple ID can register %d a week.":
         "Questo Apple ID può registrarne %d a settimana.",
 

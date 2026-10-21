@@ -621,8 +621,8 @@ pub unsafe fn signing_account(
 /// What signing an app would cost in App IDs, for the confirmation before it.
 #[derive(Serialize, Debug, PartialEq)]
 struct AppIdQuota {
-    /// The identifiers `sign_app` would register, in bundle order: the ones
-    /// not on the team yet.
+    /// The identifiers `sign_app` would register: the main app's, unless the
+    /// team has it already. Extensions don't get one.
     new_ids: Vec<String>,
     /// How many more Apple says the team can register now. None when Apple
     /// doesn't say or reports a negative number (`register_app_ids` skips its
@@ -635,34 +635,17 @@ struct AppIdQuota {
     next_expiry: Option<u64>,
 }
 
-/// The App IDs `sign_app` registers for bundles with `bundle_ids` (the main
-/// app's first, then each `PlugIns` extension's, as the IPA has them), with the
-/// main ID suffixed by the team ID and each extension's following it.
-/// Mirrors `Sideloader::sign_app` and `Application::update_bundle_id`. An
-/// extension outside the main app's ID is left as it is; signing refuses it.
-fn signed_app_ids(bundle_ids: &[String], team_id: &str) -> Vec<String> {
-    let Some((main, extensions)) = bundle_ids.split_first() else {
-        return Vec::new();
+/// The quota for signing an app whose main bundle ID is `bundle_id` (as the
+/// IPA has it) against the team's App IDs as listed. `sign_app` registers one
+/// App ID, the bundle ID suffixed by the team ID (`Application::update_bundle_id`);
+/// extensions are signed with the main app's profile and get none.
+fn app_id_quota(bundle_id: &str, team_id: &str, listing: &ListAppIdsResponse) -> AppIdQuota {
+    let main_id = format!("{bundle_id}.{team_id}");
+    let new_ids = if listing.app_ids.iter().any(|a| a.identifier == main_id) {
+        Vec::new()
+    } else {
+        vec![main_id]
     };
-    let main_id = format!("{main}.{team_id}");
-    let mut ids = vec![main_id.clone()];
-    for ext in extensions {
-        match ext.strip_prefix(main.as_str()) {
-            Some(suffix) if !suffix.is_empty() => ids.push(format!("{main_id}{suffix}")),
-            _ => ids.push(ext.clone()),
-        }
-    }
-    ids
-}
-
-/// The quota for `bundle_ids` against the team's App IDs as listed.
-fn app_id_quota(bundle_ids: &[String], team_id: &str, listing: &ListAppIdsResponse) -> AppIdQuota {
-    let mut new_ids: Vec<String> = Vec::new();
-    for id in signed_app_ids(bundle_ids, team_id) {
-        if !listing.app_ids.iter().any(|a| a.identifier == id) && !new_ids.contains(&id) {
-            new_ids.push(id);
-        }
-    }
     let next_expiry = listing
         .app_ids
         .iter()
@@ -678,15 +661,15 @@ fn app_id_quota(bundle_ids: &[String], team_id: &str, listing: &ListAppIdsRespon
     }
 }
 
-/// Set `*out_json` to the [`AppIdQuota`] for signing an app whose bundle IDs
-/// are `bundle_ids`, newline-separated, the main app's first. Lists the team's
-/// App IDs, as signing does first; registers nothing.
+/// Set `*out_json` to the [`AppIdQuota`] for signing an app whose main bundle
+/// ID is `bundle_id`. Lists the team's App IDs, as signing does first;
+/// registers nothing.
 ///
 /// # Safety
 /// `session` must be a valid pointer from `apple_signin`; out pointers valid.
 pub unsafe fn appid_quota(
     session: *mut SignSession,
-    bundle_ids: *const c_char,
+    bundle_id: *const c_char,
     out_json: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
@@ -695,13 +678,9 @@ pub unsafe fn appid_quota(
         return 2;
     }
     let session = &mut *session;
-    let bundle_ids: Vec<String> = opt(bundle_ids, "")
-        .lines()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
-    if bundle_ids.is_empty() {
-        *out_error = cstr("no bundle IDs");
+    let bundle_id = opt(bundle_id, "").trim().to_string();
+    if bundle_id.is_empty() {
+        *out_error = cstr("no bundle ID");
         return 2;
     }
 
@@ -718,7 +697,7 @@ pub unsafe fn appid_quota(
                 .list_app_ids(&team, None)
                 .await
                 .map_err(|e| format!("list app IDs failed: {}", report_text(&e)))?;
-            let quota = app_id_quota(&bundle_ids, &team.team_id, &listing);
+            let quota = app_id_quota(&bundle_id, &team.team_id, &listing);
             tracing::info!(
                 "App IDs: {} new for this app, {:?} of {:?} available",
                 quota.new_ids.len(),
@@ -1007,25 +986,27 @@ mod app_id_quota_tests {
     }
 
     #[test]
-    fn rewrites_ids_the_way_sign_app_does() {
-        assert_eq!(
-            signed_app_ids(
-                &ids(&["com.example.App", "com.example.App.Widget", "org.other.Ext"]),
-                "TEAM123456"
-            ),
-            ids(&[
-                "com.example.App.TEAM123456",
-                "com.example.App.TEAM123456.Widget",
-                "org.other.Ext",
-            ])
+    fn only_the_main_app_needs_an_app_id() {
+        let quota = app_id_quota(
+            "com.example.App",
+            "TEAM123456",
+            &listing(vec![app_id("com.other.Thing.TEAM123456", Some(1_800_000_100))], Some(8)),
         );
-        assert!(signed_app_ids(&[], "TEAM123456").is_empty());
+        assert_eq!(
+            quota,
+            AppIdQuota {
+                new_ids: ids(&["com.example.App.TEAM123456"]),
+                available: Some(8),
+                max: Some(10),
+                next_expiry: Some(1_800_000_100),
+            }
+        );
     }
 
     #[test]
-    fn counts_only_ids_the_team_lacks() {
+    fn an_app_id_the_team_has_costs_nothing() {
         let quota = app_id_quota(
-            &ids(&["com.example.App", "com.example.App.Widget", "com.example.App.Share"]),
+            "com.example.App",
             "TEAM123456",
             &listing(
                 vec![
@@ -1035,23 +1016,14 @@ mod app_id_quota_tests {
                 Some(8),
             ),
         );
-        assert_eq!(
-            quota,
-            AppIdQuota {
-                new_ids: ids(&[
-                    "com.example.App.TEAM123456.Widget",
-                    "com.example.App.TEAM123456.Share",
-                ]),
-                available: Some(8),
-                max: Some(10),
-                next_expiry: Some(1_800_000_100),
-            }
-        );
+        assert!(quota.new_ids.is_empty());
+        assert_eq!(quota.available, Some(8));
+        assert_eq!(quota.next_expiry, Some(1_800_000_100));
     }
 
     #[test]
     fn a_negative_quota_is_unknown() {
-        let quota = app_id_quota(&ids(&["a.b"]), "T", &listing(vec![], Some(-2)));
+        let quota = app_id_quota("a.b", "T", &listing(vec![], Some(-2)));
         assert_eq!(quota.available, None);
         assert_eq!(quota.new_ids, ids(&["a.b.T"]));
         assert_eq!(quota.next_expiry, None);

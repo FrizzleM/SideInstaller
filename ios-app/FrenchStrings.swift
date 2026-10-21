@@ -842,8 +842,8 @@ let frenchStrings: [String: String] = [
     "Open Apple Account":
         "Ouvrir le compte Apple",
     "No App IDs left this week": "Plus d'App ID cette semaine",
-    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
-        "Chaque app et extension d'app que SideInstaller signe a besoin d'un App ID. Un Apple ID gratuit peut en enregistrer 10 par semaine, et chacun compte pendant 7 jours.",
+    "Every app SideInstaller signs needs an App ID, which its extensions share. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "Chaque app que SideInstaller signe a besoin d'un App ID, que ses extensions partagent. Un Apple ID gratuit peut en enregistrer 10 par semaine, et chacun compte pendant 7 jours.",
     "They can't be deleted sooner. Wait until some expire, then tap Install again.":
         "Ils ne peuvent pas être supprimés plus tôt. Attendez que certains expirent, puis touchez à nouveau Installer.",
     "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
@@ -1000,8 +1000,8 @@ let frenchStrings: [String: String] = [
     "The next one frees up on %@.": "Le prochain se libère le %@.",
     "Your Apple ID already has every App ID this app needs, so installing it uses none.":
         "Votre Apple ID a déjà tous les App IDs dont cette app a besoin, donc l'installer n'en utilise aucun.",
-    "Signing registers an App ID for the app and for each of its extensions, and each one counts for 7 days.":
-        "La signature enregistre un App ID pour l'app et un pour chacune de ses extensions, et chacun compte pendant 7 jours.",
+    "Signing registers one App ID for the app, and its extensions share it. It counts for 7 days.":
+        "La signature enregistre un seul App ID pour l'app, que ses extensions partagent. Il compte pendant 7 jours.",
     "This Apple ID can register %d a week.":
         "Cet Apple ID peut en enregistrer %d par semaine.",
 
