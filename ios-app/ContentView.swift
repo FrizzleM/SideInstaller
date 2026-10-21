@@ -1017,12 +1017,10 @@ struct InstallPopup: View {
                     Text(message)
                         .font(.subheadline)
                         .fixedSize(horizontal: false, vertical: true)
-                    Button { showReport = true } label: {
-                        Label(L("Report this problem"), systemImage: "exclamationmark.bubble")
-                            .font(.subheadline.weight(.semibold))
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 10) { errorButtons(message) }
+                        VStack(alignment: .leading, spacing: 10) { errorButtons(message) }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
                 }
             }
             .sheet(isPresented: $showReport) { ReportProblemView() }
@@ -1044,6 +1042,22 @@ struct InstallPopup: View {
     }
 
     private func close() { engine.closePopup(popup) }
+
+    /// The error popup's buttons. Copy logs shows only when nothing explains
+    /// the fix: no guide or revoke-and-retry popup beside it, and a message
+    /// that doesn't say what to do itself.
+    @ViewBuilder
+    private func errorButtons(_ message: String) -> some View {
+        Button { showReport = true } label: {
+            Label(L("Report this problem"), systemImage: "exclamationmark.bubble")
+                .font(.subheadline.weight(.semibold))
+        }
+        .buttonStyle(.bordered)
+        .tint(.red)
+        if engine.guide == nil, !engine.certConflict, !ErrorHelp.isExplained(message) {
+            CopyLogsButton()
+        }
+    }
 
     /// The error popup's title, which also titles the group it's in.
     static func errorTitle(stoppedRun: Bool) -> String {

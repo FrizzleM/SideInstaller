@@ -615,8 +615,8 @@ final class Engine: ObservableObject {
         if let needed = installSource.minimumOSMajorVersion,
            !ProcessInfo.processInfo.isOperatingSystemAtLeast(
                OperatingSystemVersion(majorVersion: needed, minorVersion: 0, patchVersion: 0)) {
-            lastError = L("%@ needs iOS %d or later. This iPhone runs iOS %@.",
-                          installSource.displayName, needed, osVersionText)
+            lastError = ErrorHelp.explained(L("%@ needs iOS %d or later. This iPhone runs iOS %@.",
+                                              installSource.displayName, needed, osVersionText))
             log("⛔️ \(installSource.displayName) needs iOS \(needed) or later; this iPhone runs iOS \(osVersionText).")
             return
         }
@@ -1600,8 +1600,8 @@ final class Engine: ObservableObject {
             // The picker accepts any file. Validation runs on a staged copy, so
             // the previous import is kept.
             refreshCustomIPA()
-            lastError = L("%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.",
-                          url.lastPathComponent)
+            lastError = ErrorHelp.explained(L("%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.",
+                                              url.lastPathComponent))
             log("⛔️ Import: \(lastError ?? "")")
         } catch {
             // Re-read the import from disk to update the button label.
@@ -1618,7 +1618,7 @@ final class Engine: ObservableObject {
     func importCustomIPA(fromLink text: String) async -> Bool {
         guard !isImportingIPA else { return false }
         guard let url = Self.downloadLink(text) else {
-            lastError = L("That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.")
+            lastError = ErrorHelp.explained(L("That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from."))
             log("⛔️ Import: \(lastError ?? "")")
             return false
         }
@@ -1643,7 +1643,7 @@ final class Engine: ObservableObject {
             return true
         } catch IPALibrary.ImportError.notAnIPA {
             refreshCustomIPA()
-            lastError = L("That link didn't return an IPA. It has to download the file itself — a page that only links to the .ipa, or one that asks you to sign in first, arrives here as a web page.")
+            lastError = ErrorHelp.explained(L("That link didn't return an IPA. It has to download the file itself — a page that only links to the .ipa, or one that asks you to sign in first, arrives here as a web page."))
             log("⛔️ Import: \(lastError ?? "")")
         } catch is CancellationError {
             refreshCustomIPA()
@@ -2629,8 +2629,8 @@ final class Engine: ObservableObject {
             let data = try Self.readImport(from: url)
             let kind = PairingFileKind.of(data: data)
             guard kind.isUsable else {
-                lastError = L("%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.",
-                              url.lastPathComponent)
+                lastError = ErrorHelp.explained(L("%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.",
+                                                  url.lastPathComponent))
                 log("⛔️ Pairing import: \(lastError ?? "")")
                 return
             }
@@ -2775,7 +2775,7 @@ final class Engine: ObservableObject {
         UIApplication.shared.open(url) { opened in
             Task { @MainActor in
                 guard !opened else { return }
-                self.lastError = L("LiveContainer isn't installed on this iPhone.")
+                self.lastError = ErrorHelp.explained(L("LiveContainer isn't installed on this iPhone."))
                 self.log("⛔️ LiveContainer: \(self.lastError ?? "")")
             }
         }
@@ -2793,7 +2793,7 @@ final class Engine: ObservableObject {
             Task { @MainActor in
                 guard !opened else { return }
                 self.sideStorePairingRequestedAt = nil
-                self.lastError = L("SideStore isn't installed on this iPhone, so there's no pairing file to get from it.")
+                self.lastError = ErrorHelp.explained(L("SideStore isn't installed on this iPhone, so there's no pairing file to get from it."))
                 self.log("⛔️ Pairing import: \(self.lastError ?? "")")
             }
         }

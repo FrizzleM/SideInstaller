@@ -9,6 +9,7 @@ let frenchStrings: [String: String] = [
 
     "Cancel": "Annuler",
     "Copy": "Copier",
+    "Copy logs": "Copier les journaux",
     "Email": "E-mail",
     "Password": "Mot de passe",
     "Install": "Installer",

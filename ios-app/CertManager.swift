@@ -133,7 +133,7 @@ final class CertManager: ObservableObject {
         guard !isWorking, revokingID == nil else { return }
         let id = engine.normalizedAppleID, pw = engine.applePassword
         guard !id.isEmpty, !pw.isEmpty else {
-            lastError = L("No Apple ID saved. Add one in Settings › Account.")
+            lastError = ErrorHelp.explained(L("No Apple ID saved. Add one in Settings › Account."))
             return
         }
         isWorking = true
@@ -166,7 +166,7 @@ final class CertManager: ObservableObject {
         guard session != nil, revokingID == nil, !isWorking else { return }
         let serial = cert.serialNumber
         guard !serial.isEmpty else {
-            lastError = L("This certificate has no serial number, so it can't be revoked.")
+            lastError = ErrorHelp.explained(L("This certificate has no serial number, so it can't be revoked."))
             return
         }
         revokingID = cert.id
@@ -204,7 +204,7 @@ final class CertManager: ObservableObject {
         lastError = nil
         lastSuccess = nil
         engine.requestSideStoreCertificate(retryInstall: retryInstall) { [weak self] in
-            self?.lastError = L("SideStore isn't installed on this iPhone, so there's no certificate to get from it.")
+            self?.lastError = ErrorHelp.explained(L("SideStore isn't installed on this iPhone, so there's no certificate to get from it."))
             self?.engine.log("⛔️ Certificates: \(self?.lastError ?? "")")
         }
     }
@@ -218,7 +218,7 @@ final class CertManager: ObservableObject {
         guard !isImporting else { return }
         let id = engine.normalizedAppleID, pw = engine.applePassword
         guard !id.isEmpty, !pw.isEmpty else {
-            lastError = L("No Apple ID saved. Add one in Settings › Account.")
+            lastError = ErrorHelp.explained(L("No Apple ID saved. Add one in Settings › Account."))
             return
         }
         let cert = request.certificate

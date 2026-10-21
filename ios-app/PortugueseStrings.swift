@@ -12,6 +12,7 @@ let portugueseStrings: [String: String] = [
 
     "Cancel": "Cancelar",
     "Copy": "Copiar",
+    "Copy logs": "Copiar registros",
     "Email": "E-mail",
     "Password": "Senha",
     "Install": "Instalar",

@@ -517,7 +517,8 @@ extension View {
     }
 }
 
-/// A popup that only reports: what went wrong, or what went right.
+/// A popup that only reports: what went wrong, or what went right. An error
+/// the app can't explain offers Copy logs.
 struct MessagePopup: View {
     var title: String
     var message: String
@@ -529,10 +530,74 @@ struct MessagePopup: View {
                   systemImage: isError ? "exclamationmark.triangle.fill" : "checkmark.seal.fill",
                   tint: isError ? .red : .green,
                   onClose: onClose) {
+            ErrorMessage(message: message, offersLogs: isError)
+        }
+    }
+}
+
+/// An error popup's message, with Copy logs under it unless the message
+/// already says how to fix it.
+struct ErrorMessage: View {
+    var message: String
+    /// False when something else on screen explains the fix.
+    var offersLogs = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
             Text(message)
                 .font(.subheadline)
                 .fixedSize(horizontal: false, vertical: true)
+            if offersLogs && !ErrorHelp.isExplained(message) {
+                CopyLogsButton()
+            }
         }
+    }
+}
+
+/// Error messages that tell the user what to do themselves ("pick the .ipa
+/// file itself", "Wi-Fi is off"). Every other error is one the app can't help
+/// with, so its popup offers the activity log to send on.
+enum ErrorHelp {
+    private static let lock = NSLock()
+    private static var explained = Set<String>()
+
+    /// Marks `message` as one that explains its own fix, and returns it.
+    @discardableResult
+    static func explained(_ message: String) -> String {
+        lock.lock(); defer { lock.unlock() }
+        explained.insert(message)
+        return message
+    }
+
+    static func isExplained(_ message: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return explained.contains(message)
+    }
+}
+
+/// Copies the activity log, the same text as Settings › Activity Log › Copy,
+/// and says so for a moment.
+struct CopyLogsButton: View {
+    var tint: Color = .red
+    @State private var copied = false
+
+    var body: some View {
+        Button {
+            UIPasteboard.general.string = Engine.shared.logText()
+            copied = true
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                copied = false
+            }
+        } label: {
+            Label(copied ? L("Copied") : L("Copy logs"),
+                  systemImage: copied ? "checkmark" : "doc.on.doc")
+                .font(.subheadline.weight(.semibold))
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .buttonStyle(.bordered)
+        .tint(tint)
+        .animation(.default, value: copied)
     }
 }
 

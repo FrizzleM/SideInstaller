@@ -10,6 +10,7 @@ let vietnameseStrings: [String: String] = [
 
     "Cancel": "Hủy",
     "Copy": "Sao chép",
+    "Copy logs": "Sao chép nhật ký",
     "Email": "Email",
     "Password": "Mật khẩu",
     "Install": "Cài ứng dụng",

@@ -428,7 +428,7 @@ final class SideloadedAppsManager: ObservableObject {
     func refreshAll() {
         guard !isRefreshing, !isWorking, !refreshable.isEmpty else { return }
         guard !engine.isRunning else {
-            lastError = L("An install is already running. Wait for it to finish, then refresh.")
+            lastError = ErrorHelp.explained(L("An install is already running. Wait for it to finish, then refresh."))
             return
         }
         jobs = refreshable

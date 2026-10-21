@@ -212,22 +212,22 @@ final class SideBySideManager: ObservableObject {
 
         if let ip {
             guard Self.isIPv4(ip) else {
-                lastError = L("“%@” isn't an IPv4 address. It should look like 192.168.1.42.", ip)
+                lastError = ErrorHelp.explained(L("“%@” isn't an IPv4 address. It should look like 192.168.1.42.", ip))
                 return
             }
             // Pointed at this iPhone, the whole run would talk to itself.
             guard !NetworkStatus.isOwnAddress(ip) else {
-                lastError = L("%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.", ip)
+                lastError = ErrorHelp.explained(L("%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.", ip))
                 return
             }
         }
         guard !id.isEmpty, !pw.isEmpty else {
-            lastError = L("Enter the Apple ID to sign with, and its password.")
+            lastError = ErrorHelp.explained(L("Enter the Apple ID to sign with, and its password."))
             return
         }
         engine.refreshNetworkStatus()
         guard engine.wifiConnected else {
-            lastError = L("Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.")
+            lastError = ErrorHelp.explained(L("Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work."))
             return
         }
 
@@ -1157,9 +1157,7 @@ struct SideBySidePopup: View {
                       systemImage: "exclamationmark.triangle.fill",
                       tint: .red,
                       onClose: close) {
-                Text(message)
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
+                ErrorMessage(message: message)
             }
         case .success(let appName):
             PopupCard(title: L("Last step: they trust %@", appName),

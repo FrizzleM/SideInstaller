@@ -516,7 +516,7 @@ final class LocationManager: ObservableObject {
         guard !isBusy else { return }
         guard (-90...90).contains(coordinate.latitude),
               (-180...180).contains(coordinate.longitude) else {
-            lastError = L("That isn't a valid coordinate.")
+            lastError = ErrorHelp.explained(L("That isn't a valid coordinate."))
             return
         }
         cancelPlayback()
@@ -598,7 +598,7 @@ final class LocationManager: ObservableObject {
         stage = .notReady
         keepAlive.stopAll()
         lastSuccess = nil
-        lastError = L("Location session closed — set it up again.")
+        lastError = ErrorHelp.explained(L("Location session closed — set it up again."))
     }
 
     private func stopResending() {
@@ -1174,7 +1174,7 @@ struct LocationView: View {
             defer { isSearching = false }
             guard let response = try? await MKLocalSearch(request: request).start(),
                   let first = response.mapItems.first else {
-                manager.lastError = L("Nothing found for “%@”.", text)
+                manager.lastError = ErrorHelp.explained(L("Nothing found for “%@”.", text))
                 return
             }
             manager.lastError = nil

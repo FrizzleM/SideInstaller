@@ -10,6 +10,7 @@ let japaneseStrings: [String: String] = [
 
     "Cancel": "キャンセル",
     "Copy": "コピー",
+    "Copy logs": "ログをコピー",
     "Email": "メールアドレス",
     "Password": "パスワード",
     "Install": "インストール",

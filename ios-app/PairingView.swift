@@ -302,9 +302,7 @@ struct PairingPopup: View {
                       systemImage: "exclamationmark.triangle.fill",
                       tint: .red,
                       onClose: close) {
-                Text(message)
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
+                ErrorMessage(message: message)
             }
         case .success(let message):
             // Titled after the page: this covers a new file and a write alike.

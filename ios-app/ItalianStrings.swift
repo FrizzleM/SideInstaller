@@ -8,6 +8,7 @@ let italianStrings: [String: String] = [
 
     "Cancel": "Annulla",
     "Copy": "Copia",
+    "Copy logs": "Copia log",
     "Email": "Email",
     "Password": "Password",
     "Install": "Installa",
