@@ -215,6 +215,11 @@ let italianStrings: [String: String] = [
     "Pairing file ready. You can export it or install it into an app below.":
         "File di abbinamento pronto. Puoi esportarlo o installarlo in un'app qui sotto.",
     "Pairing file installed into %@.": "File di abbinamento installato in %@.",
+    "Install pairing into all apps": "Installa l'abbinamento in tutte le app",
+    "Installing into all apps": "Installazione in tutte le app",
+    "Pairing file installed into all %d apps.": "File di abbinamento installato in tutte le %d app.",
+    "Couldn't write into %@.": "Impossibile scrivere in %@.",
+    "The %@ record isn't a plist dictionary.": "Il record %@ non è un dizionario plist.",
 
     // Importing a pairing file (required below iOS 27, under Advanced from 27)
 

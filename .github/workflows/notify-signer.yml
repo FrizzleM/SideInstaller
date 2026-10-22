@@ -1,0 +1,89 @@
+name: notify-signer
+
+# Tells FrizzleM/SideInstaller-Signed that a release here has an unsigned IPA
+# ready to sign. That repository holds the certificates and the signing
+# workflow, signs the IPA with every certificate, attaches the signed IPAs to a
+# release of its own under the same tag and deploys the install page
+# (sideinstaller.net). This repository never signs, and never commits an IPA.
+#
+# This is the only call from here to the signed repository: a
+# repository_dispatch of type `unsigned-release` with {"tag": "<tag>"}. The
+# signed repository reads everything else (the IPA, whether it's a beta) from
+# the release itself.
+#
+# It runs:
+#   - when a release is published by hand (Releases › Draft a new release),
+#   - from release-sideinstaller, right after it publishes a release (a
+#     release made with a run's own token starts no workflows by itself),
+#   - from Actions › notify-signer › Run workflow, to re-sign a given tag.
+#
+# Needs a GitHub App installed on FrizzleM/SideInstaller-Signed with
+# Repository permissions › Contents: Read and write, and two secrets here:
+#   SIGNER_APP_ID           the App's ID (App settings › General › App ID)
+#   SIGNER_APP_PRIVATE_KEY  a private key generated for the App (.pem contents)
+
+on:
+  release:
+    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to sign, e.g. v1.6.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    name: Ask SideInstaller-Signed to sign the release
+    runs-on: ubuntu-latest
+    steps:
+      # The tag reaches the shell through env only, and is checked before use.
+      - name: Resolve the tag
+        id: tag
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          tag="${INPUT_TAG:-$RELEASE_TAG}"
+          if [[ ! "$tag" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then
+            echo "::error::Not a usable release tag: '$tag'"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Mint a token for SideInstaller-Signed
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.SIGNER_APP_ID }}
+          private-key: ${{ secrets.SIGNER_APP_PRIVATE_KEY }}
+          owner: FrizzleM
+          repositories: SideInstaller-Signed
+          # repository_dispatch needs Contents: write; nothing else is asked for.
+          permission-contents: write
+
+      - name: Send the dispatch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          jq -n --arg tag "$TAG" '{event_type: "unsigned-release", client_payload: {tag: $tag}}' |
+            gh api --method POST repos/FrizzleM/SideInstaller-Signed/dispatches --input -
+          {
+            echo "### Sent to SideInstaller-Signed"
+            echo
+            echo "\`unsigned-release\` for \`$TAG\`. Signing runs there:"
+            echo "https://github.com/FrizzleM/SideInstaller-Signed/actions"
+          } >> "$GITHUB_STEP_SUMMARY"

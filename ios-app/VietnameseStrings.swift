@@ -216,6 +216,11 @@ let vietnameseStrings: [String: String] = [
     "Pairing file ready. You can export it or install it into an app below.":
         "Tệp ghép nối đã sẵn sàng. Bạn có thể xuất tệp hoặc cài vào một ứng dụng bên dưới.",
     "Pairing file installed into %@.": "Đã cài tệp ghép nối vào %@.",
+    "Install pairing into all apps": "Cài tệp ghép nối vào tất cả ứng dụng",
+    "Installing into all apps": "Đang cài vào tất cả ứng dụng",
+    "Pairing file installed into all %d apps.": "Đã cài tệp ghép nối vào cả %d ứng dụng.",
+    "Couldn't write into %@.": "Không thể ghi vào %@.",
+    "The %@ record isn't a plist dictionary.": "Bản ghi %@ không phải là từ điển plist.",
 
     // Importing a pairing file (required below iOS 27, under Advanced from 27)
 

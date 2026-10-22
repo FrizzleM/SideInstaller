@@ -17,9 +17,9 @@ final class PairingLiveActivity: PairingCodeSurface {
 
     /// True when the widget extension that draws the activity is in the app.
     /// A build signed with a certificate that only covers the app's own
-    /// identifier ships without it (see `scripts/sign_with_all_certs.sh`), and
-    /// an activity started then would be an empty box. `PairingNotification`
-    /// stands in there.
+    /// identifier ships without it (see `scripts/sign_with_all_certs.sh` in
+    /// FrizzleM/SideInstaller-Signed), and an activity started then would be
+    /// an empty box. `PairingNotification` stands in there.
     nonisolated static let hasExtension: Bool = {
         guard let plugIns = Bundle.main.builtInPlugInsURL,
               let contents = try? FileManager.default.contentsOfDirectory(
