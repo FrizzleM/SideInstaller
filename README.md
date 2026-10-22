@@ -56,7 +56,8 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 
 ## Requirements
 
-- An iPhone (the iPhone Duo too, open or closed) or iPad on iOS 27+ (iOS 17.4+ if you have your pairing file)
+- An iPhone (the iPhone Duo too, open or closed) or iPad on iOS 27+ (iOS 17.4+ with a pairing file
+  made on a computer; from iOS 26.4, a [remote pairing one](#ios-264-to-26x-a-remote-pairing-file))
 - Wi-Fi (first time only)
 - Your Apple account credentials (not collected)
 
@@ -100,8 +101,26 @@ doesn't open the app on its own.
 | iOS | Is it compatible? |
 | --- | --- |
 | 27+ | ✅ Yes |
-| 17.4 - 26.7 | ⚠️ Yes, but [a pairing file is needed](https://docs.sidestore.io/docs/advanced/alternative#pairing), and that requires a PC |
+| 26.4 - 26.7 | ⚠️ Yes, but [a remote pairing file is needed](#ios-264-to-26x-a-remote-pairing-file), and that requires a PC |
+| 17.4 - 26.3 | ⚠️ Yes, but [a pairing file is needed](https://docs.sidestore.io/docs/advanced/alternative#pairing), and that requires a PC |
 | <17.4 | ❌ No |
+
+### iOS 26.4 to 26.x: a remote pairing file
+
+Since iOS 26.4, the iPhone hangs up on lockdown pairing files (from jitterbugpair,
+`pymobiledevice3 lockdown pair`, or idevice_pair's **Lockdown**) as soon as they connect through
+LocalDevVPN, so they can't be used on the iPhone any more, however new. A remote pairing (RPPairing)
+file still works:
+
+1. On a Mac, Windows PC or Linux computer, open [idevice_pair](https://github.com/jkcoxson/idevice_pair/releases/latest)
+   and plug the iPhone in. Tap **Trust** if it asks.
+2. Pick the iPhone, choose **Remote pairing**, click **Create**, and keep the iPhone unlocked until
+   it's done.
+3. Click **Save to file…** and send the file to the iPhone by AirDrop, iCloud Drive or a cable.
+4. In SideInstaller, tap **Import pairing file** (or **Replace**) and pick it.
+
+A pairing file exported from [iLoader](https://github.com/nab138/iloader) (**Manage Pairing File** ›
+**Export**) holds both kinds and works too.
 
 
 ## Is SideInstaller safe?

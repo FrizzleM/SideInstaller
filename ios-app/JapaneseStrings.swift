@@ -766,6 +766,18 @@ let japaneseStrings: [String: String] = [
     "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
         "こちらに戻り、「ペアリングファイルをインポート」をタップして選択してください。それ以降の流れは iOS %@ と同じです。",
     "Get jitterbugpair": "jitterbugpair を入手",
+    "From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.":
+        "iOS 26.4 以降は「Remote pairing」形式のファイルが必要です。jitterbugpair で作るような lockdown 形式のファイルは、LocalDevVPN を経由するとこの iPhone に切断されます。",
+    "Get idevice_pair": "idevice_pair を入手",
+    "Make a remote pairing file": "「Remote pairing」ファイルを作成",
+    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
+        "インポートしたペアリングファイルは lockdown 形式です。iOS 26.4 以降、この iPhone は LocalDevVPN を経由する lockdown 形式のファイルを切断するため、このファイルでは接続できず、同じ形式で作り直しても同じです。",
+    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
+        "こちらに戻り、「ペアリングファイル」カードの「置き換え」をタップして、そのファイルを選択してください。",
+    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
+        "Mac、Windows パソコン、または Linux マシンで idevice_pair を開き、この iPhone を接続して、求められたら「信頼」をタップしてください。この iPhone を選び、「Remote pairing」を選んで「Create」をクリックし、完了するまで iPhone のロックを解除したままにしてください。",
+    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
+        "「Save to file…」をクリックし、そのファイルを AirDrop、iCloud Drive、またはケーブルでこの iPhone に転送してください。iLoader から書き出したペアリングファイルも使えます。",
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
@@ -818,6 +830,12 @@ let japaneseStrings: [String: String] = [
         "デバイス IP が %@ になっています。これはこの iPhone 自身のアドレスの一つで、iOS はアプリがそこへ接続することを許可しません。「設定 › 詳細設定 › デバイス IP」を、LocalDevVPN の「Settings › Device IP」にあるアドレス（初期値は 10.7.0.1）にしてください。LocalDevVPN のメイン画面に「… に接続しました」と表示されているアドレスではありません。",
     "iOS refused the connection to %@ on this iPhone, before anything was sent. It does that for this iPhone's own addresses, like the “Connected to” address on LocalDevVPN's main screen. Device IP, in Settings › Advanced, has to be the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off and on again, then try again.":
         "iOS がこの iPhone 上で %@ への接続を拒否しました（何も送信されていません）。iOS は、LocalDevVPN のメイン画面に「… に接続しました」と表示されるアドレスのような、この iPhone 自身のアドレスへの接続を拒否します。「設定 › 詳細設定 › デバイス IP」は、LocalDevVPN の「Settings › Device IP」にあるアドレス（初期値は 10.7.0.1）でなければなりません。既にそうなっている場合は、LocalDevVPN をオフにしてからオンに戻し、もう一度お試しください。",
+    "This iPhone hung up on the connection as soon as it opened. From iOS 26.4 on it does that to lockdown pairing files, like this one, when they come through LocalDevVPN. Pair this iPhone with itself instead: tap “Regenerate” under Tools › Pairing, or tap Install, which pairs it first.":
+        "この iPhone は、接続が開いた直後に切断しました。iOS 26.4 以降、LocalDevVPN を経由する lockdown 形式のペアリングファイル（このファイルなど）はこのように切断されます。代わりにこの iPhone を自分自身とペアリングしてください。「ツール › ペアリング」で「再生成」をタップするか、「インストール」をタップすると最初にペアリングが行われます。",
+    "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
+        "この iPhone は、接続が開いた直後に切断しました。iOS 26.4 以降、LocalDevVPN を経由する lockdown 形式のペアリングファイル（このファイルなど）はこのように切断されるため、同じ形式のファイルを作り直しても解決しません。「Remote pairing」形式のペアリングファイルなら今でも使えます。パソコンで idevice_pair を開き、「Remote pairing」を選んで「Create」、続けて「Save to file…」をクリックし、そのファイルを「ペアリングファイル」からインポートしてください。",
+    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
+        "この iPhone が接続を切断しました。iOS 26.4 以降、LocalDevVPN を経由する lockdown 形式のペアリングファイル（このファイルなど）はこのように切断されます。上記の手順をご覧ください。",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "この iPhone のペアリングには Wi-Fi が必要です。SideInstaller は「設定」アプリから見つけてもらうために、ローカルネットワーク上で自身をアドバタイズします。",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
