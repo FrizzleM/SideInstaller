@@ -1021,8 +1021,13 @@ screen.
 [Madeira](https://github.com/willfaust/Madeira) (Windows PC games through Wine and
 FEX) is a fourth `InstallSource`. Four things differ from SideStore.
 
-**The download.** Its release asset is named after the version
-(`Madeira-0.1.3.ipa` on tag `v0.1.3`), so there's no fixed `latest/download` URL.
+**The download.** It comes from the releases of the fork
+[FrizzleM/Madeira](https://github.com/FrizzleM/Madeira), built from its
+`sideinstaller-refresh` branch (willfaust/Madeira#264), since only that build
+renews its own signing; switch `InstallSource.repo` back once upstream ships it.
+Its release asset is named after the version, as upstream names it
+(`Madeira-0.1.3.ipa` on tag `v0.1.3`, `Madeira-0.1.3-self-refresh.1.ipa` on
+`v0.1.3-self-refresh.1`), so there's no fixed `latest/download` URL.
 `SideStoreDownloader.latestTag` reads the tag off where
 `github.com/<repo>/releases/latest` redirects to, which has no rate limit, and the
 URL is built from it; a 404 falls back to the API as before. There's no nightly,
@@ -1035,7 +1040,7 @@ needs.
 that has isideload enable that capability on the app's App IDs before the profile
 is requested (`Engine.isMadeira` also catches a Madeira IPA imported as custom, or
 refreshed from Documents, by its bundle id: `com.willfaust.madeora` or any id under
-it, such as the `.test` one the pinned build has). Its `MadeiraJITHelper.appex` is signed like every
+it, such as the `.test` one of a local development build). Its `MadeiraJITHelper.appex` is signed like every
 extension here, with the main app's profile and entitlements, and renamed with the
 app (`<id>.<team>.JITHelper`), which is how Madeira finds it. Madeira picks its
 background task from `BGTaskSchedulerPermittedIdentifiers` by taking the first
