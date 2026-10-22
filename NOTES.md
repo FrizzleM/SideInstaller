@@ -426,7 +426,7 @@ arrives in the content state, already translated, since the extension has neithe
 the tables nor the language setting.
 
 An extension needs an application-identifier of its own, under the app's.
-`scripts/sign_with_all_certs.sh` therefore signs it only under a wildcard profile
+`scripts/sign_with_all_certs.sh` (in FrizzleM/SideInstaller-Signed) therefore signs it only under a wildcard profile
 (`TEAM.*`), renamed to sit under the app's new bundle id; under an explicit
 profile, which covers one id, it removes `PlugIns/`. Every certificate in the pool
 on 2026-10-11 had an explicit profile, so none of those builds carry the
