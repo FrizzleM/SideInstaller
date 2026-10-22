@@ -228,7 +228,8 @@ int32_t si_cert_signin(const char *apple_id,
 
 // List the team's iOS development certificates. BLOCKS. On success *out_json is
 // a heap JSON array of objects: {name, serial_number, machine_name, machine_id,
-// certificate_id, platform, status, expiration}. Free with si_string_free.
+// certificate_id, platform, status, expiration, signing}, where signing is true
+// for the one SideInstaller signs with. Free with si_string_free.
 int32_t si_cert_list(CertSession *session,
                      char **out_json,
                      char **out_error);
@@ -250,6 +251,18 @@ int32_t si_cert_import(CertSession *session,
                        size_t p12_len,
                        const char *password,
                        char **out_json,
+                       char **out_error);
+
+// Write the certificate with the given serial number and its private key to
+// out_path as a PKCS#12 archive encrypted with password (triple-DES, SHA-1 MAC),
+// for another app or computer to sign with. Only the certificate SideInstaller
+// signs with has its key here. BLOCKS. Returns 0 on success, 3 when the
+// certificate isn't that one (nothing written), other non-zero on error
+// (*out_error set).
+int32_t si_cert_export(CertSession *session,
+                       const char *serial_number,
+                       const char *password,
+                       const char *out_path,
                        char **out_error);
 
 // Free a certificate session.

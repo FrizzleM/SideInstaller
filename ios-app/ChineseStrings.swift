@@ -266,6 +266,20 @@ let chineseStrings: [String: String] = [
     "This certificate has no serial number, so it can't be revoked.":
         "此证书没有序列号，因此无法吊销。",
 
+    // Export: the certificate SideInstaller signs with, as a .p12
+    "This certificate has no serial number, so it can't be exported.": "此证书没有序列号，因此无法导出。",
+    "Only the certificate SideInstaller signs with can be exported: the private key of any other stays on the device that asked Apple for it.":
+        "只能导出 SideInstaller 用来签名的证书：其他证书的私钥只保存在向 Apple 申请它的设备上。",
+    "Couldn't export the certificate: %@": "无法导出证书：%@",
+    "Export certificate": "导出证书",
+    "Export": "导出",
+    "Exporting": "正在导出",
+    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password for it: you'll need it to import the file. Keep the file to yourself.":
+        "将此证书及其私钥存为 .p12 文件，供其他签名 App 或电脑签名使用。请为它设置密码：导入文件时需要输入。请勿将文件交给他人。",
+    "SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it.":
+        "SideInstaller 只能导出它用来签名的证书，而这里没有：证书的私钥只保存在向 Apple 申请它的设备上。",
+    "SideInstaller signs with this one": "SideInstaller 用此证书签名",
+
     // MARK: - SideStore's certificate (sidestore://certificate)
 
     "Use SideStore's certificate": "使用 SideStore 的证书",

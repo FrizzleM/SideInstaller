@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Lists and revokes the Apple ID's development certificates (e.g. to fix error
-/// 7460), or signs with SideStore's instead. Pushed from Tools (relies on its
-/// `NavigationStack`).
+/// 7460), exports the one SideInstaller signs with, or signs with SideStore's
+/// instead. Pushed from Tools (relies on its `NavigationStack`).
 struct CertsView: View {
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
@@ -11,6 +11,9 @@ struct CertsView: View {
     @State private var showSettings = false
     /// The certificate the user tapped "Revoke" on, pending confirmation.
     @State private var pendingRevoke: DevCert?
+    /// The certificate the user tapped "Export" on, pending a password.
+    @State private var pendingExport: DevCert?
+    @State private var exportPassword = ""
 
     var body: some View {
         ScrollView {
@@ -22,6 +25,22 @@ struct CertsView: View {
                 }
                 // Errors show as a popup, which `RootView` lays over the app.
                 certList
+            }
+            // Here rather than beside the revoke alert: one view, one alert.
+            .alert(L("Export certificate"),
+                   isPresented: Binding(get: { pendingExport != nil },
+                                        set: { if !$0 { endExport() } })) {
+                SecureField(L("Password"), text: $exportPassword)
+                Button(L("Export")) {
+                    if let cert = pendingExport {
+                        manager.export(cert, password: exportPassword, share: share)
+                    }
+                    endExport()
+                }
+                .disabled(exportPassword.isEmpty)
+                Button(L("Cancel"), role: .cancel) { endExport() }
+            } message: {
+                Text(L("Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password for it: you'll need it to import the file. Keep the file to yourself."))
             }
             .padding(20)
             .animation(.smooth(duration: 0.35), value: manager.certs)
@@ -130,6 +149,14 @@ struct CertsView: View {
                     Spacer()
                 }
                 .cascadeItem(3)
+                if manager.hasLoaded && !manager.certs.contains(where: \.isSigning) {
+                    Text(L("SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .cascadeItem(3)
+                }
                 ForEach(Array(manager.certs.enumerated()), id: \.element.id) { idx, cert in
                     certRow(cert).cascadeItem(4 + idx)
                 }
@@ -156,8 +183,7 @@ struct CertsView: View {
     }
 
     private func certRow(_ cert: DevCert) -> some View {
-        let revoking = manager.revokingID == cert.id
-        return PanelCard {
+        PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "seal.fill")
@@ -170,6 +196,11 @@ struct CertsView: View {
                             Label(machine, systemImage: "desktopcomputer")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                        }
+                        if cert.isSigning {
+                            Label(L("SideInstaller signs with this one"), systemImage: "checkmark.seal.fill")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.green)
                         }
                     }
                     Spacer()
@@ -201,26 +232,93 @@ struct CertsView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                Button(role: .destructive) {
-                    pendingRevoke = cert
-                } label: {
-                    HStack(spacing: 6) {
-                        if revoking {
-                            ProgressView().controlSize(.small)
-                            Text(L("Revoking"))
-                        } else {
-                            Image(systemName: "trash")
-                            Text(L("Revoke"))
-                        }
+                HStack(spacing: 10) {
+                    if cert.isSigning {
+                        exportButton(cert)
                     }
-                    .font(.subheadline.weight(.medium))
-                    .frame(maxWidth: .infinity)
+                    revokeButton(cert)
                 }
-                .buttonStyle(.bordered)
-                .tint(.red)
-                .controlSize(.regular)
-                .disabled(revoking || manager.isWorking || manager.revokingID != nil)
             }
         }
+    }
+
+    private func exportButton(_ cert: DevCert) -> some View {
+        Button {
+            exportPassword = ""
+            pendingExport = cert
+        } label: {
+            HStack(spacing: 6) {
+                if manager.exportingID == cert.id {
+                    ProgressView().controlSize(.small)
+                    Text(L("Exporting"))
+                } else {
+                    Image(systemName: "square.and.arrow.up")
+                    Text(L("Export"))
+                }
+            }
+            .font(.subheadline.weight(.medium))
+            // Two side by side leave little room for "Exporting" in some languages.
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .tint(Theme.accent)
+        .controlSize(.regular)
+        .disabled(manager.isBusy)
+    }
+
+    private func revokeButton(_ cert: DevCert) -> some View {
+        Button(role: .destructive) {
+            pendingRevoke = cert
+        } label: {
+            HStack(spacing: 6) {
+                if manager.revokingID == cert.id {
+                    ProgressView().controlSize(.small)
+                    Text(L("Revoking"))
+                } else {
+                    Image(systemName: "trash")
+                    Text(L("Revoke"))
+                }
+            }
+            .font(.subheadline.weight(.medium))
+            // Two side by side leave little room for "Exporting" in some languages.
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .tint(.red)
+        .controlSize(.regular)
+        .disabled(manager.isBusy)
+    }
+
+    // MARK: Export
+
+    private func endExport() {
+        pendingExport = nil
+        exportPassword = ""
+    }
+
+    /// Offers the exported .p12 to Files, AirDrop or a signing app, then deletes
+    /// it and its folder: it holds the private key.
+    private func share(_ file: URL) {
+        let folder = file.deletingLastPathComponent()
+        // The password prompt may still be animating away.
+        var top = UIApplication.shared.topViewController
+        while let leaving = top, leaving.isBeingDismissed { top = leaving.presentingViewController }
+        guard let top else {
+            try? FileManager.default.removeItem(at: folder)
+            return
+        }
+        let sheet = UIActivityViewController(activityItems: [file], applicationActivities: nil)
+        sheet.completionWithItemsHandler = { _, _, _, _ in
+            try? FileManager.default.removeItem(at: folder)
+        }
+        // On iPad the share sheet is a popover and needs an anchor.
+        sheet.popoverPresentationController?.sourceView = top.view
+        sheet.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY,
+                                                                 width: 0, height: 0)
+        top.present(sheet, animated: true)
     }
 }

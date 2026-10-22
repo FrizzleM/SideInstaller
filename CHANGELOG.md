@@ -34,6 +34,12 @@ All notable changes to SideInstaller are documented here.
   certificate is used only once Apple lists it among the signed-in Apple ID's certificates, and the
   key SideInstaller signed with before is kept. SideStore 0.6.4 and the nightlies send it
   unencrypted, and the encrypted one an older SideStore kept works too.
+- **The Certificates page exports the certificate SideInstaller signs with.** The certificate it
+  signs with is marked “SideInstaller signs with this one” and has an Export button, which asks for
+  a password and saves the certificate with its private key as a .p12 file, to save in Files, send
+  by AirDrop or open in another signing app. The other certificates can't be exported: their
+  private keys stay on the device that asked Apple for them. The file is triple-DES encrypted with
+  a SHA-1 MAC, the format Keychain, OpenSSL and iOS signing apps all read.
 - **Settings can show Developer Mode, or turn it on.** A new Developer Mode section asks this iPhone
   to show the Developer Mode switch under Settings › Privacy & Security, or to turn Developer Mode
   on, which restarts the iPhone and asks to confirm once it's unlocked. It first checks whether

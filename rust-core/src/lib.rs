@@ -247,7 +247,7 @@ pub unsafe extern "C" fn si_forget_apple_session(
 }
 
 // ---------------------------------------------------------------------------
-// Certificates — list, revoke and import
+// Certificates — list, revoke, import and export
 // ---------------------------------------------------------------------------
 
 /// Open a developer session on the first team for certificate management.
@@ -317,6 +317,23 @@ pub unsafe extern "C" fn si_cert_import(
     out_error: *mut *mut c_char,
 ) -> i32 {
     certs::cert_import(session, p12, p12_len, password, out_json, out_error)
+}
+
+/// Write the certificate with `serial_number` and its private key to
+/// `out_path` as a PKCS#12 archive encrypted with `password`. Returns 3 when
+/// it isn't the certificate SideInstaller signs with. Blocks.
+///
+/// # Safety
+/// See `certs::cert_export`.
+#[no_mangle]
+pub unsafe extern "C" fn si_cert_export(
+    session: *mut CertSession,
+    serial_number: *const c_char,
+    password: *const c_char,
+    out_path: *const c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    certs::cert_export(session, serial_number, password, out_path, out_error)
 }
 
 /// Free a certificate session.

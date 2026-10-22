@@ -270,6 +270,21 @@ let portugueseStrings: [String: String] = [
     "This certificate has no serial number, so it can't be revoked.":
         "Este certificado não tem número de série, então não pode ser revogado.",
 
+    // Export: the certificate SideInstaller signs with, as a .p12
+    "This certificate has no serial number, so it can't be exported.":
+        "Este certificado não tem número de série, então não pode ser exportado.",
+    "Only the certificate SideInstaller signs with can be exported: the private key of any other stays on the device that asked Apple for it.":
+        "Só o certificado com que o SideInstaller assina pode ser exportado: a chave privada de qualquer outro fica no dispositivo que o pediu à Apple.",
+    "Couldn't export the certificate: %@": "Não foi possível exportar o certificado: %@",
+    "Export certificate": "Exportar certificado",
+    "Export": "Exportar",
+    "Exporting": "Exportando",
+    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password for it: you'll need it to import the file. Keep the file to yourself.":
+        "Salva este certificado e a chave privada dele em um arquivo .p12, para outro app de assinatura ou um computador assinar com ele. Escolha uma senha: você vai precisar dela para importar o arquivo. Não o passe para ninguém.",
+    "SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it.":
+        "O SideInstaller só pode exportar o certificado com que assina, e nenhum destes é ele: a chave privada de um certificado fica no dispositivo que o pediu à Apple.",
+    "SideInstaller signs with this one": "O SideInstaller assina com este",
+
     // MARK: - SideStore's certificate (sidestore://certificate)
 
     "Use SideStore's certificate": "Usar o certificado do SideStore",
