@@ -167,6 +167,9 @@ All notable changes to SideInstaller are documented here.
   app's own provisioning profile, yet it still registered an App ID for each of them that nothing
   used, out of the 10 a free Apple ID gets a week. Now only the app gets one, as in iLoader 2.4.0:
   SideStore with its widget costs 1 App ID instead of 2, and signing sends fewer requests to Apple.
+- **The update banner goes by the latest release.** SideInstaller now checks the version tag of the
+  newest release on GitHub instead of a separate version file, so the banner shows up as soon as a
+  release is out. Betas don't trigger it.
 
 ## 1.5.3
 
