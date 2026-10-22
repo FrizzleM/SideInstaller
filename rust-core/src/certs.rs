@@ -1,8 +1,9 @@
 //! Lists and revokes iOS development certificates via `isideload`'s
 //! `DeveloperSession` (developer portal only, no device). `si_cert_signin` opens
 //! a session on the first team, `si_cert_list` returns its certificates as JSON,
-//! `si_cert_revoke` revokes one by serial number, and `si_cert_import` signs
-//! with SideStore's certificate from then on.
+//! `si_cert_revoke` revokes one by serial number, `si_cert_import` signs with
+//! SideStore's certificate from then on, and `si_cert_export` writes the one
+//! SideInstaller signs with to a password-protected PKCS#12 archive.
 
 use std::ffi::{c_char, c_void};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -18,7 +19,9 @@ use isideload::{
     },
     sideload::cert_identity::CertificateIdentity,
 };
+use der::Decode;
 use rsa::{
+    pkcs1::EncodeRsaPublicKey,
     pkcs8::{DecodePrivateKey, EncodePrivateKey},
     RsaPrivateKey,
 };
@@ -27,7 +30,7 @@ use serde::Serialize;
 use crate::account::{make_2fa, TwoFactorCb, TwoFaCtx};
 use crate::apple_session;
 use crate::error_text::report_text;
-use crate::ffi_util::{cstr, opt_str};
+use crate::ffi_util::{cstr, opt_str, req_str};
 
 /// Opaque handle owning the runtime, developer session and selected team.
 pub struct CertSession {
@@ -56,6 +59,9 @@ struct CertInfo {
     status: String,
     /// RFC3339 expiry (e.g. `2027-01-01T00:00:00Z`), or "" if Apple omitted it.
     expiration: String,
+    /// True for the certificate SideInstaller signs with: the only one whose
+    /// private key is on this iPhone, so the only one it can export.
+    signing: bool,
 }
 
 impl From<&DevelopmentCertificate> for CertInfo {
@@ -75,7 +81,15 @@ impl From<&DevelopmentCertificate> for CertInfo {
                 .as_ref()
                 .map(|d| d.to_xml_format())
                 .unwrap_or_default(),
+            signing: false,
         }
+    }
+}
+
+impl CertInfo {
+    fn signing(mut self, signing: bool) -> Self {
+        self.signing = signing;
+        self
     }
 }
 
@@ -180,6 +194,7 @@ pub unsafe fn cert_list(
     let session = &mut *session;
 
     let result = catch_unwind(AssertUnwindSafe(|| {
+        let key = signing_key(session).ok().flatten();
         session.rt.block_on(async {
             let certs = session
                 .dev
@@ -187,7 +202,13 @@ pub unsafe fn cert_list(
                 .await
                 .map_err(|e| format!("list certs failed: {}", report_text(&e)))?;
             tracing::info!("Certs: {} iOS development certificate(s)", certs.len());
-            let infos: Vec<CertInfo> = certs.iter().map(CertInfo::from).collect();
+            let infos: Vec<CertInfo> = certs
+                .iter()
+                .map(|c| {
+                    let signing = key.as_ref().is_some_and(|k| holds_key(c, k));
+                    CertInfo::from(c).signing(signing)
+                })
+                .collect();
             serde_json::to_string(&infos).map_err(|e| format!("serialize certs: {e}"))
         })
     }));
@@ -320,7 +341,10 @@ pub unsafe fn cert_import(
                     cert.machine_name.as_deref().unwrap_or("no machine name"),
                     if replaced { "" } else { "; it was the one in use already" }
                 );
-                let import = CertImport { certificate: CertInfo::from(&cert), replaced_key: replaced };
+                let import = CertImport {
+                    certificate: CertInfo::from(&cert).signing(true),
+                    replaced_key: replaced,
+                };
                 return serde_json::to_string(&import)
                     .map_err(|e| (1, format!("serialize import: {e}")));
             }
@@ -355,6 +379,111 @@ pub unsafe fn cert_import(
             2
         }
     }
+}
+
+/// Write the certificate with `serial_number` and SideInstaller's private key
+/// for it to `out_path` as a PKCS#12 archive encrypted with `password`, for
+/// another app or computer to sign with (see `p12::archive`).
+///
+/// Only the certificate SideInstaller signs with can go: the private key of any
+/// other stays on the device that asked Apple for it. Returns 3, writing
+/// nothing, when the certificate isn't that one (or SideInstaller has no key
+/// for this Apple ID yet), 1 when the portal no longer lists it.
+///
+/// # Safety
+/// `session` must be a valid pointer from `cert_signin`; `serial_number`,
+/// `password` and `out_path` valid C strings; `out_error` valid and writable.
+pub unsafe fn cert_export(
+    session: *mut CertSession,
+    serial_number: *const c_char,
+    password: *const c_char,
+    out_path: *const c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    if session.is_null() {
+        *out_error = cstr("null session");
+        return 2;
+    }
+    let session = &mut *session;
+    let serial = opt_str(serial_number, "");
+    let (Some(password), Some(out_path)) = (req_str(password), req_str(out_path)) else {
+        *out_error = cstr("missing password or destination");
+        return 2;
+    };
+    if serial.is_empty() {
+        *out_error = cstr("empty serial number");
+        return 2;
+    }
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let not_ours = |why: &str| {
+            (3, format!("certificate {serial} can't be exported: {why}"))
+        };
+        let key = signing_key(session)
+            .map_err(|e| (1, e))?
+            .ok_or_else(|| not_ours("SideInstaller has no signing key for this Apple ID yet"))?;
+        let certs = session
+            .rt
+            .block_on(session.dev.list_ios_certs(&session.team))
+            .map_err(|e| (1, format!("list certs failed: {}", report_text(&e))))?;
+        let cert = certs
+            .iter()
+            .find(|c| c.serial_number.as_deref() == Some(serial.as_str()))
+            .ok_or_else(|| (1, format!("certificate {serial} isn't on team {} anymore", session.team.team_id)))?;
+        if !holds_key(cert, &key) {
+            return Err(not_ours("its private key isn't the one SideInstaller signs with"));
+        }
+        let cert_der = cert
+            .cert_content
+            .as_ref()
+            .ok_or_else(|| (1, "Apple sent the certificate without its content".to_string()))?;
+        let name = cert.name.as_deref().filter(|n| !n.is_empty()).unwrap_or("SideInstaller");
+        let p12 = crate::p12::archive(cert_der.as_ref(), &key, name, &password).map_err(|e| (1, e))?;
+        std::fs::write(&out_path, &p12).map_err(|e| (1, format!("couldn't write the archive: {e}")))?;
+        tracing::info!("Certs: exported certificate {serial} ({} byte p12)", p12.len());
+        Ok(())
+    }));
+
+    match result {
+        Ok(Ok(())) => 0,
+        Ok(Err((rc, e))) => {
+            *out_error = cstr(e);
+            rc
+        }
+        Err(_) => {
+            *out_error = cstr("panic while exporting the certificate");
+            2
+        }
+    }
+}
+
+/// The key isideload signs with for this session's Apple ID, or None when it
+/// has made none yet. Read as is: `CertificateIdentity::retrieve_private_key`
+/// would make one.
+fn signing_key(session: &CertSession) -> Result<Option<RsaPrivateKey>, String> {
+    let path = apple_session::account_dir(&session.storage_dir, &session.apple_id).join("key");
+    match std::fs::read(&path) {
+        Ok(der) => RsaPrivateKey::from_pkcs8_der(&der)
+            .map(Some)
+            .map_err(|e| format!("couldn't read the signing key: {e}")),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("couldn't read the signing key: {e}")),
+    }
+}
+
+/// Whether `cert` is the certificate for `key`, compared the way isideload's
+/// `find_matching` does.
+fn holds_key(cert: &DevelopmentCertificate, key: &RsaPrivateKey) -> bool {
+    cert.cert_content
+        .as_ref()
+        .is_some_and(|der| cert_holds_key(der.as_ref(), key))
+}
+
+fn cert_holds_key(cert_der: &[u8], key: &RsaPrivateKey) -> bool {
+    let Ok(cert) = x509_cert::Certificate::from_der(cert_der) else { return false };
+    let Ok(public) = key.to_public_key().to_pkcs1_der() else { return false };
+    cert.tbs_certificate().subject_public_key_info().subject_public_key.as_bytes()
+        == Some(public.as_bytes())
 }
 
 /// Makes `key` the signing key isideload reads for `apple_id`. Returns false
@@ -440,5 +569,13 @@ mod tests {
         assert!(!dir.join("key.tmp").exists());
 
         std::fs::remove_dir_all(&storage).unwrap();
+    }
+
+    #[test]
+    fn tells_the_certificate_for_a_key_from_the_others() {
+        let cert = include_bytes!("../testdata/p12/cert.der");
+        assert!(cert_holds_key(cert, &key(include_bytes!("../testdata/p12/key.pk8"))));
+        assert!(!cert_holds_key(cert, &key(include_bytes!("../testdata/p12/other-key.pk8"))));
+        assert!(!cert_holds_key(b"not a certificate", &key(include_bytes!("../testdata/p12/key.pk8"))));
     }
 }

@@ -14,12 +14,50 @@ use der::{
     oid::ObjectIdentifier,
     Decode, Encode,
 };
-use p12_keystore::{KeyStore, KeyStoreEntry, Pkcs12ImportPolicy};
+use p12_keystore::{
+    EncryptionAlgorithm, KeyStore, KeyStoreEntry, MacAlgorithm, Pkcs12ImportPolicy, PrivateKeyChain,
+};
 use pkcs12::{
     cms::content_info::ContentInfo, AuthenticatedSafe, CertBag, Pfx, PKCS_12_CERT_BAG_OID,
     PKCS_12_KEY_BAG_OID, PKCS_12_X509_CERT_OID,
 };
-use rsa::{pkcs8::DecodePrivateKey, RsaPrivateKey};
+use rsa::{
+    pkcs8::{DecodePrivateKey, EncodePrivateKey},
+    RsaPrivateKey,
+};
+use sha2::{Digest, Sha256};
+
+/// A password-protected PKCS#12 archive of `key` and its certificate, for
+/// another app or computer to sign with: the Certificates page's export.
+///
+/// Triple-DES bags and a SHA-1 MAC, OpenSSL's `-legacy` shape: every importer
+/// reads it, while the PBES2/AES-256 archive `KeyStore::writer` makes by
+/// default is refused by some (Keychain on older macOS among them).
+pub(crate) fn archive(
+    cert_der: &[u8],
+    key: &RsaPrivateKey,
+    name: &str,
+    password: &str,
+) -> Result<Vec<u8>, String> {
+    let cert = p12_keystore::Certificate::from_der(cert_der)
+        .map_err(|e| format!("unreadable certificate: {e:?}"))?;
+    let key_der = key.to_pkcs8_der().map_err(|e| format!("couldn't encode the key: {e}"))?;
+    let key = p12_keystore::PrivateKey::from_der(key_der.as_bytes())
+        .map_err(|e| format!("couldn't encode the key: {e:?}"))?;
+    // Ties the key to its certificate; any value both bags share will do.
+    let local_key_id = Sha256::digest(cert_der)[..20].to_vec();
+    let mut store = KeyStore::new();
+    store.add_entry(
+        name,
+        KeyStoreEntry::PrivateKeyChain(PrivateKeyChain::new(local_key_id, key, vec![cert])),
+    );
+    store
+        .writer(password)
+        .encryption_algorithm(EncryptionAlgorithm::PbeWithShaAnd3KeyTripleDesCbc)
+        .mac_algorithm(MacAlgorithm::HmacSha1)
+        .write()
+        .map_err(|e| format!("couldn't write the PKCS#12 archive: {e:?}"))
+}
 
 /// PKCS#7 `data`, the content type of an unencrypted safe.
 const DATA_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.7.1");
@@ -174,6 +212,20 @@ mod tests {
         let p12 = store.writer("machine-id").write().unwrap();
 
         assert_the_key(&signing_keys(&p12, "machine-id").unwrap());
+    }
+
+    #[test]
+    fn exports_an_archive_that_reads_back_with_its_password_only() {
+        let cert_der = include_bytes!("../testdata/p12/cert.der");
+        let p12 = archive(cert_der, &expected_key(), "iOS Development: someone", "s3cret").unwrap();
+
+        assert_the_key(&signing_keys(&p12, "s3cret").unwrap());
+        assert!(signing_keys(&p12, "wrong").is_err());
+        // The certificate goes with it, encrypted like the key.
+        let store = KeyStore::from_pkcs12(&p12, "s3cret", Pkcs12ImportPolicy::Strict).unwrap();
+        let (_, chain) = store.private_key_chain().unwrap();
+        assert_eq!(chain.certs().len(), 1);
+        assert_eq!(chain.certs()[0].as_der(), &cert_der[..]);
     }
 
     #[test]

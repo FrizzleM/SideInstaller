@@ -271,6 +271,21 @@ let vietnameseStrings: [String: String] = [
     "This certificate has no serial number, so it can't be revoked.":
         "Chứng chỉ này không có số sê-ri nên không thể thu hồi.",
 
+    // Export: the certificate SideInstaller signs with, as a .p12
+    "This certificate has no serial number, so it can't be exported.":
+        "Chứng chỉ này không có số sê-ri nên không thể xuất.",
+    "Only the certificate SideInstaller signs with can be exported: the private key of any other stays on the device that asked Apple for it.":
+        "Chỉ có thể xuất chứng chỉ mà SideInstaller dùng để ký: khóa riêng của mọi chứng chỉ khác nằm trên thiết bị đã yêu cầu nó từ Apple.",
+    "Couldn't export the certificate: %@": "Không thể xuất chứng chỉ: %@",
+    "Export certificate": "Xuất chứng chỉ",
+    "Export": "Xuất",
+    "Exporting": "Đang xuất",
+    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password for it: you'll need it to import the file. Keep the file to yourself.":
+        "Lưu chứng chỉ này và khóa riêng của nó thành tệp .p12, để một ứng dụng ký khác hoặc máy tính ký bằng nó. Hãy chọn mật khẩu: bạn sẽ cần nó để nhập tệp. Đừng đưa tệp cho ai.",
+    "SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it.":
+        "SideInstaller chỉ có thể xuất chứng chỉ mà nó dùng để ký, và không chứng chỉ nào ở đây là nó: khóa riêng của một chứng chỉ nằm trên thiết bị đã yêu cầu nó từ Apple.",
+    "SideInstaller signs with this one": "SideInstaller ký bằng chứng chỉ này",
+
     // MARK: - SideStore's certificate (sidestore://certificate)
 
     "Use SideStore's certificate": "Dùng chứng chỉ của SideStore",

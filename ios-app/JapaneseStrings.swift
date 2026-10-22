@@ -266,6 +266,21 @@ let japaneseStrings: [String: String] = [
     "This certificate has no serial number, so it can't be revoked.":
         "この証明書にはシリアル番号がないため、失効させることができません。",
 
+    // Export: the certificate SideInstaller signs with, as a .p12
+    "This certificate has no serial number, so it can't be exported.":
+        "この証明書にはシリアル番号がないため、書き出せません。",
+    "Only the certificate SideInstaller signs with can be exported: the private key of any other stays on the device that asked Apple for it.":
+        "書き出せるのは SideInstaller が署名に使っている証明書だけです。ほかの証明書の秘密鍵は、それを Apple に要求したデバイスにしかありません。",
+    "Couldn't export the certificate: %@": "証明書を書き出せませんでした: %@",
+    "Export certificate": "証明書を書き出す",
+    "Export": "書き出す",
+    "Exporting": "書き出し中",
+    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password for it: you'll need it to import the file. Keep the file to yourself.":
+        "この証明書と秘密鍵を .p12 ファイルとして保存し、ほかの署名アプリやコンピュータで署名に使えるようにします。パスワードを決めてください。ファイルを読み込むときに必要です。ファイルは誰にも渡さないでください。",
+    "SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it.":
+        "SideInstaller が書き出せるのは署名に使っている証明書だけですが、この中にはありません。証明書の秘密鍵は、それを Apple に要求したデバイスにしかありません。",
+    "SideInstaller signs with this one": "SideInstaller はこの証明書で署名します",
+
     // MARK: - SideStore's certificate (sidestore://certificate)
 
     "Use SideStore's certificate": "SideStore の証明書を使う",

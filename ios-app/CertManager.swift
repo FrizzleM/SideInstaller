@@ -13,6 +13,8 @@ struct DevCert: Identifiable, Decodable, Equatable {
     let status: String
     /// RFC3339 expiry (e.g. `2027-01-01T00:00:00Z`), or "" if Apple omitted it.
     let expiration: String
+    /// True for the certificate SideInstaller signs with.
+    let signing: Bool?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -23,6 +25,7 @@ struct DevCert: Identifiable, Decodable, Equatable {
         case platform
         case status
         case expiration
+        case signing
     }
 
     /// Stable identity: the serial revocation keys on, or the certificate id.
@@ -49,6 +52,10 @@ struct DevCert: Identifiable, Decodable, Equatable {
         guard let date = expiresAt else { return false }
         return date < Date()
     }
+
+    /// The certificate SideInstaller signs with: the only one whose private key
+    /// is on this iPhone, so the only one it can export.
+    var isSigning: Bool { signing == true }
 }
 
 /// What `si_cert_import` reports: the team's certificate SideInstaller now signs
@@ -63,9 +70,9 @@ private struct CertImportResult: Decodable {
     }
 }
 
-/// Lists and revokes the Apple ID's development certificates, and signs with
-/// SideStore's instead when asked, using the engine's credentials and 2FA
-/// prompt. Developer-portal only (no device); blocking FFI calls run on a
+/// Lists, revokes and exports the Apple ID's development certificates, and
+/// signs with SideStore's instead when asked, using the engine's credentials
+/// and 2FA prompt. Developer-portal only (no device); blocking FFI calls run on a
 /// background queue.
 final class CertManager: ObservableObject {
 
@@ -76,6 +83,8 @@ final class CertManager: ObservableObject {
     @Published private(set) var isWorking = false
     /// `id` of the certificate currently being revoked, if any.
     @Published private(set) var revokingID: String?
+    /// `id` of the certificate currently being exported, if any.
+    @Published private(set) var exportingID: String?
     @Published var lastError: String?
     /// What the last certificate import did.
     @Published var lastSuccess: String?
@@ -112,8 +121,8 @@ final class CertManager: ObservableObject {
         }
     }
 
-    /// True while signing in, listing, revoking or importing.
-    var isBusy: Bool { isWorking || isImporting || revokingID != nil }
+    /// True while signing in, listing, revoking, importing or exporting.
+    var isBusy: Bool { isWorking || isImporting || revokingID != nil || exportingID != nil }
 
     // MARK: - Public actions
 
@@ -188,6 +197,56 @@ final class CertManager: ObservableObject {
             // Run `onSuccess` if the revoke succeeded, even if the refresh failed.
             if revoked { onSuccess?() }
         }
+    }
+
+    /// Writes the certificate SideInstaller signs with and its private key to a
+    /// .p12 file protected by `password`, then hands the file to `share`. The
+    /// file is alone in a temporary folder, for `share` to delete when done.
+    @MainActor
+    func export(_ cert: DevCert, password: String, share: @escaping (URL) -> Void) {
+        guard session != nil, !isBusy, !password.isEmpty else { return }
+        let serial = cert.serialNumber
+        guard !serial.isEmpty else {
+            lastError = ErrorHelp.explained(L("This certificate has no serial number, so it can't be exported."))
+            return
+        }
+        exportingID = cert.id
+        lastError = nil
+        lastSuccess = nil
+        engine.log("Certificates: exporting \(cert.displayName) (\(serial)) …")
+        Task { @MainActor in
+            defer { exportingID = nil }
+            do {
+                let file = try Self.exportFile(for: cert)
+                do {
+                    try await onQueue { try self.performExport(serial: serial, password: password, to: file) }
+                } catch {
+                    try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+                    throw error
+                }
+                engine.log("Certificates: exported \(cert.displayName) as a .p12 file.")
+                share(file)
+            } catch {
+                lastError = short(error)
+                engine.log("⛔️ Certificates: \(lastError ?? "export failed")")
+            }
+        }
+    }
+
+    /// Where an export goes: `<temporary>/Certificate export/<name>.p12`, the
+    /// folder emptied first so no earlier export lingers.
+    private static func exportFile(for cert: DevCert) throws -> URL {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Certificate export", isDirectory: true)
+        try? FileManager.default.removeItem(at: folder)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        // Portal names read like "iOS Development: Name"; keep them file-safe.
+        let name = cert.displayName
+            .components(separatedBy: CharacterSet(charactersIn: "/\\:"))
+            .joined(separator: " -")
+            .trimmingCharacters(in: .whitespaces)
+        return folder.appendingPathComponent(name.isEmpty ? "Development certificate" : name)
+            .appendingPathExtension("p12")
     }
 
     // MARK: - SideStore's certificate
@@ -414,6 +473,23 @@ final class CertManager: ObservableObject {
             error.map { si_string_free($0) }
             throw EngineError.message("Revoke failed: \(msg)")
         }
+    }
+
+    /// Error 3 from `si_cert_export`: not the certificate SideInstaller signs with.
+    private static let exportNotSigning: Int32 = 3
+
+    private func performExport(serial: String, password: String, to file: URL) throws {
+        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        var error: UnsafeMutablePointer<CChar>?
+        let rc = si_cert_export(session, serial, password, file.path, &error)
+        if rc == 0 { return }
+        let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
+        error.map { si_string_free($0) }
+        engine.log("Certificate export: \(msg)")
+        if rc == Self.exportNotSigning {
+            throw EngineError.message(L("Only the certificate SideInstaller signs with can be exported: the private key of any other stays on the device that asked Apple for it."))
+        }
+        throw EngineError.message(L("Couldn't export the certificate: %@", msg))
     }
 
     /// Error 3 from `si_cert_import`: no certificate on the team has the key.
