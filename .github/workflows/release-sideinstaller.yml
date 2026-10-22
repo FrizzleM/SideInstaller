@@ -65,7 +65,9 @@ permissions:
 env:
   # The Xcode to build with: the one the app is developed on. The code needs
   # the iOS 27 SDK, which only the xcode-27 runner has for now; when GitHub's
-  # macos-latest gets Xcode 27, `runs-on` below can move to it.
+  # macos-latest gets Xcode 27, `runs-on` below can move to it. Built with an
+  # SDK older than 27.1, the iPhone Duo would show the app in a window instead
+  # of full screen, so scripts/build-ipa.sh stops on one.
   XCODE_VERSION: "27.1"
   HOMEBREW_NO_AUTO_UPDATE: "1"
   HOMEBREW_NO_INSTALL_CLEANUP: "1"

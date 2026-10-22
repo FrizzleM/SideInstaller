@@ -23,6 +23,7 @@ struct PairingView: View {
                 targetList
             }
             .padding(20)
+            .pageColumn()
             .animation(.smooth(duration: 0.35), value: manager.pairingFileExists)
             .animation(.smooth(duration: 0.35), value: manager.targets)
             .animation(.smooth(duration: 0.3), value: engine.deviceSummary)

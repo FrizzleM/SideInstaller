@@ -82,6 +82,7 @@ struct ContentView: View {
                     footer.cascadeItem(cascade(6))
                 }
                 .padding(20)
+                .pageColumn()
                 // One modifier per piece of state, so only its own card animates.
                 .animation(.smooth(duration: 0.35), value: updateChecker.showBanner)
                 .animation(.smooth(duration: 0.35), value: engine.vpnConnected)

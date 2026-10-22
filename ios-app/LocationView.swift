@@ -918,6 +918,7 @@ struct LocationView: View {
                     // lays over the app.
                 }
                 .padding(20)
+                .pageColumn()
                 .animation(.smooth(duration: 0.35), value: manager.stage)
                 .animation(.smooth(duration: 0.3), value: manager.isBusy)
                 .animation(.smooth(duration: 0.3), value: engine.vpnConnected)

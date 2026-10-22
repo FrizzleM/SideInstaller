@@ -38,6 +38,7 @@ struct AccountSetupView: View {
                 }
                 .padding(20)
                 .padding(.top, 24)
+                .pageColumn()
             }
             .scrollDismissesKeyboard(.interactively)
         }
@@ -281,6 +282,7 @@ struct AccountEditor: View {
                         }
                     }
                     .padding(20)
+                    .pageColumn()
                 }
                 .navigationTitle(L("Add Apple ID"))
                 .navigationBarTitleDisplayMode(.inline)

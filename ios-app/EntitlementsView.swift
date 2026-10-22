@@ -416,6 +416,7 @@ struct EntitlementsView: View {
                 appList
             }
             .padding(20)
+            .pageColumn()
             .animation(.smooth(duration: 0.35), value: manager.apps)
             .animation(.smooth(duration: 0.3), value: manager.isWorking)
             .animation(.smooth(duration: 0.35), value: manager.teamSummary)
@@ -555,6 +556,7 @@ private struct EntitlementPicker: View {
                 }
             }
             .padding(20)
+            .pageColumn()
             .animation(.smooth(duration: 0.35), value: manager.outcomes[app.id])
             .animation(.smooth(duration: 0.3), value: manager.applyingID)
         }
@@ -658,6 +660,8 @@ private struct EntitlementPicker: View {
         .buttonStyle(PrimaryButtonStyle())
         .disabled(selected.isEmpty || manager.isBusy)
         .padding(.horizontal, 20)
+        // The button keeps the page's width; the bar under it spans the window.
+        .pageColumn()
         .padding(.bottom, 12)
         .background(.ultraThinMaterial)
     }
