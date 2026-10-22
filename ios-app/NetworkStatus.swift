@@ -3,8 +3,19 @@ import Darwin
 import Network
 
 /// Detects the loopback tunnel (a `utun*` interface) and Wi-Fi (`en0`) by
-/// scanning the active interfaces. For status display only; a successful connect
-/// is the real test.
+/// scanning the active interfaces and asking the routing table. The answer
+/// gates Install, the Pairing and Location pages, and whether LocalDevVPN is
+/// started, though a successful connect is still the real test.
+///
+/// The route to Device IP is one of three kinds (`TunnelRoute`):
+/// (a) a tunnel's own route, as LocalDevVPN sets up: the tunnel is up;
+/// (b) no tunnel, or a route the table can't tell: down, unless a tunnel
+///     interface's subnet holds Device IP;
+/// (c) a tunnel that also carries the default route, a full-tunnel VPN. Some
+///     (ClashMi, Shadowrocket and other proxy VPNs, with a direct rule) loop
+///     Device IP back to this iPhone and most don't, so the subnet test is
+///     tried and then a probe: a TCP connect to Device IP's RSD port
+///     (`probeConnect`). Engine runs and caches it, never on the main thread.
 enum NetworkStatus {
 
     struct Interface {
@@ -42,48 +53,203 @@ enum NetworkStatus {
         return String(cString: host)
     }
 
-    /// (vpnUp, wifiUp, detail) for the current interfaces.
-    static func summarize(deviceIP: String) -> (vpn: Bool, wifi: Bool, detail: String) {
+    /// How traffic to Device IP leaves this iPhone.
+    enum TunnelRoute: Equatable {
+        /// (a) Through a tunnel interface, on a route of its own: a loopback
+        /// VPN such as LocalDevVPN is on.
+        case dedicated
+        /// (b) Not through a tunnel interface, or the routing table can't tell.
+        case other
+        /// (c) Through a tunnel interface that also carries the default route:
+        /// a full-tunnel VPN, which may or may not loop Device IP back.
+        case fullTunnel(interface: String, source: String)
+    }
+
+    /// What a probe of Device IP through a full-tunnel VPN found.
+    enum ProbeResult: Equatable, CustomStringConvertible {
+        case connected
+        /// Something answered with a reset (ECONNREFUSED): the device is there
+        /// but not listening on that port, as `DeviceConnection.wasRefused`
+        /// assumes too.
+        case refused
+        case timedOut
+        case failed(errno: Int32)
+
+        /// True when something on the far end answered, so the VPN carries
+        /// Device IP back to this iPhone.
+        var answered: Bool { self == .connected || self == .refused }
+
+        var description: String {
+            switch self {
+            case .connected: return "connected"
+            case .refused: return "refused"
+            case .timedOut: return "timed out"
+            case .failed(let code): return "error \(code)"
+            }
+        }
+    }
+
+    /// A full-tunnel VPN that only a probe can judge, and where to probe.
+    struct ProbeTarget: Equatable {
+        /// Device IP, as dialled.
+        let deviceIP: String
+        /// The tunnel interface, e.g. `utun4`.
+        let interface: String
+        /// The tunnel's own address, which changes with the VPN.
+        let source: String
+
+        /// What a cached answer is kept under: a new Device IP or another VPN
+        /// makes it stale.
+        var key: String { "\(deviceIP) via \(source)" }
+    }
+
+    /// One look at the interfaces and the routes.
+    struct Scan {
+        let route: TunnelRoute
+        /// The fallback test passed: a tunnel interface's subnet holds Device
+        /// IP, or, when Device IP isn't an IPv4 address, any tunnel is up.
+        let fallbackMatch: Bool
+        let wifi: Bool
+        let detail: String
+        /// Set only in case (c) when the fallback test failed: the one case a
+        /// probe decides.
+        let probeTarget: ProbeTarget?
+    }
+
+    static func scan(deviceIP: String) -> Scan {
         let ifs = interfaces()
-        let vpn = isLoopbackTunnelUp(in: ifs, deviceIP: deviceIP)
-        let wifi = ifs.contains { $0.name == "en0" }
-        let detail = ifs.map { "\($0.name)=\($0.ipv4)" }.joined(separator: ", ")
-        return (vpn, wifi, detail)
+        let (route, fallbackMatch) = tunnelRoute(in: ifs, deviceIP: deviceIP)
+        var probeTarget: ProbeTarget?
+        if case .fullTunnel(let interface, let source) = route, !fallbackMatch {
+            probeTarget = ProbeTarget(deviceIP: deviceIP, interface: interface, source: source)
+        }
+        return Scan(route: route,
+                    fallbackMatch: fallbackMatch,
+                    wifi: ifs.contains { $0.name == "en0" },
+                    detail: ifs.map { "\($0.name)=\($0.ipv4)" }.joined(separator: ", "),
+                    probeTarget: probeTarget)
     }
 
-    /// True when a tunnel carries traffic to `deviceIP`. Never equality:
-    /// `deviceIP` is the peer, which no interface holds.
+    /// Whether the loopback tunnel counts as up, from the route to Device IP,
+    /// the subnet fallback, and, for a full-tunnel VPN, a probe (nil while
+    /// none has answered). Pure, so the rules are easy to test.
+    static func tunnelIsUp(route: TunnelRoute, fallbackMatch: Bool, probe: ProbeResult?) -> Bool {
+        switch route {
+        case .dedicated: return true
+        case .other: return fallbackMatch
+        case .fullTunnel: return fallbackMatch || probe?.answered == true
+        }
+    }
+
+    /// True when a tunnel carries traffic to `deviceIP`, without probing: a
+    /// full-tunnel VPN counts only when its subnet holds `deviceIP`. Never
+    /// equality: `deviceIP` is the peer, which no interface holds.
     static func loopbackTunnelUp(deviceIP: String) -> Bool {
-        isLoopbackTunnelUp(in: interfaces(), deviceIP: deviceIP)
+        let (route, fallbackMatch) = tunnelRoute(in: interfaces(), deviceIP: deviceIP)
+        return tunnelIsUp(route: route, fallbackMatch: fallbackMatch, probe: nil)
     }
 
-    private static func isLoopbackTunnelUp(in ifs: [Interface], deviceIP: String) -> Bool {
+    private static func tunnelRoute(in ifs: [Interface],
+                                    deviceIP: String) -> (route: TunnelRoute, fallbackMatch: Bool) {
         guard let target = ipv4Value(deviceIP) else {
             // Unparseable target IP — fall back to the broad tunnel-name check.
-            return ifs.contains { isTunnelInterface($0.name) }
+            return (.other, ifs.contains { isTunnelInterface($0.name) })
         }
         // The routing table is the authority; ask it first.
-        if tunnelCarriesRoute(to: deviceIP, in: ifs) == true { return true }
+        let route = tunnelRoute(to: deviceIP, in: ifs)
         // Fall back to a subnet check on tunnel interfaces only: iOS keeps system
         // `utun`s up without a VPN, and a home LAN can overlap the tunnel's range.
-        return ifs.contains { isTunnelInterface($0.name) && subnet($0, contains: target) }
+        let fallbackMatch = route != .dedicated
+            && ifs.contains { isTunnelInterface($0.name) && subnet($0, contains: target) }
+        return (route, fallbackMatch)
     }
 
-    /// Whether traffic to `deviceIP` goes through a tunnel interface via its own
-    /// (non-default) route. Nil when the routing table can't tell.
+    /// Which kind of route carries traffic to `deviceIP` (see `TunnelRoute`).
     ///
     /// More reliable than a subnet check: point-to-point tunnels (e.g.
     /// LocalDevVPN's `10.7.1.1/32` with peer `10.7.0.1/32`) reach the peer over a
     /// host route, so no interface's subnet contains it.
-    private static func tunnelCarriesRoute(to deviceIP: String, in ifs: [Interface]) -> Bool? {
+    private static func tunnelRoute(to deviceIP: String, in ifs: [Interface]) -> TunnelRoute {
         guard let source = routeSource(to: deviceIP),
               let iface = ifs.first(where: { $0.ipv4 == source })
-        else { return nil }
-        guard isTunnelInterface(iface.name) else { return false }
-        // A full-tunnel VPN routes every address, so only count it when
-        // `deviceIP` uses a different route than the default.
-        return routeSource(to: defaultRouteProbe) != source
+        else { return .other }
+        guard isTunnelInterface(iface.name) else { return .other }
+        // A full-tunnel VPN routes every address, so a tunnel only counts by
+        // itself when `deviceIP` uses a different route than the default.
+        if routeSource(to: defaultRouteProbe) != source { return .dedicated }
+        return .fullTunnel(interface: iface.name, source: source)
     }
+
+    /// Whether `host:port` answers through the current route: opens a TCP
+    /// connection, waits up to `timeout` milliseconds, and closes it without
+    /// sending anything. Blocks the calling thread for up to `timeout`, so
+    /// only `probe(host:port:)` calls it.
+    ///
+    /// Some proxy TUN stacks (Mihomo's gVisor mode, for one) accept every TCP
+    /// connection themselves, so they read as up here and fail later at the
+    /// real connection, with the usual “couldn't reach the device” error.
+    static func probeConnect(host: String, port: UInt16, timeout: Int32 = 500) -> ProbeResult {
+        var remote = sockaddr_in()
+        remote.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        remote.sin_family = sa_family_t(AF_INET)
+        remote.sin_port = in_port_t(port.bigEndian)
+        guard host.withCString({ inet_pton(AF_INET, $0, &remote.sin_addr) }) == 1
+        else { return .failed(errno: EINVAL) }
+
+        let fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+        guard fd >= 0 else { return .failed(errno: errno) }
+        defer { close(fd) }
+        var on: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+        let flags = fcntl(fd, F_GETFL, 0)
+        guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0
+        else { return .failed(errno: errno) }
+
+        let dialled = withUnsafePointer(to: remote) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        if dialled == 0 { return .connected }
+        switch errno {
+        case EINPROGRESS: break
+        case ECONNREFUSED: return .refused
+        case let code: return .failed(errno: code)
+        }
+
+        // Wait for the handshake to finish, one way or the other.
+        let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(timeout) * 1_000_000
+        var poller = pollfd(fd: fd, events: Int16(POLLOUT), revents: 0)
+        while true {
+            let now = DispatchTime.now().uptimeNanoseconds
+            guard now < deadline else { return .timedOut }
+            let ready = poll(&poller, 1, Int32((deadline - now) / 1_000_000))
+            if ready > 0 { break }
+            if ready == 0 { return .timedOut }
+            guard errno == EINTR else { return .failed(errno: errno) }
+        }
+        var outcome: Int32 = 0
+        var length = socklen_t(MemoryLayout<Int32>.size)
+        guard getsockopt(fd, SOL_SOCKET, SO_ERROR, &outcome, &length) == 0
+        else { return .failed(errno: errno) }
+        switch outcome {
+        case 0: return .connected
+        case ECONNREFUSED: return .refused
+        default: return .failed(errno: outcome)
+        }
+    }
+
+    /// `probeConnect` on a background queue, so no caller's thread waits on it.
+    static func probe(host: String, port: UInt16) async -> ProbeResult {
+        await withCheckedContinuation { continuation in
+            probeQueue.async {
+                continuation.resume(returning: probeConnect(host: host, port: port))
+            }
+        }
+    }
+
+    private static let probeQueue = DispatchQueue(label: "sideinstaller.tunnel-probe",
+                                                  qos: .utility)
 
     /// TEST-NET-3 (RFC 5737), reserved for documentation: no VPN app routes it
     /// deliberately, so only a default route can claim it. Nothing is ever sent.

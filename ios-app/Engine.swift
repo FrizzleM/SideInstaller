@@ -383,6 +383,10 @@ final class Engine: ObservableObject {
     /// Poll that keeps `vpnConnected` live; NWPathMonitor never fires for a
     /// loopback tunnel, which carries no default route.
     private var statusTimer: Timer?
+    /// The last probe of a full-tunnel VPN, and the one running, if any; see
+    /// `fullTunnelAnswer`. Main thread only.
+    private var lastFullTunnelProbe: (key: String, result: NetworkStatus.ProbeResult, date: Date)?
+    private var fullTunnelProbe: (key: String, task: Task<NetworkStatus.ProbeResult, Never>)?
 
     /// True when the installed build is LiveContainer + SideStore.
     var installedIsLiveContainer: Bool {
@@ -603,8 +607,10 @@ final class Engine: ObservableObject {
     // MARK: - One-click pipeline (the default flow)
 
     /// Run every install step in order, stopping at the first failure.
+    /// `afterProbe` is set on the second pass, once a full-tunnel VPN's probe
+    /// has answered.
     @MainActor
-    func runOneClick() {
+    func runOneClick(afterProbe: Bool = false) {
         guard !isRunning else { return }
         // Nothing downstream works on an older iOS.
         guard osSupported else {
@@ -647,6 +653,15 @@ final class Engine: ObservableObject {
             return
         }
         guard tunnelAvailable else {
+            // A full-tunnel VPN counts as down until its probe answers, which
+            // takes half a second at most: wait for it, then decide.
+            if !afterProbe, awaitsFullTunnelProbe() {
+                Task { @MainActor in
+                    await self.settleNetworkStatus()
+                    self.runOneClick(afterProbe: true)
+                }
+                return
+            }
             setGuide(Guides.vpn)
             log("⛔️ No loopback VPN is connected. Turn one on, then tap Install again.")
             return
@@ -856,7 +871,8 @@ final class Engine: ObservableObject {
         var announced: String?
         while true {
             try Task.checkCancellation()
-            let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceHost)
+            // Waits for a full-tunnel VPN's probe when there's no fresh answer.
+            let (vpn, wifi, detail) = await readNetworkSettled()
             publishNetwork(vpn: vpn, wifi: wifi, vpnText: vpn ? "tunnel up" : "no tunnel")
             // Only a run that pairs needs Wi-Fi; the tunnel is always required.
             let wifiSatisfied = wifi || !needsFreshPairing
@@ -2445,7 +2461,7 @@ final class Engine: ObservableObject {
     // a run or showing a guide.
 
     func checkVPNAndWifi() {
-        let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceHost)
+        let (vpn, wifi, detail) = readNetwork()
         publishNetwork(vpn: vpn, wifi: wifi,
                        vpnText: vpn ? "tunnel up" : "no tunnel (start a loopback VPN)")
         log("Network: \(detail)")
@@ -2464,11 +2480,118 @@ final class Engine: ObservableObject {
         statusTimer = timer
     }
 
-    /// One quiet re-scan of the tunnel and Wi-Fi state.
+    /// One quiet re-scan of the tunnel and Wi-Fi state. A full-tunnel VPN gets
+    /// its cached probe answer, and a probe is started when that's stale.
     func refreshNetworkStatus() {
-        let (vpn, wifi, _) = NetworkStatus.summarize(deviceIP: deviceHost)
+        let (vpn, wifi, _) = readNetwork()
         publishNetwork(vpn: vpn, wifi: wifi,
                        vpnText: vpn ? "tunnel up" : "no tunnel (start a loopback VPN)")
+    }
+
+    /// `refreshNetworkStatus`, but waiting for a full-tunnel VPN's probe when
+    /// there's no fresh answer, so what's decided next sees it. Returns at once
+    /// for any other route.
+    @MainActor
+    func settleNetworkStatus() async {
+        let (vpn, wifi, _) = await readNetworkSettled()
+        publishNetwork(vpn: vpn, wifi: wifi,
+                       vpnText: vpn ? "tunnel up" : "no tunnel (start a loopback VPN)")
+    }
+
+    // MARK: Full-tunnel probe
+    //
+    // A full-tunnel VPN (case (c) in `NetworkStatus`) is judged by a TCP probe
+    // of Device IP. It runs off the main thread, one at a time, and its answer
+    // is kept for `fullTunnelProbeLifetime` per Device IP and tunnel address.
+    // LocalDevVPN, and no VPN at all, never get here.
+
+    private static let fullTunnelProbeLifetime: TimeInterval = 5
+
+    private typealias NetworkReading = (vpn: Bool, wifi: Bool, detail: String)
+
+    /// The tunnel and Wi-Fi state now. A full-tunnel VPN counts as up by its
+    /// last probe, and as down until one has answered.
+    private func readNetwork() -> NetworkReading {
+        reading(of: NetworkStatus.scan(deviceIP: deviceHost))
+    }
+
+    private func reading(of scan: NetworkStatus.Scan) -> NetworkReading {
+        let probe = scan.probeTarget.flatMap { fullTunnelAnswer(for: $0) }
+        let vpn = NetworkStatus.tunnelIsUp(route: scan.route,
+                                           fallbackMatch: scan.fallbackMatch,
+                                           probe: probe)
+        return (vpn, scan.wifi, scan.detail)
+    }
+
+    /// `readNetwork`, after waiting for a full-tunnel VPN's probe that has no
+    /// fresh answer (half a second at most).
+    @MainActor
+    private func readNetworkSettled() async -> NetworkReading {
+        let scan = NetworkStatus.scan(deviceIP: deviceHost)
+        guard let target = scan.probeTarget, freshFullTunnelAnswer(for: target) == nil
+        else { return reading(of: scan) }
+        // One probe at a time: one for an earlier VPN or Device IP finishes first.
+        while let running = fullTunnelProbe, running.key != target.key {
+            _ = await running.task.value
+        }
+        if let task = startFullTunnelProbe(target) { _ = await task.value }
+        return readNetwork()
+    }
+
+    /// True when the tunnel is a full-tunnel VPN whose probe has no fresh
+    /// answer, so it may still turn out to be up.
+    private func awaitsFullTunnelProbe() -> Bool {
+        guard let target = NetworkStatus.scan(deviceIP: deviceHost).probeTarget else { return false }
+        return freshFullTunnelAnswer(for: target) == nil
+    }
+
+    /// The last answer for `target`, if it's recent.
+    private func freshFullTunnelAnswer(for target: NetworkStatus.ProbeTarget) -> NetworkStatus.ProbeResult? {
+        guard let last = lastFullTunnelProbe, last.key == target.key,
+              Date().timeIntervalSince(last.date) < Self.fullTunnelProbeLifetime
+        else { return nil }
+        return last.result
+    }
+
+    /// The probe answer to judge `target` by: the cached one, possibly stale,
+    /// or nil when there's none. Starts a probe when it's stale, and drops it
+    /// once Device IP or the VPN has changed.
+    private func fullTunnelAnswer(for target: NetworkStatus.ProbeTarget) -> NetworkStatus.ProbeResult? {
+        if let last = lastFullTunnelProbe, last.key != target.key { lastFullTunnelProbe = nil }
+        if let fresh = freshFullTunnelAnswer(for: target) { return fresh }
+        startFullTunnelProbe(target)
+        return lastFullTunnelProbe?.result
+    }
+
+    /// Starts a probe of `target`, or returns the one already running for it.
+    /// Nil while one for another target runs; the next look starts this one.
+    @discardableResult
+    private func startFullTunnelProbe(_ target: NetworkStatus.ProbeTarget) -> Task<NetworkStatus.ProbeResult, Never>? {
+        if let running = fullTunnelProbe {
+            return running.key == target.key ? running.task : nil
+        }
+        let task = Task { @MainActor [weak self] () -> NetworkStatus.ProbeResult in
+            let result = await NetworkStatus.probe(host: target.deviceIP, port: DeviceConnection.rsdPort)
+            self?.finishFullTunnelProbe(target, result: result)
+            return result
+        }
+        fullTunnelProbe = (target.key, task)
+        return task
+    }
+
+    /// Keeps the answer, and publishes it when it turns the tunnel up or down.
+    @MainActor
+    private func finishFullTunnelProbe(_ target: NetworkStatus.ProbeTarget,
+                                       result: NetworkStatus.ProbeResult) {
+        fullTunnelProbe = nil
+        let previous = lastFullTunnelProbe.flatMap { $0.key == target.key ? $0.result : nil }
+        lastFullTunnelProbe = (target.key, result, Date())
+        let wasUp = previous?.answered ?? false
+        guard result.answered != wasUp else { return }
+        if result.answered {
+            log("Tunnel: the full-tunnel VPN on \(target.interface) loops \(target.deviceIP) back (probe \(result)).")
+        }
+        refreshNetworkStatus()
     }
 
     /// Publish only what changed, so the poll doesn't redraw every view.
@@ -2537,7 +2660,9 @@ final class Engine: ObservableObject {
     /// waits for the tunnel once SideInstaller is back. Returns whether it's up.
     @MainActor
     func tunnelUp() async -> Bool {
-        refreshNetworkStatus()
+        // A full-tunnel VPN that loops Device IP back is already the tunnel, so
+        // its probe answers before LocalDevVPN is opened over it.
+        await settleNetworkStatus()
         guard !vpnConnected, startsVPNWhenNeeded else { return vpnConnected }
         // A handover a moment ago is still under way: wait for it, don't
         // open LocalDevVPN again.

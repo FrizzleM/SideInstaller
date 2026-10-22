@@ -2,6 +2,18 @@
 
 All notable changes to SideInstaller are documented here.
 
+## Unreleased
+
+### Fixed
+- **Proxy VPNs that loop the device's address back to this iPhone now work instead of
+  LocalDevVPN.** ClashMi, Shadowrocket and similar apps can send the Device IP straight back to
+  the iPhone with a direct rule, but since they carry all of the iPhone's traffic, SideInstaller
+  didn't count them as the tunnel: Install waited for it forever, the Pairing and Location pages
+  stayed greyed out, and with “Start LocalDevVPN when needed” on it opened LocalDevVPN, which
+  turned the proxy VPN off (issues #30 and #83). With one of these VPNs on, SideInstaller now
+  checks whether the device answers at the Device IP, which takes half a second at most, and
+  carries on when it does. Nothing changes with LocalDevVPN.
+
 ## 1.6.0
 
 ### Added
