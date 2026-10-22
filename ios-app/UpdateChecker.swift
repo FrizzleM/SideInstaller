@@ -1,14 +1,15 @@
 import Foundation
 
-/// Compares this build's version against `latest_version.txt` in the repo and
-/// reveals the Install screen's update banner if that one is newer. Every
-/// failure is silent: it only ever means there's nothing to show.
+/// Compares this build's version against the tag of the latest GitHub release
+/// and reveals the Install screen's update banner if that one is newer. Betas
+/// (prereleases) and drafts are never "latest", so they don't trigger it.
+/// Every failure is silent: it only ever means there's nothing to show.
 @MainActor
 final class UpdateChecker: ObservableObject {
 
-    /// Raw contents of the version file on the default branch.
-    static let versionFileURL =
-        "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/latest_version.txt"
+    /// The newest published, non-prerelease release; its `tag_name` is e.g. "v1.5.3".
+    static let latestReleaseAPIURL =
+        "https://api.github.com/repos/FrizzleM/SideInstaller/releases/latest"
     /// The install page the banner offers first, which carries the OTA links.
     static let installPageURL = "https://sideinstaller.net/"
     /// The latest release's unsigned IPA, for the banner's other two ways:
@@ -25,30 +26,46 @@ final class UpdateChecker: ObservableObject {
     let currentVersion =
         (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
 
-    /// Fetch the remote version and reveal the banner if it's newer.
+    private struct Release: Decodable {
+        let tag_name: String
+    }
+
+    /// Fetch the latest release's tag and reveal the banner if it's newer.
     func check() async {
-        guard let url = URL(string: Self.versionFileURL) else { return }
+        guard let url = URL(string: Self.latestReleaseAPIURL) else { return }
         var req = URLRequest(url: url)
         req.cachePolicy = .reloadIgnoringLocalCacheData
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
         guard let (data, response) = try? await URLSession.shared.data(for: req),
               (response as? HTTPURLResponse)?.statusCode == 200,
-              let body = String(data: data, encoding: .utf8) else { return }
+              let release = try? JSONDecoder().decode(Release.self, from: data),
+              let latest = Self.version(fromTag: release.tag_name) else { return }
 
-        let latest = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !latest.isEmpty else { return }
         latestVersion = latest
         showBanner = Self.isNewer(latest, than: currentVersion)
+    }
+
+    /// "v1.5.3" → "1.5.3". Nil for an empty tag.
+    static func version(fromTag tag: String) -> String? {
+        var v = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        if v.first == "v" || v.first == "V" { v.removeFirst() }
+        return v.isEmpty ? nil : v
     }
 
     /// Close the banner for this launch.
     func dismiss() { showBanner = false }
 
-    /// Compare dotted versions numerically, so "0.10.0" > "0.9.0".
+    /// Compare dotted versions numerically, so "0.10.0" > "0.9.0". Anything
+    /// after a "-" (e.g. "-beta.1") is ignored.
     static func isNewer(_ lhs: String, than rhs: String) -> Bool {
-        let a = lhs.split(separator: ".").map { Int($0) ?? 0 }
-        let b = rhs.split(separator: ".").map { Int($0) ?? 0 }
+        func parts(_ v: String) -> [Int] {
+            let core = v.split(separator: "-", maxSplits: 1).first ?? ""
+            return core.split(separator: ".").map { Int($0) ?? 0 }
+        }
+        let a = parts(lhs)
+        let b = parts(rhs)
         for i in 0..<max(a.count, b.count) {
             let l = i < a.count ? a[i] : 0
             let r = i < b.count ? b[i] : 0

@@ -28,7 +28,8 @@ name: release-sideinstaller
 # the notes are previewed in the run summary, and nothing is published.
 #
 # A version that already has a release or tag is refused, so a release can't
-# be overwritten. latest_version.txt (the in-app update banner) is left alone.
+# be overwritten. The in-app update banner reads the latest stable release's
+# tag, so publishing a stable release here is all it takes to show it.
 
 on:
   workflow_dispatch:
