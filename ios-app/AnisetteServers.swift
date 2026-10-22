@@ -209,6 +209,7 @@ extension AnisetteServer {
         static func isServerFault(_ error: String) -> Bool {
             error.lowercased().contains("anisette")
                 && !Engine.isAppleServiceRefusal(error)
+                && !Engine.isAppleOutdatedMacRefusal(error)
                 && !Engine.isAppleRateLimit(error)
                 && !Engine.isAppleUnreachable(error)
         }
@@ -226,38 +227,93 @@ extension AnisetteServer {
         return addresses.filter { library(of: $0, in: servers) == kind }
     }
 
-    /// Apple's HTTP 503 refusals during one sign-in loop, counted by the
-    /// device sign-in reported (`ADILibrary.client`).
+    /// Apple refusing the device sign-in reported (`ADILibrary.client`) during
+    /// one sign-in loop: its HTTP 503s, counted by device, and the devices it
+    /// called too old (`Engine.isAppleOutdatedMacRefusal`).
     ///
     /// Apple refuses a reported device the same through every server, so once
-    /// it has refused one twice the servers left that report it are skipped.
-    /// One refusal only moves on to the next server, since Apple has also sent
-    /// a 503 that passed on retry. The loop stops when every server left
-    /// reports a device refused twice.
+    /// it has refused one twice with a 503 the servers left that report it are
+    /// skipped. One 503 only moves on to the next server, since Apple has also
+    /// sent a 503 that passed on retry. A device Apple called too old is
+    /// skipped from the first time: the macOS-ADI servers all report the same
+    /// Mac (`macADIHosts`), and that answer is no blip. The loop stops when
+    /// every server left reports a device ruled out.
     struct AppleRefusals {
         private let servers: [AnisetteServer]
         private var byClient: [ADILibrary.Client: Int] = [:]
-        /// Refusals so far.
+        private var outdated: Set<ADILibrary.Client> = []
+        /// HTTP 503 refusals so far.
         private(set) var count = 0
 
         init(servers: [AnisetteServer]) { self.servers = servers }
 
-        /// Counts a refusal of the attempt through `address`.
+        /// Counts a 503 refusal of the attempt through `address`.
         mutating func record(_ address: String) {
             count += 1
-            byClient[AnisetteServer.library(of: address, in: servers).client, default: 0] += 1
+            byClient[client(of: address), default: 0] += 1
+        }
+
+        /// Notes that Apple called the device the attempt through `address`
+        /// reported too old to sign in with.
+        mutating func recordOutdated(_ address: String) {
+            outdated.insert(client(of: address))
         }
 
         /// Whether a sign-in through `address` would report a device Apple
-        /// has refused twice already.
+        /// has refused twice already, or called too old.
         func rulesOut(_ address: String) -> Bool {
-            byClient[AnisetteServer.library(of: address, in: servers).client, default: 0] >= 2
+            let client = client(of: address)
+            return outdated.contains(client) || byClient[client, default: 0] >= 2
         }
 
-        /// Whether, after a refusal, the sign-in should stop: at least two
-        /// refusals, and none of `remaining` worth trying.
+        private func client(of address: String) -> ADILibrary.Client {
+            AnisetteServer.library(of: address, in: servers).client
+        }
+
+        /// Whether, after a 503 refusal, the sign-in should stop: at least two
+        /// of them, and none of `remaining` worth trying.
         func endsSignIn(remaining: ArraySlice<String>) -> Bool {
             count >= 2 && remaining.allSatisfy(rulesOut)
+        }
+    }
+
+    /// The failed attempts of one sign-in loop, for the error it ends with
+    /// (`Engine.anisetteSignInFailure`).
+    struct SignInFailures {
+        /// Servers a sign-in was attempted through.
+        private(set) var tried = 0
+        /// Servers passed over because Apple had refused the device they
+        /// report (`AppleRefusals`).
+        private(set) var skipped = 0
+        /// The error to show, and the server it came through: of the errors
+        /// saying most about why sign-in failed (`weight`), the first, since
+        /// servers are tried most likely to work first.
+        private(set) var shown: (server: String, error: String)?
+        private var shownWeight = -1
+
+        /// Notes that the attempt through `address` failed with `error`.
+        mutating func failed(_ address: String, error: String) {
+            tried += 1
+            let weight = Self.weight(of: error)
+            if weight > shownWeight {
+                shown = (address, error)
+                shownWeight = weight
+            }
+        }
+
+        /// Notes that a server was passed over.
+        mutating func skip() { skipped += 1 }
+
+        /// How much an attempt's error says about why sign-in failed:
+        /// 2, Apple's answer about this account (anything not below);
+        /// 1, Apple refusing the device sign-in reported (HTTP 503, or too
+        /// old), which servers reporting the other device may get past;
+        /// 0, no answer from Apple at all, since the anisette server failed or
+        /// Apple couldn't be reached.
+        static func weight(of error: String) -> Int {
+            if RecentFailures.isServerFault(error) || Engine.isAppleUnreachable(error) { return 0 }
+            if Engine.isAppleServiceRefusal(error) || Engine.isAppleOutdatedMacRefusal(error) { return 1 }
+            return 2
         }
     }
 

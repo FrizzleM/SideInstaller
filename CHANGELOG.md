@@ -154,6 +154,15 @@ All notable changes to SideInstaller are documented here.
   Automatic, SideInstaller formatted them in English with the iPhone's region, so an iPhone in
   Italian showed Italian text next to English month and unit names. They now use the language the
   text is in, still with the iPhone's region.
+- **A failed Apple ID sign-in shows the error that explains it, not just the last one.** With Auto
+  on, sign-in tries the anisette servers one after another, and the error it ended with was the
+  last server's. That was almost always one of the Mac servers, which are tried last: one that was
+  down (issue #82), or Apple answering “A Mac with macOS version 10.13 or later is required”
+  (issue #89). It now shows Apple's answer about your account if there was one, and otherwise
+  Apple turning down the computer a server reports before a server that was down, with the name of
+  the server it came through. That macOS answer now also skips the other Mac servers, since they
+  all report the same Mac, and the message counts only the servers tried, saying how many were
+  skipped, instead of “all 20”.
 
 ### Changed
 - **Madeira now comes from a GitHub release.** Latest installs Madeira from the releases of

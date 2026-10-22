@@ -690,8 +690,10 @@ let vietnameseStrings: [String: String] = [
     "Two-factor verification was cancelled.": "Đã hủy xác minh hai yếu tố.",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
         "Apple ID hoặc mật khẩu không đúng. Hãy kiểm tra lại email và mật khẩu Apple Account của bạn rồi thử lại.",
-    "Apple ID sign-in failed on %@. Last error: %@":
-        "Đăng nhập Apple ID thất bại trên %@. Lỗi cuối cùng: %@",
+    "Apple ID sign-in failed on %@. Error: %@":
+        "Đăng nhập Apple ID thất bại trên %@. Lỗi: %@",
+    "Apple ID sign-in failed on %@. Error via %@: %@":
+        "Đăng nhập Apple ID thất bại trên %@. Lỗi qua %@: %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Máy chủ đăng nhập của Apple đã từ chối yêu cầu (HTTP 503). Lỗi không phải do mật khẩu hay máy chủ anisette, nên thử thêm máy chủ khác cũng không giúp được. Hãy thử lại sau hoặc cập nhật SideInstaller.",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
@@ -712,6 +714,7 @@ let vietnameseStrings: [String: String] = [
         "Apple đã khóa Apple Account này vì lý do bảo mật (lỗi -20209), nên mọi lần đăng nhập đều thất bại cho đến khi tài khoản được mở khóa. Hãy đặt lại mật khẩu tại iforgot.apple.com, rồi đăng nhập lại bằng mật khẩu mới.",
     "the anisette server": "máy chủ anisette",
     "all %d anisette servers": "tất cả %d máy chủ anisette",
+    "%d anisette servers (%d skipped)": "%d máy chủ anisette (bỏ qua %d)",
     "Not signed in.": "Chưa đăng nhập.",
     "No SideStore IPA downloaded.": "Chưa tải tệp IPA của SideStore.",
     "Signing failed: %@": "Ký ứng dụng thất bại: %@",

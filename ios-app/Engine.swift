@@ -1123,7 +1123,7 @@ final class Engine: ObservableObject {
         let servers = anisetteCandidates()
         let id = normalizedAppleID, pw = applePassword, dir = storageDir
         twoFactorWasCancelled = false
-        var lastError = "no anisette servers configured"
+        var failures = AnisetteServer.SignInFailures()
         var appleRefusals = AnisetteServer.AppleRefusals(servers: anisetteServers)
         var appleUnreachable = 0
 
@@ -1132,6 +1132,7 @@ final class Engine: ObservableObject {
             let name = anisetteName(for: ani)
             if appleRefusals.rulesOut(ani) {
                 log("Skipping anisette \(name): Apple has refused the device sign-in reports through it.")
+                failures.skip()
                 continue
             }
             signInStatus = servers.count > 1
@@ -1149,7 +1150,7 @@ final class Engine: ObservableObject {
                 if updatingChecklist { setStep(.signIn, .done) }
                 return
             } catch let error as EngineError {
-                lastError = error.errorDescription ?? "sign-in failed"
+                let failure = error.errorDescription ?? "sign-in failed"
 
                 // A cancelled 2FA prompt isn't the server's fault.
                 if twoFactorWasCancelled {
@@ -1158,43 +1159,49 @@ final class Engine: ObservableObject {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
                 // A locked account fails everywhere, and retrying keeps it locked.
-                if Self.isAccountLocked(lastError) {
+                if Self.isAccountLocked(failure) {
                     signInStatus = "sign-in failed"
-                    log("Apple has locked this Apple Account: \(lastError)")
+                    log("Apple has locked this Apple Account: \(failure)")
                     throw EngineError.accountLocked
                 }
                 // Apple turns the account down for its owner's age through
                 // every anisette server alike.
-                if Self.isUnderageError(lastError) {
+                if Self.isUnderageError(failure) {
                     signInStatus = "sign-in failed"
-                    log("Apple won't let this Apple Account use developer services: \(lastError)")
+                    log("Apple won't let this Apple Account use developer services: \(failure)")
                     throw EngineError.underage
                 }
                 // So does an email address Apple hasn't seen verified, and
                 // signing in again only meets the same refusal.
-                if Self.isEmailUnverifiedError(lastError) {
+                if Self.isEmailUnverifiedError(failure) {
                     signInStatus = "sign-in failed"
-                    log("Apple wants this Apple Account's email address verified first: \(lastError)")
+                    log("Apple wants this Apple Account's email address verified first: \(failure)")
                     throw EngineError.emailUnverified
                 }
                 // Bad credentials fail everywhere, and retrying risks a lockout.
-                if Self.isCredentialError(lastError) {
+                if Self.isCredentialError(failure) {
                     signInStatus = "sign-in failed"
-                    log("Apple ID credentials rejected: \(lastError)")
+                    log("Apple ID credentials rejected: \(failure)")
                     throw EngineError.message(Self.credentialErrorMessage)
                 }
-                log("Anisette \(name) failed: \(lastError)")
-                anisetteFailed(ani, error: lastError)
-                if Self.isAppleRateLimit(lastError) {
+                log("Anisette \(name) failed: \(failure)")
+                failures.failed(ani, error: failure)
+                anisetteFailed(ani, error: failure)
+                if Self.isAppleRateLimit(failure) {
                     signInStatus = "sign-in failed"
                     log("Apple is rate-limiting sign-in (HTTP 429) — not trying more anisette servers.")
                     throw EngineError.message(Self.appleRateLimitMessage)
+                }
+                // Apple calling the reported Mac too old rules out the servers
+                // left that report it (`AnisetteServer.AppleRefusals`).
+                if Self.isAppleOutdatedMacRefusal(failure) {
+                    appleRefusals.recordOutdated(ani)
                 }
                 // Apple refusing the device sign-in reports looks the same
                 // through every server reporting it: after two refusals those
                 // are skipped, and the loop ends when no other server is left
                 // (`AnisetteServer.AppleRefusals`).
-                if Self.isAppleServiceRefusal(lastError) {
+                if Self.isAppleServiceRefusal(failure) {
                     appleRefusals.record(ani)
                     if appleRefusals.endsSignIn(remaining: servers[(idx + 1)...]) {
                         signInStatus = "sign-in failed"
@@ -1204,7 +1211,7 @@ final class Engine: ObservableObject {
                 }
                 // Every anisette server starts with the same request to Apple, so
                 // when that can't even be sent, more of them won't help.
-                if Self.isAppleUnreachable(lastError) {
+                if Self.isAppleUnreachable(failure) {
                     appleUnreachable += 1
                     if let message = await appleUnreachableStop(failures: appleUnreachable) {
                         signInStatus = "sign-in failed"
@@ -1218,7 +1225,7 @@ final class Engine: ObservableObject {
         }
 
         signInStatus = "sign-in failed"
-        throw EngineError.message(anisetteSignInFailure(tried: servers.count, lastError: lastError))
+        throw EngineError.message(anisetteSignInFailure(failures))
     }
 
     /// One sign-in attempt against a specific anisette server.
@@ -1298,16 +1305,25 @@ final class Engine: ObservableObject {
         AnisetteServer.RecentFailures.record(address, error: error)
     }
 
-    /// The error for a sign-in that failed on each of the `tried` servers.
-    /// With a server picked in Settings, the only one tried, it names that
-    /// server and points to Auto, which would have tried the others.
-    func anisetteSignInFailure(tried: Int, lastError: String) -> String {
+    /// The error for a sign-in that failed on every server it tried. It shows
+    /// the error saying most about why (`AnisetteServer.SignInFailures`), and
+    /// with several servers tried, the one it came through. It counts the
+    /// servers tried, apart from those skipped. With a server picked in
+    /// Settings, the only one tried, it names that server and points to Auto,
+    /// which would have tried the others.
+    func anisetteSignInFailure(_ failures: AnisetteServer.SignInFailures) -> String {
+        let error = failures.shown?.error ?? "no anisette servers configured"
         guard anisetteAuto else {
-            return L("Apple ID sign-in failed on %@. Last error: %@", anisetteName(for: anisetteURL), lastError)
+            return L("Apple ID sign-in failed on %@. Error: %@", anisetteName(for: anisetteURL), error)
                 + " " + L("Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.")
         }
-        let servers = tried == 1 ? L("the anisette server") : L("all %d anisette servers", tried)
-        return L("Apple ID sign-in failed on %@. Last error: %@", servers, lastError)
+        guard let shown = failures.shown, failures.tried > 1 else {
+            return L("Apple ID sign-in failed on %@. Error: %@", L("the anisette server"), error)
+        }
+        let servers = failures.skipped == 0
+            ? L("all %d anisette servers", failures.tried)
+            : L("%d anisette servers (%d skipped)", failures.tried, failures.skipped)
+        return L("Apple ID sign-in failed on %@. Error via %@: %@", servers, anisetteName(for: shown.server), shown.error)
     }
 
     /// Friendly name for an anisette address (falls back to the address itself).
@@ -1374,6 +1390,16 @@ final class Engine: ObservableObject {
     static func isAppleServiceRefusal(_ raw: String) -> Bool {
         let m = raw.lowercased()
         return m.contains("gsa.apple.com") && m.contains("503")
+    }
+
+    /// Detects GrandSlam -23782, "A Mac with macOS version 10.13 or later is
+    /// required to sign in with this Apple Account": Apple turning down the
+    /// macOS 10.12.6 the macOS-ADI servers report (issue #89, 2026-10). Every
+    /// one of them reports it, so the rest are skipped
+    /// (`AnisetteServer.AppleRefusals`); the other servers report a Windows PC.
+    static func isAppleOutdatedMacRefusal(_ raw: String) -> Bool {
+        let m = raw.lowercased()
+        return m.contains("-23782") || m.contains("a mac with macos version")
     }
 
     /// Detects a sign-in that never reached Apple: sending GrandSlam's URL-bag

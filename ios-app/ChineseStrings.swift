@@ -668,8 +668,10 @@ let chineseStrings: [String: String] = [
     "Two-factor verification was cancelled.": "双重认证验证已取消。",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
         "Apple ID 或密码不正确。请检查你的 Apple 账户电子邮件和密码，然后重试。",
-    "Apple ID sign-in failed on %@. Last error: %@":
-        "在 %@ 上登录 Apple ID 失败。最后的错误：%@",
+    "Apple ID sign-in failed on %@. Error: %@":
+        "在 %@ 上登录 Apple ID 失败。错误：%@",
+    "Apple ID sign-in failed on %@. Error via %@: %@":
+        "在 %@ 上登录 Apple ID 失败。经由 %@ 的错误：%@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Apple 登录服务器拒绝了请求（HTTP 503）。这不是你的密码或 anisette 服务器的问题，换用其他服务器也无济于事。请稍后重试，或更新 SideInstaller。",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
@@ -690,6 +692,7 @@ let chineseStrings: [String: String] = [
         "出于安全原因，Apple 已锁定此 Apple 账户（错误 -20209），在解锁之前每次登录都会失败。请在 iforgot.apple.com 重设其密码，然后用新密码重新登录。",
     "the anisette server": "anisette 服务器",
     "all %d anisette servers": "全部 %d 个 anisette 服务器",
+    "%d anisette servers (%d skipped)": "%d 个 anisette 服务器（跳过 %d 个）",
     "Not signed in.": "尚未登录。",
     "No SideStore IPA downloaded.": "尚未下载 SideStore 的 IPA。",
     "Signing failed: %@": "签名失败：%@",

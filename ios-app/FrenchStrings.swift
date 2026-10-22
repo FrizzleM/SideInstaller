@@ -696,8 +696,10 @@ let frenchStrings: [String: String] = [
         "La validation en deux étapes a été annulée.",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
         "Identifiant Apple ou mot de passe incorrect. Vérifiez l'e-mail et le mot de passe de votre compte Apple, puis réessayez.",
-    "Apple ID sign-in failed on %@. Last error: %@":
-        "Échec de la connexion à l'Apple ID sur %@. Dernière erreur : %@",
+    "Apple ID sign-in failed on %@. Error: %@":
+        "Échec de la connexion à l'Apple ID sur %@. Erreur : %@",
+    "Apple ID sign-in failed on %@. Error via %@: %@":
+        "Échec de la connexion à l'Apple ID sur %@. Erreur via %@ : %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Le serveur de connexion d'Apple a refusé la requête (HTTP 503). Ce n'est ni votre mot de passe ni le serveur anisette : essayer d'autres serveurs n'y changera rien. Réessayez plus tard ou mettez à jour SideInstaller.",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
@@ -718,6 +720,7 @@ let frenchStrings: [String: String] = [
         "Apple a verrouillé ce compte Apple pour des raisons de sécurité (erreur -20209) : toute connexion échoue tant qu'il n'est pas déverrouillé. Réinitialisez son mot de passe sur iforgot.apple.com, puis reconnectez-vous avec le nouveau mot de passe.",
     "the anisette server": "le serveur anisette",
     "all %d anisette servers": "les %d serveurs anisette",
+    "%d anisette servers (%d skipped)": "%d serveurs anisette (%d ignorés)",
     "Not signed in.": "Non connecté.",
     "No SideStore IPA downloaded.": "Aucun IPA de SideStore téléchargé.",
     "Signing failed: %@": "Échec de la signature : %@",

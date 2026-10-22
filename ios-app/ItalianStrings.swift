@@ -690,8 +690,10 @@ let italianStrings: [String: String] = [
         "La verifica a due fattori è stata annullata.",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
         "Apple ID o password non corretti. Controlla l'email e la password del tuo Apple Account e riprova.",
-    "Apple ID sign-in failed on %@. Last error: %@":
-        "Accesso con l'Apple ID non riuscito su %@. Ultimo errore: %@",
+    "Apple ID sign-in failed on %@. Error: %@":
+        "Accesso con l'Apple ID non riuscito su %@. Errore: %@",
+    "Apple ID sign-in failed on %@. Error via %@: %@":
+        "Accesso con l'Apple ID non riuscito su %@. Errore tramite %@: %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Il server di accesso di Apple ha rifiutato la richiesta (HTTP 503). Non dipende dalla password né dal server anisette, quindi provare altri server non serve. Riprova più tardi o aggiorna SideInstaller.",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
@@ -712,6 +714,7 @@ let italianStrings: [String: String] = [
         "Apple ha bloccato questo Apple Account per motivi di sicurezza (errore -20209), quindi ogni accesso non riesce finché non viene sbloccato. Reimposta la password su iforgot.apple.com, poi accedi di nuovo con la nuova password.",
     "the anisette server": "il server anisette",
     "all %d anisette servers": "tutti e %d i server anisette",
+    "%d anisette servers (%d skipped)": "%d server anisette (%d saltati)",
     "Not signed in.": "Accesso non effettuato.",
     "No SideStore IPA downloaded.": "Nessun IPA di SideStore scaricato.",
     "Signing failed: %@": "Firma non riuscita: %@",

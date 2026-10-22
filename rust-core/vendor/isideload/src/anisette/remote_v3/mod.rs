@@ -62,8 +62,11 @@ const STOCK_CLIENTS: [&str; 2] = [
 /// Apple answers with 503): then `WINDOWS_CLIENT_INFO`. A server that hands out
 /// something else made it for the library it runs, as the Windows-ADI servers
 /// do and the macOS-ADI ones (mac-ani.jkcoxson.com, new.ani.sidestore.io:
-/// `<MacBookPro13,3> <Mac OS X;10.12.6;16G29>`, which Apple accepts from them),
-/// and so will anisette v4's server-chosen client.
+/// `<MacBookPro13,3> <Mac OS X;10.12.6;16G29>`), and so will anisette v4's
+/// server-chosen client. Apple has taken that Mac from them for most
+/// accounts, but answered one with -23782, "A Mac with macOS version 10.13
+/// or later is required" (SideInstaller issue #89, 2026-10): the app then
+/// skips the other macOS-ADI servers for that sign-in.
 pub fn client_info_to_use(advertised: &AnisetteClientInfo) -> AnisetteClientInfo {
     let client = advertised.client_info.trim();
     let stock = STOCK_CLIENTS.iter().any(|s| client.starts_with(s));
