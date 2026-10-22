@@ -79,7 +79,7 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 | --- | --- |
 | 27+ | ✅ Yes |
 | 17.4 - 26.7 | ⚠️ Yes, but [a pairing file is needed](https://docs.sidestore.io/docs/advanced/alternative#pairing), and that requires a PC |
-| < iOS 17.4 | ❌ No |
+| <17.4 | ❌ No |
 
 
 ## Is SideInstaller safe?
