@@ -16,3 +16,9 @@ SideInstaller.ipa
 
 # scripts/build-ipa.sh output
 /build/
+
+# Xcode derived data from -derivedDataPath build-dd
+/build-dd/
+
+# Claude Code per-machine settings
+/.claude/settings.local.json
