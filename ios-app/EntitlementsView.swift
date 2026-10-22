@@ -240,13 +240,14 @@ final class EntitlementsManager: ObservableObject {
         let servers = anisetteCandidates()
         let dir = storageDir
         engine.twoFactorWasCancelled = false
-        var lastError = "no anisette servers configured"
+        var failures = AnisetteServer.SignInFailures()
         var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
         var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
             if appleRefusals.rulesOut(ani) {
                 engine.log("Entitlements: skipping anisette \(idx + 1)/\(servers.count): Apple has refused the device sign-in reports through it.")
+                failures.skip()
                 continue
             }
             do {
@@ -258,28 +259,32 @@ final class EntitlementsManager: ObservableObject {
                 engine.log("Entitlements: signed in (\(summary)).")
                 return
             } catch let error as EngineError {
-                lastError = error.errorDescription ?? "sign-in failed"
+                let failure = error.errorDescription ?? "sign-in failed"
                 if engine.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
-                if Engine.isAccountLocked(lastError) {
+                if Engine.isAccountLocked(failure) {
                     throw EngineError.accountLocked
                 }
-                if Engine.isEmailUnverifiedError(lastError) {
+                if Engine.isEmailUnverifiedError(failure) {
                     throw EngineError.emailUnverified
                 }
-                if Engine.isCredentialError(lastError) {
+                if Engine.isCredentialError(failure) {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
-                engine.log("Entitlements: anisette \(idx + 1)/\(servers.count) failed: \(lastError)")
-                engine.anisetteFailed(ani, error: lastError)
-                if Engine.isAppleRateLimit(lastError) {
+                engine.log("Entitlements: anisette \(idx + 1)/\(servers.count) failed: \(failure)")
+                failures.failed(ani, error: failure)
+                engine.anisetteFailed(ani, error: failure)
+                if Engine.isAppleRateLimit(failure) {
                     engine.log("Entitlements: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
                     throw EngineError.message(Engine.appleRateLimitMessage)
                 }
                 // Apple refuses a reported device through every server alike;
                 // see `AnisetteServer.AppleRefusals`.
-                if Engine.isAppleServiceRefusal(lastError) {
+                if Engine.isAppleOutdatedMacRefusal(failure) {
+                    appleRefusals.recordOutdated(ani)
+                }
+                if Engine.isAppleServiceRefusal(failure) {
                     appleRefusals.record(ani)
                     if appleRefusals.endsSignIn(remaining: servers[(idx + 1)...]) {
                         engine.log("Entitlements: Apple's sign-in server refused \(appleRefusals.count) attempts with HTTP 503 — stopping.")
@@ -288,7 +293,7 @@ final class EntitlementsManager: ObservableObject {
                 }
                 // Every anisette server starts with the same request to Apple, so
                 // when that can't even be sent, more of them won't help.
-                if Engine.isAppleUnreachable(lastError) {
+                if Engine.isAppleUnreachable(failure) {
                     appleUnreachable += 1
                     if let message = await engine.appleUnreachableStop(
                         failures: appleUnreachable, logPrefix: "Entitlements: ") {
@@ -299,7 +304,7 @@ final class EntitlementsManager: ObservableObject {
                 }
             }
         }
-        throw EngineError.message(engine.anisetteSignInFailure(tried: servers.count, lastError: lastError))
+        throw EngineError.message(engine.anisetteSignInFailure(failures))
     }
 
     private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {

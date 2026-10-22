@@ -583,8 +583,10 @@ let japaneseStrings: [String: String] = [
     "Two-factor verification was cancelled.": "二段階認証がキャンセルされました。",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
         "Apple ID またはパスワードが正しくありません。Apple アカウントのメールアドレスとパスワードを確認してから、再度お試しください。",
-    "Apple ID sign-in failed on %@. Last error: %@":
-        "%@ での Apple ID サインインに失敗しました。直近のエラー：%@",
+    "Apple ID sign-in failed on %@. Error: %@":
+        "%@ での Apple ID サインインに失敗しました。エラー：%@",
+    "Apple ID sign-in failed on %@. Error via %@: %@":
+        "%@ での Apple ID サインインに失敗しました。%@ 経由のエラー：%@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Apple のサインインサーバーがリクエストを拒否しました（HTTP 503）。パスワードや anisette サーバーの問題ではないため、別のサーバーを試しても解決しません。しばらくしてから再度お試しいただくか、SideInstaller をアップデートしてください。",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
@@ -605,6 +607,7 @@ let japaneseStrings: [String: String] = [
         "セキュリティ上の理由により、Apple はこの Apple アカウントをロックしました（エラー -20209）。ロックが解除されるまで、サインインはすべて失敗します。iforgot.apple.com でパスワードをリセットしてから、新しいパスワードでもう一度サインインしてください。",
     "the anisette server": "anisette サーバー",
     "all %d anisette servers": "%d 個すべての anisette サーバー",
+    "%d anisette servers (%d skipped)": "%d 個の anisette サーバー（%d 個はスキップ）",
     "Not signed in.": "サインインしていません。",
     "No SideStore IPA downloaded.": "SideStore の IPA がダウンロードされていません。",
     "Signing failed: %@": "署名に失敗しました：%@",

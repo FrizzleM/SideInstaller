@@ -353,13 +353,14 @@ final class CertManager: ObservableObject {
         let servers = anisetteCandidates()
         let dir = storageDir
         engine.twoFactorWasCancelled = false
-        var lastError = "no anisette servers configured"
+        var failures = AnisetteServer.SignInFailures()
         var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
         var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
             if appleRefusals.rulesOut(ani) {
                 engine.log("Certificates: skipping anisette \(idx + 1)/\(servers.count): Apple has refused the device sign-in reports through it.")
+                failures.skip()
                 continue
             }
             do {
@@ -372,32 +373,36 @@ final class CertManager: ObservableObject {
                 engine.log("Certificates: signed in (\(summary)).")
                 return
             } catch let error as EngineError {
-                lastError = error.errorDescription ?? "sign-in failed"
+                let failure = error.errorDescription ?? "sign-in failed"
                 if engine.twoFactorWasCancelled {
                     engine.log("Two-factor verification cancelled — stopping.")
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
-                if Engine.isAccountLocked(lastError) {
-                    engine.log("Apple has locked this Apple Account: \(lastError)")
+                if Engine.isAccountLocked(failure) {
+                    engine.log("Apple has locked this Apple Account: \(failure)")
                     throw EngineError.accountLocked
                 }
-                if Engine.isEmailUnverifiedError(lastError) {
-                    engine.log("Apple wants this Apple Account's email address verified first: \(lastError)")
+                if Engine.isEmailUnverifiedError(failure) {
+                    engine.log("Apple wants this Apple Account's email address verified first: \(failure)")
                     throw EngineError.emailUnverified
                 }
-                if Engine.isCredentialError(lastError) {
-                    engine.log("Apple ID credentials rejected: \(lastError)")
+                if Engine.isCredentialError(failure) {
+                    engine.log("Apple ID credentials rejected: \(failure)")
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
-                engine.log("Certificates: anisette \(idx + 1)/\(servers.count) failed: \(lastError)")
-                engine.anisetteFailed(ani, error: lastError)
-                if Engine.isAppleRateLimit(lastError) {
+                engine.log("Certificates: anisette \(idx + 1)/\(servers.count) failed: \(failure)")
+                failures.failed(ani, error: failure)
+                engine.anisetteFailed(ani, error: failure)
+                if Engine.isAppleRateLimit(failure) {
                     engine.log("Certificates: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
                     throw EngineError.message(Engine.appleRateLimitMessage)
                 }
                 // Apple refuses a reported device through every server alike;
                 // see `AnisetteServer.AppleRefusals`.
-                if Engine.isAppleServiceRefusal(lastError) {
+                if Engine.isAppleOutdatedMacRefusal(failure) {
+                    appleRefusals.recordOutdated(ani)
+                }
+                if Engine.isAppleServiceRefusal(failure) {
                     appleRefusals.record(ani)
                     if appleRefusals.endsSignIn(remaining: servers[(idx + 1)...]) {
                         engine.log("Certificates: Apple's sign-in server refused \(appleRefusals.count) attempts with HTTP 503 — stopping.")
@@ -406,7 +411,7 @@ final class CertManager: ObservableObject {
                 }
                 // Every anisette server starts with the same request to Apple, so
                 // when that can't even be sent, more of them won't help.
-                if Engine.isAppleUnreachable(lastError) {
+                if Engine.isAppleUnreachable(failure) {
                     appleUnreachable += 1
                     if let message = await engine.appleUnreachableStop(
                         failures: appleUnreachable, logPrefix: "Certificates: ") {
@@ -417,7 +422,7 @@ final class CertManager: ObservableObject {
                 }
             }
         }
-        throw EngineError.message(engine.anisetteSignInFailure(tried: servers.count, lastError: lastError))
+        throw EngineError.message(engine.anisetteSignInFailure(failures))
     }
 
     /// One sign-in attempt against a specific anisette server.

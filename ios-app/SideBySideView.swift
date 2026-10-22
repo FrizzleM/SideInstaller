@@ -605,7 +605,7 @@ final class SideBySideManager: ObservableObject {
         let servers = anisetteCandidates()
         let dir = PrivateStore.isideload.path
         engine.twoFactorWasCancelled = false
-        var lastFailure = "no anisette servers configured"
+        var failures = AnisetteServer.SignInFailures()
         var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
         var appleUnreachable = 0
 
@@ -613,6 +613,7 @@ final class SideBySideManager: ObservableObject {
             try Task.checkCancellation()
             if appleRefusals.rulesOut(anisette) {
                 engine.log("Side by Side: skipping anisette \(index + 1)/\(servers.count): Apple has refused the device sign-in reports through it.")
+                failures.skip()
                 continue
             }
             do {
@@ -625,34 +626,38 @@ final class SideBySideManager: ObservableObject {
                 setStep(.signIn, .done)
                 return
             } catch let error as EngineError {
-                lastFailure = error.errorDescription ?? "sign-in failed"
+                let failure = error.errorDescription ?? "sign-in failed"
                 // A cancelled 2FA prompt isn't the server's fault.
                 if engine.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
                 // A locked account fails everywhere, and retrying keeps it locked.
-                if Engine.isAccountLocked(lastFailure) {
-                    engine.log("Apple has locked this Apple Account: \(lastFailure)")
+                if Engine.isAccountLocked(failure) {
+                    engine.log("Apple has locked this Apple Account: \(failure)")
                     throw EngineError.accountLocked
                 }
-                if Engine.isEmailUnverifiedError(lastFailure) {
-                    engine.log("Apple wants this Apple Account's email address verified first: \(lastFailure)")
+                if Engine.isEmailUnverifiedError(failure) {
+                    engine.log("Apple wants this Apple Account's email address verified first: \(failure)")
                     throw EngineError.emailUnverified
                 }
                 // Bad credentials fail everywhere, and retrying risks a lockout.
-                if Engine.isCredentialError(lastFailure) {
-                    engine.log("Apple ID credentials rejected: \(lastFailure)")
+                if Engine.isCredentialError(failure) {
+                    engine.log("Apple ID credentials rejected: \(failure)")
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
-                engine.log("Side by Side: anisette \(index + 1)/\(servers.count) failed: \(lastFailure)")
-                engine.anisetteFailed(anisette, error: lastFailure)
-                if Engine.isAppleRateLimit(lastFailure) {
+                engine.log("Side by Side: anisette \(index + 1)/\(servers.count) failed: \(failure)")
+                failures.failed(anisette, error: failure)
+                engine.anisetteFailed(anisette, error: failure)
+                if Engine.isAppleRateLimit(failure) {
                     engine.log("Side by Side: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
                     throw EngineError.message(Engine.appleRateLimitMessage)
                 }
                 // Apple refuses a reported device through every server alike;
                 // see `AnisetteServer.AppleRefusals`.
-                if Engine.isAppleServiceRefusal(lastFailure) {
+                if Engine.isAppleOutdatedMacRefusal(failure) {
+                    appleRefusals.recordOutdated(anisette)
+                }
+                if Engine.isAppleServiceRefusal(failure) {
                     appleRefusals.record(anisette)
                     if appleRefusals.endsSignIn(remaining: servers[(index + 1)...]) {
                         engine.log("Side by Side: Apple's sign-in server refused \(appleRefusals.count) attempts with HTTP 503 — stopping.")
@@ -661,7 +666,7 @@ final class SideBySideManager: ObservableObject {
                 }
                 // Every anisette server starts with the same request to Apple, so
                 // when that can't even be sent, more of them won't help.
-                if Engine.isAppleUnreachable(lastFailure) {
+                if Engine.isAppleUnreachable(failure) {
                     appleUnreachable += 1
                     if let message = await engine.appleUnreachableStop(
                         failures: appleUnreachable, logPrefix: "Side by Side: ") {
@@ -672,7 +677,7 @@ final class SideBySideManager: ObservableObject {
                 }
             }
         }
-        throw EngineError.message(engine.anisetteSignInFailure(tried: servers.count, lastError: lastFailure))
+        throw EngineError.message(engine.anisetteSignInFailure(failures))
     }
 
     /// One sign-in attempt against a specific anisette server. Uses the machine

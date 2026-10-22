@@ -690,8 +690,10 @@ let portugueseStrings: [String: String] = [
     "Two-factor verification was cancelled.": "A verificação em duas etapas foi cancelada.",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
         "Apple ID ou senha incorretos. Confira o e-mail e a senha da sua conta Apple e tente de novo.",
-    "Apple ID sign-in failed on %@. Last error: %@":
-        "Falha ao entrar no Apple ID em %@. Último erro: %@",
+    "Apple ID sign-in failed on %@. Error: %@":
+        "Falha ao entrar no Apple ID em %@. Erro: %@",
+    "Apple ID sign-in failed on %@. Error via %@: %@":
+        "Falha ao entrar no Apple ID em %@. Erro via %@: %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "O servidor de login da Apple recusou a solicitação (HTTP 503). Não é a sua senha nem o servidor anisette, então tentar outros servidores não vai adiantar. Tente de novo mais tarde ou atualize o SideInstaller.",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
@@ -712,6 +714,7 @@ let portugueseStrings: [String: String] = [
         "A Apple bloqueou esta conta Apple por motivos de segurança (erro -20209), então todo login falha até ela ser desbloqueada. Redefina a senha em iforgot.apple.com e entre de novo com a nova senha.",
     "the anisette server": "o servidor anisette",
     "all %d anisette servers": "todos os %d servidores anisette",
+    "%d anisette servers (%d skipped)": "%d servidores anisette (%d ignorados)",
     "Not signed in.": "Não conectado.",
     "No SideStore IPA downloaded.": "Nenhum IPA do SideStore foi baixado.",
     "Signing failed: %@": "Falha ao assinar: %@",

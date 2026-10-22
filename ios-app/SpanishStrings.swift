@@ -693,8 +693,10 @@ let spanishStrings: [String: String] = [
     "Two-factor verification was cancelled.": "Se ha cancelado la verificación en dos pasos.",
     "Incorrect Apple ID or password. Check your Apple Account email and password, then try again.":
         "Apple ID o contraseña incorrectos. Comprueba el correo y la contraseña de tu Apple Account y vuelve a intentarlo.",
-    "Apple ID sign-in failed on %@. Last error: %@":
-        "No se ha podido iniciar sesión con el Apple ID en %@. Último error: %@",
+    "Apple ID sign-in failed on %@. Error: %@":
+        "No se ha podido iniciar sesión con el Apple ID en %@. Error: %@",
+    "Apple ID sign-in failed on %@. Error via %@: %@":
+        "No se ha podido iniciar sesión con el Apple ID en %@. Error a través de %@: %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "El servidor de inicio de sesión de Apple ha rechazado la solicitud (HTTP 503). No es tu contraseña ni el servidor anisette, así que probar más servidores no servirá de nada. Vuelve a intentarlo más tarde o actualiza SideInstaller.",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
@@ -715,6 +717,7 @@ let spanishStrings: [String: String] = [
         "Apple ha bloqueado esta Apple Account por motivos de seguridad (error -20209), así que todos los inicios de sesión fallarán hasta que se desbloquee. Restablece su contraseña en iforgot.apple.com y vuelve a iniciar sesión con la nueva contraseña.",
     "the anisette server": "el servidor anisette",
     "all %d anisette servers": "los %d servidores anisette",
+    "%d anisette servers (%d skipped)": "%d servidores anisette (%d omitidos)",
     "Not signed in.": "No has iniciado sesión.",
     "No SideStore IPA downloaded.": "No hay ningún IPA de SideStore descargado.",
     "Signing failed: %@": "Falló la firma: %@",
