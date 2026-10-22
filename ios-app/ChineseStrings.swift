@@ -212,6 +212,11 @@ let chineseStrings: [String: String] = [
     "Pairing file ready. You can export it or install it into an app below.":
         "配对文件已就绪。你可以导出，或安装到下面的某个应用中。",
     "Pairing file installed into %@.": "配对文件已安装到 %@。",
+    "Install pairing into all apps": "将配对文件安装到所有应用",
+    "Installing into all apps": "正在安装到所有应用",
+    "Pairing file installed into all %d apps.": "配对文件已安装到全部 %d 个应用。",
+    "Couldn't write into %@.": "无法写入 %@。",
+    "The %@ record isn't a plist dictionary.": "%@ 记录不是 plist 字典。",
 
     // Importing a pairing file (required below iOS 27, under Advanced from 27)
 
