@@ -148,6 +148,10 @@ All notable changes to SideInstaller are documented here.
   text is in, still with the iPhone's region.
 
 ### Changed
+- **Madeira now comes from a GitHub release.** Latest installs Madeira from the releases of
+  [FrizzleM/Madeira](https://github.com/FrizzleM/Madeira), the build that renews its own signing,
+  instead of a fixed download link, and Advanced lists that fork's releases. Upstream releases
+  come back once upstream Madeira renews its own signing.
 - **The anisette server can be left on Auto, or kept to one.** Settings › Anisette Server has a new
   Auto choice, the default, which works as sign-in did before: it starts with the server that last
   signed in, then tries the others, the ones most likely to work first. It now also remembers a

@@ -71,11 +71,15 @@ enum InstallSource: String, CaseIterable, Identifiable {
     }
 
     /// GitHub "owner/repo" whose release holds the IPA.
+    ///
+    /// Madeira comes from FrizzleM's fork, whose releases are upstream Madeira
+    /// plus willfaust/Madeira#264 (it renews its own signing), until upstream
+    /// ships that.
     var repo: String? {
         switch self {
         case .sideStore:     return "SideStore/SideStore"
         case .liveContainer: return "LiveContainer/LiveContainer"
-        case .madeira:       return "willfaust/Madeira"
+        case .madeira:       return "FrizzleM/Madeira"
         case .custom:        return nil
         }
     }
@@ -151,21 +155,6 @@ enum InstallSource: String, CaseIterable, Identifiable {
         case .stable:  return URL(string: "\(base)/latest/download/\(assetFileName)")
         // The nightly tag is fixed, so nothing needs resolving.
         case .nightly: return URL(string: "\(base)/download/nightly/\(assetFileName)")
-        }
-    }
-
-    /// A fixed link that stands in for the build's latest release.
-    ///
-    /// Temporary, for Madeira: a build that renews its own signing, until
-    /// upstream publishes one. Remove it to go back to `repo`'s latest release.
-    /// A link that has gone fails the download: no release is tried in its
-    /// place, so another build is never installed instead.
-    var pinnedDownload: (url: URL, name: String)? {
-        switch self {
-        case .madeira:
-            return URL(string: "https://files.catbox.moe/06d9x0.ipa").map { ($0, "Madeira.ipa") }
-        case .sideStore, .liveContainer, .custom:
-            return nil
         }
     }
 
@@ -550,7 +539,7 @@ enum SideStoreDownloader {
                 return current.path
             }
             fetched = try await fetch(asset.url, named: asset.name, from: channel, log: log)
-        } catch let error as DownloadError where error.isRefused && source.pinnedDownload == nil {
+        } catch let error as DownloadError where error.isRefused {
             // Either the asset was renamed, or the repository itself is gone.
             if let mirror = source.mirror, let repo = source.repo, await isGone(repo) {
                 return try await downloadCopy(on: mirror, of: source, standingInFor: repo, log: log)
@@ -625,7 +614,6 @@ enum SideStoreDownloader {
     /// its latest tag looked up first.
     private static func latestAsset(of source: InstallSource,
                                     channel: ReleaseChannel) async throws -> (url: URL, name: String) {
-        if let pinned = source.pinnedDownload { return pinned }
         if let direct = source.downloadURL(channel), let name = source.assetFileName {
             return (direct, name)
         }
