@@ -135,6 +135,14 @@ All notable changes to SideInstaller are documented here.
   them, so the check always failed and pairing stopped at “Local Network denied” even with access
   turned on for LiveContainer (issue #38). The check now uses StikPair's service type, which
   LiveContainer lists.
+- **Inside LiveContainer, SideInstaller no longer says LocalDevVPN isn't installed.** iOS only
+  lets an app ask whether another app is installed for the apps its Info.plist names, and inside
+  LiveContainer that's LiveContainer's list, which has SideStore and LiveContainer but not
+  LocalDevVPN. So the answer was always no: Settings said LocalDevVPN wasn't installed, “Start
+  LocalDevVPN now” stayed greyed out, and Install asked for the tunnel instead of starting it
+  (issue #69). Where iOS won't answer, SideInstaller now just opens LocalDevVPN and goes by
+  whether that worked. It shows the same note in Settings, and the usual “Connect LocalDevVPN”
+  steps during an install, when nothing opens.
 - **Side by Side forgets the other iPhone once SideInstaller is on it.** Pairings with other
   people's iPhones were kept for good, so the iPhone that helped could still reach a friend's long
   after. They're now deleted after a successful install, and “Clear their details” deletes them

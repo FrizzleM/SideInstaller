@@ -34,6 +34,9 @@ struct SettingsView: View {
     @State private var developerModeBusy = false
     /// How the last Developer Mode request went.
     @State private var developerModeNote: DeveloperModeNote?
+    /// Set when “Start LocalDevVPN now” opened nothing: how a missing
+    /// LocalDevVPN shows inside LiveContainer, where `canOpenURL` can't tell.
+    @State private var localDevVPNDidntOpen = false
     /// Set while the restart warning is up, before Developer Mode is turned on.
     @State private var confirmEnableDeveloperMode = false
     /// Set while the Report a problem sheet is up.
@@ -201,7 +204,10 @@ struct SettingsView: View {
         Section {
             Toggle(L("Start LocalDevVPN when needed"), isOn: $engine.autoStartVPN)
             Button {
-                engine.startLocalDevVPN()
+                Task {
+                    let opened = await engine.startLocalDevVPN()
+                    localDevVPNDidntOpen = !opened
+                }
             } label: {
                 Label(L("Start LocalDevVPN now"), systemImage: "bolt.horizontal.circle")
             }
@@ -209,8 +215,8 @@ struct SettingsView: View {
         } header: {
             Text(L("Tunnel"))
         } footer: {
-            // Explain why the button is disabled.
-            if !engine.localDevVPNInstalled {
+            // Explain why the button is disabled, or why it did nothing.
+            if !engine.localDevVPNInstalled || localDevVPNDidntOpen {
                 Text(L("LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you."))
             }
         }

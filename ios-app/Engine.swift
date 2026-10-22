@@ -2464,22 +2464,23 @@ final class Engine: ObservableObject {
     /// The scheme LocalDevVPN is asked to return to, registered in Info.plist.
     private static let callbackScheme = DeepLink.scheme
 
-    /// True when LocalDevVPN is installed. Only answerable because Info.plist
-    /// lists its scheme under `LSApplicationQueriesSchemes`.
+    /// True unless LocalDevVPN is known to be missing. Inside LiveContainer
+    /// `canOpenURL` can't see it (see `appPresence`), so it counts as
+    /// installed there and opening it is what tells.
     var localDevVPNInstalled: Bool {
-        guard let url = URL(string: "\(Self.localDevVPNScheme)://") else { return false }
-        return UIApplication.shared.canOpenURL(url)
+        Self.appPresence(scheme: Self.localDevVPNScheme) != .missing
     }
 
     /// Time of the last handover, so a second caller waits for it instead of
     /// opening LocalDevVPN again.
     private var lastVPNStartAttempt: Date?
 
-    /// Opens LocalDevVPN to connect its tunnel and return. Returns false if it
-    /// isn't installed; whether the tunnel connects isn't visible from here.
+    /// Opens LocalDevVPN to connect its tunnel and return. Returns false if
+    /// nothing opened, so it isn't installed; whether the tunnel connects
+    /// isn't visible from here.
     @MainActor
     @discardableResult
-    func startLocalDevVPN() -> Bool {
+    func startLocalDevVPN() async -> Bool {
         guard localDevVPNInstalled,
               let url = URL(string: "\(Self.localDevVPNScheme)://enable?scheme=\(Self.callbackScheme)")
         else {
@@ -2488,7 +2489,13 @@ final class Engine: ObservableObject {
         }
         lastVPNStartAttempt = Date()
         log("Handing over to LocalDevVPN to connect the tunnel …")
-        UIApplication.shared.open(url)
+        // `open` says whether anything took the link, and unlike
+        // `canOpenURL` needs no Info.plist entry.
+        guard await UIApplication.shared.open(url) else {
+            lastVPNStartAttempt = nil
+            log("⛔️ LocalDevVPN didn't open, so it isn't installed. Get it from the App Store.")
+            return false
+        }
         return true
     }
 
@@ -2509,7 +2516,9 @@ final class Engine: ObservableObject {
         // A handover a moment ago is still under way: wait for it, don't
         // open LocalDevVPN again.
         let handingOver = lastVPNStartAttempt.map { Date().timeIntervalSince($0) < 5 } ?? false
-        guard handingOver || startLocalDevVPN() else { return false }
+        if !handingOver {
+            guard await startLocalDevVPN() else { return false }
+        }
         // Only time back in SideInstaller counts, so a while spent in
         // LocalDevVPN (its VPN permission prompt, say) doesn't use up the wait.
         var waited = 0.0
@@ -2797,18 +2806,60 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// True when SideStore is installed to ask. Only answerable because
-    /// Info.plist lists its scheme under `LSApplicationQueriesSchemes`.
+    /// True unless SideStore is known to be missing (see `appPresence`).
+    /// Opening it reports when it isn't there.
     var sideStoreInstalled: Bool {
-        guard let url = URL(string: "sidestore://") else { return false }
-        return UIApplication.shared.canOpenURL(url)
+        Self.appPresence(scheme: "sidestore") != .missing
     }
 
-    /// True when LiveContainer is installed. Only answerable because
-    /// Info.plist lists its scheme under `LSApplicationQueriesSchemes`.
+    /// True unless LiveContainer is known to be missing (see `appPresence`).
+    /// Opening it reports when it isn't there.
     var liveContainerInstalled: Bool {
-        guard let url = URL(string: "livecontainer://") else { return false }
-        return UIApplication.shared.canOpenURL(url)
+        Self.appPresence(scheme: "livecontainer") != .missing
+    }
+
+    // Is another app installed?
+    //
+    // `canOpenURL` only answers for the schemes listed under
+    // `LSApplicationQueriesSchemes` in the Info.plist of the app this process
+    // really is, and says false for every other one. Inside LiveContainer
+    // that's LiveContainer's Info.plist, not ours, the same trap as the Bonjour
+    // types in issue #38. It lists sidestore and livecontainer but not
+    // localdevvpn, so there LocalDevVPN always read as missing (issue #69).
+
+    enum AppPresence { case installed, missing, unknown }
+
+    /// Whether an app that opens `scheme://` links is installed, as far as
+    /// `canOpenURL` can tell. `.unknown` when it isn't allowed to ask.
+    static func appPresence(scheme: String) -> AppPresence {
+        guard let url = URL(string: "\(scheme)://") else { return .unknown }
+        if UIApplication.shared.canOpenURL(url) { return .installed }
+        return queryableSchemes?.contains(scheme.lowercased()) == true ? .missing : .unknown
+    }
+
+    /// The schemes `canOpenURL` answers for, or nil when they can't be read.
+    /// LiveContainer swaps `Bundle.main` for the guest's bundle and keeps its
+    /// own as `UserDefaults.lcMainBundle`.
+    private static let queryableSchemes: Set<String>? = {
+        let host: Bundle
+        if getenv("LC_HOME_PATH") == nil {
+            host = .main
+        } else if let liveContainer = liveContainerBundle() {
+            host = liveContainer
+        } else {
+            return nil
+        }
+        let schemes = host.object(forInfoDictionaryKey: "LSApplicationQueriesSchemes") as? [String] ?? []
+        return Set(schemes.map { $0.lowercased() })
+    }()
+
+    /// LiveContainer's own bundle, from the `+[NSUserDefaults lcMainBundle]`
+    /// it adds for the guest app.
+    private static func liveContainerBundle() -> Bundle? {
+        let selector = NSSelectorFromString("lcMainBundle")
+        let defaults = UserDefaults.self as AnyObject
+        guard defaults.responds(to: selector) else { return nil }
+        return defaults.perform(selector)?.takeUnretainedValue() as? Bundle
     }
 
     /// Opens `livecontainer://install?url=`, which has LiveContainer download
