@@ -212,6 +212,11 @@ let japaneseStrings: [String: String] = [
     "Pairing file ready. You can export it or install it into an app below.":
         "ペアリングファイルの準備ができました。書き出すか、以下のアプリにインストールできます。",
     "Pairing file installed into %@.": "ペアリングファイルを %@ にインストールしました。",
+    "Install pairing into all apps": "ペアリングをすべてのアプリにインストール",
+    "Installing into all apps": "すべてのアプリにインストール中",
+    "Pairing file installed into all %d apps.": "ペアリングファイルを %d 個のアプリすべてにインストールしました。",
+    "Couldn't write into %@.": "%@ に書き込めませんでした。",
+    "The %@ record isn't a plist dictionary.": "%@ レコードは plist 辞書ではありません。",
 
     // Importing a pairing file (required below iOS 27, under Advanced from 27)
 

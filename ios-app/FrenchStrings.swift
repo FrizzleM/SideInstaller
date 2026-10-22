@@ -216,6 +216,11 @@ let frenchStrings: [String: String] = [
     "Pairing file ready. You can export it or install it into an app below.":
         "Fichier de jumelage prêt. Vous pouvez l'exporter ou l'installer dans une app ci-dessous.",
     "Pairing file installed into %@.": "Fichier de jumelage installé dans %@.",
+    "Install pairing into all apps": "Installer le jumelage dans toutes les apps",
+    "Installing into all apps": "Installation dans toutes les apps",
+    "Pairing file installed into all %d apps.": "Fichier de jumelage installé dans les %d apps.",
+    "Couldn't write into %@.": "Impossible d'écrire dans %@.",
+    "The %@ record isn't a plist dictionary.": "L'enregistrement %@ n'est pas un dictionnaire plist.",
 
     // Importing a pairing file (required below iOS 27, under Advanced from 27)
 

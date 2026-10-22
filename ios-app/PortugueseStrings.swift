@@ -216,6 +216,11 @@ let portugueseStrings: [String: String] = [
     "Pairing file ready. You can export it or install it into an app below.":
         "Arquivo de pareamento pronto. Você pode exportá-lo ou instalá-lo em um app abaixo.",
     "Pairing file installed into %@.": "Arquivo de pareamento instalado no %@.",
+    "Install pairing into all apps": "Instalar pareamento em todos os apps",
+    "Installing into all apps": "Instalando em todos os apps",
+    "Pairing file installed into all %d apps.": "Arquivo de pareamento instalado nos %d apps.",
+    "Couldn't write into %@.": "Não foi possível gravar em %@.",
+    "The %@ record isn't a plist dictionary.": "O registro %@ não é um dicionário plist.",
 
     "Import pairing file": "Importar arquivo de pareamento",
     "How do I make one?": "Como faço um?",
