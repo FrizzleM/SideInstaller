@@ -922,6 +922,7 @@ struct SideBySideView: View {
                 // `SideBySidePopup`, which `RootView` lays over the app.
             }
             .padding(20)
+            .pageColumn()
             .animation(.smooth(duration: 0.35), value: manager.targetSummary)
             .animation(.smooth(duration: 0.3), value: manager.isRunning)
             .animation(.smooth(duration: 0.4, extraBounce: 0.12), value: manager.finished)

@@ -6,8 +6,8 @@
 #
 #   scripts/build-ipa.sh
 #
-# Needs Xcode with the iOS 27 SDK, Rust with the aarch64-apple-ios target
-# (added here when rustup is around) and xcodegen.
+# Needs Xcode with the iOS 27.1 SDK or later, Rust with the aarch64-apple-ios
+# target (added here when rustup is around) and xcodegen.
 #
 # For a clean clone, like the one CI checks out. The Xcode project is generated
 # into the checkout, so one that already has its own SideInstaller.xcodeproj is
@@ -24,6 +24,8 @@
 #   DERIVED_DATA   Xcode build folder (default: build/DerivedData)
 #   REBUILD_RUST   1 = rebuild SideInstallerFFI.xcframework even when one is
 #                  there (default: build it only when it's missing)
+#   MIN_IOS_SDK    oldest iOS SDK to build with (default: 27.1, the first the
+#                  iPhone Duo shows full screen)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -33,6 +35,7 @@ DERIVED_DATA="${DERIVED_DATA:-$ROOT/build/DerivedData}"
 REBUILD_RUST="${REBUILD_RUST:-0}"
 VERSION="${VERSION:-}"
 BUILD_NUMBER="${BUILD_NUMBER:-}"
+MIN_IOS_SDK="${MIN_IOS_SDK:-27.1}"
 
 die() { echo "error: $*" >&2; exit 1; }
 plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$2" 2>/dev/null; }
@@ -61,6 +64,12 @@ source "$HOME/.cargo/env" 2>/dev/null || true
 command -v xcodegen >/dev/null || die "xcodegen isn't installed (brew install xcodegen)"
 command -v cargo >/dev/null || die "Rust isn't installed (https://rustup.rs)"
 echo "==> $(xcodebuild -version | tr '\n' ' ')"
+# The iPhone Duo runs an app built with an older iOS SDK in a window beside its
+# status bar instead of across the whole screen, so an older Xcode is refused.
+sdk="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || true)"
+[ -n "$sdk" ] || die "this Xcode has no iOS SDK"
+[ "$(printf '%s\n' "$MIN_IOS_SDK" "$sdk" | sort -V | head -1)" = "$MIN_IOS_SDK" ] ||
+  die "this Xcode has the iOS $sdk SDK; SideInstaller needs the iOS $MIN_IOS_SDK SDK or later (Xcode $MIN_IOS_SDK+), or the iPhone Duo shows it in a window instead of full screen"
 
 # --- Rust library -------------------------------------------------------------
 if [ "$REBUILD_RUST" = 1 ] || [ ! -d SideInstallerFFI.xcframework ]; then

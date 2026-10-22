@@ -21,6 +21,24 @@ enum Theme {
         LinearGradient(colors: [color, color.opacity(0.72)],
                        startPoint: .topLeading, endPoint: .bottomTrailing)
     }
+
+    /// The widest a page's column grows, its padding included. A phone is
+    /// narrower than this; a wider window, such as an open iPhone Duo (about
+    /// 950 points across) or an iPad, keeps the column at this width and
+    /// centres it rather than stretching every card across the screen.
+    static let columnWidth: CGFloat = 600
+}
+
+// MARK: - Page column
+
+extension View {
+    /// Holds a page's content to `Theme.columnWidth`, centred. Goes inside the
+    /// page's scroll view, which still spans the window, so the page scrolls
+    /// from anywhere and its backdrop fills the screen.
+    func pageColumn() -> some View {
+        frame(maxWidth: Theme.columnWidth)
+            .frame(maxWidth: .infinity)
+    }
 }
 
 // MARK: - Backdrop level
@@ -688,6 +706,10 @@ struct BetaBadge: View {
 }
 
 /// The hero at the top of each screen: a glyph, the title, and an accessory.
+///
+/// In a short window (an iPhone on its side, or a closed iPhone Duo stood up
+/// like a tent) it takes one row, the glyph beside the title, so it doesn't
+/// fill the screen and push the page's controls out of sight.
 struct BrandHeader<Accessory: View>: View {
     var icon: String
     /// Asset image shown instead of the SF Symbol `icon`.
@@ -700,28 +722,44 @@ struct BrandHeader<Accessory: View>: View {
     var animateIcon: Bool = false
     @ViewBuilder var accessory: () -> Accessory
 
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    /// True in a short window, where the header takes one row.
+    private var isRow: Bool { verticalSizeClass == .compact }
+    private var glyphSide: CGFloat { isRow ? 56 : 86 }
+    private var alignment: HorizontalAlignment { isRow ? .leading : .center }
+
     var body: some View {
-        VStack(spacing: 14) {
+        // One layout that changes shape, so a rotation moves the pieces
+        // rather than swapping them out.
+        let layout = isRow ? AnyLayout(HStackLayout(spacing: 16))
+                           : AnyLayout(VStackLayout(spacing: 14))
+        layout {
             glyph
-                .frame(width: 86, height: 86)
-                .shadow(color: Theme.glow, radius: 20, x: 0, y: 12)
-            VStack(spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(title)
-                        .font(.largeTitle.weight(.bold))
-                    if beta { BetaBadge() }
+                .frame(width: glyphSide, height: glyphSide)
+                .shadow(color: Theme.glow, radius: isRow ? 14 : 20, x: 0, y: isRow ? 8 : 12)
+            VStack(alignment: alignment, spacing: isRow ? 8 : 14) {
+                VStack(alignment: alignment, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(title)
+                            .font((isRow ? Font.title : .largeTitle).weight(.bold))
+                        if beta { BetaBadge() }
+                    }
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
+                accessory()
             }
-            accessory()
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
     }
+
+    /// The icon art's corner radius, at any size.
+    private var cornerRadius: CGFloat { glyphSide * 23 / 86 }
 
     @ViewBuilder
     private var glyph: some View {
@@ -729,7 +767,7 @@ struct BrandHeader<Accessory: View>: View {
             Image(image)
                 .resizable()
                 .scaledToFill()
-                .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 // A breathe while a run is in flight, mirroring `.pulse`.
                 .scaleEffect(animateIcon ? 1.04 : 1)
                 .animation(animateIcon ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
@@ -737,10 +775,10 @@ struct BrandHeader<Accessory: View>: View {
                            value: animateIcon)
         } else {
             ZStack {
-                RoundedRectangle(cornerRadius: 23, style: .continuous)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(Theme.brand)
                 Image(systemName: icon)
-                    .font(.system(size: 40, weight: .semibold))
+                    .font(.system(size: glyphSide * 40 / 86, weight: .semibold))
                     .foregroundStyle(.white)
                     .symbolEffect(.pulse, isActive: animateIcon)
             }

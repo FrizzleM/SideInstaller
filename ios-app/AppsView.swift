@@ -575,6 +575,7 @@ struct AppsView: View {
                 unmatchedSection
             }
             .padding(20)
+            .pageColumn()
             .animation(.smooth(duration: 0.35), value: manager.entries)
             .animation(.smooth(duration: 0.3), value: manager.isWorking)
             .animation(.smooth(duration: 0.35), value: manager.jobs)
@@ -958,6 +959,7 @@ private struct AppProfileDetail: View {
                 }
             }
             .padding(20)
+            .pageColumn()
         }
         .background(AppBackground())
         .navigationTitle(status.app.name)

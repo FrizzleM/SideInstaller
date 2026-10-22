@@ -23,6 +23,7 @@ struct AboutView: View {
                     builtWith.cascadeItem(4)
                 }
                 .padding(20)
+                .pageColumn()
             }
             // Uses the same bright backdrop level as the Install tab.
             .background(AppBackground())
@@ -290,6 +291,7 @@ private struct CryptoDonationsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(20)
+                .pageColumn()
             }
             .background(AppBackground())
             .navigationTitle(L("Crypto donations"))

@@ -25,12 +25,15 @@
 #   XCODEPROJ   Xcode project to copy in, instead of picking one as above
 #   CACHE_DIR   worktree, build folders and built Rust libraries, reused between
 #               runs (default: ~/Library/Caches/SideInstallerExport)
+#   MIN_IOS_SDK oldest iOS SDK to build with (default: 27.1, the first the
+#               iPhone Duo shows full screen)
 set -euo pipefail
 
 BUNDLE_ID="${BUNDLE_ID:-com.frizzlem.sideinstaller}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
 REVEAL="${REVEAL:-1}"
 CACHE_DIR="${CACHE_DIR:-$HOME/Library/Caches/SideInstallerExport}"
+MIN_IOS_SDK="${MIN_IOS_SDK:-27.1}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$CACHE_DIR/src"
@@ -52,6 +55,13 @@ build_failed() {
   exit 1
 }
 plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$2" 2>/dev/null; }
+
+# The iPhone Duo runs an app built with an older iOS SDK in a window beside its
+# status bar instead of across the whole screen, so an older Xcode is refused.
+sdk="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || true)"
+[ -n "$sdk" ] || die "this Xcode has no iOS SDK"
+[ "$(printf '%s\n' "$MIN_IOS_SDK" "$sdk" | sort -V | head -1)" = "$MIN_IOS_SDK" ] ||
+  die "this Xcode has the iOS $sdk SDK; SideInstaller needs the iOS $MIN_IOS_SDK SDK or later (Xcode $MIN_IOS_SDK+), or the iPhone Duo shows it in a window instead of full screen"
 
 HERE="$PWD"
 cd "$ROOT"

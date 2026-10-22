@@ -44,6 +44,7 @@ struct WelcomeView: View {
                         .welcomeItem(Engine.deviceCanSelfPair ? 3 : 4)
                 }
                 .padding(.horizontal, 24)
+                .pageColumn()
                 .padding(.bottom, 28)
             }
         }

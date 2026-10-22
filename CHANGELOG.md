@@ -5,6 +5,12 @@ All notable changes to SideInstaller are documented here.
 ## 1.6.0
 
 ### Added
+- **SideInstaller is ready for the iPhone Duo.** It's built with the iOS 27.1 SDK, so it fills both
+  of the Duo's screens rather than running in a window beside the status bar, and resizes with it as
+  the Duo opens and closes. On the open Duo's wide screen, and on an iPad, each page keeps to a
+  column in the middle instead of stretching every card across the screen. On its side (the closed
+  Duo stood up like a tent, or any iPhone in landscape) each page's header takes a single row, so
+  what's under it stays in view.
 - **SideInstaller asks where it came from before your Apple ID goes in.** The first time you add an
   Apple ID, at setup or later in Settings, it asks whether you downloaded it from sideinstaller.net.
   It's open source, so anyone can publish a copy changed to steal the Apple ID typed into it; “No,

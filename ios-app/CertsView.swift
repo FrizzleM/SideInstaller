@@ -43,6 +43,7 @@ struct CertsView: View {
                 Text(L("Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password for it: you'll need it to import the file. Keep the file to yourself."))
             }
             .padding(20)
+            .pageColumn()
             .animation(.smooth(duration: 0.35), value: manager.certs)
             .animation(.smooth(duration: 0.3), value: manager.isWorking)
             .animation(.smooth(duration: 0.3), value: manager.isImporting)

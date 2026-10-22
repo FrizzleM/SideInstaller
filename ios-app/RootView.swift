@@ -531,6 +531,7 @@ struct ToolsView: View {
                 // No bottom padding: the tab bar's inset already clears the last
                 // row, and the extra 20pt would make a page that fits scroll.
                 .padding([.horizontal, .top], 20)
+                .pageColumn()
             }
             // Still unless the rows don't all fit on the screen.
             .scrollBounceBehavior(.basedOnSize)
