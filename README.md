@@ -64,7 +64,7 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 
 ## How to use it
 
-1. Open [the official install page](https://frizzlem.github.io/SideInstaller/) and install the app using any
+1. Open [the official install page](https://sideinstaller.net/) and install the app using any
    of the certificates.
 2. Once it's installed, open it.
 3. Connect the device to LocalDevVPN (or any alternative)
@@ -149,8 +149,12 @@ anyone can inspect exactly what it does.
 | `ios-app/` | The SwiftUI app — UI, install engine, certificate handling, translations |
 | `ios-live-activity/` | The widget extension that draws the pairing code in the Dynamic Island and on the Lock Screen |
 | `rust-core/` | Rust core compiled into `SideInstallerFFI.xcframework` |
-| `scripts/` | Build, signing, and install-page generation scripts |
-| `.github/` | Workflows for signing and publishing the install page |
+| `scripts/` | Build and release scripts |
+| `.github/` | Workflows that build the unsigned IPA, publish it as a release and hand it to the signer |
+
+Signed builds and the install page live in [FrizzleM/SideInstaller-Signed](https://github.com/FrizzleM/SideInstaller-Signed):
+it signs each release's IPA with every certificate, attaches the signed IPAs to a release of its own and
+deploys [sideinstaller.net](https://sideinstaller.net/). No IPA is ever committed to either repository.
 
 ## Contributing
 

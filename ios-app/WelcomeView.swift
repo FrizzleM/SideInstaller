@@ -107,7 +107,7 @@ struct WelcomeView: View {
                        isOn: $accepted.animation(.snappy(duration: 0.25)))
             }
 
-            Link(destination: URL(string: "https://frizzlem.github.io/SideInstaller/terms.html")!) {
+            Link(destination: URL(string: "https://sideinstaller.net/terms.html")!) {
                 Text("TOS")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.accent2)
