@@ -256,15 +256,25 @@ final class Engine: ObservableObject {
 
     var canSelfPair: Bool { Engine.deviceCanSelfPair }
 
-    /// False on iOS 27 and later, where this iPhone can't make itself a classic
-    /// lockdown pair record: lockdownd answers `Pair` over the tunnel with
-    /// `InvalidHostID` whatever the request carries, and resets every request
-    /// on port 62078, so no app could use such a record there anyway. See
-    /// NOTES.md ("lockdownd refuses it").
-    static var canMintLockdownRecord: Bool {
+    /// False from iOS 26.4 on, where lockdownd hangs up on a connection that
+    /// reaches it through a loopback VPN, on its first request. A lockdown pair
+    /// record (jitterbugpair, “pymobiledevice3 lockdown pair”, idevice_pair's
+    /// “Lockdown”) then can't open the tunnel however fresh it is, while an
+    /// RPPairing one can. Reported from 26.4 beta 1 through 26.6.2, and the
+    /// same reset is measured here on iOS 27. See NOTES.md ("iOS 26.4+:
+    /// lockdownd hangs up on loopback connections").
+    static var lockdownWorksOverLoopback: Bool {
         !ProcessInfo.processInfo.isOperatingSystemAtLeast(
-            OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0))
+            OperatingSystemVersion(majorVersion: 26, minorVersion: 4, patchVersion: 0))
     }
+
+    /// False from iOS 26.4 on, where a classic lockdown pair record made here
+    /// would be no use: lockdownd hangs up on it through the loopback VPN, for
+    /// this app and for every app it's handed to (`lockdownWorksOverLoopback`).
+    /// On iOS 27 it can't even be made: lockdownd answers `Pair` over the
+    /// tunnel with `InvalidHostID` whatever the request carries. See NOTES.md
+    /// ("lockdownd refuses it").
+    static var canMintLockdownRecord: Bool { lockdownWorksOverLoopback }
 
     /// False when iOS is too old for the install tunnel, even with an imported
     /// pairing file.
@@ -907,6 +917,14 @@ final class Engine: ObservableObject {
         do {
             try await connect()
         } catch {
+            // From iOS 26.4 on, lockdownd hangs up on a lockdown-only file
+            // through the loopback. Below iOS 27 the way on is a remote pairing
+            // file made on a computer, which the guide walks through.
+            let lockdownClosed = (error as? DeviceConnection.TunnelError)?.lockdownRouteClosed == true
+            if lockdownClosed, !canSelfPair {
+                setGuide(Guides.remotePairingNeeded)
+                throw EngineError.message(ErrorHelp.explained(L("This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.")))
+            }
             // A reused pairing file may be stale: re-pair once and retry.
             // Only possible when this iPhone can self-pair (iOS 27+).
             guard reused, canSelfPair else { throw error }
@@ -916,7 +934,9 @@ final class Engine: ObservableObject {
                !tunnel.repairingCouldHelp {
                 throw error
             }
-            log("Saved pairing didn't work (\(short(error))). Pairing fresh…")
+            log(lockdownClosed
+                ? "The pairing file holds only a lockdown record, and lockdownd hangs up on those through LocalDevVPN from iOS 26.4 on. Pairing this iPhone with itself instead, for an RPPairing record…"
+                : "Saved pairing didn't work (\(short(error))). Pairing fresh…")
             // Pairing has the user type a code into Settings. Let a sign-in that
             // may be asking for a 2FA code finish first, so the two never overlap.
             if let signingIn = backgroundSignIn { _ = await signingIn.result }
@@ -2681,8 +2701,15 @@ final class Engine: ObservableObject {
                        kind.hasRemotePairing ? "remote-pairing" : nil]
             .compactMap { $0 }.joined(separator: " + ")
         log("Imported \(name) (\(data.count) bytes, \(records) record\(records.contains("+") ? "s" : "")\(kind.udid.map { ", UDID \($0)" } ?? "")).")
-        if !kind.hasLockdown {
-            log("⚠️ No lockdown record in that file — SideStore and Feather can't read it, though the install itself will work.")
+        if Self.lockdownWorksOverLoopback {
+            if !kind.hasLockdown {
+                log("⚠️ No lockdown record in that file — SideStore and Feather can't read it, though the install itself will work.")
+            }
+        } else if !kind.hasRemotePairing {
+            // Nothing stops the import: the connect explains it with advice.
+            log(Self.deviceCanSelfPair
+                ? "⚠️ That file holds only a lockdown record, and from iOS 26.4 on lockdownd hangs up on those through LocalDevVPN. Install pairs this iPhone with itself instead."
+                : "⚠️ That file holds only a lockdown record, and from iOS 26.4 on lockdownd hangs up on those through LocalDevVPN, so it won't connect. Make a remote pairing file instead: idevice_pair › Remote pairing › Create › Save to file…, or iLoader's exported file.")
         }
     }
 
@@ -3197,11 +3224,13 @@ final class Engine: ObservableObject {
         do {
             try await ensurePairingConnection()
         } catch {
-            // No VPN, no pairing file, or a Device IP lockdownd can't be
-            // reached on either: nothing else to try.
+            // No VPN, no pairing file, a Device IP lockdownd can't be reached
+            // on either, or an iOS (26.4+) whose lockdownd hangs up on the
+            // loopback: nothing else to try.
             let path = pairingFilePath ?? PairingController.pairingFilePath()
             guard vpnConnected, PairingFileKind.of(path: path).hasLockdown,
-                  !NetworkStatus.isOwnAddress(deviceHost) else { throw error }
+                  !NetworkStatus.isOwnAddress(deviceHost),
+                  Self.lockdownWorksOverLoopback else { throw error }
             log("Developer Mode: the tunnel didn't open (\(short(error))). Asking lockdownd directly …")
             let ip = deviceHost
             do {
@@ -3264,8 +3293,9 @@ final class Engine: ObservableObject {
     ///
     /// SideInstaller pairs via RPPairing, but minimuxer (SideStore, LiveContainer)
     /// and Feather need a classic lockdown record. This creates one over the open
-    /// tunnel and merges both records into one file, as iLoader does. On iOS 27
-    /// lockdownd won't pair, so the RPPairing file goes alone.
+    /// tunnel and merges both records into one file, as iLoader does. From iOS
+    /// 26.4 on the RPPairing file goes alone: no app can use a lockdown record
+    /// through the loopback there, and on iOS 27 lockdownd won't pair at all.
     ///
     /// Runs on `deviceQueue`. Never throws: on failure it returns the RPPairing
     /// file alone, which StikDebug can still use.
@@ -3298,7 +3328,7 @@ final class Engine: ObservableObject {
             if let cached = CompositePairingFile.cachedLockdownRecord(forUDID: udid) {
                 lockdown = cached
             } else if !Self.canMintLockdownRecord {
-                log("Handing over the RPPairing record on its own: iOS 27 doesn't let lockdown pair over the tunnel. StikDebug (sideloaded) and SideStore nightlies from 20 September 2026 on read it.")
+                log("Handing over the RPPairing record on its own: from iOS 26.4 on, lockdownd hangs up on lockdown records through LocalDevVPN, so no app could use one. StikDebug (sideloaded) and SideStore nightlies from 20 September 2026 on read the RPPairing record.")
                 return rpPairingPath
             } else {
                 log("Pairing with lockdown as well, so AltStore-family apps can read the file. Tap Trust if this iPhone asks, and unlock it if it's locked …")
@@ -3654,20 +3684,60 @@ enum Guides {
     }
 
     /// Shown on an iPhone below iOS 27, where the pairing file has to be made
-    /// somewhere else and brought over.
+    /// somewhere else and brought over. From iOS 26.4 on it has to be a remote
+    /// pairing (RPPairing) file: lockdownd hangs up on lockdown ones through
+    /// the loopback VPN (`Engine.lockdownWorksOverLoopback`).
     static var importPairing: Guide {
-        Guide(
+        let first = L("iOS %@ is the first version an iPhone can pair with itself on. On this one the pairing file has to be made on a computer.", Engine.minimumOSText)
+        let last = L("Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.", Engine.minimumOSText)
+        guard Engine.lockdownWorksOverLoopback else {
+            return Guide(
+                title: L("Import a pairing file"),
+                systemImage: "lock.doc",
+                steps: [first,
+                        L("From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.")]
+                    + remotePairingSteps + [last],
+                actionLabel: L("Get idevice_pair"),
+                actionURLString: idevicePairURL)
+        }
+        return Guide(
             title: L("Import a pairing file"),
             systemImage: "lock.doc",
             steps: [
-                L("iOS %@ is the first version an iPhone can pair with itself on. On this one the pairing file has to be made on a computer.", Engine.minimumOSText),
+                first,
                 L("On a Mac, Windows PC or Linux box, plug this iPhone in, trust the computer, and run jitterbugpair (or “pymobiledevice3 lockdown pair”)."),
                 L("Send the file it writes — a .mobiledevicepairing or .plist — to this iPhone, by AirDrop, iCloud Drive or a cable."),
-                L("Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.", Engine.minimumOSText),
+                last,
             ],
             actionLabel: L("Get jitterbugpair"),
             actionURLString: "https://github.com/osy/Jitterbug/releases")
     }
+
+    /// Shown from iOS 26.4 on, below iOS 27, when the imported pairing file
+    /// holds only a lockdown record: lockdownd hangs up on it through the
+    /// loopback VPN, and would on a new one just the same.
+    static var remotePairingNeeded: Guide {
+        Guide(
+            title: L("Make a remote pairing file"),
+            systemImage: "lock.doc",
+            steps: [L("The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.")]
+                + remotePairingSteps
+                + [L("Come back here, tap “Replace” on the Pairing file card, and pick it.")],
+            actionLabel: L("Get idevice_pair"),
+            actionURLString: idevicePairURL)
+    }
+
+    /// Making a remote pairing (RPPairing) file on a computer with idevice_pair
+    /// and bringing it over. iLoader's exported file carries one as well,
+    /// beside its lockdown record.
+    private static var remotePairingSteps: [String] {
+        [
+            L("On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done."),
+            L("Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too."),
+        ]
+    }
+
+    private static let idevicePairURL = "https://github.com/jkcoxson/idevice_pair/releases/latest"
 
     /// Shown when Apple refuses a certificate because one exists (error 7460).
     /// With SideStore on the iPhone, using its certificate comes first.

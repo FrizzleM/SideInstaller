@@ -52,9 +52,9 @@ All notable changes to SideInstaller are documented here.
   Developer Mode is already on, so it never restarts an iPhone for nothing. iOS turns it on from
   here only when the iPhone has no passcode; with one, show the switch and turn it on in Settings.
   Both need a link to the iPhone that already works, such as an imported pairing file on iOS 17.4
-  to 26, and when the tunnel won't open, a pairing file made on a computer is tried straight
-  through lockdownd. On iOS 27 the link itself needs Developer Mode, so this can't bring back a
-  missing switch there (issue #29).
+  to 26, and below iOS 26.4, when the tunnel won't open, a pairing file made on a computer is tried
+  straight through lockdownd. On iOS 27 the link itself needs Developer Mode, so this can't bring
+  back a missing switch there (issue #29).
 - **`sideinstaller://` links.** `sideinstaller://install?url=<link to an .ipa>` downloads that IPA
   as the custom .ipa and installs it, so a site or a post can offer a one-tap install.
   `sideinstaller://pairingFile?data=<base64>` imports a pairing file, which is what SideStore sends
@@ -117,6 +117,18 @@ All notable changes to SideInstaller are documented here.
   and carries on; otherwise it says which address to use. A connection iOS refuses for any other
   reason now says so in plain words instead of the raw error, and no longer makes an iOS 27
   iPhone pair again.
+- **A lockdown pairing file on iOS 26.4 or later now says what to do instead of failing with
+  “Broken pipe”.** Since iOS 26.4, the iPhone hangs up on lockdown pairing files (jitterbugpair's,
+  “pymobiledevice3 lockdown pair”'s, or idevice_pair's “Lockdown”) as soon as they connect through
+  LocalDevVPN, so the link stopped with a raw “Socket(Os { code: 32, kind: BrokenPipe })” error,
+  and a new file of the same kind failed the same way. SideInstaller now says so and shows how to
+  make a remote pairing file with idevice_pair, which still connects; SideStore, StikDebug and
+  LiveContainer moved to these for the same reason. From iOS 26.4 the import guide asks for one,
+  and iLoader's exported pairing file, which holds both kinds, works too. A file with both now
+  tries its remote pairing record first there, and SideInstaller no longer asks lockdownd for a
+  pairing record of its own, or for Developer Mode, through LocalDevVPN, which can't work. On
+  iOS 27, Install still pairs the iPhone with itself when the file is lockdown-only, and the
+  other pages now say to.
 - **Pairing works when SideInstaller runs inside LiveContainer.** Before pairing, SideInstaller
   checks Local Network access by looking for a Bonjour service of its own. Inside LiveContainer,
   iOS only allows the service types listed by LiveContainer, and SideInstaller's wasn't one of

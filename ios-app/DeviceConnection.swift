@@ -39,13 +39,22 @@ final class DeviceConnection {
         let advice: String
         /// The unclassified FFI error, for the debug log — never presented.
         let underlying: FFIError
+        /// True when this iPhone's lockdownd hung up on the lockdown route, as
+        /// it does from iOS 26.4 on (`Engine.lockdownWorksOverLoopback`): no
+        /// lockdown record opens a tunnel through the loopback there, only an
+        /// RPPairing one.
+        var lockdownRouteClosed = false
         var description: String { advice }
         var errorDescription: String? { advice }
 
         /// Whether re-pairing might fix this failure. False for route/network
         /// failures, where the pairing file isn't the problem.
         var repairingCouldHelp: Bool {
-            kind != TunnelFailureHostsRefused
+            // A new lockdown record would be hung up on just the same. Pairing
+            // this iPhone with itself makes an RPPairing record instead, which
+            // only iOS 27 can do.
+            if lockdownRouteClosed { return Engine.deviceCanSelfPair }
+            return kind != TunnelFailureHostsRefused
                 && kind != TunnelFailureTimeout
                 && kind != TunnelFailureRsdUnreachable
         }
@@ -187,24 +196,53 @@ final class DeviceConnection {
             underlying: raw)
     }
 
+    /// True when lockdownd took the connection and then hung up: reset it,
+    /// closed it, or left the next request to a dead socket. A reset on the
+    /// first request reads `Socket(Os { code: 32, kind: BrokenPipe, … })`: the
+    /// first request is the `GetValue` that `start_session` doesn't check, so
+    /// `StartSession` is the write that fails. A plain close reads
+    /// `Socket(Custom { kind: UnexpectedEof, error: "early eof" })`.
+    static func lockdownHungUp(_ error: Error) -> Bool {
+        let raw = (error as? FFIError) ?? (error as? TunnelError)?.underlying
+        guard let message = raw?.message.lowercased() else { return false }
+        return ["brokenpipe", "broken pipe", "connectionreset", "connection reset",
+                "connectionaborted", "unexpectedeof", "early eof"]
+            .contains { message.contains($0) }
+    }
+
+    /// `error`, this iPhone's lockdownd hanging up on the lockdown route from
+    /// iOS 26.4 on, as a tunnel failure with advice instead of the raw errno.
+    /// It says to use an RPPairing record: made on a computer below iOS 27,
+    /// or by pairing this iPhone with itself from 27 on.
+    private func lockdownClosed(_ error: Error) -> TunnelError {
+        let raw = (error as? FFIError) ?? fail(String(describing: error))
+        let advice = Engine.deviceCanSelfPair
+            ? L("This iPhone hung up on the connection as soon as it opened. From iOS 26.4 on it does that to lockdown pairing files, like this one, when they come through LocalDevVPN. Pair this iPhone with itself instead: tap “Regenerate” under Tools › Pairing, or tap Install, which pairs it first.")
+            : L("This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.")
+        return TunnelError(kind: TunnelFailureOther, advice: ErrorHelp.explained(advice),
+                           underlying: raw, lockdownRouteClosed: true)
+    }
+
     // MARK: Connect / disconnect
 
     /// Opens the loopback tunnel and RSD handshake using the routes the pairing
     /// file supports. Both routes produce the same adapter + handshake:
     ///
     /// - **RPPairing** (`tunnel_create_rppairing`): connects to the device's
-    ///   remote-pairing listener with the Ed25519 record from on-device pairing
-    ///   (iOS 27+).
+    ///   remote-pairing listener with an Ed25519 record, from on-device pairing
+    ///   (iOS 27+) or made on a computer (idevice_pair's “Remote pairing”,
+    ///   iLoader) for iOS 17.4+.
     /// - **CoreDeviceProxy** (`tunnel_create_usb`): opens a lockdown session with
-    ///   a classic pair record and starts CoreDeviceProxy. Works on iOS 17+ and
-    ///   is the only route for pairing files made on a computer.
+    ///   a classic pair record and starts CoreDeviceProxy. Works on iOS 17 to
+    ///   26.3; from 26.4 on, lockdownd hangs up on it through the loopback VPN
+    ///   (`Engine.lockdownWorksOverLoopback`).
     ///
     /// With both records, the route most likely to work on this iOS goes first.
     /// With only an RPPairing record, a lockdown record is created as a last
     /// resort and CoreDeviceProxy is tried — unless `allowLockdownMinting` is
     /// false, as it must be for another iPhone's file (Side by Side): minting
     /// stores this iPhone's own record and falls back to its own lockdownd on
-    /// 127.0.0.1. Never on iOS 27, where lockdownd won't pair
+    /// 127.0.0.1. Never from iOS 26.4 on, where no lockdown record gets through
     /// (`Engine.canMintLockdownRecord`).
     func connect(deviceIP: String, pairingFilePath: String, hostname: String = "SideInstaller",
                  allowLockdownMinting: Bool = true) throws {
@@ -212,18 +250,23 @@ final class DeviceConnection {
         guard kind.isUsable else {
             throw fail("\((pairingFilePath as NSString).lastPathComponent) isn't a pairing file: it carries neither a remote-pairing key pair nor a lockdown pair record.")
         }
-        // Prefer RPPairing on iOS 27+, lockdown otherwise. With one record, use
-        // its route only.
-        let remoteFirst = Engine.deviceCanSelfPair
+        // Prefer RPPairing where lockdownd hangs up on the loopback (iOS 26.4
+        // and later, so every iOS that pairs itself), lockdown otherwise. With
+        // one record, use its route only.
+        let remoteFirst = !Engine.lockdownWorksOverLoopback
         let routes: [Bool] = (kind.hasRemotePairing && kind.hasLockdown)
             ? (remoteFirst ? [true, false] : [false, true])
             : [kind.hasRemotePairing]
 
         var firstFailure: Error?
         // An RPPairing-only file can still fall back to creating a lockdown
-        // record (see below), except on iOS 27, where lockdownd won't pair.
+        // record (see below), except from iOS 26.4 on.
         let canMintLockdownRecord = !kind.hasLockdown && allowLockdownMinting
             && Engine.canMintLockdownRecord
+        // Only this iPhone's own lockdownd is known to hang up on the loopback,
+        // and only from iOS 26.4. Another iPhone's file (Side by Side, the one
+        // caller that can't mint) reaches an iOS this one knows nothing about.
+        let lockdownClosedHere = allowLockdownMinting && !Engine.lockdownWorksOverLoopback
         for (index, useRemotePairing) in routes.enumerated() {
             do {
                 if useRemotePairing {
@@ -238,7 +281,10 @@ final class DeviceConnection {
                 return
             } catch {
                 // Report what the preferred route said, not the fallback's noise.
-                if firstFailure == nil { firstFailure = error }
+                if firstFailure == nil {
+                    firstFailure = !useRemotePairing && lockdownClosedHere && Self.lockdownHungUp(error)
+                        ? lockdownClosed(error) : error
+                }
                 let more = (index + 1 < routes.count || canMintLockdownRecord)
                     ? " Trying the other route…" : ""
                 Engine.shared.log("\(useRemotePairing ? "Remote-pairing" : "Lockdown") tunnel didn't come up (\(error)).\(more)")
@@ -249,7 +295,7 @@ final class DeviceConnection {
         // tunnel listener only binds to the Wi-Fi interface, and the device
         // closes a tunnel to itself right after the TLS handshake.
         // CoreDeviceProxy needs no inbound listener, only a classic pair record,
-        // which lockdownd can create directly on its own port (before iOS 27).
+        // which lockdownd can create directly on its own port (before iOS 26.4).
         if canMintLockdownRecord {
             do {
                 try connectByMintingLockdownRecord(deviceIP: deviceIP, hostname: hostname)
