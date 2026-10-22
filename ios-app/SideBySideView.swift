@@ -293,12 +293,20 @@ final class SideBySideManager: ObservableObject {
     /// anew. Their address goes too: it was kept to find those records.
     @MainActor
     private func forgetTheirIPhone() {
-        // Disconnected on `deviceQueue`, which owns the connection.
-        deviceQueue.async { [weak self] in self?.connection.disconnect() }
+        disconnectTheirIPhone()
         PrivateStore.forgetPeerPairings()
         pairRecordPath = nil
         targetIP = ""
         remembersTheirIPhone = false
+    }
+
+    /// Closes the link to their iPhone on `deviceQueue`, which owns the
+    /// connection.
+    ///
+    /// Not main-actor isolated, like `signOut`: the queued closure holds
+    /// `self`, which isn't `Sendable`, and only reads `connection`, a `let`.
+    private func disconnectTheirIPhone() {
+        deviceQueue.async { [weak self] in self?.connection.disconnect() }
     }
 
     /// Clear the page back to how it opened, credentials and pairings included.
