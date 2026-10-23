@@ -106,7 +106,7 @@ extension Localizer {
     /// Locale for dates and numbers, so they match the copy around them.
     static var locale: Locale {
         switch shared.language {
-        case .auto:       return .autoupdatingCurrent
+        case .auto:       return phoneLocale
         case .english:    return Locale(identifier: "en_US")
         case .spanish:    return Locale(identifier: "es_ES")
         case .italian:    return Locale(identifier: "it_IT")
@@ -117,6 +117,29 @@ extension Localizer {
         case .korean:     return Locale(identifier: "ko_KR")
         case .portuguese: return Locale(identifier: "pt_BR")
         }
+    }
+
+    /// The phone's region in the language the copy resolved to. The app's own
+    /// current locale takes its language from the bundle, which is English
+    /// only, so an Italian phone got "en_IT": Italian copy next to English
+    /// unit and month names ("1 min, 30 secs").
+    private static var phoneLocale: Locale {
+        let language: String
+        switch AppLanguage.auto.resolved {
+        case .spanish:        language = "es"
+        case .italian:        language = "it"
+        case .vietnamese:     language = "vi"
+        case .french:         language = "fr"
+        case .chinese:        language = "zh_Hans"
+        case .japanese:       language = "ja"
+        case .korean:         language = "ko"
+        case .portuguese:     language = "pt"
+        case .auto, .english: return .autoupdatingCurrent
+        }
+        guard let region = Locale.autoupdatingCurrent.region?.identifier else {
+            return Locale(identifier: language)
+        }
+        return Locale(identifier: "\(language)_\(region)")
     }
 }
 
