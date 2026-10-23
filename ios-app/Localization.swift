@@ -10,6 +10,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case french
     case chinese
     case japanese
+    case korean
     case portuguese
 
     var id: String { rawValue }
@@ -25,6 +26,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .french:     return "Français"
         case .chinese:    return "简体中文"
         case .japanese:   return "日本語"
+        case .korean:     return "한국어"
         case .portuguese: return "Português"
         }
     }
@@ -42,6 +44,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         // All Chinese variants use the Simplified Chinese translation.
         case "zh": return .chinese
         case "ja": return .japanese
+        case "ko": return .korean
         // All Portuguese variants use the Brazilian Portuguese translation.
         case "pt": return .portuguese
         default:   return .english
@@ -57,6 +60,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .french:         return frenchStrings
         case .chinese:        return chineseStrings
         case .japanese:       return japaneseStrings
+        case .korean:         return koreanStrings
         case .portuguese:     return portugueseStrings
         case .auto, .english: return nil
         }
@@ -110,6 +114,7 @@ extension Localizer {
         case .french:     return Locale(identifier: "fr_FR")
         case .chinese:    return Locale(identifier: "zh_Hans_CN")
         case .japanese:   return Locale(identifier: "ja_JP")
+        case .korean:     return Locale(identifier: "ko_KR")
         case .portuguese: return Locale(identifier: "pt_BR")
         }
     }
@@ -127,6 +132,7 @@ extension Localizer {
         case .french:         language = "fr"
         case .chinese:        language = "zh_Hans"
         case .japanese:       language = "ja"
+        case .korean:         language = "ko"
         case .portuguese:     language = "pt"
         case .auto, .english: return .autoupdatingCurrent
         }
