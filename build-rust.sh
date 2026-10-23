@@ -14,7 +14,14 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Dev
 export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-17.4}"
 # Make ~/.cargo visible to non-login shells such as Xcode's.
 # shellcheck disable=SC1090
-source "$HOME/.cargo/env" 2>/dev/null || true
+# Only when cargo isn't on PATH already: GitHub's macOS runner has it there,
+# and sourcing that runner's env file ended the script without a word
+# (2026-10-23, v1.6.1's release run).
+if ! command -v cargo >/dev/null && [ -f "$HOME/.cargo/env" ]; then
+  set +u
+  source "$HOME/.cargo/env" || true
+  set -u
+fi
 
 # Rewrite $HOME to /build, since Rust bakes absolute source paths in as string
 # constants that survive stripping and reach the app's log console.
