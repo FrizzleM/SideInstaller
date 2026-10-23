@@ -10,6 +10,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case french
     case chinese
     case japanese
+    case korean
     case portuguese
 
     var id: String { rawValue }
@@ -25,6 +26,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .french:     return "Français"
         case .chinese:    return "简体中文"
         case .japanese:   return "日本語"
+        case .korean:     return "한국어"
         case .portuguese: return "Português"
         }
     }
@@ -42,6 +44,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         // All Chinese variants use the Simplified Chinese translation.
         case "zh": return .chinese
         case "ja": return .japanese
+        case "ko": return .korean
         // All Portuguese variants use the Brazilian Portuguese translation.
         case "pt": return .portuguese
         default:   return .english
@@ -57,6 +60,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .french:         return frenchStrings
         case .chinese:        return chineseStrings
         case .japanese:       return japaneseStrings
+        case .korean:         return koreanStrings
         case .portuguese:     return portugueseStrings
         case .auto, .english: return nil
         }
@@ -102,7 +106,7 @@ extension Localizer {
     /// Locale for dates and numbers, so they match the copy around them.
     static var locale: Locale {
         switch shared.language {
-        case .auto:       return phoneLocale
+        case .auto:       return .autoupdatingCurrent
         case .english:    return Locale(identifier: "en_US")
         case .spanish:    return Locale(identifier: "es_ES")
         case .italian:    return Locale(identifier: "it_IT")
@@ -110,30 +114,9 @@ extension Localizer {
         case .french:     return Locale(identifier: "fr_FR")
         case .chinese:    return Locale(identifier: "zh_Hans_CN")
         case .japanese:   return Locale(identifier: "ja_JP")
+        case .korean:     return Locale(identifier: "ko_KR")
         case .portuguese: return Locale(identifier: "pt_BR")
         }
-    }
-
-    /// The phone's region in the language the copy resolved to. The app's own
-    /// current locale takes its language from the bundle, which is English
-    /// only, so an Italian phone got "en_IT": Italian copy next to English
-    /// unit and month names ("1 min, 30 secs").
-    private static var phoneLocale: Locale {
-        let language: String
-        switch AppLanguage.auto.resolved {
-        case .spanish:        language = "es"
-        case .italian:        language = "it"
-        case .vietnamese:     language = "vi"
-        case .french:         language = "fr"
-        case .chinese:        language = "zh_Hans"
-        case .japanese:       language = "ja"
-        case .portuguese:     language = "pt"
-        case .auto, .english: return .autoupdatingCurrent
-        }
-        guard let region = Locale.autoupdatingCurrent.region?.identifier else {
-            return Locale(identifier: language)
-        }
-        return Locale(identifier: "\(language)_\(region)")
     }
 }
 
