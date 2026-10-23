@@ -27,6 +27,11 @@
 #   MIN_IOS_SDK    oldest iOS SDK to build with (default: 27.1, the first the
 #                  iPhone Duo shows full screen)
 set -euo pipefail
+# Say where it stopped: a failing command under set -e, or an unset variable
+# under set -u, otherwise ends the script without a word.
+trap 'rc=$?; [ "$rc" = 0 ] || echo "error: build-ipa.sh stopped (exit $rc) at: $BASH_COMMAND" >&2' EXIT
+# With "Enable debug logging" on a re-run, trace every command.
+if [ "${RUNNER_DEBUG:-}" = 1 ]; then set -x; fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUNDLE_ID="${BUNDLE_ID:-com.frizzlem.sideinstaller}"
