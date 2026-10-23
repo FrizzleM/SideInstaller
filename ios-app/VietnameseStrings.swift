@@ -997,6 +997,7 @@ let vietnameseStrings: [String: String] = [
     "For the support, and for spotting the bugs that got fixed because of it.":
         "Vì đã hỗ trợ và phát hiện những lỗi sau đó được sửa.",
     "For the Japanese translation.": "Vì bản dịch tiếng Nhật.",
+    "For the Korean translation.": "Vì bản dịch tiếng Hàn.",
 
     "Built with": "Được xây dựng với",
     "The open source work this app is built on:":

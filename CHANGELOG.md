@@ -4,6 +4,11 @@ All notable changes to SideInstaller are documented here.
 
 ## 1.6.1
 
+### Added
+- **SideInstaller is now in Korean.** Pick 한국어 in Settings › Language, or leave it on Auto
+  with your iPhone set to Korean. Thanks to [kes158](https://github.com/kes158) for the
+  translation (#85), who's now in About › Special thanks.
+
 ### Fixed
 - **Apple ID sign-in works again after error -80046.** Since 21 October, Apple takes the password
   and the verification code, then refuses to finish signing in (“This action cannot be completed

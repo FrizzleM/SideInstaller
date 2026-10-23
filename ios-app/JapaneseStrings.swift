@@ -976,6 +976,7 @@ let japaneseStrings: [String: String] = [
     "For the support, and for spotting the bugs that got fixed because of it.":
         "これまでのご支援と、そのおかげで発見・修正できたバグに感謝します。",
     "For the Japanese translation.": "日本語への翻訳に感謝します。",
+    "For the Korean translation.": "韓国語への翻訳に感謝します。",
 
     "Built with": "使用しているオープンソース",
     "The open source work this app is built on:": "このアプリの基盤となっているオープンソースの成果：",

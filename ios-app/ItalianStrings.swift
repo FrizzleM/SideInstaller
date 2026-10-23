@@ -999,6 +999,7 @@ let italianStrings: [String: String] = [
     "For the support, and for spotting the bugs that got fixed because of it.":
         "Per il supporto e per aver individuato i bug poi corretti.",
     "For the Japanese translation.": "Per la traduzione in giapponese.",
+    "For the Korean translation.": "Per la traduzione in coreano.",
 
     "Built with": "Realizzato con",
     "The open source work this app is built on:":

@@ -115,6 +115,11 @@ struct AboutView: View {
                          title: "so-5699",
                          detail: L("For the Japanese translation."),
                          urlString: "https://github.com/so-5699")
+                AboutRow(systemImage: "character.bubble.fill",
+                         tint: Color(red: 0.25, green: 0.55, blue: 0.95),
+                         title: "kes158",
+                         detail: L("For the Korean translation."),
+                         urlString: "https://github.com/kes158")
             }
         }
     }

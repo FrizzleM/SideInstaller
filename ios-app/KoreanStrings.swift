@@ -595,6 +595,16 @@ let koreanStrings: [String: String] = [
         "%@에서 Apple ID 로그인에 실패했습니다. %@ 경유 오류: %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Apple 로그인 서버가 요청을 거부했습니다(HTTP 503). 암호나 Anisette 서버 문제가 아니므로 다른 서버를 시도해도 소용없습니다. 나중에 다시 시도하거나 SideInstaller를 업데이트하세요.",
+    "“%@” makes its anisette data with Apple's Android library, and Apple now refuses to finish signing in through those servers (error -80046), after your password and code. In Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
+        "“%@”은(는) Apple의 Android 라이브러리로 anisette 데이터를 만들며, 이제 Apple은 암호와 코드를 입력한 뒤 이러한 서버를 통한 로그인 완료를 거부합니다(오류 -80046). 설정 › Anisette 서버에서 자동 또는 “SideStore (New)” 같은 Mac 서버를 선택하세요.",
+    "Apple refused to finish signing in (error -80046), even through a Mac anisette server, the kind it still accepted. Try again later, or check for a SideInstaller update.":
+        "Apple이 로그인 완료를 거부했습니다(오류 -80046). 지금까지 허용하던 Mac anisette 서버를 통해서도 마찬가지였습니다. 나중에 다시 시도하거나 SideInstaller 업데이트가 있는지 확인하세요.",
+    "Apple refused to finish signing in through “%@” (error -80046). It now only accepts sign-ins through anisette servers on its macOS library: in Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
+        "Apple이 “%@”을(를) 통한 로그인 완료를 거부했습니다(오류 -80046). 이제 Apple은 macOS 라이브러리를 사용하는 anisette 서버를 통한 로그인만 허용합니다. 설정 › Anisette 서버에서 자동 또는 “SideStore (New)” 같은 Mac 서버를 선택하세요.",
+    "Apple won't send a code by text or call to this sign-in, so it was sent to your Apple devices.":
+        "Apple이 이 로그인에는 문자나 전화로 코드를 보내지 않으므로, 코드를 Apple 기기로 보냈습니다.",
+    "Apple didn't confirm sending a code to your Apple devices. If one arrived, enter it; if not, try another way.":
+        "Apple이 Apple 기기로 코드를 보냈는지 확인해 주지 않았습니다. 코드를 받았다면 입력하고, 받지 못했다면 다른 방법을 시도하세요.",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
         "이 iPhone이 인터넷에 연결되어 있는데도 SideInstaller가 Apple 로그인 서버(gsa.apple.com)에 연결할 수 없습니다. 방화벽, DNS 필터나 광고 차단기, 스크린 타임 콘텐츠 제한, 다른 VPN 앱 등이 접속을 막고 있습니다. 해당 기능을 끄거나 다른 네트워크를 사용한 뒤 다시 시도하세요.",
     "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":
@@ -967,6 +977,7 @@ let koreanStrings: [String: String] = [
     "For the support, and for spotting the bugs that got fixed because of it.":
         "응원해 주시고, 버그를 찾아내 고칠 수 있게 도와주셔서 감사합니다.",
     "For the Japanese translation.": "일본어 번역에 감사드립니다.",
+    "For the Korean translation.": "한국어 번역에 감사드립니다.",
 
     "Built with": "사용된 오픈 소스",
     "The open source work this app is built on:": "이 앱의 기반이 된 오픈 소스 작업물입니다:",
