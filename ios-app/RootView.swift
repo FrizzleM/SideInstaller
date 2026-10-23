@@ -333,7 +333,7 @@ struct TwoFactorSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                if let error = prompt.lastError {
+                if let error = prompt.shownError {
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)

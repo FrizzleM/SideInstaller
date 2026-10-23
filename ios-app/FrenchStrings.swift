@@ -707,6 +707,16 @@ let frenchStrings: [String: String] = [
         "Échec de la connexion à l'Apple ID sur %@. Erreur via %@ : %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Le serveur de connexion d'Apple a refusé la requête (HTTP 503). Ce n'est ni votre mot de passe ni le serveur anisette : essayer d'autres serveurs n'y changera rien. Réessayez plus tard ou mettez à jour SideInstaller.",
+    "“%@” makes its anisette data with Apple's Android library, and Apple now refuses to finish signing in through those servers (error -80046), after your password and code. In Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
+        "« %@ » produit ses données anisette avec la bibliothèque Android d'Apple, et Apple refuse désormais de terminer la connexion via ces serveurs (erreur -80046), après votre mot de passe et votre code. Dans Réglages › Serveur Anisette, choisissez Automatique ou un serveur Mac comme « SideStore (New) ».",
+    "Apple refused to finish signing in (error -80046), even through a Mac anisette server, the kind it still accepted. Try again later, or check for a SideInstaller update.":
+        "Apple a refusé de terminer la connexion (erreur -80046), même via un serveur anisette Mac, le type qu'il acceptait encore. Réessayez plus tard ou vérifiez s'il existe une mise à jour de SideInstaller.",
+    "Apple refused to finish signing in through “%@” (error -80046). It now only accepts sign-ins through anisette servers on its macOS library: in Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
+        "Apple a refusé de terminer la connexion via « %@ » (erreur -80046). Il n'accepte désormais que les connexions via des serveurs anisette utilisant sa bibliothèque macOS : dans Réglages › Serveur Anisette, choisissez Automatique ou un serveur Mac comme « SideStore (New) ».",
+    "Apple won't send a code by text or call to this sign-in, so it was sent to your Apple devices.":
+        "Apple n'envoie pas de code par SMS ou par appel pour cette connexion, il a donc été envoyé sur vos appareils Apple.",
+    "Apple didn't confirm sending a code to your Apple devices. If one arrived, enter it; if not, try another way.":
+        "Apple n'a pas confirmé l'envoi d'un code sur vos appareils Apple. Si vous en avez reçu un, saisissez-le ; sinon, essayez une autre méthode.",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
         "SideInstaller ne parvient pas à joindre le serveur de connexion d'Apple (gsa.apple.com), alors que cet iPhone est connecté à Internet. Quelque chose le bloque : un pare-feu, un filtre DNS ou un bloqueur de publicités, les restrictions de contenu de Temps d'écran ou une autre app VPN. Désactivez-le ou essayez un autre réseau, puis réessayez.",
     "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":

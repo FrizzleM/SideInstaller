@@ -522,3 +522,57 @@ enum SideStorePairingHandoff {
         try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
     }
 }
+
+/// The anisette settings SideStore signs in with, set when SideInstaller
+/// installs it.
+///
+/// SideStore starts on its own on-device anisette and on ani.sidestore.io,
+/// both Apple's Android ADI library, with auto-rotation through the community
+/// list. Since 2026-10-21 Apple refuses the sign-in token for that anisette
+/// (-80046), and SideStore's users got past it by turning on-device anisette
+/// and auto-rotation off, picking a macOS-ADI server ("SideStore (New)" or
+/// "jkcoxson"), keeping the default headers and resetting adi.pb (SideStore
+/// #1685, #1686). The reset can't be done from here: adi.pb is in SideStore's
+/// keychain, and SideStore doesn't provision again by itself when a server
+/// refuses one made on another library.
+enum SideStoreAnisetteHandoff {
+    /// "SideStore (New)" on SideStore's list (servers.sidestore.io), spelled
+    /// as the list has it: SideStore starts on the first server when the one
+    /// picked isn't on it.
+    static let server = "https://new.ani.sidestore.io"
+    /// SideStore's default headers (AnisetteKit's `defaultClientInfo` and
+    /// `defaultUserAgent`): a current Mac, which SideInstaller reports through
+    /// the macOS-ADI servers too.
+    static let clientInfo = "<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+    static let userAgent = "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)"
+
+    /// Sets SideStore's settings (`prefs`, its preferences plist) to sign in
+    /// that way, and returns what changed, for the log. A macOS-ADI server
+    /// already picked is kept, and so is client info saved for a Mac; client
+    /// info saved for a Windows PC or an Android phone (as guides for -80045
+    /// had people do) goes back to SideStore's default Mac.
+    static func applySettings(to prefs: inout [String: Any]) -> [String] {
+        var changes: [String] = []
+        if prefs["useOnDeviceAnisette"] as? Bool != false {
+            prefs["useOnDeviceAnisette"] = false
+            changes.append("on-device anisette off")
+        }
+        if prefs["disableAnisetteRotation"] as? Bool != true {
+            prefs["disableAnisetteRotation"] = true
+            changes.append("auto-rotation off")
+        }
+        let picked = (prefs["menuAnisetteURL"] as? String) ?? ""
+        let pickedHost = URL(string: picked)?.host?.lowercased() ?? ""
+        if !AnisetteServer.macADIHosts.contains(pickedHost) {
+            prefs["menuAnisetteURL"] = server
+            changes.append("server “SideStore (New)”")
+        }
+        if let saved = prefs["customAnisetteClientInfo"] as? String, !saved.isEmpty,
+           !saved.contains("<macOS;"), !saved.contains("<Mac OS X;") {
+            prefs["customAnisetteClientInfo"] = clientInfo
+            prefs["customAnisetteUserAgent"] = userAgent
+            changes.append("client info back to SideStore's default Mac")
+        }
+        return changes
+    }
+}

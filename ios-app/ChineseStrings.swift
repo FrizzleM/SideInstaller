@@ -679,6 +679,16 @@ let chineseStrings: [String: String] = [
         "在 %@ 上登录 Apple ID 失败。经由 %@ 的错误：%@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Apple 登录服务器拒绝了请求（HTTP 503）。这不是你的密码或 anisette 服务器的问题，换用其他服务器也无济于事。请稍后重试，或更新 SideInstaller。",
+    "“%@” makes its anisette data with Apple's Android library, and Apple now refuses to finish signing in through those servers (error -80046), after your password and code. In Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
+        "“%@”使用 Apple 的 Android 库生成 anisette 数据，而 Apple 现在会在你输入密码和验证码之后，拒绝完成通过这类服务器的登录（错误 -80046）。请在“设置 › Anisette 服务器”中选择“自动”，或选择 Mac 服务器，例如“SideStore (New)”。",
+    "Apple refused to finish signing in (error -80046), even through a Mac anisette server, the kind it still accepted. Try again later, or check for a SideInstaller update.":
+        "Apple 拒绝完成登录（错误 -80046），即使通过的是它此前仍接受的 Mac anisette 服务器。请稍后重试，或检查 SideInstaller 是否有更新。",
+    "Apple refused to finish signing in through “%@” (error -80046). It now only accepts sign-ins through anisette servers on its macOS library: in Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
+        "Apple 拒绝完成通过“%@”的登录（错误 -80046）。它现在只接受通过使用其 macOS 库的 anisette 服务器登录：请在“设置 › Anisette 服务器”中选择“自动”，或选择 Mac 服务器，例如“SideStore (New)”。",
+    "Apple won't send a code by text or call to this sign-in, so it was sent to your Apple devices.":
+        "Apple 不会为此次登录通过短信或电话发送验证码，因此已将验证码发送到你的 Apple 设备。",
+    "Apple didn't confirm sending a code to your Apple devices. If one arrived, enter it; if not, try another way.":
+        "Apple 未确认已向你的 Apple 设备发送验证码。如果收到了，请输入；如果没有，请换一种方式。",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
         "SideInstaller 无法连接 Apple 登录服务器（gsa.apple.com），但这台 iPhone 已连接互联网。有东西在拦截它：防火墙、DNS 过滤或广告拦截工具、屏幕使用时间的内容限制，或其他 VPN App。请将其关闭或换一个网络，然后重试。",
     "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":

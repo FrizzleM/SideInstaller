@@ -319,6 +319,63 @@ also for an account with trusted devices (#994; 2.3.10's new store key puts
 everyone on new.ani.sidestore.io unless they pick again), so the app adds ani3
 to the macOS group and keeps its order.
 
+From 2026-10-21 Apple lets a sign-in through an Android-ADI server take the
+password and the second factor (`validate` ec 0, `complete` hsc 200), then
+answers `apptokens` with ec **-80046**, "This action cannot be completed at
+this time" (hsc 400), whatever client it names: xtool #378, iPASide #10,
+SideStore #1685/#1686, Sideloadly, AltServer 1.8.2 (AltStore #1840), Impactor
+#298. xtool 1.23.0 (PR #380), iPASide 1.2.9 and iLoader (902597564, which also
+comments out its Windows servers as "works ~50% of the time, and doesn't work
+with SMS 2FA") moved to macOS-ADI servers; isideload 065e852 defaults to its own
+`ani.iloader.app`. SideStore's users got past it with on-device anisette
+(Android ADI under Unicorn) and auto-rotation off, a macOS-ADI server picked
+("SideStore (New)" or "jkcoxson"), the default headers and a reset adi.pb.
+SideStore's default headers name a current Mac (AnisetteKit:
+`<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>`,
+user agent `AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)`), not the
+servers' Sierra Mac.
+
+Measured 2026-10-23 with made-up accounts (`ish/sideinstaller.py` and this
+crate): an identity provisioned through new.ani.sidestore.io while reporting
+SideStore's Mac works on mac-ani.jkcoxson.com, ani.iloader.app,
+ani3.stikstore.app, ani.stikstore.app, **ani.jkcoxson.com and
+ani2.stikstore.app** (both Windows-ADI on 2026-10-19, and all of these now hand
+out the Sierra Mac) and gets -45061 from ani.sidestore.io; win.ani.sidestore.io
+answers 502. `init` gives -20970 to SideStore's Mac and to the Sierra Mac alike.
+new.ani.sidestore.io answered 4 of 6 `/v3/get_headers` requests, the other two
+after a minute without an answer, and others with 502; the other macOS servers
+answered 6 of 6 within a few seconds.
+
+- `client_info_to_use` reports `CURRENT_MAC_CLIENT_INFO` (SideStore's Mac)
+  where the server names a Mac older than macOS 10.13, the floor -23782 named.
+- `android_adi` (a stock client or an Android phone, what every Android-ADI
+  server hands out) is kept per provider (`AnisetteProvider::runs_android_adi`),
+  and the app's `apple_session::open` doesn't log in through such a server
+  (`ANDROID_ADI_SKIP`, naming -80046): a saved token is still tried through it.
+- `Slots` records the client each new identity was provisioned while reporting
+  (`provisioned_as`). Before a full login, `open` calls
+  `AnisetteDataGenerator::require_current_mac_identity`: reporting a current
+  Mac, only an identity provisioned as one fits (`Slots::fits`), so 1.6.1's
+  first login through a macOS-ADI server provisions a new one, as SideStore's
+  "Reset adi.pb" after its headers changed; an older identity stays assigned
+  until then, for its saved token.
+- `/v3/get_headers` is asked again on a 5xx (twice, a second apart) and given
+  up on after 20 seconds, so a flaky server ends the attempt sooner and the app
+  moves to another server on the library, which takes the same identity.
+- A bare 403 from `PUT /auth/verify/phone`, even as a Mac (the 2026-10-16
+  route), goes to `NeedsDevice2FA` with `PHONE_CODE_REFUSED` in `last_error`,
+  and a bare 403 from the trusted-device request goes on to ask for the code
+  with `DEVICE_CODE_UNCONFIRMED`: `validateCode` is outside `/auth`, and Apple
+  pushed a code at the proof to the Android and Windows clients.
+
+Tests: `cargo test -p isideload --lib remote_v3`. A throwaway test ran the
+app's `apple_session::open` with a made-up account: new.ani.sidestore.io
+provisioned a SideStore's-Mac identity (then answered 502), mac-ani.jkcoxson.com
+took it and `init` answered -20970, and ani.sidestore.io was skipped with
+`ANDROID_ADI_SKIP`. **Not verified:** a real account through the macOS servers
+as SideStore's Mac (which second factor Apple picks, the token), and the 2FA
+fallbacks.
+
 **3. `src/auth/apple_account.rs`, `builder.rs`, `grandslam.rs` — let the user
 choose how the 2FA code arrives.**
 

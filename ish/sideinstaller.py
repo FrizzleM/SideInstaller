@@ -64,36 +64,31 @@ DEV_HOST = "developerservices2.apple.com"
 DEV_CLIENT_ID = "XABBG36SBA"
 DEV_PROTOCOL = "QH65B2"
 
-# The app's defaults (AnisetteServer.fallback / .legacyDefault): jkcoxson's
-# server on Apple's Windows ADI library for a first run, and the old default
-# for anyone with an anisette identity from before, so they keep it (see
-# default_anisette).
-FALLBACK_ANISETTE = "https://ani.jkcoxson.com"
-LEGACY_ANISETTE = "https://ani.sidestore.io"
+# The app's default (AnisetteServer.fallback): "SideStore (New)", on Apple's
+# macOS ADI library. Since 2026-10-21 Apple refuses the sign-in token for
+# anisette from its Android library (-80046), after the password and the code,
+# so this script no longer signs in through those servers.
+FALLBACK_ANISETTE = "https://new.ani.sidestore.io"
 # Same live list the app reads, with the same bundled fallback, so a server
 # going down here fails over exactly the way it does in SideInstaller.
 ANISETTE_LIST_URL = "https://servers.sidestore.io/servers.json"
 BUNDLED_ANISETTE = [
-    "https://ani.jkcoxson.com",
-    "https://win.ani.sidestore.io",
-    "https://ani2.stikstore.app",
-    "https://ani.sidestore.io",
-    "https://ani.sidestore.app",
-    "https://ani.sidestore.zip",
-    "https://ani.846969.xyz",
-    "https://ani.npeg.us",
-    "https://anisette.wedotstud.io",
-    "https://ani.neoarz.com",
-    "https://ani.jaydenha.uk",
-    "https://mac-ani.jkcoxson.com",
     "https://new.ani.sidestore.io",
+    "https://mac-ani.jkcoxson.com",
+    "https://ani.iloader.app",
     "https://ani3.stikstore.app",
+    "https://ani.jkcoxson.com",
+    "https://ani2.stikstore.app",
+    "https://win.ani.sidestore.io",
 ]
-# Servers known to run Apple's macOS and Windows ADI libraries (the app's
-# AnisetteServer.macADIHosts / .windowsADIHosts). The Windows ones are tried
-# right after the preferred one, the macOS ones last (see anisette_candidates).
-MAC_ADI_HOSTS = ("mac-ani.jkcoxson.com", "new.ani.sidestore.io", "ani3.stikstore.app")
-WINDOWS_ADI_HOSTS = ("ani.jkcoxson.com", "win.ani.sidestore.io", "ani2.stikstore.app")
+# Servers known to run Apple's macOS ADI library, in the order they're tried,
+# and its Windows one (the app's AnisetteServer.macADIOrder / .windowsADIHosts).
+# ani.jkcoxson.com and ani2.stikstore.app ran the Windows library until about
+# 2026-10-22. Every other server runs Android's, which is skipped (see
+# anisette_candidates).
+MAC_ADI_HOSTS = ("new.ani.sidestore.io", "mac-ani.jkcoxson.com", "ani.iloader.app",
+                 "ani3.stikstore.app", "ani.jkcoxson.com", "ani2.stikstore.app")
+WINDOWS_ADI_HOSTS = ("win.ani.sidestore.io",)
 # Anisette servers are volunteer-run and half of any list is usually down;
 # stop after this many so a bad day doesn't turn into a long wait.
 MAX_ANISETTE_TRIES = 6
@@ -691,18 +686,48 @@ STOCK_CLIENTS = ("<MacBookPro13,2> <macOS;13.1;22C65>", "<MacBookPro15,1> <Mac O
 # phone with a bare 403. The Windows PC gets the full bag and reaches the
 # token check on /auth, so both are asked as it, like the rest of sign-in.
 GSA_MAC_CLIENT_INFO = "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+# What we tell GrandSlam we are on a macOS-ADI server, which names a Mac on
+# macOS 10.12.6: a current Mac, as SideStore reports by default (AnisetteKit's
+# defaults). Apple called that old Mac too old for some accounts (-23782) and
+# asked others for a code by text it then wouldn't send.
+GSA_CURRENT_MAC_CLIENT_INFO = "<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+GSA_CURRENT_MAC_USER_AGENT = "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)"
 # The URL-bag entries this script uses.
 GSA_BAG_KEYS = ("gsService", "midStartProvisioning", "midFinishProvisioning",
                 "trustedDeviceSecondaryAuth", "secondaryAuth", "validateCode")
 
 
+def android_adi(client_info):
+    """Whether a server handing out `client_info` makes its anisette data with
+    Apple's Android ADI library (a stock client or an Android phone). Apple
+    refuses the sign-in token for that anisette (-80046) since 2026-10-21."""
+    client_info = (client_info or "").strip()
+    return client_info.startswith(STOCK_CLIENTS) or "<Android;" in client_info
+
+
+def mac_version(client_info):
+    """The (major, minor) macOS version a client info names, or None."""
+    match = re.search(r"<(?:macOS|Mac OS X);(\d+)(?:\.(\d+))?", client_info or "")
+    if not match:
+        return None
+    return int(match.group(1)), int(match.group(2) or 0)
+
+
+def is_current_mac(client_info):
+    version = mac_version(client_info)
+    return version is not None and version >= (10, 13)
+
+
 def client_info_to_use(client_info, user_agent):
     """The (client info, user agent) to tell GrandSlam, given what a server
-    hands out: its own, unless it's a stock one or an Android phone's."""
+    hands out: its own, unless it's a stock one or an Android phone's (then
+    the Windows PC), or a Mac older than macOS 10.13 (then a current Mac)."""
     client_info = (client_info or "").strip()
-    if (not client_info or client_info.startswith(STOCK_CLIENTS)
-            or "<Android;" in client_info):
+    if not client_info or android_adi(client_info):
         return GSA_CLIENT_INFO, GSA_USER_AGENT
+    version = mac_version(client_info)
+    if version is not None and version < (10, 13):
+        return GSA_CURRENT_MAC_CLIENT_INFO, GSA_CURRENT_MAC_USER_AGENT
     return client_info, (user_agent or "").strip() or GSA_USER_AGENT
 
 
@@ -728,6 +753,7 @@ class Anisette:
         self.state_dir = os.path.dirname(state_path)
         self.slots_path = os.path.join(self.state_dir, "anisette-servers.json")
         self.version = None
+        self.android_adi = False
         self.client_info = GSA_CLIENT_INFO
         self.user_agent = GSA_USER_AGENT
         self.routing_info = "0"
@@ -766,9 +792,17 @@ class Anisette:
             with open(self.slots_path) as handle:
                 slots = json.load(handle)
             return {"servers": dict(slots.get("servers", {})), "used": dict(slots.get("used", {})),
+                    "provisioned_as": dict(slots.get("provisioned_as", {})),
                     "last": slots.get("last")}
         except (OSError, ValueError, AttributeError):
-            return {"servers": {}, "used": {}, "last": None}
+            return {"servers": {}, "used": {}, "provisioned_as": {}, "last": None}
+
+    def _fits(self, slots, name):
+        """Whether the identity `name` can sign in as this client: reporting a
+        current Mac, only one provisioned as one (as the app's sign-in does,
+        like SideStore's "Reset adi.pb" after a change of client info)."""
+        return (not is_current_mac(self.client_info)
+                or is_current_mac(slots["provisioned_as"].get(name, "")))
 
     def _use(self, slots, name, identifier, adi_pb):
         self.identity, self.identifier, self.adi_pb = name, identifier, adi_pb
@@ -792,7 +826,7 @@ class Anisette:
             del slots["servers"][self.url]
 
         name = slots["servers"].get(self.url)
-        if name and name != rejected:
+        if name and name != rejected and self._fits(slots, name):
             stored = self._read_identity(name)
             if stored:
                 self._use(slots, name, *stored)
@@ -803,7 +837,7 @@ class Anisette:
             names.append(legacy)
         for name in names:
             stored = self._read_identity(name)
-            if name == rejected or not stored:
+            if name == rejected or not stored or not self._fits(slots, name):
                 continue
             self.identifier, self.adi_pb = stored
             try:
@@ -825,6 +859,7 @@ class Anisette:
         self.headers()  # checked before it's kept
         self.identity = name
         self._save()
+        slots["provisioned_as"][name] = self.client_info
         self._use(slots, name, self.identifier, self.adi_pb)
 
     @property
@@ -855,6 +890,7 @@ class Anisette:
                 payload = {}
             if isinstance(payload, dict) and "client_info" in payload and "user_agent" in payload:
                 self.version = 3
+                self.android_adi = android_adi(payload.get("client_info"))
                 self.client_info, self.user_agent = client_info_to_use(
                     payload.get("client_info"), payload.get("user_agent"))
                 return 3
@@ -1189,11 +1225,17 @@ class AppleAccount:
         """Ask for the trusted-device code and hand it to Apple. With `send`
         false Apple has pushed the code already, and says so in `sm`."""
         if send:
-            status, _ = self.gs.auth_request("GET", self.gs.url("trustedDeviceSecondaryAuth"),
-                                             self._identity_headers())
-            if status >= 400:
+            status, body = self.gs.auth_request("GET", self.gs.url("trustedDeviceSecondaryAuth"),
+                                                self._identity_headers())
+            if status == 403 and b"serviceErrors" not in (body or b""):
+                # Apple may have pushed a code at the password proof anyway,
+                # and validateCode, outside /auth, takes it.
+                warn("Apple didn't confirm sending a code to your trusted devices. "
+                     "If one arrived, enter it.")
+            elif status >= 400:
                 raise Fail("Apple would not send a verification code (HTTP %d)." % status)
-            info("A verification code has been sent to your trusted devices.")
+            else:
+                info("A verification code has been sent to your trusted devices.")
         else:
             info(self.spd.get("sm") or "A verification code has been sent to your trusted devices.")
 
@@ -1207,8 +1249,15 @@ class AppleAccount:
         check_gs_error(plistlib.loads(body))
 
     def _sms_2fa(self, ask_code):
-        status, _ = self.gs.auth_request("GET", self.gs.url("secondaryAuth"),
-                                         self._identity_headers(), plist=False)
+        status, body = self.gs.auth_request("GET", self.gs.url("secondaryAuth"),
+                                            self._identity_headers(), plist=False)
+        if status == 403 and b"serviceErrors" not in (body or b""):
+            # Apple asked for a code by text and then refused to send one, as
+            # it did through the macOS-ADI servers on 2026-10-16: try the
+            # trusted devices, as SideStore lets its users.
+            warn("Apple won't send a code by text to this sign-in; sending it to your trusted devices.")
+            self._device_2fa(ask_code)
+            return
         if status >= 400:
             raise Fail("Apple would not send an SMS code (HTTP %d)." % status)
         info("A verification code has been sent by SMS.")
@@ -1959,21 +2008,17 @@ def parse_args(argv):
 
 
 def default_anisette():
-    """ANISETTE_URL if set; else the server the last run used; else the old
-    default for anyone with an anisette identity from before this script kept
-    one per library (they keep it, and the second factor Apple trusts it
-    with); else the new one."""
+    """ANISETTE_URL if set; else the server the last run used, unless it runs
+    Apple's Android ADI library; else the default."""
     if os.environ.get("ANISETTE_URL"):
         return os.environ["ANISETTE_URL"]
     try:
         with open(os.path.join(STORAGE, "anisette-servers.json")) as handle:
             last = json.load(handle).get("last")
-        if last:
+        if last and adi_library(last) != "android":
             return last
     except (OSError, ValueError, AttributeError):
         pass
-    if os.path.exists(os.path.join(STORAGE, "anisette.json")):
-        return LEGACY_ANISETTE
     return FALLBACK_ANISETTE
 
 
@@ -1989,12 +2034,13 @@ def adi_library(url):
 
 
 def anisette_candidates(preferred):
-    """The user's choice first, then the rest of its library unless that's
-    Android's, then the servers on Apple's Windows ADI library, then the rest
-    of the live community list and the copy baked in here, with the macOS-ADI
-    servers last: through them Apple asked an account with trusted devices
-    for a code by text and refused to send one (HTTP 403, 2026-10-16). As in
-    the app (AnisetteServer.candidates)."""
+    """The user's choice first, then the macOS-ADI servers (MAC_ADI_HOSTS
+    order), then the Windows-ADI ones; the Android-ADI servers of the live
+    community list are left out, since Apple refuses the sign-in token through
+    them (-80046), and so is a preferred one this script knows runs Android's
+    (connect_anisette skips any other that turns out to). As in the app
+    (AnisetteServer.candidates), which only keeps an Android pick for its
+    saved token."""
     urls = [preferred]
     try:
         status, _, body = request("GET", ANISETTE_LIST_URL,
@@ -2009,12 +2055,12 @@ def anisette_candidates(preferred):
     urls.extend(BUNDLED_ANISETTE)
 
     rest = urls[1:]
-    own = adi_library(preferred)
-    urls = (urls[:1]
-            + ([u for u in rest if adi_library(u) == own] if own != "android" else [])
-            + [u for u in rest if adi_library(u) == "windows"]
-            + [u for u in rest if adi_library(u) != "mac"]
-            + rest)
+    host_rank = {host: rank for rank, host in enumerate(MAC_ADI_HOSTS)}
+    mac = sorted((u for u in rest if adi_library(u) == "mac"),
+                 key=lambda u: host_rank.get(urllib.parse.urlparse(u).hostname, len(host_rank)))
+    known = adi_library(preferred) != "android" or preferred.rstrip("/") not in [
+        u.rstrip("/") for u in rest]
+    urls = (urls[:1] if known else []) + mac + [u for u in rest if adi_library(u) == "windows"]
     seen = set()
     unique = []
     for url in urls:
@@ -2037,6 +2083,11 @@ def connect_anisette(url_hint, state_path):
         try:
             anisette = Anisette(url, state_path)
             version = anisette.detect()
+            if anisette.android_adi:
+                tried.append("%s — Apple's Android ADI library, whose sign-in token Apple refuses (-80046)" % url)
+                warn("Skipping %s: it makes its anisette data with Apple's Android library, "
+                     "and Apple refuses the sign-in token for that (-80046)." % url)
+                continue
             gs = GrandSlam(anisette)
 
             if version == 3:

@@ -594,6 +594,16 @@ let japaneseStrings: [String: String] = [
         "%@ での Apple ID サインインに失敗しました。%@ 経由のエラー：%@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Apple のサインインサーバーがリクエストを拒否しました（HTTP 503）。パスワードや anisette サーバーの問題ではないため、別のサーバーを試しても解決しません。しばらくしてから再度お試しいただくか、SideInstaller をアップデートしてください。",
+    "“%@” makes its anisette data with Apple's Android library, and Apple now refuses to finish signing in through those servers (error -80046), after your password and code. In Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
+        "「%@」は Apple の Android ライブラリで anisette データを作成しており、Apple は現在、パスワードとコードの入力後にこれらのサーバー経由のサインインの完了を拒否しています（エラー -80046）。「設定 › Anisette サーバー」で「自動」または「SideStore (New)」などの Mac サーバーを選んでください。",
+    "Apple refused to finish signing in (error -80046), even through a Mac anisette server, the kind it still accepted. Try again later, or check for a SideInstaller update.":
+        "Apple がサインインの完了を拒否しました（エラー -80046）。これまで受け付けていた Mac の anisette サーバーを経由しても同じでした。しばらくしてから再度お試しいただくか、SideInstaller のアップデートを確認してください。",
+    "Apple refused to finish signing in through “%@” (error -80046). It now only accepts sign-ins through anisette servers on its macOS library: in Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
+        "Apple が「%@」経由のサインインの完了を拒否しました（エラー -80046）。現在は macOS ライブラリを使う anisette サーバー経由のサインインしか受け付けません。「設定 › Anisette サーバー」で「自動」または「SideStore (New)」などの Mac サーバーを選んでください。",
+    "Apple won't send a code by text or call to this sign-in, so it was sent to your Apple devices.":
+        "Apple はこのサインインに SMS や電話でコードを送らないため、Apple デバイスに送信しました。",
+    "Apple didn't confirm sending a code to your Apple devices. If one arrived, enter it; if not, try another way.":
+        "Apple は Apple デバイスへのコード送信を確認しませんでした。コードが届いた場合は入力し、届いていない場合は別の方法をお試しください。",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
         "この iPhone はインターネットに接続されていますが、SideInstaller は Apple のサインインサーバー（gsa.apple.com）に接続できません。ファイアウォール、DNS フィルタや広告ブロッカー、スクリーンタイムのコンテンツ制限、または別の VPN App が接続を妨げています。それをオフにするか別のネットワークを試してから、もう一度お試しください。",
     "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":

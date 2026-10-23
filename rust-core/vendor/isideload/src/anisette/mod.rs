@@ -128,6 +128,18 @@ pub trait AnisetteProvider {
 
     async fn get_client_info(&self) -> Result<AnisetteClientInfo, Report>;
 
+    /// Whether the server makes its anisette data with Apple's Android ADI
+    /// library (`remote_v3::android_adi`), once its client info has been
+    /// asked for.
+    fn runs_android_adi(&self) -> bool {
+        false
+    }
+
+    /// From now on, only picks an identity provisioned as the client it
+    /// reports when that is a current Mac (`remote_v3`'s `Slots::fits`). For a
+    /// full sign-in; a saved token stays with the identity it was issued to.
+    fn require_current_mac_identity(&mut self) {}
+
     /// Picks the identity to use, provisioning one if needed. `rejected` says
     /// the server has just refused the identity in use as not provisioned.
     async fn provision(&mut self, gs: Arc<GrandSlam>, rejected: bool) -> Result<(), Report>;
@@ -210,5 +222,18 @@ impl AnisetteDataGenerator {
     pub async fn get_client_info(&self) -> Result<AnisetteClientInfo, Report> {
         let provider = self.provider.read().await;
         provider.get_client_info().await
+    }
+
+    /// See `AnisetteProvider::runs_android_adi`.
+    pub async fn runs_android_adi(&self) -> bool {
+        self.provider.read().await.runs_android_adi()
+    }
+
+    /// See `AnisetteProvider::require_current_mac_identity`. Drops this
+    /// generator's cached data, which may come from an identity that no longer
+    /// fits.
+    pub async fn require_current_mac_identity(&mut self) {
+        self.provider.write().await.require_current_mac_identity();
+        self.data = None;
     }
 }

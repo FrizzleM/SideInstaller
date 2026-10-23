@@ -390,6 +390,16 @@ final class CertManager: ObservableObject {
                     engine.log("Apple ID credentials rejected: \(failure)")
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
+                // Not logged in through an Android-ADI server (-80046).
+                if Engine.isAndroidADISkip(failure) {
+                    engine.log("Certificates: skipping anisette \(idx + 1)/\(servers.count): Apple refuses the sign-in token for anisette from its Android library (-80046).")
+                    appleRefusals.recordTokenRefusal(ani)
+                    failures.skip()
+                    if failures.tried == 0, appleRefusals.rulesOutAll(servers[(idx + 1)...]) {
+                        throw EngineError.message(engine.androidADIRefusalMessage(server: ani))
+                    }
+                    continue
+                }
                 engine.log("Certificates: anisette \(idx + 1)/\(servers.count) failed: \(failure)")
                 failures.failed(ani, error: failure)
                 engine.anisetteFailed(ani, error: failure)
@@ -401,6 +411,13 @@ final class CertManager: ObservableObject {
                 // see `AnisetteServer.AppleRefusals`.
                 if Engine.isAppleOutdatedMacRefusal(failure) {
                     appleRefusals.recordOutdated(ani)
+                }
+                if Engine.isAppleTokenRefusal(failure) {
+                    appleRefusals.recordTokenRefusal(ani)
+                    if appleRefusals.rulesOutAll(servers[(idx + 1)...]) {
+                        engine.log("Certificates: Apple refused the sign-in token (-80046) — stopping.")
+                        throw EngineError.message(engine.appleTokenRefusalMessage(through: ani))
+                    }
                 }
                 if Engine.isAppleServiceRefusal(failure) {
                     appleRefusals.record(ani)

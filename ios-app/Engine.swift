@@ -1200,6 +1200,18 @@ final class Engine: ObservableObject {
                     log("Apple ID credentials rejected: \(failure)")
                     throw EngineError.message(Self.credentialErrorMessage)
                 }
+                // Not logged in through a server on Apple's Android library
+                // (-80046): nothing reached Apple, and the server isn't at fault.
+                if Self.isAndroidADISkip(failure) {
+                    log("Skipping anisette \(name): Apple refuses the sign-in token for anisette from its Android library (-80046).")
+                    appleRefusals.recordTokenRefusal(ani)
+                    failures.skip()
+                    if failures.tried == 0, appleRefusals.rulesOutAll(servers[(idx + 1)...]) {
+                        signInStatus = "sign-in failed"
+                        throw EngineError.message(androidADIRefusalMessage(server: ani))
+                    }
+                    continue
+                }
                 log("Anisette \(name) failed: \(failure)")
                 failures.failed(ani, error: failure)
                 anisetteFailed(ani, error: failure)
@@ -1212,6 +1224,16 @@ final class Engine: ObservableObject {
                 // left that report it (`AnisetteServer.AppleRefusals`).
                 if Self.isAppleOutdatedMacRefusal(failure) {
                     appleRefusals.recordOutdated(ani)
+                }
+                // So does Apple refusing the sign-in token for the anisette the
+                // servers of that library share.
+                if Self.isAppleTokenRefusal(failure) {
+                    appleRefusals.recordTokenRefusal(ani)
+                    if appleRefusals.rulesOutAll(servers[(idx + 1)...]) {
+                        signInStatus = "sign-in failed"
+                        log("Apple refused the sign-in token (-80046) — no anisette server of another kind left to try.")
+                        throw EngineError.message(appleTokenRefusalMessage(through: ani))
+                    }
                 }
                 // Apple refusing the device sign-in reports looks the same
                 // through every server reporting it: after two refusals those
@@ -1416,6 +1438,40 @@ final class Engine: ObservableObject {
     static func isAppleOutdatedMacRefusal(_ raw: String) -> Bool {
         let m = raw.lowercased()
         return m.contains("-23782") || m.contains("a mac with macos version")
+    }
+
+    /// Detects GrandSlam -80046, "This action cannot be completed at this
+    /// time", at the sign-in token request: Apple took the password and the
+    /// code, then turned down the anisette (from its Android library, since
+    /// 2026-10-21). Also isideload's skip of a sign-in through such a server
+    /// (`isAndroidADISkip`), which names the code. Every server on that
+    /// library shares the identity, so the rest of them are skipped
+    /// (`AnisetteServer.AppleRefusals`).
+    static func isAppleTokenRefusal(_ raw: String) -> Bool {
+        raw.contains("-80046")
+    }
+
+    /// Detects isideload's `ANDROID_ADI_SKIP`: a sign-in through a server on
+    /// Apple's Android ADI library wasn't started, so nothing reached Apple.
+    static func isAndroidADISkip(_ raw: String) -> Bool {
+        raw.hasPrefix("login skipped") && raw.contains("-80046")
+    }
+
+    /// The error when the anisette server picked in Settings, the only one
+    /// tried, runs Apple's Android library.
+    func androidADIRefusalMessage(server: String) -> String {
+        L("“%@” makes its anisette data with Apple's Android library, and Apple now refuses to finish signing in through those servers (error -80046), after your password and code. In Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.",
+          anisetteName(for: server))
+    }
+
+    /// The error when Apple refused the sign-in token through `server` and no
+    /// server of another kind is left.
+    func appleTokenRefusalMessage(through server: String) -> String {
+        if AnisetteServer.library(of: server, in: anisetteServers) == .mac {
+            return L("Apple refused to finish signing in (error -80046), even through a Mac anisette server, the kind it still accepted. Try again later, or check for a SideInstaller update.")
+        }
+        return L("Apple refused to finish signing in through “%@” (error -80046). It now only accepts sign-ins through anisette servers on its macOS library: in Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.",
+                 anisetteName(for: server))
     }
 
     /// Detects a sign-in that never reached Apple: sending GrandSlam's URL-bag
@@ -2230,6 +2286,7 @@ final class Engine: ObservableObject {
         if let home = source.sideStoreHome ?? (signedSideStore ? .standalone : nil) {
             handOffSplitPairing(placementPath: placement, bundleID: bundleID,
                                 appName: appName, home: home, udid: udid)
+            handOffSideStoreAnisette(bundleID: bundleID, appName: appName, home: home)
         }
 
         // Give SideStore the signing certificate so its first sign-in reuses it
@@ -3225,6 +3282,24 @@ final class Engine: ObservableObject {
         }
     }
 
+    /// Sets SideStore up to sign in the way its users got past Apple's -80046
+    /// (`SideStoreAnisetteHandoff`). After the install, as `handOffSplitPairing`;
+    /// failures only log. Runs on `deviceQueue`.
+    private func handOffSideStoreAnisette(bundleID: String, appName: String, home: SideStoreHome) {
+        let prefsPath = home.preferencesPath(hostBundleID: bundleID)
+        do {
+            var changes: [String] = []
+            try connection.updatePlist(inBundleID: bundleID, containerPath: prefsPath) { prefs in
+                changes = SideStoreAnisetteHandoff.applySettings(to: &prefs)
+            }
+            guard !changes.isEmpty else { return }
+            log("Set \(appName)'s anisette the way SideStore's users get past Apple's -80046: \(changes.joined(separator: ", ")) (/\(prefsPath)).")
+            log("If \(appName)'s own sign-in still fails, use its Settings › User Customizations › Reset adi.pb, with “Keep header customizations” unticked, then sign in again.")
+        } catch {
+            log("⚠️ Couldn't set \(appName)'s anisette settings (\(short(error))). If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation in its settings and pick “SideStore (New)”.")
+        }
+    }
+
     /// The file to hand over, once the RPPairing record it's built from is known
     /// to be there. Runs on `deviceQueue`.
     private func resolvePlacement(rpPairingPath: String, udid: String?) throws -> String {
@@ -4122,6 +4197,20 @@ struct TwoFactorPrompt: Decodable, Equatable {
     let selectedNumberId: UInt32?
     let lastError: String?
     let numbers: [Number]
+
+    /// The errors isideload itself writes into `lastError` when Apple turns a
+    /// way of getting the code away (`PHONE_CODE_REFUSED`,
+    /// `DEVICE_CODE_UNCONFIRMED` in `apple_account.rs`); keep them in step.
+    static let isideloadErrors: Set<String> = [
+        "Apple won't send a code by text or call to this sign-in, so it was sent to your Apple devices.",
+        "Apple didn't confirm sending a code to your Apple devices. If one arrived, enter it; if not, try another way.",
+    ]
+
+    /// `lastError` as the sheet shows it: Apple's own as it came, isideload's
+    /// in the app's language.
+    var shownError: String? {
+        lastError.map { Self.isideloadErrors.contains($0) ? L($0) : $0 }
+    }
 
     /// For a request that can't be read: the one prompt that always makes sense.
     static let deviceOnly = TwoFactorPrompt(method: .device, selectedNumberId: nil, lastError: nil, numbers: [])

@@ -2,17 +2,44 @@
 
 All notable changes to SideInstaller are documented here.
 
-## Unreleased
+## 1.6.1
 
 ### Fixed
-- **Proxy VPNs that loop the device's address back to this iPhone now work instead of
-  LocalDevVPN.** ClashMi, Shadowrocket and similar apps can send the Device IP straight back to
-  the iPhone with a direct rule, but since they carry all of the iPhone's traffic, SideInstaller
-  didn't count them as the tunnel: Install waited for it forever, the Pairing and Location pages
-  stayed greyed out, and with “Start LocalDevVPN when needed” on it opened LocalDevVPN, which
-  turned the proxy VPN off (issues #30 and #83). With one of these VPNs on, SideInstaller now
-  checks whether the device answers at the Device IP, which takes half a second at most, and
-  carries on when it does. Nothing changes with LocalDevVPN.
+- **Apple ID sign-in works again after error -80046.** Since 21 October, Apple takes the password
+  and the verification code, then refuses to finish signing in (“This action cannot be completed
+  at this time”, error -80046) when the anisette data comes from Apple's Android library, which
+  most community servers run. SideInstaller now signs in through the servers that run Apple's
+  macOS library, starting with “SideStore (New)”, and reports a current Mac through them, as
+  SideStore does, instead of the macOS 10.12 they name, which Apple also called too old for some
+  accounts (error -23782). Like SideStore's “Reset adi.pb”, the first sign-in through them makes a
+  new anisette identity, so Apple asks for your verification code once more. If you're signed in
+  already, your saved sign-in keeps working until it expires.
+- **SideStore signs in after SideInstaller installs it.** SideStore starts with its on-device
+  anisette and auto-rotation on, which now end in -80046 too. After installing SideStore, on its
+  own or inside LiveContainer, SideInstaller turns both off and picks “SideStore (New)”, the
+  settings SideStore's users got past -80046 with, and puts client info saved for a Windows PC or
+  an Android phone back to SideStore's default. If SideStore still can't sign in, use its
+  Settings › User Customizations › Reset adi.pb with “Keep header customizations” unticked, then
+  sign in again.
+- **A code Apple won't text no longer ends the sign-in.** Through the Mac servers, Apple has asked
+  for a code by text and then refused to send one. SideInstaller now sends the code to your Apple
+  devices instead, and if Apple won't confirm that either, still asks for the code in case one
+  arrived.
+- **A slow or failing anisette server no longer holds up sign-in.** A server that answers with an
+  error is asked twice more, and one that doesn't answer is left after 20 seconds instead of
+  waited on, so sign-in moves on to the next Mac server, which uses the same anisette identity and
+  doesn't ask for a new code.
+
+### Changed
+- **Auto no longer tries the Android anisette servers.** With Auto on, sign-in goes through the
+  Mac servers (“SideStore (New)”, “jkcoxson”, “iLoader (Mac ADI)”, StikStore's, and jkcoxson's and
+  StikStore's former Windows servers, which now run Apple's macOS library), then
+  “SideStore (Windows ADI)”. If you last signed in through an Android server, it's still tried
+  first for your saved sign-in, without your password being sent. With an Android server picked
+  in Settings, sign-in now stops and says to choose Auto or a Mac server.
+- **“iLoader (Mac ADI)” is on the anisette server list**, the server iLoader's sign-in library
+  uses since 22 October. “jkcoxson (Windows ADI)” and “StikStore (Windows ADI)” are now listed as
+  Mac servers, which they've become.
 
 ## 1.6.0
 
@@ -117,6 +144,14 @@ All notable changes to SideInstaller are documented here.
   round.
 
 ### Fixed
+- **Proxy VPNs that loop the device's address back to this iPhone now work instead of
+  LocalDevVPN.** ClashMi, Shadowrocket and similar apps can send the Device IP straight back to
+  the iPhone with a direct rule, but since they carry all of the iPhone's traffic, SideInstaller
+  didn't count them as the tunnel: Install waited for it forever, the Pairing and Location pages
+  stayed greyed out, and with “Start LocalDevVPN when needed” on it opened LocalDevVPN, which
+  turned the proxy VPN off (issues #30 and #83). With one of these VPNs on, SideInstaller now
+  checks whether the device answers at the Device IP, which takes half a second at most, and
+  carries on when it does. Nothing changes with LocalDevVPN.
 - **A Device IP copied from LocalDevVPN's main screen no longer fails with “Operation not
   permitted”.** LocalDevVPN's main screen says “Connected to 10.7.1.1/32”, but that's this
   iPhone's own end of the tunnel; the address to connect to is the 10.7.0.1 under its Settings ›

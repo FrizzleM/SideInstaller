@@ -701,6 +701,16 @@ let vietnameseStrings: [String: String] = [
         "Đăng nhập Apple ID thất bại trên %@. Lỗi qua %@: %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Máy chủ đăng nhập của Apple đã từ chối yêu cầu (HTTP 503). Lỗi không phải do mật khẩu hay máy chủ anisette, nên thử thêm máy chủ khác cũng không giúp được. Hãy thử lại sau hoặc cập nhật SideInstaller.",
+    "“%@” makes its anisette data with Apple's Android library, and Apple now refuses to finish signing in through those servers (error -80046), after your password and code. In Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
+        "“%@” tạo dữ liệu anisette bằng thư viện Android của Apple, và giờ Apple từ chối hoàn tất đăng nhập qua các máy chủ đó (lỗi -80046), sau khi bạn nhập mật khẩu và mã. Trong Cài đặt › Máy chủ Anisette, hãy chọn Tự động hoặc một máy chủ Mac như “SideStore (New)”.",
+    "Apple refused to finish signing in (error -80046), even through a Mac anisette server, the kind it still accepted. Try again later, or check for a SideInstaller update.":
+        "Apple đã từ chối hoàn tất đăng nhập (lỗi -80046), kể cả qua máy chủ anisette Mac, loại mà Apple vẫn chấp nhận. Hãy thử lại sau hoặc kiểm tra bản cập nhật SideInstaller.",
+    "Apple refused to finish signing in through “%@” (error -80046). It now only accepts sign-ins through anisette servers on its macOS library: in Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
+        "Apple đã từ chối hoàn tất đăng nhập qua “%@” (lỗi -80046). Giờ Apple chỉ chấp nhận đăng nhập qua các máy chủ anisette dùng thư viện macOS của Apple: trong Cài đặt › Máy chủ Anisette, hãy chọn Tự động hoặc một máy chủ Mac như “SideStore (New)”.",
+    "Apple won't send a code by text or call to this sign-in, so it was sent to your Apple devices.":
+        "Apple không gửi mã qua tin nhắn hoặc cuộc gọi cho lần đăng nhập này, nên mã đã được gửi đến thiết bị Apple của bạn.",
+    "Apple didn't confirm sending a code to your Apple devices. If one arrived, enter it; if not, try another way.":
+        "Apple chưa xác nhận đã gửi mã đến thiết bị Apple của bạn. Nếu đã nhận được mã, hãy nhập; nếu chưa, hãy thử cách khác.",
     "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
         "SideInstaller không kết nối được tới máy chủ đăng nhập của Apple (gsa.apple.com), dù iPhone này vẫn có kết nối internet. Có thứ gì đó đang chặn nó: tường lửa, bộ lọc DNS hoặc trình chặn quảng cáo, giới hạn nội dung trong Thời gian sử dụng, hoặc một ứng dụng VPN khác. Hãy tắt nó hoặc thử mạng khác, rồi thử lại.",
     "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":

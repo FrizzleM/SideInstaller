@@ -23,7 +23,7 @@ use crate::util::plist::PlistDataExtract;
 use crate::util::storage::{SideloadingStorage, new_storage};
 use futures_util::{SinkExt, StreamExt};
 
-pub const DEFAULT_ANISETTE_V3_URL: &str = "https://ani.jkcoxson.com";
+pub const DEFAULT_ANISETTE_V3_URL: &str = "https://new.ani.sidestore.io";
 
 /// The key of the anisette identity made before identities were kept per
 /// server, and of the first one made since.
@@ -46,6 +46,27 @@ pub const WINDOWS_CLIENT_INFO: &str =
     "<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.iTunes/12.12.4.1)>";
 const AKD_USER_AGENT: &str = "akd/1.0 CFNetwork/808.1.4";
 
+/// What GrandSlam is told the client is on a server on Apple's macOS ADI
+/// library that names a Mac older than macOS 10.13: a current Mac, with the
+/// user agent to match. Both are SideStore's own defaults (AnisetteKit's
+/// `defaultClientInfo` and `defaultUserAgent`).
+///
+/// The macOS-ADI servers (new.ani.sidestore.io, mac-ani.jkcoxson.com,
+/// ani.iloader.app, ani3.stikstore.app, and since about 2026-10-22
+/// ani.jkcoxson.com and ani2.stikstore.app) all name
+/// `<MacBookPro13,3> <Mac OS X;10.12.6;16G29>`, and Apple has answered that Mac
+/// with -23782 for some accounts ("A Mac with macOS version 10.13 or later is
+/// required", SideInstaller issue #89) and asked others for a code by text it
+/// then wouldn't send (2026-10-16). Since Apple started answering anisette
+/// from its Android library with -80046 at the token request (2026-10-21),
+/// the working route is these servers with this Mac: SideStore with its
+/// default headers, on-device anisette off and a macOS-ADI server picked. Apple
+/// takes it on a macOS-ADI identity (-20970 for a made-up account, 2026-10-23),
+/// including for provisioning.
+pub const CURRENT_MAC_CLIENT_INFO: &str =
+    "<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+const CURRENT_MAC_USER_AGENT: &str = "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)";
+
 /// Device and OS of the stock client info of anisette-v3-server and of
 /// AltServer/omnisette. Servers hand these out whatever library they run, and
 /// every public server that does runs Apple's Android ADI library, so the Mac
@@ -59,21 +80,23 @@ const STOCK_CLIENTS: [&str; 2] = [
 /// The client info to tell GrandSlam, given what the server hands out.
 ///
 /// The server's own, unless it is a stock one or an Android phone's (which
-/// Apple answers with 503): then `WINDOWS_CLIENT_INFO`. A server that hands out
-/// something else made it for the library it runs, as the Windows-ADI servers
-/// do and the macOS-ADI ones (mac-ani.jkcoxson.com, new.ani.sidestore.io:
-/// `<MacBookPro13,3> <Mac OS X;10.12.6;16G29>`), and so will anisette v4's
-/// server-chosen client. Apple has taken that Mac from them for most
-/// accounts, but answered one with -23782, "A Mac with macOS version 10.13
-/// or later is required" (SideInstaller issue #89, 2026-10): the app then
-/// skips the other macOS-ADI servers for that sign-in.
+/// Apple answers with 503): then `WINDOWS_CLIENT_INFO`; or a Mac older than
+/// macOS 10.13, as the macOS-ADI servers name: then `CURRENT_MAC_CLIENT_INFO`.
+/// A server that hands out something else made it for the library it runs,
+/// as the Windows-ADI servers do, and so will anisette v4's server-chosen
+/// client.
 pub fn client_info_to_use(advertised: &AnisetteClientInfo) -> AnisetteClientInfo {
     let client = advertised.client_info.trim();
-    let stock = STOCK_CLIENTS.iter().any(|s| client.starts_with(s));
-    if client.is_empty() || stock || client.contains("<Android;") {
+    if client.is_empty() || android_adi(advertised) {
         return AnisetteClientInfo {
             client_info: WINDOWS_CLIENT_INFO.to_string(),
             user_agent: AKD_USER_AGENT.to_string(),
+        };
+    }
+    if mac_version(client).is_some_and(|version| version < (10, 13)) {
+        return AnisetteClientInfo {
+            client_info: CURRENT_MAC_CLIENT_INFO.to_string(),
+            user_agent: CURRENT_MAC_USER_AGENT.to_string(),
         };
     }
     let user_agent = advertised.user_agent.trim();
@@ -81,6 +104,38 @@ pub fn client_info_to_use(advertised: &AnisetteClientInfo) -> AnisetteClientInfo
         client_info: client.to_string(),
         user_agent: if user_agent.is_empty() { AKD_USER_AGENT } else { user_agent }.to_string(),
     }
+}
+
+/// Whether a server that hands out `advertised` makes its anisette data with
+/// Apple's Android ADI library: it names a stock client or an Android phone,
+/// as every server that runs anisette-v3-server or omnisette on that library
+/// does.
+///
+/// Since 2026-10-21 Apple lets a sign-in through such a server get as far as
+/// the password and the second factor, then refuses the developer token with
+/// -80046, "This action cannot be completed at this time", whatever device it
+/// names (xtool #378, iPASide #10, SideStore #1685/#1686). SideInstaller's
+/// sign-in doesn't log in through one any more.
+pub fn android_adi(advertised: &AnisetteClientInfo) -> bool {
+    let client = advertised.client_info.trim();
+    STOCK_CLIENTS.iter().any(|s| client.starts_with(s)) || client.contains("<Android;")
+}
+
+/// The macOS version a client info names, as (major, minor), if it names a Mac.
+fn mac_version(client: &str) -> Option<(u32, u32)> {
+    let rest = ["<macOS;", "<Mac OS X;"]
+        .iter()
+        .find_map(|marker| client.split_once(marker).map(|(_, rest)| rest))?;
+    let version = rest.split([';', '>']).next()?.trim();
+    let mut parts = version.split('.').map(|part| part.parse::<u32>().ok());
+    let major = parts.next()??;
+    let minor = parts.next().flatten().unwrap_or(0);
+    Some((major, minor))
+}
+
+/// Whether `client` is a Mac on macOS 10.13 or later, as `CURRENT_MAC_CLIENT_INFO`.
+pub fn is_current_mac(client: &str) -> bool {
+    mac_version(client).is_some_and(|version| version >= (10, 13))
 }
 
 /// Which stored anisette identity each server takes.
@@ -101,6 +156,10 @@ struct Slots {
     /// Identity key → Unix seconds it last worked.
     #[serde(default)]
     used: BTreeMap<String, u64>,
+    /// Identity key → the client info provisioning reported. Identities made
+    /// before SideInstaller 1.6.1 have none.
+    #[serde(default)]
+    provisioned_as: BTreeMap<String, String>,
 }
 
 impl Slots {
@@ -151,6 +210,18 @@ impl Slots {
             .unwrap_or(0);
         self.used.insert(key.to_string(), now);
     }
+
+    /// Whether the identity `key` can sign in reporting `client`. With
+    /// `fresh_mac` (a full sign-in, see
+    /// `RemoteV3AnisetteProvider::require_current_mac_identity`) and `client`
+    /// a current Mac, only an identity provisioned as one can: one made as the
+    /// macOS-ADI servers' old Mac before 1.6.1 is left for its saved token, and
+    /// the sign-in provisions a new one, as SideStore's "Reset adi.pb" does
+    /// once the client info has changed.
+    fn fits(&self, key: &str, client: &str, fresh_mac: bool) -> bool {
+        !(fresh_mac && is_current_mac(client))
+            || self.provisioned_as.get(key).is_some_and(|c| is_current_mac(c))
+    }
 }
 
 fn server_key(url: &str) -> String {
@@ -178,6 +249,10 @@ pub struct RemoteV3AnisetteProvider {
     client: reqwest::Client,
     /// `client_info_to_use` of what the server hands out, once asked.
     client_info: Mutex<Option<AnisetteClientInfo>>,
+    /// `android_adi` of what the server hands out, once asked.
+    android_adi: Mutex<Option<bool>>,
+    /// Set by `require_current_mac_identity`; see `Slots::fits`.
+    fresh_mac: bool,
 }
 
 impl RemoteV3AnisetteProvider {
@@ -202,6 +277,8 @@ impl RemoteV3AnisetteProvider {
                 .build()
                 .context("Failed to build HTTP client")?,
             client_info: Mutex::new(None),
+            android_adi: Mutex::new(None),
+            fresh_mac: false,
         })
     }
 
@@ -216,6 +293,7 @@ impl RemoteV3AnisetteProvider {
     pub fn set_url(mut self, url: &str) -> RemoteV3AnisetteProvider {
         self.url = url.to_string();
         self.client_info = Mutex::new(None);
+        self.android_adi = Mutex::new(None);
         self
     }
 
@@ -272,10 +350,30 @@ impl AnisetteProvider for RemoteV3AnisetteProvider {
             );
         }
         *self
+            .android_adi
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(android_adi(&advertised));
+        *self
             .client_info
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(info.clone());
         Ok(info)
+    }
+
+    fn runs_android_adi(&self) -> bool {
+        self.android_adi
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .unwrap_or(false)
+    }
+
+    fn require_current_mac_identity(&mut self) {
+        if !self.fresh_mac {
+            self.fresh_mac = true;
+            // Whatever was picked so far went by the old rule: pick again.
+            self.state = None;
+            self.state_key = None;
+        }
     }
 
     fn needs_provisioning(&self) -> Result<bool, Report> {
@@ -284,8 +382,11 @@ impl AnisetteProvider for RemoteV3AnisetteProvider {
 
     /// Picks the identity for this server (see `Slots`): the one it took last
     /// time; else the first stored one it takes; else a new one, provisioned
-    /// through it. With `rejected`, the identity in use is left out.
+    /// through it. With `rejected`, the identity in use is left out. Only
+    /// identities that `Slots::fits` the client this server reports are
+    /// picked.
     async fn provision(&mut self, gs: Arc<GrandSlam>, rejected: bool) -> Result<(), Report> {
+        let client = self.get_client_info().await?.client_info;
         let mut slots = Slots::load(self.storage.as_ref());
         let server = server_key(&self.url);
         let mut skip = Vec::new();
@@ -302,14 +403,23 @@ impl AnisetteProvider for RemoteV3AnisetteProvider {
         if let Some(key) = slots.servers.get(&server).cloned()
             && !skip.contains(&key)
         {
-            if let Some(state) = self.load_state(&key) {
+            if !slots.fits(&key, &client, self.fresh_mac) {
+                info!(
+                    "Anisette identity {key} wasn't provisioned as the Mac this sign-in reports; making a new one"
+                );
+                skip.push(key);
+            } else if let Some(state) = self.load_state(&key) {
                 debug!("Anisette identity: {key}, which this server took before");
                 return self.use_state(&mut slots, &server, key, state);
+            } else {
+                slots.servers.remove(&server);
             }
-            slots.servers.remove(&server);
         }
 
         for key in slots.candidates(&skip) {
+            if !slots.fits(&key, &client, self.fresh_mac) {
+                continue;
+            }
             let Some(state) = self.load_state(&key) else {
                 continue;
             };
@@ -339,6 +449,7 @@ impl AnisetteProvider for RemoteV3AnisetteProvider {
             .await
             .context("The anisette server refused the identity it just provisioned")?;
         self.store_state(&key, &state)?;
+        slots.provisioned_as.insert(key.clone(), client);
         self.use_state(&mut slots, &server, key, state)
     }
 }
@@ -426,16 +537,34 @@ impl RemoteV3AnisetteProvider {
             body["md_lu"] = serde_json::Value::String(hex::encode(state.get_md_lu()));
         }
 
-        let headers = self
-            .client
-            .post(format!("{}/v3/get_headers", self.url))
-            .header(CONTENT_TYPE, "application/json")
-            .body(body.to_string())
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<AnisetteHeaders>()
-            .await?;
+        // Answered in under a second when a server is well. On 2026-10-23
+        // new.ani.sidestore.io answered about one request in three with HTTP
+        // 502 and left others unanswered for a minute: a 5xx is asked again
+        // (a sign-in makes several of these requests, and one failing ends
+        // the attempt), and a silent server is given up on sooner, so the
+        // sign-in moves to a server on the same library, which takes the same
+        // identity.
+        let mut asked = 0;
+        let headers = loop {
+            asked += 1;
+            let response = self
+                .client
+                .post(format!("{}/v3/get_headers", self.url))
+                .header(CONTENT_TYPE, "application/json")
+                .body(body.to_string())
+                .timeout(Duration::from_secs(20))
+                .send()
+                .await?;
+            if response.status().is_server_error() && asked < 3 {
+                warn!("The anisette server answered {}; asking again", response.status());
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                continue;
+            }
+            break response
+                .error_for_status()?
+                .json::<AnisetteHeaders>()
+                .await?;
+        };
 
         match headers {
             AnisetteHeaders::Headers {
@@ -707,21 +836,84 @@ mod tests {
         }
     }
 
+    /// What every macOS-ADI server hands out (2026-10-23).
+    const SIERRA_MAC: &str =
+        "<MacBookPro13,3> <Mac OS X;10.12.6;16G29> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+
     #[test]
     fn a_server_made_client_is_kept() {
         let used = client_info_to_use(&info(WINDOWS_CLIENT_INFO, "akd/1.0 CFNetwork/808.1.4"));
         assert_eq!(used.client_info, WINDOWS_CLIENT_INFO);
-        // A Mac-ADI server names a Mac of its own.
+        // A Mac-ADI server that names a current Mac of its own.
         let mac = "<Mac14,2> <macOS;14.6;23G80> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
         let used = client_info_to_use(&info(mac, ""));
         assert_eq!(used.client_info, mac);
         assert_eq!(used.user_agent, AKD_USER_AGENT);
-        // What mac-ani.jkcoxson.com and new.ani.sidestore.io hand out.
-        let mac_adi = "<MacBookPro13,3> <Mac OS X;10.12.6;16G29> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
-        let ua = "akd/1.0 CFNetwork/811.5.4 Darwin/16.7.0";
-        let used = client_info_to_use(&info(mac_adi, ua));
-        assert_eq!(used.client_info, mac_adi);
-        assert_eq!(used.user_agent, ua);
+        let used = client_info_to_use(&info(mac, "akd/1.0 CFNetwork/1568 Darwin/24.0.0"));
+        assert_eq!(used.user_agent, "akd/1.0 CFNetwork/1568 Darwin/24.0.0");
+    }
+
+    #[test]
+    fn the_macos_adi_servers_old_mac_becomes_a_current_one() {
+        let used = client_info_to_use(&info(SIERRA_MAC, "akd/1.0 CFNetwork/811.5.4 Darwin/16.7.0"));
+        assert_eq!(used.client_info, CURRENT_MAC_CLIENT_INFO);
+        assert_eq!(used.user_agent, CURRENT_MAC_USER_AGENT);
+        let older = "<MacBookPro11,1> <Mac OS X;10.9.5;13F1911> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+        assert_eq!(client_info_to_use(&info(older, "")).client_info, CURRENT_MAC_CLIENT_INFO);
+        // 10.13 is the floor Apple named with -23782, so it stays.
+        let high_sierra = "<MacBookPro14,1> <Mac OS X;10.13.6;17G66> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+        assert_eq!(client_info_to_use(&info(high_sierra, "")).client_info, high_sierra);
+    }
+
+    #[test]
+    fn android_adi_is_told_by_the_stock_and_android_clients() {
+        for advertised in [
+            STOCK,
+            "<MacBookPro15,1> <Mac OS X;10.15.2;19C57> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
+            "<Pixel 7> <Android;14;UQ1A.240205.002> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
+        ] {
+            assert!(android_adi(&info(advertised, "")), "{advertised}");
+        }
+        for advertised in [SIERRA_MAC, WINDOWS_CLIENT_INFO, CURRENT_MAC_CLIENT_INFO, ""] {
+            assert!(!android_adi(&info(advertised, "")), "{advertised}");
+        }
+    }
+
+    #[test]
+    fn mac_versions_are_read_from_either_spelling() {
+        assert_eq!(mac_version(SIERRA_MAC), Some((10, 12)));
+        assert_eq!(mac_version(CURRENT_MAC_CLIENT_INFO), Some((26, 6)));
+        assert_eq!(mac_version("<Mac15,7> <macOS;27.0;26A5378j> <x>"), Some((27, 0)));
+        assert_eq!(mac_version("<iMac21,1> <macOS;15;24A335> <x>"), Some((15, 0)));
+        assert_eq!(mac_version(WINDOWS_CLIENT_INFO), None);
+        assert_eq!(mac_version("<Pixel 7> <Android;14;UQ1A.240205.002> <x>"), None);
+        assert!(is_current_mac(CURRENT_MAC_CLIENT_INFO));
+        assert!(!is_current_mac(SIERRA_MAC));
+        assert!(!is_current_mac(WINDOWS_CLIENT_INFO));
+    }
+
+    #[test]
+    fn a_full_mac_sign_in_only_fits_identities_made_as_a_current_mac() {
+        let mut slots = Slots::default();
+        slots.provisioned_as.insert("current".into(), CURRENT_MAC_CLIENT_INFO.into());
+        slots.provisioned_as.insert("windows".into(), WINDOWS_CLIENT_INFO.into());
+        // Everything fits outside a full sign-in that reports a current Mac.
+        for key in ["current", "windows", LEGACY_STATE_KEY] {
+            assert!(slots.fits(key, CURRENT_MAC_CLIENT_INFO, false), "{key}");
+            assert!(slots.fits(key, WINDOWS_CLIENT_INFO, true), "{key}");
+        }
+        assert!(slots.fits("current", CURRENT_MAC_CLIENT_INFO, true));
+        assert!(!slots.fits("windows", CURRENT_MAC_CLIENT_INFO, true));
+        // Made before 1.6.1, so with nothing recorded.
+        assert!(!slots.fits(LEGACY_STATE_KEY, CURRENT_MAC_CLIENT_INFO, true));
+    }
+
+    #[test]
+    fn slots_from_before_provisioned_as_was_kept_still_load() {
+        let old = r#"{"servers":{"https://a":"anisette_state"},"used":{"anisette_state":5}}"#;
+        let slots: Slots = serde_json::from_str(old).unwrap();
+        assert_eq!(slots.servers["https://a"], LEGACY_STATE_KEY);
+        assert!(slots.provisioned_as.is_empty());
     }
 
     #[test]
@@ -967,6 +1159,76 @@ mod tests {
         // Nothing was kept or remapped for the failed attempt.
         assert_eq!(state_key_for(&storage, &windows.url), LEGACY_STATE_KEY);
         assert!(storage.retrieve_data("anisette_state_2").unwrap().is_none());
+    }
+
+    const MAC: u8 = b'M';
+
+    #[test]
+    fn a_full_sign_in_leaves_an_old_mac_identity_to_its_saved_token() {
+        let storage = Shared(Arc::new(InMemoryStorage::new()));
+        // A macOS-ADI identity made by 1.6.0, as the servers' old Mac.
+        store_identity(&storage, LEGACY_STATE_KEY, MAC);
+        let server = serve(MAC, SIERRA_MAC);
+
+        // Reusing a saved token: the identity the server took is used.
+        run(async {
+            generator(&server.url, &storage)
+                .get_anisette_data(no_bag())
+                .await
+                .unwrap()
+        });
+        assert_eq!(state_key_for(&storage, &server.url), LEGACY_STATE_KEY);
+
+        // A full sign-in reports the current Mac, so it provisions a new
+        // identity (which this client, with no URL bag, gets as far as trying)
+        // and leaves the old one where it was.
+        let error = run(async {
+            let mut generator = generator(&server.url, &storage);
+            generator.get_anisette_data(no_bag()).await.unwrap();
+            generator.require_current_mac_identity().await;
+            generator.get_anisette_data(no_bag()).await.unwrap_err()
+        });
+        let text = format!("{error:?}");
+        assert!(text.contains("Failed to provision"), "{text}");
+        assert_eq!(state_key_for(&storage, &server.url), LEGACY_STATE_KEY);
+        assert!(storage.retrieve_data(LEGACY_STATE_KEY).unwrap().is_some());
+
+        // One made as the current Mac is what a full sign-in picks.
+        store_identity(&storage, "anisette_state_2", MAC);
+        let mut slots = Slots::load(&storage);
+        slots.used.insert("anisette_state_2".into(), 1);
+        slots.provisioned_as.insert("anisette_state_2".into(), CURRENT_MAC_CLIENT_INFO.into());
+        slots.save(&storage).unwrap();
+        run(async {
+            let mut generator = generator(&server.url, &storage);
+            generator.require_current_mac_identity().await;
+            generator.get_anisette_data(no_bag()).await.unwrap()
+        });
+        assert_eq!(state_key_for(&storage, &server.url), "anisette_state_2");
+    }
+
+    #[test]
+    fn a_server_on_the_android_library_says_so_once_asked() {
+        let storage = Shared(Arc::new(InMemoryStorage::new()));
+        let android = serve(ANDROID, STOCK);
+        let mac = serve(MAC, SIERRA_MAC);
+        run(async {
+            let provider =
+                RemoteV3AnisetteProvider::new(&android.url, Box::new(storage.clone()), "0".into())
+                    .unwrap();
+            assert!(!provider.runs_android_adi(), "unknown until asked");
+            provider.get_client_info().await.unwrap();
+            assert!(provider.runs_android_adi());
+
+            let provider =
+                RemoteV3AnisetteProvider::new(&mac.url, Box::new(storage.clone()), "0".into())
+                    .unwrap();
+            assert_eq!(
+                provider.get_client_info().await.unwrap().client_info,
+                CURRENT_MAC_CLIENT_INFO
+            );
+            assert!(!provider.runs_android_adi());
+        });
     }
 
     #[test]

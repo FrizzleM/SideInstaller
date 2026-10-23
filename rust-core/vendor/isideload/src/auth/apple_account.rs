@@ -29,6 +29,16 @@ use sha2::{Digest, Sha256};
 use srp::{ClientVerifier, groups::G2048};
 use tracing::{debug, info, warn};
 
+/// The second-factor prompt's error when Apple refused to send a code by text
+/// or call and the trusted devices are asked instead. SideInstaller shows it
+/// in the app's language, so keep the wording in step with `TwoFactorPrompt`.
+pub const PHONE_CODE_REFUSED: &str =
+    "Apple won't send a code by text or call to this sign-in, so it was sent to your Apple devices.";
+
+/// The second-factor prompt's error when Apple refused to confirm sending a
+/// code to the trusted devices, and the code is asked for anyway.
+pub const DEVICE_CODE_UNCONFIRMED: &str = "Apple didn't confirm sending a code to your Apple devices. If one arrived, enter it; if not, try another way.";
+
 pub struct AppleAccount {
     pub email: String,
     pub spd: Option<plist::Dictionary>,
@@ -446,6 +456,14 @@ impl AppleAccount {
             .send_auth(reqwest::Method::GET, &request_code_url, false, headers, None)
             .await
             .context("Failed to request trusted device 2fa")?;
+        if Self::refuses_client(status.as_u16(), &text) {
+            // Apple may have pushed a code at the password proof anyway (it
+            // did to the Android and Windows clients), and `validateCode`,
+            // outside /auth, takes it; with none, the user can pick another way.
+            warn!("Apple turned the trusted-device code request away (bare 403); asking for a code anyway");
+            self.last_error = Some(DEVICE_CODE_UNCONFIRMED.to_string());
+            return Ok(());
+        }
         if !status.is_success() {
             bail!(
                 "Trusted device 2FA request failed with http status {}: {}",
@@ -536,6 +554,16 @@ impl AppleAccount {
             )
             .await
             .context("Failed to request phone 2FA code")?;
+
+        // A bare 403 here even as a Mac: Apple asked for a code by text and
+        // then refused to send one, as it did through the macOS-ADI servers on
+        // 2026-10-16. The trusted devices are tried instead, as SideStore lets
+        // the user pick them whatever Apple asked for.
+        if Self::refuses_client(status.as_u16(), &text) {
+            warn!("Apple turned the phone-code request away (bare 403); sending the code to the trusted devices instead");
+            self.last_error = Some(PHONE_CODE_REFUSED.to_string());
+            return Ok(LoginState::NeedsDevice2FA);
+        }
 
         match Self::classify_sms_send_response(status.as_u16(), &text, id, mode)? {
             SmsSendOutcome::Sent => {

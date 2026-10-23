@@ -645,6 +645,16 @@ final class SideBySideManager: ObservableObject {
                     engine.log("Apple ID credentials rejected: \(failure)")
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
+                // Not logged in through an Android-ADI server (-80046).
+                if Engine.isAndroidADISkip(failure) {
+                    engine.log("Side by Side: skipping anisette \(index + 1)/\(servers.count): Apple refuses the sign-in token for anisette from its Android library (-80046).")
+                    appleRefusals.recordTokenRefusal(anisette)
+                    failures.skip()
+                    if failures.tried == 0, appleRefusals.rulesOutAll(servers[(index + 1)...]) {
+                        throw EngineError.message(engine.androidADIRefusalMessage(server: anisette))
+                    }
+                    continue
+                }
                 engine.log("Side by Side: anisette \(index + 1)/\(servers.count) failed: \(failure)")
                 failures.failed(anisette, error: failure)
                 engine.anisetteFailed(anisette, error: failure)
@@ -656,6 +666,13 @@ final class SideBySideManager: ObservableObject {
                 // see `AnisetteServer.AppleRefusals`.
                 if Engine.isAppleOutdatedMacRefusal(failure) {
                     appleRefusals.recordOutdated(anisette)
+                }
+                if Engine.isAppleTokenRefusal(failure) {
+                    appleRefusals.recordTokenRefusal(anisette)
+                    if appleRefusals.rulesOutAll(servers[(index + 1)...]) {
+                        engine.log("Side by Side: Apple refused the sign-in token (-80046) — stopping.")
+                        throw EngineError.message(engine.appleTokenRefusalMessage(through: anisette))
+                    }
                 }
                 if Engine.isAppleServiceRefusal(failure) {
                     appleRefusals.record(anisette)
