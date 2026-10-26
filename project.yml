@@ -59,7 +59,7 @@ targets:
       base:
         # Has to stay the app's identifier plus a suffix, or iOS refuses to
         # install the app. Change both together.
-        PRODUCT_BUNDLE_IDENTIFIER: com.frizzle.sideinstaller.LiveActivity.certificate.exporter
+        PRODUCT_BUNDLE_IDENTIFIER: com.frizzle.sideinstaller.LiveActivity
         INFOPLIST_FILE: ios-live-activity/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES
