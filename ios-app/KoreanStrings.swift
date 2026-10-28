@@ -498,6 +498,10 @@ let koreanStrings: [String: String] = [
     "Tunnel": "터널",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "%@:%d에서 연결을 거부했습니다. 터널은 트래픽을 전달하고 있지만, 기기가 페어링 포트를 열고 있지 않다는 뜻입니다. 이 포트는 개발자 모드가 켜져 있을 때만 열리고, iOS는 재시동할 때마다 다시 켜라고 요청합니다. 설정 › 개인정보 보호 및 보안 › 개발자 모드를 켠 뒤 다시 시도하세요. 이미 켜져 있다면 “페어링 파일”에서 이 iPhone을 다시 페어링하세요.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
+        "%@:%d에서 연결을 거부했습니다. 터널은 트래픽을 전달하고 있지만, 개발자 모드가 꺼져 있어 이 iPhone이 페어링 포트를 열고 있지 않습니다. 설정 › 개인정보 보호 및 보안 › 개발자 모드를 켠 뒤(iPhone이 재시동됩니다) 다시 시도하세요.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
+        "%@:%d에서 연결을 거부했습니다. 터널은 트래픽을 전달하고 있지만, 개발자 모드가 켜져 있는데도 이 iPhone이 페어링 포트를 열고 있지 않습니다. “페어링 파일”에서 이 iPhone을 다시 페어링한 뒤 다시 시도하세요. 그래도 실패하면 iPhone을 재시동하세요.",
     "Start LocalDevVPN when needed": "필요할 때 LocalDevVPN 시작",
     "Start LocalDevVPN now": "지금 LocalDevVPN 시작",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -1074,6 +1078,12 @@ let koreanStrings: [String: String] = [
     "not connected": "연결되지 않음",
     "none": "없음",
     "made on this iPhone": "이 iPhone에서 생성",
+    "Runs inside LiveContainer": "LiveContainer 안에서 실행",
+    "on": "켬",
+    "off": "끔",
+    "unknown": "알 수 없음",
+    "yes": "예",
+    "no": "아니요",
     "latest": "최신",
     "custom server": "사용자 지정 서버",
     "Auto, starts with %@": "자동, %@부터 시작",
@@ -1094,8 +1104,14 @@ let koreanStrings: [String: String] = [
     "Share the report": "보고서 공유",
     "Preview the report": "보고서 미리 보기",
     "Report": "보고서",
-    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
-        "보고서는 파일 › 나의 iPhone › SideInstaller › Reports에 저장됩니다. GitHub에서 입력란 아래의 “Paste, drop, or click to add files”로 첨부한 뒤 이슈를 제출하세요.",
+    "The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.":
+        "이슈는 내용이 채워진 채로 열립니다. 로그가 너무 길어 채울 수 없으면 SideInstaller가 로그를 복사해 두니 이슈 끝에 붙여 넣으세요. 전체 보고서는 %@에도 저장됩니다.",
+    "Files › On My iPhone": "파일 › 나의 iPhone",
+    "Copy the full log": "전체 로그 복사",
+    "Paste the log into the issue": "로그를 이슈에 붙여 넣으세요",
+    "Open GitHub": "GitHub 열기",
+    "The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue.":
+        "전체 로그가 너무 길어 자동으로 채울 수 없어서 SideInstaller가 복사해 두었습니다. GitHub에서 텍스트 끝을 탭하고 붙여넣기를 선택한 뒤 이슈를 제출하세요.",
     "Describe the problem above first.": "먼저 위에 문제를 설명해 주세요.",
     "Couldn't save the report: %@": "보고서를 저장하지 못했습니다: %@",
 

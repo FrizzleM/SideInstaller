@@ -10,7 +10,8 @@ import Foundation
 /// Every line passes through `redact` before it's shown, copied or mirrored
 /// to stdout. The rules match how the plists, XPC messages and pairing
 /// structures are printed (idevice's pretty printer and Rust's `{:#?}`), plus
-/// Swift's `  Key = value` lines.
+/// Swift's `  Key = value` lines. Then Rust's one-item-per-line byte lists are
+/// put on one line (`compactions`).
 enum LogRedactor {
 
     // MARK: Public
@@ -18,6 +19,7 @@ enum LogRedactor {
     static func redact(_ line: String) -> String {
         var text = line
         for rule in rules { text = rule(text) }
+        for compaction in compactions { text = compaction(text) }
         return text
     }
 
@@ -124,6 +126,23 @@ enum LogRedactor {
         // its owner. The team ID stays, since bundle IDs and certificates carry it.
         replacing(#"\b(team:? )[^\n]+ (\([A-Z0-9]{10}\))"#) { m, s in
             "\(s.group(m, 1))‹name› \(s.group(m, 2))"
+        },
+    ]
+
+    // MARK: Compaction
+
+    /// Puts back on one line what Rust's `{:#?}` prints an item per line, so a
+    /// public key isn't 35 lines of a report (#100): lists of numbers, then
+    /// wrappers around one value, `Data(\n [\n 103,\n 229,\n ],\n)` becoming
+    /// `Data([103, 229])`. Only whitespace changes. Runs after the rules, so
+    /// what they take out is already gone.
+    private static let compactions: [(String) -> String] = [
+        replacing(#"\[[ \t]*\n(?:[ \t]*-?\d+,[ \t]*\n)+[ \t]*\]"#) { m, s in
+            let numbers = s.group(m, 0).split(whereSeparator: { !$0.isNumber && $0 != "-" })
+            return "[\(numbers.joined(separator: ", "))]"
+        },
+        replacing(#"\b([A-Za-z_][A-Za-z0-9_]*)\([ \t]*\n[ \t]*(\[[^\]\n]*\]|"(?:[^"\\\n]|\\.)*"|-?\d+(?:\.\d+)?|true|false),[ \t]*\n[ \t]*\)"#) { m, s in
+            "\(s.group(m, 1))(\(s.group(m, 2)))"
         },
     ]
 

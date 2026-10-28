@@ -604,6 +604,10 @@ let portugueseStrings: [String: String] = [
     "Tunnel": "Túnel",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "Algo em %@:%d recusou a conexão, então o túnel está funcionando: é o dispositivo que não está escutando na porta de pareamento. Essa porta só abre com o Modo de Desenvolvedor ligado, e o iOS pede de novo depois de cada reinício: ative em Ajustes › Privacidade e Segurança › Modo de Desenvolvedor e tente outra vez. Se já estiver ligado, pareie este iPhone de novo em “Arquivo de pareamento”.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
+        "Algo em %@:%d recusou a conexão, então o túnel está funcionando, mas este iPhone não está escutando na porta de pareamento: o Modo de Desenvolvedor está desligado. Ative em Ajustes › Privacidade e Segurança › Modo de Desenvolvedor (o iPhone reinicia) e tente outra vez.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
+        "Algo em %@:%d recusou a conexão, então o túnel está funcionando, mas este iPhone não está escutando na porta de pareamento, embora o Modo de Desenvolvedor esteja ligado. Pareie este iPhone de novo em “Arquivo de pareamento” e tente outra vez. Se ainda falhar, reinicie o iPhone.",
     "Start LocalDevVPN when needed": "Iniciar o LocalDevVPN quando for preciso",
     "Start LocalDevVPN now": "Iniciar o LocalDevVPN agora",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -1094,6 +1098,12 @@ let portugueseStrings: [String: String] = [
     "not connected": "não conectado",
     "none": "nenhum",
     "made on this iPhone": "criado neste iPhone",
+    "Runs inside LiveContainer": "Rodando dentro do LiveContainer",
+    "on": "ligado",
+    "off": "desligado",
+    "unknown": "desconhecido",
+    "yes": "sim",
+    "no": "não",
     "latest": "mais recente",
     "custom server": "servidor personalizado",
     "Auto, starts with %@": "Auto, começa por %@",
@@ -1114,8 +1124,14 @@ let portugueseStrings: [String: String] = [
     "Share the report": "Compartilhar o relatório",
     "Preview the report": "Ver o relatório",
     "Report": "Relatório",
-    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
-        "O relatório fica salvo em Arquivos › No Meu iPhone › SideInstaller › Reports. No GitHub, anexe-o com “Paste, drop, or click to add files” abaixo do texto e envie a issue.",
+    "The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.":
+        "A issue abre já preenchida. Quando o registro é longo demais para isso, o SideInstaller o copia para você colar no fim da issue. O relatório completo também fica salvo em %@.",
+    "Files › On My iPhone": "Arquivos › No Meu iPhone",
+    "Copy the full log": "Copiar o registro completo",
+    "Paste the log into the issue": "Cole o registro na issue",
+    "Open GitHub": "Abrir o GitHub",
+    "The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue.":
+        "O registro completo é longo demais para ser preenchido, então o SideInstaller o copiou. No GitHub, toque no fim do texto, escolha Colar e envie a issue.",
     "Describe the problem above first.": "Descreva o problema acima primeiro.",
     "Couldn't save the report: %@": "Não foi possível salvar o relatório: %@",
 

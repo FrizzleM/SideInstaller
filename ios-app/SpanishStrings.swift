@@ -607,6 +607,10 @@ let spanishStrings: [String: String] = [
     "Tunnel": "Túnel",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "Algo en %@:%d rechazó la conexión, así que el túnel funciona: es el dispositivo el que no está escuchando en su puerto de emparejamiento. Ese puerto solo se abre con el Modo de desarrollador activado, y iOS vuelve a pedirlo tras cada reinicio: actívalo en Ajustes › Privacidad y seguridad › Modo de desarrollador y vuelve a intentarlo. Si ya está activado, vuelve a emparejar este iPhone desde “Archivo de emparejamiento”.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
+        "Algo en %@:%d rechazó la conexión, así que el túnel funciona, pero este iPhone no está escuchando en su puerto de emparejamiento: el Modo de desarrollador está desactivado. Actívalo en Ajustes › Privacidad y seguridad › Modo de desarrollador (el iPhone se reinicia) y vuelve a intentarlo.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
+        "Algo en %@:%d rechazó la conexión, así que el túnel funciona, pero este iPhone no está escuchando en su puerto de emparejamiento, aunque el Modo de desarrollador está activado. Vuelve a emparejar este iPhone desde “Archivo de emparejamiento” y vuelve a intentarlo. Si sigue fallando, reinicia el iPhone.",
     "Start LocalDevVPN when needed": "Iniciar LocalDevVPN cuando haga falta",
     "Start LocalDevVPN now": "Iniciar LocalDevVPN ahora",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -1104,6 +1108,12 @@ let spanishStrings: [String: String] = [
     "not connected": "no conectado",
     "none": "ninguno",
     "made on this iPhone": "creado en este iPhone",
+    "Runs inside LiveContainer": "Se ejecuta dentro de LiveContainer",
+    "on": "activado",
+    "off": "desactivado",
+    "unknown": "desconocido",
+    "yes": "sí",
+    "no": "no",
     "latest": "la más reciente",
     "custom server": "servidor personalizado",
     "Auto, starts with %@": "Auto, empieza por %@",
@@ -1124,8 +1134,14 @@ let spanishStrings: [String: String] = [
     "Share the report": "Compartir el informe",
     "Preview the report": "Ver el informe",
     "Report": "Informe",
-    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
-        "El informe se guarda en Archivos › En mi iPhone › SideInstaller › Reports. En GitHub, adjúntalo con “Paste, drop, or click to add files” debajo del texto y envía la incidencia.",
+    "The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.":
+        "La incidencia se abre ya rellenada. Si el registro es demasiado largo para eso, SideInstaller lo copia para que lo pegues al final de la incidencia. El informe completo también se guarda en %@.",
+    "Files › On My iPhone": "Archivos › En mi iPhone",
+    "Copy the full log": "Copiar el registro completo",
+    "Paste the log into the issue": "Pega el registro en la incidencia",
+    "Open GitHub": "Abrir GitHub",
+    "The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue.":
+        "El registro completo es demasiado largo para rellenarlo, así que SideInstaller lo ha copiado. En GitHub, toca el final del texto, elige Pegar y envía la incidencia.",
     "Describe the problem above first.": "Primero describe el problema arriba.",
     "Couldn't save the report: %@": "No se ha podido guardar el informe: %@",
 

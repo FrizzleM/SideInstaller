@@ -1016,6 +1016,46 @@ So the cutoff is 26.4 and it holds through 26.6.2 at least; nothing says why.
 None of this has run on a 26.x device, and the new copy hasn't been seen on
 screen.
 
+#### Port 49152 refused on iOS 27 (issues #56, #100)
+
+Both reports: an iOS 27 iPhone with a pairing file it made itself, LocalDevVPN
+up, and `tunnel_create_rppairing` to 10.7.0.1:49152 answered with a reset
+(ECONNREFUSED, kind `RsdUnreachable`), so nothing on the iPhone accepted on that
+port. #56 says pairing again didn't help. #100's log shows SideInstaller running
+inside LiveContainer: its Live Activity failed with “Target does not include
+NSSupportsLiveActivities plist key” and its continued-processing task with
+BGTaskScheduler error 3 (not permitted), although the released 1.6.1 IPA has both
+keys. LiveContainer's own Info.plist has neither. What that does to the tunnel is
+unknown. Local Network permission isn't it: TN3179 counts VPN interfaces out of
+local network privacy.
+
+49152 is just the first port iOS hands out. On a Mac, rapportd holds it. On an
+iPhone remotepairingd normally gets it, which is why StikDebug and SideInstaller
+can dial it blind, but whatever binds first at boot wins. The iPhone advertises
+its real listener as `_remotepairing._tcp` (pymobiledevice3 takes the port from
+there), and a local browse sees the iPhone's own services (on a Mac, `dns-sd -B`
+lists the Mac's own adverts on interface 1). So after a refused 49152,
+`DeviceConnection.connectRemotePairing` calls
+`NetworkStatus.ownRemotePairingAdvert` (NetServiceBrowser on the main run loop,
+3 s at most; only a service resolving to one of this iPhone's own addresses
+counts), logs what it found, and dials the advertised port when it's another one.
+Side by Side never does this, since its listener isn't this iPhone's.
+`_remotepairing._tcp` is in NSBonjourServices, and LiveContainer's plist lists it
+too.
+
+The refusal advice now reads `security.mac.amfi.developer_mode_status`
+(`Engine.developerModeIsOn`): off says so plainly, on drops the “turn on
+Developer Mode” advice and suggests pairing again, then a restart. Where the
+sysctl can't be read, the old text stays. Problem reports list Developer Mode,
+Device IP and whether SideInstaller runs inside LiveContainer.
+
+Checked in the iPhone Duo simulator (2026-10-27), with a fake advert from
+`dns-sd -R … _remotepairing._tcp local. 49170` and a hook dialling a closed port
+first: the refusal, the lookup (“port 49170”), the second dial and the Developer
+Mode text (the simulator reads the Mac's sysctl, 1) all behaved. Never run on an
+iPhone: whether its own advert is seen from inside the app, whether the sysctl
+can be read there, and whether either report's iPhone had moved its port.
+
 ## Madeira
 
 [Madeira](https://github.com/willfaust/Madeira) (Windows PC games through Wine and
@@ -1121,6 +1161,30 @@ async step cores in `Engine`, so they can never drift. State for the progress
 bar/checklist (`Engine.stepStates`, `installProgress`, `pairingPIN`, `guide`)
 is all `@Published`. Reused-pairing/sign-in/download are skipped when already
 valid; a stale pairing file triggers one automatic re-pair before giving up.
+
+#### Report a problem: GitHub's link limits (issue #100)
+
+A new-issue link can't carry a file, and its length is capped twice (measured
+2026-10-27 with curl): GitHub answers 414 from about 8 KB, and a browser that
+isn't signed in (the in-app Safari keeps its own cookies) is redirected to
+`/login?return_to=…`, which carries the whole link escaped again (each `%`, `&`,
+`=`, `/` and `?` grows by two) and fails with GitHub's “Whoops, something went
+wrong!” 500 from about 6.6 KB. The old 7,500-character cap hit that with an
+ordinary log, and the saved report file was hardly ever attached (inside
+LiveContainer it isn't under Files › SideInstaller at all).
+
+`ProblemReport.issueDraft` now caps the sign-in link's length
+(`signInLength`, 6,000) and puts the whole log in the issue. If it fits in the
+link, it goes there. Otherwise the link carries the description, details, error and
+the log's last lines, the rest is copied to the clipboard (log first, newest
+lines kept, then a description or error the link had to cut, then crash logs,
+within GitHub's 65,536-character body limit, counting line breaks twice), and an
+alert says to paste it at the end of the issue, where the body says
+“Paste below this line”. “Copy the full log” copies it again. A non-Latin
+description can cost 15 sign-in characters a character, so the loop can cut the
+description and error from the link entirely and the title to 30 characters.
+Rust's `{:#?}` byte lists are put on one line by `LogRedactor` (a public key was
+35 lines of #100), after the redaction rules.
 
 ## Honest status summary
 

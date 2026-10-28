@@ -256,6 +256,21 @@ final class Engine: ObservableObject {
 
     var canSelfPair: Bool { Engine.deviceCanSelfPair }
 
+    /// Whether Developer Mode is on, from the `security.mac.amfi.developer_mode_status`
+    /// sysctl AMFI publishes; nil when this iOS won't let the app read it.
+    /// Static so non-isolated code can read it.
+    static var developerModeIsOn: Bool? {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        guard sysctlbyname("security.mac.amfi.developer_mode_status", &value, &size, nil, 0) == 0,
+              size == MemoryLayout<Int32>.size else { return nil }
+        return value != 0
+    }
+
+    /// True when SideInstaller runs as a LiveContainer guest. iOS then applies
+    /// LiveContainer's Info.plist to the process, not SideInstaller's.
+    static var runsInLiveContainer: Bool { getenv("LC_HOME_PATH") != nil }
+
     /// False from iOS 26.4 on, where lockdownd hangs up on a connection that
     /// reaches it through a loopback VPN, on its first request. A lockdown pair
     /// record (jitterbugpair, “pymobiledevice3 lockdown pair”, idevice_pair's
@@ -3060,6 +3075,14 @@ final class Engine: ObservableObject {
         let schemes = host.object(forInfoDictionaryKey: "LSApplicationQueriesSchemes") as? [String] ?? []
         return Set(schemes.map { $0.lowercased() })
     }()
+
+    /// LiveContainer's name on the Home Screen, which the Files app gives its
+    /// folder too; nil outside LiveContainer.
+    static var liveContainerName: String? {
+        guard runsInLiveContainer, let bundle = liveContainerBundle() else { return nil }
+        return bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+            ?? bundle.object(forInfoDictionaryKey: "CFBundleName") as? String
+    }
 
     /// LiveContainer's own bundle, from the `+[NSUserDefaults lcMainBundle]`
     /// it adds for the guest app.

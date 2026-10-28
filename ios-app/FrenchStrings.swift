@@ -609,6 +609,10 @@ let frenchStrings: [String: String] = [
     "Tunnel": "Tunnel",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "Quelque chose sur %@:%d a refusé la connexion : le tunnel fonctionne donc, c'est l'appareil qui n'écoute pas sur son port de jumelage. Ce port ne s'ouvre qu'avec le mode développeur activé, et iOS le redemande après chaque redémarrage : activez-le dans Réglages › Confidentialité et sécurité › Mode développeur, puis réessayez. S'il est déjà activé, jumelez de nouveau cet iPhone depuis « Fichier de jumelage ».",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
+        "Quelque chose sur %@:%d a refusé la connexion : le tunnel fonctionne donc, mais cet iPhone n'écoute pas sur son port de jumelage, car le mode développeur est désactivé. Activez-le dans Réglages › Confidentialité et sécurité › Mode développeur (l'iPhone redémarre), puis réessayez.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
+        "Quelque chose sur %@:%d a refusé la connexion : le tunnel fonctionne donc, mais cet iPhone n'écoute pas sur son port de jumelage, bien que le mode développeur soit activé. Jumelez de nouveau cet iPhone depuis « Fichier de jumelage », puis réessayez. Si ça échoue encore, redémarrez l'iPhone.",
     "Start LocalDevVPN when needed": "Lancer LocalDevVPN au besoin",
     "Start LocalDevVPN now": "Lancer LocalDevVPN maintenant",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -1107,6 +1111,12 @@ let frenchStrings: [String: String] = [
     "not connected": "non connecté",
     "none": "aucun",
     "made on this iPhone": "créé sur cet iPhone",
+    "Runs inside LiveContainer": "Exécuté dans LiveContainer",
+    "on": "activé",
+    "off": "désactivé",
+    "unknown": "inconnu",
+    "yes": "oui",
+    "no": "non",
     "latest": "la plus récente",
     "custom server": "serveur personnalisé",
     "Auto, starts with %@": "Auto, commence par %@",
@@ -1127,8 +1137,14 @@ let frenchStrings: [String: String] = [
     "Share the report": "Partager le rapport",
     "Preview the report": "Aperçu du rapport",
     "Report": "Rapport",
-    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
-        "Le rapport est enregistré dans Fichiers › Sur mon iPhone › SideInstaller › Reports. Sur GitHub, joins-le avec « Paste, drop, or click to add files » sous le texte, puis envoie le ticket.",
+    "The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.":
+        "Le ticket s'ouvre déjà rempli. Si le journal est trop long pour ça, SideInstaller le copie pour que tu le colles à la fin du ticket. Le rapport complet est aussi enregistré dans %@.",
+    "Files › On My iPhone": "Fichiers › Sur mon iPhone",
+    "Copy the full log": "Copier le journal complet",
+    "Paste the log into the issue": "Colle le journal dans le ticket",
+    "Open GitHub": "Ouvrir GitHub",
+    "The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue.":
+        "Le journal complet est trop long pour être rempli automatiquement, alors SideInstaller l'a copié. Sur GitHub, touche la fin du texte, choisis Coller, puis envoie le ticket.",
     "Describe the problem above first.": "Décris d'abord le problème ci-dessus.",
     "Couldn't save the report: %@": "Impossible d'enregistrer le rapport : %@",
 

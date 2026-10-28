@@ -2,6 +2,28 @@
 
 All notable changes to SideInstaller are documented here.
 
+## Unreleased
+
+### Fixed
+- **Bug reports carry the whole log.** A GitHub link only holds a few thousand characters, so a
+  report's issue got the last lines of the log at most and asked for the report file to be
+  attached, which was easy to miss, and inside LiveContainer the file wasn't where the issue said
+  (#100). When the log doesn't fit in the link, SideInstaller now copies it and says so, and the
+  issue ends with “Paste below this line”. “Copy the full log” copies it again.
+- **Report a problem no longer ends on GitHub's “Whoops, something went wrong!” page.** When the
+  in-app browser wasn't signed in to GitHub, a long report made a sign-in link too long for
+  GitHub. Links are now kept short enough for it.
+- **The pairing port is looked for when 49152 refuses.** When this iPhone refuses the device link
+  on port 49152, SideInstaller asks which port it advertises for remote pairing and tries that one
+  before giving up (#56, #100).
+- **The “refused the connection” message knows whether Developer Mode is on.** It no longer asks to
+  turn on Developer Mode when it's already on, and says plainly when it's off.
+
+### Changed
+- **Reports list Device IP, Developer Mode, and whether SideInstaller runs inside LiveContainer.**
+  A log pasted into “What happened?” no longer makes the issue's title: the error does.
+- **Key bytes take one line in the log**, not one line per byte. Private keys stay redacted.
+
 ## 1.6.1
 
 ### Added

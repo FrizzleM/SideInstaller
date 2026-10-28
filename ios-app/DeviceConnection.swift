@@ -108,9 +108,10 @@ final class DeviceConnection {
     }
 
     /// User-facing advice for each tunnel failure kind, listing the hosts that
-    /// were tried.
+    /// were tried. `port` is the remote-pairing port dialled last.
     private func tunnelAdvice(kind: TunnelFailureKind,
                               deviceIP: String,
+                              port: UInt16 = DeviceConnection.rsdPort,
                               candidates: [String],
                               raw: FFIError?) -> String {
         let tried = ([deviceIP, "127.0.0.1"] + candidates).joined(separator: ", ")
@@ -147,14 +148,24 @@ final class DeviceConnection {
                 """
         case TunnelFailureRsdUnreachable:
             // ECONNREFUSED means the tunnel works and the address is right, but
-            // nothing is listening on the pairing port (usually Developer Mode
-            // is off), so don't blame the VPN.
+            // nothing is listening on the pairing port (often Developer Mode
+            // is off), so don't blame the VPN. iOS says whether Developer
+            // Mode is on, where it lets the app read it.
             if Self.wasRefused(raw) {
-                return L("Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.",
-                         deviceIP, Int(Self.rsdPort))
+                switch Engine.developerModeIsOn {
+                case false?:
+                    return L("Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.",
+                             deviceIP, Int(port))
+                case true?:
+                    return L("Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.",
+                             deviceIP, Int(port))
+                case nil:
+                    return L("Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.",
+                             deviceIP, Int(port))
+                }
             }
             return """
-                Couldn't reach the device at \(deviceIP):\(Self.rsdPort) at all. The \
+                Couldn't reach the device at \(deviceIP):\(port) at all. The \
                 loopback VPN is most likely off, or Device IP isn't the address it \
                 carries: in LocalDevVPN that's the one under Settings › Device IP \
                 (10.7.0.1 by default), not the “Connected to” address on its main screen.
@@ -270,9 +281,12 @@ final class DeviceConnection {
         for (index, useRemotePairing) in routes.enumerated() {
             do {
                 if useRemotePairing {
+                    // Another iPhone's listener (Side by Side, the one caller
+                    // that can't mint) isn't the one this iPhone advertises.
                     try connectRemotePairing(deviceIP: deviceIP,
                                              pairingFilePath: pairingFilePath,
-                                             hostname: hostname)
+                                             hostname: hostname,
+                                             findsMovedPort: allowLockdownMinting)
                 } else {
                     try connectCoreDeviceProxy(deviceIP: deviceIP,
                                                pairingFilePath: pairingFilePath,
@@ -312,8 +326,14 @@ final class DeviceConnection {
     }
 
     /// The RPPairing route: straight to the device's remote-pairing listener.
+    ///
+    /// The listener is dialled on `rsdPort`, the port it nearly always has.
+    /// When that's refused and `findsMovedPort` is set (the listener is this
+    /// iPhone's own), the port this iPhone advertises over Bonjour is looked
+    /// up and dialled too: the listener takes whatever port is free when it
+    /// starts (`NetworkStatus.ownRemotePairingAdvert`).
     private func connectRemotePairing(deviceIP: String, pairingFilePath: String,
-                                      hostname: String) throws {
+                                      hostname: String, findsMovedPort: Bool) throws {
         var pf: OpaquePointer?
         try pairingFilePath.withCString { p in
             try check(rp_pairing_file_read(p, &pf), "failed to read pairing file at \(pairingFilePath)")
@@ -321,17 +341,54 @@ final class DeviceConnection {
         guard let pairingFile = pf else { throw fail("pairing file handle was null") }
         defer { rp_pairing_file_free(pairingFile) }
 
-        var addr = sockaddr_in()
-        addr.sin_family = sa_family_t(AF_INET)
-        addr.sin_port = Self.rsdPort.bigEndian
-        guard deviceIP.withCString({ inet_pton(AF_INET, $0, &addr.sin_addr) }) == 1 else {
-            throw fail("invalid device IP: \(deviceIP)")
-        }
-
         // createListener returns a port but no host, so the Rust side tries the
         // RSD address, loopback, then these local interface addresses, all
         // within one shared timeout.
         let candidates = NetworkStatus.tunnelHostCandidates()
+        guard var failure = try dialRemotePairing(pairingFile, deviceIP: deviceIP, port: Self.rsdPort,
+                                                  hostname: hostname, candidates: candidates) else { return }
+        var port = Self.rsdPort
+        if findsMovedPort, failure.kind == TunnelFailureRsdUnreachable, Self.wasRefused(failure.raw) {
+            let advert = NetworkStatus.ownRemotePairingAdvert()
+            Engine.shared.log("Port \(port) refused. This iPhone's remote pairing advertisement: \(advert.summary).")
+            if let moved = advert.port, moved != port {
+                Engine.shared.log("Dialling the advertised port \(moved) instead …")
+                port = moved
+                guard let retried = try dialRemotePairing(pairingFile, deviceIP: deviceIP, port: moved,
+                                                          hostname: hostname, candidates: candidates) else {
+                    Engine.shared.log("The tunnel opened on port \(moved).")
+                    return
+                }
+                failure = retried
+            }
+        }
+        throw TunnelError(kind: failure.kind,
+                          advice: tunnelAdvice(kind: failure.kind,
+                                               deviceIP: deviceIP,
+                                               port: port,
+                                               candidates: candidates,
+                                               raw: failure.raw),
+                          underlying: failure.raw)
+    }
+
+    /// Why a `dialRemotePairing` failed.
+    private struct DialFailure {
+        let raw: FFIError
+        let kind: TunnelFailureKind
+    }
+
+    /// One tunnel attempt to the remote-pairing listener at `deviceIP:port`.
+    /// Nil when the tunnel came up, and the adapter and handshake are now this
+    /// connection's.
+    private func dialRemotePairing(_ pairingFile: OpaquePointer, deviceIP: String, port: UInt16,
+                                   hostname: String, candidates: [String]) throws -> DialFailure? {
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = port.bigEndian
+        guard deviceIP.withCString({ inet_pton(AF_INET, $0, &addr.sin_addr) }) == 1 else {
+            throw fail("invalid device IP: \(deviceIP)")
+        }
+
         let cHosts: [UnsafePointer<CChar>?] = candidates.map { UnsafePointer(strdup($0)) }
         defer { for p in cHosts { free(UnsafeMutablePointer(mutating: p)) } }
 
@@ -353,14 +410,9 @@ final class DeviceConnection {
             }
         }
         if let raw = ffiError(err, "tunnel_create_rppairing failed (is a loopback VPN connected, Wi-Fi on, device IP \(deviceIP)?)") {
-            // Log the raw error; throw the classified one.
+            // Log the raw error; the caller throws the classified one.
             Engine.shared.log("tunnel dial failed — raw error: \(raw)")
-            throw TunnelError(kind: failureKind,
-                              advice: tunnelAdvice(kind: failureKind,
-                                                   deviceIP: deviceIP,
-                                                   candidates: candidates,
-                                                   raw: raw),
-                              underlying: raw)
+            return DialFailure(raw: raw, kind: failureKind)
         }
         guard newAdapter != nil, newHandshake != nil else {
             throw fail("tunnel created without valid handles")
@@ -368,6 +420,7 @@ final class DeviceConnection {
         disconnect()
         adapter = newAdapter
         handshake = newHandshake
+        return nil
     }
 
     /// The CoreDeviceProxy route, using a classic lockdown pair record.

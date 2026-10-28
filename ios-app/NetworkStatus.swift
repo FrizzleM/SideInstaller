@@ -359,3 +359,149 @@ enum NetworkStatus {
         return value
     }
 }
+
+// MARK: - This iPhone's remote pairing listener
+
+extension NetworkStatus {
+
+    /// What a look for this iPhone's `_remotepairing._tcp` advertisement found.
+    struct PairingAdvert {
+        /// The port this iPhone advertises, nil when none was seen.
+        let port: UInt16?
+        /// What was seen, for the log.
+        let summary: String
+    }
+
+    /// Looks for the `_remotepairing._tcp` service this iPhone advertises: the
+    /// listener `tunnel_create_rppairing` dials. Its port is whatever the
+    /// listener got when it started. That's 49152 (`DeviceConnection.rsdPort`),
+    /// the first port iOS hands out, as long as nothing took it first, which
+    /// can't be counted on: on a Mac it's rapportd's. Other iPhones on the
+    /// network advertise the same service, so only one resolving to an address
+    /// this iPhone holds counts.
+    ///
+    /// Blocks for up to `timeout`. The browse runs on the main run loop, so
+    /// never call this on the main thread.
+    static func ownRemotePairingAdvert(timeout: TimeInterval = 3) -> PairingAdvert {
+        precondition(!Thread.isMainThread, "the browse needs the main run loop")
+        let finder = RemotePairingAdvertFinder(ownAddresses: ownAddresses())
+        DispatchQueue.main.async { finder.start() }
+        let advert = finder.wait(timeout: timeout)
+        DispatchQueue.main.async { finder.stop() }
+        return advert
+    }
+
+    /// Every address this iPhone holds, IPv4 and IPv6, without a scope suffix.
+    static func ownAddresses() -> Set<String> {
+        var result = Set<String>()
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddr) == 0, let first = ifaddr else { return result }
+        defer { freeifaddrs(ifaddr) }
+        var ptr: UnsafeMutablePointer<ifaddrs>? = first
+        while let cur = ptr {
+            defer { ptr = cur.pointee.ifa_next }
+            guard let addr = cur.pointee.ifa_addr,
+                  let host = numericHost(addr, length: socklen_t(addr.pointee.sa_len)) else { continue }
+            result.insert(host)
+        }
+        return result
+    }
+
+    /// `addr` as a numeric address, without a `%scope` suffix; nil for a
+    /// family other than IPv4 or IPv6.
+    static func numericHost(_ addr: UnsafePointer<sockaddr>, length: socklen_t) -> String? {
+        let family = Int32(addr.pointee.sa_family)
+        guard family == AF_INET || family == AF_INET6 else { return nil }
+        var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+        guard getnameinfo(addr, length, &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0
+        else { return nil }
+        return String(cString: host).split(separator: "%").first.map(String.init)
+    }
+}
+
+/// Browses `_remotepairing._tcp` and resolves each service found until one
+/// resolves to an address this iPhone holds. Used from the main thread, except
+/// `wait`.
+private final class RemotePairingAdvertFinder: NSObject, NetServiceBrowserDelegate, NetServiceDelegate {
+
+    private let ownAddresses: Set<String>
+    private let browser = NetServiceBrowser()
+    /// Held while they resolve, or they'd go away.
+    private var services: [NetService] = []
+    private var othersResolved = 0
+    private let lock = NSLock()
+    private var found: NetworkStatus.PairingAdvert?
+    private let done = DispatchSemaphore(value: 0)
+
+    init(ownAddresses: Set<String>) {
+        self.ownAddresses = ownAddresses
+    }
+
+    func start() {
+        browser.delegate = self
+        // Common modes, so a scroll doesn't hold the callbacks back.
+        browser.remove(from: .main, forMode: .default)
+        browser.schedule(in: .main, forMode: .common)
+        browser.searchForServices(ofType: "_remotepairing._tcp.", inDomain: "local.")
+    }
+
+    /// Their delegates are unretained, so they're cleared before this goes.
+    func stop() {
+        browser.delegate = nil
+        browser.stop()
+        for service in services {
+            service.delegate = nil
+            service.stop()
+        }
+        services.removeAll()
+    }
+
+    func wait(timeout: TimeInterval) -> NetworkStatus.PairingAdvert {
+        _ = done.wait(timeout: .now() + timeout)
+        lock.lock()
+        defer { lock.unlock() }
+        if let found { return found }
+        let others = othersResolved == 0 ? "" : " (\(othersResolved) from other devices)"
+        return NetworkStatus.PairingAdvert(
+            port: nil, summary: "none from this iPhone in \(Int(timeout)) s\(others)")
+    }
+
+    private func finish(_ advert: NetworkStatus.PairingAdvert) {
+        lock.lock()
+        let first = found == nil
+        if first { found = advert }
+        lock.unlock()
+        if first { done.signal() }
+    }
+
+    func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) {
+        services.append(service)
+        service.delegate = self
+        service.remove(from: .main, forMode: .default)
+        service.schedule(in: .main, forMode: .common)
+        service.resolve(withTimeout: 2)
+    }
+
+    func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: NSNumber]) {
+        // Without Local Network permission, or without the type in NSBonjourServices.
+        let code = errorDict[NetService.errorCode]?.intValue ?? 0
+        finish(NetworkStatus.PairingAdvert(port: nil, summary: "the browse failed (error \(code))"))
+    }
+
+    func netServiceDidResolveAddress(_ sender: NetService) {
+        let addresses: [String] = (sender.addresses ?? []).compactMap { data in
+            data.withUnsafeBytes { raw in
+                guard let base = raw.baseAddress, raw.count >= MemoryLayout<sockaddr>.size else { return nil }
+                return NetworkStatus.numericHost(base.assumingMemoryBound(to: sockaddr.self),
+                                                 length: socklen_t(raw.count))
+            }
+        }
+        guard sender.port > 0, addresses.contains(where: ownAddresses.contains) else {
+            if !addresses.isEmpty { lock.lock(); othersResolved += 1; lock.unlock() }
+            return
+        }
+        // Not the service's name, which can be the iPhone's.
+        finish(NetworkStatus.PairingAdvert(port: UInt16(sender.port),
+                                           summary: "port \(sender.port)"))
+    }
+}

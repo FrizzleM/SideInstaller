@@ -497,6 +497,10 @@ let japaneseStrings: [String: String] = [
     "Tunnel": "トンネル",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "%@:%d で接続が拒否されました。トンネルは通っていて、デバイスがペアリング用のポートで待ち受けていないだけです。このポートはデベロッパモードが有効なときだけ開き、再起動のたびに iOS が確認を求めます。「設定 › プライバシーとセキュリティ › デベロッパモード」で有効にしてから、もう一度お試しください。すでに有効な場合は、「ペアリングファイル」からこの iPhone をペアリングし直してください。",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
+        "%@:%d で接続が拒否されました。トンネルは通っていますが、デベロッパモードがオフのため、この iPhone がペアリング用のポートで待ち受けていません。「設定 › プライバシーとセキュリティ › デベロッパモード」でオンにしてから（iPhone が再起動します）、もう一度お試しください。",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
+        "%@:%d で接続が拒否されました。トンネルは通っていますが、デベロッパモードがオンなのに、この iPhone がペアリング用のポートで待ち受けていません。「ペアリングファイル」からこの iPhone をペアリングし直してから、もう一度お試しください。それでも失敗する場合は、iPhone を再起動してください。",
     "Start LocalDevVPN when needed": "必要なときに LocalDevVPN を開始",
     "Start LocalDevVPN now": "今すぐ LocalDevVPN を開始",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -1073,6 +1077,12 @@ let japaneseStrings: [String: String] = [
     "not connected": "未接続",
     "none": "なし",
     "made on this iPhone": "この iPhone で作成",
+    "Runs inside LiveContainer": "LiveContainer 内で実行",
+    "on": "オン",
+    "off": "オフ",
+    "unknown": "不明",
+    "yes": "はい",
+    "no": "いいえ",
     "latest": "最新",
     "custom server": "カスタムサーバー",
     "Auto, starts with %@": "自動、%@ から開始",
@@ -1093,8 +1103,14 @@ let japaneseStrings: [String: String] = [
     "Share the report": "レポートを共有",
     "Preview the report": "レポートをプレビュー",
     "Report": "レポート",
-    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
-        "レポートは「ファイル」›「この iPhone 内」› SideInstaller › Reports に保存されます。GitHub ではテキスト欄の下の “Paste, drop, or click to add files” で添付してから Issue を送信してください。",
+    "The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.":
+        "Issue は入力済みの状態で開きます。ログが長すぎて入力しきれないときは SideInstaller がログをコピーするので、Issue の末尾に貼り付けてください。レポート全体は %@ にも保存されます。",
+    "Files › On My iPhone": "「ファイル」›「この iPhone 内」",
+    "Copy the full log": "ログ全体をコピー",
+    "Paste the log into the issue": "ログを Issue に貼り付けてください",
+    "Open GitHub": "GitHub を開く",
+    "The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue.":
+        "ログ全体が長すぎて自動で入力できないため、SideInstaller がコピーしました。GitHub でテキストの末尾をタップし、「ペースト」を選んでから Issue を送信してください。",
     "Describe the problem above first.": "先に上で問題を説明してください。",
     "Couldn't save the report: %@": "レポートを保存できませんでした：%@",
 

@@ -604,6 +604,10 @@ let vietnameseStrings: [String: String] = [
     "Tunnel": "Đường hầm",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "Có thứ gì đó ở %@:%d đã từ chối kết nối, nghĩa là đường hầm vẫn thông — chỉ là thiết bị không lắng nghe trên cổng ghép nối của nó. Cổng đó chỉ mở khi bật Chế độ nhà phát triển, và iOS hỏi lại sau mỗi lần khởi động lại: hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển rồi thử lại. Nếu đã bật, hãy ghép nối lại iPhone này trong “Tệp ghép nối”.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
+        "Có thứ gì đó ở %@:%d đã từ chối kết nối, nghĩa là đường hầm vẫn thông, nhưng iPhone này không lắng nghe trên cổng ghép nối: Chế độ nhà phát triển đang tắt. Hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển (iPhone sẽ khởi động lại) rồi thử lại.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
+        "Có thứ gì đó ở %@:%d đã từ chối kết nối, nghĩa là đường hầm vẫn thông, nhưng iPhone này không lắng nghe trên cổng ghép nối dù Chế độ nhà phát triển đang bật. Hãy ghép nối lại iPhone này trong “Tệp ghép nối” rồi thử lại. Nếu vẫn lỗi, hãy khởi động lại iPhone.",
     "Start LocalDevVPN when needed": "Khởi động LocalDevVPN khi cần",
     "Start LocalDevVPN now": "Khởi động LocalDevVPN ngay",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -1099,6 +1103,12 @@ let vietnameseStrings: [String: String] = [
     "not connected": "chưa kết nối",
     "none": "không có",
     "made on this iPhone": "tạo trên iPhone này",
+    "Runs inside LiveContainer": "Chạy bên trong LiveContainer",
+    "on": "bật",
+    "off": "tắt",
+    "unknown": "không rõ",
+    "yes": "có",
+    "no": "không",
     "latest": "mới nhất",
     "custom server": "máy chủ tùy chỉnh",
     "Auto, starts with %@": "Tự động, bắt đầu với %@",
@@ -1119,8 +1129,14 @@ let vietnameseStrings: [String: String] = [
     "Share the report": "Chia sẻ báo cáo",
     "Preview the report": "Xem trước báo cáo",
     "Report": "Báo cáo",
-    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
-        "Báo cáo được lưu trong Tệp › Trên iPhone của tôi › SideInstaller › Reports. Trên GitHub, đính kèm bằng “Paste, drop, or click to add files” bên dưới ô văn bản, rồi gửi issue.",
+    "The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.":
+        "Issue mở ra với nội dung đã điền sẵn. Khi nhật ký quá dài để điền, SideInstaller sẽ sao chép nó để bạn dán vào cuối issue. Toàn bộ báo cáo cũng được lưu trong %@.",
+    "Files › On My iPhone": "Tệp › Trên iPhone của tôi",
+    "Copy the full log": "Sao chép toàn bộ nhật ký",
+    "Paste the log into the issue": "Dán nhật ký vào issue",
+    "Open GitHub": "Mở GitHub",
+    "The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue.":
+        "Nhật ký đầy đủ quá dài để điền sẵn, nên SideInstaller đã sao chép nó. Trên GitHub, chạm vào cuối văn bản, chọn Dán, rồi gửi issue.",
     "Describe the problem above first.": "Hãy mô tả sự cố ở trên trước.",
     "Couldn't save the report: %@": "Không thể lưu báo cáo: %@",
 
