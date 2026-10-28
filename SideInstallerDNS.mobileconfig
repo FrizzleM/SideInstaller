@@ -48,13 +48,13 @@
 			<key>PayloadDisplayName</key>
 			<string>SideInstaller</string>
 			<key>PayloadIdentifier</key>
-			<string>io.nextdns.73f83a.profile.dnsSettings.managed</string>
+			<string>net.sideinstaller.dns.settings</string>
 			<key>PayloadOrganization</key>
 			<string>SideInstaller</string>
 			<key>PayloadType</key>
 			<string>com.apple.dnsSettings.managed</string>
 			<key>PayloadUUID</key>
-			<string>A1E2F262-DB73-40F6-BD22-2E42A43A3C94.73f83a.dnsSettings.managed</string>
+			<string>D8287F31-5D4E-4422-AA21-DA34EE93486D</string>
 			<key>PayloadVersion</key>
 			<integer>1</integer>
 		</dict>
@@ -64,13 +64,13 @@
 	<key>PayloadDisplayName</key>
 	<string>SideInstaller</string>
 	<key>PayloadIdentifier</key>
-	<string>io.nextdns.73f83a.profile</string>
+	<string>net.sideinstaller.dns</string>
 	<key>PayloadScope</key>
 	<string>System</string>
 	<key>PayloadType</key>
 	<string>Configuration</string>
 	<key>PayloadUUID</key>
-	<string>A1E2F262-DB73-40F6-BD22-2E42A43A3C94.73f83a</string>
+	<string>8542A063-974B-44A7-9C27-E14A9C4DCF65</string>
 	<key>PayloadVersion</key>
 	<integer>1</integer>
 	<key>TargetDeviceType</key>
