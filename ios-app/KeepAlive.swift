@@ -11,6 +11,9 @@ final class KeepAlive: NSObject {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private var audioRunning = false
+    /// How many keep-alives play now. The pairing and a simulated location
+    /// share the app's one audio session, so only the last to stop lets it go.
+    private static var audioHolders = 0
 
     func startAudio() {
         guard !audioRunning else { return }
@@ -31,8 +34,10 @@ final class KeepAlive: NSObject {
             player.scheduleBuffer(buffer, at: nil, options: .loops)
             player.play()
             audioRunning = true
+            Self.audioHolders += 1
         } catch {
             audioRunning = false
+            if Self.audioHolders == 0 { Self.releaseSession() }
         }
     }
 
@@ -41,8 +46,17 @@ final class KeepAlive: NSObject {
         player.stop()
         engine.stop()
         engine.detach(player)
-        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
         audioRunning = false
+        Self.audioHolders -= 1
+        if Self.audioHolders == 0 { Self.releaseSession() }
+    }
+
+    /// Deactivates the session and puts it back in a category that Silent
+    /// Mode mutes: `.playback` would let `SoundEffects` play through it.
+    private static func releaseSession() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setActive(false, options: [.notifyOthersOnDeactivation])
+        try? session.setCategory(.ambient)
     }
 
     private lazy var location: CLLocationManager = {

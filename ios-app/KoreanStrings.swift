@@ -495,7 +495,6 @@ let koreanStrings: [String: String] = [
     "App language": "앱 언어",
     "Sounds": "사운드",
     "Sound effects": "효과음",
-    "Buttons, switches and messages make a short sound. Silent Mode mutes them.": "버튼, 스위치, 메시지에서 짧은 소리가 납니다. 무음 모드에서는 재생되지 않습니다.",
     "Auto": "자동",
     // The Tunnel section: starting LocalDevVPN from here.
     "Tunnel": "터널",

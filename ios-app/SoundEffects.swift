@@ -1,10 +1,13 @@
+import AVFAudio
 import AudioToolbox
 import SwiftUI
+import notify
 
 /// The app's sound effects. Each is drawn here in code, written out once per
 /// launch as a short WAV file and played as a system sound, so:
 ///
-/// - the silent switch (or Silent Mode) mutes them, like keyboard clicks;
+/// - Silent Mode mutes them, like keyboard clicks (see `silentModeAllows`
+///   for while `KeepAlive` runs);
 /// - they mix with whatever else is playing;
 /// - they leave the app's audio session alone, which `KeepAlive` holds with
 ///   silent audio while a run waits in the background.
@@ -40,12 +43,45 @@ enum SoundEffects {
         UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true
     }
 
-    /// Plays `sound`, unless sound effects are off.
+    /// Plays `sound`, unless sound effects are off or the iPhone is in
+    /// Silent Mode.
     static func play(_ sound: UISound) {
         guard isEnabled else { return }
         queue.async {
+            guard silentModeAllows() else { return }
             if let id = loadedIDs()[sound] { AudioServicesPlaySystemSound(id) }
         }
+    }
+
+    /// Whether Silent Mode lets a sound play. iOS mutes the app's system
+    /// sounds in Silent Mode only while its audio session category follows
+    /// Silent Mode, as the default and `.ambient` do. `.playback` doesn't, and
+    /// `KeepAlive` uses it while a pairing or a simulated location runs, so
+    /// then SpringBoard's ringer state decides.
+    private static func silentModeAllows() -> Bool {
+        switch AVAudioSession.sharedInstance().category {
+        case .ambient, .soloAmbient: return true
+        default: return ringerIsOn()
+        }
+    }
+
+    /// SpringBoard's ringer state; registered on `queue`, kept for good.
+    private static var ringerToken: Int32?
+
+    /// The ringer as SpringBoard last posted it: 1 when it's on, 0 in Silent
+    /// Mode. A state this app can't read also comes back 0, so in doubt this
+    /// stays quiet.
+    private static func ringerIsOn() -> Bool {
+        if ringerToken == nil {
+            var token: Int32 = 0
+            guard notify_register_check("com.apple.springboard.ringerstate", &token)
+                    == NOTIFY_STATUS_OK else { return false }
+            ringerToken = token
+        }
+        var state: UInt64 = 0
+        guard let token = ringerToken,
+              notify_get_state(token, &state) == NOTIFY_STATUS_OK else { return false }
+        return state != 0
     }
 
     /// Draws the sounds ahead of the first tap, off the main thread.

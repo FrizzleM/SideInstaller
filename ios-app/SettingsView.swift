@@ -204,8 +204,6 @@ struct SettingsView: View {
             Toggle(L("Sound effects"), isOn: $soundEffects)
         } header: {
             Text(L("Sounds"))
-        } footer: {
-            Text(L("Buttons, switches and messages make a short sound. Silent Mode mutes them."))
         }
     }
 

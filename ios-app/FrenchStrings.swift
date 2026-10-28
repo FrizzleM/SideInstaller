@@ -606,7 +606,6 @@ let frenchStrings: [String: String] = [
     "App language": "Langue de l'app",
     "Sounds": "Sons",
     "Sound effects": "Effets sonores",
-    "Buttons, switches and messages make a short sound. Silent Mode mutes them.": "Les boutons, interrupteurs et messages émettent un son bref. Le mode Silence les coupe.",
     "Auto": "Automatique",
     // The Tunnel section: starting LocalDevVPN from here.
     "Tunnel": "Tunnel",

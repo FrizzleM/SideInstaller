@@ -494,7 +494,6 @@ let japaneseStrings: [String: String] = [
     "App language": "アプリの言語",
     "Sounds": "サウンド",
     "Sound effects": "効果音",
-    "Buttons, switches and messages make a short sound. Silent Mode mutes them.": "ボタン、スイッチ、メッセージで短い音が鳴ります。消音モードでは鳴りません。",
     "Auto": "自動",
     // The Tunnel section: starting LocalDevVPN from here.
     "Tunnel": "トンネル",
