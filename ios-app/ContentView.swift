@@ -227,7 +227,7 @@ struct ContentView: View {
                             .padding(6)
                             .background(Circle().fill(.white.opacity(0.08)))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .dismiss)
                 }
                 Menu {
                     updateOptions
@@ -374,7 +374,7 @@ struct ContentView: View {
             .fieldBackground()
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain, sound: .tap)
         .disabled(engine.isImportingIPA)
     }
 
@@ -408,14 +408,14 @@ struct ContentView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.tertiary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tick)
                 }
                 Button(action: downloadFromLink) {
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.title3)
                         .foregroundStyle(linkIsUsable ? Theme.accent2 : Color.secondary.opacity(0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.plain, sound: .tap)
                 .disabled(!linkIsUsable)
             }
             .fieldBackground()
@@ -464,7 +464,7 @@ struct ContentView: View {
                         .padding(.vertical, 16)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(PressReportingButtonStyle(isPressed: $installPressed))
+                .buttonStyle(PressReportingButtonStyle(isPressed: $installPressed), sound: .press)
                 .transition(.surfaceSwap)
             }
         }
@@ -599,7 +599,7 @@ struct ContentView: View {
                 .fieldBackground()
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.plain, sound: .tap)
             .disabled(engine.isImportingPairing)
             Text(L("SideStore opens and sends back the pairing file it has."))
                 .font(.footnote)
@@ -620,7 +620,7 @@ struct ContentView: View {
             .font(.footnote.weight(.semibold))
             .foregroundStyle(Theme.accent2)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain, sound: .tick)
     }
 
     /// Import button, labelled with the imported file's name once one is in.
@@ -649,7 +649,7 @@ struct ContentView: View {
             .fieldBackground()
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain, sound: .tap)
         .disabled(engine.isImportingPairing)
     }
 
@@ -674,7 +674,7 @@ struct ContentView: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.plain, sound: .tick)
 
             if advancedExpanded {
                 VStack(alignment: .leading, spacing: 22) {
@@ -745,7 +745,7 @@ struct ContentView: View {
                     }
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.accent2)
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tap)
                 }
             }
         }
@@ -818,7 +818,7 @@ struct ContentView: View {
                             Label(label, systemImage: "arrow.up.right")
                                 .font(.footnote.weight(.semibold))
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.bordered, sound: .tap)
                         .controlSize(.small)
                         .tint(.red)
                         .padding(.top, 2)
@@ -879,7 +879,7 @@ struct ContentView: View {
                 .background(Circle().fill(.white.opacity(0.08)))
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain, sound: .tap)
         .disabled(engine.isCancelling)
         .opacity(engine.isCancelling ? 0.4 : 1)
         .accessibilityLabel(L("Cancel"))
@@ -906,7 +906,7 @@ struct ContentView: View {
             disclosureChevron(expanded: stepsExpanded)
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain, sound: .tick)
         .accessibilityLabel(stepsExpanded ? L("Show fewer steps") : L("Show all steps"))
     }
 
@@ -1053,7 +1053,7 @@ struct InstallPopup: View {
             Label(L("Report this problem"), systemImage: "exclamationmark.bubble")
                 .font(.subheadline.weight(.semibold))
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.bordered, sound: .tap)
         .tint(.red)
         if engine.guide == nil, !engine.certConflict, !ErrorHelp.isExplained(message) {
             CopyLogsButton()
@@ -1078,7 +1078,7 @@ struct InstallPopup: View {
                         Label(label, systemImage: "arrow.up.right")
                             .font(.subheadline.weight(.semibold))
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered, sound: .tap)
                     .tint(Theme.accent)
                 }
             }
@@ -1130,7 +1130,7 @@ struct InstallPopup: View {
                             .font(.subheadline.weight(.semibold))
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered, sound: .tap)
                     .tint(cost.isAffordable ? Color.secondary : .orange)
                 }
             }
@@ -1254,7 +1254,7 @@ struct InstallPopup: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered, sound: .tap)
             .tint(.secondary)
         }
     }
@@ -1327,7 +1327,7 @@ struct InstallPopup: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.bordered, sound: .tap)
                 .tint(.orange)
                 .disabled(certManager.isBusy)
                 // A failed load, revoke or import shows as the Certificates

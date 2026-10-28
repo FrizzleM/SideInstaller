@@ -1060,7 +1060,7 @@ struct SideBySideView: View {
                         focus = nil
                     }
                     .font(.subheadline.weight(.semibold))
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tap)
                     .foregroundStyle(Theme.accent)
                 }
             }
@@ -1139,7 +1139,7 @@ struct SideBySideView: View {
                     Button(L("Clear their details")) { manager.clear() }
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .buttonStyle(.plain)
+                        .buttonStyle(.plain, sound: .tap)
                     if manager.remembersTheirIPhone {
                         Text(L("This iPhone is still paired with theirs. Clearing forgets it."))
                             .font(.caption)

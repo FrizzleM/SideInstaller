@@ -24,6 +24,8 @@ struct SideInstallerApp: App {
         InstallActivity.shared.endLeftovers()
         // iOS hands over the last crash's diagnostic now, for Report a problem.
         CrashDiagnostics.shared.start()
+        // Drawn now so the first tap already has its sound.
+        SoundEffects.prepare()
     }
 
     var body: some Scene {
@@ -59,6 +61,8 @@ struct SideInstallerApp: App {
             }
             .animation(.smooth(duration: 0.5), value: hasAcceptedTOS)
             .animation(.smooth(duration: 0.5), value: hasCompletedAccountSetup)
+            // Every switch in the app clicks on and off.
+            .toggleStyle(SoundingToggleStyle())
             // Files opened in the app (share sheet, "Open with", other apps), as
             // an alternative to the document picker, and `sideinstaller://`
             // links, which ask before doing anything.

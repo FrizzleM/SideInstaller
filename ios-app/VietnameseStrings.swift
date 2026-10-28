@@ -599,6 +599,9 @@ let vietnameseStrings: [String: String] = [
     "Done": "Xong",
     "Language": "Ngôn ngữ",
     "App language": "Ngôn ngữ ứng dụng",
+    "Sounds": "Âm thanh",
+    "Sound effects": "Hiệu ứng âm thanh",
+    "Buttons, switches and messages make a short sound. Silent Mode mutes them.": "Nút, công tắc và thông báo phát ra một âm thanh ngắn. Chế độ Im lặng sẽ tắt chúng.",
     "Auto": "Tự động",
     // The Tunnel section: starting LocalDevVPN from here.
     "Tunnel": "Đường hầm",

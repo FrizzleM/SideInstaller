@@ -127,7 +127,7 @@ struct CertsView: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.bordered, sound: .tap)
                 .tint(Theme.accent)
                 .disabled(manager.isBusy)
             }
@@ -263,7 +263,7 @@ struct CertsView: View {
             .minimumScaleFactor(0.75)
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.bordered, sound: .tap)
         .tint(Theme.accent)
         .controlSize(.regular)
         .disabled(manager.isBusy)
@@ -288,7 +288,7 @@ struct CertsView: View {
             .minimumScaleFactor(0.75)
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.bordered, sound: .tap)
         .tint(.red)
         .controlSize(.regular)
         .disabled(manager.isBusy)

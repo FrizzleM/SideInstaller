@@ -109,7 +109,7 @@ struct AccountSetupView: View {
             Button(L("Set this up later")) { hasCompletedAccountSetup = true }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .buttonStyle(.plain)
+                .buttonStyle(.plain, sound: .tap)
         }
     }
 }
@@ -169,7 +169,7 @@ struct OfficialSourceCheck: View {
                     .padding(.vertical, 16)
                     .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(.white.opacity(0.08)))
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .press)
             }
         }
     }
@@ -204,7 +204,7 @@ struct OfficialSourceCheck: View {
                 Button(L("Back")) { unofficial = false }
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tap)
             }
 
             // Kept small and dim on purpose, and behind a confirmation, so
@@ -213,7 +213,7 @@ struct OfficialSourceCheck: View {
             Button(L("I understand the risks")) { confirmRisk = true }
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.3))
-                .buttonStyle(.plain)
+                .buttonStyle(.plain, sound: .tap)
                 .padding(.top, 24)
         }
         .alert(L("Use an unofficial copy?"), isPresented: $confirmRisk) {

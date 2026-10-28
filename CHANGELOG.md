@@ -10,6 +10,9 @@ All notable changes to SideInstaller are documented here.
   memory get it without a trip to Tools › Entitlements. SideStore and LiveContainer + SideStore
   are left as they were, because SideStore drops the capability when it renews their App IDs each
   week. If Apple refuses it, the app is signed without it.
+- **Sound effects.** Buttons, switches and messages make a short sound: a soft press for the main
+  buttons, clicks for switches, and their own sounds for success, errors and anything that needs
+  you, such as a pairing code. Silent Mode mutes them, and Settings › Sounds turns them off.
 
 ### Fixed
 - **Bug reports carry the whole log.** A GitHub link only holds a few thousand characters, so a

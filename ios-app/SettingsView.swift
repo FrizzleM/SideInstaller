@@ -41,6 +41,8 @@ struct SettingsView: View {
     @State private var confirmEnableDeveloperMode = false
     /// Set while the Report a problem sheet is up.
     @State private var showReport = false
+    /// Buttons, switches and messages make sounds; see `SoundEffects`.
+    @AppStorage(SoundEffects.enabledKey) private var soundEffects = true
 
     private struct DeveloperModeNote {
         let text: String
@@ -52,6 +54,7 @@ struct SettingsView: View {
             Form {
                 accountSection
                 languageSection
+                soundsSection
                 tunnelSection
                 developerModeSection
                 downloadsSection
@@ -114,7 +117,7 @@ struct SettingsView: View {
             ForEach(accounts.accounts) { account in
                 Button { accounts.activate(account) } label: { accountRow(account) }
                     // `.plain` keeps the row text from using the accent color.
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tick)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
                             pendingRemove = account
@@ -191,6 +194,18 @@ struct SettingsView: View {
             }
         } header: {
             Text(L("Language"))
+        }
+    }
+
+    // MARK: Sounds
+
+    private var soundsSection: some View {
+        Section {
+            Toggle(L("Sound effects"), isOn: $soundEffects)
+        } header: {
+            Text(L("Sounds"))
+        } footer: {
+            Text(L("Buttons, switches and messages make a short sound. Silent Mode mutes them."))
         }
     }
 
@@ -282,10 +297,12 @@ struct SettingsView: View {
                     text = L("Developer Mode is set to turn on, and this iPhone restarts now. Once you unlock it, tap Turn On.")
                 }
                 developerModeNote = DeveloperModeNote(text: text, failed: false)
+                SoundEffects.play(.success)
             } catch {
                 developerModeNote = DeveloperModeNote(
                     text: (error as? LocalizedError)?.errorDescription ?? String(describing: error),
                     failed: true)
+                SoundEffects.play(.error)
             }
             developerModeBusy = false
         }

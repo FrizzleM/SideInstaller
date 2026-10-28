@@ -500,7 +500,7 @@ struct EntitlementsView: View {
                     } label: {
                         appRow(app)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tick)
                     .cascadeItem(3 + idx)
                 }
             }
@@ -596,15 +596,15 @@ private struct EntitlementPicker: View {
                     .foregroundStyle(.secondary)
                 HStack(spacing: 10) {
                     Button(L("Recommended")) { selected = Entitlement.recommendedIDs }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.bordered, sound: .tap)
                         .controlSize(.small)
                         .tint(Theme.accent)
                     Button(L("Select all")) { selected = Set(Entitlement.all.map(\.id)) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.bordered, sound: .tap)
                         .controlSize(.small)
                         .tint(Theme.accent)
                     Button(L("None")) { selected = [] }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.bordered, sound: .tap)
                         .controlSize(.small)
                         .tint(.secondary)
                 }
@@ -664,7 +664,7 @@ private struct EntitlementPicker: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain, sound: selected.contains(entitlement.id) ? .fall : .rise)
     }
 
     private var applyBar: some View {

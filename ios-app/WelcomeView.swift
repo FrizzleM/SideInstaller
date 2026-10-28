@@ -100,7 +100,7 @@ struct WelcomeView: View {
                         .foregroundStyle(.white.opacity(0.9))
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.plain, sound: accepted ? .fall : .rise)
             // A tickbox to assistive tech, with an on/off value, not a button.
             .accessibilityRepresentation {
                 Toggle(L("I have accepted the") + " TOS",

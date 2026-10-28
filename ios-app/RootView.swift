@@ -76,7 +76,7 @@ struct RootView: View {
 
     var body: some View {
         // `.tabItem`/`.tag` rather than iOS 18's `Tab`, to keep iOS 17.
-        TabView(selection: $page) {
+        TabView(selection: tabSelection) {
             ContentView()
                 .tabItem { Label(L("Install"), systemImage: "square.and.arrow.down") }
                 .tag(Page.install)
@@ -110,6 +110,9 @@ struct RootView: View {
         .popupStack(entries, onBackdropTap: backdropTap) { entry in
             card(for: entry)
         }
+        .onChange(of: popups) { old, new in
+            playSound(forShown: new.filter { !old.contains($0) })
+        }
         // The Install tab's revoke-and-retry runs through this same manager
         // (declared below the popups, which use it too).
         .environmentObject(certManager)
@@ -132,9 +135,26 @@ struct RootView: View {
                 TwoFactorSheet(phase: phase)
             }
         }
-        .onChange(of: engine.twoFactor) { _, phase in
+        .onChange(of: engine.twoFactor) { old, phase in
             if let phase { shownTwoFactor = phase }
+            // A code is wanted, or the one entered was turned down.
+            if case .asking(let prompt) = phase {
+                if old == nil {
+                    SoundEffects.play(.attention)
+                } else if case .working = old, prompt.lastError != nil {
+                    SoundEffects.play(.error)
+                }
+            }
         }
+    }
+
+    /// The tab selection, ticking as the user changes tab.
+    private var tabSelection: Binding<Page> {
+        Binding(get: { page },
+                set: { newPage in
+                    if newPage != page { SoundEffects.play(.tick) }
+                    page = newPage
+                })
     }
 
     // MARK: Popups
@@ -160,7 +180,43 @@ struct RootView: View {
     private var backdropTap: (() -> Void)? {
         let closable = popups.filter { !blocks($0) }
         guard !closable.isEmpty else { return nil }
-        return { closable.forEach(close) }
+        return {
+            SoundEffects.play(.dismiss)
+            closable.forEach(close)
+        }
+    }
+
+    /// Plays the sound for popups that just came up: an error over a success
+    /// over a request for the user, when several come up at once.
+    private func playSound(forShown items: [PopupItem]) {
+        let sounds = Set(items.compactMap(sound(for:)))
+        if let sound = [UISound.error, .success, .attention].first(where: sounds.contains) {
+            SoundEffects.play(sound)
+        }
+    }
+
+    /// What a popup sounds like as it comes up, if anything.
+    private func sound(for item: PopupItem) -> UISound? {
+        switch item {
+        case .install(.error), .install(.certConflict), .sideBySide(.error), .pairing(.error),
+             .certificates(.error), .entitlements(.error), .location(.error), .apps(.error):
+            .error
+        case .install(.success), .sideBySide(.success), .pairing(.success),
+             .certificates(.success), .location(.success), .apps(.success):
+            .success
+        // Apple granting nothing it was asked for is a failure.
+        case .entitlements(.results(_, let outcomes)):
+            outcomes.contains(where: \.ok) ? .success : .error
+        // A guide that comes up mid-run is what the run waits on; after one,
+        // it comes with the error or the success, which speak for it.
+        case .install(.guide):
+            engine.isRunning ? .attention : nil
+        // Waiting on the user: a code to type, steps to follow, a go-ahead.
+        case .install(.pairingCode), .install(.liveContainerImport), .install(.appIDCost),
+             .install(.link), .sideBySide(.pairingCode), .sideBySide(.pairInSettings),
+             .pairing(.pairingCode), .pairing(.pairInSettings):
+            .attention
+        }
     }
 
     /// True when a run is waiting on the popup, so closing it stops the run.
@@ -486,7 +542,7 @@ struct ToolsView: View {
                                 title: L("Side by Side"),
                                 beta: true)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tick)
                     .cascadeItem(1)
                     // The Pairing page generates a pairing file on-device, which
                     // needs iOS 27+. Older iOS imports it on the Install screen.
@@ -496,7 +552,7 @@ struct ToolsView: View {
                         } label: {
                             ToolRow(image: "PairingLogo", title: L("Pairing"))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.plain, sound: .tick)
                         .cascadeItem(2)
                     }
                     NavigationLink {
@@ -504,28 +560,28 @@ struct ToolsView: View {
                     } label: {
                         ToolRow(image: "CertsLogo", title: L("Certificates"))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tick)
                     .cascadeItem(rowIndex(2))
                     NavigationLink {
                         EntitlementsView(manager: entitlementsManager)
                     } label: {
                         ToolRow(image: "EntitlementsLogo", title: L("Entitlements"))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tick)
                     .cascadeItem(rowIndex(3))
                     NavigationLink {
                         LocationView(manager: locationManager)
                     } label: {
                         ToolRow(image: "LocationLogo", title: L("Location spoofing"))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tick)
                     .cascadeItem(rowIndex(4))
                     NavigationLink {
                         AppsView(manager: appsManager)
                     } label: {
                         ToolRow(image: "AppsLogo", title: L("Sideloaded apps"))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tick)
                     .cascadeItem(rowIndex(5))
                 }
                 // No bottom padding: the tab bar's inset already clears the last

@@ -579,6 +579,9 @@ let chineseStrings: [String: String] = [
     "Done": "完成",
     "Language": "语言",
     "App language": "应用语言",
+    "Sounds": "声音",
+    "Sound effects": "音效",
+    "Buttons, switches and messages make a short sound. Silent Mode mutes them.": "按钮、开关和消息会发出简短的声音。静音模式下不会播放。",
     "Auto": "自动",
     // The Tunnel section: starting LocalDevVPN from here.
     "Tunnel": "隧道",
