@@ -2,7 +2,7 @@
 
 All notable changes to SideInstaller are documented here.
 
-## Unreleased
+## 1.6.2
 
 ### Added
 - **Apps get Increased Memory Limit.** As iLoader 2.4.1 does, SideInstaller now turns on this
