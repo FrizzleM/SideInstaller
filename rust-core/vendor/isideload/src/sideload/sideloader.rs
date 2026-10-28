@@ -21,7 +21,49 @@ use std::path::PathBuf;
 use futures_util::future::{try_join, try_join3, try_join_all};
 use idevice::provider::IdeviceProvider;
 use rootcause::{option_ext::OptionExt, prelude::*};
-use tracing::info;
+use tracing::{info, warn};
+
+/// Whether [`Sideloader::sign_app`] enables the Increased Memory Limit
+/// capability on the app's App IDs before the profile is requested. The
+/// profile then grants `com.apple.developer.kernel.increased-memory-limit`, and
+/// the app is signed with it, which raises the memory iOS lets it use.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MemoryLimit {
+    /// Leave the App IDs as they are.
+    Off,
+    /// Enable it, and fail if Apple refuses: the app needs it (Madeira).
+    Required,
+    /// Enable it unless the app is an app store that refreshes itself (see
+    /// `renews_own_app_id`); if Apple refuses, sign without it.
+    Preferred,
+}
+
+impl MemoryLimit {
+    /// The mode to use for an app that is `special`.
+    fn for_app(self, special: Option<&SpecialApp>) -> MemoryLimit {
+        match (self, special) {
+            (MemoryLimit::Preferred, Some(app)) if renews_own_app_id(app) => MemoryLimit::Off,
+            (limit, _) => limit,
+        }
+    }
+}
+
+/// Whether `app` is an app store that refreshes itself. Once Apple expires its
+/// App ID (7 days after it was registered, on a free team), it registers a new
+/// one and refreshes by installing that App ID's profiles, without signing
+/// itself again. LiveContainer on its own is refreshed by whatever installed it.
+///
+/// SideStore doesn't enable Increased Memory Limit on the App ID it registers
+/// for a free team: SideSign's `Feature.freeFeatures` is App Groups and
+/// Inter-App Audio only (SideStore issue #1616; the fix, SideSign PR #4, was
+/// still unmerged on 2026-10-28, and SideStore's `develop` pins SideSign
+/// 752d1ef). A SideStore signed with the entitlement, or a LiveContainer it
+/// lives in, would then get profiles that grant less than its signature claims.
+/// AltStore enables it again (AltSign b2c8861), and StikStore wasn't checked;
+/// none of them needs the memory, so all four are left alone.
+fn renews_own_app_id(app: &SpecialApp) -> bool {
+    !matches!(app, SpecialApp::LiveContainer)
+}
 
 pub struct Sideloader {
     team_selection: TeamSelection,
@@ -64,6 +106,8 @@ impl Sideloader {
 
     /// Sign the app at the provided path and return the path to the signed app bundle (in a temp dir). To sign and install, see [`Self::install_app`].
     ///
+    /// `memory_limit` says whether the App IDs get Increased Memory Limit
+    /// first (see [`MemoryLimit`]).
     /// `register_device` is a device's (name, UDID) to register with the team
     /// first, since the provisioning profile only covers registered devices.
     /// `pairing_file` is that device's RPPairing record, which goes encrypted
@@ -76,8 +120,7 @@ impl Sideloader {
         &mut self,
         app_path: PathBuf,
         team: Option<DeveloperTeam>,
-        // this will be replaced with proper entitlement handling later
-        increased_memory_limit: bool,
+        memory_limit: MemoryLimit,
         app_group: bool,
         register_device: Option<(&str, &str)>,
         pairing_file: Option<&[u8]>,
@@ -132,6 +175,13 @@ impl Sideloader {
                 .await
                 .map_err(|e| report!("Failed to open application archive: {e}"))??;
             let special = app.get_special_app();
+            let wanted_memory_limit = memory_limit;
+            let memory_limit = wanted_memory_limit.for_app(special.as_ref());
+            if memory_limit != wanted_memory_limit
+                && let Some(special) = &special
+            {
+                info!("Leaving Increased Memory Limit off: {special} renews its own App ID");
+            }
 
             let main_bundle_id = app.main_bundle_id()?;
             let main_app_name = app.main_app_name()?;
@@ -183,8 +233,17 @@ impl Sideloader {
                             .assign_app_group(team, app_group, app_id, None)
                             .await?;
                     }
-                    if increased_memory_limit {
-                        session.add_increased_memory_limit(team, app_id).await?;
+                    if memory_limit != MemoryLimit::Off {
+                        match session.add_increased_memory_limit(team, app_id).await {
+                            Ok(()) => {
+                                info!("Increased Memory Limit enabled for {}", app_id.identifier)
+                            }
+                            Err(e) if memory_limit == MemoryLimit::Preferred => warn!(
+                                "Couldn't enable Increased Memory Limit for {}, signing without it: {e}",
+                                app_id.identifier
+                            ),
+                            Err(e) => return Err(e),
+                        }
                     }
                     Ok::<(), Report>(())
                 }
@@ -251,14 +310,13 @@ impl Sideloader {
     }
 
     #[cfg(feature = "install")]
-    /// Sign and install an app to a device. `pairing_file` is as for
-    /// [`Self::sign_app`].
+    /// Sign and install an app to a device. `memory_limit` and `pairing_file`
+    /// are as for [`Self::sign_app`].
     pub async fn install_app(
         &mut self,
         device_provider: &impl IdeviceProvider,
         app_path: PathBuf,
-        // this is gross but will be replaced with proper entitlement handling later
-        increased_memory_limit: bool,
+        memory_limit: MemoryLimit,
         pairing_file: Option<&[u8]>,
     ) -> Result<Option<SpecialApp>, Report> {
         let device_info = IdeviceInfo::from_device(device_provider).await?;
@@ -268,7 +326,7 @@ impl Sideloader {
             .sign_app(
                 app_path,
                 Some(team),
-                increased_memory_limit,
+                memory_limit,
                 true,
                 Some((&device_info.name, &device_info.udid)),
                 pairing_file,
@@ -340,5 +398,31 @@ impl Sideloader {
 
     pub fn get_email(&self) -> &str {
         &self.apple_email
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MemoryLimit, SpecialApp};
+
+    #[test]
+    fn memory_limit_leaves_out_the_app_stores_that_refresh_themselves() {
+        use MemoryLimit::{Off, Preferred, Required};
+        let stores = [
+            SpecialApp::SideStore,
+            SpecialApp::SideStoreLc,
+            SpecialApp::AltStore,
+            SpecialApp::StikStore,
+        ];
+        for store in &stores {
+            assert_eq!(Preferred.for_app(Some(store)), Off, "{store}");
+            // An app that needs it gets it, whatever it is.
+            assert_eq!(Required.for_app(Some(store)), Required, "{store}");
+            assert_eq!(Off.for_app(Some(store)), Off, "{store}");
+        }
+        assert_eq!(Preferred.for_app(Some(&SpecialApp::LiveContainer)), Preferred);
+        for limit in [Off, Required, Preferred] {
+            assert_eq!(limit.for_app(None), limit);
+        }
     }
 }

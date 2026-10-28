@@ -4,6 +4,13 @@ All notable changes to SideInstaller are documented here.
 
 ## Unreleased
 
+### Added
+- **Apps get Increased Memory Limit.** As iLoader 2.4.1 does, SideInstaller now turns on this
+  capability for an app's App ID when it signs the app, so emulators and other apps that need more
+  memory get it without a trip to Tools › Entitlements. SideStore and LiveContainer + SideStore
+  are left as they were, because SideStore drops the capability when it renews their App IDs each
+  week. If Apple refuses it, the app is signed without it.
+
 ### Fixed
 - **Bug reports carry the whole log.** A GitHub link only holds a few thousand characters, so a
   report's issue got the last lines of the log at most and asked for the report file to be

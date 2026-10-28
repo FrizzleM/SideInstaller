@@ -546,7 +546,7 @@ stays, next to the pairing activity.
   callback (`SITwoFactorCb`).
 - `si_sign_ipa(session, ipa, udid, device_name, …)` — first calls
   `DeveloperSession::ensure_device_registered(team, name, udid)` so the team has
-  the connected device, then `Sideloader::sign_app(ipa, None, false)` → signed
+  the connected device, then `Sideloader::sign_app(ipa, None, memory_limit, …)` → signed
   `.app` bundle path. sign_app internally registers the App ID + provisioning
   profile and retrieves/creates the dev certificate, then signs with
   `apple-codesign`. **Device registration is mandatory here:** we use the
@@ -606,6 +606,17 @@ stays, next to the pairing activity.
   `Frameworks/SideStoreApp.framework/SideStore`, where `build_github.sh` moves
   and dylibifies `SideStore.app`. When the check can't run, it errs towards not
   writing the file.
+
+**Increased Memory Limit (since iLoader 2.4.1 does it):** the Install tab and
+the Apps tab's refresh pass `si_sign_ipa` a `memory_limit` of 2, so isideload
+enables that capability on the App ID before the profile is requested and the
+app is signed with `com.apple.developer.kernel.increased-memory-limit`. If Apple
+refuses, the app is signed without it. SideStore, LiveContainer+SideStore,
+AltStore and StikStore are left out: they refresh themselves, and the App ID
+SideStore registers each week doesn't get the capability on a free team
+(SideStore issue #1616), so their next profiles would grant less than they're
+signed with. Madeira passes 1 (required), Side by Side 0. See the vendored
+isideload README, change 13.
 
 **idevice version coexistence:** isideload pulls idevice **0.1.61** (crates.io,
 behind its `install` feature, which is required because its feature-gating is
@@ -1076,9 +1087,10 @@ so the channel picker is hidden and `Engine.selectedChannel` is always stable.
 needs.
 
 **Signing.** Madeira isn't ready to play without
-`com.apple.developer.kernel.increased-memory-limit`. `si_sign_ipa` takes a flag
-that has isideload enable that capability on the app's App IDs before the profile
-is requested (`Engine.isMadeira` also catches a Madeira IPA imported as custom, or
+`com.apple.developer.kernel.increased-memory-limit`. For it `si_sign_ipa` gets a
+`memory_limit` of 1: isideload enables that capability on the app's App IDs
+before the profile is requested, and signing fails if Apple refuses (other apps
+get 2, which signs without it then) (`Engine.isMadeira` also catches a Madeira IPA imported as custom, or
 refreshed from Documents, by its bundle id: `com.willfaust.madeora` or any id under
 it, such as the `.test` one of a local development build). Its `MadeiraJITHelper.appex` is signed like every
 extension here, with the main app's profile and entitlements, and renamed with the

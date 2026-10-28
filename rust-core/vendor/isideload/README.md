@@ -376,6 +376,18 @@ took it and `init` answered -20970, and ani.sidestore.io was skipped with
 as SideStore's Mac (which second factor Apple picks, the token), and the 2FA
 fallbacks.
 
+iLoader 2.4.1 (`d319ce7`, isideload 0.5.2, 2026-10-28) does the same "while
+waiting for the anisette servers to update", to fix SMS 2FA's 403, with one
+fixed client for every server through isideload 0.5.1's
+`set_client_info_override` (`20b06c7`):
+`<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>`,
+user agent `akd/1.0 CFNetwork/811.5.4`. isideload 0.5.2 (`326e562`) then asks
+for the URL bag as that client instead of as a Mac; this crate already asks as
+the client and falls back to the Mac only for an incomplete bag. Not ported:
+`client_info_to_use` replaces only a Mac older than macOS 10.13, so a server
+that starts naming a current one is taken as it is. All six macOS servers
+still named the Sierra Mac on 2026-10-28.
+
 **3. `src/auth/apple_account.rs`, `builder.rs`, `grandslam.rs` — let the user
 choose how the 2FA code arrives.**
 
@@ -612,7 +624,47 @@ else to choose here. `si_appid_quota` (`rust-core/src/account.rs`) counts the
 main App ID alone to match. App IDs registered for extensions before stay on the
 team until they expire.
 
+**13. `src/sideload/sideloader.rs` — Increased Memory Limit for every app but
+the app stores that refresh themselves (iLoader 2.4.1).**
+
+iLoader 2.4.1 (`d319ce7`, 2026-10-28) passes `true` for `install_app`'s
+`increased_memory_limit`, so every App ID it signs for gets that capability
+("no need for GetMoreRam"). Here the bool is a `MemoryLimit`: `Off`,
+`Required` (signing fails if Apple refuses; Madeira) and `Preferred`, which the
+Install tab and the Apps tab's refresh use (`si_sign_ipa`'s 2). `Preferred`
+leaves out SideStore, LiveContainer+SideStore, AltStore and StikStore, and when
+Apple refuses, it logs that and signs without the capability. Since `sign` uses
+the profile's entitlements, the capability puts
+`com.apple.developer.kernel.increased-memory-limit` into the signature.
+
+Why the app stores are left out: they refresh themselves. Once Apple expires a
+free team's App ID (7 days after it was registered), SideStore registers a new
+one and refreshes by installing that App ID's profiles, without signing itself
+again (`RefreshAppOperation`). On a free team that new App ID never gets the
+capability: SideSign's `Feature.freeFeatures` is App Groups and Inter-App Audio
+only, and SideSign sends no `bundleIdCapabilities` request (SideStore issue
+#1616, open; the fix, SideSign PR #4, unmerged on 2026-10-28, and SideStore's
+`develop` pins SideSign `752d1ef`). A SideStore signed with the entitlement, or
+a LiveContainer it lives in, would then only get profiles that grant less than
+its signature claims, which is what change 10 avoids for Madeira's app group.
+How iOS treats that wasn't tried here. AltStore enables the capability again
+for an app whose entitlements have it (AltSign `b2c8861`, 2025-03), and
+StikStore wasn't checked; none of the four needs the memory.
+
+Apps SideInstaller refreshes are signed again every time, so a new App ID gets
+the capability again then. The cost is one more request per App ID per sign:
+upstream's `add_increased_memory_limit`, the request GetMoreRam and AltSign
+send, which Madeira's signing already used. A free Apple ID's run reported in
+SideInstaller PR #79 (iOS 27.0.1, 2026-10-15) got both the app group and the
+capability on one App ID, so the request doesn't drop the group. Tests:
+`cargo test -p isideload --lib sideloader`. Not tested: a sign with an Apple
+ID.
+
 ## Re-vendoring
+
+Upstream's `sign_app` and `install_app` take `increased_memory_limit: bool`, and
+iLoader 2.4.1 passes `true` for every app. A re-vendor has to keep change 13's
+`MemoryLimit`, or SideStore gets the capability too.
 
 Upstream fixed change 1 its own way in `baca89d` (per-extension profiles). Since
 isideload 0.5.0 (`fc7a81a`) it can also do what change 1 and change 12 do:

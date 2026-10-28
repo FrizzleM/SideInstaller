@@ -1989,10 +1989,17 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// `forMadeira` signs the way Madeira needs: with Increased Memory Limit
-    /// enabled on its App IDs before the profile is requested, and without an
-    /// app group. Madeira renews its own profile and registers its App ID again
-    /// when it runs out; it can restore the first on a new App ID, not the second.
+    /// Every app gets Increased Memory Limit on its App ID before the profile is
+    /// requested, as iLoader 2.4.1 does, unless it's an app store that refreshes
+    /// itself, such as SideStore and LiveContainer + SideStore: SideStore registers
+    /// their App IDs again each week without it, so their next profiles would grant
+    /// less than they're signed with (isideload's `MemoryLimit`). A refusal from
+    /// Apple only leaves it out.
+    ///
+    /// `forMadeira` signs the way Madeira needs: with that capability required,
+    /// and without an app group. Madeira renews its own profile and registers
+    /// its App ID again when it runs out; it can restore the first on a new App
+    /// ID, not the second.
     private func performSign(session: OpaquePointer, ipa: String, udid: String, deviceName: String,
                              pairingFilePath: String, forMadeira: Bool) throws -> String {
         log("Signing \(ipa) …")
@@ -2001,8 +2008,9 @@ final class Engine: ObservableObject {
         }
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
+        // Memory limit: 1 = required, 2 = where it's safe (see sideinstaller.h).
         let rc = si_sign_ipa(session, ipa, udid, deviceName, pairingFilePath,
-                             forMadeira ? 1 : 0, forMadeira ? 0 : 1, &signed, &error)
+                             forMadeira ? 1 : 2, forMadeira ? 0 : 1, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
             signed.map { si_string_free($0) }
