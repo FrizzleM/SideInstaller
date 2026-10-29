@@ -1067,6 +1067,46 @@ Mode text (the simulator reads the Mac's sysctl, 1) all behaved. Never run on an
 iPhone: whether its own advert is seen from inside the app, whether the sysctl
 can be read there, and whether either report's iPhone had moved its port.
 
+## Resuming downloads
+
+Every IPA download from GitHub — SideStore, LiveContainer + SideStore, the
+LiveContainer mirror copy, a version picked under Advanced, Madeira's Actions
+build — goes through `SideStoreDownloader.fetch`, which runs `ResumingDownload`
+(since 2026-10-29; before, a single `URLSession.download` that started over on
+any failure, retried twice by `perform`). Pasted links (`fetchDirect`) don't.
+
+- One data task per attempt writes straight to a temp file. The start link
+  (`github.com/<repo>/releases/download/…` or nightly.link) redirects to a
+  signed storage URL (`response.url`), and a later attempt asks that URL for
+  `Range: bytes=<saved>-`. When it refuses (expired), the next attempt goes back
+  to the start link, the Range carried through the redirects, without a pause.
+- The rest must be of the same file. A 206 has to start at the saved byte and
+  carry the ETag the file began with; otherwise, and for a 200 or a 416, the
+  saved part is dropped and the file starts over. `If-Range` is sent too, but
+  GitHub's release storage ignores it: given a stale ETag it still answered
+  206 (checked 2026-10-29), so the ETag comparison is what catches a nightly
+  replaced mid-download.
+- Until something has answered, it behaves as the download always did: a 60 s
+  request timeout, a timeout fails at once (where GitHub is blocked, more waits
+  would only multiply it), and a dropped or refused connection or a 5xx is
+  tried again after 1 and 3 s. Once the file is arriving, the idle timeout is
+  30 s and attempts in a row that get no new byte pause 2, 4, 8 and 15 s, then
+  give up with the last error. An attempt that got new bytes pauses 1 s.
+- A refusal that says when to come back (Retry-After, or GitHub's rate-limit
+  headers) is passed on, not retried, as before. A 4xx from the start link (a
+  missing asset: the API fallback takes over) fails at once, as does a TLS
+  failure or any error `passing` doesn't list.
+- The ETag ends up in the ledger, as before, so `unchangedDownload` still skips
+  a file GitHub serves unchanged. The log's "HTTP 200 for … — N bytes, release
+  …" line says 206 and "resumed n×" after a resume.
+
+Release storage (`release-assets.githubusercontent.com`) answers Range through
+both redirects with the asset's ETag; its links carried an expiry about 50
+minutes out. Tested against a local server that drops, stalls, expires links
+after one use, ignores or misplaces the Range, swaps the file's ETag, refuses
+with 503 or 429 + Retry-After, never answers, or isn't there; and live against
+SideStore, LiveContainer + SideStore and the mirror.
+
 ## Madeira
 
 [Madeira](https://github.com/willfaust/Madeira) (Windows PC games through Wine and
@@ -1109,19 +1149,10 @@ the prefetch during pairing and sign-in hides part of it. Artifacts expire after
 
 **Resuming.** A second run that evening crawled at 0.13 MB/s, then went
 silent and failed on URLSession's 60 s idle timeout with half the file there.
-So the zip comes through `fetchResuming` (`ResumingDownload`), not `fetch`: a
-data task per attempt writing straight to the file, with a 30 s idle timeout. A
-stall or a dropped connection carries on with `Range: bytes=<saved>-` from the
-storage URL nightly.link redirected to (`response.url`). That URL is a signed
-Azure link valid for ten minutes (`st`…`se`), and once expired it answers 403
-(checked on the real one), so a refusal from it goes straight back to
-nightly.link for a new link, the Range carried through the redirect. A 200 to a
-Range request starts the file over; a 206 that starts elsewhere, or a 416, drops
-what was saved and starts over. Five attempts in a row without a new byte
-(pauses 2, 4, 8, 15 s) give up with the last error, as does nightly.link
-refusing with a 4xx (an artifact that's gone), a TLS failure, or anything
-`passing` doesn't list. Only the Actions download uses it so far; release
-downloads still go through `fetch`.
+Every download now resumes: see "Resuming downloads" below. For the artifact,
+nightly.link's storage link is valid for ten minutes (`st`…`se`) and answers 403
+once expired (checked on the real one), which sends the download back to
+nightly.link for a new one.
 
 Advanced lists the `main` builds from that same API call, one per commit,
 labelled with the short commit and build date ("e96065a · 28 Oct 2026"); a picked

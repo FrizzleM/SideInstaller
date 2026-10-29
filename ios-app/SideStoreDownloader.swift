@@ -749,28 +749,24 @@ enum SideStoreDownloader {
     }
 
     /// Download one URL to a temporary file, if the response isn't a refusal.
+    ///
+    /// The IPA is tens or hundreds of megabytes, so a transfer that stalls or
+    /// drops carries on from the bytes already saved (`ResumingDownload`).
     private static func fetch(_ url: URL, named name: String, from channel: ReleaseChannel,
+                              idleTimeout: TimeInterval = 30,
                               log: @escaping (String) -> Void) async throws -> Fetched {
-        var req = URLRequest(url: url)
-        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
-        let redirects = ReleaseTagRecorder()
-
         log("Downloading \(name) …")
-        let (file, response) = try await perform(log: log) {
-            try await URLSession.shared.download(for: req, delegate: redirects)
-        }
+        let download = ResumingDownload(from: url, name: name, idleTimeout: idleTimeout, log: log)
         do {
-            // No body to quote: the download host refuses in plain text, not JSON.
-            try check(response)
+            let file = try await download.run()
+            let tag = download.tag.map { ", release \($0)" } ?? ""
+            let resumed = download.resumes > 0 ? ", resumed \(download.resumes)×" : ""
+            log("HTTP \(download.status) for \(name) — \(download.written) bytes\(tag)\(resumed)")
+            return Fetched(file: file, name: name, channel: channel, etag: download.etag)
         } catch {
-            try? FileManager.default.removeItem(at: file)
+            try? FileManager.default.removeItem(at: download.file)
             throw error
         }
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        let tag = redirects.tag.map { ", release \($0)" } ?? ""
-        log("HTTP \(status) for \(name) — \(response.expectedContentLength) bytes\(tag)")
-        return Fetched(file: file, name: name, channel: channel,
-                       etag: (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "ETag"))
     }
 
     /// Downloads a pasted link into its own temp directory, saved as `name`.
@@ -1042,7 +1038,7 @@ enum SideStoreDownloader {
 
         let fetched: Fetched
         do {
-            fetched = try await fetchResuming(build.assetURL, named: build.assetName, log: log)
+            fetched = try await fetch(build.assetURL, named: build.assetName, from: .stable, log: log)
         } catch DownloadError.badStatus(let status, _, _) {
             throw DownloadError.relayFailed(source.displayName, detail: "HTTP \(status)")
         } catch DownloadError.unreachable(let error) {
@@ -1061,23 +1057,6 @@ enum SideStoreDownloader {
             throw DownloadError.notAnIPA(build.assetName)
         }
         try store(Fetched(file: ipa, name: member, channel: .stable, etag: expected), as: dest)
-    }
-
-    /// `fetch` for a file large enough that its transfer may stall: a stalled
-    /// or dropped connection carries on from the bytes already saved. Throws
-    /// what `fetch` throws.
-    private static func fetchResuming(_ url: URL, named name: String, idleTimeout: TimeInterval = 30,
-                              log: @escaping (String) -> Void) async throws -> Fetched {
-        log("Downloading \(name) …")
-        let download = ResumingDownload(from: url, name: name, idleTimeout: idleTimeout, log: log)
-        do {
-            let file = try await download.run()
-            log("\(name): \(download.written) bytes\(download.resumes > 0 ? ", resumed \(download.resumes)×" : "")")
-            return Fetched(file: file, name: name, channel: .stable, etag: nil)
-        } catch {
-            try? FileManager.default.removeItem(at: download.file)
-            throw error
-        }
     }
 
     /// Runs a URLSession call, mapping `URLError` to `.unreachable` (or to
@@ -1126,7 +1105,7 @@ enum SideStoreDownloader {
 
     /// Retry time for a GitHub rate limit: from `retry-after` (seconds), or from
     /// `x-ratelimit-reset` (Unix time) when the hourly quota is used up.
-    private static func retryAfter(_ http: HTTPURLResponse) -> Date? {
+    fileprivate static func retryAfter(_ http: HTTPURLResponse) -> Date? {
         if let seconds = http.value(forHTTPHeaderField: "retry-after").flatMap(Double.init) {
             return Date().addingTimeInterval(seconds)
         }
@@ -1146,18 +1125,31 @@ enum SideStoreDownloader {
 }
 
 /// Downloads one file to disk, carrying on from the bytes already saved when
-/// the transfer stalls or drops, instead of starting over.
+/// the transfer stalls or drops, instead of starting over. Every IPA download
+/// from GitHub goes through it: release assets and Actions builds.
 ///
-/// Made for Actions builds: a couple of hundred megabytes from GitHub's
-/// artifact storage, which can crawl and then stall. The start link
-/// (nightly.link) redirects to a signed storage URL that works for about ten
-/// minutes, so a later attempt asks that URL for the rest with a Range request,
-/// and once it refuses, gets a fresh one from the start link.
+/// Both start at a link (`github.com/<repo>/releases/download/…`, nightly.link)
+/// that redirects to a signed storage URL with an expiry (ten minutes out for
+/// an artifact, around 50 for a release asset). A later attempt asks that URL
+/// for the rest with a Range request, and once it refuses, gets a fresh one
+/// from the start link. The rest must be of the same file: a 206 with another
+/// ETag starts the download over, for a nightly replaced meanwhile. `If-Range`
+/// asks for that too, but GitHub's release storage ignores it.
 private final class ResumingDownload: NSObject, URLSessionDataDelegate, @unchecked Sendable {
 
-    /// The pause before each attempt in a row that got no new bytes; one more
-    /// such attempt than there are pauses gives up.
-    private static let pauses: [UInt64] = [1, 2, 4, 8, 15]
+    /// The request timeout until something has answered: URLSession's
+    /// default, which the download always had.
+    private static let firstTimeout: TimeInterval = 60
+
+    /// The pauses before trying again while nothing has answered yet, as the
+    /// download always had: for a connection the VPN coming up cut, or a dead
+    /// one GitHub kept open from an earlier request. A timeout isn't retried
+    /// then: where GitHub is blocked, it would only multiply the wait.
+    private static let firstPauses: [UInt64] = [1, 3]
+
+    /// The pauses before each further attempt in a row that gets no new bytes,
+    /// once the file has started arriving; one more such attempt gives up.
+    private static let pauses: [UInt64] = [2, 4, 8, 15]
 
     /// Failures a moment later may not repeat. A TLS failure isn't one: on a
     /// network that intercepts it, it would only repeat.
@@ -1169,7 +1161,8 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
     let file: URL
     private let start: URL
     private let name: String
-    /// A transfer that gets no data for this long has stalled.
+    /// A transfer that gets no data for this long has stalled, once the file
+    /// has started arriving.
     private let idleTimeout: TimeInterval
     private let log: (String) -> Void
     private let queue: OperationQueue = {
@@ -1182,12 +1175,23 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
     private var output: FileHandle?
     private(set) var written = 0
     private(set) var resumes = 0
+    /// The last response's status.
+    private(set) var status = 0
+    /// The release the start link redirected through, if it named one.
+    private(set) var tag: String?
+    /// The file's ETag, once a response has given one.
+    private(set) var etag: String?
+    private var lastModified: String?
     /// The file's full size, once a response has said it.
     private var total: Int?
+    /// True once a response has started the file arriving.
+    private var responded = false
+    private var response: HTTPURLResponse?
     /// The signed URL the start link redirected to, while it's thought to work.
     private var storage: URL?
-    private var status = 0
-    /// A 206 that doesn't start at the byte asked for.
+    /// The current attempt's request timeout, kept through redirects.
+    private var timeout: TimeInterval = 60
+    /// A 206 that isn't the part asked for: another start, or another file.
     private var misaligned = false
     private var writeError: Error?
     private var finish: CheckedContinuation<Error?, Never>?
@@ -1210,7 +1214,6 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
         defer { try? handle.close() }
 
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = idleTimeout
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCache = nil
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
@@ -1225,8 +1228,8 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
             if Task.isCancelled { throw CancellationError() }
             if let writeError { throw writeError }
 
-            let transferred = status == 200 || status == 206
-            if transferred, error == nil, !misaligned, total.map({ written >= $0 }) ?? true {
+            let transferred = (status == 200 || status == 206) && !misaligned
+            if transferred, error == nil, total.map({ written >= $0 }) ?? true {
                 return file
             }
             // Asked for the bytes after the last one: there are none.
@@ -1236,37 +1239,48 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
             // What the log says went wrong, when HTTP's status doesn't.
             var why: String?
             if misaligned || status == 416 {
-                // Not the bytes asked for: start again from the first.
-                why = "the server sent other bytes than the ones asked for, so it starts over"
+                // Not the part asked for: start again from the first byte.
+                why = "the server sent another part of the file, or of another file, than the one asked for"
                 truncate()
                 storage = nil
                 reason = .badStatus(status: status, detail: nil, retryAfter: nil)
             } else if transferred || status == 0 {
                 // The connection stalled or dropped, before or during the body.
                 let urlError = (error as? URLError) ?? URLError(.networkConnectionLost)
-                guard Self.passing.contains(urlError.code) else { throw SideStoreDownloader.DownloadError.unreachable(urlError) }
+                guard Self.passing.contains(urlError.code), responded || urlError.code != .timedOut
+                else { throw SideStoreDownloader.DownloadError.unreachable(urlError) }
                 reason = .unreachable(urlError)
             } else {
-                reason = .badStatus(status: status, detail: nil, retryAfter: nil)
-                if fromStorage {
+                // A refusal. One that says when to come back isn't asked again now.
+                let retryAfter = response.flatMap(SideStoreDownloader.retryAfter)
+                reason = .badStatus(status: status, detail: nil, retryAfter: retryAfter)
+                if fromStorage, retryAfter == nil {
                     // Expired, most likely: straight back to the start link,
                     // whose answer comes from a new storage link or not at all.
                     log("The storage link for \(name) answered HTTP \(status) — asking \(start.host ?? "the start link") for a new one.")
                     storage = nil
                     continue
                 }
-                guard status == 429 || (500...599).contains(status) else { throw reason }
+                guard retryAfter == nil, (500...599).contains(status) else { throw reason }
             }
 
-            idle = written > before ? 0 : idle + 1
-            guard idle < Self.pauses.count else { throw reason }
-            let pause = Self.pauses[idle]
-            let cause = why ?? Self.describe(reason)
-            if written > 0 {
-                resumes += 1
-                log("\(name) stopped at \(Self.megabytes(written)) of \(total.map(Self.megabytes) ?? "?") (\(cause)) — carrying on from there in \(pause) s.")
+            let pause: UInt64
+            if written > before {
+                idle = 0
+                pause = 1
             } else {
-                log("\(name) didn't arrive (\(cause)) — trying again in \(pause) s.")
+                let table = responded ? Self.pauses : Self.firstPauses
+                guard idle < table.count else { throw reason }
+                pause = table[idle]
+                idle += 1
+            }
+            if let why {
+                log("\(name): \(why) — starting over in \(pause) s.")
+            } else if written > 0 {
+                resumes += 1
+                log("\(name) stopped at \(Self.megabytes(written)) of \(total.map(Self.megabytes) ?? "?") (\(Self.describe(reason))) — carrying on from there in \(pause) s.")
+            } else {
+                log("\(name) didn't arrive (\(Self.describe(reason))) — trying again in \(pause) s.")
             }
             try await Task.sleep(nanoseconds: pause * 1_000_000_000)
         }
@@ -1275,10 +1289,10 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
     /// One request for the bytes still missing. Returns how the transfer
     /// ended: nil when it ran to its end.
     private func attempt(in session: URLSession) async -> Error? {
-        var request = URLRequest(url: storage ?? start)
-        request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
-        if written > 0 { request.setValue("bytes=\(written)-", forHTTPHeaderField: "Range") }
+        timeout = responded ? idleTimeout : Self.firstTimeout
+        let request = ranged(URLRequest(url: storage ?? start))
         status = 0
+        response = nil
         misaligned = false
         let task = session.dataTask(with: request)
         return await withTaskCancellationHandler {
@@ -1294,42 +1308,62 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
         }
     }
 
+    /// `request` asking for the bytes after the ones saved, of the same file.
+    private func ranged(_ request: URLRequest) -> URLRequest {
+        var request = request
+        request.timeoutInterval = timeout
+        request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        guard written > 0 else { return request }
+        request.setValue("bytes=\(written)-", forHTTPHeaderField: "Range")
+        // A weak ETag can't be used here; the date can.
+        if let validator = etag.flatMap({ $0.hasPrefix("W/") ? nil : $0 }) ?? lastModified {
+            request.setValue(validator, forHTTPHeaderField: "If-Range")
+        }
+        return request
+    }
+
     // MARK: URLSessionDataDelegate, on `queue`
 
     func urlSession(_ session: URLSession, task: URLSessionTask,
                     willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest,
                     completionHandler: @escaping (URLRequest?) -> Void) {
+        if let found = ReleaseTagRecorder.tag(in: request.url) { tag = found }
         // The range goes on to the storage URL.
-        var next = request
-        if written > 0 { next.setValue("bytes=\(written)-", forHTTPHeaderField: "Range") }
-        completionHandler(next)
+        completionHandler(ranged(request))
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask,
                     didReceive response: URLResponse,
                     completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         let http = response as? HTTPURLResponse
+        self.response = http
         status = http?.statusCode ?? 0
+        let theirETag = http?.value(forHTTPHeaderField: "ETag")
         switch status {
         case 200:
             // The whole file, from its first byte.
             truncate()
             total = response.expectedContentLength > 0 ? Int(response.expectedContentLength) : nil
+            etag = theirETag
+            lastModified = http?.value(forHTTPHeaderField: "Last-Modified")
         case 206:
-            // "bytes <first>-<last>/<size>"
+            // "bytes <first>-<last>/<size>", and of the file begun.
             let range = http?.value(forHTTPHeaderField: "Content-Range") ?? ""
             let numbers = range.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
-            guard numbers.first == written else {
+            let sameFile = etag == nil || theirETag == nil || etag == theirETag
+            guard numbers.first == written, sameFile else {
                 misaligned = true
                 completionHandler(.cancel)
                 return
             }
             if numbers.count == 3 { total = numbers[2] }
+            if etag == nil { etag = theirETag }
         default:
             completionHandler(.cancel)
             return
         }
+        responded = true
         storage = response.url
         completionHandler(.allow)
     }
