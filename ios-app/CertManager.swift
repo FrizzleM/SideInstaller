@@ -200,11 +200,12 @@ final class CertManager: ObservableObject {
     }
 
     /// Writes the certificate SideInstaller signs with and its private key to a
-    /// .p12 file protected by `password`, then hands the file to `share`. The
-    /// file is alone in a temporary folder, for `share` to delete when done.
+    /// .p12 file (optionally protected by `password`), then hands the file to
+    /// `share`. The file is alone in a temporary folder, for `share` to delete
+    /// when done. An empty password produces an unprotected .p12.
     @MainActor
     func export(_ cert: DevCert, password: String, share: @escaping (URL) -> Void) {
-        guard session != nil, !isBusy, !password.isEmpty else { return }
+        guard session != nil, !isBusy else { return }
         let serial = cert.serialNumber
         guard !serial.isEmpty else {
             lastError = ErrorHelp.explained(L("This certificate has no serial number, so it can't be exported."))

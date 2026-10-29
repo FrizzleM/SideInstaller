@@ -30,17 +30,16 @@ struct CertsView: View {
             .alert(L("Export certificate"),
                    isPresented: Binding(get: { pendingExport != nil },
                                         set: { if !$0 { endExport() } })) {
-                SecureField(L("Password"), text: $exportPassword)
+                SecureField(L("Password (optional)"), text: $exportPassword)
                 Button(L("Export")) {
                     if let cert = pendingExport {
                         manager.export(cert, password: exportPassword, share: share)
                     }
                     endExport()
                 }
-                .disabled(exportPassword.isEmpty)
                 Button(L("Cancel"), role: .cancel) { endExport() }
             } message: {
-                Text(L("Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password for it: you'll need it to import the file. Keep the file to yourself."))
+                Text(L("Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Leave the password empty for no protection, or choose one — you'll need it later to import the file. Keep the file to yourself."))
             }
             .padding(20)
             .pageColumn()
@@ -150,8 +149,8 @@ struct CertsView: View {
                     Spacer()
                 }
                 .cascadeItem(3)
-                if manager.hasLoaded && !manager.certs.contains(where: \.isSigning) {
-                    Text(L("SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it."))
+                if manager.hasLoaded {
+                    Text(L("Pick any certificate and tap Export. Only the one SideInstaller signs with has its private key on this iPhone — others will show an error because the key stays on the device that asked Apple for it."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -234,9 +233,7 @@ struct CertsView: View {
                 }
 
                 HStack(spacing: 10) {
-                    if cert.isSigning {
-                        exportButton(cert)
-                    }
+                    exportButton(cert)
                     revokeButton(cert)
                 }
             }
