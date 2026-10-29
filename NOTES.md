@@ -1072,17 +1072,61 @@ can be read there, and whether either report's iPhone had moved its port.
 [Madeira](https://github.com/willfaust/Madeira) (Windows PC games through Wine and
 FEX) is a fourth `InstallSource`. Four things differ from SideStore.
 
-**The download.** It comes from the releases of the fork
-[FrizzleM/Madeira](https://github.com/FrizzleM/Madeira), built from its
-`sideinstaller-refresh` branch (willfaust/Madeira#264), since only that build
-renews its own signing; switch `InstallSource.repo` back once upstream ships it.
-Its release asset is named after the version, as upstream names it
-(`Madeira-0.1.3.ipa` on tag `v0.1.3`, `Madeira-0.1.3-self-refresh.1.ipa` on
-`v0.1.3-self-refresh.1`), so there's no fixed `latest/download` URL.
-`SideStoreDownloader.latestTag` reads the tag off where
-`github.com/<repo>/releases/latest` redirects to, which has no rate limit, and the
-URL is built from it; a 404 falls back to the API as before. There's no nightly,
-so the channel picker is hidden and `Engine.selectedChannel` is always stable.
+**The download.** It's the newest CI build of upstream's main branch
+(`InstallSource.actionsBuild`): the `Madeira-ipa` artifact that
+willfaust/Madeira's "Build IPA" workflow (`build.yml`) uploads on every push, a
+zip holding `Madeira.ipa`. Upstream's newest release, 0.1.3, predates the
+self-refresh (willfaust/Madeira#264, merged 28 October 2026), and the main build
+has the `MadeiraSigningAccountVersion` key and the 32-bit Windows DLLs. Before
+1.6.2 Madeira came from releases of the fork FrizzleM/Madeira.
+
+GitHub serves artifacts only to a signed-in account (the API's `/zip` answers
+401), so:
+- One unauthenticated API call, `actions/artifacts?name=Madeira-ipa&per_page=100`,
+  lists the uploads with each one's commit and the SHA-256 GitHub recorded
+  (`digest`). Only runs of `main` in the repository itself count: pull requests
+  upload the artifact too, and a fork's runs have the fork as head repository
+  even from a branch named `main`. An upload without a digest is skipped. When
+  the newest 100 uploads are all pull requests', `newestRunBuild` asks for the
+  newest successful `main` run of the workflow, then its artifacts (two calls).
+- The zip is downloaded through nightly.link
+  (`nightly.link/<repo>/actions/artifacts/<id>.zip`), which redirects to the
+  file in GitHub's own storage, and must match that digest before anything is
+  kept, so nightly.link can't substitute a file. Mismatch: `unverifiedBuild`;
+  nightly.link refusing or unreachable: `relayFailed`.
+- `IPALibrary.extractIPA(fromArtifact:to:)` streams the IPA out of the zip
+  (stored, as the workflow uploads it with `compression-level: 0`, or deflated)
+  and the IPA is saved as `Madeira.ipa`. The ledger records the zip's digest as
+  its ETag, so a later run that finds the same build skips the download.
+
+The API's hourly limit (60 per address) applies, unlike the release downloads;
+when it's hit, the download step falls back to the `Madeira.ipa` an earlier
+run left, as for any failed download. GitHub's artifact storage was about 4×
+slower than release downloads from here (0.8 against 3.6 MB/s on 28 October
+2026, the same with four parallel ranges), so the 183 MB zip takes minutes;
+the prefetch during pairing and sign-in hides part of it. Artifacts expire after
+90 days without a push to `main`.
+
+**Resuming.** A second run that evening crawled at 0.13 MB/s, then went
+silent and failed on URLSession's 60 s idle timeout with half the file there.
+So the zip comes through `fetchResuming` (`ResumingDownload`), not `fetch`: a
+data task per attempt writing straight to the file, with a 30 s idle timeout. A
+stall or a dropped connection carries on with `Range: bytes=<saved>-` from the
+storage URL nightly.link redirected to (`response.url`). That URL is a signed
+Azure link valid for ten minutes (`st`…`se`), and once expired it answers 403
+(checked on the real one), so a refusal from it goes straight back to
+nightly.link for a new link, the Range carried through the redirect. A 200 to a
+Range request starts the file over; a 206 that starts elsewhere, or a 416, drops
+what was saved and starts over. Five attempts in a row without a new byte
+(pauses 2, 4, 8, 15 s) give up with the last error, as does nightly.link
+refusing with a 4xx (an artifact that's gone), a TLS failure, or anything
+`passing` doesn't list. Only the Actions download uses it so far; release
+downloads still go through `fetch`.
+
+Advanced lists the `main` builds from that same API call, one per commit,
+labelled with the short commit and build date ("e96065a · 28 Oct 2026"); a picked
+one is saved as `Madeira (e96065a).ipa`. There's no nightly, so the channel
+picker is hidden and `Engine.selectedChannel` is always stable.
 `minimumOSMajorVersion` stops a run below iOS 26, which Madeira's JIT helper
 needs.
 

@@ -30,6 +30,15 @@ All notable changes to SideInstaller are documented here.
   turn on Developer Mode when it's already on, and says plainly when it's off.
 
 ### Changed
+- **Madeira comes from its official repository again.** Madeira's own repository now has the
+  self-renewing signing, so Latest installs the newest build of
+  [willfaust/Madeira](https://github.com/willfaust/Madeira)'s main branch from its GitHub Actions
+  runs, instead of a release of the FrizzleM/Madeira fork. GitHub hands those builds only to
+  signed-in accounts, so SideInstaller downloads them through nightly.link and installs one only if
+  it's exactly the file GitHub recorded. The build includes the 32-bit Windows parts the fork's
+  release left out. Advanced lists recent builds by commit and date. GitHub serves these builds
+  more slowly than releases, so when the download stalls or the connection drops, it carries on
+  from where it stopped instead of starting over.
 - **Reports list Device IP, Developer Mode, and whether SideInstaller runs inside LiveContainer.**
   A log pasted into “What happened?” no longer makes the issue's title: the error does.
 - **Key bytes take one line in the log**, not one line per byte. Private keys stay redacted.

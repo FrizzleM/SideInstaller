@@ -695,6 +695,12 @@ let vietnameseStrings: [String: String] = [
         "tệp tải về dưới tên %@ không phải là IPA — có thể thứ gì đó trên mạng này đã trả về một trang web, hoặc quá trình tải bị gián đoạn.",
     "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
         "liên kết đó trả về HTTP %d — không phải liên kết tải trực tiếp, hoặc cần đăng nhập.",
+    "GitHub has no build of %@'s %@ branch to download right now.":
+        "Hiện GitHub không có bản dựng nào của nhánh %2$@ thuộc %1$@ để tải xuống.",
+    "couldn't download %@ through nightly.link, which passes on GitHub's builds: %@":
+        "không thể tải %@ qua nightly.link, dịch vụ chuyển tiếp các bản dựng của GitHub: %@",
+    "the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.":
+        "bản dựng %@ nhận được không phải là tệp GitHub đã ghi nhận, nên sẽ không được cài đặt. Hãy thử lại sau.",
 
     // MARK: - Engine failures
 

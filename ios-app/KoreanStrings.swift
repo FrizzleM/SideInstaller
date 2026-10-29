@@ -589,6 +589,12 @@ let koreanStrings: [String: String] = [
         "%@(으)로 다운로드된 파일은 IPA가 아닙니다. 이 네트워크가 대신 웹 페이지를 돌려줬거나 전송이 중간에 끊겼을 수 있습니다.",
     "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
         "그 링크가 HTTP %d로 응답했습니다. 직접 다운로드 링크가 아니거나 로그인이 필요합니다.",
+    "GitHub has no build of %@'s %@ branch to download right now.":
+        "지금 GitHub에는 다운로드할 수 있는 %1$@의 %2$@ 브랜치 빌드가 없습니다.",
+    "couldn't download %@ through nightly.link, which passes on GitHub's builds: %@":
+        "GitHub 빌드를 전달하는 nightly.link를 통해 %@을(를) 다운로드하지 못했습니다: %@",
+    "the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.":
+        "받은 %@ 빌드가 GitHub에 기록된 파일이 아니라서 설치하지 않습니다. 나중에 다시 시도하세요.",
 
     // MARK: - Engine failures
 

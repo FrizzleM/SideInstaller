@@ -700,6 +700,12 @@ let frenchStrings: [String: String] = [
         "ce qui a été téléchargé sous le nom %@ n'est pas un IPA — quelque chose sur ce réseau a renvoyé une page, ou le transfert s'est interrompu.",
     "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
         "ce lien a répondu HTTP %d — ce n'est pas un téléchargement direct, ou il exige une connexion.",
+    "GitHub has no build of %@'s %@ branch to download right now.":
+        "GitHub n'a pour l'instant aucune version de la branche %2$@ de %1$@ à télécharger.",
+    "couldn't download %@ through nightly.link, which passes on GitHub's builds: %@":
+        "impossible de télécharger %@ via nightly.link, qui relaie les versions compilées par GitHub : %@",
+    "the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.":
+        "la version de %@ reçue n'est pas le fichier enregistré par GitHub, elle n'est donc pas installée. Réessayez plus tard.",
 
     // MARK: - Engine failures
 

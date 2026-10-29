@@ -673,6 +673,12 @@ let chineseStrings: [String: String] = [
         "以 %@ 为名下载到的文件不是 IPA —— 此网络上的某个环节可能返回了一个网页，或者传输中断了。",
     "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
         "该链接返回 HTTP %d — 它不是直接下载链接，或者需要登录。",
+    "GitHub has no build of %@'s %@ branch to download right now.":
+        "GitHub 目前没有 %1$@ 的 %2$@ 分支构建版本可供下载。",
+    "couldn't download %@ through nightly.link, which passes on GitHub's builds: %@":
+        "无法通过 nightly.link（转交 GitHub 构建版本的服务）下载 %@：%@",
+    "the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.":
+        "收到的 %@ 构建版本不是 GitHub 记录的文件，因此不会安装。请稍后重试。",
 
     // MARK: - Engine failures
 

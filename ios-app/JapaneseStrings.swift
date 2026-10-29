@@ -588,6 +588,12 @@ let japaneseStrings: [String: String] = [
         "%@ としてダウンロードされたものは IPA ではありません。このネットワーク上の何かがページを返したか、転送が途中で中断された可能性があります。",
     "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
         "そのリンクの応答は HTTP %d でした。直接ダウンロードできるリンクではないか、サインインが必要です。",
+    "GitHub has no build of %@'s %@ branch to download right now.":
+        "GitHub には今、ダウンロードできる %1$@ の %2$@ ブランチのビルドがありません。",
+    "couldn't download %@ through nightly.link, which passes on GitHub's builds: %@":
+        "GitHub のビルドを中継する nightly.link 経由で %@ をダウンロードできませんでした: %@",
+    "the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.":
+        "届いた %@ のビルドは GitHub が記録したファイルではないため、インストールしません。しばらくしてからもう一度お試しください。",
 
     // MARK: - Engine failures
 
