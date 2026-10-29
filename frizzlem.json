@@ -10,18 +10,18 @@
       "iconURL": "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon~ios-marketing.png",
       "subtitle": "An an app that installs Sidestore on iOS 27, fully on-device",
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
-      "version": "1.6.1",
-      "versionDate": "2026-10-23T11:25:00Z",
-      "versionDescription": "# Main changes:\r\n- Fixed Apple ID sign-in failing with error -80046 (\"This action cannot be completed at this time\") after entering the verification code\r\n    - SideInstaller now signs in through Mac anisette servers, starting with \"SideStore (New)\", and reports a current Mac through them, the fix SideStore users found\r\n    - The first sign-in makes a new anisette identity, so Apple asks for your verification code once more\r\n    - With Auto, the Android anisette servers are no longer tried, since Apple refuses to finish signing in through them\r\n    - Thanks to SealedButRamen in my Discord server for helping me fix this\r\n- SideStore installed by SideInstaller now signs in out of the box: its on-device anisette and auto-rotation are turned off and \"SideStore (New)\" is picked. If it still fails, use Reset adi.pb in SideStore's Settings › User Customizations, with \"Keep header customizations\" unticked\r\n- Added Korean, kudos to [kes158](https://github.com/kes158) (#85)\r\n\r\n## Fixes:\r\n- If Apple won't send the code by text, it's now sent to your Apple devices instead\r\n- A slow or failing anisette server no longer holds up sign-in\r\n- \"jkcoxson (Windows ADI)\" and \"StikStore (Windows ADI)\" now show as Mac servers, which they've become, and \"iLoader (Mac ADI)\" was added",
-      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.1/SideInstaller.ipa",
-      "size": 10201016,
+      "version": "1.6.2",
+      "versionDate": "2026-10-29T08:30:09Z",
+      "versionDescription": "# Added\n\n- Custom .ipas now get automatically signed with Extended Memory Limit\n- Downloads now get paused instead of cancelled, so users can resume at anytime\n- Sound effects, which can be disabled with silent mode or on the app’s settings\n\n# Fixed\n\n- Bug reports now attach the full log to GitHub\n- Fixed GitHub’s “Whoops, something went wrong!” when reporting an error\n- When the device refuses the connection, SideInstaller asks which port it advertises for remote pairing and tries that one before giving up (#56, #100).\n\n# Changed\n\n- Madeira is now fetched from the official repo. It was fetched from a fork of mine before since it was needed for it to be compatible, but since it has been merged the source is now the main repo.\n- Key bytes take one line in the log, not one line per byte. Private keys stay redacted.",
+      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.2/SideInstaller.ipa",
+      "size": 10307778,
       "versions": [
         {
-          "version": "1.6.1",
-          "date": "2026-10-23T11:25:00Z",
-          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.1/SideInstaller.ipa",
-          "localizedDescription": "# Main changes:\r\n- Fixed Apple ID sign-in failing with error -80046 (\"This action cannot be completed at this time\") after entering the verification code\r\n    - SideInstaller now signs in through Mac anisette servers, starting with \"SideStore (New)\", and reports a current Mac through them, the fix SideStore users found\r\n    - The first sign-in makes a new anisette identity, so Apple asks for your verification code once more\r\n    - With Auto, the Android anisette servers are no longer tried, since Apple refuses to finish signing in through them\r\n    - Thanks to SealedButRamen in my Discord server for helping me fix this\r\n- SideStore installed by SideInstaller now signs in out of the box: its on-device anisette and auto-rotation are turned off and \"SideStore (New)\" is picked. If it still fails, use Reset adi.pb in SideStore's Settings › User Customizations, with \"Keep header customizations\" unticked\r\n- Added Korean, kudos to [kes158](https://github.com/kes158) (#85)\r\n\r\n## Fixes:\r\n- If Apple won't send the code by text, it's now sent to your Apple devices instead\r\n- A slow or failing anisette server no longer holds up sign-in\r\n- \"jkcoxson (Windows ADI)\" and \"StikStore (Windows ADI)\" now show as Mac servers, which they've become, and \"iLoader (Mac ADI)\" was added",
-          "size": 10201016
+          "version": "1.6.2",
+          "date": "2026-10-29T08:30:09Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.2/SideInstaller.ipa",
+          "localizedDescription": "# Added\n\n- Custom .ipas now get automatically signed with Extended Memory Limit\n- Downloads now get paused instead of cancelled, so users can resume at anytime\n- Sound effects, which can be disabled with silent mode or on the app’s settings\n\n# Fixed\n\n- Bug reports now attach the full log to GitHub\n- Fixed GitHub’s “Whoops, something went wrong!” when reporting an error\n- When the device refuses the connection, SideInstaller asks which port it advertises for remote pairing and tries that one before giving up (#56, #100).\n\n# Changed\n\n- Madeira is now fetched from the official repo. It was fetched from a fork of mine before since it was needed for it to be compatible, but since it has been merged the source is now the main repo.\n- Key bytes take one line in the log, not one line per byte. Private keys stay redacted.",
+          "size": 10307778
         }
       ]
     },
