@@ -2,7 +2,7 @@
 
 All notable changes to SideInstaller are documented here.
 
-## Unreleased
+## 1.6.4
 
 ### Fixed
 - **“Use SideStore's certificate” works inside LiveContainer.** There, SideStore showed its Export
