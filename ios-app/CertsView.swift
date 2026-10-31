@@ -20,7 +20,7 @@ struct CertsView: View {
             VStack(spacing: 18) {
                 header.cascadeItem(0)
                 loadButton.cascadeItem(1)
-                if manager.sideStoreInstalled {
+                if manager.canUseSideStoreCertificate {
                     sideStoreCard.cascadeItem(2)
                 }
                 // Errors show as a popup, which `RootView` lays over the app.
@@ -104,11 +104,14 @@ struct CertsView: View {
     // MARK: SideStore's certificate
 
     /// Signs with SideStore's certificate instead of a certificate of its own,
-    /// which a free Apple ID can't have alongside SideStore's.
+    /// which a free Apple ID can't have alongside SideStore's. Inside
+    /// LiveContainer it's read from LiveContainer, as SideStore can't send it.
     private var sideStoreCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text(L("SideStore opens and sends back its certificate. SideInstaller then signs with it too, so on a free Apple ID neither app has to revoke the other's."))
+                Text(Engine.runsInLiveContainer
+                     ? L("SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.")
+                     : L("SideStore opens and sends back its certificate. SideInstaller then signs with it too, so on a free Apple ID neither app has to revoke the other's."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

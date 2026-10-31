@@ -1277,24 +1277,25 @@ struct InstallPopup: View {
 
     // MARK: Certificate conflict (Apple error 7460)
 
-    /// Shown on error 7460. With SideStore on the iPhone, the first button
-    /// asks it for its certificate, signs with that and retries the install.
-    /// The other loads the certificates; the dialog asks which one to revoke,
-    /// then retries the install.
+    /// Shown on error 7460. With SideStore's certificate to be had, the first
+    /// button gets it (from SideStore, or inside LiveContainer from
+    /// LiveContainer), signs with that and retries the install. The other
+    /// loads the certificates; the dialog asks which one to revoke, then
+    /// retries the install.
     private var certConflictPopup: some View {
-        let sideStoreInstalled = engine.sideStoreInstalled
+        let sideStoreCertificate = engine.canUseSideStoreCertificate
         return PopupCard(title: L("A certificate already exists"),
                          systemImage: "exclamationmark.shield.fill",
                          tint: .orange,
                          onClose: close) {
             VStack(alignment: .leading, spacing: 14) {
-                Text(sideStoreInstalled
+                Text(sideStoreCertificate
                      ? L("Apple won't issue a second signing certificate for this Apple ID. If SideStore made the one it has, SideInstaller can sign with that one too, and nothing is revoked. Revoking it lets the install continue as well — but it can't be undone.")
                      : L("Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                if sideStoreInstalled {
+                if sideStoreCertificate {
                     Button {
                         certManager.requestSideStoreCertificate(retryInstall: true)
                     } label: {

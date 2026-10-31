@@ -2,6 +2,16 @@
 
 All notable changes to SideInstaller are documented here.
 
+## Unreleased
+
+### Fixed
+- **“Use SideStore's certificate” works inside LiveContainer.** There, SideStore showed its Export
+  prompt but its certificate never came back, because iOS only opens LiveContainer's links, not
+  SideInstaller's (#95). Inside LiveContainer, SideInstaller now takes the certificate LiveContainer
+  holds instead: its built-in SideStore's, or the copy LiveContainer imported from SideStore. It is
+  checked against your Apple ID as before. If LiveContainer has none yet, SideInstaller says how to
+  import it there.
+
 ## 1.6.3
 
 ### Fixed

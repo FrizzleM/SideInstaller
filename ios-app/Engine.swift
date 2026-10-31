@@ -1970,7 +1970,7 @@ final class Engine: ObservableObject {
             // User-fixable failures get an explanatory card. A certificate that
             // already exists offers revoke-and-retry, never revoked automatically.
             if case EngineError.certExists = error {
-                setGuide(Guides.certExists(sideStoreInstalled: sideStoreInstalled))
+                setGuide(Guides.certExists(sideStoreCertificate: canUseSideStoreCertificate))
                 certConflict = true
             }
             if case let EngineError.deviceRegistration(udid, raw) = error {
@@ -3043,6 +3043,13 @@ final class Engine: ObservableObject {
         Self.appPresence(scheme: "sidestore") != .missing
     }
 
+    /// True when “Use SideStore's certificate” has somewhere to get it: SideStore
+    /// is on this iPhone, or SideInstaller runs inside LiveContainer, which
+    /// keeps SideStore's certificate itself (`LiveContainerCertificate`).
+    var canUseSideStoreCertificate: Bool {
+        Self.runsInLiveContainer || sideStoreInstalled
+    }
+
     /// True unless LiveContainer is known to be missing (see `appPresence`).
     /// Opening it reports when it isn't there.
     var liveContainerInstalled: Bool {
@@ -4048,15 +4055,15 @@ enum Guides {
     private static let idevicePairURL = "https://github.com/jkcoxson/idevice_pair/releases/latest"
 
     /// Shown when Apple refuses a certificate because one exists (error 7460).
-    /// With SideStore on the iPhone, using its certificate comes first.
-    static func certExists(sideStoreInstalled: Bool) -> Guide {
+    /// When SideStore's certificate can be had, using it comes first.
+    static func certExists(sideStoreCertificate: Bool) -> Guide {
         Guide(
             title: L("A signing certificate already exists"),
             systemImage: "exclamationmark.shield",
             steps: [
                 L("Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending."),
                 L("SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone."),
-                sideStoreInstalled
+                sideStoreCertificate
                     ? L("If SideStore made it, tap “Use SideStore's certificate” above: SideInstaller signs with that one too, and nothing is revoked.")
                     : nil,
                 L("Use “Revoke and retry” above, or open Certificates in the Tools tab, tap “Load certificates”, and revoke it there."),
