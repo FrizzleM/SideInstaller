@@ -1058,6 +1058,14 @@ let chineseStrings: [String: String] = [
     "SideStore opens and sends back the pairing file it has.": "SideStore 会打开并发回它现有的配对文件。",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
         "这台 iPhone 上没有安装 SideStore，因此无法从中获取配对文件。",
+    "SideInstaller takes the pairing file LiveContainer's built-in SideStore has.":
+        "SideInstaller 会读取 LiveContainer 内置 SideStore 现有的配对文件。",
+    "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
+        "这是 LiveContainer 内置 SideStore 现有的配对文件。SideInstaller 将用它连接这台 iPhone。",
+    "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
+        "在 LiveContainer 的多任务模式下，SideInstaller 无法打开内置 SideStore 的文件。请在 LiveContainer 中不使用多任务模式打开 SideInstaller，然后重试；或者点按“导入配对文件”，选择电脑生成的文件。",
+    "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
+        "在 LiveContainer 中，SideStore 无法把配对文件发回给 SideInstaller，而 LiveContainer 内置的 SideStore 也没有 SideInstaller 能用的配对文件。请点按“导入配对文件”，选择电脑生成的文件；或者先把配对文件导入 SideStore，然后回到这里重试。",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "该安装链接中没有 .ipa。它需要 ?url= 后跟下载 .ipa 的 https:// 地址。",
     "That link was meant to carry a pairing file, but what it holds can't be read.": "该链接本应包含配对文件，但其内容无法读取。",

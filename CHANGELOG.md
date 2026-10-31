@@ -2,6 +2,17 @@
 
 All notable changes to SideInstaller are documented here.
 
+## Unreleased
+
+### Fixed
+- **“Get it from SideStore” works inside LiveContainer.** There, the pairing-file button opened
+  SideStore, but nothing came back, because iOS only opens LiveContainer's links, not
+  SideInstaller's (the same cause as #95). Inside LiveContainer, SideInstaller now reads the
+  pairing file LiveContainer's built-in SideStore keeps and asks before importing it, as before.
+  When there's none to read, or SideInstaller runs in LiveContainer's Multitask Mode, it says what
+  to do instead. The button no longer shows in a LiveContainer without a built-in SideStore,
+  which has no pairing file to give.
+
 ## 1.6.3
 
 ### Fixed

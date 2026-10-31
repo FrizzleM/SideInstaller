@@ -571,7 +571,7 @@ struct ContentView: View {
                 }
 
                 pairingImportButton
-                if engine.sideStoreInstalled {
+                if engine.canGetSideStorePairing {
                     orDivider
                     sideStorePairingButton
                 }
@@ -582,9 +582,11 @@ struct ContentView: View {
     }
 
     /// Asks SideStore for the pairing file it already has. SideStore opens and
-    /// sends it back, and the import asks before replacing anything.
+    /// sends it back, and the import asks before replacing anything. Inside
+    /// LiveContainer nothing opens: the built-in SideStore's file is read.
     private var sideStorePairingButton: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let insideLiveContainer = Engine.runsInLiveContainer
+        return VStack(alignment: .leading, spacing: 6) {
             Button { engine.requestSideStorePairing() } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.uturn.backward.circle")
@@ -592,16 +594,20 @@ struct ContentView: View {
                     Text(L("Get it from SideStore"))
                         .foregroundStyle(.primary)
                     Spacer()
-                    Image(systemName: "arrow.up.forward.app")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Theme.accent2)
+                    if !insideLiveContainer {
+                        Image(systemName: "arrow.up.forward.app")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Theme.accent2)
+                    }
                 }
                 .fieldBackground()
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain, sound: .tap)
             .disabled(engine.isImportingPairing)
-            Text(L("SideStore opens and sends back the pairing file it has."))
+            Text(insideLiveContainer
+                 ? L("SideInstaller takes the pairing file LiveContainer's built-in SideStore has.")
+                 : L("SideStore opens and sends back the pairing file it has."))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1266,9 +1272,16 @@ struct InstallPopup: View {
     }
 
     private func pairingLinkMessage(_ file: LinkedPairingFile) -> String {
-        let base = file.fromSideStore
-            ? L("SideStore sent back the pairing file it has. SideInstaller will connect to this iPhone with it.")
-            : L("A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.")
+        let base: String
+        if !file.fromSideStore {
+            base = L("A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.")
+        } else if Engine.runsInLiveContainer {
+            // SideStore's reply can't get there, so it's the file read from
+            // the built-in SideStore.
+            base = L("This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.")
+        } else {
+            base = L("SideStore sent back the pairing file it has. SideInstaller will connect to this iPhone with it.")
+        }
         if let current = engine.importedPairingName {
             return base + " " + L("It replaces %@.", current)
         }

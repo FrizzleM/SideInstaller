@@ -1062,6 +1062,14 @@ let japaneseStrings: [String: String] = [
     "SideStore opens and sends back the pairing file it has.": "SideStore が開き、保持しているペアリングファイルを送り返します。",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
         "この iPhone には SideStore がインストールされていないため、ペアリングファイルを取得できません。",
+    "SideInstaller takes the pairing file LiveContainer's built-in SideStore has.":
+        "LiveContainer 内蔵の SideStore が保持しているペアリングファイルを、SideInstaller が読み込みます。",
+    "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
+        "これは LiveContainer 内蔵の SideStore が保持しているペアリングファイルです。SideInstaller はこれを使ってこの iPhone に接続します。",
+    "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
+        "LiveContainer のマルチタスクモードでは、SideInstaller は内蔵の SideStore のファイルを開けません。マルチタスクモードを使わずに LiveContainer で SideInstaller を開いてからもう一度試すか、「ペアリングファイルをインポート」をタップしてパソコンで作成したファイルを選択してください。",
+    "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
+        "LiveContainer の中では、SideStore はペアリングファイルを SideInstaller に送り返せません。また、LiveContainer 内蔵の SideStore には SideInstaller が使えるペアリングファイルがありません。「ペアリングファイルをインポート」をタップしてパソコンで作成したファイルを選択するか、先に SideStore にペアリングファイルをインポートしてから、ここでもう一度試してください。",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "このインストールリンクには .ipa が含まれていません。?url= の後に .ipa のダウンロード元の https:// アドレスが必要です。",
     "That link was meant to carry a pairing file, but what it holds can't be read.":

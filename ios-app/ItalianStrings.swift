@@ -1089,6 +1089,14 @@ let italianStrings: [String: String] = [
         "SideStore si apre e rimanda il file di abbinamento che ha.",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
         "SideStore non è installato su questo iPhone, quindi non c'è nessun file di abbinamento da prendere.",
+    "SideInstaller takes the pairing file LiveContainer's built-in SideStore has.":
+        "SideInstaller prende il file di abbinamento del SideStore integrato in LiveContainer.",
+    "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
+        "Questo è il file di abbinamento del SideStore integrato in LiveContainer. SideInstaller lo userà per collegarsi a questo iPhone.",
+    "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
+        "Nella modalità Multitasking di LiveContainer, SideInstaller non può aprire i file del SideStore integrato. Apri SideInstaller in LiveContainer senza la modalità Multitasking, poi riprova, oppure tocca “Importa il file di abbinamento” e scegli il file creato dal tuo computer.",
+    "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
+        "Dentro LiveContainer, SideStore non può restituire il suo file di abbinamento a SideInstaller, e il SideStore integrato in LiveContainer non ne ha nessuno che SideInstaller possa usare. Tocca “Importa il file di abbinamento” e scegli il file creato dal tuo computer, oppure importane prima uno in SideStore, poi riprova qui.",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "Quel link di installazione non contiene nessun .ipa. Serve ?url= seguito dall'indirizzo https:// da cui si scarica l'.ipa.",
     "That link was meant to carry a pairing file, but what it holds can't be read.":

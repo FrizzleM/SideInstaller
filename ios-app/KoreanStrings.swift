@@ -1063,6 +1063,14 @@ let koreanStrings: [String: String] = [
     "SideStore opens and sends back the pairing file it has.": "SideStore가 열리고 보유한 페어링 파일을 돌려보냅니다.",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
         "이 iPhone에 SideStore가 설치되어 있지 않아서 가져올 페어링 파일이 없습니다.",
+    "SideInstaller takes the pairing file LiveContainer's built-in SideStore has.":
+        "SideInstaller가 LiveContainer 내장 SideStore가 보유한 페어링 파일을 가져옵니다.",
+    "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
+        "LiveContainer 내장 SideStore가 보유한 페어링 파일입니다. SideInstaller가 이 파일로 이 iPhone에 연결합니다.",
+    "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
+        "LiveContainer의 멀티태스킹 모드에서는 SideInstaller가 내장 SideStore의 파일을 열 수 없습니다. 멀티태스킹 모드를 쓰지 않고 LiveContainer에서 SideInstaller를 연 다음 다시 시도하거나, “페어링 파일 가져오기”를 탭하고 컴퓨터에서 만든 파일을 선택하세요.",
+    "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
+        "LiveContainer 안에서는 SideStore가 페어링 파일을 SideInstaller로 돌려보낼 수 없고, LiveContainer 내장 SideStore에도 SideInstaller가 쓸 수 있는 페어링 파일이 없습니다. “페어링 파일 가져오기”를 탭하고 컴퓨터에서 만든 파일을 선택하거나, 먼저 SideStore에 페어링 파일을 가져온 다음 여기서 다시 시도하세요.",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "이 설치 링크에는 .ipa가 없습니다. ?url= 뒤에 .ipa를 내려받을 https:// 주소가 있어야 합니다.",
     "That link was meant to carry a pairing file, but what it holds can't be read.":

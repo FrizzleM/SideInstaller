@@ -3120,10 +3120,26 @@ final class Engine: ObservableObject {
         }
     }
 
+    /// True when “Get it from SideStore” has somewhere to get the pairing file:
+    /// SideStore is on this iPhone, or, inside LiveContainer, LiveContainer
+    /// carries the built-in SideStore whose file is read instead. A SideStore
+    /// installed on its own can't hand its file to a LiveContainer guest.
+    var canGetSideStorePairing: Bool {
+        Self.runsInLiveContainer
+            ? LiveContainerSideStorePairing.hasBuiltInSideStore != false
+            : sideStoreInstalled
+    }
+
     /// Opens SideStore, which sends back the pairing file it has as a
     /// `sideinstaller://pairingFile` link. That link asks before importing.
+    /// Inside LiveContainer, which the link can't reach, the pairing file the
+    /// built-in SideStore keeps is read instead, and the same popup asks.
     @MainActor
     func requestSideStorePairing() {
+        if Self.runsInLiveContainer {
+            offerBuiltInSideStorePairing()
+            return
+        }
         guard let url = URL(string: "sidestore://pairing?urlname=\(DeepLink.scheme)") else { return }
         lastError = nil
         sideStorePairingRequestedAt = Date()
@@ -3135,6 +3151,27 @@ final class Engine: ObservableObject {
                 self.lastError = ErrorHelp.explained(L("SideStore isn't installed on this iPhone, so there's no pairing file to get from it."))
                 self.log("⛔️ Pairing import: \(self.lastError ?? "")")
             }
+        }
+    }
+
+    /// Puts up the link popup with the pairing file LiveContainer's built-in
+    /// SideStore keeps (see `LiveContainerSideStorePairing`), or says what to
+    /// do when there's none to be had.
+    @MainActor
+    private func offerBuiltInSideStorePairing() {
+        lastError = nil
+        log("Pairing import: inside LiveContainer, SideStore can't send its pairing file back, so SideInstaller reads the one LiveContainer's built-in SideStore keeps.")
+        switch LiveContainerSideStorePairing.find(log: { self.log($0) }) {
+        case let .found(file, from: names):
+            let link = DeepLink.pairingFile(file)
+            pendingLink = link
+            log("Pairing import: \(link.logDescription), from \(names.joined(separator: " + ")). Waiting for the go-ahead.")
+        case .unreachable:
+            lastError = ErrorHelp.explained(L("In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made."))
+            log("⛔️ Pairing import: \(lastError ?? "")")
+        case .notFound:
+            lastError = ErrorHelp.explained(L("Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here."))
+            log("⛔️ Pairing import: \(lastError ?? "")")
         }
     }
 

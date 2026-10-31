@@ -1092,6 +1092,14 @@ let spanishStrings: [String: String] = [
         "SideStore se abre y devuelve el archivo de emparejamiento que tiene.",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
         "SideStore no está instalado en este iPhone, así que no hay ningún archivo de emparejamiento que obtener de él.",
+    "SideInstaller takes the pairing file LiveContainer's built-in SideStore has.":
+        "SideInstaller toma el archivo de emparejamiento del SideStore integrado en LiveContainer.",
+    "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
+        "Este es el archivo de emparejamiento del SideStore integrado en LiveContainer. SideInstaller se conectará a este iPhone con él.",
+    "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
+        "En el modo multitarea de LiveContainer, SideInstaller no puede abrir los archivos del SideStore integrado. Abre SideInstaller en LiveContainer sin el modo multitarea y vuelve a intentarlo, o toca “Importar archivo de emparejamiento” y elige el archivo que creó tu ordenador.",
+    "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
+        "Dentro de LiveContainer, SideStore no puede devolverle su archivo de emparejamiento a SideInstaller, y el SideStore integrado en LiveContainer no tiene ninguno que SideInstaller pueda usar. Toca “Importar archivo de emparejamiento” y elige el archivo que creó tu ordenador, o importa uno primero en SideStore y vuelve a intentarlo aquí.",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "Ese enlace de instalación no contiene ningún .ipa. Necesita ?url= seguido de la dirección https:// desde la que se descarga el .ipa.",
     "That link was meant to carry a pairing file, but what it holds can't be read.":

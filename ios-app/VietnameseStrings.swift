@@ -1087,6 +1087,14 @@ let vietnameseStrings: [String: String] = [
         "SideStore sẽ mở ra và gửi lại tệp ghép nối nó đang có.",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
         "SideStore chưa được cài trên iPhone này, nên không có tệp ghép nối nào để lấy.",
+    "SideInstaller takes the pairing file LiveContainer's built-in SideStore has.":
+        "SideInstaller sẽ lấy tệp ghép nối mà SideStore tích hợp trong LiveContainer đang có.",
+    "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
+        "Đây là tệp ghép nối mà SideStore tích hợp trong LiveContainer đang có. SideInstaller sẽ dùng tệp này để kết nối với iPhone này.",
+    "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
+        "Trong Chế độ Đa nhiệm của LiveContainer, SideInstaller không mở được các tệp của SideStore tích hợp. Hãy mở SideInstaller trong LiveContainer mà không dùng Chế độ Đa nhiệm rồi thử lại, hoặc chạm “Nhập tệp ghép nối” và chọn tệp máy tính đã tạo.",
+    "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
+        "Trong LiveContainer, SideStore không gửi lại được tệp ghép nối cho SideInstaller, và SideStore tích hợp trong LiveContainer cũng không có tệp nào SideInstaller dùng được. Hãy chạm “Nhập tệp ghép nối” và chọn tệp máy tính đã tạo, hoặc nhập một tệp vào SideStore trước, rồi quay lại đây thử lại.",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "Liên kết cài đặt đó không chứa .ipa nào. Nó cần ?url= theo sau là địa chỉ https:// để tải .ipa.",
     "That link was meant to carry a pairing file, but what it holds can't be read.":
