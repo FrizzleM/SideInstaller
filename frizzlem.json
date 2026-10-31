@@ -10,18 +10,18 @@
       "iconURL": "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon~ios-marketing.png",
       "subtitle": "An an app that installs Sidestore on iOS 27, fully on-device",
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
-      "version": "1.6.2",
-      "versionDate": "2026-10-29T08:30:09Z",
-      "versionDescription": "# Added\n\n- Custom .ipas now get automatically signed with Extended Memory Limit\n- Downloads now get paused instead of cancelled, so users can resume at anytime\n- Sound effects, which can be disabled with silent mode or on the app’s settings\n\n# Fixed\n\n- Bug reports now attach the full log to GitHub\n- Fixed GitHub’s “Whoops, something went wrong!” when reporting an error\n- When the device refuses the connection, SideInstaller asks which port it advertises for remote pairing and tries that one before giving up (#56, #100).\n\n# Changed\n\n- Madeira is now fetched from the official repo. It was fetched from a fork of mine before since it was needed for it to be compatible, but since it has been merged the source is now the main repo.\n- Key bytes take one line in the log, not one line per byte. Private keys stay redacted.",
-      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.2/SideInstaller.ipa",
-      "size": 10307778,
+      "version": "1.6.3",
+      "versionDate": "2026-10-31T10:40:37Z",
+      "versionDescription": "# Fixed\n\n- With a pairing file made on a computer, “Open the device link” no longer stops with “peer closed connection without sending TLS close_notify” before iOS 26.4 (#105, #107). SideInstaller now answers the iPhone’s heartbeat while the link is open, as SideStore and StikDebug do.",
+      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.3/SideInstaller.ipa",
+      "size": 10328448,
       "versions": [
         {
-          "version": "1.6.2",
-          "date": "2026-10-29T08:30:09Z",
-          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.2/SideInstaller.ipa",
-          "localizedDescription": "# Added\n\n- Custom .ipas now get automatically signed with Extended Memory Limit\n- Downloads now get paused instead of cancelled, so users can resume at anytime\n- Sound effects, which can be disabled with silent mode or on the app’s settings\n\n# Fixed\n\n- Bug reports now attach the full log to GitHub\n- Fixed GitHub’s “Whoops, something went wrong!” when reporting an error\n- When the device refuses the connection, SideInstaller asks which port it advertises for remote pairing and tries that one before giving up (#56, #100).\n\n# Changed\n\n- Madeira is now fetched from the official repo. It was fetched from a fork of mine before since it was needed for it to be compatible, but since it has been merged the source is now the main repo.\n- Key bytes take one line in the log, not one line per byte. Private keys stay redacted.",
-          "size": 10307778
+          "version": "1.6.3",
+          "date": "2026-10-31T10:40:37Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.3/SideInstaller.ipa",
+          "localizedDescription": "# Fixed\n\n- With a pairing file made on a computer, “Open the device link” no longer stops with “peer closed connection without sending TLS close_notify” before iOS 26.4 (#105, #107). SideInstaller now answers the iPhone’s heartbeat while the link is open, as SideStore and StikDebug do.",
+          "size": 10328448
         }
       ]
     },
