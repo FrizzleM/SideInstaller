@@ -12,6 +12,10 @@ final class DeviceConnection {
     // idevice opaque handles import as OpaquePointer.
     private var adapter: OpaquePointer?
     private var handshake: OpaquePointer?
+    /// Answers lockdownd's heartbeat while a CoreDeviceProxy tunnel is open,
+    /// which iOS closes without it (`LockdownHeartbeat`). Nil on the RPPairing
+    /// route, which doesn't go through lockdownd.
+    private var heartbeat: LockdownHeartbeat?
 
     /// RemoteServiceDiscovery port reached over the VPN loopback.
     static let rsdPort: UInt16 = 49152
@@ -90,6 +94,13 @@ final class DeviceConnection {
     /// Consume an `IdeviceFfiError*` into an `FFIError` (null == success).
     private func ffiError(_ err: UnsafeMutablePointer<IdeviceFfiError>?,
                           _ fallback: String) -> FFIError? {
+        Self.takeFFIError(err, fallback)
+    }
+
+    /// `ffiError` for code that runs without a connection, like the heartbeat's
+    /// thread.
+    fileprivate static func takeFFIError(_ err: UnsafeMutablePointer<IdeviceFfiError>?,
+                                         _ fallback: String) -> FFIError? {
         guard let err = err else { return nil }
         let code = err.pointee.code
         let sub = err.pointee.sub_code
@@ -244,8 +255,10 @@ final class DeviceConnection {
     ///   (iOS 27+) or made on a computer (idevice_pair's “Remote pairing”,
     ///   iLoader) for iOS 17.4+.
     /// - **CoreDeviceProxy** (`tunnel_create_usb`): opens a lockdown session with
-    ///   a classic pair record and starts CoreDeviceProxy. Works on iOS 17 to
-    ///   26.3; from 26.4 on, lockdownd hangs up on it through the loopback VPN
+    ///   a classic pair record and starts CoreDeviceProxy, with lockdownd's
+    ///   heartbeat answered for as long as the tunnel is open
+    ///   (`LockdownHeartbeat`). Works on iOS 17 to 26.3; from 26.4 on,
+    ///   lockdownd hangs up on it through the loopback VPN
     ///   (`Engine.lockdownWorksOverLoopback`).
     ///
     /// With both records, the route most likely to work on this iOS goes first.
@@ -428,6 +441,11 @@ final class DeviceConnection {
     /// Despite its name, `tunnel_create_usb` works with any provider; here a
     /// `TcpProvider` reaches lockdownd over the loopback tunnel. No RPPairing
     /// record is needed, so imported pairing files work.
+    ///
+    /// Through the loopback, lockdownd counts this app as a host on the
+    /// network, so the heartbeat starts first and stays up with the tunnel.
+    /// Without it, CoreDeviceProxy hangs up on the tunnel request
+    /// (`LockdownHeartbeat`).
     private func connectCoreDeviceProxy(deviceIP: String, pairingFilePath: String,
                                         hostname: String) throws {
         let provider = try lockdownProvider(deviceIP: deviceIP,
@@ -435,16 +453,47 @@ final class DeviceConnection {
                                             hostname: hostname)
         defer { idevice_provider_free(provider) }
 
+        // iOS keeps one heartbeat per pairing, so the new one ends the old one,
+        // and the old tunnel with it. Stopped first, its thread doesn't report
+        // that as a failure.
+        heartbeat?.stop()
+        let newHeartbeat = startHeartbeat(provider, deviceIP: deviceIP)
         var newAdapter: OpaquePointer?
         var newHandshake: OpaquePointer?
-        try check(tunnel_create_usb(provider, &newAdapter, &newHandshake),
-                  "CoreDeviceProxy tunnel failed (is a loopback VPN connected, device IP \(deviceIP), and is this pairing file this iPhone's?)")
-        guard newAdapter != nil, newHandshake != nil else {
-            throw fail("tunnel created without valid handles")
+        do {
+            try check(tunnel_create_usb(provider, &newAdapter, &newHandshake),
+                      "CoreDeviceProxy tunnel failed (is a loopback VPN connected, device IP \(deviceIP), and is this pairing file this iPhone's?)")
+            guard newAdapter != nil, newHandshake != nil else {
+                throw fail("tunnel created without valid handles")
+            }
+        } catch {
+            newHeartbeat?.stop()
+            throw error
         }
         disconnect()
         adapter = newAdapter
         handshake = newHandshake
+        heartbeat = newHeartbeat
+    }
+
+    /// Connects to lockdownd's heartbeat through `provider` and answers it on a
+    /// thread of its own, returning once the first Marco is answered. iOS
+    /// sends that one as soon as the heartbeat connects.
+    ///
+    /// Nil, with the reason logged, when it doesn't start. The caller goes on
+    /// without it, as before there was a heartbeat, and reports what fails then.
+    private func startHeartbeat(_ provider: OpaquePointer, deviceIP: String) -> LockdownHeartbeat? {
+        var client: OpaquePointer?
+        if let error = ffiError(heartbeat_connect(provider, &client), "heartbeat_connect failed") {
+            Engine.shared.log("Lockdown heartbeat didn't start (\(error)). Trying without it …")
+            return nil
+        }
+        guard let client else { return nil }
+        let started = LockdownHeartbeat(client: client, deviceIP: deviceIP)
+        if !started.waitUntilAnswered(timeout: 5) {
+            Engine.shared.log("Lockdown heartbeat: no Marco from the iPhone within 5 s. Trying anyway …")
+        }
+        return started
     }
 
     /// A provider that reaches lockdownd at `deviceIP` with the classic pair
@@ -600,6 +649,9 @@ final class DeviceConnection {
         endLocationSimulation()
         if let handshake { rsd_handshake_free(handshake); self.handshake = nil }
         if let adapter { adapter_free(adapter); self.adapter = nil }
+        // Last, since iOS closes the tunnel once its heartbeat stops.
+        heartbeat?.stop()
+        heartbeat = nil
     }
 
     // MARK: RSD handshake summary
@@ -1654,6 +1706,12 @@ final class DeviceConnection {
                                             pairingFilePath: pairingFilePath,
                                             hostname: hostname)
         defer { idevice_provider_free(provider) }
+        // iOS closes AMFI without a heartbeat, like any other service. A new
+        // one would end this connection's own and close its tunnel, so that
+        // one is used while it's still answering this iPhone.
+        let ownAnswering = heartbeat.map { $0.isAnswering && $0.deviceIP == deviceIP } ?? false
+        let requestHeartbeat = ownAnswering ? nil : startHeartbeat(provider, deviceIP: deviceIP)
+        defer { requestHeartbeat?.stop() }
         var client: OpaquePointer?
         try check(amfi_connect(provider, &client), "amfi_connect failed")
         guard let client else { throw fail("AMFI client was null") }
@@ -1808,5 +1866,128 @@ private let installProgressCb: @convention(c) (UInt64, UnsafeMutableRawPointer?)
         guard Engine.shared.installProgress != fraction else { return }
         Engine.shared.installProgress = fraction
         Engine.shared.log("install progress: \(progress)%")
+    }
+}
+
+/// Answers lockdownd's heartbeat (`com.apple.mobile.heartbeat`) on a thread of
+/// its own, for the services one lockdown connection starts.
+///
+/// lockdownd sees an app coming through the loopback VPN as a host on the
+/// network, and wants such a host to answer its heartbeat: a Marco about every
+/// 10 s, each answered with a Polo. While none is answering, iOS closes what
+/// that host starts. CoreDeviceProxy finishes the TLS handshake, then hangs up
+/// on the tunnel request (`peer closed connection without sending TLS
+/// close_notify`, issues #105 and #107), and an open tunnel closes 6–9 s after
+/// its heartbeat stops. A computer on the same network answering one with the
+/// same pairing covers for it, which may be why the route worked for some
+/// without one. StikDebug, Feather and minimuxer answer it the same way.
+///
+/// iOS keeps one heartbeat per pairing: a new one closes the one before, and
+/// tunnels opened under that one close 6–9 s later, even with the new one
+/// answering. So a connection keeps one heartbeat for as long as its tunnel is
+/// open, and another app that starts its own with the same pairing file ends it.
+///
+/// Measured on 2026-10-31 on iOS 27.2 over Wi-Fi from a Mac, where lockdownd
+/// still takes network hosts. Not run through LocalDevVPN, which only goes
+/// through lockdownd before iOS 26.4.
+private final class LockdownHeartbeat {
+    /// The device IP the heartbeat reaches.
+    let deviceIP: String
+    /// Owned by the thread, which frees it on the way out.
+    private let client: OpaquePointer
+    private let condition = NSCondition()
+    private var answered = 0
+    private var ended = false
+    private var stopped = false
+
+    /// idevice's `IdeviceError::Heartbeat` code, which comes with sub-code 1
+    /// when the device is going to sleep and 2 when a Marco is late.
+    private static let heartbeatErrorCode: Int32 = 100
+    private static let sleepyTimeSubCode: Int32 = 1
+
+    /// Takes `client`, from `heartbeat_connect`, and starts answering it.
+    init(client: OpaquePointer, deviceIP: String) {
+        self.client = client
+        self.deviceIP = deviceIP
+        let thread = Thread { [self] in run() }
+        thread.name = "sideinstaller.heartbeat"
+        // A Polo that goes out too late closes the tunnel, mid-install too.
+        thread.qualityOfService = .userInitiated
+        thread.start()
+    }
+
+    /// True once a Marco has been answered, until the heartbeat stops or ends.
+    var isAnswering: Bool {
+        condition.lock(); defer { condition.unlock() }
+        return answered > 0 && !ended && !stopped
+    }
+
+    /// Waits up to `timeout` for the first Marco to be answered. False if it
+    /// wasn't, or the heartbeat ended first.
+    func waitUntilAnswered(timeout: TimeInterval) -> Bool {
+        let deadline = Date(timeIntervalSinceNow: timeout)
+        condition.lock(); defer { condition.unlock() }
+        while answered == 0, !ended, !stopped {
+            if !condition.wait(until: deadline) { break }
+        }
+        return answered > 0
+    }
+
+    /// Stops answering. The thread notices at the next Marco, at most about
+    /// 10 s later, then closes the connection.
+    func stop() {
+        condition.lock()
+        stopped = true
+        condition.broadcast()
+        condition.unlock()
+    }
+
+    private var isStopped: Bool {
+        condition.lock(); defer { condition.unlock() }
+        return stopped
+    }
+
+    private func run() {
+        defer {
+            heartbeat_client_free(client)
+            condition.lock()
+            ended = true
+            condition.broadcast()
+            condition.unlock()
+        }
+        // How long to wait for the next Marco: what iOS asked for, plus slack.
+        var wait: UInt64 = 15
+        while !isStopped {
+            var interval: UInt64 = 0
+            if let error = DeviceConnection.takeFFIError(heartbeat_get_marco(client, wait, &interval),
+                                                         "heartbeat_get_marco failed") {
+                if isStopped { return }
+                // A late Marco, or an iPhone going to sleep, doesn't end the
+                // heartbeat. The connection closing does.
+                if error.code == Self.heartbeatErrorCode {
+                    if error.subCode == Self.sleepyTimeSubCode {
+                        Engine.shared.log("Lockdown heartbeat: the iPhone is going to sleep.")
+                    }
+                    continue
+                }
+                Engine.shared.log("Lockdown heartbeat ended (\(error)). iOS closes the tunnel within seconds without it. Another app with this pairing file (SideStore, StikDebug, Feather) starting its own heartbeat ends this one.")
+                return
+            }
+            if isStopped { return }
+            if let error = DeviceConnection.takeFFIError(heartbeat_send_polo(client),
+                                                         "heartbeat_send_polo failed") {
+                Engine.shared.log("Lockdown heartbeat ended: the answer didn't go out (\(error)).")
+                return
+            }
+            wait = interval + 5
+            condition.lock()
+            answered += 1
+            let first = answered == 1
+            condition.broadcast()
+            condition.unlock()
+            if first {
+                Engine.shared.log("Lockdown heartbeat answered. iOS asks every \(interval) s.")
+            }
+        }
     }
 }

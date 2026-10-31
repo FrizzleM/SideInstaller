@@ -2,6 +2,14 @@
 
 All notable changes to SideInstaller are documented here.
 
+## 1.6.3
+
+### Fixed
+- **The device link opens with a pairing file made on a computer.** Before iOS 26.4, “Open the
+  device link” could stop with “peer closed connection without sending TLS close_notify” (#105,
+  #107). iOS closes what an app starts through LocalDevVPN unless the app answers its heartbeat,
+  as SideStore and StikDebug do. SideInstaller now answers it for as long as the link is open.
+
 ## 1.6.2
 
 ### Added
