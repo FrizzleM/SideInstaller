@@ -310,6 +310,12 @@ let spanishStrings: [String: String] = [
     "Couldn't use that certificate: %@": "No se ha podido usar ese certificado: %@",
     "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
         "SideStore no está instalado en este iPhone, así que no hay ningún certificado que obtener de él.",
+    "Inside LiveContainer, SideStore can't send its certificate back to SideInstaller, and LiveContainer doesn't hold one yet. In LiveContainer's Settings, tap “Import Certificate From SideStore” (sign in to SideStore first if it has no certificate), then try again here.":
+        "Dentro de LiveContainer, SideStore no puede devolver su certificado a SideInstaller, y LiveContainer aún no tiene ninguno. En los Settings de LiveContainer, toca “Import Certificate From SideStore” (inicia sesión antes en SideStore si no tiene certificado) y vuelve a intentarlo aquí.",
+    "The certificate LiveContainer holds for SideStore isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID. Nothing was changed. If SideStore has made a new one since, tap “Refresh Certificate from SideStore” in LiveContainer's Settings, then try again here.":
+        "El certificado que LiveContainer guarda para SideStore no es de este Apple ID: se ha revocado o pertenece a otro Apple ID. No se ha cambiado nada. Si SideStore ha creado uno nuevo desde entonces, toca “Refresh Certificate from SideStore” en los Settings de LiveContainer y vuelve a intentarlo aquí.",
+    "SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "SideInstaller toma el certificado de SideStore de LiveContainer y también firma con él, así que con un Apple ID gratuito ninguna de las dos apps tiene que revocar el de la otra.",
     "Sign with this certificate?": "¿Firmar con este certificado?",
     "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
         "Un enlace ha enviado a SideInstaller un certificado de firma. Úsalo solo si lo has pedido tú: a partir de ahora SideInstaller firmará las apps con él, en lugar de con el suyo. Solo se usa si es uno de los certificados de tu Apple ID.",

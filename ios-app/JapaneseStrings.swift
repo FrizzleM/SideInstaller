@@ -304,6 +304,12 @@ let japaneseStrings: [String: String] = [
     "Couldn't use that certificate: %@": "その証明書を使用できませんでした：%@",
     "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
         "この iPhone には SideStore がインストールされていないため、証明書を取得できません。",
+    "Inside LiveContainer, SideStore can't send its certificate back to SideInstaller, and LiveContainer doesn't hold one yet. In LiveContainer's Settings, tap “Import Certificate From SideStore” (sign in to SideStore first if it has no certificate), then try again here.":
+        "LiveContainer 内では SideStore が証明書を SideInstaller に送り返せず、LiveContainer もまだ証明書を持っていません。LiveContainer の「Settings」で「Import Certificate From SideStore」をタップし（SideStore に証明書がない場合は先に SideStore にサインインしてください）、ここでもう一度お試しください。",
+    "The certificate LiveContainer holds for SideStore isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID. Nothing was changed. If SideStore has made a new one since, tap “Refresh Certificate from SideStore” in LiveContainer's Settings, then try again here.":
+        "LiveContainer が SideStore 用に保持している証明書はこの Apple ID のものではありません。失効しているか、別の Apple ID のものです。何も変更されていません。その後 SideStore が新しい証明書を作成した場合は、LiveContainer の「Settings」で「Refresh Certificate from SideStore」をタップしてから、ここでもう一度お試しください。",
+    "SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "SideInstaller は LiveContainer から SideStore の証明書を取得し、その証明書でも署名するので、無料の Apple ID でもどちらのアプリも相手の証明書を失効させる必要がなくなります。",
     "Sign with this certificate?": "この証明書で署名しますか？",
     "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
         "リンクから SideInstaller に署名用証明書が送られてきました。自分で要求した場合のみ使ってください。今後 SideInstaller は自身の証明書の代わりにこの証明書でアプリに署名します。あなたの Apple ID の証明書である場合にのみ使用されます。",

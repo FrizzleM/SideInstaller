@@ -303,6 +303,12 @@ let chineseStrings: [String: String] = [
     "Couldn't use that certificate: %@": "无法使用该证书：%@",
     "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
         "这台 iPhone 上没有安装 SideStore，因此无法从中获取证书。",
+    "Inside LiveContainer, SideStore can't send its certificate back to SideInstaller, and LiveContainer doesn't hold one yet. In LiveContainer's Settings, tap “Import Certificate From SideStore” (sign in to SideStore first if it has no certificate), then try again here.":
+        "在 LiveContainer 中，SideStore 无法把证书发回 SideInstaller，而 LiveContainer 里也还没有证书。请在 LiveContainer 的 Settings 中轻点“Import Certificate From SideStore”（如果 SideStore 还没有证书，请先登录 SideStore），然后回到这里重试。",
+    "The certificate LiveContainer holds for SideStore isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID. Nothing was changed. If SideStore has made a new one since, tap “Refresh Certificate from SideStore” in LiveContainer's Settings, then try again here.":
+        "LiveContainer 为 SideStore 保存的证书不属于此 Apple ID：它已被吊销，或属于另一个 Apple ID。未做任何更改。如果 SideStore 之后生成了新证书，请在 LiveContainer 的 Settings 中轻点“Refresh Certificate from SideStore”，然后回到这里重试。",
+    "SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "SideInstaller 会从 LiveContainer 取得 SideStore 的证书，并也用它签名，这样在免费 Apple ID 上两个 App 都不必吊销对方的证书。",
     "Sign with this certificate?": "使用此证书签名？",
     "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
         "某个链接向 SideInstaller 发送了签名证书。只有在你主动请求时才使用：从现在起 SideInstaller 将用它代替自己的证书为 App 签名。只有当它是你 Apple ID 的证书时才会被使用。",
