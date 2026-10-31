@@ -10,18 +10,18 @@
       "iconURL": "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon~ios-marketing.png",
       "subtitle": "An an app that installs Sidestore on iOS 27, fully on-device",
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
-      "version": "1.6.3",
-      "versionDate": "2026-10-31T10:40:37Z",
-      "versionDescription": "# Fixed\n\n- With a pairing file made on a computer, “Open the device link” no longer stops with “peer closed connection without sending TLS close_notify” before iOS 26.4 (#105, #107). SideInstaller now answers the iPhone’s heartbeat while the link is open, as SideStore and StikDebug do.",
-      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.3/SideInstaller.ipa",
-      "size": 10328448,
+      "version": "1.6.4",
+      "versionDate": "2026-10-31T14:30:24Z",
+      "versionDescription": "# Fixed\n\n- Inside LiveContainer, “Use SideStore's certificate” now works (#95). SideStore's reply can't reach SideInstaller there, so SideInstaller takes the certificate LiveContainer holds instead (its built-in SideStore's, or the copy LiveContainer imported) and checks it against your Apple ID as before.\n- Inside LiveContainer, “Get it from SideStore” now imports the pairing file LiveContainer's built-in SideStore keeps, asking first, instead of opening SideStore for a reply that never came. In Multitask Mode, or when there's no file to take, it says what to do instead.",
+      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.4/SideInstaller.ipa",
+      "size": 10345806,
       "versions": [
         {
-          "version": "1.6.3",
-          "date": "2026-10-31T10:40:37Z",
-          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.3/SideInstaller.ipa",
-          "localizedDescription": "# Fixed\n\n- With a pairing file made on a computer, “Open the device link” no longer stops with “peer closed connection without sending TLS close_notify” before iOS 26.4 (#105, #107). SideInstaller now answers the iPhone’s heartbeat while the link is open, as SideStore and StikDebug do.",
-          "size": 10328448
+          "version": "1.6.4",
+          "date": "2026-10-31T14:30:24Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.4/SideInstaller.ipa",
+          "localizedDescription": "# Fixed\n\n- Inside LiveContainer, “Use SideStore's certificate” now works (#95). SideStore's reply can't reach SideInstaller there, so SideInstaller takes the certificate LiveContainer holds instead (its built-in SideStore's, or the copy LiveContainer imported) and checks it against your Apple ID as before.\n- Inside LiveContainer, “Get it from SideStore” now imports the pairing file LiveContainer's built-in SideStore keeps, asking first, instead of opening SideStore for a reply that never came. In Multitask Mode, or when there's no file to take, it says what to do instead.",
+          "size": 10345806
         }
       ]
     },
