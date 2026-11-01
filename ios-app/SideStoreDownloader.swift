@@ -1769,6 +1769,31 @@ extension IPALibrary {
                        version: dict["CFBundleShortVersionString"] as? String)
     }
 
+    /// The build of SideInstaller's own that the IPA at `url` is, told by its
+    /// bundle ID rather than its filename: SideStore, LiveContainer carrying
+    /// SideStore, or Madeira. A custom IPA that is one of them is set up just
+    /// like that build's download. Nil for any other app, and for LiveContainer
+    /// without SideStore, which has no SideStore to set up.
+    static func knownSource(ofIPAAt url: URL) -> InstallSource? {
+        guard let id = appInfo(at: url)?.bundleID else { return nil }
+        // As published, or with the team ID an earlier signing appended.
+        let source = InstallSource.allCases.first { source in
+            source.pairingBundleIDBase.map { id == $0 || id.hasPrefix($0 + ".") } ?? false
+        }
+        if source == .liveContainer, !carriesSideStore(url) { return nil }
+        return source
+    }
+
+    /// True when the app holds SideStore where LiveContainer + SideStore keeps
+    /// it, `Frameworks/SideStoreApp.framework`; plain LiveContainer has none.
+    private static func carriesSideStore(_ url: URL) -> Bool {
+        archiveFiles(at: url)?.contains { file in
+            let parts = file.path.split(separator: "/", maxSplits: 4, omittingEmptySubsequences: false)
+            return parts.count == 5 && parts[0] == "Payload" && parts[1].hasSuffix(".app")
+                && parts[2] == "Frameworks" && parts[3] == "SideStoreApp.framework"
+        } ?? false
+    }
+
     /// One file inside an IPA, for copying it out without unpacking the rest.
     struct ArchiveFile {
         /// Path inside the archive, e.g. "Payload/SideStore.app/Assets.car".

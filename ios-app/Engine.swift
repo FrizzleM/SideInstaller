@@ -403,21 +403,30 @@ final class Engine: ObservableObject {
     private var lastFullTunnelProbe: (key: String, result: NetworkStatus.ProbeResult, date: Date)?
     private var fullTunnelProbe: (key: String, task: Task<NetworkStatus.ProbeResult, Never>)?
 
+    /// The build installed, or being installed: the one picked, or the build
+    /// of SideInstaller's own that a custom IPA turned out to be, which is set
+    /// up just like that build's download.
+    private var installedBuild: InstallSource {
+        let source = downloadedSource ?? installSource
+        guard source == .custom else { return source }
+        return recognizedSource ?? .custom
+    }
+
     /// True when the installed build is LiveContainer + SideStore.
     var installedIsLiveContainer: Bool {
-        (downloadedSource ?? installSource) == .liveContainer
+        installedBuild == .liveContainer
     }
 
     /// Name of the build that was installed, or is selected.
     var installedSourceName: String {
-        let source = downloadedSource ?? installSource
+        let source = installedBuild
         if source == .custom, let signed = signedDisplayName { return signed }
         return source.displayName
     }
 
     /// Home-screen name of the app that landed on the device.
     var installedAppName: String {
-        (downloadedSource ?? installSource).pairingAppDisplayName
+        installedBuild.pairingAppDisplayName
             ?? signedDisplayName
             ?? L("your app")
     }
@@ -447,11 +456,16 @@ final class Engine: ObservableObject {
     private var downloadedSource: InstallSource?
     private var downloadedChannel: ReleaseChannel?
     private var downloadedVersion: String?
+    /// For a custom IPA, the build of SideInstaller's own it is, if it is one
+    /// (`IPALibrary.knownSource`).
+    private var recognizedSource: InstallSource?
     @Published var signedAppPath: String?
     /// CFBundleDisplayName read off the signed bundle.
     @Published private(set) var signedDisplayName: String?
     /// Filename of the IPA imported for `InstallSource.custom`, if any.
     @Published private(set) var customIPAName: String?
+    /// The build of SideInstaller's own that the imported IPA is, if it is one.
+    @Published private(set) var customIPABuild: InstallSource?
     /// True while a picked IPA is being copied in.
     @Published private(set) var isImportingIPA = false
     /// Download progress of a link import (0…1); nil for file imports.
@@ -500,7 +514,7 @@ final class Engine: ObservableObject {
         // Refresh the anisette server picker from the live community list.
         loadAnisetteServers()
         // Reflect an IPA imported in an earlier run.
-        customIPAName = IPALibrary.customImport()?.url.lastPathComponent
+        showCustomImport(IPALibrary.customImport()?.url)
         // A Madeira CI build from before Madeira had channels is its nightly.
         IPALibrary.moveMadeiraCIBuildsToNightly()
     }
@@ -708,8 +722,9 @@ final class Engine: ObservableObject {
                 try await signInStep()
                 try await download()
                 // Signing registers App IDs, which a free Apple ID has few of,
-                // so an imported IPA waits for the go-ahead first.
-                if downloadedSource == .custom {
+                // so an imported IPA waits for the go-ahead first, unless it's
+                // one of SideInstaller's own builds, installed like its download.
+                if installedBuild == .custom {
                     try await confirmAppIDCost()
                 }
                 // Most of the app is the same signed or not, so that part goes
@@ -1594,9 +1609,16 @@ final class Engine: ObservableObject {
                 setStep(.download, .done)
                 return
             }
-            // With the repository gone, the user's own copy is the only way in.
-            if (error as? SideStoreDownloader.DownloadError)?.isRepoUnavailable == true {
-                setGuide(Guides.repoUnavailable(source: src, saveAs: src.fileName(channel)))
+            if let failure = error as? SideStoreDownloader.DownloadError {
+                if failure.isRepoUnavailable {
+                    // With the repository gone, the user's own copy is the only way in.
+                    setGuide(Guides.repoUnavailable(source: src, saveAs: src.fileName(channel)))
+                } else if failure.manualSideloadHelps,
+                          let link = Self.manualDownloadLink(source: src, channel: channel, version: version) {
+                    // Where GitHub can't be reached, a copy fetched another way
+                    // goes in as a custom IPA.
+                    setGuide(Guides.githubUnreachable(source: src, link: link))
+                }
             }
             // Renaming a file to the build's name helps only the latest build.
             if version == nil { logImportHint(for: error, source: src, channel: channel) }
@@ -1673,6 +1695,7 @@ final class Engine: ObservableObject {
         downloadedSource = source
         downloadedChannel = channel
         downloadedVersion = version
+        recognizedSource = source == .custom ? IPALibrary.knownSource(ofIPAAt: url) : nil
     }
 
     // MARK: Versions to pick from (Advanced)
@@ -1713,6 +1736,9 @@ final class Engine: ObservableObject {
         }
         adopt(entry.url, source: source, channel: channel)
         log("Using your own \(entry.url.lastPathComponent) — skipping the download.")
+        if let known = recognizedSource {
+            log("\(entry.url.lastPathComponent) is \(known.displayName): it's set up the same way as SideInstaller's own download.")
+        }
         setStep(.download, .done)
     }
 
@@ -1727,7 +1753,7 @@ final class Engine: ObservableObject {
         log("Importing \(url.lastPathComponent) …")
         do {
             let dest = try await Self.copyImport(from: url)
-            customIPAName = dest.lastPathComponent
+            showCustomImport(dest)
             // Clear the cached path so the next run uses the new file.
             if downloadedSource == .custom { downloadedIPAPath = nil }
             setGuide(nil)
@@ -1771,7 +1797,7 @@ final class Engine: ObservableObject {
             // The download lives in its own staging directory; remove all of it.
             defer { try? FileManager.default.removeItem(at: downloaded.deletingLastPathComponent()) }
             let dest = try await Self.copyImport(from: downloaded)
-            customIPAName = dest.lastPathComponent
+            showCustomImport(dest)
             // Clear the cached path so the next run uses the new file.
             if downloadedSource == .custom { downloadedIPAPath = nil }
             setGuide(nil)
@@ -1845,7 +1871,14 @@ final class Engine: ObservableObject {
     /// Re-read the custom import from disk.
     @MainActor
     func refreshCustomIPA() {
-        customIPAName = IPALibrary.customImport()?.url.lastPathComponent
+        showCustomImport(IPALibrary.customImport()?.url)
+    }
+
+    /// Shows the custom import at `url`, or none, on the Install tab: its name,
+    /// and the build of SideInstaller's own it is.
+    private func showCustomImport(_ url: URL?) {
+        customIPAName = url?.lastPathComponent
+        customIPABuild = url.flatMap(IPALibrary.knownSource(ofIPAAt:))
     }
 
     /// Log the way past a failed download: rename a stray IPA, or fetch one
@@ -1863,7 +1896,17 @@ final class Engine: ObservableObject {
             return
         }
         guard (error as? SideStoreDownloader.DownloadError)?.manualSideloadHelps ?? true else { return }
-        log("Can't reach GitHub? Download \(source.displayName) on another device or through a proxy, rename it to \(wanted), copy it into Files › On My iPhone › SideInstaller, then tap Install again.")
+        log("Can't reach GitHub? Download \(source.displayName) on another device or through a proxy, then import it under Custom .ipa (it's recognized and set up the same way), or rename it to \(wanted) and copy it into Files › On My iPhone › SideInstaller. Then tap Install again.")
+    }
+
+    /// Where to get the build in a browser when SideInstaller can't download
+    /// it: the file itself when it has a fixed link, otherwise the releases page.
+    private static func manualDownloadLink(source: InstallSource, channel: ReleaseChannel,
+                                           version: ReleaseVersion?) -> URL? {
+        let releases = source.repo.flatMap { URL(string: "https://github.com/\($0)/releases") }
+        // A GitHub Actions build comes zipped, so the releases page stands in.
+        if let version { return version.artifactSHA256 == nil ? version.assetURL : releases }
+        return source.downloadURL(channel) ?? releases
     }
 
     // MARK: Step 6 — sign the IPA
@@ -2222,7 +2265,7 @@ final class Engine: ObservableObject {
         setStep(.writePairing, .active)
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         // The installed build decides the host app and where the file lands.
-        let source = downloadedSource ?? installSource
+        let source = installedBuild
         // Built on the sign queue, where all isideload calls run, before the
         // device-queue write below; a run starts it during the install.
         let accountConfig: String?
@@ -2368,7 +2411,7 @@ final class Engine: ObservableObject {
     /// Starts building the certificate hand-off for the build just signed.
     @MainActor
     private func startAccountConfig() -> Task<String?, Never> {
-        let source = downloadedSource ?? installSource
+        let source = installedBuild
         return Task { @MainActor in await self.accountConfigJSON(source: source) }
     }
 
@@ -2516,7 +2559,7 @@ final class Engine: ObservableObject {
     @MainActor
     private func finishSuccess() {
         finished = true
-        let source = downloadedSource ?? installSource
+        let source = installedBuild
         setGuide(signedAppIsMadeira(source)
                  ? Guides.trustMadeira(holding: madeiraHandoff)
                  : Guides.trust(appName: installedAppName))
@@ -4012,6 +4055,25 @@ enum Guides {
                 L("Then tap Install again — SideInstaller uses your file instead of downloading one."),
             ],
             actionLabel: nil, actionURLString: nil)
+    }
+
+    /// Shown when the build couldn't be downloaded because GitHub can't be
+    /// reached from here: blocked, filtered or cut off. Where a VPN app is the
+    /// way to GitHub, it can't carry the download, since LocalDevVPN holds the
+    /// one VPN iOS runs. A copy fetched another way goes in as a custom IPA,
+    /// which SideInstaller recognizes and sets up like its own download.
+    static func githubUnreachable(source: InstallSource, link: URL) -> Guide {
+        Guide(
+            title: L("Bring the .ipa yourself"),
+            systemImage: "tray.and.arrow.down",
+            steps: [
+                L("If you reach GitHub through a VPN or proxy app, turn off LocalDevVPN and turn that one on: iOS runs only one VPN at a time."),
+                L("Tap “Get the .ipa” below and save the file, or download it on another device and bring it over."),
+                L("Back in SideInstaller, pick Custom .ipa under Install, tap “Import .ipa” and choose the file. SideInstaller recognizes %@ and sets it up just like its own download.",
+                  source.displayName),
+                L("Turn LocalDevVPN back on, then tap Install."),
+            ],
+            actionLabel: L("Get the .ipa"), actionURLString: link.absoluteString)
     }
 
     static var pairing: Guide {

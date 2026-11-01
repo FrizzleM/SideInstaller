@@ -139,6 +139,8 @@ let koreanStrings: [String: String] = [
     "Replace": "교체",
     "or": "또는",
     "Paste a download link": "다운로드 링크 붙여넣기",
+    "SideInstaller recognizes this as %@ and sets it up just like its own download.":
+        "SideInstaller가 이 파일을 %@(으)로 인식하여 직접 다운로드한 경우와 똑같이 설정합니다.",
     "Downloading… %d%%": "다운로드 중… %d%%",
     "iOS %@ required": "iOS %@ 필요",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
@@ -704,6 +706,15 @@ let koreanStrings: [String: String] = [
         "그래도 설치하려면 신뢰할 수 있는 곳에서 .ipa를 구해 이름을 %@(으)로 바꾸고, 파일 › 나의 iPhone › SideInstaller에 복사하세요.",
     "Then tap Install again — SideInstaller uses your file instead of downloading one.":
         "그런 다음 설치를 다시 탭하세요. SideInstaller가 다운로드하는 대신 그 파일을 사용합니다.",
+    "If you reach GitHub through a VPN or proxy app, turn off LocalDevVPN and turn that one on: iOS runs only one VPN at a time.":
+        "VPN이나 프록시 앱을 통해 GitHub에 접속한다면 LocalDevVPN을 끄고 그 앱을 켜세요. iOS는 한 번에 VPN을 하나만 실행합니다.",
+    "Tap “Get the .ipa” below and save the file, or download it on another device and bring it over.":
+        "아래의 “.ipa 받기”를 탭하고 파일을 저장하거나, 다른 기기에서 다운로드한 다음 이쪽으로 옮기세요.",
+    "Back in SideInstaller, pick Custom .ipa under Install, tap “Import .ipa” and choose the file. SideInstaller recognizes %@ and sets it up just like its own download.":
+        "SideInstaller로 돌아와 설치에서 “사용자 지정 .ipa”를 선택하고 “.ipa 가져오기”를 탭한 다음 파일을 고르세요. SideInstaller가 %@을(를) 인식하여 직접 다운로드한 경우와 똑같이 설정합니다.",
+    "Turn LocalDevVPN back on, then tap Install.":
+        "LocalDevVPN을 다시 켠 다음 설치를 탭하세요.",
+    "Get the .ipa": ".ipa 받기",
     "Pair this iPhone in Settings": "설정에서 이 iPhone 페어링",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "설정 앱을 열고 개인정보 보호 및 보안 › 개발자 모드로 이동하세요.",

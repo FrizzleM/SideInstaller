@@ -140,6 +140,8 @@ let vietnameseStrings: [String: String] = [
     "Replace": "Thay",
     "or": "hoặc",
     "Paste a download link": "Dán liên kết tải xuống",
+    "SideInstaller recognizes this as %@ and sets it up just like its own download.":
+        "SideInstaller nhận ra đây là %@ và thiết lập nó y như bản tự tải về.",
     "Downloading… %d%%": "Đang tải… %d%%",
     "iOS %@ required": "Yêu cầu iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
@@ -811,6 +813,15 @@ let vietnameseStrings: [String: String] = [
         "Để vẫn cài được, hãy lấy tệp .ipa của nó từ một nguồn bạn tin cậy, đặt tên là %@ rồi chép vào Tệp › Trên iPhone của tôi › SideInstaller.",
     "Then tap Install again — SideInstaller uses your file instead of downloading one.":
         "Sau đó chạm vào Cài ứng dụng lần nữa — SideInstaller sẽ dùng tệp của bạn thay vì tải về.",
+    "If you reach GitHub through a VPN or proxy app, turn off LocalDevVPN and turn that one on: iOS runs only one VPN at a time.":
+        "Nếu bạn vào GitHub qua một ứng dụng VPN hoặc proxy, hãy tắt LocalDevVPN rồi bật ứng dụng đó: iOS chỉ chạy một VPN tại một thời điểm.",
+    "Tap “Get the .ipa” below and save the file, or download it on another device and bring it over.":
+        "Chạm vào “Lấy tệp .ipa” bên dưới và lưu tệp, hoặc tải tệp trên thiết bị khác rồi chuyển sang đây.",
+    "Back in SideInstaller, pick Custom .ipa under Install, tap “Import .ipa” and choose the file. SideInstaller recognizes %@ and sets it up just like its own download.":
+        "Quay lại SideInstaller, chọn IPA tùy chọn trong mục Cài ứng dụng, chạm vào “Nhập .ipa” rồi chọn tệp. SideInstaller nhận ra %@ và thiết lập nó y như bản tự tải về.",
+    "Turn LocalDevVPN back on, then tap Install.":
+        "Bật lại LocalDevVPN, rồi chạm vào Cài ứng dụng.",
+    "Get the .ipa": "Lấy tệp .ipa",
     "Pair this iPhone in Settings": "Ghép nối iPhone này trong Cài đặt",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "Mở ứng dụng Cài đặt, rồi vào Quyền riêng tư & Bảo mật › Chế độ nhà phát triển.",

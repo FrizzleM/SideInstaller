@@ -13,6 +13,14 @@ All notable changes to SideInstaller are documented here.
   version downloaded stays on as the nightly, so it isn't fetched again.
 
 ### Fixed
+- **A LiveContainer + SideStore you import is set up like the download.** Where GitHub can't be
+  reached, as in mainland China, the download step can't fetch the build, and the VPN that would
+  reach GitHub can't run beside LocalDevVPN, since iOS runs one VPN at a time (#108). Importing
+  the .ipa as a Custom .ipa got past that step, but left LiveContainer's built-in SideStore
+  without its pairing file and certificate. SideInstaller now recognizes SideStore,
+  LiveContainer + SideStore and Madeira in an imported .ipa, says so under Import .ipa, and sets
+  each up just as it does its own download. When a download can't reach GitHub, a card explains
+  how to bring the .ipa this way.
 - **Apps with an ExtensionKit extension install.** Some apps keep an extension in an Extensions
   folder rather than PlugIns, such as Mornye's Now Playing remote controls on iOS 27. SideInstaller
   added your team ID to the app's bundle ID but left those extensions' IDs as they were, so iOS

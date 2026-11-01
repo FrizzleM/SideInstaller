@@ -322,9 +322,26 @@ struct ContentView: View {
     private var importControl: some View {
         VStack(spacing: 10) {
             filePickerButton
+            if let build = engine.customIPABuild, !engine.isImportingIPA {
+                recognizedNote(build)
+            }
             orDivider
             linkField
         }
+        .animation(.smooth(duration: 0.25), value: engine.customIPABuild)
+    }
+
+    /// Says the imported IPA is one of SideInstaller's own builds, which the
+    /// install sets up just like its download: a LiveContainer + SideStore
+    /// brought from elsewhere gets its pairing file where SideStore reads it.
+    private func recognizedNote(_ build: InstallSource) -> some View {
+        Text(L("SideInstaller recognizes this as %@ and sets it up just like its own download.",
+               build.displayName))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .transition(.opacity)
     }
 
     /// "or" divider between the file picker and the link field.

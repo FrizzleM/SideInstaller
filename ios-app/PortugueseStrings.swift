@@ -140,6 +140,8 @@ let portugueseStrings: [String: String] = [
     "Replace": "Substituir",
     "or": "ou",
     "Paste a download link": "Cole um link de download",
+    "SideInstaller recognizes this as %@ and sets it up just like its own download.":
+        "O SideInstaller reconhece isto como %@ e o configura como se ele mesmo o tivesse baixado.",
     "Downloading… %d%%": "Baixando… %d%%",
     "iOS %@ required": "É necessário o iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
@@ -809,6 +811,15 @@ let portugueseStrings: [String: String] = [
         "Para instalá-lo mesmo assim, consiga o .ipa dele em uma fonte em que você confie, dê a ele o nome %@ e copie-o para Arquivos › No meu iPhone › SideInstaller.",
     "Then tap Install again — SideInstaller uses your file instead of downloading one.":
         "Depois, toque em Instalar de novo — o SideInstaller usa o seu arquivo em vez de baixar um.",
+    "If you reach GitHub through a VPN or proxy app, turn off LocalDevVPN and turn that one on: iOS runs only one VPN at a time.":
+        "Se você acessa o GitHub por um app de VPN ou proxy, desative o LocalDevVPN e ative esse app: o iOS mantém só uma VPN por vez.",
+    "Tap “Get the .ipa” below and save the file, or download it on another device and bring it over.":
+        "Toque em “Obter o .ipa” abaixo e salve o arquivo, ou baixe-o em outro aparelho e traga-o para cá.",
+    "Back in SideInstaller, pick Custom .ipa under Install, tap “Import .ipa” and choose the file. SideInstaller recognizes %@ and sets it up just like its own download.":
+        "De volta ao SideInstaller, escolha .ipa personalizado em Instalar, toque em “Importar .ipa” e escolha o arquivo. O SideInstaller reconhece %@ e o configura como se ele mesmo o tivesse baixado.",
+    "Turn LocalDevVPN back on, then tap Install.":
+        "Ative o LocalDevVPN de novo e toque em Instalar.",
+    "Get the .ipa": "Obter o .ipa",
     "Pair this iPhone in Settings": "Pareie este iPhone nos Ajustes",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "Abra o app Ajustes e vá em Privacidade e Segurança › Modo de Desenvolvedor.",

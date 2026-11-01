@@ -648,6 +648,18 @@ creation, and signing. Real code, unverified until run with real credentials.
   `Documents/ALTPairingFile.mobiledevicepairing`. The bundle id is read from the
   signed bundle's Info.plist (isideload rewrites it to `<orig>.<teamID>`),
   falling back to `com.SideStore.SideStore`.
+- **A custom IPA that is one of the app's own builds** (#108): where GitHub
+  can't be reached, users bring the .ipa as a custom IPA.
+  `IPALibrary.knownSource` tells SideStore, LiveContainer + SideStore and
+  Madeira apart by the IPA's bundle id (published, or with a team id appended);
+  LiveContainer counts only with `Frameworks/SideStoreApp.framework` inside,
+  since plain `LiveContainer.ipa` carries no SideStore. The run then treats it
+  as that build (`Engine.installedBuild`): pairing file and `Account.sideconf`
+  where it reads them (under LiveContainer, `SideStore/Documents/`), the split
+  pairing and anisette hand-offs, LiveContainer's certificate-import popup, and
+  no App ID prompt, which the downloaded builds don't get either. The early,
+  ahead-of-install pairing write stays off for custom IPAs; the one after the
+  install covers it.
 
 **Pairing-file format — resolved in 0.9.0 (was a documented caveat).** What the
 RPPairing host produces is an **RPPairing** record (`public_key`,
