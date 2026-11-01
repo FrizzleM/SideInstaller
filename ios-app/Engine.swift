@@ -501,6 +501,8 @@ final class Engine: ObservableObject {
         loadAnisetteServers()
         // Reflect an IPA imported in an earlier run.
         customIPAName = IPALibrary.customImport()?.url.lastPathComponent
+        // A Madeira CI build from before Madeira had channels is its nightly.
+        IPALibrary.moveMadeiraCIBuildsToNightly()
     }
 
     // MARK: - Anisette servers
@@ -1690,7 +1692,7 @@ final class Engine: ObservableObject {
         do {
             let catalog = try await SideStoreDownloader.releaseCatalog(source: source)
             releaseCatalogs[source] = catalog
-            log("Versions: \(source.displayName) has \(catalog.others[.stable]?.count ?? 0) stable and \(catalog.others[.nightly]?.count ?? 0) pre-release builds besides the latest.")
+            log("Versions: \(source.displayName) has \(catalog.others[.stable]?.count ?? 0) stable and \(catalog.others[.nightly]?.count ?? 0) nightly builds besides the latest.")
         } catch is CancellationError {
             // The picker closed mid-fetch; opening it again retries.
         } catch {

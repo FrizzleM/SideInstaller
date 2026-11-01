@@ -91,8 +91,8 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
-    /// GitHub "owner/repo" the IPA comes from: its releases, or for Madeira its
-    /// Actions builds (`actionsBuild`).
+    /// GitHub "owner/repo" the IPA comes from: its releases, and for Madeira's
+    /// nightly its Actions builds (`actionsBuild(_:)`).
     var repo: String? {
         switch self {
         case .sideStore:     return "SideStore/SideStore"
@@ -102,28 +102,29 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The workflow whose newest build is installed, for a build taken from
-    /// GitHub Actions instead of a release.
+    /// The workflow whose newest build the channel installs, for a channel
+    /// taken from GitHub Actions instead of a release.
     ///
-    /// Madeira's CI builds every push to main. Its newest release (0.1.3)
-    /// predates the self-refresh (willfaust/Madeira#264, merged 28 October
-    /// 2026) that SideInstaller hands its sign-in to.
-    var actionsBuild: ActionsBuild? {
-        switch self {
-        case .madeira:
+    /// Madeira publishes no nightly release: its nightly is the build CI makes
+    /// of every push to main. Its releases are the stable channel; the newest
+    /// (0.1.3) predates the self-refresh (willfaust/Madeira#264, merged 28
+    /// October 2026) that SideInstaller hands its sign-in to.
+    func actionsBuild(_ channel: ReleaseChannel) -> ActionsBuild? {
+        switch (self, channel) {
+        case (.madeira, .nightly):
             return ActionsBuild(repo: "willfaust/Madeira", workflow: "build.yml",
                                 branch: "main", artifact: "Madeira-ipa")
-        case .sideStore, .liveContainer, .custom:
+        default:
             return nil
         }
     }
 
-    /// False for a build with no nightly release, which is always installed
-    /// from the stable channel.
+    /// False for a build with no nightly, which is always installed from the
+    /// stable channel.
     var hasNightly: Bool {
         switch self {
-        case .sideStore, .liveContainer: return true
-        case .madeira, .custom:          return false
+        case .sideStore, .liveContainer, .madeira: return true
+        case .custom:                              return false
         }
     }
 
@@ -149,7 +150,8 @@ enum InstallSource: String, CaseIterable, Identifiable {
     }
 
     /// Published `.ipa` asset name, used to build the direct download URL. Nil
-    /// for Madeira, which comes from GitHub Actions.
+    /// for Madeira too, whose asset is named after its release: see
+    /// `assetFileName(forTag:)`.
     var assetFileName: String? {
         switch self {
         case .sideStore:        return "SideStore.ipa"
@@ -158,8 +160,20 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The `.ipa` asset's name on the release tagged `tag`, for a build that
+    /// names it after the version: "Madeira-0.1.3.ipa" on "v0.1.3".
+    func assetFileName(forTag tag: String) -> String? {
+        switch self {
+        case .madeira:
+            let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+            return version.isEmpty ? nil : "Madeira-\(version).ipa"
+        case .sideStore, .liveContainer, .custom:
+            return nil
+        }
+    }
+
     /// True when a release's title only repeats the build's name and the
-    /// version its tag carries ("SideStore 0.6.3" on "0.6.3").
+    /// version its tag carries ("Madeira 0.1.3" on "v0.1.3").
     func titleRestatesTag(_ title: String, tag: String) -> Bool {
         let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
         return [version, tag].contains {
@@ -298,8 +312,12 @@ enum InstallSource: String, CaseIterable, Identifiable {
             // Prefer the published name, in case the asset is renamed later.
             return assets.first { $0.name == "LiveContainer+SideStore.ipa" }
                 ?? assets.first { $0.name.lowercased().contains("sidestore") && $0.name.hasSuffix(".ipa") }
-        case .madeira, .custom:
-            // No release to pick from: Madeira comes from GitHub Actions.
+        case .madeira:
+            // "Madeira-<version>.ipa", beside its checksum file.
+            return assets.first { $0.name.lowercased().hasPrefix("madeira") && $0.name.hasSuffix(".ipa") }
+                ?? assets.first { $0.name.hasSuffix(".ipa") }
+        case .custom:
+            // No release to pick from.
             return nil
         }
     }
@@ -386,11 +404,19 @@ struct ReleaseCatalog {
         self.fetched = fetched
     }
 
-    /// For a build from GitHub Actions, which has no nightly: `builds` newest
-    /// first, the first of them being what "Latest" installs.
-    init(builds: [ReleaseVersion], fetched: Date = Date()) {
-        latest = builds.first.map { [.stable: $0] } ?? [:]
-        others = builds.count > 1 ? [.stable: Array(builds.dropFirst())] : [:]
+    /// For a build whose nightly comes from GitHub Actions: its releases make
+    /// the stable channel, and `builds`, newest first, the nightly one, the
+    /// first of them being what "Latest" installs. Pre-releases aren't
+    /// offered, since the nightly channel never installs them.
+    init(source: InstallSource, releases: [SideStoreDownloader.GHRelease],
+         builds: [ReleaseVersion], fetched: Date = Date()) {
+        let released = ReleaseCatalog(source: source, releases: releases, fetched: fetched)
+        var latest = released.latest
+        latest[.nightly] = builds.first
+        var others = released.others
+        others[.nightly] = builds.count > 1 ? Array(builds.dropFirst()) : nil
+        self.latest = latest
+        self.others = others
         self.fetched = fetched
     }
 
@@ -574,11 +600,11 @@ enum SideStoreDownloader {
                                channel: ReleaseChannel,
                                log: @escaping (String) -> Void) async throws -> String {
         guard source.repo != nil else { throw DownloadError.notDownloadable }
-        if let actions = source.actionsBuild {
+        if let actions = source.actionsBuild(channel) {
             let build = try await latestBuild(actions, of: source)
             log("Newest \(source.displayName) build of \(actions.repo)'s \(actions.branch) branch: \(build.menuTitle).")
-            let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(.stable))
-            try await downloadArtifact(build, of: source, to: dest, log: log)
+            let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
+            try await downloadArtifact(build, of: source, channel: channel, to: dest, log: log)
             return dest.path
         }
 
@@ -666,13 +692,50 @@ enum SideStoreDownloader {
     }
 
     /// Where the channel's newest IPA is and what it's called, without asking
-    /// the API.
+    /// the API. A build whose asset is named after its version (Madeira) has
+    /// its latest tag looked up first.
     private static func latestAsset(of source: InstallSource,
                                     channel: ReleaseChannel) async throws -> (url: URL, name: String) {
-        guard let direct = source.downloadURL(channel), let name = source.assetFileName else {
-            throw DownloadError.notDownloadable
+        if let direct = source.downloadURL(channel), let name = source.assetFileName {
+            return (direct, name)
         }
-        return (direct, name)
+        // Only a stable release is found by its tag: `releases/latest` skips
+        // pre-releases.
+        guard channel == .stable, let repo = source.repo else { throw DownloadError.notDownloadable }
+        let tag = try await latestTag(of: repo)
+        guard let name = source.assetFileName(forTag: tag),
+              let path = "\(repo)/releases/download/\(tag)/\(name)"
+                  .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let url = URL(string: "https://github.com/\(path)")
+        else { throw DownloadError.badURL }
+        return (url, name)
+    }
+
+    /// The tag of a repo's latest full release, read off where its
+    /// `releases/latest` page redirects to (`releases/tag/<tag>`). Like the
+    /// download link and unlike the API, that page has no per-IP rate limit.
+    private static func latestTag(of repo: String) async throws -> String {
+        guard let page = URL(string: "https://github.com/\(repo)/releases/latest") else {
+            throw DownloadError.badURL
+        }
+        var req = URLRequest(url: page, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
+        req.httpMethod = "HEAD"
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        // The recorder keeps the request a HEAD through the redirect.
+        let (_, response) = try await perform {
+            try await URLSession.shared.data(for: req, delegate: ReleaseTagRecorder())
+        }
+        try check(response)
+        let parts = response.url?.pathComponents ?? []
+        guard let marker = parts.lastIndex(of: "tag"), marker > 0, parts[marker - 1] == "releases",
+              marker + 1 < parts.count
+        else {
+            // A repo without a full release lands on its release list instead.
+            // Reported as a missing asset, so the API is asked next.
+            throw DownloadError.badStatus(status: 404, detail: nil, retryAfter: nil)
+        }
+        // A tag can hold slashes, which arrive as further path components.
+        return parts[(marker + 1)...].joined(separator: "/")
     }
 
     /// Downloads one release picked under Advanced. It's saved under its own
@@ -685,7 +748,7 @@ enum SideStoreDownloader {
         let dest = IPALibrary.documentsDir
             .appendingPathComponent(source.fileName(channel, version: version.tag))
         if version.artifactSHA256 != nil {
-            try await downloadArtifact(version, of: source, to: dest, log: log)
+            try await downloadArtifact(version, of: source, channel: channel, to: dest, log: log)
         } else {
             if let current = await unchangedDownload(dest, at: version.assetURL, log: log) {
                 return current.path
@@ -881,13 +944,16 @@ enum SideStoreDownloader {
     }
 
     /// Every release of `source` the version picker can offer, from one API
-    /// call; for a build from GitHub Actions, its recent builds.
+    /// call; for a build whose nightly comes from GitHub Actions, its recent
+    /// builds too, from another.
     static func releaseCatalog(source: InstallSource) async throws -> ReleaseCatalog {
         guard let repo = source.repo else { throw DownloadError.notDownloadable }
-        if let actions = source.actionsBuild {
-            let builds = try await recentBuilds(actions)
+        if let actions = source.actionsBuild(.nightly) {
+            async let releases = recentReleases(of: repo, count: 100)
+            var builds = try await recentBuilds(actions)
             // None among the newest uploads: "Latest" is still looked up.
-            return ReleaseCatalog(builds: builds.isEmpty ? [try await newestRunBuild(actions, of: source)] : builds)
+            if builds.isEmpty { builds = [try await newestRunBuild(actions, of: source)] }
+            return ReleaseCatalog(source: source, releases: try await releases, builds: builds)
         }
         do {
             return ReleaseCatalog(source: source, releases: try await recentReleases(of: repo, count: 100))
@@ -1025,7 +1091,8 @@ enum SideStoreDownloader {
     /// Downloads Actions build `build` through nightly.link and keeps the IPA
     /// inside it as `dest`, unless `dest` is that build already. The zip must
     /// be the one GitHub recorded.
-    private static func downloadArtifact(_ build: ReleaseVersion, of source: InstallSource, to dest: URL,
+    private static func downloadArtifact(_ build: ReleaseVersion, of source: InstallSource,
+                                         channel: ReleaseChannel, to dest: URL,
                                          log: @escaping (String) -> Void) async throws {
         guard let expected = build.artifactSHA256 else {
             throw DownloadError.unverifiedBuild(source.displayName)
@@ -1038,7 +1105,7 @@ enum SideStoreDownloader {
 
         let fetched: Fetched
         do {
-            fetched = try await fetch(build.assetURL, named: build.assetName, from: .stable, log: log)
+            fetched = try await fetch(build.assetURL, named: build.assetName, from: channel, log: log)
         } catch DownloadError.badStatus(let status, _, _) {
             throw DownloadError.relayFailed(source.displayName, detail: "HTTP \(status)")
         } catch DownloadError.unreachable(let error) {
@@ -1056,7 +1123,7 @@ enum SideStoreDownloader {
             try? FileManager.default.removeItem(at: ipa)
             throw DownloadError.notAnIPA(build.assetName)
         }
-        try store(Fetched(file: ipa, name: member, channel: .stable, etag: expected), as: dest)
+        try store(Fetched(file: ipa, name: member, channel: channel, etag: expected), as: dest)
     }
 
     /// Runs a URLSession call, mapping `URLError` to `.unreachable` (or to
@@ -1539,6 +1606,26 @@ enum IPALibrary {
         return scan()
             .filter { $0.source == source && $0.channel == channel && $0.version == nil }
             .min { rank($0) < rank($1) }
+    }
+
+    /// Moves Madeira CI builds the app downloaded before 1.6.5 to the nightly
+    /// names. Madeira had only its CI builds then, saved under the stable
+    /// names ("Madeira.ipa", "Madeira (e96065a).ipa"); its stable channel now
+    /// installs releases. The ledger tells the two apart: a CI build's ETag is
+    /// its zip's bare SHA-256, a release's is the quoted ETag GitHub sent.
+    static func moveMadeiraCIBuildsToNightly() {
+        let fm = FileManager.default
+        for entry in scan() where entry.source == .madeira && entry.channel == .stable && !entry.isImported {
+            guard let etag = DownloadLedger.etag(for: entry.url),
+                  etag.count == 64, etag.allSatisfy(\.isHexDigit) else { continue }
+            let dest = documentsDir.appendingPathComponent(
+                InstallSource.madeira.fileName(.nightly, version: entry.version))
+            guard !fm.fileExists(atPath: dest.path),
+                  (try? fm.moveItem(at: entry.url, to: dest)) != nil else { continue }
+            // A move keeps the size and modification date the ledger checks.
+            DownloadLedger.record(dest, etag: etag)
+            DownloadLedger.forget(entry.url)
+        }
     }
 
     /// The app's earlier download of a version picked under Advanced, if it's

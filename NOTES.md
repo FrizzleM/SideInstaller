@@ -1112,16 +1112,24 @@ SideStore, LiveContainer + SideStore and the mirror.
 [Madeira](https://github.com/willfaust/Madeira) (Windows PC games through Wine and
 FEX) is a fourth `InstallSource`. Four things differ from SideStore.
 
-**The download.** It's the newest CI build of upstream's main branch
-(`InstallSource.actionsBuild`): the `Madeira-ipa` artifact that
+**The download.** Since 1.6.5 Madeira has both channels, like SideStore.
+Stable is upstream's newest full release: its tag is read off where
+`github.com/willfaust/Madeira/releases/latest` redirects (no API call), and the
+asset is named after it (`assetFileName(forTag:)`: `Madeira-0.1.3.ipa` on
+`v0.1.3`), saved as `Madeira.ipa`; when that 404s, the releases API is asked,
+as for the others. Nightly is the newest CI build of upstream's main branch
+(`InstallSource.actionsBuild(.nightly)`): the `Madeira-ipa` artifact that
 willfaust/Madeira's "Build IPA" workflow (`build.yml`) uploads on every push, a
 zip holding `Madeira.ipa`. Upstream's newest release, 0.1.3, predates the
-self-refresh (willfaust/Madeira#264, merged 28 October 2026), and the main build
-has the `MadeiraSigningAccountVersion` key and the 32-bit Windows DLLs. Before
+self-refresh (willfaust/Madeira#264, merged 28 October 2026), so only Nightly
+has the `MadeiraSigningAccountVersion` key (and the 32-bit Windows DLLs) until
+a release does; a Stable install is refreshed under Tools › Sideloaded apps like
+any other app. In
+1.6.2–1.6.4 Latest was the CI build and there was no channel picker; before
 1.6.2 Madeira came from releases of the fork FrizzleM/Madeira.
 
-GitHub serves artifacts only to a signed-in account (the API's `/zip` answers
-401), so:
+For Nightly: GitHub serves artifacts only to a signed-in account (the API's
+`/zip` answers 401), so:
 - One unauthenticated API call, `actions/artifacts?name=Madeira-ipa&per_page=100`,
   lists the uploads with each one's commit and the SHA-256 GitHub recorded
   (`digest`). Only runs of `main` in the repository itself count: pull requests
@@ -1136,12 +1144,16 @@ GitHub serves artifacts only to a signed-in account (the API's `/zip` answers
   nightly.link refusing or unreachable: `relayFailed`.
 - `IPALibrary.extractIPA(fromArtifact:to:)` streams the IPA out of the zip
   (stored, as the workflow uploads it with `compression-level: 0`, or deflated)
-  and the IPA is saved as `Madeira.ipa`. The ledger records the zip's digest as
-  its ETag, so a later run that finds the same build skips the download.
+  and the IPA is saved as `Madeira-nightly.ipa`. The ledger records the zip's
+  digest as its ETag, so a later run that finds the same build skips the
+  download. At launch, `IPALibrary.moveMadeiraCIBuildsToNightly` renames a CI
+  build 1.6.2–1.6.4 saved under the stable names (`Madeira.ipa`,
+  `Madeira (e96065a).ipa`) to the nightly ones, told apart by that bare 64-hex
+  ETag (a release's is GitHub's quoted one).
 
 The API's hourly limit (60 per address) applies, unlike the release downloads;
-when it's hit, the download step falls back to the `Madeira.ipa` an earlier
-run left, as for any failed download. GitHub's artifact storage was about 4×
+when it's hit, the download step falls back to the `Madeira-nightly.ipa` an
+earlier run left, as for any failed download. GitHub's artifact storage was about 4×
 slower than release downloads from here (0.8 against 3.6 MB/s on 28 October
 2026, the same with four parallel ranges), so the 183 MB zip takes minutes;
 the prefetch during pairing and sign-in hides part of it. Artifacts expire after
@@ -1154,10 +1166,12 @@ nightly.link's storage link is valid for ten minutes (`st`…`se`) and answers 4
 once expired (checked on the real one), which sends the download back to
 nightly.link for a new one.
 
-Advanced lists the `main` builds from that same API call, one per commit,
-labelled with the short commit and build date ("e96065a · 28 Oct 2026"); a picked
-one is saved as `Madeira (e96065a).ipa`. There's no nightly, so the channel
-picker is hidden and `Engine.selectedChannel` is always stable.
+Advanced lists the releases under Stable and, under Nightly, the `main` builds
+from that same API call, one per commit, labelled with the short commit and
+build date ("e96065a · 28 Oct 2026"); a picked one is saved as
+`Madeira-nightly (e96065a).ipa`. Listing both costs two API calls
+(`ReleaseCatalog(source:releases:builds:)`); pre-releases aren't offered, since
+Nightly never installs one.
 `minimumOSMajorVersion` stops a run below iOS 26, which Madeira's JIT helper
 needs.
 
