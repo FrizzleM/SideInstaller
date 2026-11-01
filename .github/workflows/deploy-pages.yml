@@ -1,0 +1,58 @@
+name: deploy-pages
+
+# frizzlem.github.io/SideInstaller only redirects now. The install site is
+# sideinstaller.net, built and deployed by FrizzleM/SideInstaller-Signed (which
+# still takes terms.html and open.html from this repository).
+#
+# This publishes index.html, plus a copy as 404.html, so every old path here
+# lands on the same path at sideinstaller.net.
+#
+# Settings › Pages › Source stays "GitHub Actions", with no custom domain.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - ".github/workflows/deploy-pages.yml"
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write      # publish the site
+  id-token: write   # required by actions/deploy-pages
+
+jobs:
+  deploy:
+    name: Deploy the redirect
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /index.html
+
+      - name: Assemble the site
+        run: |
+          mkdir _site
+          cp index.html _site/index.html
+          cp index.html _site/404.html
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
