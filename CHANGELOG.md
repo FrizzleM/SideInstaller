@@ -19,6 +19,11 @@ All notable changes to SideInstaller are documented here.
   refused the app with “Mismatched bundle IDs” (#110), and it didn't sign them either. They now
   get the new ID, the app's provisioning profile and a signature of their own, like the
   extensions in PlugIns.
+- **Apps with data after a binary's signature can be signed.** Signing stopped at “Sign the
+  app” with “cannot grow a code signature that is not at the end of the Mach-O slice” (#109).
+  TrollStore's signer, for one, leaves spare bytes after each signature it writes, so an IPA
+  taken from a TrollStore install could hit this, as could a tweak signed that way.
+  SideInstaller now leaves those bytes where they are and puts the new signature after them.
 
 ### Changed
 - **A certificate can be exported without a password.** The Certificates page's Export no longer

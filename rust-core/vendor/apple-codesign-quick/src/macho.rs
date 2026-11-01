@@ -134,26 +134,27 @@ fn sign_thin_macho(
     };
 
     let mut cms_blob_reservation = config.cms_blob_reservation;
+    let is_executable = macho.is_executable();
 
     for _ in 0..8 {
-        let code_limit = macho.code_signature_offset().unwrap_or(macho.data.len());
-        let planned_len = planned_superblob_len_from_parts(SuperblobSizePlan {
-            identifier: config.identifier,
-            team_id: config.team_id,
-            code_limit,
-            is_executable: macho.is_executable(),
-            requirements_blob_len: requirements.len(),
-            entitlements_blob_len: entitlements.len(),
-            der_entitlements_blob_len: der_entitlements.as_ref().map(Vec::len),
-            has_cms_signature: config.cms_signer.is_some(),
-            cms_blob_reservation,
-        });
+        // SideInstaller, 2026-11-01: the size is planned for where the signature
+        // will start, which reserve_code_signature decides (the code directories
+        // hash every page before it).
+        let signature_len_at = |code_limit| {
+            planned_superblob_len_from_parts(SuperblobSizePlan {
+                identifier: config.identifier,
+                team_id: config.team_id,
+                code_limit,
+                is_executable,
+                requirements_blob_len: requirements.len(),
+                entitlements_blob_len: entitlements.len(),
+                der_entitlements_blob_len: der_entitlements.as_ref().map(Vec::len),
+                has_cms_signature: config.cms_signer.is_some(),
+                cms_blob_reservation,
+            })
+        };
 
-        macho.reserve_code_signature(planned_len)?;
-
-        let code_limit = macho
-            .code_signature_offset()
-            .ok_or_else(|| CodeSignError::macho(path, "missing LC_CODE_SIGNATURE after reserve"))?;
+        let code_limit = macho.reserve_code_signature(signature_len_at)?;
         let exec_flags = entitlement_exec_flags(config.entitlements, macho.is_executable());
         let params = CodeDirectoryParams {
             identifier: config.identifier,
@@ -333,14 +334,15 @@ impl ThinMachO {
         self.filetype == MH_EXECUTE
     }
 
-    fn code_signature_offset(&self) -> Option<usize> {
-        self.code_signature_command_offset
-            .map(|offset| LittleEndian::read_u32(&self.data[offset + 8..offset + 12]) as usize)
-    }
-
-    fn reserve_code_signature(&mut self, signature_len: usize) -> Result<()> {
+    /// Makes room for the signature and returns where it starts, which is where
+    /// the signed code ends. `signature_len_at` is the signature's size for a
+    /// given start.
+    fn reserve_code_signature(
+        &mut self,
+        signature_len_at: impl Fn(usize) -> usize,
+    ) -> Result<usize> {
         if self.code_signature_command_offset.is_none() {
-            self.install_code_signature_command(signature_len)?;
+            self.install_code_signature_command(signature_len_at(self.data.len()))?;
         }
 
         let command_offset = self
@@ -352,20 +354,18 @@ impl ThinMachO {
             LittleEndian::read_u32(&self.data[command_offset + 12..command_offset + 16]) as usize;
 
         if datasize == 0 {
-            return self.allocate_code_signature(command_offset, signature_len);
+            return self.allocate_code_signature(command_offset, signature_len_at);
         }
 
+        let signature_len = signature_len_at(dataoff);
         if signature_len <= datasize {
             self.zero_signature_region(dataoff, datasize)?;
-            return Ok(());
+            return Ok(dataoff);
         }
 
         let old_end = checked_add(&self.path, dataoff, datasize, "code signature")?;
         if old_end < self.data.len() {
-            return Err(CodeSignError::macho(
-                &self.path,
-                "cannot grow a code signature that is not at the end of the Mach-O slice",
-            ));
+            return self.move_code_signature_to_end(command_offset, signature_len_at);
         }
 
         let linkedit_offset = self.linkedit_command_offset.ok_or_else(|| {
@@ -390,7 +390,91 @@ impl ThinMachO {
                 .map_err(|_| CodeSignError::macho(&self.path, "code signature size exceeds u32"))?,
         );
 
-        Ok(())
+        Ok(dataoff)
+    }
+
+    /// Puts the signature after everything else in the slice, for an old one
+    /// that is too small and has data after it.
+    ///
+    /// Signers that write a smaller signature over a bigger one can leave the
+    /// rest of the old space after it: ChOma's CoreTrust bypass, which TrollStore
+    /// signs apps with, shrinks LC_CODE_SIGNATURE to its new signature and keeps
+    /// the old one's padding after it, inside __LINKEDIT. The old signature and
+    /// what follows it stay where they are, in case something points into them;
+    /// __LINKEDIT grows over them and the new signature, and the code directories
+    /// hash them as code.
+    fn move_code_signature_to_end(
+        &mut self,
+        command_offset: usize,
+        signature_len_at: impl Fn(usize) -> usize,
+    ) -> Result<usize> {
+        let linkedit_offset = self.linkedit_command_offset.ok_or_else(|| {
+            CodeSignError::macho(&self.path, "missing __LINKEDIT segment for code signature")
+        })?;
+        let (linkedit_start, linkedit_end) = self.linkedit_file_range(linkedit_offset)?;
+        if linkedit_end > self.data.len() {
+            return Err(CodeSignError::macho(
+                &self.path,
+                "__LINKEDIT extends beyond the Mach-O slice",
+            ));
+        }
+        if self.segment_content_ends_after(linkedit_start, linkedit_offset) {
+            return Err(CodeSignError::macho(
+                &self.path,
+                "data follows the code signature, and __LINKEDIT is not the last segment",
+            ));
+        }
+
+        let dataoff = align_to(self.data.len(), CODE_SIGNATURE_ALIGNMENT);
+        let signature_len = signature_len_at(dataoff);
+        let end = checked_add(&self.path, dataoff, signature_len, "code signature")?;
+        self.grow_linkedit_segment(linkedit_offset, end - linkedit_end)?;
+        self.data.resize(end, 0);
+
+        LittleEndian::write_u32(
+            &mut self.data[command_offset + 8..command_offset + 12],
+            dataoff.try_into().map_err(|_| {
+                CodeSignError::macho(&self.path, "code signature offset exceeds u32")
+            })?,
+        );
+        LittleEndian::write_u32(
+            &mut self.data[command_offset + 12..command_offset + 16],
+            signature_len
+                .try_into()
+                .map_err(|_| CodeSignError::macho(&self.path, "code signature size exceeds u32"))?,
+        );
+
+        Ok(dataoff)
+    }
+
+    /// Whether a segment other than the one at `skip_command` has file content
+    /// that ends after `offset`.
+    fn segment_content_ends_after(&self, offset: usize, skip_command: usize) -> bool {
+        let mut command = self.header_size;
+        for _ in 0..self.ncmds {
+            let cmd = LittleEndian::read_u32(&self.data[command..command + 4]);
+            let cmdsize = LittleEndian::read_u32(&self.data[command + 4..command + 8]) as usize;
+            let file_range = match cmd {
+                LC_SEGMENT => Some((
+                    u64::from(LittleEndian::read_u32(&self.data[command + 32..command + 36])),
+                    u64::from(LittleEndian::read_u32(&self.data[command + 36..command + 40])),
+                )),
+                LC_SEGMENT_64 => Some((
+                    LittleEndian::read_u64(&self.data[command + 40..command + 48]),
+                    LittleEndian::read_u64(&self.data[command + 48..command + 56]),
+                )),
+                _ => None,
+            };
+            if let Some((fileoff, filesize)) = file_range
+                && command != skip_command
+                && filesize != 0
+                && fileoff.saturating_add(filesize) > offset as u64
+            {
+                return true;
+            }
+            command += cmdsize;
+        }
+        false
     }
 
     fn install_code_signature_command(&mut self, signature_len: usize) -> Result<()> {
@@ -444,12 +528,12 @@ impl ThinMachO {
     fn allocate_code_signature(
         &mut self,
         command_offset: usize,
-        signature_len: usize,
-    ) -> Result<()> {
+        signature_len_at: impl Fn(usize) -> usize,
+    ) -> Result<usize> {
         let linkedit_offset = self.linkedit_command_offset.ok_or_else(|| {
             CodeSignError::macho(&self.path, "missing __LINKEDIT segment for code signature")
         })?;
-        let linkedit_end = self.linkedit_file_end(linkedit_offset)?;
+        let (_, linkedit_end) = self.linkedit_file_range(linkedit_offset)?;
         if linkedit_end > self.data.len() {
             return Err(CodeSignError::macho(
                 &self.path,
@@ -458,6 +542,7 @@ impl ThinMachO {
         }
 
         let dataoff = align_to(linkedit_end, CODE_SIGNATURE_ALIGNMENT);
+        let signature_len = signature_len_at(dataoff);
         let padding = dataoff - linkedit_end;
         self.resize_linkedit_for_new_signature(linkedit_offset, padding, signature_len)?;
 
@@ -477,7 +562,7 @@ impl ThinMachO {
                 .map_err(|_| CodeSignError::macho(&self.path, "code signature size exceeds u32"))?,
         );
 
-        Ok(())
+        Ok(dataoff)
     }
 
     fn write_code_signature(&mut self, signature: &[u8]) -> Result<()> {
@@ -576,7 +661,8 @@ impl ThinMachO {
         Ok(())
     }
 
-    fn linkedit_file_end(&self, command_offset: usize) -> Result<usize> {
+    /// Where __LINKEDIT starts and ends in the file.
+    fn linkedit_file_range(&self, command_offset: usize) -> Result<(usize, usize)> {
         let cmd = LittleEndian::read_u32(&self.data[command_offset..command_offset + 4]);
         match cmd {
             LC_SEGMENT => {
@@ -586,7 +672,10 @@ impl ThinMachO {
                 let filesize =
                     LittleEndian::read_u32(&self.data[command_offset + 36..command_offset + 40])
                         as usize;
-                checked_add(&self.path, fileoff, filesize, "__LINKEDIT end")
+                Ok((
+                    fileoff,
+                    checked_add(&self.path, fileoff, filesize, "__LINKEDIT end")?,
+                ))
             }
             LC_SEGMENT_64 => {
                 let fileoff =
@@ -596,8 +685,12 @@ impl ThinMachO {
                 let end = fileoff
                     .checked_add(filesize)
                     .ok_or_else(|| CodeSignError::macho(&self.path, "__LINKEDIT end overflow"))?;
-                usize::try_from(end)
-                    .map_err(|_| CodeSignError::macho(&self.path, "__LINKEDIT end exceeds usize"))
+                let to_usize = |value: u64| {
+                    usize::try_from(value).map_err(|_| {
+                        CodeSignError::macho(&self.path, "__LINKEDIT end exceeds usize")
+                    })
+                };
+                Ok((to_usize(fileoff)?, to_usize(end)?))
             }
             _ => Err(CodeSignError::macho(
                 &self.path,
@@ -1058,6 +1151,138 @@ pub(crate) mod tests {
             err,
             CodeSignError::NeedsCodeSignatureAllocation { .. }
         ));
+    }
+
+    // SideInstaller, 2026-11-01: signatures with data after them (issue #109).
+
+    #[test]
+    fn moves_a_signature_with_padding_after_it_to_the_end() {
+        // ChOma's CoreTrust bypass (TrollStore) leaves zeroes after the signature, in __LINKEDIT.
+        let macho = macho_with_data_after_signature(64, &[0; 100], true);
+        let entitlements = Dictionary::new();
+        let signer = TestCmsSigner;
+        let config =
+            MachOSigningConfig::new("com.example.test", "TEAMID", &entitlements, Some(&signer));
+
+        let signed = sign_macho_data(Path::new("ChOmaBinary"), &macho, &config).unwrap();
+
+        let dataoff = signature_at_end(&signed);
+        assert_eq!(dataoff, align_to(macho.len(), CODE_SIGNATURE_ALIGNMENT));
+        assert_eq!(signed[512..macho.len()], macho[512..]);
+    }
+
+    #[test]
+    fn moves_a_signature_with_data_after_linkedit_to_the_end() {
+        let macho = macho_with_data_after_signature(64, &[0x5a; 100], false);
+        let entitlements = Dictionary::new();
+        let config = MachOSigningConfig::new("com.example.test", "TEAMID", &entitlements, None);
+
+        let signed = sign_macho_data(Path::new("TrailingDataBinary"), &macho, &config).unwrap();
+
+        let dataoff = signature_at_end(&signed);
+        assert_eq!(dataoff, align_to(macho.len(), CODE_SIGNATURE_ALIGNMENT));
+        assert_eq!(signed[512..macho.len()], macho[512..]);
+    }
+
+    #[test]
+    fn reuses_a_big_enough_signature_with_data_after_it() {
+        let macho = macho_with_data_after_signature(64 * 1024, &[0x5a; 100], true);
+        let entitlements = Dictionary::new();
+        let config = MachOSigningConfig::new("com.example.test", "TEAMID", &entitlements, None);
+
+        let signed = sign_macho_data(Path::new("RoomyBinary"), &macho, &config).unwrap();
+
+        let code_sig_cmd = 32 + 72 + 72;
+        assert_eq!(
+            LittleEndian::read_u32(&signed[code_sig_cmd + 8..code_sig_cmd + 12]),
+            512
+        );
+        assert_eq!(signed.len(), macho.len());
+        assert_eq!(signed[signed.len() - 100..], [0x5a; 100]);
+    }
+
+    #[test]
+    fn will_not_move_a_signature_over_another_segment() {
+        let mut macho = macho_with_data_after_signature(64, &[0x5a; 100], false);
+        // The data after the signature is a segment's, so __LINKEDIT can't grow over it.
+        write_segment_64(&mut macho, 32 + 72 + 72 + 16, "__EXTRA", 512 + 64, 100);
+        LittleEndian::write_u32(&mut macho[16..20], 4);
+        LittleEndian::write_u32(&mut macho[20..24], 72 + 72 + 16 + 72);
+        let entitlements = Dictionary::new();
+        let config = MachOSigningConfig::new("com.example.test", "TEAMID", &entitlements, None);
+
+        let err = sign_macho_data(Path::new("SegmentAfterLinkedit"), &macho, &config).unwrap_err();
+
+        assert!(matches!(
+            err,
+            CodeSignError::MachO { ref message, .. }
+                if message.contains("__LINKEDIT is not the last segment")
+        ));
+    }
+
+    #[test]
+    fn plans_an_empty_signature_for_where_it_lands() {
+        // dataoff 0 is stale: the signature goes after __LINKEDIT, 4 pages in.
+        let mut macho = minimal_macho_with_empty_signature();
+        macho.resize(4 * 4096, 0x55);
+        write_segment_64(&mut macho, 32 + 72, "__LINKEDIT", 512, 4 * 4096 - 512);
+        let code_sig_cmd = 32 + 72 + 72;
+        LittleEndian::write_u32(&mut macho[code_sig_cmd + 8..code_sig_cmd + 12], 0);
+        let entitlements = Dictionary::new();
+        let config = MachOSigningConfig::new("com.example.test", "TEAMID", &entitlements, None);
+
+        let signed = sign_macho_data(Path::new("StaleOffsetBinary"), &macho, &config).unwrap();
+
+        assert_eq!(signature_at_end(&signed), 4 * 4096);
+    }
+
+    /// minimal_macho_with_empty_signature with a `signature_len` byte signature,
+    /// followed by `tail` inside __LINKEDIT or past its end.
+    fn macho_with_data_after_signature(
+        signature_len: usize,
+        tail: &[u8],
+        linkedit_covers_tail: bool,
+    ) -> Vec<u8> {
+        let mut macho = minimal_macho_with_empty_signature();
+        macho.resize(512 + signature_len, 0xcc);
+        macho.extend_from_slice(tail);
+        let linkedit_size = signature_len + if linkedit_covers_tail { tail.len() } else { 0 };
+        write_segment_64(&mut macho, 32 + 72, "__LINKEDIT", 512, linkedit_size as u64);
+        let code_sig_cmd = 32 + 72 + 72;
+        LittleEndian::write_u32(
+            &mut macho[code_sig_cmd + 12..code_sig_cmd + 16],
+            signature_len as u32,
+        );
+        macho
+    }
+
+    /// Checks that the signature ends the file and __LINKEDIT and that its code
+    /// directory signs everything before it, and returns where it starts.
+    fn signature_at_end(signed: &[u8]) -> usize {
+        let linkedit_cmd = 32 + 72;
+        let code_sig_cmd = linkedit_cmd + 72;
+        let dataoff = LittleEndian::read_u32(&signed[code_sig_cmd + 8..code_sig_cmd + 12]) as usize;
+        let datasize =
+            LittleEndian::read_u32(&signed[code_sig_cmd + 12..code_sig_cmd + 16]) as usize;
+        let linkedit_end = LittleEndian::read_u64(&signed[linkedit_cmd + 40..linkedit_cmd + 48])
+            + LittleEndian::read_u64(&signed[linkedit_cmd + 48..linkedit_cmd + 56]);
+        let linkedit_vmsize = LittleEndian::read_u64(&signed[linkedit_cmd + 32..linkedit_cmd + 40]);
+
+        assert_eq!(signed.len(), dataoff + datasize);
+        assert_eq!(linkedit_end as usize, signed.len());
+        assert!(linkedit_vmsize >= linkedit_end - 512);
+        assert_eq!(
+            BigEndian::read_u32(&signed[dataoff..dataoff + 4]),
+            CSMAGIC_EMBEDDED_SIGNATURE
+        );
+        // The code directory is the first blob, with its code limit 32 bytes in.
+        let code_directory =
+            dataoff + BigEndian::read_u32(&signed[dataoff + 16..dataoff + 20]) as usize;
+        assert_eq!(
+            BigEndian::read_u32(&signed[code_directory + 32..code_directory + 36]) as usize,
+            dataoff
+        );
+        dataoff
     }
 
     pub(crate) fn minimal_macho_with_empty_signature() -> Vec<u8> {
