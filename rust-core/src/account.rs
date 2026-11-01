@@ -17,7 +17,9 @@ use isideload::{
     auth::apple_account::{TwoFactorCallbackParams, TwoFactorCallbackResponse},
     dev::app_ids::{AppIdsApi, ListAppIdsResponse},
     sideload::{
-        builder::MaxCertsBehavior, cert_identity::CertificateIdentity, sideloader::Sideloader,
+        builder::MaxCertsBehavior,
+        cert_identity::CertificateIdentity,
+        sideloader::{MemoryLimit, Sideloader},
         SideloaderBuilder, TeamSelection,
     },
     util::{fs_storage::FsStorage, storage::SideloadingStorage},
@@ -327,7 +329,7 @@ pub unsafe fn sign_ipa(
     udid: *const c_char,
     device_name: *const c_char,
     pairing_file_path: *const c_char,
-    increased_memory_limit: bool,
+    memory_limit: MemoryLimit,
     app_group: bool,
     out_signed_path: *mut *mut c_char,
     out_error: *mut *mut c_char,
@@ -368,7 +370,7 @@ pub unsafe fn sign_ipa(
                 .sign_app(
                     PathBuf::from(&ipa_path),
                     None,
-                    increased_memory_limit,
+                    memory_limit,
                     app_group,
                     device,
                     pairing_file.as_deref(),

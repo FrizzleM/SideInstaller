@@ -197,7 +197,7 @@ struct PairingView: View {
             .font(.subheadline.weight(.medium))
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.bordered, sound: .tap)
         .tint(Theme.brand)
         .controlSize(.regular)
         .disabled(manager.isBusy || engine.isRunning)
@@ -254,7 +254,7 @@ struct PairingView: View {
                     .font(.subheadline.weight(.medium))
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.bordered, sound: .tap)
                 .tint(Theme.accent)
                 .controlSize(.regular)
                 .disabled(manager.isBusy || engine.isRunning)

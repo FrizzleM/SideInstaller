@@ -308,6 +308,12 @@ let italianStrings: [String: String] = [
     "Couldn't use that certificate: %@": "Impossibile usare quel certificato: %@",
     "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
         "SideStore non è installato su questo iPhone, quindi non c'è nessun certificato da prendere.",
+    "Inside LiveContainer, SideStore can't send its certificate back to SideInstaller, and LiveContainer doesn't hold one yet. In LiveContainer's Settings, tap “Import Certificate From SideStore” (sign in to SideStore first if it has no certificate), then try again here.":
+        "Dentro LiveContainer, SideStore non può restituire il suo certificato a SideInstaller, e LiveContainer non ne ha ancora uno. Nelle Settings di LiveContainer tocca “Import Certificate From SideStore” (prima accedi a SideStore se non ha un certificato), poi riprova qui.",
+    "The certificate LiveContainer holds for SideStore isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID. Nothing was changed. If SideStore has made a new one since, tap “Refresh Certificate from SideStore” in LiveContainer's Settings, then try again here.":
+        "Il certificato che LiveContainer conserva per SideStore non è di questo Apple ID: è stato revocato, oppure appartiene a un altro Apple ID. Non è stato modificato nulla. Se nel frattempo SideStore ne ha creato uno nuovo, tocca “Refresh Certificate from SideStore” nelle Settings di LiveContainer, poi riprova qui.",
+    "SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "SideInstaller prende il certificato di SideStore da LiveContainer e firma anche con quello, così con un Apple ID gratuito nessuna delle due app deve revocare quello dell'altra.",
     "Sign with this certificate?": "Firmare con questo certificato?",
     "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
         "Un link ha inviato a SideInstaller un certificato di firma. Usalo solo se l'hai chiesto tu: d'ora in poi SideInstaller firmerà le app con esso, al posto del proprio. Viene usato solo se è uno dei certificati del tuo Apple ID.",
@@ -598,11 +604,17 @@ let italianStrings: [String: String] = [
     "Done": "Fine",
     "Language": "Lingua",
     "App language": "Lingua dell'app",
+    "Sounds": "Suoni",
+    "Sound effects": "Effetti sonori",
     "Auto": "Automatica",
     // The Tunnel section: starting LocalDevVPN from here.
     "Tunnel": "Tunnel",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "Qualcosa su %@:%d ha rifiutato la connessione, quindi il tunnel funziona: è il dispositivo che non è in ascolto sulla sua porta di abbinamento. Quella porta si apre solo con la Modalità sviluppatore attiva, e iOS la richiede di nuovo dopo ogni riavvio: attivala in Impostazioni › Privacy e sicurezza › Modalità sviluppatore, poi riprova. Se è già attiva, abbina di nuovo questo iPhone da “File di abbinamento”.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
+        "Qualcosa su %@:%d ha rifiutato la connessione, quindi il tunnel funziona, ma questo iPhone non è in ascolto sulla sua porta di abbinamento: la Modalità sviluppatore è disattivata. Attivala in Impostazioni › Privacy e sicurezza › Modalità sviluppatore (l'iPhone si riavvia), poi riprova.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
+        "Qualcosa su %@:%d ha rifiutato la connessione, quindi il tunnel funziona, ma questo iPhone non è in ascolto sulla sua porta di abbinamento, anche se la Modalità sviluppatore è attiva. Abbina di nuovo questo iPhone da “File di abbinamento”, poi riprova. Se non funziona ancora, riavvia l'iPhone.",
     "Start LocalDevVPN when needed": "Avvia LocalDevVPN quando serve",
     "Start LocalDevVPN now": "Avvia LocalDevVPN adesso",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -688,6 +700,12 @@ let italianStrings: [String: String] = [
         "ciò che è stato scaricato come %@ non è un IPA — qualcosa su questa rete ha restituito una pagina, oppure il trasferimento si è interrotto.",
     "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
         "quel link ha risposto HTTP %d — non è un download diretto, oppure richiede l'accesso.",
+    "GitHub has no build of %@'s %@ branch to download right now.":
+        "Al momento GitHub non ha build del ramo %2$@ di %1$@ da scaricare.",
+    "couldn't download %@ through nightly.link, which passes on GitHub's builds: %@":
+        "impossibile scaricare %@ tramite nightly.link, che inoltra le build di GitHub: %@",
+    "the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.":
+        "la build di %@ arrivata non è il file registrato da GitHub, quindi non viene installata. Riprova più tardi.",
 
     // MARK: - Engine failures
 
@@ -1077,6 +1095,14 @@ let italianStrings: [String: String] = [
         "SideStore si apre e rimanda il file di abbinamento che ha.",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
         "SideStore non è installato su questo iPhone, quindi non c'è nessun file di abbinamento da prendere.",
+    "SideInstaller takes the pairing file LiveContainer's built-in SideStore has.":
+        "SideInstaller prende il file di abbinamento del SideStore integrato in LiveContainer.",
+    "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
+        "Questo è il file di abbinamento del SideStore integrato in LiveContainer. SideInstaller lo userà per collegarsi a questo iPhone.",
+    "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
+        "Nella modalità Multitasking di LiveContainer, SideInstaller non può aprire i file del SideStore integrato. Apri SideInstaller in LiveContainer senza la modalità Multitasking, poi riprova, oppure tocca “Importa il file di abbinamento” e scegli il file creato dal tuo computer.",
+    "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
+        "Dentro LiveContainer, SideStore non può restituire il suo file di abbinamento a SideInstaller, e il SideStore integrato in LiveContainer non ne ha nessuno che SideInstaller possa usare. Tocca “Importa il file di abbinamento” e scegli il file creato dal tuo computer, oppure importane prima uno in SideStore, poi riprova qui.",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "Quel link di installazione non contiene nessun .ipa. Serve ?url= seguito dall'indirizzo https:// da cui si scarica l'.ipa.",
     "That link was meant to carry a pairing file, but what it holds can't be read.":
@@ -1101,6 +1127,12 @@ let italianStrings: [String: String] = [
     "not connected": "non connesso",
     "none": "nessuno",
     "made on this iPhone": "creato su questo iPhone",
+    "Runs inside LiveContainer": "Eseguito dentro LiveContainer",
+    "on": "attiva",
+    "off": "disattivata",
+    "unknown": "sconosciuta",
+    "yes": "sì",
+    "no": "no",
     "latest": "più recente",
     "custom server": "server personalizzato",
     "Auto, starts with %@": "Auto, parte da %@",
@@ -1121,8 +1153,14 @@ let italianStrings: [String: String] = [
     "Share the report": "Condividi la segnalazione",
     "Preview the report": "Anteprima della segnalazione",
     "Report": "Segnalazione",
-    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
-        "La segnalazione viene salvata in File › Sul mio iPhone › SideInstaller › Reports. Su GitHub allegala con “Paste, drop, or click to add files” sotto il testo, poi invia la segnalazione.",
+    "The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.":
+        "La segnalazione si apre già compilata. Se il registro è troppo lungo per farlo, SideInstaller lo copia perché tu lo incolli alla fine della segnalazione. La segnalazione completa viene salvata anche in %@.",
+    "Files › On My iPhone": "File › Sul mio iPhone",
+    "Copy the full log": "Copia il registro completo",
+    "Paste the log into the issue": "Incolla il registro nella segnalazione",
+    "Open GitHub": "Apri GitHub",
+    "The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue.":
+        "Il registro completo è troppo lungo per compilarlo, quindi SideInstaller l'ha copiato. Su GitHub tocca la fine del testo, scegli Incolla, poi invia la segnalazione.",
     "Describe the problem above first.": "Prima descrivi il problema qui sopra.",
     "Couldn't save the report: %@": "Impossibile salvare la segnalazione: %@",
 

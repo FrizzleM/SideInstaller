@@ -39,6 +39,27 @@ struct Mirror {
     let sha256: String
 }
 
+/// A build that a repository's GitHub Actions workflow makes of a branch, for
+/// a build installed from CI rather than from a release.
+///
+/// GitHub serves a workflow's artifacts only to a signed-in account, so the
+/// zip is downloaded through nightly.link, which fetches it for anyone, and
+/// checked against the SHA-256 GitHub's own API records for it.
+struct ActionsBuild {
+    /// GitHub "owner/repo" whose workflow makes the build.
+    let repo: String
+    /// The workflow's file name in `.github/workflows`.
+    let workflow: String
+    let branch: String
+    /// The name the workflow uploads the IPA under: a zip holding it.
+    let artifact: String
+
+    /// Where nightly.link serves artifact `id` of `repo`.
+    func relayURL(artifactID id: Int) -> URL? {
+        URL(string: "https://nightly.link/\(repo)/actions/artifacts/\(id).zip")
+    }
+}
+
 /// What to install: two SideStore builds and Madeira, fetched from GitHub, or a
 /// user-supplied IPA. Nothing is known about the latter, so its release
 /// properties are nil.
@@ -70,26 +91,40 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
-    /// GitHub "owner/repo" whose release holds the IPA.
-    ///
-    /// Madeira comes from FrizzleM's fork, whose releases are upstream Madeira
-    /// plus willfaust/Madeira#264 (it renews its own signing), until upstream
-    /// ships that.
+    /// GitHub "owner/repo" the IPA comes from: its releases, and for Madeira's
+    /// nightly its Actions builds (`actionsBuild(_:)`).
     var repo: String? {
         switch self {
         case .sideStore:     return "SideStore/SideStore"
         case .liveContainer: return "LiveContainer/LiveContainer"
-        case .madeira:       return "FrizzleM/Madeira"
+        case .madeira:       return "willfaust/Madeira"
         case .custom:        return nil
         }
     }
 
-    /// False for a build with no nightly release, which is always installed
-    /// from the stable channel.
+    /// The workflow whose newest build the channel installs, for a channel
+    /// taken from GitHub Actions instead of a release.
+    ///
+    /// Madeira publishes no nightly release: its nightly is the build CI makes
+    /// of every push to main. Its releases are the stable channel; the newest
+    /// (0.1.3) predates the self-refresh (willfaust/Madeira#264, merged 28
+    /// October 2026) that SideInstaller hands its sign-in to.
+    func actionsBuild(_ channel: ReleaseChannel) -> ActionsBuild? {
+        switch (self, channel) {
+        case (.madeira, .nightly):
+            return ActionsBuild(repo: "willfaust/Madeira", workflow: "build.yml",
+                                branch: "main", artifact: "Madeira-ipa")
+        default:
+            return nil
+        }
+    }
+
+    /// False for a build with no nightly, which is always installed from the
+    /// stable channel.
     var hasNightly: Bool {
         switch self {
-        case .sideStore, .liveContainer: return true
-        case .madeira, .custom:          return false
+        case .sideStore, .liveContainer, .madeira: return true
+        case .custom:                              return false
         }
     }
 
@@ -290,15 +325,22 @@ enum InstallSource: String, CaseIterable, Identifiable {
 
 // MARK: - Versions to pick from
 
-/// One release of a build, as the version picker under Advanced offers it.
+/// One release of a build, as the version picker under Advanced offers it, or
+/// one GitHub Actions build of it.
 struct ReleaseVersion: Identifiable, Hashable {
-    /// The release's tag, e.g. "0.6.3" or "alpha".
+    /// The release's tag, e.g. "0.6.3" or "alpha"; for an Actions build, its
+    /// short commit ("e96065a").
     let tag: String
     /// The release's title, which can carry a warning: "0.6.4 (DO NOT USE)".
+    /// An Actions build's gives its date: "e96065a · 28 Oct 2026".
     let name: String
-    /// The build's `.ipa` on this release.
+    /// The build's `.ipa` on this release, or an Actions build's zip.
     let assetName: String
     let assetURL: URL
+    /// For an Actions build: the SHA-256 GitHub recorded for its zip, in
+    /// lowercase hex. The download must match it, and the IPA is unpacked
+    /// from the zip. Nil for a release, whose asset is the IPA itself.
+    var artifactSHA256: String? = nil
 
     var id: String { tag }
 
@@ -362,6 +404,22 @@ struct ReleaseCatalog {
         self.fetched = fetched
     }
 
+    /// For a build whose nightly comes from GitHub Actions: its releases make
+    /// the stable channel, and `builds`, newest first, the nightly one, the
+    /// first of them being what "Latest" installs. Pre-releases aren't
+    /// offered, since the nightly channel never installs them.
+    init(source: InstallSource, releases: [SideStoreDownloader.GHRelease],
+         builds: [ReleaseVersion], fetched: Date = Date()) {
+        let released = ReleaseCatalog(source: source, releases: releases, fetched: fetched)
+        var latest = released.latest
+        latest[.nightly] = builds.first
+        var others = released.others
+        others[.nightly] = builds.count > 1 ? Array(builds.dropFirst()) : nil
+        self.latest = latest
+        self.others = others
+        self.fetched = fetched
+    }
+
     /// Nightly for a pre-release, whether GitHub flags it or its version says so
     /// ("0.7.0-alpha"); stable for a plain version number. Other tags
     /// ("auto-update-test") belong on neither.
@@ -417,6 +475,14 @@ enum SideStoreDownloader {
         /// A pasted link returned a non-2xx status (kept separate from the
         /// GitHub-specific `badStatus`).
         case linkStatus(Int)
+        /// GitHub lists no build of the branch an Actions build comes from
+        /// ("Madeira", "main").
+        case noBuild(String, branch: String)
+        /// nightly.link, which an Actions build is downloaded through, didn't
+        /// hand it over: its status, or why it couldn't be reached.
+        case relayFailed(String, detail: String)
+        /// What arrived for an Actions build isn't the zip GitHub recorded.
+        case unverifiedBuild(String)
 
         var description: String {
             switch self {
@@ -452,6 +518,14 @@ enum SideStoreDownloader {
                 // Usually 401/403: the link requires signing in.
                 return L("that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.",
                          status)
+            case let .noBuild(source, branch):
+                return L("GitHub has no build of %@'s %@ branch to download right now.", source, branch)
+            case let .relayFailed(source, detail):
+                return L("couldn't download %@ through nightly.link, which passes on GitHub's builds: %@",
+                         source, detail)
+            case let .unverifiedBuild(source):
+                return L("the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.",
+                         source)
             }
         }
 
@@ -459,9 +533,10 @@ enum SideStoreDownloader {
         /// interference), not for rate limits or missing releases.
         var manualSideloadHelps: Bool {
             switch self {
-            case .unreachable, .badRelease, .notAnIPA:
+            case .unreachable, .badRelease, .notAnIPA, .relayFailed, .unverifiedBuild:
                 return true
-            case .noIPAAsset, .noRelease, .badURL, .notDownloadable, .linkStatus, .repoUnavailable:
+            case .noIPAAsset, .noRelease, .badURL, .notDownloadable, .linkStatus, .repoUnavailable,
+                 .noBuild:
                 return false
             case let .badStatus(_, _, retryAfter):
                 return retryAfter == nil
@@ -494,7 +569,7 @@ enum SideStoreDownloader {
             case .noIPAAsset, .noRelease:
                 return true
             case .badURL, .notDownloadable, .badStatus, .repoUnavailable, .unreachable,
-                 .badRelease, .notAnIPA, .linkStatus:
+                 .badRelease, .notAnIPA, .linkStatus, .noBuild, .relayFailed, .unverifiedBuild:
                 return false
             }
         }
@@ -525,6 +600,13 @@ enum SideStoreDownloader {
                                channel: ReleaseChannel,
                                log: @escaping (String) -> Void) async throws -> String {
         guard source.repo != nil else { throw DownloadError.notDownloadable }
+        if let actions = source.actionsBuild(channel) {
+            let build = try await latestBuild(actions, of: source)
+            log("Newest \(source.displayName) build of \(actions.repo)'s \(actions.branch) branch: \(build.menuTitle).")
+            let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
+            try await downloadArtifact(build, of: source, channel: channel, to: dest, log: log)
+            return dest.path
+        }
 
         let existing = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
         // What the log calls the asset until its name is known.
@@ -617,7 +699,9 @@ enum SideStoreDownloader {
         if let direct = source.downloadURL(channel), let name = source.assetFileName {
             return (direct, name)
         }
-        guard let repo = source.repo else { throw DownloadError.notDownloadable }
+        // Only a stable release is found by its tag: `releases/latest` skips
+        // pre-releases.
+        guard channel == .stable, let repo = source.repo else { throw DownloadError.notDownloadable }
         let tag = try await latestTag(of: repo)
         guard let name = source.assetFileName(forTag: tag),
               let path = "\(repo)/releases/download/\(tag)/\(name)"
@@ -663,11 +747,15 @@ enum SideStoreDownloader {
                          log: @escaping (String) -> Void) async throws -> String {
         let dest = IPALibrary.documentsDir
             .appendingPathComponent(source.fileName(channel, version: version.tag))
-        if let current = await unchangedDownload(dest, at: version.assetURL, log: log) {
-            return current.path
+        if version.artifactSHA256 != nil {
+            try await downloadArtifact(version, of: source, channel: channel, to: dest, log: log)
+        } else {
+            if let current = await unchangedDownload(dest, at: version.assetURL, log: log) {
+                return current.path
+            }
+            let fetched = try await fetch(version.assetURL, named: version.assetName, from: channel, log: log)
+            try store(fetched, as: dest)
         }
-        let fetched = try await fetch(version.assetURL, named: version.assetName, from: channel, log: log)
-        try store(fetched, as: dest)
 
         // Keep one picked version per build and channel: drop the app's others.
         for other in IPALibrary.scan()
@@ -724,28 +812,24 @@ enum SideStoreDownloader {
     }
 
     /// Download one URL to a temporary file, if the response isn't a refusal.
+    ///
+    /// The IPA is tens or hundreds of megabytes, so a transfer that stalls or
+    /// drops carries on from the bytes already saved (`ResumingDownload`).
     private static func fetch(_ url: URL, named name: String, from channel: ReleaseChannel,
+                              idleTimeout: TimeInterval = 30,
                               log: @escaping (String) -> Void) async throws -> Fetched {
-        var req = URLRequest(url: url)
-        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
-        let redirects = ReleaseTagRecorder()
-
         log("Downloading \(name) …")
-        let (file, response) = try await perform(log: log) {
-            try await URLSession.shared.download(for: req, delegate: redirects)
-        }
+        let download = ResumingDownload(from: url, name: name, idleTimeout: idleTimeout, log: log)
         do {
-            // No body to quote: the download host refuses in plain text, not JSON.
-            try check(response)
+            let file = try await download.run()
+            let tag = download.tag.map { ", release \($0)" } ?? ""
+            let resumed = download.resumes > 0 ? ", resumed \(download.resumes)×" : ""
+            log("HTTP \(download.status) for \(name) — \(download.written) bytes\(tag)\(resumed)")
+            return Fetched(file: file, name: name, channel: channel, etag: download.etag)
         } catch {
-            try? FileManager.default.removeItem(at: file)
+            try? FileManager.default.removeItem(at: download.file)
             throw error
         }
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        let tag = redirects.tag.map { ", release \($0)" } ?? ""
-        log("HTTP \(status) for \(name) — \(response.expectedContentLength) bytes\(tag)")
-        return Fetched(file: file, name: name, channel: channel,
-                       etag: (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "ETag"))
     }
 
     /// Downloads a pasted link into its own temp directory, saved as `name`.
@@ -859,9 +943,18 @@ enum SideStoreDownloader {
         throw DownloadError.noIPAAsset(source.displayName, channel)
     }
 
-    /// Every release of `source` the version picker can offer, from one API call.
+    /// Every release of `source` the version picker can offer, from one API
+    /// call; for a build whose nightly comes from GitHub Actions, its recent
+    /// builds too, from another.
     static func releaseCatalog(source: InstallSource) async throws -> ReleaseCatalog {
         guard let repo = source.repo else { throw DownloadError.notDownloadable }
+        if let actions = source.actionsBuild(.nightly) {
+            async let releases = recentReleases(of: repo, count: 100)
+            var builds = try await recentBuilds(actions)
+            // None among the newest uploads: "Latest" is still looked up.
+            if builds.isEmpty { builds = [try await newestRunBuild(actions, of: source)] }
+            return ReleaseCatalog(source: source, releases: try await releases, builds: builds)
+        }
         do {
             return ReleaseCatalog(source: source, releases: try await recentReleases(of: repo, count: 100))
         } catch let error as DownloadError where error.isRepoUnavailable && source.mirror != nil {
@@ -872,24 +965,165 @@ enum SideStoreDownloader {
 
     /// A repo's `count` newest releases, newest first.
     private static func recentReleases(of repo: String, count: Int) async throws -> [GHRelease] {
-        guard let api = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=\(count)")
+        try await apiGet("releases?per_page=\(count)", of: repo)
+    }
+
+    /// One answer of GitHub's API about `repo`, decoded. Every path asked for
+    /// answers 200 when there's nothing to list, so a 404 is the repository
+    /// itself.
+    private static func apiGet<T: Decodable>(_ path: String, of repo: String) async throws -> T {
+        guard let api = URL(string: "https://api.github.com/repos/\(repo)/\(path)")
         else { throw DownloadError.badURL }
         var req = URLRequest(url: api)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await perform { try await URLSession.shared.data(for: req) }
-        // A repo without releases answers 200 with an empty list, so a 404 here
-        // is the repository itself.
         if (response as? HTTPURLResponse)?.statusCode == 404 {
             throw DownloadError.repoUnavailable(repo)
         }
         try check(response, body: data)
         do {
-            return try JSONDecoder().decode([GHRelease].self, from: data)
+            return try JSONDecoder().decode(T.self, from: data)
         } catch {
             throw DownloadError.badRelease(String(describing: error))
         }
+    }
+
+    // MARK: Builds from GitHub Actions
+
+    /// One upload of a workflow's artifact, as GitHub's API lists it.
+    private struct GHArtifact: Decodable {
+        struct Run: Decodable {
+            let repository_id: Int
+            let head_repository_id: Int?
+            let head_branch: String?
+            let head_sha: String
+        }
+        let id: Int
+        let name: String
+        let expired: Bool
+        /// "sha256:<hex>" of the zip GitHub stores.
+        let digest: String?
+        let created_at: String?
+        let workflow_run: Run?
+    }
+    private struct GHArtifactList: Decodable {
+        let artifacts: [GHArtifact]
+    }
+    private struct GHRunList: Decodable {
+        struct Run: Decodable {
+            struct Repo: Decodable { let id: Int }
+            let id: Int
+            let event: String
+            let repository: Repo
+            let head_repository: Repo?
+        }
+        let workflow_runs: [Run]
+    }
+
+    /// The newest build of the branch, which "Latest" installs.
+    private static func latestBuild(_ actions: ActionsBuild,
+                                    of source: InstallSource) async throws -> ReleaseVersion {
+        if let newest = try await recentBuilds(actions).first { return newest }
+        return try await newestRunBuild(actions, of: source)
+    }
+
+    /// The branch's builds among the artifact's 100 newest uploads, newest
+    /// first and one per commit, from one API call.
+    ///
+    /// Pull requests upload the artifact too, so only uploads by a run of the
+    /// branch in the repository itself count: a fork's pull request runs with
+    /// the fork as its head repository, even from a branch of the same name.
+    private static func recentBuilds(_ actions: ActionsBuild) async throws -> [ReleaseVersion] {
+        let list: GHArtifactList = try await apiGet(
+            "actions/artifacts?name=\(actions.artifact)&per_page=100", of: actions.repo)
+        var seen = Set<String>()
+        return list.artifacts
+            .filter { artifact in
+                guard let run = artifact.workflow_run else { return false }
+                return run.head_branch == actions.branch && run.head_repository_id == run.repository_id
+            }
+            // GitHub answers newest first already; ISO 8601 times sort as text.
+            .sorted { ($0.created_at ?? "") > ($1.created_at ?? "") }
+            .compactMap { version(of: $0, actions) }
+            .filter { seen.insert($0.tag).inserted }
+    }
+
+    /// The build of the branch's newest successful run, from two API calls:
+    /// for when the artifact's newest uploads are all pull requests'.
+    private static func newestRunBuild(_ actions: ActionsBuild,
+                                       of source: InstallSource) async throws -> ReleaseVersion {
+        let runs: GHRunList = try await apiGet(
+            "actions/workflows/\(actions.workflow)/runs?branch=\(actions.branch)&status=success&per_page=20",
+            of: actions.repo)
+        // The branch filter matches a fork's pull request from a branch of that
+        // name too.
+        guard let run = runs.workflow_runs.first(where: {
+            !$0.event.hasPrefix("pull_request") && $0.head_repository?.id == $0.repository.id
+        }) else { throw DownloadError.noBuild(source.displayName, branch: actions.branch) }
+        let list: GHArtifactList = try await apiGet(
+            "actions/runs/\(run.id)/artifacts?name=\(actions.artifact)", of: actions.repo)
+        guard let build = list.artifacts.lazy.compactMap({ version(of: $0, actions) }).first
+        else { throw DownloadError.noBuild(source.displayName, branch: actions.branch) }
+        return build
+    }
+
+    /// An upload as the version picker shows it: its short commit, and the date
+    /// it was built. Nil for one that's gone, or that GitHub records no SHA-256
+    /// for, since nothing could vouch for what nightly.link hands over.
+    private static func version(of artifact: GHArtifact, _ actions: ActionsBuild) -> ReleaseVersion? {
+        guard artifact.name == actions.artifact, !artifact.expired,
+              let commit = artifact.workflow_run?.head_sha, commit.count >= 7,
+              let digest = artifact.digest?.lowercased(), digest.hasPrefix("sha256:"),
+              let url = actions.relayURL(artifactID: artifact.id) else { return nil }
+        let sha256 = String(digest.dropFirst("sha256:".count))
+        guard sha256.count == 64, sha256.allSatisfy(\.isHexDigit) else { return nil }
+        let short = String(commit.prefix(7))
+        let built = artifact.created_at.flatMap { ISO8601DateFormatter().date(from: $0) }
+        let name = built.map {
+            "\(short) · \($0.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, locale: Localizer.locale)))"
+        } ?? short
+        return ReleaseVersion(tag: short, name: name, assetName: "\(actions.artifact).zip",
+                              assetURL: url, artifactSHA256: sha256)
+    }
+
+    /// Downloads Actions build `build` through nightly.link and keeps the IPA
+    /// inside it as `dest`, unless `dest` is that build already. The zip must
+    /// be the one GitHub recorded.
+    private static func downloadArtifact(_ build: ReleaseVersion, of source: InstallSource,
+                                         channel: ReleaseChannel, to dest: URL,
+                                         log: @escaping (String) -> Void) async throws {
+        guard let expected = build.artifactSHA256 else {
+            throw DownloadError.unverifiedBuild(source.displayName)
+        }
+        // The ledger keeps the zip's checksum as the IPA's ETag.
+        if DownloadLedger.etag(for: dest) == expected, IPALibrary.looksLikeIPA(dest) {
+            log("\(dest.lastPathComponent) is already build \(build.tag) — skipping the download.")
+            return
+        }
+
+        let fetched: Fetched
+        do {
+            fetched = try await fetch(build.assetURL, named: build.assetName, from: channel, log: log)
+        } catch DownloadError.badStatus(let status, _, _) {
+            throw DownloadError.relayFailed(source.displayName, detail: "HTTP \(status)")
+        } catch DownloadError.unreachable(let error) {
+            throw DownloadError.relayFailed(source.displayName, detail: error.localizedDescription)
+        }
+        defer { try? FileManager.default.removeItem(at: fetched.file) }
+        guard IPALibrary.sha256(of: fetched.file) == expected else {
+            log("⚠️ \(build.assetName) from nightly.link isn't the file GitHub recorded for build \(build.tag) (SHA-256 \(expected)), so it isn't installed.")
+            throw DownloadError.unverifiedBuild(source.displayName)
+        }
+        log("\(build.assetName) is the file GitHub recorded for build \(build.tag) (SHA-256 \(expected.prefix(12))…) — unpacking the IPA.")
+
+        let ipa = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).ipa")
+        guard let member = IPALibrary.extractIPA(fromArtifact: fetched.file, to: ipa) else {
+            try? FileManager.default.removeItem(at: ipa)
+            throw DownloadError.notAnIPA(build.assetName)
+        }
+        try store(Fetched(file: ipa, name: member, channel: channel, etag: expected), as: dest)
     }
 
     /// Runs a URLSession call, mapping `URLError` to `.unreachable` (or to
@@ -938,7 +1172,7 @@ enum SideStoreDownloader {
 
     /// Retry time for a GitHub rate limit: from `retry-after` (seconds), or from
     /// `x-ratelimit-reset` (Unix time) when the hourly quota is used up.
-    private static func retryAfter(_ http: HTTPURLResponse) -> Date? {
+    fileprivate static func retryAfter(_ http: HTTPURLResponse) -> Date? {
         if let seconds = http.value(forHTTPHeaderField: "retry-after").flatMap(Double.init) {
             return Date().addingTimeInterval(seconds)
         }
@@ -954,6 +1188,286 @@ enum SideStoreDownloader {
         guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
               !envelope.message.isEmpty else { return nil }
         return envelope.message
+    }
+}
+
+/// Downloads one file to disk, carrying on from the bytes already saved when
+/// the transfer stalls or drops, instead of starting over. Every IPA download
+/// from GitHub goes through it: release assets and Actions builds.
+///
+/// Both start at a link (`github.com/<repo>/releases/download/…`, nightly.link)
+/// that redirects to a signed storage URL with an expiry (ten minutes out for
+/// an artifact, around 50 for a release asset). A later attempt asks that URL
+/// for the rest with a Range request, and once it refuses, gets a fresh one
+/// from the start link. The rest must be of the same file: a 206 with another
+/// ETag starts the download over, for a nightly replaced meanwhile. `If-Range`
+/// asks for that too, but GitHub's release storage ignores it.
+private final class ResumingDownload: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+
+    /// The request timeout until something has answered: URLSession's
+    /// default, which the download always had.
+    private static let firstTimeout: TimeInterval = 60
+
+    /// The pauses before trying again while nothing has answered yet, as the
+    /// download always had: for a connection the VPN coming up cut, or a dead
+    /// one GitHub kept open from an earlier request. A timeout isn't retried
+    /// then: where GitHub is blocked, it would only multiply the wait.
+    private static let firstPauses: [UInt64] = [1, 3]
+
+    /// The pauses before each further attempt in a row that gets no new bytes,
+    /// once the file has started arriving; one more such attempt gives up.
+    private static let pauses: [UInt64] = [2, 4, 8, 15]
+
+    /// Failures a moment later may not repeat. A TLS failure isn't one: on a
+    /// network that intercepts it, it would only repeat.
+    private static let passing: Set<URLError.Code> = [
+        .timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost,
+        .cannotFindHost, .dnsLookupFailed,
+    ]
+
+    let file: URL
+    private let start: URL
+    private let name: String
+    /// A transfer that gets no data for this long has stalled, once the file
+    /// has started arriving.
+    private let idleTimeout: TimeInterval
+    private let log: (String) -> Void
+    private let queue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 1
+        return queue
+    }()
+
+    // Written on `queue` while an attempt runs, read once it has ended.
+    private var output: FileHandle?
+    private(set) var written = 0
+    private(set) var resumes = 0
+    /// The last response's status.
+    private(set) var status = 0
+    /// The release the start link redirected through, if it named one.
+    private(set) var tag: String?
+    /// The file's ETag, once a response has given one.
+    private(set) var etag: String?
+    private var lastModified: String?
+    /// The file's full size, once a response has said it.
+    private var total: Int?
+    /// True once a response has started the file arriving.
+    private var responded = false
+    private var response: HTTPURLResponse?
+    /// The signed URL the start link redirected to, while it's thought to work.
+    private var storage: URL?
+    /// The current attempt's request timeout, kept through redirects.
+    private var timeout: TimeInterval = 60
+    /// A 206 that isn't the part asked for: another start, or another file.
+    private var misaligned = false
+    private var writeError: Error?
+    private var finish: CheckedContinuation<Error?, Never>?
+
+    init(from start: URL, name: String, idleTimeout: TimeInterval, log: @escaping (String) -> Void) {
+        self.start = start
+        self.name = name
+        self.idleTimeout = idleTimeout
+        self.log = log
+        file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).download")
+    }
+
+    /// Returns the downloaded file, `file`.
+    func run() async throws -> URL {
+        guard FileManager.default.createFile(atPath: file.path, contents: nil),
+              let handle = try? FileHandle(forWritingTo: file) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        output = handle
+        defer { try? handle.close() }
+
+        let configuration = URLSessionConfiguration.default
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
+        // The session holds on to its delegate until it's invalidated.
+        defer { session.invalidateAndCancel() }
+
+        var idle = 0
+        while true {
+            try Task.checkCancellation()
+            let before = written, fromStorage = storage != nil
+            let error = await attempt(in: session)
+            if Task.isCancelled { throw CancellationError() }
+            if let writeError { throw writeError }
+
+            let transferred = (status == 200 || status == 206) && !misaligned
+            if transferred, error == nil, total.map({ written >= $0 }) ?? true {
+                return file
+            }
+            // Asked for the bytes after the last one: there are none.
+            if status == 416, let total, written == total { return file }
+
+            let reason: SideStoreDownloader.DownloadError
+            // What the log says went wrong, when HTTP's status doesn't.
+            var why: String?
+            if misaligned || status == 416 {
+                // Not the part asked for: start again from the first byte.
+                why = "the server sent another part of the file, or of another file, than the one asked for"
+                truncate()
+                storage = nil
+                reason = .badStatus(status: status, detail: nil, retryAfter: nil)
+            } else if transferred || status == 0 {
+                // The connection stalled or dropped, before or during the body.
+                let urlError = (error as? URLError) ?? URLError(.networkConnectionLost)
+                guard Self.passing.contains(urlError.code), responded || urlError.code != .timedOut
+                else { throw SideStoreDownloader.DownloadError.unreachable(urlError) }
+                reason = .unreachable(urlError)
+            } else {
+                // A refusal. One that says when to come back isn't asked again now.
+                let retryAfter = response.flatMap(SideStoreDownloader.retryAfter)
+                reason = .badStatus(status: status, detail: nil, retryAfter: retryAfter)
+                if fromStorage, retryAfter == nil {
+                    // Expired, most likely: straight back to the start link,
+                    // whose answer comes from a new storage link or not at all.
+                    log("The storage link for \(name) answered HTTP \(status) — asking \(start.host ?? "the start link") for a new one.")
+                    storage = nil
+                    continue
+                }
+                guard retryAfter == nil, (500...599).contains(status) else { throw reason }
+            }
+
+            let pause: UInt64
+            if written > before {
+                idle = 0
+                pause = 1
+            } else {
+                let table = responded ? Self.pauses : Self.firstPauses
+                guard idle < table.count else { throw reason }
+                pause = table[idle]
+                idle += 1
+            }
+            if let why {
+                log("\(name): \(why) — starting over in \(pause) s.")
+            } else if written > 0 {
+                resumes += 1
+                log("\(name) stopped at \(Self.megabytes(written)) of \(total.map(Self.megabytes) ?? "?") (\(Self.describe(reason))) — carrying on from there in \(pause) s.")
+            } else {
+                log("\(name) didn't arrive (\(Self.describe(reason))) — trying again in \(pause) s.")
+            }
+            try await Task.sleep(nanoseconds: pause * 1_000_000_000)
+        }
+    }
+
+    /// One request for the bytes still missing. Returns how the transfer
+    /// ended: nil when it ran to its end.
+    private func attempt(in session: URLSession) async -> Error? {
+        timeout = responded ? idleTimeout : Self.firstTimeout
+        let request = ranged(URLRequest(url: storage ?? start))
+        status = 0
+        response = nil
+        misaligned = false
+        let task = session.dataTask(with: request)
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                // Set on the delegate queue, before anything can arrive there.
+                queue.addOperation {
+                    self.finish = continuation
+                    task.resume()
+                }
+            }
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    /// `request` asking for the bytes after the ones saved, of the same file.
+    private func ranged(_ request: URLRequest) -> URLRequest {
+        var request = request
+        request.timeoutInterval = timeout
+        request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        guard written > 0 else { return request }
+        request.setValue("bytes=\(written)-", forHTTPHeaderField: "Range")
+        // A weak ETag can't be used here; the date can.
+        if let validator = etag.flatMap({ $0.hasPrefix("W/") ? nil : $0 }) ?? lastModified {
+            request.setValue(validator, forHTTPHeaderField: "If-Range")
+        }
+        return request
+    }
+
+    // MARK: URLSessionDataDelegate, on `queue`
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        if let found = ReleaseTagRecorder.tag(in: request.url) { tag = found }
+        // The range goes on to the storage URL.
+        completionHandler(ranged(request))
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask,
+                    didReceive response: URLResponse,
+                    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        let http = response as? HTTPURLResponse
+        self.response = http
+        status = http?.statusCode ?? 0
+        let theirETag = http?.value(forHTTPHeaderField: "ETag")
+        switch status {
+        case 200:
+            // The whole file, from its first byte.
+            truncate()
+            total = response.expectedContentLength > 0 ? Int(response.expectedContentLength) : nil
+            etag = theirETag
+            lastModified = http?.value(forHTTPHeaderField: "Last-Modified")
+        case 206:
+            // "bytes <first>-<last>/<size>", and of the file begun.
+            let range = http?.value(forHTTPHeaderField: "Content-Range") ?? ""
+            let numbers = range.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+            let sameFile = etag == nil || theirETag == nil || etag == theirETag
+            guard numbers.first == written, sameFile else {
+                misaligned = true
+                completionHandler(.cancel)
+                return
+            }
+            if numbers.count == 3 { total = numbers[2] }
+            if etag == nil { etag = theirETag }
+        default:
+            completionHandler(.cancel)
+            return
+        }
+        responded = true
+        storage = response.url
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        do {
+            try output?.write(contentsOf: data)
+            written += data.count
+        } catch {
+            writeError = error
+            dataTask.cancel()
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        finish?.resume(returning: error)
+        finish = nil
+    }
+
+    // MARK: Helpers
+
+    /// Drops what was saved, for a response that starts from the first byte.
+    private func truncate() {
+        try? output?.truncate(atOffset: 0)
+        written = 0
+    }
+
+    private static func megabytes(_ bytes: Int) -> String {
+        String(format: "%.1f MB", Double(bytes) / 1_000_000)
+    }
+
+    private static func describe(_ error: SideStoreDownloader.DownloadError) -> String {
+        switch error {
+        case let .unreachable(urlError): return urlError.localizedDescription
+        case let .badStatus(status, _, _): return "HTTP \(status)"
+        default: return error.description
+        }
     }
 }
 
@@ -1094,6 +1608,26 @@ enum IPALibrary {
             .min { rank($0) < rank($1) }
     }
 
+    /// Moves Madeira CI builds the app downloaded before 1.6.5 to the nightly
+    /// names. Madeira had only its CI builds then, saved under the stable
+    /// names ("Madeira.ipa", "Madeira (e96065a).ipa"); its stable channel now
+    /// installs releases. The ledger tells the two apart: a CI build's ETag is
+    /// its zip's bare SHA-256, a release's is the quoted ETag GitHub sent.
+    static func moveMadeiraCIBuildsToNightly() {
+        let fm = FileManager.default
+        for entry in scan() where entry.source == .madeira && entry.channel == .stable && !entry.isImported {
+            guard let etag = DownloadLedger.etag(for: entry.url),
+                  etag.count == 64, etag.allSatisfy(\.isHexDigit) else { continue }
+            let dest = documentsDir.appendingPathComponent(
+                InstallSource.madeira.fileName(.nightly, version: entry.version))
+            guard !fm.fileExists(atPath: dest.path),
+                  (try? fm.moveItem(at: entry.url, to: dest)) != nil else { continue }
+            // A move keeps the size and modification date the ledger checks.
+            DownloadLedger.record(dest, etag: etag)
+            DownloadLedger.forget(entry.url)
+        }
+    }
+
     /// The app's earlier download of a version picked under Advanced, if it's
     /// still intact.
     static func pickedDownload(_ version: String, source: InstallSource,
@@ -1166,13 +1700,21 @@ enum IPALibrary {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         var hasher = SHA256()
-        do {
-            // A megabyte at a time: an IPA is tens of them.
-            while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
-                hasher.update(data: chunk)
+        // A megabyte at a time: an IPA is tens or hundreds of them, each
+        // released before the next is read.
+        while true {
+            let more: Bool? = autoreleasepool {
+                do {
+                    // Nil or empty at the end of the file.
+                    guard let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty else { return false }
+                    hasher.update(data: chunk)
+                    return true
+                } catch {
+                    return nil
+                }
             }
-        } catch {
-            return nil
+            guard let more else { return nil }
+            if !more { break }
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
@@ -1343,14 +1885,8 @@ extension IPALibrary {
         // allocates this size.
         guard entry.uncompressedSize > 0, entry.uncompressedSize < maxSize,
               entry.compressedSize > 0,
-              (try? handle.seek(toOffset: UInt64(entry.localHeaderOffset))) != nil,
-              let header = try? handle.read(upToCount: 30), header.count == 30,
-              u32(header, 0) == 0x0403_4B50                        // "PK\u{03}\u{04}"
-        else { return nil }
-        // The local header repeats the name and carries its own extra field,
-        // whose length routinely differs from the central directory's.
-        let dataOffset = entry.localHeaderOffset + 30 + u16(header, 26) + u16(header, 28)
-        guard (try? handle.seek(toOffset: UInt64(dataOffset))) != nil,
+              let start = dataOffset(of: entry, handle),
+              (try? handle.seek(toOffset: UInt64(start))) != nil,
               let raw = try? handle.read(upToCount: entry.compressedSize),
               raw.count == entry.compressedSize else { return nil }
         switch entry.method {
@@ -1358,6 +1894,121 @@ extension IPALibrary {
         case 8: return inflate(raw, to: entry.uncompressedSize)      // deflated
         default: return nil
         }
+    }
+
+    /// Where an entry's bytes start. The local header before them repeats the
+    /// name and carries its own extra field, whose length routinely differs
+    /// from the central directory's.
+    private static func dataOffset(of entry: ZipEntry, _ handle: FileHandle) -> Int? {
+        guard (try? handle.seek(toOffset: UInt64(entry.localHeaderOffset))) != nil,
+              let header = try? handle.read(upToCount: 30), header.count == 30,
+              u32(header, 0) == 0x0403_4B50                        // "PK\u{03}\u{04}"
+        else { return nil }
+        return entry.localHeaderOffset + 30 + u16(header, 26) + u16(header, 28)
+    }
+
+    /// Unpacks the `.ipa` a GitHub Actions artifact wraps (a zip around the one
+    /// file) into `dest`. Streamed, since it's hundreds of megabytes. Returns
+    /// the IPA's name, or nil when the zip holds none or it can't be read.
+    static func extractIPA(fromArtifact zip: URL, to dest: URL) -> String? {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: zip.path)[.size]) as? Int,
+              size > 22,
+              let input = try? FileHandle(forReadingFrom: zip) else { return nil }
+        defer { try? input.close() }
+        guard let entry = centralDirectory(input, fileSize: size)?
+                .first(where: { $0.name.lowercased().hasSuffix(".ipa") }),
+              entry.compressedSize > 0,
+              let start = dataOffset(of: entry, input),
+              (try? input.seek(toOffset: UInt64(start))) != nil,
+              FileManager.default.createFile(atPath: dest.path, contents: nil),
+              let output = try? FileHandle(forWritingTo: dest) else { return nil }
+        defer { try? output.close() }
+
+        // Madeira's workflow uploads it stored (`compression-level: 0`), but
+        // upload-artifact deflates by default.
+        let written: Int?
+        switch entry.method {
+        case 0:  written = copy(entry.compressedSize, from: input, to: output)
+        case 8:  written = inflate(entry.compressedSize, from: input, to: output)
+        default: written = nil
+        }
+        guard written == entry.uncompressedSize else { return nil }
+        return (entry.name as NSString).lastPathComponent
+    }
+
+    /// Copies the next `count` bytes of `input` to `output`, a megabyte at a
+    /// time. Returns how many it wrote, or nil when a read or write fails.
+    private static func copy(_ count: Int, from input: FileHandle, to output: FileHandle) -> Int? {
+        var left = count
+        while left > 0 {
+            // Each chunk is released before the next is read.
+            let copied: Int? = autoreleasepool {
+                guard let chunk = try? input.read(upToCount: min(left, 1 << 20)), !chunk.isEmpty,
+                      (try? output.write(contentsOf: chunk)) != nil else { return nil }
+                return chunk.count
+            }
+            guard let copied else { return nil }
+            left -= copied
+        }
+        return count
+    }
+
+    /// Inflates the next `count` bytes of `input`, raw DEFLATE, into `output`,
+    /// a megabyte at a time. Returns how many bytes it wrote, or nil when the
+    /// data is damaged or cut short, or a read or write fails.
+    private static func inflate(_ count: Int, from input: FileHandle, to output: FileHandle) -> Int? {
+        let chunkSize = 1 << 20
+        let stream = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
+        defer { stream.deallocate() }
+        guard compression_stream_init(stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB)
+                == COMPRESSION_STATUS_OK else { return nil }
+        defer { compression_stream_destroy(stream) }
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: chunkSize)
+        defer { buffer.deallocate() }
+
+        var left = count, written = 0
+        while left > 0 {
+            // True at the end of the stream, false once a chunk is used up.
+            let ended: Bool? = autoreleasepool {
+                guard let chunk = try? input.read(upToCount: min(left, chunkSize)), !chunk.isEmpty
+                else { return nil }
+                left -= chunk.count
+                let flags = left == 0 ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0
+                return chunk.withUnsafeBytes { raw -> Bool? in
+                    stream.pointee.src_ptr = raw.bindMemory(to: UInt8.self).baseAddress!
+                    stream.pointee.src_size = raw.count
+                    var idle = 0
+                    while true {
+                        stream.pointee.dst_ptr = buffer
+                        stream.pointee.dst_size = chunkSize
+                        let status = compression_stream_process(stream, flags)
+                        let produced = chunkSize - stream.pointee.dst_size
+                        if produced > 0 {
+                            let out = Data(bytesNoCopy: buffer, count: produced, deallocator: .none)
+                            guard (try? output.write(contentsOf: out)) != nil else { return nil }
+                            written += produced
+                        }
+                        switch status {
+                        case COMPRESSION_STATUS_END:
+                            return true
+                        case COMPRESSION_STATUS_OK:
+                            // Input used up with room to spare: the next chunk.
+                            // Finishing, there's none, and it still holds output,
+                            // so it's called until the end unless it stops moving.
+                            guard stream.pointee.src_size == 0, stream.pointee.dst_size > 0 else { continue }
+                            if flags == 0 { return false }
+                            idle = produced == 0 ? idle + 1 : 0
+                            if idle == 3 { return nil }
+                        default:
+                            return nil
+                        }
+                    }
+                }
+            }
+            guard let ended else { return nil }
+            if ended { return written }
+        }
+        return nil          // the zip ended before the stream did
     }
 
     /// `COMPRESSION_ZLIB` is raw DEFLATE with no zlib wrapper, which is exactly

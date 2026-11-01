@@ -198,11 +198,11 @@ private struct AboutRow: View {
     var body: some View {
         if let action {
             Button(action: action) { content(accessory: "chevron.right") }
-                .buttonStyle(.plain)
+                .buttonStyle(.plain, sound: .tick)
         } else if let url = urlString.flatMap(URL.init(string:)) {
             Button { openURL(url) } label: { content(accessory: "arrow.up.right") }
                 // `.plain` keeps the row from using the accent color.
-                .buttonStyle(.plain)
+                .buttonStyle(.plain, sound: .tick)
         } else {
             content(accessory: nil)
         }
@@ -330,7 +330,7 @@ private struct CryptoDonationsView: View {
                     Label(isCopied ? L("Copied") : L("Copy"),
                           systemImage: isCopied ? "checkmark" : "doc.on.doc")
                 }
-                .buttonStyle(PrimaryButtonStyle())
+                .buttonStyle(PrimaryButtonStyle(sound: .rise))
             }
             .frame(maxWidth: .infinity)
         }

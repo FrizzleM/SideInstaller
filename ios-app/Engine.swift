@@ -256,6 +256,21 @@ final class Engine: ObservableObject {
 
     var canSelfPair: Bool { Engine.deviceCanSelfPair }
 
+    /// Whether Developer Mode is on, from the `security.mac.amfi.developer_mode_status`
+    /// sysctl AMFI publishes; nil when this iOS won't let the app read it.
+    /// Static so non-isolated code can read it.
+    static var developerModeIsOn: Bool? {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        guard sysctlbyname("security.mac.amfi.developer_mode_status", &value, &size, nil, 0) == 0,
+              size == MemoryLayout<Int32>.size else { return nil }
+        return value != 0
+    }
+
+    /// True when SideInstaller runs as a LiveContainer guest. iOS then applies
+    /// LiveContainer's Info.plist to the process, not SideInstaller's.
+    static var runsInLiveContainer: Bool { getenv("LC_HOME_PATH") != nil }
+
     /// False from iOS 26.4 on, where lockdownd hangs up on a connection that
     /// reaches it through a loopback VPN, on its first request. A lockdown pair
     /// record (jitterbugpair, “pymobiledevice3 lockdown pair”, idevice_pair's
@@ -486,6 +501,8 @@ final class Engine: ObservableObject {
         loadAnisetteServers()
         // Reflect an IPA imported in an earlier run.
         customIPAName = IPALibrary.customImport()?.url.lastPathComponent
+        // A Madeira CI build from before Madeira had channels is its nightly.
+        IPALibrary.moveMadeiraCIBuildsToNightly()
     }
 
     // MARK: - Anisette servers
@@ -1675,7 +1692,7 @@ final class Engine: ObservableObject {
         do {
             let catalog = try await SideStoreDownloader.releaseCatalog(source: source)
             releaseCatalogs[source] = catalog
-            log("Versions: \(source.displayName) has \(catalog.others[.stable]?.count ?? 0) stable and \(catalog.others[.nightly]?.count ?? 0) pre-release builds besides the latest.")
+            log("Versions: \(source.displayName) has \(catalog.others[.stable]?.count ?? 0) stable and \(catalog.others[.nightly]?.count ?? 0) nightly builds besides the latest.")
         } catch is CancellationError {
             // The picker closed mid-fetch; opening it again retries.
         } catch {
@@ -1955,7 +1972,7 @@ final class Engine: ObservableObject {
             // User-fixable failures get an explanatory card. A certificate that
             // already exists offers revoke-and-retry, never revoked automatically.
             if case EngineError.certExists = error {
-                setGuide(Guides.certExists(sideStoreInstalled: sideStoreInstalled))
+                setGuide(Guides.certExists(sideStoreCertificate: canUseSideStoreCertificate))
                 certConflict = true
             }
             if case let EngineError.deviceRegistration(udid, raw) = error {
@@ -1974,10 +1991,17 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// `forMadeira` signs the way Madeira needs: with Increased Memory Limit
-    /// enabled on its App IDs before the profile is requested, and without an
-    /// app group. Madeira renews its own profile and registers its App ID again
-    /// when it runs out; it can restore the first on a new App ID, not the second.
+    /// Every app gets Increased Memory Limit on its App ID before the profile is
+    /// requested, as iLoader 2.4.1 does, unless it's an app store that refreshes
+    /// itself, such as SideStore and LiveContainer + SideStore: SideStore registers
+    /// their App IDs again each week without it, so their next profiles would grant
+    /// less than they're signed with (isideload's `MemoryLimit`). A refusal from
+    /// Apple only leaves it out.
+    ///
+    /// `forMadeira` signs the way Madeira needs: with that capability required,
+    /// and without an app group. Madeira renews its own profile and registers
+    /// its App ID again when it runs out; it can restore the first on a new App
+    /// ID, not the second.
     private func performSign(session: OpaquePointer, ipa: String, udid: String, deviceName: String,
                              pairingFilePath: String, forMadeira: Bool) throws -> String {
         log("Signing \(ipa) …")
@@ -1986,8 +2010,9 @@ final class Engine: ObservableObject {
         }
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
+        // Memory limit: 1 = required, 2 = where it's safe (see sideinstaller.h).
         let rc = si_sign_ipa(session, ipa, udid, deviceName, pairingFilePath,
-                             forMadeira ? 1 : 0, forMadeira ? 0 : 1, &signed, &error)
+                             forMadeira ? 1 : 2, forMadeira ? 0 : 1, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
             signed.map { si_string_free($0) }
@@ -3020,6 +3045,13 @@ final class Engine: ObservableObject {
         Self.appPresence(scheme: "sidestore") != .missing
     }
 
+    /// True when “Use SideStore's certificate” has somewhere to get it: SideStore
+    /// is on this iPhone, or SideInstaller runs inside LiveContainer, which
+    /// keeps SideStore's certificate itself (`LiveContainerCertificate`).
+    var canUseSideStoreCertificate: Bool {
+        Self.runsInLiveContainer || sideStoreInstalled
+    }
+
     /// True unless LiveContainer is known to be missing (see `appPresence`).
     /// Opening it reports when it isn't there.
     var liveContainerInstalled: Bool {
@@ -3061,6 +3093,14 @@ final class Engine: ObservableObject {
         return Set(schemes.map { $0.lowercased() })
     }()
 
+    /// LiveContainer's name on the Home Screen, which the Files app gives its
+    /// folder too; nil outside LiveContainer.
+    static var liveContainerName: String? {
+        guard runsInLiveContainer, let bundle = liveContainerBundle() else { return nil }
+        return bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+            ?? bundle.object(forInfoDictionaryKey: "CFBundleName") as? String
+    }
+
     /// LiveContainer's own bundle, from the `+[NSUserDefaults lcMainBundle]`
     /// it adds for the guest app.
     private static func liveContainerBundle() -> Bundle? {
@@ -3089,10 +3129,26 @@ final class Engine: ObservableObject {
         }
     }
 
+    /// True when “Get it from SideStore” has somewhere to get the pairing file:
+    /// SideStore is on this iPhone, or, inside LiveContainer, LiveContainer
+    /// carries the built-in SideStore whose file is read instead. A SideStore
+    /// installed on its own can't hand its file to a LiveContainer guest.
+    var canGetSideStorePairing: Bool {
+        Self.runsInLiveContainer
+            ? LiveContainerSideStorePairing.hasBuiltInSideStore != false
+            : sideStoreInstalled
+    }
+
     /// Opens SideStore, which sends back the pairing file it has as a
     /// `sideinstaller://pairingFile` link. That link asks before importing.
+    /// Inside LiveContainer, which the link can't reach, the pairing file the
+    /// built-in SideStore keeps is read instead, and the same popup asks.
     @MainActor
     func requestSideStorePairing() {
+        if Self.runsInLiveContainer {
+            offerBuiltInSideStorePairing()
+            return
+        }
         guard let url = URL(string: "sidestore://pairing?urlname=\(DeepLink.scheme)") else { return }
         lastError = nil
         sideStorePairingRequestedAt = Date()
@@ -3104,6 +3160,27 @@ final class Engine: ObservableObject {
                 self.lastError = ErrorHelp.explained(L("SideStore isn't installed on this iPhone, so there's no pairing file to get from it."))
                 self.log("⛔️ Pairing import: \(self.lastError ?? "")")
             }
+        }
+    }
+
+    /// Puts up the link popup with the pairing file LiveContainer's built-in
+    /// SideStore keeps (see `LiveContainerSideStorePairing`), or says what to
+    /// do when there's none to be had.
+    @MainActor
+    private func offerBuiltInSideStorePairing() {
+        lastError = nil
+        log("Pairing import: inside LiveContainer, SideStore can't send its pairing file back, so SideInstaller reads the one LiveContainer's built-in SideStore keeps.")
+        switch LiveContainerSideStorePairing.find(log: { self.log($0) }) {
+        case let .found(file, from: names):
+            let link = DeepLink.pairingFile(file)
+            pendingLink = link
+            log("Pairing import: \(link.logDescription), from \(names.joined(separator: " + ")). Waiting for the go-ahead.")
+        case .unreachable:
+            lastError = ErrorHelp.explained(L("In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made."))
+            log("⛔️ Pairing import: \(lastError ?? "")")
+        case .notFound:
+            lastError = ErrorHelp.explained(L("Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here."))
+            log("⛔️ Pairing import: \(lastError ?? "")")
         }
     }
 
@@ -4017,15 +4094,15 @@ enum Guides {
     private static let idevicePairURL = "https://github.com/jkcoxson/idevice_pair/releases/latest"
 
     /// Shown when Apple refuses a certificate because one exists (error 7460).
-    /// With SideStore on the iPhone, using its certificate comes first.
-    static func certExists(sideStoreInstalled: Bool) -> Guide {
+    /// When SideStore's certificate can be had, using it comes first.
+    static func certExists(sideStoreCertificate: Bool) -> Guide {
         Guide(
             title: L("A signing certificate already exists"),
             systemImage: "exclamationmark.shield",
             steps: [
                 L("Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending."),
                 L("SideInstaller couldn't reuse it. That happens when the certificate was issued somewhere else — AltStore, SideStore, Sideloadly or Xcode on another device — so the private key it needs isn't on this iPhone."),
-                sideStoreInstalled
+                sideStoreCertificate
                     ? L("If SideStore made it, tap “Use SideStore's certificate” above: SideInstaller signs with that one too, and nothing is revoked.")
                     : nil,
                 L("Use “Revoke and retry” above, or open Certificates in the Tools tab, tap “Load certificates”, and revoke it there."),

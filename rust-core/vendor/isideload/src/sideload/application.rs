@@ -477,6 +477,46 @@ mod tests {
         plist::Value::Array(vec![GROUP.into()])
     }
 
+    /// SideInstaller issue #110: the ExtensionKit extension in Extensions kept
+    /// its bundle ID, which iOS refused as not under the app's new one.
+    #[test]
+    fn rebases_extensions_in_plugins_and_extensions() {
+        use crate::sideload::bundle::tests::{TempDir, write_app_with_both_extension_kinds};
+
+        let dir = TempDir::new();
+        let app_dir = write_app_with_both_extension_kinds(&dir.0);
+        let mut app = Application {
+            bundle: Bundle::new(app_dir.clone()).unwrap(),
+        };
+        app.update_bundle_id("com.zarz.mornye", "com.zarz.mornye.TEAMID1234")
+            .unwrap();
+
+        // As `sign_app` does before signing.
+        app.bundle.write_info().unwrap();
+        for ext in app.bundle.app_extensions_mut() {
+            ext.write_info().unwrap();
+        }
+
+        let id_on_disk = |bundle: &str| -> String {
+            let info: plist::Dictionary =
+                plist::from_file(app_dir.join(bundle).join("Info.plist")).unwrap();
+            info["CFBundleIdentifier"].as_string().unwrap().to_string()
+        };
+        assert_eq!(id_on_disk(""), "com.zarz.mornye.TEAMID1234");
+        assert_eq!(
+            id_on_disk("PlugIns/PlayerWidget.appex"),
+            "com.zarz.mornye.TEAMID1234.PlayerWidget"
+        );
+        assert_eq!(
+            id_on_disk("Extensions/LinkNowPlaying.appex"),
+            "com.zarz.mornye.TEAMID1234.LinkNowPlaying"
+        );
+        // Neither an extension nor under the app's ID: left alone, and no
+        // reason to refuse the app.
+        assert_eq!(id_on_disk("Extensions/Strings.bundle"), "org.example.Strings");
+        assert_eq!(id_on_disk("Frameworks/Flutter.framework"), "io.flutter.flutter");
+    }
+
     #[test]
     fn app_groups_reach_the_extensions() {
         for special in [SpecialApp::SideStore, SpecialApp::SideStoreLc, SpecialApp::AltStore] {

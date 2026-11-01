@@ -227,7 +227,7 @@ struct ContentView: View {
                             .padding(6)
                             .background(Circle().fill(.white.opacity(0.08)))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .dismiss)
                 }
                 Menu {
                     updateOptions
@@ -374,7 +374,7 @@ struct ContentView: View {
             .fieldBackground()
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain, sound: .tap)
         .disabled(engine.isImportingIPA)
     }
 
@@ -408,14 +408,14 @@ struct ContentView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.tertiary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tick)
                 }
                 Button(action: downloadFromLink) {
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.title3)
                         .foregroundStyle(linkIsUsable ? Theme.accent2 : Color.secondary.opacity(0.5))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.plain, sound: .tap)
                 .disabled(!linkIsUsable)
             }
             .fieldBackground()
@@ -464,7 +464,7 @@ struct ContentView: View {
                         .padding(.vertical, 16)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(PressReportingButtonStyle(isPressed: $installPressed))
+                .buttonStyle(PressReportingButtonStyle(isPressed: $installPressed), sound: .press)
                 .transition(.surfaceSwap)
             }
         }
@@ -571,7 +571,7 @@ struct ContentView: View {
                 }
 
                 pairingImportButton
-                if engine.sideStoreInstalled {
+                if engine.canGetSideStorePairing {
                     orDivider
                     sideStorePairingButton
                 }
@@ -582,9 +582,11 @@ struct ContentView: View {
     }
 
     /// Asks SideStore for the pairing file it already has. SideStore opens and
-    /// sends it back, and the import asks before replacing anything.
+    /// sends it back, and the import asks before replacing anything. Inside
+    /// LiveContainer nothing opens: the built-in SideStore's file is read.
     private var sideStorePairingButton: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let insideLiveContainer = Engine.runsInLiveContainer
+        return VStack(alignment: .leading, spacing: 6) {
             Button { engine.requestSideStorePairing() } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.uturn.backward.circle")
@@ -592,16 +594,20 @@ struct ContentView: View {
                     Text(L("Get it from SideStore"))
                         .foregroundStyle(.primary)
                     Spacer()
-                    Image(systemName: "arrow.up.forward.app")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Theme.accent2)
+                    if !insideLiveContainer {
+                        Image(systemName: "arrow.up.forward.app")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Theme.accent2)
+                    }
                 }
                 .fieldBackground()
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.plain, sound: .tap)
             .disabled(engine.isImportingPairing)
-            Text(L("SideStore opens and sends back the pairing file it has."))
+            Text(insideLiveContainer
+                 ? L("SideInstaller takes the pairing file LiveContainer's built-in SideStore has.")
+                 : L("SideStore opens and sends back the pairing file it has."))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -620,7 +626,7 @@ struct ContentView: View {
             .font(.footnote.weight(.semibold))
             .foregroundStyle(Theme.accent2)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain, sound: .tick)
     }
 
     /// Import button, labelled with the imported file's name once one is in.
@@ -649,7 +655,7 @@ struct ContentView: View {
             .fieldBackground()
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain, sound: .tap)
         .disabled(engine.isImportingPairing)
     }
 
@@ -674,7 +680,7 @@ struct ContentView: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.plain, sound: .tick)
 
             if advancedExpanded {
                 VStack(alignment: .leading, spacing: 22) {
@@ -745,7 +751,7 @@ struct ContentView: View {
                     }
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.accent2)
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tap)
                 }
             }
         }
@@ -818,7 +824,7 @@ struct ContentView: View {
                             Label(label, systemImage: "arrow.up.right")
                                 .font(.footnote.weight(.semibold))
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.bordered, sound: .tap)
                         .controlSize(.small)
                         .tint(.red)
                         .padding(.top, 2)
@@ -879,7 +885,7 @@ struct ContentView: View {
                 .background(Circle().fill(.white.opacity(0.08)))
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain, sound: .tap)
         .disabled(engine.isCancelling)
         .opacity(engine.isCancelling ? 0.4 : 1)
         .accessibilityLabel(L("Cancel"))
@@ -906,7 +912,7 @@ struct ContentView: View {
             disclosureChevron(expanded: stepsExpanded)
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.plain, sound: .tick)
         .accessibilityLabel(stepsExpanded ? L("Show fewer steps") : L("Show all steps"))
     }
 
@@ -1053,7 +1059,7 @@ struct InstallPopup: View {
             Label(L("Report this problem"), systemImage: "exclamationmark.bubble")
                 .font(.subheadline.weight(.semibold))
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.bordered, sound: .tap)
         .tint(.red)
         if engine.guide == nil, !engine.certConflict, !ErrorHelp.isExplained(message) {
             CopyLogsButton()
@@ -1078,7 +1084,7 @@ struct InstallPopup: View {
                         Label(label, systemImage: "arrow.up.right")
                             .font(.subheadline.weight(.semibold))
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered, sound: .tap)
                     .tint(Theme.accent)
                 }
             }
@@ -1130,7 +1136,7 @@ struct InstallPopup: View {
                             .font(.subheadline.weight(.semibold))
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered, sound: .tap)
                     .tint(cost.isAffordable ? Color.secondary : .orange)
                 }
             }
@@ -1254,7 +1260,7 @@ struct InstallPopup: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered, sound: .tap)
             .tint(.secondary)
         }
     }
@@ -1266,9 +1272,16 @@ struct InstallPopup: View {
     }
 
     private func pairingLinkMessage(_ file: LinkedPairingFile) -> String {
-        let base = file.fromSideStore
-            ? L("SideStore sent back the pairing file it has. SideInstaller will connect to this iPhone with it.")
-            : L("A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.")
+        let base: String
+        if !file.fromSideStore {
+            base = L("A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.")
+        } else if Engine.runsInLiveContainer {
+            // SideStore's reply can't get there, so it's the file read from
+            // the built-in SideStore.
+            base = L("This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.")
+        } else {
+            base = L("SideStore sent back the pairing file it has. SideInstaller will connect to this iPhone with it.")
+        }
         if let current = engine.importedPairingName {
             return base + " " + L("It replaces %@.", current)
         }
@@ -1277,24 +1290,25 @@ struct InstallPopup: View {
 
     // MARK: Certificate conflict (Apple error 7460)
 
-    /// Shown on error 7460. With SideStore on the iPhone, the first button
-    /// asks it for its certificate, signs with that and retries the install.
-    /// The other loads the certificates; the dialog asks which one to revoke,
-    /// then retries the install.
+    /// Shown on error 7460. With SideStore's certificate to be had, the first
+    /// button gets it (from SideStore, or inside LiveContainer from
+    /// LiveContainer), signs with that and retries the install. The other
+    /// loads the certificates; the dialog asks which one to revoke, then
+    /// retries the install.
     private var certConflictPopup: some View {
-        let sideStoreInstalled = engine.sideStoreInstalled
+        let sideStoreCertificate = engine.canUseSideStoreCertificate
         return PopupCard(title: L("A certificate already exists"),
                          systemImage: "exclamationmark.shield.fill",
                          tint: .orange,
                          onClose: close) {
             VStack(alignment: .leading, spacing: 14) {
-                Text(sideStoreInstalled
+                Text(sideStoreCertificate
                      ? L("Apple won't issue a second signing certificate for this Apple ID. If SideStore made the one it has, SideInstaller can sign with that one too, and nothing is revoked. Revoking it lets the install continue as well — but it can't be undone.")
                      : L("Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                if sideStoreInstalled {
+                if sideStoreCertificate {
                     Button {
                         certManager.requestSideStoreCertificate(retryInstall: true)
                     } label: {
@@ -1327,7 +1341,7 @@ struct InstallPopup: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.bordered, sound: .tap)
                 .tint(.orange)
                 .disabled(certManager.isBusy)
                 // A failed load, revoke or import shows as the Certificates

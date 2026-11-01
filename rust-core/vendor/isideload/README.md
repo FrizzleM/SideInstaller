@@ -376,6 +376,18 @@ took it and `init` answered -20970, and ani.sidestore.io was skipped with
 as SideStore's Mac (which second factor Apple picks, the token), and the 2FA
 fallbacks.
 
+iLoader 2.4.1 (`d319ce7`, isideload 0.5.2, 2026-10-28) does the same "while
+waiting for the anisette servers to update", to fix SMS 2FA's 403, with one
+fixed client for every server through isideload 0.5.1's
+`set_client_info_override` (`20b06c7`):
+`<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>`,
+user agent `akd/1.0 CFNetwork/811.5.4`. isideload 0.5.2 (`326e562`) then asks
+for the URL bag as that client instead of as a Mac; this crate already asks as
+the client and falls back to the Mac only for an incomplete bag. Not ported:
+`client_info_to_use` replaces only a Mac older than macOS 10.13, so a server
+that starts naming a current one is taken as it is. All six macOS servers
+still named the Sierra Mac on 2026-10-28.
+
 **3. `src/auth/apple_account.rs`, `builder.rs`, `grandslam.rs` — let the user
 choose how the 2FA code arrives.**
 
@@ -612,7 +624,101 @@ else to choose here. `si_appid_quota` (`rust-core/src/account.rs`) counts the
 main App ID alone to match. App IDs registered for extensions before stay on the
 team until they expire.
 
+**13. `src/sideload/sideloader.rs` — Increased Memory Limit for every app but
+the app stores that refresh themselves (iLoader 2.4.1).**
+
+iLoader 2.4.1 (`d319ce7`, 2026-10-28) passes `true` for `install_app`'s
+`increased_memory_limit`, so every App ID it signs for gets that capability
+("no need for GetMoreRam"). Here the bool is a `MemoryLimit`: `Off`,
+`Required` (signing fails if Apple refuses; Madeira) and `Preferred`, which the
+Install tab and the Apps tab's refresh use (`si_sign_ipa`'s 2). `Preferred`
+leaves out SideStore, LiveContainer+SideStore, AltStore and StikStore, and when
+Apple refuses, it logs that and signs without the capability. Since `sign` uses
+the profile's entitlements, the capability puts
+`com.apple.developer.kernel.increased-memory-limit` into the signature.
+
+Why the app stores are left out: they refresh themselves. Once Apple expires a
+free team's App ID (7 days after it was registered), SideStore registers a new
+one and refreshes by installing that App ID's profiles, without signing itself
+again (`RefreshAppOperation`). On a free team that new App ID never gets the
+capability: SideSign's `Feature.freeFeatures` is App Groups and Inter-App Audio
+only, and SideSign sends no `bundleIdCapabilities` request (SideStore issue
+#1616, open; the fix, SideSign PR #4, unmerged on 2026-10-28, and SideStore's
+`develop` pins SideSign `752d1ef`). A SideStore signed with the entitlement, or
+a LiveContainer it lives in, would then only get profiles that grant less than
+its signature claims, which is what change 10 avoids for Madeira's app group.
+How iOS treats that wasn't tried here. AltStore enables the capability again
+for an app whose entitlements have it (AltSign `b2c8861`, 2025-03), and
+StikStore wasn't checked; none of the four needs the memory.
+
+Apps SideInstaller refreshes are signed again every time, so a new App ID gets
+the capability again then. The cost is one more request per App ID per sign:
+upstream's `add_increased_memory_limit`, the request GetMoreRam and AltSign
+send, which Madeira's signing already used. A free Apple ID's run reported in
+SideInstaller PR #79 (iOS 27.0.1, 2026-10-15) got both the app group and the
+capability on one App ID, so the request doesn't drop the group. Tests:
+`cargo test -p isideload --lib sideloader`. Not tested: a sign with an Apple
+ID.
+
+**14. `src/sideload/bundle.rs`, `sign.rs` — app extensions in `Extensions/`
+too (SideInstaller issue #110).**
+
+`Bundle::new` looked for app extensions in `PlugIns/` only. Apps keep their
+ExtensionKit extensions (`EXAppExtensionAttributes` in the Info.plist) in
+`Extensions/`, and an extension there was left out of everything that works
+from that list: `update_bundle_id` kept its bundle ID, `sign` gave it neither
+the main profile nor the entitlements, and `clear_old_signatures` skipped its
+old signature. iOS refuses such an app before it looks at any signature:
+
+```
+Failed to set app extension placeholders for com.zarz.mornye.TEAMID1234
+Attempted to set app extension placeholder promise with bundle ID
+com.zarz.mornye.LinkNowPlaying that does not match required prefix of
+com.zarz.mornye.TEAMID1234. for parent
+```
+
+That was Mornye's Now Playing remote-media extension (iOS 27). iLoader issue
+#394 has the same error for Instagram's `lockscreencamera` extension, where
+nab138 named this cause on 2026-08-01; upstream still looks in `PlugIns/` only
+(`326e562`, 2026-10-28). `Bundle::new` now also takes the `.appex` folders in
+`Extensions/`, after those in `PlugIns/`, so they are rebased
+(`com.zarz.mornye.TEAMID1234.LinkNowPlaying`), get the main profile and
+entitlements, and get `ALTAppGroups` for the AltStore family, as `PlugIns/`
+ones do. Only `.appex` folders count there, so a resource bundle in
+`Extensions/` can't make `update_bundle_id` refuse the app for a bundle ID
+outside the app's. apple-codesign-quick 0.1.0 had the same blind spot, signing
+nested bundles in `Frameworks/` and `PlugIns/` only, so it is vendored with the
+same rule (`vendor/apple-codesign-quick/README.md`); with the fix here alone,
+the extension would have been rebased but its executable left unsigned.
+
+Tests: `cargo test -p isideload --lib sideload::`
+(`finds_app_extensions_in_plugins_and_extensions`,
+`rebases_extensions_in_plugins_and_extensions` and
+`every_app_extension_is_provisioned`, on that app's layout) and
+`cargo test -p apple-codesign-quick --lib`
+(`signs_app_extensions_in_extensions`, which fails against 0.1.0).
+
+Checked on the Mac (2026-11-01) with an IPA of that layout (arm64 binaries from
+the iOS 27.2 SDK), a self-signed test certificate and a CMS-signed profile, run
+through `Application::new`, `update_bundle_id` and `sign` as `sign_app` calls
+them. `LinkNowPlaying.appex` came out as
+`com.zarz.mornye.TEAMID1234.LinkNowPlaying`, signed under that identifier with
+the main entitlements and a copy of the profile, the same as the widget in
+`PlugIns/`. `codesign --verify --strict` passes for it, and
+`codesign --verify --deep --strict` for the app, whose `CodeResources` seals
+the extension's signed files. The same IPA through the code before this change
+kept `com.zarz.mornye.LinkNowPlaying`, got no profile and gave "code object is
+not signed at all", while `codesign --verify --deep --strict` still passed for
+the app, which had sealed the extension's files as its own. **Not verified:**
+an install on an iPhone, and whether iOS runs an ExtensionKit extension signed
+with the main app's profile and entitlements, the arrangement `PlugIns/`
+extensions get (changes 1 and 12).
+
 ## Re-vendoring
+
+Upstream's `sign_app` and `install_app` take `increased_memory_limit: bool`, and
+iLoader 2.4.1 passes `true` for every app. A re-vendor has to keep change 13's
+`MemoryLimit`, or SideStore gets the capability too.
 
 Upstream fixed change 1 its own way in `baca89d` (per-extension profiles). Since
 isideload 0.5.0 (`fc7a81a`) it can also do what change 1 and change 12 do:
@@ -624,6 +730,10 @@ has to set `ReuseMain`, as iLoader 2.4.0 does, or SideStore goes back to costing
 
 Change 7 is upstream on `main` from `5992f00` (isideload 0.4.0), without the
 `_CodeSignature` cleanup.
+
+Upstream still looks for app extensions in `PlugIns/` only (`326e562`), so a
+re-vendor has to keep change 14, and the vendored apple-codesign-quick with it,
+or apps with an extension in `Extensions/` fail to install again.
 
 Change 2 is upstream on the `apple-codesign-quick` branch at `f6a4d5d` (what
 iLoader 2.3.3 pins) but was not on `main` (`b6d1113`) as of 2026-09-13. A

@@ -12,6 +12,10 @@ final class DeviceConnection {
     // idevice opaque handles import as OpaquePointer.
     private var adapter: OpaquePointer?
     private var handshake: OpaquePointer?
+    /// Answers lockdownd's heartbeat while a CoreDeviceProxy tunnel is open,
+    /// which iOS closes without it (`LockdownHeartbeat`). Nil on the RPPairing
+    /// route, which doesn't go through lockdownd.
+    private var heartbeat: LockdownHeartbeat?
 
     /// RemoteServiceDiscovery port reached over the VPN loopback.
     static let rsdPort: UInt16 = 49152
@@ -90,6 +94,13 @@ final class DeviceConnection {
     /// Consume an `IdeviceFfiError*` into an `FFIError` (null == success).
     private func ffiError(_ err: UnsafeMutablePointer<IdeviceFfiError>?,
                           _ fallback: String) -> FFIError? {
+        Self.takeFFIError(err, fallback)
+    }
+
+    /// `ffiError` for code that runs without a connection, like the heartbeat's
+    /// thread.
+    fileprivate static func takeFFIError(_ err: UnsafeMutablePointer<IdeviceFfiError>?,
+                                         _ fallback: String) -> FFIError? {
         guard let err = err else { return nil }
         let code = err.pointee.code
         let sub = err.pointee.sub_code
@@ -108,9 +119,10 @@ final class DeviceConnection {
     }
 
     /// User-facing advice for each tunnel failure kind, listing the hosts that
-    /// were tried.
+    /// were tried. `port` is the remote-pairing port dialled last.
     private func tunnelAdvice(kind: TunnelFailureKind,
                               deviceIP: String,
+                              port: UInt16 = DeviceConnection.rsdPort,
                               candidates: [String],
                               raw: FFIError?) -> String {
         let tried = ([deviceIP, "127.0.0.1"] + candidates).joined(separator: ", ")
@@ -147,14 +159,24 @@ final class DeviceConnection {
                 """
         case TunnelFailureRsdUnreachable:
             // ECONNREFUSED means the tunnel works and the address is right, but
-            // nothing is listening on the pairing port (usually Developer Mode
-            // is off), so don't blame the VPN.
+            // nothing is listening on the pairing port (often Developer Mode
+            // is off), so don't blame the VPN. iOS says whether Developer
+            // Mode is on, where it lets the app read it.
             if Self.wasRefused(raw) {
-                return L("Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.",
-                         deviceIP, Int(Self.rsdPort))
+                switch Engine.developerModeIsOn {
+                case false?:
+                    return L("Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.",
+                             deviceIP, Int(port))
+                case true?:
+                    return L("Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.",
+                             deviceIP, Int(port))
+                case nil:
+                    return L("Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.",
+                             deviceIP, Int(port))
+                }
             }
             return """
-                Couldn't reach the device at \(deviceIP):\(Self.rsdPort) at all. The \
+                Couldn't reach the device at \(deviceIP):\(port) at all. The \
                 loopback VPN is most likely off, or Device IP isn't the address it \
                 carries: in LocalDevVPN that's the one under Settings › Device IP \
                 (10.7.0.1 by default), not the “Connected to” address on its main screen.
@@ -233,8 +255,10 @@ final class DeviceConnection {
     ///   (iOS 27+) or made on a computer (idevice_pair's “Remote pairing”,
     ///   iLoader) for iOS 17.4+.
     /// - **CoreDeviceProxy** (`tunnel_create_usb`): opens a lockdown session with
-    ///   a classic pair record and starts CoreDeviceProxy. Works on iOS 17 to
-    ///   26.3; from 26.4 on, lockdownd hangs up on it through the loopback VPN
+    ///   a classic pair record and starts CoreDeviceProxy, with lockdownd's
+    ///   heartbeat answered for as long as the tunnel is open
+    ///   (`LockdownHeartbeat`). Works on iOS 17 to 26.3; from 26.4 on,
+    ///   lockdownd hangs up on it through the loopback VPN
     ///   (`Engine.lockdownWorksOverLoopback`).
     ///
     /// With both records, the route most likely to work on this iOS goes first.
@@ -270,9 +294,12 @@ final class DeviceConnection {
         for (index, useRemotePairing) in routes.enumerated() {
             do {
                 if useRemotePairing {
+                    // Another iPhone's listener (Side by Side, the one caller
+                    // that can't mint) isn't the one this iPhone advertises.
                     try connectRemotePairing(deviceIP: deviceIP,
                                              pairingFilePath: pairingFilePath,
-                                             hostname: hostname)
+                                             hostname: hostname,
+                                             findsMovedPort: allowLockdownMinting)
                 } else {
                     try connectCoreDeviceProxy(deviceIP: deviceIP,
                                                pairingFilePath: pairingFilePath,
@@ -312,8 +339,14 @@ final class DeviceConnection {
     }
 
     /// The RPPairing route: straight to the device's remote-pairing listener.
+    ///
+    /// The listener is dialled on `rsdPort`, the port it nearly always has.
+    /// When that's refused and `findsMovedPort` is set (the listener is this
+    /// iPhone's own), the port this iPhone advertises over Bonjour is looked
+    /// up and dialled too: the listener takes whatever port is free when it
+    /// starts (`NetworkStatus.ownRemotePairingAdvert`).
     private func connectRemotePairing(deviceIP: String, pairingFilePath: String,
-                                      hostname: String) throws {
+                                      hostname: String, findsMovedPort: Bool) throws {
         var pf: OpaquePointer?
         try pairingFilePath.withCString { p in
             try check(rp_pairing_file_read(p, &pf), "failed to read pairing file at \(pairingFilePath)")
@@ -321,17 +354,54 @@ final class DeviceConnection {
         guard let pairingFile = pf else { throw fail("pairing file handle was null") }
         defer { rp_pairing_file_free(pairingFile) }
 
-        var addr = sockaddr_in()
-        addr.sin_family = sa_family_t(AF_INET)
-        addr.sin_port = Self.rsdPort.bigEndian
-        guard deviceIP.withCString({ inet_pton(AF_INET, $0, &addr.sin_addr) }) == 1 else {
-            throw fail("invalid device IP: \(deviceIP)")
-        }
-
         // createListener returns a port but no host, so the Rust side tries the
         // RSD address, loopback, then these local interface addresses, all
         // within one shared timeout.
         let candidates = NetworkStatus.tunnelHostCandidates()
+        guard var failure = try dialRemotePairing(pairingFile, deviceIP: deviceIP, port: Self.rsdPort,
+                                                  hostname: hostname, candidates: candidates) else { return }
+        var port = Self.rsdPort
+        if findsMovedPort, failure.kind == TunnelFailureRsdUnreachable, Self.wasRefused(failure.raw) {
+            let advert = NetworkStatus.ownRemotePairingAdvert()
+            Engine.shared.log("Port \(port) refused. This iPhone's remote pairing advertisement: \(advert.summary).")
+            if let moved = advert.port, moved != port {
+                Engine.shared.log("Dialling the advertised port \(moved) instead …")
+                port = moved
+                guard let retried = try dialRemotePairing(pairingFile, deviceIP: deviceIP, port: moved,
+                                                          hostname: hostname, candidates: candidates) else {
+                    Engine.shared.log("The tunnel opened on port \(moved).")
+                    return
+                }
+                failure = retried
+            }
+        }
+        throw TunnelError(kind: failure.kind,
+                          advice: tunnelAdvice(kind: failure.kind,
+                                               deviceIP: deviceIP,
+                                               port: port,
+                                               candidates: candidates,
+                                               raw: failure.raw),
+                          underlying: failure.raw)
+    }
+
+    /// Why a `dialRemotePairing` failed.
+    private struct DialFailure {
+        let raw: FFIError
+        let kind: TunnelFailureKind
+    }
+
+    /// One tunnel attempt to the remote-pairing listener at `deviceIP:port`.
+    /// Nil when the tunnel came up, and the adapter and handshake are now this
+    /// connection's.
+    private func dialRemotePairing(_ pairingFile: OpaquePointer, deviceIP: String, port: UInt16,
+                                   hostname: String, candidates: [String]) throws -> DialFailure? {
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = port.bigEndian
+        guard deviceIP.withCString({ inet_pton(AF_INET, $0, &addr.sin_addr) }) == 1 else {
+            throw fail("invalid device IP: \(deviceIP)")
+        }
+
         let cHosts: [UnsafePointer<CChar>?] = candidates.map { UnsafePointer(strdup($0)) }
         defer { for p in cHosts { free(UnsafeMutablePointer(mutating: p)) } }
 
@@ -353,14 +423,9 @@ final class DeviceConnection {
             }
         }
         if let raw = ffiError(err, "tunnel_create_rppairing failed (is a loopback VPN connected, Wi-Fi on, device IP \(deviceIP)?)") {
-            // Log the raw error; throw the classified one.
+            // Log the raw error; the caller throws the classified one.
             Engine.shared.log("tunnel dial failed — raw error: \(raw)")
-            throw TunnelError(kind: failureKind,
-                              advice: tunnelAdvice(kind: failureKind,
-                                                   deviceIP: deviceIP,
-                                                   candidates: candidates,
-                                                   raw: raw),
-                              underlying: raw)
+            return DialFailure(raw: raw, kind: failureKind)
         }
         guard newAdapter != nil, newHandshake != nil else {
             throw fail("tunnel created without valid handles")
@@ -368,6 +433,7 @@ final class DeviceConnection {
         disconnect()
         adapter = newAdapter
         handshake = newHandshake
+        return nil
     }
 
     /// The CoreDeviceProxy route, using a classic lockdown pair record.
@@ -375,6 +441,11 @@ final class DeviceConnection {
     /// Despite its name, `tunnel_create_usb` works with any provider; here a
     /// `TcpProvider` reaches lockdownd over the loopback tunnel. No RPPairing
     /// record is needed, so imported pairing files work.
+    ///
+    /// Through the loopback, lockdownd counts this app as a host on the
+    /// network, so the heartbeat starts first and stays up with the tunnel.
+    /// Without it, CoreDeviceProxy hangs up on the tunnel request
+    /// (`LockdownHeartbeat`).
     private func connectCoreDeviceProxy(deviceIP: String, pairingFilePath: String,
                                         hostname: String) throws {
         let provider = try lockdownProvider(deviceIP: deviceIP,
@@ -382,16 +453,47 @@ final class DeviceConnection {
                                             hostname: hostname)
         defer { idevice_provider_free(provider) }
 
+        // iOS keeps one heartbeat per pairing, so the new one ends the old one,
+        // and the old tunnel with it. Stopped first, its thread doesn't report
+        // that as a failure.
+        heartbeat?.stop()
+        let newHeartbeat = startHeartbeat(provider, deviceIP: deviceIP)
         var newAdapter: OpaquePointer?
         var newHandshake: OpaquePointer?
-        try check(tunnel_create_usb(provider, &newAdapter, &newHandshake),
-                  "CoreDeviceProxy tunnel failed (is a loopback VPN connected, device IP \(deviceIP), and is this pairing file this iPhone's?)")
-        guard newAdapter != nil, newHandshake != nil else {
-            throw fail("tunnel created without valid handles")
+        do {
+            try check(tunnel_create_usb(provider, &newAdapter, &newHandshake),
+                      "CoreDeviceProxy tunnel failed (is a loopback VPN connected, device IP \(deviceIP), and is this pairing file this iPhone's?)")
+            guard newAdapter != nil, newHandshake != nil else {
+                throw fail("tunnel created without valid handles")
+            }
+        } catch {
+            newHeartbeat?.stop()
+            throw error
         }
         disconnect()
         adapter = newAdapter
         handshake = newHandshake
+        heartbeat = newHeartbeat
+    }
+
+    /// Connects to lockdownd's heartbeat through `provider` and answers it on a
+    /// thread of its own, returning once the first Marco is answered. iOS
+    /// sends that one as soon as the heartbeat connects.
+    ///
+    /// Nil, with the reason logged, when it doesn't start. The caller goes on
+    /// without it, as before there was a heartbeat, and reports what fails then.
+    private func startHeartbeat(_ provider: OpaquePointer, deviceIP: String) -> LockdownHeartbeat? {
+        var client: OpaquePointer?
+        if let error = ffiError(heartbeat_connect(provider, &client), "heartbeat_connect failed") {
+            Engine.shared.log("Lockdown heartbeat didn't start (\(error)). Trying without it …")
+            return nil
+        }
+        guard let client else { return nil }
+        let started = LockdownHeartbeat(client: client, deviceIP: deviceIP)
+        if !started.waitUntilAnswered(timeout: 5) {
+            Engine.shared.log("Lockdown heartbeat: no Marco from the iPhone within 5 s. Trying anyway …")
+        }
+        return started
     }
 
     /// A provider that reaches lockdownd at `deviceIP` with the classic pair
@@ -547,6 +649,9 @@ final class DeviceConnection {
         endLocationSimulation()
         if let handshake { rsd_handshake_free(handshake); self.handshake = nil }
         if let adapter { adapter_free(adapter); self.adapter = nil }
+        // Last, since iOS closes the tunnel once its heartbeat stops.
+        heartbeat?.stop()
+        heartbeat = nil
     }
 
     // MARK: RSD handshake summary
@@ -1601,6 +1706,12 @@ final class DeviceConnection {
                                             pairingFilePath: pairingFilePath,
                                             hostname: hostname)
         defer { idevice_provider_free(provider) }
+        // iOS closes AMFI without a heartbeat, like any other service. A new
+        // one would end this connection's own and close its tunnel, so that
+        // one is used while it's still answering this iPhone.
+        let ownAnswering = heartbeat.map { $0.isAnswering && $0.deviceIP == deviceIP } ?? false
+        let requestHeartbeat = ownAnswering ? nil : startHeartbeat(provider, deviceIP: deviceIP)
+        defer { requestHeartbeat?.stop() }
         var client: OpaquePointer?
         try check(amfi_connect(provider, &client), "amfi_connect failed")
         guard let client else { throw fail("AMFI client was null") }
@@ -1755,5 +1866,128 @@ private let installProgressCb: @convention(c) (UInt64, UnsafeMutableRawPointer?)
         guard Engine.shared.installProgress != fraction else { return }
         Engine.shared.installProgress = fraction
         Engine.shared.log("install progress: \(progress)%")
+    }
+}
+
+/// Answers lockdownd's heartbeat (`com.apple.mobile.heartbeat`) on a thread of
+/// its own, for the services one lockdown connection starts.
+///
+/// lockdownd sees an app coming through the loopback VPN as a host on the
+/// network, and wants such a host to answer its heartbeat: a Marco about every
+/// 10 s, each answered with a Polo. While none is answering, iOS closes what
+/// that host starts. CoreDeviceProxy finishes the TLS handshake, then hangs up
+/// on the tunnel request (`peer closed connection without sending TLS
+/// close_notify`, issues #105 and #107), and an open tunnel closes 6–9 s after
+/// its heartbeat stops. A computer on the same network answering one with the
+/// same pairing covers for it, which may be why the route worked for some
+/// without one. StikDebug, Feather and minimuxer answer it the same way.
+///
+/// iOS keeps one heartbeat per pairing: a new one closes the one before, and
+/// tunnels opened under that one close 6–9 s later, even with the new one
+/// answering. So a connection keeps one heartbeat for as long as its tunnel is
+/// open, and another app that starts its own with the same pairing file ends it.
+///
+/// Measured on 2026-10-31 on iOS 27.2 over Wi-Fi from a Mac, where lockdownd
+/// still takes network hosts. Not run through LocalDevVPN, which only goes
+/// through lockdownd before iOS 26.4.
+private final class LockdownHeartbeat {
+    /// The device IP the heartbeat reaches.
+    let deviceIP: String
+    /// Owned by the thread, which frees it on the way out.
+    private let client: OpaquePointer
+    private let condition = NSCondition()
+    private var answered = 0
+    private var ended = false
+    private var stopped = false
+
+    /// idevice's `IdeviceError::Heartbeat` code, which comes with sub-code 1
+    /// when the device is going to sleep and 2 when a Marco is late.
+    private static let heartbeatErrorCode: Int32 = 100
+    private static let sleepyTimeSubCode: Int32 = 1
+
+    /// Takes `client`, from `heartbeat_connect`, and starts answering it.
+    init(client: OpaquePointer, deviceIP: String) {
+        self.client = client
+        self.deviceIP = deviceIP
+        let thread = Thread { [self] in run() }
+        thread.name = "sideinstaller.heartbeat"
+        // A Polo that goes out too late closes the tunnel, mid-install too.
+        thread.qualityOfService = .userInitiated
+        thread.start()
+    }
+
+    /// True once a Marco has been answered, until the heartbeat stops or ends.
+    var isAnswering: Bool {
+        condition.lock(); defer { condition.unlock() }
+        return answered > 0 && !ended && !stopped
+    }
+
+    /// Waits up to `timeout` for the first Marco to be answered. False if it
+    /// wasn't, or the heartbeat ended first.
+    func waitUntilAnswered(timeout: TimeInterval) -> Bool {
+        let deadline = Date(timeIntervalSinceNow: timeout)
+        condition.lock(); defer { condition.unlock() }
+        while answered == 0, !ended, !stopped {
+            if !condition.wait(until: deadline) { break }
+        }
+        return answered > 0
+    }
+
+    /// Stops answering. The thread notices at the next Marco, at most about
+    /// 10 s later, then closes the connection.
+    func stop() {
+        condition.lock()
+        stopped = true
+        condition.broadcast()
+        condition.unlock()
+    }
+
+    private var isStopped: Bool {
+        condition.lock(); defer { condition.unlock() }
+        return stopped
+    }
+
+    private func run() {
+        defer {
+            heartbeat_client_free(client)
+            condition.lock()
+            ended = true
+            condition.broadcast()
+            condition.unlock()
+        }
+        // How long to wait for the next Marco: what iOS asked for, plus slack.
+        var wait: UInt64 = 15
+        while !isStopped {
+            var interval: UInt64 = 0
+            if let error = DeviceConnection.takeFFIError(heartbeat_get_marco(client, wait, &interval),
+                                                         "heartbeat_get_marco failed") {
+                if isStopped { return }
+                // A late Marco, or an iPhone going to sleep, doesn't end the
+                // heartbeat. The connection closing does.
+                if error.code == Self.heartbeatErrorCode {
+                    if error.subCode == Self.sleepyTimeSubCode {
+                        Engine.shared.log("Lockdown heartbeat: the iPhone is going to sleep.")
+                    }
+                    continue
+                }
+                Engine.shared.log("Lockdown heartbeat ended (\(error)). iOS closes the tunnel within seconds without it. Another app with this pairing file (SideStore, StikDebug, Feather) starting its own heartbeat ends this one.")
+                return
+            }
+            if isStopped { return }
+            if let error = DeviceConnection.takeFFIError(heartbeat_send_polo(client),
+                                                         "heartbeat_send_polo failed") {
+                Engine.shared.log("Lockdown heartbeat ended: the answer didn't go out (\(error)).")
+                return
+            }
+            wait = interval + 5
+            condition.lock()
+            answered += 1
+            let first = answered == 1
+            condition.broadcast()
+            condition.unlock()
+            if first {
+                Engine.shared.log("Lockdown heartbeat answered. iOS asks every \(interval) s.")
+            }
+        }
     }
 }

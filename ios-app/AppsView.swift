@@ -663,7 +663,7 @@ struct AppsView: View {
             Button(role: .cancel) { manager.cancelRefresh() } label: {
                 Text(L("Cancel")).frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered, sound: .tap)
             .controlSize(.large)
             .tint(Theme.accent)
             .cascadeItem(2)
@@ -671,7 +671,7 @@ struct AppsView: View {
             Button { manager.load() } label: {
                 loadLabel(spinner: Theme.accent).frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered, sound: .tap)
             .controlSize(.large)
             .tint(Theme.accent)
             .disabled(manager.isWorking || manager.isRefreshing)
@@ -820,7 +820,7 @@ struct AppsView: View {
                     } label: {
                         appRow(status)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain, sound: .tick)
                     .cascadeItem(5 + idx)
                 }
             }

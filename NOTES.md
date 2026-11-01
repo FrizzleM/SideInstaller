@@ -546,7 +546,7 @@ stays, next to the pairing activity.
   callback (`SITwoFactorCb`).
 - `si_sign_ipa(session, ipa, udid, device_name, …)` — first calls
   `DeveloperSession::ensure_device_registered(team, name, udid)` so the team has
-  the connected device, then `Sideloader::sign_app(ipa, None, false)` → signed
+  the connected device, then `Sideloader::sign_app(ipa, None, memory_limit, …)` → signed
   `.app` bundle path. sign_app internally registers the App ID + provisioning
   profile and retrieves/creates the dev certificate, then signs with
   `apple-codesign`. **Device registration is mandatory here:** we use the
@@ -606,6 +606,17 @@ stays, next to the pairing activity.
   `Frameworks/SideStoreApp.framework/SideStore`, where `build_github.sh` moves
   and dylibifies `SideStore.app`. When the check can't run, it errs towards not
   writing the file.
+
+**Increased Memory Limit (since iLoader 2.4.1 does it):** the Install tab and
+the Apps tab's refresh pass `si_sign_ipa` a `memory_limit` of 2, so isideload
+enables that capability on the App ID before the profile is requested and the
+app is signed with `com.apple.developer.kernel.increased-memory-limit`. If Apple
+refuses, the app is signed without it. SideStore, LiveContainer+SideStore,
+AltStore and StikStore are left out: they refresh themselves, and the App ID
+SideStore registers each week doesn't get the capability on a free team
+(SideStore issue #1616), so their next profiles would grant less than they're
+signed with. Madeira passes 1 (required), Side by Side 0. See the vendored
+isideload README, change 13.
 
 **idevice version coexistence:** isideload pulls idevice **0.1.61** (crates.io,
 behind its `install` feature, which is required because its feature-gating is
@@ -1016,29 +1027,159 @@ So the cutoff is 26.4 and it holds through 26.6.2 at least; nothing says why.
 None of this has run on a 26.x device, and the new copy hasn't been seen on
 screen.
 
+#### Port 49152 refused on iOS 27 (issues #56, #100)
+
+Both reports: an iOS 27 iPhone with a pairing file it made itself, LocalDevVPN
+up, and `tunnel_create_rppairing` to 10.7.0.1:49152 answered with a reset
+(ECONNREFUSED, kind `RsdUnreachable`), so nothing on the iPhone accepted on that
+port. #56 says pairing again didn't help. #100's log shows SideInstaller running
+inside LiveContainer: its Live Activity failed with “Target does not include
+NSSupportsLiveActivities plist key” and its continued-processing task with
+BGTaskScheduler error 3 (not permitted), although the released 1.6.1 IPA has both
+keys. LiveContainer's own Info.plist has neither. What that does to the tunnel is
+unknown. Local Network permission isn't it: TN3179 counts VPN interfaces out of
+local network privacy.
+
+49152 is just the first port iOS hands out. On a Mac, rapportd holds it. On an
+iPhone remotepairingd normally gets it, which is why StikDebug and SideInstaller
+can dial it blind, but whatever binds first at boot wins. The iPhone advertises
+its real listener as `_remotepairing._tcp` (pymobiledevice3 takes the port from
+there), and a local browse sees the iPhone's own services (on a Mac, `dns-sd -B`
+lists the Mac's own adverts on interface 1). So after a refused 49152,
+`DeviceConnection.connectRemotePairing` calls
+`NetworkStatus.ownRemotePairingAdvert` (NetServiceBrowser on the main run loop,
+3 s at most; only a service resolving to one of this iPhone's own addresses
+counts), logs what it found, and dials the advertised port when it's another one.
+Side by Side never does this, since its listener isn't this iPhone's.
+`_remotepairing._tcp` is in NSBonjourServices, and LiveContainer's plist lists it
+too.
+
+The refusal advice now reads `security.mac.amfi.developer_mode_status`
+(`Engine.developerModeIsOn`): off says so plainly, on drops the “turn on
+Developer Mode” advice and suggests pairing again, then a restart. Where the
+sysctl can't be read, the old text stays. Problem reports list Developer Mode,
+Device IP and whether SideInstaller runs inside LiveContainer.
+
+Checked in the iPhone Duo simulator (2026-10-27), with a fake advert from
+`dns-sd -R … _remotepairing._tcp local. 49170` and a hook dialling a closed port
+first: the refusal, the lookup (“port 49170”), the second dial and the Developer
+Mode text (the simulator reads the Mac's sysctl, 1) all behaved. Never run on an
+iPhone: whether its own advert is seen from inside the app, whether the sysctl
+can be read there, and whether either report's iPhone had moved its port.
+
+## Resuming downloads
+
+Every IPA download from GitHub — SideStore, LiveContainer + SideStore, the
+LiveContainer mirror copy, a version picked under Advanced, Madeira's Actions
+build — goes through `SideStoreDownloader.fetch`, which runs `ResumingDownload`
+(since 2026-10-29; before, a single `URLSession.download` that started over on
+any failure, retried twice by `perform`). Pasted links (`fetchDirect`) don't.
+
+- One data task per attempt writes straight to a temp file. The start link
+  (`github.com/<repo>/releases/download/…` or nightly.link) redirects to a
+  signed storage URL (`response.url`), and a later attempt asks that URL for
+  `Range: bytes=<saved>-`. When it refuses (expired), the next attempt goes back
+  to the start link, the Range carried through the redirects, without a pause.
+- The rest must be of the same file. A 206 has to start at the saved byte and
+  carry the ETag the file began with; otherwise, and for a 200 or a 416, the
+  saved part is dropped and the file starts over. `If-Range` is sent too, but
+  GitHub's release storage ignores it: given a stale ETag it still answered
+  206 (checked 2026-10-29), so the ETag comparison is what catches a nightly
+  replaced mid-download.
+- Until something has answered, it behaves as the download always did: a 60 s
+  request timeout, a timeout fails at once (where GitHub is blocked, more waits
+  would only multiply it), and a dropped or refused connection or a 5xx is
+  tried again after 1 and 3 s. Once the file is arriving, the idle timeout is
+  30 s and attempts in a row that get no new byte pause 2, 4, 8 and 15 s, then
+  give up with the last error. An attempt that got new bytes pauses 1 s.
+- A refusal that says when to come back (Retry-After, or GitHub's rate-limit
+  headers) is passed on, not retried, as before. A 4xx from the start link (a
+  missing asset: the API fallback takes over) fails at once, as does a TLS
+  failure or any error `passing` doesn't list.
+- The ETag ends up in the ledger, as before, so `unchangedDownload` still skips
+  a file GitHub serves unchanged. The log's "HTTP 200 for … — N bytes, release
+  …" line says 206 and "resumed n×" after a resume.
+
+Release storage (`release-assets.githubusercontent.com`) answers Range through
+both redirects with the asset's ETag; its links carried an expiry about 50
+minutes out. Tested against a local server that drops, stalls, expires links
+after one use, ignores or misplaces the Range, swaps the file's ETag, refuses
+with 503 or 429 + Retry-After, never answers, or isn't there; and live against
+SideStore, LiveContainer + SideStore and the mirror.
+
 ## Madeira
 
 [Madeira](https://github.com/willfaust/Madeira) (Windows PC games through Wine and
 FEX) is a fourth `InstallSource`. Four things differ from SideStore.
 
-**The download.** It comes from the releases of the fork
-[FrizzleM/Madeira](https://github.com/FrizzleM/Madeira), built from its
-`sideinstaller-refresh` branch (willfaust/Madeira#264), since only that build
-renews its own signing; switch `InstallSource.repo` back once upstream ships it.
-Its release asset is named after the version, as upstream names it
-(`Madeira-0.1.3.ipa` on tag `v0.1.3`, `Madeira-0.1.3-self-refresh.1.ipa` on
-`v0.1.3-self-refresh.1`), so there's no fixed `latest/download` URL.
-`SideStoreDownloader.latestTag` reads the tag off where
-`github.com/<repo>/releases/latest` redirects to, which has no rate limit, and the
-URL is built from it; a 404 falls back to the API as before. There's no nightly,
-so the channel picker is hidden and `Engine.selectedChannel` is always stable.
+**The download.** Since 1.6.5 Madeira has both channels, like SideStore.
+Stable is upstream's newest full release: its tag is read off where
+`github.com/willfaust/Madeira/releases/latest` redirects (no API call), and the
+asset is named after it (`assetFileName(forTag:)`: `Madeira-0.1.3.ipa` on
+`v0.1.3`), saved as `Madeira.ipa`; when that 404s, the releases API is asked,
+as for the others. Nightly is the newest CI build of upstream's main branch
+(`InstallSource.actionsBuild(.nightly)`): the `Madeira-ipa` artifact that
+willfaust/Madeira's "Build IPA" workflow (`build.yml`) uploads on every push, a
+zip holding `Madeira.ipa`. Upstream's newest release, 0.1.3, predates the
+self-refresh (willfaust/Madeira#264, merged 28 October 2026), so only Nightly
+has the `MadeiraSigningAccountVersion` key (and the 32-bit Windows DLLs) until
+a release does; a Stable install is refreshed under Tools › Sideloaded apps like
+any other app. In
+1.6.2–1.6.4 Latest was the CI build and there was no channel picker; before
+1.6.2 Madeira came from releases of the fork FrizzleM/Madeira.
+
+For Nightly: GitHub serves artifacts only to a signed-in account (the API's
+`/zip` answers 401), so:
+- One unauthenticated API call, `actions/artifacts?name=Madeira-ipa&per_page=100`,
+  lists the uploads with each one's commit and the SHA-256 GitHub recorded
+  (`digest`). Only runs of `main` in the repository itself count: pull requests
+  upload the artifact too, and a fork's runs have the fork as head repository
+  even from a branch named `main`. An upload without a digest is skipped. When
+  the newest 100 uploads are all pull requests', `newestRunBuild` asks for the
+  newest successful `main` run of the workflow, then its artifacts (two calls).
+- The zip is downloaded through nightly.link
+  (`nightly.link/<repo>/actions/artifacts/<id>.zip`), which redirects to the
+  file in GitHub's own storage, and must match that digest before anything is
+  kept, so nightly.link can't substitute a file. Mismatch: `unverifiedBuild`;
+  nightly.link refusing or unreachable: `relayFailed`.
+- `IPALibrary.extractIPA(fromArtifact:to:)` streams the IPA out of the zip
+  (stored, as the workflow uploads it with `compression-level: 0`, or deflated)
+  and the IPA is saved as `Madeira-nightly.ipa`. The ledger records the zip's
+  digest as its ETag, so a later run that finds the same build skips the
+  download. At launch, `IPALibrary.moveMadeiraCIBuildsToNightly` renames a CI
+  build 1.6.2–1.6.4 saved under the stable names (`Madeira.ipa`,
+  `Madeira (e96065a).ipa`) to the nightly ones, told apart by that bare 64-hex
+  ETag (a release's is GitHub's quoted one).
+
+The API's hourly limit (60 per address) applies, unlike the release downloads;
+when it's hit, the download step falls back to the `Madeira-nightly.ipa` an
+earlier run left, as for any failed download. GitHub's artifact storage was about 4×
+slower than release downloads from here (0.8 against 3.6 MB/s on 28 October
+2026, the same with four parallel ranges), so the 183 MB zip takes minutes;
+the prefetch during pairing and sign-in hides part of it. Artifacts expire after
+90 days without a push to `main`.
+
+**Resuming.** A second run that evening crawled at 0.13 MB/s, then went
+silent and failed on URLSession's 60 s idle timeout with half the file there.
+Every download now resumes: see "Resuming downloads" below. For the artifact,
+nightly.link's storage link is valid for ten minutes (`st`…`se`) and answers 403
+once expired (checked on the real one), which sends the download back to
+nightly.link for a new one.
+
+Advanced lists the releases under Stable and, under Nightly, the `main` builds
+from that same API call, one per commit, labelled with the short commit and
+build date ("e96065a · 28 Oct 2026"); a picked one is saved as
+`Madeira-nightly (e96065a).ipa`. Listing both costs two API calls
+(`ReleaseCatalog(source:releases:builds:)`); pre-releases aren't offered, since
+Nightly never installs one.
 `minimumOSMajorVersion` stops a run below iOS 26, which Madeira's JIT helper
 needs.
 
 **Signing.** Madeira isn't ready to play without
-`com.apple.developer.kernel.increased-memory-limit`. `si_sign_ipa` takes a flag
-that has isideload enable that capability on the app's App IDs before the profile
-is requested (`Engine.isMadeira` also catches a Madeira IPA imported as custom, or
+`com.apple.developer.kernel.increased-memory-limit`. For it `si_sign_ipa` gets a
+`memory_limit` of 1: isideload enables that capability on the app's App IDs
+before the profile is requested, and signing fails if Apple refuses (other apps
+get 2, which signs without it then) (`Engine.isMadeira` also catches a Madeira IPA imported as custom, or
 refreshed from Documents, by its bundle id: `com.willfaust.madeora` or any id under
 it, such as the `.test` one of a local development build). Its `MadeiraJITHelper.appex` is signed like every
 extension here, with the main app's profile and entitlements, and renamed with the
@@ -1121,6 +1262,30 @@ async step cores in `Engine`, so they can never drift. State for the progress
 bar/checklist (`Engine.stepStates`, `installProgress`, `pairingPIN`, `guide`)
 is all `@Published`. Reused-pairing/sign-in/download are skipped when already
 valid; a stale pairing file triggers one automatic re-pair before giving up.
+
+#### Report a problem: GitHub's link limits (issue #100)
+
+A new-issue link can't carry a file, and its length is capped twice (measured
+2026-10-27 with curl): GitHub answers 414 from about 8 KB, and a browser that
+isn't signed in (the in-app Safari keeps its own cookies) is redirected to
+`/login?return_to=…`, which carries the whole link escaped again (each `%`, `&`,
+`=`, `/` and `?` grows by two) and fails with GitHub's “Whoops, something went
+wrong!” 500 from about 6.6 KB. The old 7,500-character cap hit that with an
+ordinary log, and the saved report file was hardly ever attached (inside
+LiveContainer it isn't under Files › SideInstaller at all).
+
+`ProblemReport.issueDraft` now caps the sign-in link's length
+(`signInLength`, 6,000) and puts the whole log in the issue. If it fits in the
+link, it goes there. Otherwise the link carries the description, details, error and
+the log's last lines, the rest is copied to the clipboard (log first, newest
+lines kept, then a description or error the link had to cut, then crash logs,
+within GitHub's 65,536-character body limit, counting line breaks twice), and an
+alert says to paste it at the end of the issue, where the body says
+“Paste below this line”. “Copy the full log” copies it again. A non-Latin
+description can cost 15 sign-in characters a character, so the loop can cut the
+description and error from the link entirely and the title to 30 characters.
+Rust's `{:#?}` byte lists are put on one line by `LogRedactor` (a public key was
+35 lines of #100), after the redaction rules.
 
 ## Honest status summary
 

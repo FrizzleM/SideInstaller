@@ -309,6 +309,12 @@ let vietnameseStrings: [String: String] = [
     "Couldn't use that certificate: %@": "Không thể dùng chứng chỉ đó: %@",
     "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
         "SideStore chưa được cài trên iPhone này, nên không có chứng chỉ nào để lấy.",
+    "Inside LiveContainer, SideStore can't send its certificate back to SideInstaller, and LiveContainer doesn't hold one yet. In LiveContainer's Settings, tap “Import Certificate From SideStore” (sign in to SideStore first if it has no certificate), then try again here.":
+        "Trong LiveContainer, SideStore không thể gửi lại chứng chỉ cho SideInstaller, và LiveContainer cũng chưa có chứng chỉ nào. Trong Settings của LiveContainer, chạm vào “Import Certificate From SideStore” (hãy đăng nhập SideStore trước nếu nó chưa có chứng chỉ), rồi thử lại tại đây.",
+    "The certificate LiveContainer holds for SideStore isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID. Nothing was changed. If SideStore has made a new one since, tap “Refresh Certificate from SideStore” in LiveContainer's Settings, then try again here.":
+        "Chứng chỉ mà LiveContainer giữ cho SideStore không thuộc Apple ID này: nó đã bị thu hồi, hoặc thuộc một Apple ID khác. Không có gì bị thay đổi. Nếu từ đó SideStore đã tạo chứng chỉ mới, hãy chạm vào “Refresh Certificate from SideStore” trong Settings của LiveContainer, rồi thử lại tại đây.",
+    "SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "SideInstaller lấy chứng chỉ của SideStore từ LiveContainer và cũng ký bằng chứng chỉ này, nên với Apple ID miễn phí, không ứng dụng nào phải thu hồi chứng chỉ của ứng dụng kia.",
     "Sign with this certificate?": "Ký bằng chứng chỉ này?",
     "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
         "Một liên kết đã gửi cho SideInstaller một chứng chỉ ký. Chỉ dùng nếu chính bạn đã yêu cầu: từ giờ SideInstaller sẽ ký ứng dụng bằng chứng chỉ này thay cho chứng chỉ của nó. Chứng chỉ chỉ được dùng nếu là một trong các chứng chỉ của Apple ID của bạn.",
@@ -599,11 +605,17 @@ let vietnameseStrings: [String: String] = [
     "Done": "Xong",
     "Language": "Ngôn ngữ",
     "App language": "Ngôn ngữ ứng dụng",
+    "Sounds": "Âm thanh",
+    "Sound effects": "Hiệu ứng âm thanh",
     "Auto": "Tự động",
     // The Tunnel section: starting LocalDevVPN from here.
     "Tunnel": "Đường hầm",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "Có thứ gì đó ở %@:%d đã từ chối kết nối, nghĩa là đường hầm vẫn thông — chỉ là thiết bị không lắng nghe trên cổng ghép nối của nó. Cổng đó chỉ mở khi bật Chế độ nhà phát triển, và iOS hỏi lại sau mỗi lần khởi động lại: hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển rồi thử lại. Nếu đã bật, hãy ghép nối lại iPhone này trong “Tệp ghép nối”.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
+        "Có thứ gì đó ở %@:%d đã từ chối kết nối, nghĩa là đường hầm vẫn thông, nhưng iPhone này không lắng nghe trên cổng ghép nối: Chế độ nhà phát triển đang tắt. Hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển (iPhone sẽ khởi động lại) rồi thử lại.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
+        "Có thứ gì đó ở %@:%d đã từ chối kết nối, nghĩa là đường hầm vẫn thông, nhưng iPhone này không lắng nghe trên cổng ghép nối dù Chế độ nhà phát triển đang bật. Hãy ghép nối lại iPhone này trong “Tệp ghép nối” rồi thử lại. Nếu vẫn lỗi, hãy khởi động lại iPhone.",
     "Start LocalDevVPN when needed": "Khởi động LocalDevVPN khi cần",
     "Start LocalDevVPN now": "Khởi động LocalDevVPN ngay",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -689,6 +701,12 @@ let vietnameseStrings: [String: String] = [
         "tệp tải về dưới tên %@ không phải là IPA — có thể thứ gì đó trên mạng này đã trả về một trang web, hoặc quá trình tải bị gián đoạn.",
     "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
         "liên kết đó trả về HTTP %d — không phải liên kết tải trực tiếp, hoặc cần đăng nhập.",
+    "GitHub has no build of %@'s %@ branch to download right now.":
+        "Hiện GitHub không có bản dựng nào của nhánh %2$@ thuộc %1$@ để tải xuống.",
+    "couldn't download %@ through nightly.link, which passes on GitHub's builds: %@":
+        "không thể tải %@ qua nightly.link, dịch vụ chuyển tiếp các bản dựng của GitHub: %@",
+    "the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.":
+        "bản dựng %@ nhận được không phải là tệp GitHub đã ghi nhận, nên sẽ không được cài đặt. Hãy thử lại sau.",
 
     // MARK: - Engine failures
 
@@ -1075,6 +1093,14 @@ let vietnameseStrings: [String: String] = [
         "SideStore sẽ mở ra và gửi lại tệp ghép nối nó đang có.",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
         "SideStore chưa được cài trên iPhone này, nên không có tệp ghép nối nào để lấy.",
+    "SideInstaller takes the pairing file LiveContainer's built-in SideStore has.":
+        "SideInstaller sẽ lấy tệp ghép nối mà SideStore tích hợp trong LiveContainer đang có.",
+    "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
+        "Đây là tệp ghép nối mà SideStore tích hợp trong LiveContainer đang có. SideInstaller sẽ dùng tệp này để kết nối với iPhone này.",
+    "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
+        "Trong Chế độ Đa nhiệm của LiveContainer, SideInstaller không mở được các tệp của SideStore tích hợp. Hãy mở SideInstaller trong LiveContainer mà không dùng Chế độ Đa nhiệm rồi thử lại, hoặc chạm “Nhập tệp ghép nối” và chọn tệp máy tính đã tạo.",
+    "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
+        "Trong LiveContainer, SideStore không gửi lại được tệp ghép nối cho SideInstaller, và SideStore tích hợp trong LiveContainer cũng không có tệp nào SideInstaller dùng được. Hãy chạm “Nhập tệp ghép nối” và chọn tệp máy tính đã tạo, hoặc nhập một tệp vào SideStore trước, rồi quay lại đây thử lại.",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "Liên kết cài đặt đó không chứa .ipa nào. Nó cần ?url= theo sau là địa chỉ https:// để tải .ipa.",
     "That link was meant to carry a pairing file, but what it holds can't be read.":
@@ -1099,6 +1125,12 @@ let vietnameseStrings: [String: String] = [
     "not connected": "chưa kết nối",
     "none": "không có",
     "made on this iPhone": "tạo trên iPhone này",
+    "Runs inside LiveContainer": "Chạy bên trong LiveContainer",
+    "on": "bật",
+    "off": "tắt",
+    "unknown": "không rõ",
+    "yes": "có",
+    "no": "không",
     "latest": "mới nhất",
     "custom server": "máy chủ tùy chỉnh",
     "Auto, starts with %@": "Tự động, bắt đầu với %@",
@@ -1119,8 +1151,14 @@ let vietnameseStrings: [String: String] = [
     "Share the report": "Chia sẻ báo cáo",
     "Preview the report": "Xem trước báo cáo",
     "Report": "Báo cáo",
-    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
-        "Báo cáo được lưu trong Tệp › Trên iPhone của tôi › SideInstaller › Reports. Trên GitHub, đính kèm bằng “Paste, drop, or click to add files” bên dưới ô văn bản, rồi gửi issue.",
+    "The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.":
+        "Issue mở ra với nội dung đã điền sẵn. Khi nhật ký quá dài để điền, SideInstaller sẽ sao chép nó để bạn dán vào cuối issue. Toàn bộ báo cáo cũng được lưu trong %@.",
+    "Files › On My iPhone": "Tệp › Trên iPhone của tôi",
+    "Copy the full log": "Sao chép toàn bộ nhật ký",
+    "Paste the log into the issue": "Dán nhật ký vào issue",
+    "Open GitHub": "Mở GitHub",
+    "The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue.":
+        "Nhật ký đầy đủ quá dài để điền sẵn, nên SideInstaller đã sao chép nó. Trên GitHub, chạm vào cuối văn bản, chọn Dán, rồi gửi issue.",
     "Describe the problem above first.": "Hãy mô tả sự cố ở trên trước.",
     "Couldn't save the report: %@": "Không thể lưu báo cáo: %@",
 

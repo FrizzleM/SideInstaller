@@ -305,6 +305,12 @@ let koreanStrings: [String: String] = [
     "Couldn't use that certificate: %@": "해당 인증서를 사용하지 못했습니다: %@",
     "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
         "이 iPhone에 SideStore가 설치되어 있지 않아서 가져올 인증서가 없습니다.",
+    "Inside LiveContainer, SideStore can't send its certificate back to SideInstaller, and LiveContainer doesn't hold one yet. In LiveContainer's Settings, tap “Import Certificate From SideStore” (sign in to SideStore first if it has no certificate), then try again here.":
+        "LiveContainer 안에서는 SideStore가 인증서를 SideInstaller로 돌려보낼 수 없고, LiveContainer에도 아직 인증서가 없습니다. LiveContainer의 설정에서 “Import Certificate From SideStore”를 탭한 다음(SideStore에 인증서가 없다면 먼저 SideStore에 로그인하세요) 여기서 다시 시도하세요.",
+    "The certificate LiveContainer holds for SideStore isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID. Nothing was changed. If SideStore has made a new one since, tap “Refresh Certificate from SideStore” in LiveContainer's Settings, then try again here.":
+        "LiveContainer가 SideStore용으로 보관한 인증서는 이 Apple ID의 인증서가 아닙니다. 이미 폐기되었거나 다른 Apple ID의 인증서입니다. 변경된 것은 없습니다. 그 사이 SideStore가 새 인증서를 만들었다면 LiveContainer의 설정에서 “Refresh Certificate from SideStore”를 탭한 다음 여기서 다시 시도하세요.",
+    "SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "SideInstaller가 LiveContainer에서 SideStore의 인증서를 가져와 같은 인증서로 서명하므로, 무료 Apple ID에서도 두 앱이 서로의 인증서를 폐기할 필요가 없습니다.",
     "Sign with this certificate?": "이 인증서로 서명하시겠습니까?",
     "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
         "링크를 통해 SideInstaller에 서명 인증서가 전달되었습니다. 직접 요청한 경우에만 사용하세요. 사용하면 SideInstaller가 자체 인증서 대신 이 인증서로 앱에 서명합니다. 내 Apple ID의 인증서 중 하나인 경우에만 사용됩니다.",
@@ -493,11 +499,17 @@ let koreanStrings: [String: String] = [
     "Done": "완료",
     "Language": "언어",
     "App language": "앱 언어",
+    "Sounds": "사운드",
+    "Sound effects": "효과음",
     "Auto": "자동",
     // The Tunnel section: starting LocalDevVPN from here.
     "Tunnel": "터널",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "%@:%d에서 연결을 거부했습니다. 터널은 트래픽을 전달하고 있지만, 기기가 페어링 포트를 열고 있지 않다는 뜻입니다. 이 포트는 개발자 모드가 켜져 있을 때만 열리고, iOS는 재시동할 때마다 다시 켜라고 요청합니다. 설정 › 개인정보 보호 및 보안 › 개발자 모드를 켠 뒤 다시 시도하세요. 이미 켜져 있다면 “페어링 파일”에서 이 iPhone을 다시 페어링하세요.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
+        "%@:%d에서 연결을 거부했습니다. 터널은 트래픽을 전달하고 있지만, 개발자 모드가 꺼져 있어 이 iPhone이 페어링 포트를 열고 있지 않습니다. 설정 › 개인정보 보호 및 보안 › 개발자 모드를 켠 뒤(iPhone이 재시동됩니다) 다시 시도하세요.",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
+        "%@:%d에서 연결을 거부했습니다. 터널은 트래픽을 전달하고 있지만, 개발자 모드가 켜져 있는데도 이 iPhone이 페어링 포트를 열고 있지 않습니다. “페어링 파일”에서 이 iPhone을 다시 페어링한 뒤 다시 시도하세요. 그래도 실패하면 iPhone을 재시동하세요.",
     "Start LocalDevVPN when needed": "필요할 때 LocalDevVPN 시작",
     "Start LocalDevVPN now": "지금 LocalDevVPN 시작",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -583,6 +595,12 @@ let koreanStrings: [String: String] = [
         "%@(으)로 다운로드된 파일은 IPA가 아닙니다. 이 네트워크가 대신 웹 페이지를 돌려줬거나 전송이 중간에 끊겼을 수 있습니다.",
     "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
         "그 링크가 HTTP %d로 응답했습니다. 직접 다운로드 링크가 아니거나 로그인이 필요합니다.",
+    "GitHub has no build of %@'s %@ branch to download right now.":
+        "지금 GitHub에는 다운로드할 수 있는 %1$@의 %2$@ 브랜치 빌드가 없습니다.",
+    "couldn't download %@ through nightly.link, which passes on GitHub's builds: %@":
+        "GitHub 빌드를 전달하는 nightly.link를 통해 %@을(를) 다운로드하지 못했습니다: %@",
+    "the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.":
+        "받은 %@ 빌드가 GitHub에 기록된 파일이 아니라서 설치하지 않습니다. 나중에 다시 시도하세요.",
 
     // MARK: - Engine failures
 
@@ -1051,6 +1069,14 @@ let koreanStrings: [String: String] = [
     "SideStore opens and sends back the pairing file it has.": "SideStore가 열리고 보유한 페어링 파일을 돌려보냅니다.",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
         "이 iPhone에 SideStore가 설치되어 있지 않아서 가져올 페어링 파일이 없습니다.",
+    "SideInstaller takes the pairing file LiveContainer's built-in SideStore has.":
+        "SideInstaller가 LiveContainer 내장 SideStore가 보유한 페어링 파일을 가져옵니다.",
+    "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
+        "LiveContainer 내장 SideStore가 보유한 페어링 파일입니다. SideInstaller가 이 파일로 이 iPhone에 연결합니다.",
+    "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
+        "LiveContainer의 멀티태스킹 모드에서는 SideInstaller가 내장 SideStore의 파일을 열 수 없습니다. 멀티태스킹 모드를 쓰지 않고 LiveContainer에서 SideInstaller를 연 다음 다시 시도하거나, “페어링 파일 가져오기”를 탭하고 컴퓨터에서 만든 파일을 선택하세요.",
+    "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
+        "LiveContainer 안에서는 SideStore가 페어링 파일을 SideInstaller로 돌려보낼 수 없고, LiveContainer 내장 SideStore에도 SideInstaller가 쓸 수 있는 페어링 파일이 없습니다. “페어링 파일 가져오기”를 탭하고 컴퓨터에서 만든 파일을 선택하거나, 먼저 SideStore에 페어링 파일을 가져온 다음 여기서 다시 시도하세요.",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "이 설치 링크에는 .ipa가 없습니다. ?url= 뒤에 .ipa를 내려받을 https:// 주소가 있어야 합니다.",
     "That link was meant to carry a pairing file, but what it holds can't be read.":
@@ -1074,6 +1100,12 @@ let koreanStrings: [String: String] = [
     "not connected": "연결되지 않음",
     "none": "없음",
     "made on this iPhone": "이 iPhone에서 생성",
+    "Runs inside LiveContainer": "LiveContainer 안에서 실행",
+    "on": "켬",
+    "off": "끔",
+    "unknown": "알 수 없음",
+    "yes": "예",
+    "no": "아니요",
     "latest": "최신",
     "custom server": "사용자 지정 서버",
     "Auto, starts with %@": "자동, %@부터 시작",
@@ -1094,8 +1126,14 @@ let koreanStrings: [String: String] = [
     "Share the report": "보고서 공유",
     "Preview the report": "보고서 미리 보기",
     "Report": "보고서",
-    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
-        "보고서는 파일 › 나의 iPhone › SideInstaller › Reports에 저장됩니다. GitHub에서 입력란 아래의 “Paste, drop, or click to add files”로 첨부한 뒤 이슈를 제출하세요.",
+    "The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.":
+        "이슈는 내용이 채워진 채로 열립니다. 로그가 너무 길어 채울 수 없으면 SideInstaller가 로그를 복사해 두니 이슈 끝에 붙여 넣으세요. 전체 보고서는 %@에도 저장됩니다.",
+    "Files › On My iPhone": "파일 › 나의 iPhone",
+    "Copy the full log": "전체 로그 복사",
+    "Paste the log into the issue": "로그를 이슈에 붙여 넣으세요",
+    "Open GitHub": "GitHub 열기",
+    "The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue.":
+        "전체 로그가 너무 길어 자동으로 채울 수 없어서 SideInstaller가 복사해 두었습니다. GitHub에서 텍스트 끝을 탭하고 붙여넣기를 선택한 뒤 이슈를 제출하세요.",
     "Describe the problem above first.": "먼저 위에 문제를 설명해 주세요.",
     "Couldn't save the report: %@": "보고서를 저장하지 못했습니다: %@",
 

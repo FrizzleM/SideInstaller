@@ -142,9 +142,12 @@ int32_t si_apple_signin(const char *apple_id,
 // `udid` to skip registration. `pairing_file_path` is the pairing file used to
 // reach that device: when the IPA is AltStore, its RPPairing record is bundled
 // encrypted as ALTPairingFile.dat for Remote AltServer, as AltServer does. Pass
-// NULL/empty to bundle none. A non-zero `increased_memory_limit` enables the
-// Increased Memory Limit capability on the app's App IDs before the profile is
-// requested, so the signed app carries that entitlement (Madeira needs it).
+// NULL/empty to bundle none. `memory_limit` says whether the Increased Memory
+// Limit capability is enabled on the app's App IDs before the profile is
+// requested, so the signed app carries that entitlement: 0 no; 1 yes, and
+// signing fails if Apple refuses (Madeira needs it); 2 yes, except for the app
+// stores that refresh themselves (SideStore, LiveContainer+SideStore, AltStore,
+// StikStore), and the app is signed without it if Apple refuses.
 // `app_group` is non-zero for every app but one that renews its own profile
 // (Madeira): zero leaves its App IDs without an app group, which an App ID it
 // registers again later wouldn't have either.
@@ -153,7 +156,7 @@ int32_t si_sign_ipa(SignSession *session,
                     const char *udid,
                     const char *device_name,
                     const char *pairing_file_path,
-                    int32_t increased_memory_limit,
+                    int32_t memory_limit,
                     int32_t app_group,
                     char **out_signed_path,
                     char **out_error);

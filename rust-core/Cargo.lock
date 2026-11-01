@@ -135,8 +135,6 @@ dependencies = [
 [[package]]
 name = "apple-codesign-quick"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "519defc726db80b8a43836bbd6f69eb606a42783db799716a103436042593f0b"
 dependencies = [
  "byteorder",
  "cms 0.2.3",

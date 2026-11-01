@@ -462,7 +462,7 @@ enum SideStorePairingHandoff {
     ]
     private static let requiredRemoteKeys = ["private_key", "public_key", "identifier"]
     /// Every RPPairing key, including the optional `alt_irk`.
-    private static let remoteKeys: Set<String> = ["private_key", "public_key", "identifier", "alt_irk"]
+    static let remoteKeys: Set<String> = ["private_key", "public_key", "identifier", "alt_irk"]
 
     /// The records split out of the pairing file, each an XML plist (SideStore
     /// reads the file as a UTF-8 string).
@@ -520,6 +520,189 @@ enum SideStorePairingHandoff {
 
     private static func xml(_ dict: [String: Any]) throws -> Data {
         try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
+    }
+}
+
+/// The pairing file LiveContainer's built-in SideStore keeps, which “Get it
+/// from SideStore” imports while SideInstaller runs inside LiveContainer.
+///
+/// Asking SideStore can't work there. iOS opens only the URL schemes in
+/// LiveContainer's Info.plist, which has no `sideinstaller`, so the link
+/// SideStore sends back goes nowhere. LiveContainer's own links don't help
+/// either: while a guest app runs it drops every `livecontainer://` link it
+/// doesn't handle itself, and its `open-url` forwarding wants the whole link
+/// base64-encoded, which SideStore's reply can't produce.
+///
+/// SideInstaller runs in LiveContainer's own process, though, and the built-in
+/// SideStore's home is the `SideStore` folder in LiveContainer's Documents
+/// (`SideStoreHome.liveContainer`), so its files are read where they lie. The
+/// SideStore that LiveContainer carries keeps one file per protocol, as
+/// SideStore's nightlies do (`SideStorePairingHandoff`); its builds before
+/// those kept one legacy file. The records found go into one file, as in
+/// SideInstaller's own pairing file.
+enum LiveContainerSideStorePairing {
+
+    /// What looking for the built-in SideStore's pairing file came to.
+    enum Outcome {
+        /// A pairing file to import, and the files it was made from.
+        case found(LinkedPairingFile, from: [String])
+        /// SideInstaller runs in a LiveContainer Multitask Mode window: an app
+        /// extension, which isn't let into LiveContainer's Documents.
+        case unreachable
+        /// No pairing file to be had.
+        case notFound
+    }
+
+    /// The file SideStore read before it kept one per protocol. It can hold
+    /// either record, or both.
+    static let legacyFileName = "ALTPairingFile.mobiledevicepairing"
+
+    /// A pairing file is a few KB; anything far bigger isn't one.
+    private static let maxBytes = 1 << 20
+
+    /// `+[NSUserDefaults sideStoreExist]`, which LiveContainer adds for its
+    /// guest apps: whether it carries a built-in SideStore. Nil when it can't
+    /// be asked (outside LiveContainer, or an older one).
+    static var hasBuiltInSideStore: Bool? { liveContainerFlag("sideStoreExist") }
+
+    /// Reads the built-in SideStore's pairing files. `log` gets a line for
+    /// each one that is there but can't be used, and for why none was found.
+    static func find(log: (String) -> Void) -> Outcome {
+        guard let folder = documentsFolder else {
+            log("Pairing import: LiveContainer's home folder isn't known.")
+            return .notFound
+        }
+        guard hasBuiltInSideStore != false else {
+            log("Pairing import: this LiveContainer has no built-in SideStore.")
+            return .notFound
+        }
+
+        // Each protocol's own file, then the legacy one.
+        var files: [(name: String, data: Data, kind: PairingFileKind)] = []
+        var denied = false
+        for name in [SideStorePairingHandoff.remoteFileName,
+                     SideStorePairingHandoff.lockdownFileName, legacyFileName] {
+            switch read(folder.appendingPathComponent(name)) {
+            case .missing:
+                continue
+            case .denied:
+                denied = true
+            case .unusable(let reason):
+                log("Pairing import: the built-in SideStore's \(name) \(reason).")
+            case .file(let data):
+                let kind = PairingFileKind.of(data: data)
+                guard kind.isUsable else {
+                    log("Pairing import: the built-in SideStore's \(name) isn't a pairing file.")
+                    continue
+                }
+                files.append((name, data, kind))
+            }
+        }
+
+        // Each record from its own protocol's file when that has it: SideStore
+        // keeps a file it imported whole, so one can carry both records.
+        let remote = files.first { $0.kind.hasRemotePairing }
+        let lockdown = files.first { $0.name == SideStorePairingHandoff.lockdownFileName && $0.kind.hasLockdown }
+            ?? files.first { $0.kind.hasLockdown }
+        switch (remote, lockdown) {
+        case (nil, nil):
+            guard !denied else {
+                log("Pairing import: the built-in SideStore's files can't be opened from here\(runsInMultitaskWindow ? " (a Multitask Mode window)" : "").")
+                return runsInMultitaskWindow ? .unreachable : .notFound
+            }
+            log("Pairing import: the built-in SideStore has no pairing file.")
+            return .notFound
+        case let (one?, nil), let (nil, one?):
+            return found(one.data, kind: one.kind, from: [one.name])
+        case let (remote?, lockdown?) where remote.name == lockdown.name:
+            return found(remote.data, kind: remote.kind, from: [remote.name])
+        case let (remote?, lockdown?):
+            do {
+                let merged = try merge(lockdown: lockdown.data, remote: remote.data)
+                return found(merged, kind: PairingFileKind.of(data: merged),
+                             from: [lockdown.name, remote.name])
+            } catch {
+                // Then the one record this iOS connects with best.
+                let one = Engine.lockdownWorksOverLoopback ? lockdown : remote
+                log("Pairing import: couldn't merge \(lockdown.name) with \(remote.name) (\(error.localizedDescription)), so only \(one.name) is used.")
+                return found(one.data, kind: one.kind, from: [one.name])
+            }
+        }
+    }
+
+    private static func found(_ data: Data, kind: PairingFileKind, from names: [String]) -> Outcome {
+        .found(LinkedPairingFile(data: data, kind: kind, fromSideStore: true), from: names)
+    }
+
+    /// `lockdown`'s lockdown record and `remote`'s RPPairing record in one
+    /// plist, as `CompositePairingFile` merges SideInstaller's own. Each file's
+    /// other record is left out, so nothing comes from another pairing.
+    private static func merge(lockdown: Data, remote: Data) throws -> Data {
+        let remoteKeys = SideStorePairingHandoff.remoteKeys
+        var merged = try dictionary(lockdown).filter { !remoteKeys.contains($0.key) }
+        for (key, value) in try dictionary(remote) where remoteKeys.contains(key) {
+            merged[key] = value
+        }
+        return try PropertyListSerialization.data(fromPropertyList: merged, format: .xml, options: 0)
+    }
+
+    private static func dictionary(_ data: Data) throws -> [String: Any] {
+        let parsed = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+        guard let dict = parsed as? [String: Any] else {
+            throw CompositePairingFile.BuildError.notAPlistDictionary("pairing")
+        }
+        return dict
+    }
+
+    // MARK: Reading
+
+    /// The built-in SideStore's Documents. LiveContainer gives it the
+    /// `SideStore` folder in its own Documents as its home; `LC_HOME_PATH` is
+    /// LiveContainer's home, kept when it moves the guest app's.
+    private static var documentsFolder: URL? {
+        guard let home = getenv("LC_HOME_PATH").map({ String(cString: $0) }), !home.isEmpty
+        else { return nil }
+        return URL(fileURLWithPath: home, isDirectory: true)
+            .appendingPathComponent("Documents/" + SideStoreHome.liveContainer.documentsPrefix,
+                                    isDirectory: true)
+    }
+
+    private enum Read {
+        case file(Data)
+        case missing
+        /// The sandbox keeps SideInstaller out.
+        case denied
+        /// There, but not to be read as a pairing file: why, for the log.
+        case unusable(String)
+    }
+
+    private static func read(_ url: URL) -> Read {
+        do {
+            let size = (try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
+            guard size > 0 else { return .unusable("is empty") }
+            guard size <= maxBytes else { return .unusable("is too big to be a pairing file (\(size) bytes)") }
+            return .file(try Data(contentsOf: url))
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+            return .missing
+        } catch let error as CocoaError where error.code == .fileReadNoPermission {
+            return .denied
+        } catch {
+            return .unusable("can't be read (\(error.localizedDescription))")
+        }
+    }
+
+    /// `+[NSUserDefaults isLiveProcess]`: true in a Multitask Mode window,
+    /// which LiveContainer runs as an app extension with a sandbox of its own.
+    private static var runsInMultitaskWindow: Bool { liveContainerFlag("isLiveProcess") == true }
+
+    /// One of the C `bool` class methods LiveContainer adds to NSUserDefaults
+    /// for its guest apps, or nil when it has no such method.
+    private static func liveContainerFlag(_ name: String) -> Bool? {
+        let selector = NSSelectorFromString(name)
+        guard let method = class_getClassMethod(UserDefaults.self, selector) else { return nil }
+        typealias Getter = @convention(c) (AnyClass, Selector) -> Bool
+        let get = unsafeBitCast(method_getImplementation(method), to: Getter.self)
+        return get(UserDefaults.self, selector)
     }
 }
 

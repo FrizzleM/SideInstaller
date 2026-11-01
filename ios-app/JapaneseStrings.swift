@@ -304,6 +304,12 @@ let japaneseStrings: [String: String] = [
     "Couldn't use that certificate: %@": "その証明書を使用できませんでした：%@",
     "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
         "この iPhone には SideStore がインストールされていないため、証明書を取得できません。",
+    "Inside LiveContainer, SideStore can't send its certificate back to SideInstaller, and LiveContainer doesn't hold one yet. In LiveContainer's Settings, tap “Import Certificate From SideStore” (sign in to SideStore first if it has no certificate), then try again here.":
+        "LiveContainer 内では SideStore が証明書を SideInstaller に送り返せず、LiveContainer もまだ証明書を持っていません。LiveContainer の「Settings」で「Import Certificate From SideStore」をタップし（SideStore に証明書がない場合は先に SideStore にサインインしてください）、ここでもう一度お試しください。",
+    "The certificate LiveContainer holds for SideStore isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID. Nothing was changed. If SideStore has made a new one since, tap “Refresh Certificate from SideStore” in LiveContainer's Settings, then try again here.":
+        "LiveContainer が SideStore 用に保持している証明書はこの Apple ID のものではありません。失効しているか、別の Apple ID のものです。何も変更されていません。その後 SideStore が新しい証明書を作成した場合は、LiveContainer の「Settings」で「Refresh Certificate from SideStore」をタップしてから、ここでもう一度お試しください。",
+    "SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "SideInstaller は LiveContainer から SideStore の証明書を取得し、その証明書でも署名するので、無料の Apple ID でもどちらのアプリも相手の証明書を失効させる必要がなくなります。",
     "Sign with this certificate?": "この証明書で署名しますか？",
     "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
         "リンクから SideInstaller に署名用証明書が送られてきました。自分で要求した場合のみ使ってください。今後 SideInstaller は自身の証明書の代わりにこの証明書でアプリに署名します。あなたの Apple ID の証明書である場合にのみ使用されます。",
@@ -492,11 +498,17 @@ let japaneseStrings: [String: String] = [
     "Done": "完了",
     "Language": "言語",
     "App language": "アプリの言語",
+    "Sounds": "サウンド",
+    "Sound effects": "効果音",
     "Auto": "自動",
     // The Tunnel section: starting LocalDevVPN from here.
     "Tunnel": "トンネル",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "%@:%d で接続が拒否されました。トンネルは通っていて、デバイスがペアリング用のポートで待ち受けていないだけです。このポートはデベロッパモードが有効なときだけ開き、再起動のたびに iOS が確認を求めます。「設定 › プライバシーとセキュリティ › デベロッパモード」で有効にしてから、もう一度お試しください。すでに有効な場合は、「ペアリングファイル」からこの iPhone をペアリングし直してください。",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
+        "%@:%d で接続が拒否されました。トンネルは通っていますが、デベロッパモードがオフのため、この iPhone がペアリング用のポートで待ち受けていません。「設定 › プライバシーとセキュリティ › デベロッパモード」でオンにしてから（iPhone が再起動します）、もう一度お試しください。",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
+        "%@:%d で接続が拒否されました。トンネルは通っていますが、デベロッパモードがオンなのに、この iPhone がペアリング用のポートで待ち受けていません。「ペアリングファイル」からこの iPhone をペアリングし直してから、もう一度お試しください。それでも失敗する場合は、iPhone を再起動してください。",
     "Start LocalDevVPN when needed": "必要なときに LocalDevVPN を開始",
     "Start LocalDevVPN now": "今すぐ LocalDevVPN を開始",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -582,6 +594,12 @@ let japaneseStrings: [String: String] = [
         "%@ としてダウンロードされたものは IPA ではありません。このネットワーク上の何かがページを返したか、転送が途中で中断された可能性があります。",
     "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
         "そのリンクの応答は HTTP %d でした。直接ダウンロードできるリンクではないか、サインインが必要です。",
+    "GitHub has no build of %@'s %@ branch to download right now.":
+        "GitHub には今、ダウンロードできる %1$@ の %2$@ ブランチのビルドがありません。",
+    "couldn't download %@ through nightly.link, which passes on GitHub's builds: %@":
+        "GitHub のビルドを中継する nightly.link 経由で %@ をダウンロードできませんでした: %@",
+    "the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.":
+        "届いた %@ のビルドは GitHub が記録したファイルではないため、インストールしません。しばらくしてからもう一度お試しください。",
 
     // MARK: - Engine failures
 
@@ -1050,6 +1068,14 @@ let japaneseStrings: [String: String] = [
     "SideStore opens and sends back the pairing file it has.": "SideStore が開き、保持しているペアリングファイルを送り返します。",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
         "この iPhone には SideStore がインストールされていないため、ペアリングファイルを取得できません。",
+    "SideInstaller takes the pairing file LiveContainer's built-in SideStore has.":
+        "LiveContainer 内蔵の SideStore が保持しているペアリングファイルを、SideInstaller が読み込みます。",
+    "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
+        "これは LiveContainer 内蔵の SideStore が保持しているペアリングファイルです。SideInstaller はこれを使ってこの iPhone に接続します。",
+    "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
+        "LiveContainer のマルチタスクモードでは、SideInstaller は内蔵の SideStore のファイルを開けません。マルチタスクモードを使わずに LiveContainer で SideInstaller を開いてからもう一度試すか、「ペアリングファイルをインポート」をタップしてパソコンで作成したファイルを選択してください。",
+    "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
+        "LiveContainer の中では、SideStore はペアリングファイルを SideInstaller に送り返せません。また、LiveContainer 内蔵の SideStore には SideInstaller が使えるペアリングファイルがありません。「ペアリングファイルをインポート」をタップしてパソコンで作成したファイルを選択するか、先に SideStore にペアリングファイルをインポートしてから、ここでもう一度試してください。",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "このインストールリンクには .ipa が含まれていません。?url= の後に .ipa のダウンロード元の https:// アドレスが必要です。",
     "That link was meant to carry a pairing file, but what it holds can't be read.":
@@ -1073,6 +1099,12 @@ let japaneseStrings: [String: String] = [
     "not connected": "未接続",
     "none": "なし",
     "made on this iPhone": "この iPhone で作成",
+    "Runs inside LiveContainer": "LiveContainer 内で実行",
+    "on": "オン",
+    "off": "オフ",
+    "unknown": "不明",
+    "yes": "はい",
+    "no": "いいえ",
     "latest": "最新",
     "custom server": "カスタムサーバー",
     "Auto, starts with %@": "自動、%@ から開始",
@@ -1093,8 +1125,14 @@ let japaneseStrings: [String: String] = [
     "Share the report": "レポートを共有",
     "Preview the report": "レポートをプレビュー",
     "Report": "レポート",
-    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
-        "レポートは「ファイル」›「この iPhone 内」› SideInstaller › Reports に保存されます。GitHub ではテキスト欄の下の “Paste, drop, or click to add files” で添付してから Issue を送信してください。",
+    "The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.":
+        "Issue は入力済みの状態で開きます。ログが長すぎて入力しきれないときは SideInstaller がログをコピーするので、Issue の末尾に貼り付けてください。レポート全体は %@ にも保存されます。",
+    "Files › On My iPhone": "「ファイル」›「この iPhone 内」",
+    "Copy the full log": "ログ全体をコピー",
+    "Paste the log into the issue": "ログを Issue に貼り付けてください",
+    "Open GitHub": "GitHub を開く",
+    "The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue.":
+        "ログ全体が長すぎて自動で入力できないため、SideInstaller がコピーしました。GitHub でテキストの末尾をタップし、「ペースト」を選んでから Issue を送信してください。",
     "Describe the problem above first.": "先に上で問題を説明してください。",
     "Couldn't save the report: %@": "レポートを保存できませんでした：%@",
 

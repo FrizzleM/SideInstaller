@@ -1078,7 +1078,7 @@ struct LocationView: View {
                             .font(.subheadline.weight(.semibold))
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered, sound: .tap)
                     .controlSize(.regular)
                     .tint(.orange)
                     .disabled(manager.isBusy)
@@ -1106,7 +1106,7 @@ struct LocationView: View {
                 pinActionLabel(L("Save"), systemImage: "bookmark", labelled: labelled)
             }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.bordered, sound: .tap)
         .controlSize(.small)
         .tint(Theme.accent)
     }
@@ -1158,7 +1158,7 @@ struct LocationView: View {
                     Image(systemName: "magnifyingglass")
                 }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered, sound: .tap)
             .tint(Theme.accent)
             .disabled(query.trimmingCharacters(in: .whitespaces).isEmpty || isSearching)
         }
@@ -1306,7 +1306,7 @@ struct LocationView: View {
                 }
                 .tint(.red)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered, sound: .tap)
             .controlSize(.small)
             .tint(Theme.accent)
             .disabled(manager.isPlayingPlannedRoute)
@@ -1501,7 +1501,7 @@ struct LocationView: View {
                 .padding(.vertical, 6)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.plain, sound: .tap)
             .disabled(!canSetLocation)
             // `.plain` doesn't dim a disabled row on its own.
             .opacity(canSetLocation ? 1 : 0.5)
@@ -1560,7 +1560,7 @@ struct LocationView: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.bordered, sound: .tap)
                     .controlSize(.regular)
                     .tint(Theme.accent)
                     .disabled(manager.isImportingRoute)
@@ -1647,7 +1647,7 @@ struct LocationView: View {
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.bordered, sound: .tap)
             .controlSize(.regular)
             .tint(.orange)
         } else {

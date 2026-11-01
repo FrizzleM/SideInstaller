@@ -4,7 +4,8 @@ import SafariServices
 
 /// The "Report a problem" sheet: asks what happened, shows what goes along
 /// (details, log, crash logs), saves the report file and opens a prefilled
-/// GitHub issue to attach it to. See `ProblemReport`.
+/// GitHub issue. A log too long for the link is copied for the user to paste
+/// into it. See `ProblemReport`.
 struct ReportProblemView: View {
     @EnvironmentObject private var engine: Engine
     /// Observed so labels redraw when the language changes.
@@ -22,6 +23,11 @@ struct ReportProblemView: View {
     /// The report text the preview shows, set when it's opened.
     @State private var previewText: String?
     @State private var saveError: String?
+    /// An issue whose log was copied, waiting while the user reads how to
+    /// paste it.
+    @State private var issueToOpen: ProblemReport.IssueDraft?
+    /// True for a moment after “Copy the full log”.
+    @State private var copiedLog = false
 
     /// An issue with nothing in it can't be acted on (#27, #37, #67), so a few
     /// words are asked for first.
@@ -46,6 +52,15 @@ struct ReportProblemView: View {
                 }
             }
             .navigationDestination(item: $previewText) { ReportPreview(text: $0) }
+            .alert(L("Paste the log into the issue"),
+                   isPresented: Binding(get: { issueToOpen != nil },
+                                        set: { if !$0 { issueToOpen = nil } }),
+                   presenting: issueToOpen) { issue in
+                Button(L("Open GitHub")) { present(issue.url) }
+                Button(L("Cancel"), role: .cancel) {}
+            } message: { _ in
+                Text(L("The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue."))
+            }
         }
         .task {
             // Only while the tunnel is already up: opening LocalDevVPN unasked
@@ -187,6 +202,13 @@ struct ReportProblemView: View {
             }
             .disabled(!canSend)
             Button {
+                copyLog(report)
+            } label: {
+                Label(copiedLog ? L("Copied") : L("Copy the full log"),
+                      systemImage: copiedLog ? "checkmark" : "doc.on.doc")
+            }
+            .disabled(!canSend)
+            Button {
                 share(report)
             } label: {
                 Label(L("Share the report"), systemImage: "square.and.arrow.up")
@@ -204,7 +226,8 @@ struct ReportProblemView: View {
             }
         } footer: {
             Text(canSend
-                 ? L("The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.")
+                 ? L("The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.",
+                     ProblemReport.reportsFolder(onMyIPhone: L("Files › On My iPhone")))
                  : L("Describe the problem above first."))
         }
     }
@@ -214,13 +237,40 @@ struct ReportProblemView: View {
                         ownCrashes: pickedOwnCrashes)
     }
 
-    /// Saves the file, then opens the issue in Safari inside the app: GitHub's
-    /// own app would take the link and drop what's filled in.
+    private func issueDraft(_ report: ProblemReport) -> ProblemReport.IssueDraft {
+        report.issueDraft(description: description, deviceCrashes: pickedDeviceCrashes,
+                          ownCrashes: pickedOwnCrashes)
+    }
+
+    /// Saves the file, then opens the issue. When the link can't carry the
+    /// whole log, the log is copied first and an alert says where it goes.
     private func openIssue(_ report: ProblemReport) {
         guard let file = save(report) else { return }
-        let url = report.issueURL(description: description, deviceCrashes: pickedDeviceCrashes,
-                                  ownCrashes: pickedOwnCrashes)
+        let issue = issueDraft(report)
         engine.log("Report a problem: saved \(file.lastPathComponent), opening a GitHub issue.")
+        guard let paste = issue.pasteText else { return present(issue.url) }
+        UIPasteboard.general.string = paste
+        engine.log("Report a problem: the log is too long for the link, so it's copied for pasting (\(paste.count) characters).")
+        issueToOpen = issue
+    }
+
+    /// Copies what the issue needs pasted, or the whole log when the link
+    /// carries everything: for when the clipboard has been used since, or the
+    /// issue is written somewhere else.
+    private func copyLog(_ report: ProblemReport) {
+        let issue = issueDraft(report)
+        UIPasteboard.general.string = issue.pasteText ?? report.fileText(
+            description: description, deviceCrashes: pickedDeviceCrashes, ownCrashes: pickedOwnCrashes)
+        copiedLog = true
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            copiedLog = false
+        }
+    }
+
+    /// Opens `url` in Safari inside the app: GitHub's own app would take the
+    /// link and drop what's filled in.
+    private func present(_ url: URL) {
         let safari = SFSafariViewController(url: url)
         safari.dismissButtonStyle = .close
         UIApplication.shared.topViewController?.present(safari, animated: true)

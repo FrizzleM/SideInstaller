@@ -138,6 +138,13 @@ idevice = { path = "vendor/idevice" }
 [patch."https://github.com/nab138/isideload.git"]
 isideload = { path = "vendor/isideload" }
 
+# isideload's signer. Its 0.1.0 release signs nested bundles only in Frameworks/
+# and PlugIns/, so an ExtensionKit extension in Extensions/ (issue #110) was
+# sealed as plain files with its executable left unsigned. Vendored to sign
+# those too — see vendor/apple-codesign-quick/README.md.
+[patch.crates-io]
+apple-codesign-quick = { path = "vendor/apple-codesign-quick" }
+
 [profile.release]
 opt-level = 3
 lto = "thin"

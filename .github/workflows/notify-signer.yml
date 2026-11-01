@@ -24,8 +24,10 @@ name: notify-signer
 #                                  "Client ID", starts with Iv). Not a secret.
 #   secret   SIGNER_APP_PRIVATE_KEY  a private key generated for the App (the
 #                                  whole .pem file)
-# Without them the run stops with these steps, and the tag can be signed by
-# hand from SideInstaller-Signed › Actions › sign › Run workflow.
+# Without them this job only warns and leaves a run summary saying how to set
+# them up; it doesn't fail the release. SideInstaller-Signed's daily scheduled
+# sign still finds the new release by itself, and the tag can be signed at once
+# from SideInstaller-Signed › Actions › sign › Run workflow.
 
 on:
   release:
@@ -67,8 +69,10 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       # Say what's missing and how to sign anyway, instead of the token
-      # action's "client-id must be set to a non-empty string".
+      # action's "client-id must be set to a non-empty string". A warning, not
+      # a failure: the release is already out and gets signed either way.
       - name: Check the signer App is set up
+        id: app_setup
         shell: bash
         env:
           CLIENT_ID: ${{ vars.SIGNER_APP_CLIENT_ID }}
@@ -79,16 +83,20 @@ jobs:
           missing=()
           [[ -n "$CLIENT_ID" ]] || missing+=("variable SIGNER_APP_CLIENT_ID")
           [[ "$HAS_KEY" == "true" ]] || missing+=("secret SIGNER_APP_PRIVATE_KEY")
-          [[ ${#missing[@]} -eq 0 ]] && exit 0
+          if [[ ${#missing[@]} -eq 0 ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "ready=false" >> "$GITHUB_OUTPUT"
 
           list="$(printf '%s, ' "${missing[@]}")"
-          echo "::error::Can't reach SideInstaller-Signed: ${list%, } not set in this repository. $TAG was not sent for signing; see the run summary."
+          echo "::warning::$TAG wasn't sent to SideInstaller-Signed (${list%, } not set in this repository). Its daily sign run will pick it up; see the run summary to sign it now."
           {
             echo "### $TAG was not sent for signing"
             echo
-            echo "This repository has no ${list%, }, so it can't ask FrizzleM/SideInstaller-Signed to sign."
+            echo "This repository has no ${list%, }, so it can't ask FrizzleM/SideInstaller-Signed to sign. The release is published; SideInstaller-Signed's daily scheduled sign run will find it and sign it."
             echo
-            echo "**Sign it now:** [SideInstaller-Signed › Actions › sign](https://github.com/FrizzleM/SideInstaller-Signed/actions/workflows/sign.yml) › Run workflow, tag \`$TAG\`."
+            echo "**Sign it now instead:** [SideInstaller-Signed › Actions › sign](https://github.com/FrizzleM/SideInstaller-Signed/actions/workflows/sign.yml) › Run workflow, tag \`$TAG\`."
             echo
             echo "**Set it up once,** so releases are signed on their own:"
             echo
@@ -97,10 +105,10 @@ jobs:
             echo "3. Install App (left menu) › Only select repositories › SideInstaller-Signed."
             echo "4. In FrizzleM/SideInstaller › Settings › Secrets and variables › Actions: variable \`SIGNER_APP_CLIENT_ID\` = the Client ID, secret \`SIGNER_APP_PRIVATE_KEY\` = the whole .pem file."
           } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
 
       - name: Mint a token for SideInstaller-Signed
         id: app
+        if: steps.app_setup.outputs.ready == 'true'
         uses: actions/create-github-app-token@v3
         with:
           client-id: ${{ vars.SIGNER_APP_CLIENT_ID }}
@@ -111,6 +119,7 @@ jobs:
           permission-contents: write
 
       - name: Send the dispatch
+        if: steps.app_setup.outputs.ready == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}

@@ -303,6 +303,12 @@ let chineseStrings: [String: String] = [
     "Couldn't use that certificate: %@": "无法使用该证书：%@",
     "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
         "这台 iPhone 上没有安装 SideStore，因此无法从中获取证书。",
+    "Inside LiveContainer, SideStore can't send its certificate back to SideInstaller, and LiveContainer doesn't hold one yet. In LiveContainer's Settings, tap “Import Certificate From SideStore” (sign in to SideStore first if it has no certificate), then try again here.":
+        "在 LiveContainer 中，SideStore 无法把证书发回 SideInstaller，而 LiveContainer 里也还没有证书。请在 LiveContainer 的 Settings 中轻点“Import Certificate From SideStore”（如果 SideStore 还没有证书，请先登录 SideStore），然后回到这里重试。",
+    "The certificate LiveContainer holds for SideStore isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID. Nothing was changed. If SideStore has made a new one since, tap “Refresh Certificate from SideStore” in LiveContainer's Settings, then try again here.":
+        "LiveContainer 为 SideStore 保存的证书不属于此 Apple ID：它已被吊销，或属于另一个 Apple ID。未做任何更改。如果 SideStore 之后生成了新证书，请在 LiveContainer 的 Settings 中轻点“Refresh Certificate from SideStore”，然后回到这里重试。",
+    "SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.":
+        "SideInstaller 会从 LiveContainer 取得 SideStore 的证书，并也用它签名，这样在免费 Apple ID 上两个 App 都不必吊销对方的证书。",
     "Sign with this certificate?": "使用此证书签名？",
     "A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates.":
         "某个链接向 SideInstaller 发送了签名证书。只有在你主动请求时才使用：从现在起 SideInstaller 将用它代替自己的证书为 App 签名。只有当它是你 Apple ID 的证书时才会被使用。",
@@ -579,11 +585,17 @@ let chineseStrings: [String: String] = [
     "Done": "完成",
     "Language": "语言",
     "App language": "应用语言",
+    "Sounds": "声音",
+    "Sound effects": "音效",
     "Auto": "自动",
     // The Tunnel section: starting LocalDevVPN from here.
     "Tunnel": "隧道",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "%@:%d 上有东西拒绝了连接，说明隧道是通的，只是设备没有在它的配对端口上监听。该端口只有在开启开发者模式时才会打开，而且每次重启后 iOS 都会再次要求确认：请在 设置 › 隐私与安全性 › 开发者模式 中打开它，然后重试。如果已经打开，请在“配对文件”中重新配对这台 iPhone。",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
+        "%@:%d 上有东西拒绝了连接，说明隧道是通的，但这台 iPhone 没有在配对端口上监听：开发者模式已关闭。请在 设置 › 隐私与安全性 › 开发者模式 中打开它（iPhone 会重启），然后重试。",
+    "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
+        "%@:%d 上有东西拒绝了连接，说明隧道是通的，但尽管开发者模式已打开，这台 iPhone 仍没有在配对端口上监听。请在“配对文件”中重新配对这台 iPhone，然后重试。如果仍然失败，请重启 iPhone。",
     "Start LocalDevVPN when needed": "需要时打开 LocalDevVPN",
     "Start LocalDevVPN now": "立即启动 LocalDevVPN",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -667,6 +679,12 @@ let chineseStrings: [String: String] = [
         "以 %@ 为名下载到的文件不是 IPA —— 此网络上的某个环节可能返回了一个网页，或者传输中断了。",
     "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
         "该链接返回 HTTP %d — 它不是直接下载链接，或者需要登录。",
+    "GitHub has no build of %@'s %@ branch to download right now.":
+        "GitHub 目前没有 %1$@ 的 %2$@ 分支构建版本可供下载。",
+    "couldn't download %@ through nightly.link, which passes on GitHub's builds: %@":
+        "无法通过 nightly.link（转交 GitHub 构建版本的服务）下载 %@：%@",
+    "the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.":
+        "收到的 %@ 构建版本不是 GitHub 记录的文件，因此不会安装。请稍后重试。",
 
     // MARK: - Engine failures
 
@@ -1046,6 +1064,14 @@ let chineseStrings: [String: String] = [
     "SideStore opens and sends back the pairing file it has.": "SideStore 会打开并发回它现有的配对文件。",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
         "这台 iPhone 上没有安装 SideStore，因此无法从中获取配对文件。",
+    "SideInstaller takes the pairing file LiveContainer's built-in SideStore has.":
+        "SideInstaller 会读取 LiveContainer 内置 SideStore 现有的配对文件。",
+    "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
+        "这是 LiveContainer 内置 SideStore 现有的配对文件。SideInstaller 将用它连接这台 iPhone。",
+    "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
+        "在 LiveContainer 的多任务模式下，SideInstaller 无法打开内置 SideStore 的文件。请在 LiveContainer 中不使用多任务模式打开 SideInstaller，然后重试；或者点按“导入配对文件”，选择电脑生成的文件。",
+    "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
+        "在 LiveContainer 中，SideStore 无法把配对文件发回给 SideInstaller，而 LiveContainer 内置的 SideStore 也没有 SideInstaller 能用的配对文件。请点按“导入配对文件”，选择电脑生成的文件；或者先把配对文件导入 SideStore，然后回到这里重试。",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "该安装链接中没有 .ipa。它需要 ?url= 后跟下载 .ipa 的 https:// 地址。",
     "That link was meant to carry a pairing file, but what it holds can't be read.": "该链接本应包含配对文件，但其内容无法读取。",
@@ -1068,6 +1094,12 @@ let chineseStrings: [String: String] = [
     "not connected": "未连接",
     "none": "无",
     "made on this iPhone": "在此 iPhone 上生成",
+    "Runs inside LiveContainer": "在 LiveContainer 中运行",
+    "on": "已开启",
+    "off": "已关闭",
+    "unknown": "未知",
+    "yes": "是",
+    "no": "否",
     "latest": "最新",
     "custom server": "自定义服务器",
     "Auto, starts with %@": "自动，从 %@ 开始",
@@ -1088,8 +1120,14 @@ let chineseStrings: [String: String] = [
     "Share the report": "分享报告",
     "Preview the report": "预览报告",
     "Report": "报告",
-    "The report is saved in Files › On My iPhone › SideInstaller › Reports. On GitHub, attach it with “Paste, drop, or click to add files” below the text, then submit the issue.":
-        "报告保存在“文件” › 我的 iPhone › SideInstaller › Reports。在 GitHub 上，用文本框下方的“Paste, drop, or click to add files”附上它，然后提交 Issue。",
+    "The issue opens filled in. When the log is too long for that, SideInstaller copies it for you to paste at the end of the issue. The whole report is also saved in %@.":
+        "Issue 会自动填好。如果日志太长、无法自动填入，SideInstaller 会把它复制下来，供你粘贴到 Issue 末尾。完整报告也保存在 %@。",
+    "Files › On My iPhone": "“文件” › 我的 iPhone",
+    "Copy the full log": "复制完整日志",
+    "Paste the log into the issue": "把日志粘贴到 Issue 中",
+    "Open GitHub": "打开 GitHub",
+    "The full log is too long to fill in, so SideInstaller copied it. On GitHub, tap the end of the text, choose Paste, then submit the issue.":
+        "完整日志太长，无法自动填入，所以 SideInstaller 已将其复制。在 GitHub 上轻点文本末尾，选择“粘贴”，然后提交 Issue。",
     "Describe the problem above first.": "请先在上方描述问题。",
     "Couldn't save the report: %@": "无法保存报告：%@",
 

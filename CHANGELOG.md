@@ -2,6 +2,92 @@
 
 All notable changes to SideInstaller are documented here.
 
+## 1.6.5
+
+### Added
+- **Madeira has Stable and Nightly, like SideStore and LiveContainer.** Stable installs the newest
+  release from [willfaust/Madeira](https://github.com/willfaust/Madeira)'s releases (0.1.3 today).
+  Nightly installs the newest build of its main branch from GitHub Actions, as Latest did until
+  now, and is the one that renews its own signing until a release does. Advanced lists the
+  releases under Stable and recent builds by commit and date under Nightly. A build an earlier
+  version downloaded stays on as the nightly, so it isn't fetched again.
+
+### Fixed
+- **Apps with an ExtensionKit extension install.** Some apps keep an extension in an Extensions
+  folder rather than PlugIns, such as Mornye's Now Playing remote controls on iOS 27. SideInstaller
+  added your team ID to the app's bundle ID but left those extensions' IDs as they were, so iOS
+  refused the app with “Mismatched bundle IDs” (#110), and it didn't sign them either. They now
+  get the new ID, the app's provisioning profile and a signature of their own, like the
+  extensions in PlugIns.
+
+## 1.6.4
+
+### Fixed
+- **“Use SideStore's certificate” works inside LiveContainer.** There, SideStore showed its Export
+  prompt but its certificate never came back, because iOS only opens LiveContainer's links, not
+  SideInstaller's (#95). Inside LiveContainer, SideInstaller now takes the certificate LiveContainer
+  holds instead: its built-in SideStore's, or the copy LiveContainer imported from SideStore. It is
+  checked against your Apple ID as before. If LiveContainer has none yet, SideInstaller says how to
+  import it there.
+- **“Get it from SideStore” works inside LiveContainer.** There, the pairing-file button opened
+  SideStore, but nothing came back, because iOS only opens LiveContainer's links, not
+  SideInstaller's (the same cause as #95). Inside LiveContainer, SideInstaller now reads the
+  pairing file LiveContainer's built-in SideStore keeps and asks before importing it, as before.
+  When there's none to read, or SideInstaller runs in LiveContainer's Multitask Mode, it says what
+  to do instead. The button no longer shows in a LiveContainer without a built-in SideStore,
+  which has no pairing file to give.
+
+## 1.6.3
+
+### Fixed
+- **The device link opens with a pairing file made on a computer.** Before iOS 26.4, “Open the
+  device link” could stop with “peer closed connection without sending TLS close_notify” (#105,
+  #107). iOS closes what an app starts through LocalDevVPN unless the app answers its heartbeat,
+  as SideStore and StikDebug do. SideInstaller now answers it for as long as the link is open.
+
+## 1.6.2
+
+### Added
+- **Apps get Increased Memory Limit.** As iLoader 2.4.1 does, SideInstaller now turns on this
+  capability for an app's App ID when it signs the app, so emulators and other apps that need more
+  memory get it without a trip to Tools › Entitlements. SideStore and LiveContainer + SideStore
+  are left as they were, because SideStore drops the capability when it renews their App IDs each
+  week. If Apple refuses it, the app is signed without it.
+- **Downloads pick up where they stopped.** When the download of SideStore, LiveContainer +
+  SideStore or Madeira stalls or the connection drops, SideInstaller carries on from what it already
+  has instead of starting over, and starts over only if the file was replaced on GitHub meanwhile.
+  A network that can't reach GitHub at all fails as quickly as before.
+- **Sound effects.** Buttons, switches and messages make a short sound: a soft press for the main
+  buttons, clicks for switches, and their own sounds for success, errors and anything that needs
+  you, such as a pairing code. Silent Mode mutes them, and Settings › Sounds turns them off.
+
+### Fixed
+- **Bug reports carry the whole log.** A GitHub link only holds a few thousand characters, so a
+  report's issue got the last lines of the log at most and asked for the report file to be
+  attached, which was easy to miss, and inside LiveContainer the file wasn't where the issue said
+  (#100). When the log doesn't fit in the link, SideInstaller now copies it and says so, and the
+  issue ends with “Paste below this line”. “Copy the full log” copies it again.
+- **Report a problem no longer ends on GitHub's “Whoops, something went wrong!” page.** When the
+  in-app browser wasn't signed in to GitHub, a long report made a sign-in link too long for
+  GitHub. Links are now kept short enough for it.
+- **The pairing port is looked for when 49152 refuses.** When this iPhone refuses the device link
+  on port 49152, SideInstaller asks which port it advertises for remote pairing and tries that one
+  before giving up (#56, #100).
+- **The “refused the connection” message knows whether Developer Mode is on.** It no longer asks to
+  turn on Developer Mode when it's already on, and says plainly when it's off.
+
+### Changed
+- **Madeira comes from its official repository again.** Madeira's own repository now has the
+  self-renewing signing, so Latest installs the newest build of
+  [willfaust/Madeira](https://github.com/willfaust/Madeira)'s main branch from its GitHub Actions
+  runs, instead of a release of the FrizzleM/Madeira fork. GitHub hands those builds only to
+  signed-in accounts, so SideInstaller downloads them through nightly.link and installs one only if
+  it's exactly the file GitHub recorded. The build includes the 32-bit Windows parts the fork's
+  release left out. Advanced lists recent builds by commit and date.
+- **Reports list Device IP, Developer Mode, and whether SideInstaller runs inside LiveContainer.**
+  A log pasted into “What happened?” no longer makes the issue's title: the error does.
+- **Key bytes take one line in the log**, not one line per byte. Private keys stay redacted.
+
 ## 1.6.1
 
 ### Added

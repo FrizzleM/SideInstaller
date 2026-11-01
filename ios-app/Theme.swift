@@ -294,8 +294,10 @@ struct PopupCard<Content: View>: View {
         if let group {
             group.close()
         } else if endsProcess {
+            SoundEffects.play(.tap)
             confirmingClose = true
         } else {
+            SoundEffects.play(.dismiss)
             onClose()
         }
     }
@@ -374,8 +376,10 @@ struct PopupGroupCard<Content: View>: View {
     /// Closes the group, asking first when that would end the run.
     private func requestClose() {
         if endsProcess {
+            SoundEffects.play(.tap)
             confirmingClose = true
         } else {
+            SoundEffects.play(.dismiss)
             onClose()
         }
     }
@@ -412,6 +416,7 @@ private struct PopupCloseButton: View {
                 .padding(8)
                 .background(Circle().fill(.white.opacity(0.08)))
         }
+        // The card plays the sound, which depends on whether it asks first.
         .buttonStyle(.plain)
         .accessibilityLabel(L("Close"))
     }
@@ -613,7 +618,7 @@ struct CopyLogsButton: View {
                 .font(.subheadline.weight(.semibold))
                 .contentTransition(.symbolEffect(.replace))
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.bordered, sound: .rise)
         .tint(tint)
         .animation(.default, value: copied)
     }
@@ -809,9 +814,22 @@ extension View {
 // MARK: - Buttons
 
 /// The full-width gradient call-to-action; pass a `gradient` to recolour it.
-struct PrimaryButtonStyle: ButtonStyle {
+/// Plays `sound` as it fires.
+struct PrimaryButtonStyle: PrimitiveButtonStyle {
     var gradient: LinearGradient = Theme.brand
     var glow: Color = Theme.accent
+    var sound: UISound = .press
+
+    func makeBody(configuration: Configuration) -> some View {
+        SoundingButtonStyle(base: PrimaryButtonLook(gradient: gradient, glow: glow), sound: sound)
+            .makeBody(configuration: configuration)
+    }
+}
+
+/// How `PrimaryButtonStyle` draws its button, and the press.
+private struct PrimaryButtonLook: ButtonStyle {
+    var gradient: LinearGradient
+    var glow: Color
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
