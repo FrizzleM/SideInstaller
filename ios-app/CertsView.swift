@@ -11,7 +11,7 @@ struct CertsView: View {
     @State private var showSettings = false
     /// The certificate the user tapped "Revoke" on, pending confirmation.
     @State private var pendingRevoke: DevCert?
-    /// The certificate the user tapped "Export" on, pending a password.
+    /// The certificate the user tapped "Export" on, pending a password (or none).
     @State private var pendingExport: DevCert?
     @State private var exportPassword = ""
 
@@ -30,17 +30,16 @@ struct CertsView: View {
             .alert(L("Export certificate"),
                    isPresented: Binding(get: { pendingExport != nil },
                                         set: { if !$0 { endExport() } })) {
-                SecureField(L("Password"), text: $exportPassword)
+                SecureField(L("Password (optional)"), text: $exportPassword)
                 Button(L("Export")) {
                     if let cert = pendingExport {
                         manager.export(cert, password: exportPassword, share: share)
                     }
                     endExport()
                 }
-                .disabled(exportPassword.isEmpty)
                 Button(L("Cancel"), role: .cancel) { endExport() }
             } message: {
-                Text(L("Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password for it: you'll need it to import the file. Keep the file to yourself."))
+                Text(L("Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password, which you'll need to import the file, or leave it empty: signing apps import it without one, but a Mac won't. Keep the file to yourself."))
             }
             .padding(20)
             .pageColumn()
@@ -237,6 +236,7 @@ struct CertsView: View {
                 }
 
                 HStack(spacing: 10) {
+                    // Only this one's private key is on the iPhone (see `DevCert.isSigning`).
                     if cert.isSigning {
                         exportButton(cert)
                     }

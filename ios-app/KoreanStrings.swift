@@ -279,10 +279,11 @@ let koreanStrings: [String: String] = [
         "SideInstaller가 서명에 사용하는 인증서만 내보낼 수 있습니다. 다른 인증서의 개인 키는 Apple에 인증서를 요청한 기기에만 남아 있습니다.",
     "Couldn't export the certificate: %@": "인증서를 내보내지 못했습니다: %@",
     "Export certificate": "인증서 내보내기",
+    "Password (optional)": "암호(선택)",
     "Export": "내보내기",
     "Exporting": "내보내는 중",
-    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password for it: you'll need it to import the file. Keep the file to yourself.":
-        "이 인증서와 개인 키를 .p12 파일로 저장합니다. 다른 서명 앱이나 컴퓨터에서 서명할 때 사용할 수 있습니다. 파일에 사용할 암호를 정하세요. 파일을 가져올 때 필요합니다. 파일은 본인만 보관하세요.",
+    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password, which you'll need to import the file, or leave it empty: signing apps import it without one, but a Mac won't. Keep the file to yourself.":
+        "이 인증서와 개인 키를 .p12 파일로 저장합니다. 다른 서명 앱이나 컴퓨터에서 서명할 때 사용할 수 있습니다. 암호를 정하면 파일을 가져올 때 필요합니다. 비워 두어도 서명 앱은 가져올 수 있지만 Mac은 가져올 수 없습니다. 파일은 본인만 보관하세요.",
     "SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it.":
         "SideInstaller는 서명에 사용하는 인증서만 내보낼 수 있는데, 이 목록에는 해당하는 인증서가 없습니다. 인증서의 개인 키는 Apple에 인증서를 요청한 기기에만 남아 있기 때문입니다.",
     "SideInstaller signs with this one": "SideInstaller가 이 인증서로 서명합니다",
