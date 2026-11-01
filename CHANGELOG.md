@@ -20,6 +20,12 @@ All notable changes to SideInstaller are documented here.
   get the new ID, the app's provisioning profile and a signature of their own, like the
   extensions in PlugIns.
 
+### Changed
+- **A certificate can be exported without a password.** The Certificates page's Export no longer
+  insists on one (#99): leave the password empty, and Feather and other signing apps import the
+  .p12 file without one. A Mac's Keychain imports only a file with a password, so choose one for
+  a Mac.
+
 ## 1.6.4
 
 ### Fixed

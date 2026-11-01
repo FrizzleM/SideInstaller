@@ -11,7 +11,7 @@ struct CertsView: View {
     @State private var showSettings = false
     /// The certificate the user tapped "Revoke" on, pending confirmation.
     @State private var pendingRevoke: DevCert?
-    /// The certificate the user tapped "Export" on, pending a password.
+    /// The certificate the user tapped "Export" on, pending a password (or none).
     @State private var pendingExport: DevCert?
     @State private var exportPassword = ""
 
@@ -39,7 +39,7 @@ struct CertsView: View {
                 }
                 Button(L("Cancel"), role: .cancel) { endExport() }
             } message: {
-                Text(L("Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Leave the password empty for no protection, or choose one — you'll need it later to import the file. Keep the file to yourself."))
+                Text(L("Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password, which you'll need to import the file, or leave it empty: signing apps import it without one, but a Mac won't. Keep the file to yourself."))
             }
             .padding(20)
             .pageColumn()
@@ -152,8 +152,8 @@ struct CertsView: View {
                     Spacer()
                 }
                 .cascadeItem(3)
-                if manager.hasLoaded {
-                    Text(L("Pick any certificate and tap Export. Only the one SideInstaller signs with has its private key on this iPhone — others will show an error because the key stays on the device that asked Apple for it."))
+                if manager.hasLoaded && !manager.certs.contains(where: \.isSigning) {
+                    Text(L("SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -236,7 +236,10 @@ struct CertsView: View {
                 }
 
                 HStack(spacing: 10) {
-                    exportButton(cert)
+                    // Only this one's private key is on the iPhone (see `DevCert.isSigning`).
+                    if cert.isSigning {
+                        exportButton(cert)
+                    }
                     revokeButton(cert)
                 }
             }

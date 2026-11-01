@@ -33,6 +33,13 @@ use sha2::{Digest, Sha256};
 /// Triple-DES bags and a SHA-1 MAC, OpenSSL's `-legacy` shape: every importer
 /// reads it, while the PBES2/AES-256 archive `KeyStore::writer` makes by
 /// default is refused by some (Keychain on older macOS among them).
+///
+/// An empty `password` keeps that shape, keyed with the empty password (two
+/// zero bytes, RFC 7292's encoding): OpenSSL, and so zsign and the signing
+/// apps built on it such as Feather, and iOS's `SecPKCS12Import` open it
+/// without a password. A Mac refuses it, as it refuses OpenSSL's own archives
+/// without a password. An unencrypted archive (SideSign's shape) would be
+/// worse: iOS refuses that too.
 pub(crate) fn archive(
     cert_der: &[u8],
     key: &RsaPrivateKey,
@@ -226,6 +233,17 @@ mod tests {
         let (_, chain) = store.private_key_chain().unwrap();
         assert_eq!(chain.certs().len(), 1);
         assert_eq!(chain.certs()[0].as_der(), &cert_der[..]);
+    }
+
+    /// Without a password the archive keeps its encryption and MAC, keyed
+    /// with the empty password, so any other password fails its MAC.
+    #[test]
+    fn exports_an_archive_without_a_password() {
+        let cert_der = include_bytes!("../testdata/p12/cert.der");
+        let p12 = archive(cert_der, &expected_key(), "iOS Development: someone", "").unwrap();
+
+        assert_the_key(&signing_keys(&p12, "").unwrap());
+        assert!(signing_keys(&p12, "s3cret").is_err());
     }
 
     #[test]

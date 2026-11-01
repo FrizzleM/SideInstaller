@@ -282,10 +282,11 @@ let italianStrings: [String: String] = [
         "Si può esportare solo il certificato con cui firma SideInstaller: la chiave privata di ogni altro resta sul dispositivo che l'ha chiesto ad Apple.",
     "Couldn't export the certificate: %@": "Impossibile esportare il certificato: %@",
     "Export certificate": "Esporta il certificato",
+    "Password (optional)": "Password (facoltativa)",
     "Export": "Esporta",
     "Exporting": "Esportazione",
-    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password for it: you'll need it to import the file. Keep the file to yourself.":
-        "Salva questo certificato e la sua chiave privata in un file .p12, con cui un'altra app di firma o un computer può firmare. Scegli una password: ti servirà per importare il file. Non darlo a nessuno.",
+    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password, which you'll need to import the file, or leave it empty: signing apps import it without one, but a Mac won't. Keep the file to yourself.":
+        "Salva questo certificato e la sua chiave privata in un file .p12, con cui un'altra app di firma o un computer può firmare. Scegli una password, che ti servirà per importare il file, oppure lascia il campo vuoto: le app di firma lo importano anche senza, un Mac invece no. Non darlo a nessuno.",
     "SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it.":
         "SideInstaller può esportare solo il certificato con cui firma, e nessuno di questi lo è: la chiave privata di un certificato resta sul dispositivo che l'ha chiesto ad Apple.",
     "SideInstaller signs with this one": "SideInstaller firma con questo",
