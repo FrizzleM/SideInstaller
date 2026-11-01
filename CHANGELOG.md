@@ -12,6 +12,14 @@ All notable changes to SideInstaller are documented here.
   releases under Stable and recent builds by commit and date under Nightly. A build an earlier
   version downloaded stays on as the nightly, so it isn't fetched again.
 
+### Fixed
+- **Apps with an ExtensionKit extension install.** Some apps keep an extension in an Extensions
+  folder rather than PlugIns, such as Mornye's Now Playing remote controls on iOS 27. SideInstaller
+  added your team ID to the app's bundle ID but left those extensions' IDs as they were, so iOS
+  refused the app with “Mismatched bundle IDs” (#110), and it didn't sign them either. They now
+  get the new ID, the app's provisioning profile and a signature of their own, like the
+  extensions in PlugIns.
+
 ## 1.6.4
 
 ### Fixed

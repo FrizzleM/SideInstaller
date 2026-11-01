@@ -660,6 +660,60 @@ capability on one App ID, so the request doesn't drop the group. Tests:
 `cargo test -p isideload --lib sideloader`. Not tested: a sign with an Apple
 ID.
 
+**14. `src/sideload/bundle.rs`, `sign.rs` — app extensions in `Extensions/`
+too (SideInstaller issue #110).**
+
+`Bundle::new` looked for app extensions in `PlugIns/` only. Apps keep their
+ExtensionKit extensions (`EXAppExtensionAttributes` in the Info.plist) in
+`Extensions/`, and an extension there was left out of everything that works
+from that list: `update_bundle_id` kept its bundle ID, `sign` gave it neither
+the main profile nor the entitlements, and `clear_old_signatures` skipped its
+old signature. iOS refuses such an app before it looks at any signature:
+
+```
+Failed to set app extension placeholders for com.zarz.mornye.TEAMID1234
+Attempted to set app extension placeholder promise with bundle ID
+com.zarz.mornye.LinkNowPlaying that does not match required prefix of
+com.zarz.mornye.TEAMID1234. for parent
+```
+
+That was Mornye's Now Playing remote-media extension (iOS 27). iLoader issue
+#394 has the same error for Instagram's `lockscreencamera` extension, where
+nab138 named this cause on 2026-08-01; upstream still looks in `PlugIns/` only
+(`326e562`, 2026-10-28). `Bundle::new` now also takes the `.appex` folders in
+`Extensions/`, after those in `PlugIns/`, so they are rebased
+(`com.zarz.mornye.TEAMID1234.LinkNowPlaying`), get the main profile and
+entitlements, and get `ALTAppGroups` for the AltStore family, as `PlugIns/`
+ones do. Only `.appex` folders count there, so a resource bundle in
+`Extensions/` can't make `update_bundle_id` refuse the app for a bundle ID
+outside the app's. apple-codesign-quick 0.1.0 had the same blind spot, signing
+nested bundles in `Frameworks/` and `PlugIns/` only, so it is vendored with the
+same rule (`vendor/apple-codesign-quick/README.md`); with the fix here alone,
+the extension would have been rebased but its executable left unsigned.
+
+Tests: `cargo test -p isideload --lib sideload::`
+(`finds_app_extensions_in_plugins_and_extensions`,
+`rebases_extensions_in_plugins_and_extensions` and
+`every_app_extension_is_provisioned`, on that app's layout) and
+`cargo test -p apple-codesign-quick --lib`
+(`signs_app_extensions_in_extensions`, which fails against 0.1.0).
+
+Checked on the Mac (2026-11-01) with an IPA of that layout (arm64 binaries from
+the iOS 27.2 SDK), a self-signed test certificate and a CMS-signed profile, run
+through `Application::new`, `update_bundle_id` and `sign` as `sign_app` calls
+them. `LinkNowPlaying.appex` came out as
+`com.zarz.mornye.TEAMID1234.LinkNowPlaying`, signed under that identifier with
+the main entitlements and a copy of the profile, the same as the widget in
+`PlugIns/`. `codesign --verify --strict` passes for it, and
+`codesign --verify --deep --strict` for the app, whose `CodeResources` seals
+the extension's signed files. The same IPA through the code before this change
+kept `com.zarz.mornye.LinkNowPlaying`, got no profile and gave "code object is
+not signed at all", while `codesign --verify --deep --strict` still passed for
+the app, which had sealed the extension's files as its own. **Not verified:**
+an install on an iPhone, and whether iOS runs an ExtensionKit extension signed
+with the main app's profile and entitlements, the arrangement `PlugIns/`
+extensions get (changes 1 and 12).
+
 ## Re-vendoring
 
 Upstream's `sign_app` and `install_app` take `increased_memory_limit: bool`, and
@@ -676,6 +730,10 @@ has to set `ReuseMain`, as iLoader 2.4.0 does, or SideStore goes back to costing
 
 Change 7 is upstream on `main` from `5992f00` (isideload 0.4.0), without the
 `_CodeSignature` cleanup.
+
+Upstream still looks for app extensions in `PlugIns/` only (`326e562`), so a
+re-vendor has to keep change 14, and the vendored apple-codesign-quick with it,
+or apps with an extension in `Extensions/` fail to install again.
 
 Change 2 is upstream on the `apple-codesign-quick` branch at `f6a4d5d` (what
 iLoader 2.3.3 pins) but was not on `main` (`b6d1113`) as of 2026-09-13. A

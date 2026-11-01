@@ -9,6 +9,7 @@ use crate::{
     dev::{app_ids::Profile, teams::DeveloperTeam},
     sideload::{
         application::{Application, SpecialApp},
+        bundle::Bundle,
         cert_identity::CertificateIdentity,
     },
 };
@@ -21,8 +22,9 @@ use crate::{
 /// a copy of its profile, as before the switch: the main profile is the one
 /// that authorizes them (README change 1). apple-codesign-quick gives a nested
 /// bundle only what is listed for its bundle ID, which by default is no profile
-/// and no entitlements, so each extension is listed. Frameworks and dylibs get
-/// neither, as Xcode signs them.
+/// and no entitlements, so each extension is listed, ExtensionKit ones in
+/// `Extensions` too (change 14). Frameworks and dylibs get neither, as Xcode
+/// signs them.
 pub fn sign(
     app: &mut Application,
     cert_identity: &CertificateIdentity,
@@ -48,19 +50,13 @@ pub fn sign(
 
     let mut settings = BundleSigningSettings::new(&team.team_id, entitlements.clone(), Some(&signer));
     settings.embedded_mobileprovision = Some(profile_der);
-    for bundle in app.bundle.collect_nested_bundles() {
-        if bundle.bundle_dir.extension().and_then(|e| e.to_str()) != Some("appex") {
-            continue;
-        }
-        let Some(bundle_id) = bundle.bundle_identifier() else {
-            continue;
-        };
+    for bundle_id in app_extension_ids(&app.bundle) {
         settings
             .embedded_mobileprovisions_by_bundle_id
-            .insert(bundle_id.to_string(), profile_der);
+            .insert(bundle_id.clone(), profile_der);
         settings
             .entitlements_by_bundle_id
-            .insert(bundle_id.to_string(), entitlements.clone());
+            .insert(bundle_id, entitlements.clone());
     }
 
     info!(
@@ -78,6 +74,17 @@ pub fn sign(
     ))?;
 
     Ok(())
+}
+
+/// The bundle ID of every app extension in `bundle`, nested ones too, whether
+/// it is in `PlugIns` or in `Extensions`.
+fn app_extension_ids(bundle: &Bundle) -> Vec<String> {
+    bundle
+        .collect_nested_bundles()
+        .iter()
+        .filter(|nested| nested.bundle_dir.extension().and_then(|e| e.to_str()) == Some("appex"))
+        .filter_map(|nested| nested.bundle_identifier().map(str::to_string))
+        .collect()
 }
 
 /// Deletes each bundle's `_CodeSignature` folder before it is signed again.
@@ -133,4 +140,34 @@ fn entitlements(
     }
 
     entitlements
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sideload::bundle::tests::{TempDir, write_app_with_both_extension_kinds};
+
+    /// Both kinds of extension get the main profile and entitlements under
+    /// their new bundle IDs (SideInstaller issue #110); the framework and the
+    /// resource bundle in Extensions get neither.
+    #[test]
+    fn every_app_extension_is_provisioned() {
+        let dir = TempDir::new();
+        let app_dir = write_app_with_both_extension_kinds(&dir.0);
+        let mut app = Application {
+            bundle: Bundle::new(app_dir).unwrap(),
+        };
+        app.update_bundle_id("com.zarz.mornye", "com.zarz.mornye.TEAMID1234")
+            .unwrap();
+
+        let mut ids = app_extension_ids(&app.bundle);
+        ids.sort();
+        assert_eq!(
+            ids,
+            [
+                "com.zarz.mornye.TEAMID1234.LinkNowPlaying",
+                "com.zarz.mornye.TEAMID1234.PlayerWidget",
+            ]
+        );
+    }
 }

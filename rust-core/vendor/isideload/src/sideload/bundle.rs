@@ -44,41 +44,16 @@ impl Bundle {
             "Failed to parse Info.plist".to_string(),
         ))?;
 
-        // Load app extensions from PlugIns directory
-        let plug_ins_dir = bundle_path.join("PlugIns");
-        let app_extensions = if plug_ins_dir.exists() {
-            fs::read_dir(&plug_ins_dir)
-                .context(SideloadError::InvalidBundle(
-                    "Failed to read PlugIns directory".to_string(),
-                ))?
-                .filter_map(|entry| entry.ok())
-                .filter(|entry| {
-                    entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false)
-                        && entry.path().join("Info.plist").exists()
-                })
-                .filter_map(|entry| Bundle::new(entry.path()).ok())
-                .collect()
-        } else {
-            Vec::new()
-        };
+        // App extensions: the NSExtension kind (widgets, share extensions...)
+        // in PlugIns, and the ExtensionKit kind (`EXAppExtensionAttributes`,
+        // such as a Now Playing remote-media extension) in Extensions. iOS
+        // wants both kinds' bundle IDs under the app's, so both are rebased,
+        // provisioned and signed alike. In Extensions only `.appex` folders
+        // count, as for apple-codesign-quick, which signs them on their own.
+        let mut app_extensions = child_bundles(&bundle_path, "PlugIns", None)?;
+        app_extensions.extend(child_bundles(&bundle_path, "Extensions", Some("appex"))?);
 
-        // Load frameworks from Frameworks directory
-        let frameworks_dir = bundle_path.join("Frameworks");
-        let frameworks = if frameworks_dir.exists() {
-            fs::read_dir(&frameworks_dir)
-                .context(SideloadError::InvalidBundle(
-                    "Failed to read Frameworks directory".to_string(),
-                ))?
-                .filter_map(|entry| entry.ok())
-                .filter(|entry| {
-                    entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false)
-                        && entry.path().join("Info.plist").exists()
-                })
-                .filter_map(|entry| Bundle::new(entry.path()).ok())
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let frameworks = child_bundles(&bundle_path, "Frameworks", None)?;
 
         // Find all .dylib files in the bundle directory (recursive)
         let libraries = find_dylibs(&bundle_path, &bundle_path)?;
@@ -221,6 +196,34 @@ fn suffix_under<'a>(identifier: &'a str, prefix: &str) -> Option<&'a str> {
     (rest.is_empty() || rest.starts_with('.')).then_some(rest)
 }
 
+/// The bundles in `bundle_path`'s `folder`, if it has one: each folder in it
+/// with an Info.plist, and with `extension` as well when one is given. A bundle
+/// that fails to load is left out.
+fn child_bundles(
+    bundle_path: &Path,
+    folder: &str,
+    extension: Option<&str>,
+) -> Result<Vec<Bundle>, Report> {
+    let dir = bundle_path.join(folder);
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    Ok(fs::read_dir(&dir)
+        .context(SideloadError::InvalidBundle(format!(
+            "Failed to read {folder} directory"
+        )))?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            let path = entry.path();
+            entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false)
+                && path.join("Info.plist").exists()
+                && extension.is_none_or(|wanted| path.extension().is_some_and(|ext| ext == wanted))
+        })
+        .filter_map(|entry| Bundle::new(entry.path()).ok())
+        .collect())
+}
+
 fn assert_bundle(condition: bool, msg: &str) -> Result<(), Report> {
     if !condition {
         bail!(SideloadError::InvalidBundle(msg.to_string()))
@@ -275,10 +278,88 @@ fn find_dylibs(dir: &Path, bundle_root: &Path) -> Result<Vec<String>, Report> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     const TASKS_KEY: &str = "BGTaskSchedulerPermittedIdentifiers";
+
+    /// A folder in the temp directory, removed when dropped.
+    pub(crate) struct TempDir(pub(crate) PathBuf);
+
+    impl TempDir {
+        pub(crate) fn new() -> Self {
+            let dir = std::env::temp_dir().join(format!("isideload-test-{}", uuid::Uuid::new_v4()));
+            fs::create_dir_all(&dir).unwrap();
+            TempDir(dir)
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// Makes `dir` a bundle whose Info.plist names `bundle_id`.
+    fn write_bundle(dir: &Path, bundle_id: &str) {
+        fs::create_dir_all(dir).unwrap();
+        let mut info = Dictionary::new();
+        info.insert("CFBundleIdentifier".to_string(), bundle_id.into());
+        plist::to_file_xml(dir.join("Info.plist"), &info).unwrap();
+    }
+
+    /// The layout from SideInstaller issue #110, in `root`: a widget in PlugIns
+    /// and an ExtensionKit extension in Extensions, plus a framework and a
+    /// resource bundle in Extensions that isn't an extension. Returns the app.
+    pub(crate) fn write_app_with_both_extension_kinds(root: &Path) -> PathBuf {
+        let app = root.join("Runner.app");
+        write_bundle(&app, "com.zarz.mornye");
+        write_bundle(&app.join("PlugIns/PlayerWidget.appex"), "com.zarz.mornye.PlayerWidget");
+        write_bundle(
+            &app.join("Extensions/LinkNowPlaying.appex"),
+            "com.zarz.mornye.LinkNowPlaying",
+        );
+        write_bundle(&app.join("Extensions/Strings.bundle"), "org.example.Strings");
+        write_bundle(&app.join("Frameworks/Flutter.framework"), "io.flutter.flutter");
+        app
+    }
+
+    #[test]
+    fn finds_app_extensions_in_plugins_and_extensions() {
+        let dir = TempDir::new();
+        let app = write_app_with_both_extension_kinds(&dir.0);
+
+        let bundle = Bundle::new(app.clone()).unwrap();
+        let mut extensions: Vec<_> = bundle
+            .app_extensions()
+            .iter()
+            .map(|ext| {
+                let location = ext.bundle_dir.strip_prefix(&app).unwrap().to_path_buf();
+                (ext.bundle_identifier().unwrap(), location)
+            })
+            .collect();
+        extensions.sort();
+        assert_eq!(
+            extensions,
+            [
+                (
+                    "com.zarz.mornye.LinkNowPlaying",
+                    PathBuf::from("Extensions/LinkNowPlaying.appex")
+                ),
+                (
+                    "com.zarz.mornye.PlayerWidget",
+                    PathBuf::from("PlugIns/PlayerWidget.appex")
+                ),
+            ]
+        );
+
+        let frameworks: Vec<_> = bundle
+            .frameworks()
+            .iter()
+            .map(|framework| framework.bundle_identifier().unwrap())
+            .collect();
+        assert_eq!(frameworks, ["io.flutter.flutter"]);
+    }
 
     fn bundle(bundle_id: &str, task_ids: Option<&[&str]>) -> Bundle {
         let mut app_info = Dictionary::new();
