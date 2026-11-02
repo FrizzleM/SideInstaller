@@ -5,12 +5,13 @@ All notable changes to SideInstaller are documented here.
 ## 1.6.5
 
 ### Added
-- **Madeira has Stable and Nightly, like SideStore and LiveContainer.** Stable installs the newest
-  release from [willfaust/Madeira](https://github.com/willfaust/Madeira)'s releases (0.1.3 today).
-  Nightly installs the newest build of its main branch from GitHub Actions, as Latest did until
-  now, and is the one that renews its own signing until a release does. Advanced lists the
+- **Madeira gets Stable and Nightly once Madeira 0.2.0 is out.** Until
+  [willfaust/Madeira](https://github.com/willfaust/Madeira) publishes 0.2.0, Madeira installs the
+  newest build of its main branch from GitHub Actions, as before, with nothing to pick. From
+  0.2.0 on, SideInstaller offers Stable and Nightly as it does for SideStore and LiveContainer:
+  Stable installs the newest release, Nightly the newest build of main. Advanced then lists the
   releases under Stable and recent builds by commit and date under Nightly. A build an earlier
-  version downloaded stays on as the nightly, so it isn't fetched again.
+  version downloaded is kept as the nightly, so it isn't fetched again.
 
 ### Fixed
 - **A LiveContainer + SideStore you import is set up like the download.** Where GitHub can't be

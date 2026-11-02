@@ -106,10 +106,10 @@ struct ProblemReport {
         guard source != .custom else {
             return Detail(label: "App", value: "imported IPA", shown: source.displayName)
         }
-        let channel = source.hasNightly ? engine.selectedChannel : nil
+        let channel = engine.selectedChannel
         let version = engine.selectedVersion?.tag
-        let value = [source.displayName, channel?.rawValue, version ?? "latest"].compactMap { $0 }
-        let shown = [source.displayName, channel?.displayName, version ?? L("latest")].compactMap { $0 }
+        let value = [source.displayName, channel.rawValue, version ?? "latest"]
+        let shown = [source.displayName, channel.displayName, version ?? L("latest")]
         return Detail(label: "App", value: value.joined(separator: ", "),
                       shown: shown.joined(separator: ", "))
     }

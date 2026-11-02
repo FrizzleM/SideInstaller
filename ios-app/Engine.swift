@@ -203,11 +203,23 @@ final class Engine: ObservableObject {
     @Published var installSource: InstallSource = .sideStore
     // Which release track to pull that build from (stable or nightly).
     @Published var releaseChannel: ReleaseChannel = .stable
-    /// The track the selected build is installed from: the picked one, or
-    /// stable for a build that has no nightly.
+    /// The track the selected build is installed from: the picked one, or the
+    /// only one the build offers.
     var selectedChannel: ReleaseChannel {
-        installSource.hasNightly ? releaseChannel : .stable
+        let offered = channels(for: installSource)
+        return offered.contains(releaseChannel) ? releaseChannel : offered[0]
     }
+    /// The channels the picker offers for `source`.
+    func channels(for source: InstallSource) -> [ReleaseChannel] {
+        source.channels(stableReleased: source.firstStableVersion == nil || stableReleased.contains(source))
+    }
+    /// Builds whose stable channel waits for a first release (Madeira, until
+    /// 0.2.0) that GitHub has shown is out. Remembered across launches and
+    /// checked again whenever the build is picked (`checkStableRelease`).
+    @Published private(set) var stableReleased: Set<InstallSource> =
+        Set((UserDefaults.standard.stringArray(forKey: Engine.stableReleasedKey) ?? [])
+            .compactMap(InstallSource.init(rawValue:)))
+    private static let stableReleasedKey = "stableReleased"
     /// Versions picked under Advanced, per build and channel; a missing entry
     /// installs the latest release. Not persisted, like the channel.
     @Published private var pickedVersions: [InstallSource: [ReleaseChannel: ReleaseVersion]] = [:]
@@ -1699,6 +1711,22 @@ final class Engine: ObservableObject {
     }
 
     // MARK: Versions to pick from (Advanced)
+
+    /// Asks GitHub whether `source`'s stable channel has its first release yet,
+    /// for a build whose stable channel waits for one (Madeira). One request
+    /// to the website, which has no hourly limit; no answer keeps what was
+    /// known. Not applied during a run, which has already picked its channel.
+    @MainActor
+    func checkStableRelease(for source: InstallSource) async {
+        guard source.firstStableVersion != nil,
+              let released = await SideStoreDownloader.hasStableRelease(source),
+              released != stableReleased.contains(source), !isRunning else { return }
+        if released { stableReleased.insert(source) } else { stableReleased.remove(source) }
+        UserDefaults.standard.set(stableReleased.map(\.rawValue).sorted(), forKey: Self.stableReleasedKey)
+        log(released
+            ? "\(source.displayName) has a stable release now — offering Stable and Nightly."
+            : "\(source.displayName) has no stable release yet — offering its nightly builds only.")
+    }
 
     /// Lists `source`'s releases for the version picker, unless a list from the
     /// last 15 minutes is at hand. One GitHub API call, which counts against the

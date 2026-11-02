@@ -294,8 +294,8 @@ struct ContentView: View {
                 }
 
                 // A custom IPA has no release, so the importer takes that slot;
-                // a build with no nightly has nothing to pick and no slot.
-                if engine.installSource == .custom || engine.installSource.hasNightly {
+                // a build with one channel has nothing to pick and no slot.
+                if engine.installSource == .custom || engine.channels(for: engine.installSource).count > 1 {
                     ZStack {
                         if engine.installSource == .custom {
                             importControl.transition(.opacity)
@@ -314,8 +314,11 @@ struct ContentView: View {
             }
             // On the whole card, so it also resizes smoothly when the slot goes.
             .animation(.smooth(duration: 0.28), value: engine.installSource)
+            .animation(.smooth(duration: 0.28), value: engine.stableReleased)
         }
         .disabled(engine.isRunning)
+        // Madeira offers Stable only once its first stable release is out.
+        .task(id: engine.installSource) { await engine.checkStableRelease(for: engine.installSource) }
     }
 
     /// The two ways in for a custom build: pick a file, or paste a link.

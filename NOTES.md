@@ -1124,7 +1124,18 @@ SideStore, LiveContainer + SideStore and the mirror.
 [Madeira](https://github.com/willfaust/Madeira) (Windows PC games through Wine and
 FEX) is a fourth `InstallSource`. Four things differ from SideStore.
 
-**The download.** Since 1.6.5 Madeira has both channels, like SideStore.
+**The download.** Since 1.6.5 Madeira has both channels, like SideStore, but
+only once upstream has a full release from 0.2.0 on
+(`InstallSource.firstStableVersion`; `isStableRelease(tag:)` counts "v0.2.0",
+"0.2.1" and "v1.0", not "v0.2.0-beta"). Until then `channels(stableReleased:)`
+offers Nightly alone, so the picker stays hidden and Madeira installs its CI
+build, as in 1.6.2–1.6.4. `Engine.checkStableRelease` asks GitHub whenever
+Madeira is picked (`SideStoreDownloader.hasStableRelease`: one HEAD on
+`releases/latest`, no API call) and keeps the answer in the `stableReleased`
+default, so the picker shows straight away on the next launch; no answer keeps
+what was known, and the answer isn't applied during a run. `latestAsset` also
+refuses a stable download of an older release (`noRelease`).
+
 Stable is upstream's newest full release: its tag is read off where
 `github.com/willfaust/Madeira/releases/latest` redirects (no API call), and the
 asset is named after it (`assetFileName(forTag:)`: `Madeira-0.1.3.ipa` on
@@ -1133,12 +1144,11 @@ as for the others. Nightly is the newest CI build of upstream's main branch
 (`InstallSource.actionsBuild(.nightly)`): the `Madeira-ipa` artifact that
 willfaust/Madeira's "Build IPA" workflow (`build.yml`) uploads on every push, a
 zip holding `Madeira.ipa`. Upstream's newest release, 0.1.3, predates the
-self-refresh (willfaust/Madeira#264, merged 28 October 2026), so only Nightly
-has the `MadeiraSigningAccountVersion` key (and the 32-bit Windows DLLs) until
-a release does; a Stable install is refreshed under Tools › Sideloaded apps like
-any other app. In
-1.6.2–1.6.4 Latest was the CI build and there was no channel picker; before
-1.6.2 Madeira came from releases of the fork FrizzleM/Madeira.
+self-refresh (willfaust/Madeira#264, merged 28 October 2026) and lacks the
+`MadeiraSigningAccountVersion` key, which is why Stable waits for 0.2.0. A
+release without the key would be refreshed under Tools › Sideloaded apps like
+any other app. In 1.6.2–1.6.4 Latest was the CI build and there was no channel
+picker; before 1.6.2 Madeira came from releases of the fork FrizzleM/Madeira.
 
 For Nightly: GitHub serves artifacts only to a signed-in account (the API's
 `/zip` answers 401), so:
