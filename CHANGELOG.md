@@ -32,6 +32,9 @@ All notable changes to SideInstaller are documented here.
   TrollStore's signer, for one, leaves spare bytes after each signature it writes, so an IPA
   taken from a TrollStore install could hit this, as could a tweak signed that way.
   SideInstaller now leaves those bytes where they are and puts the new signature after them.
+- **Side by Side's progress bar moves during the install.** It filled as the download went, but
+  then sat still through “Install on their iPhone” until the app was on, while the step's
+  “% uploaded” line counted up. The bar now fills that step's share as the upload goes too.
 
 ### Changed
 - **A certificate can be exported without a password.** The Certificates page's Export no longer
