@@ -535,61 +535,63 @@ struct ToolsView: View {
             ScrollView {
                 VStack(spacing: 18) {
                     header.cascadeItem(0)
-                    NavigationLink {
-                        SideBySideView(manager: sideBySideManager)
-                    } label: {
-                        ToolRow(image: "SideBySideLogo",
-                                title: L("Side by Side"),
-                                beta: true)
-                    }
-                    .buttonStyle(.plain, sound: .tick)
-                    .cascadeItem(1)
-                    // The Pairing page generates a pairing file on-device, which
-                    // needs iOS 27+. Older iOS imports it on the Install screen.
-                    if Engine.deviceCanSelfPair {
+                    LazyVGrid(columns: Self.columns, spacing: 12) {
                         NavigationLink {
-                            PairingView(manager: pairingManager)
+                            SideBySideView(manager: sideBySideManager)
                         } label: {
-                            ToolRow(image: "PairingLogo", title: L("Pairing"))
+                            ToolTile(image: "SideBySideLogo",
+                                     title: L("Side by Side"),
+                                     beta: true)
                         }
                         .buttonStyle(.plain, sound: .tick)
-                        .cascadeItem(2)
+                        .cascadeItem(1)
+                        // The Pairing page generates a pairing file on-device, which
+                        // needs iOS 27+. Older iOS imports it on the Install screen.
+                        if Engine.deviceCanSelfPair {
+                            NavigationLink {
+                                PairingView(manager: pairingManager)
+                            } label: {
+                                ToolTile(image: "PairingLogo", title: L("Pairing"))
+                            }
+                            .buttonStyle(.plain, sound: .tick)
+                            .cascadeItem(2)
+                        }
+                        NavigationLink {
+                            CertsView(manager: certManager)
+                        } label: {
+                            ToolTile(image: "CertsLogo", title: L("Certificates"))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(rowIndex(2))
+                        NavigationLink {
+                            EntitlementsView(manager: entitlementsManager)
+                        } label: {
+                            ToolTile(image: "EntitlementsLogo", title: L("Entitlements"))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(rowIndex(3))
+                        NavigationLink {
+                            LocationView(manager: locationManager)
+                        } label: {
+                            ToolTile(image: "LocationLogo", title: L("Location spoofing"))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(rowIndex(4))
+                        NavigationLink {
+                            AppsView(manager: appsManager)
+                        } label: {
+                            ToolTile(image: "AppsLogo", title: L("Sideloaded apps"))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(rowIndex(5))
                     }
-                    NavigationLink {
-                        CertsView(manager: certManager)
-                    } label: {
-                        ToolRow(image: "CertsLogo", title: L("Certificates"))
-                    }
-                    .buttonStyle(.plain, sound: .tick)
-                    .cascadeItem(rowIndex(2))
-                    NavigationLink {
-                        EntitlementsView(manager: entitlementsManager)
-                    } label: {
-                        ToolRow(image: "EntitlementsLogo", title: L("Entitlements"))
-                    }
-                    .buttonStyle(.plain, sound: .tick)
-                    .cascadeItem(rowIndex(3))
-                    NavigationLink {
-                        LocationView(manager: locationManager)
-                    } label: {
-                        ToolRow(image: "LocationLogo", title: L("Location spoofing"))
-                    }
-                    .buttonStyle(.plain, sound: .tick)
-                    .cascadeItem(rowIndex(4))
-                    NavigationLink {
-                        AppsView(manager: appsManager)
-                    } label: {
-                        ToolRow(image: "AppsLogo", title: L("Sideloaded apps"))
-                    }
-                    .buttonStyle(.plain, sound: .tick)
-                    .cascadeItem(rowIndex(5))
                 }
                 // No bottom padding: the tab bar's inset already clears the last
-                // row, and the extra 20pt would make a page that fits scroll.
+                // row of tiles, and the extra 20pt would make a page that fits scroll.
                 .padding([.horizontal, .top], 20)
                 .pageColumn()
             }
-            // Still unless the rows don't all fit on the screen.
+            // Still unless the tiles don't all fit on the screen.
             .scrollBounceBehavior(.basedOnSize)
             // The darker backdrop is set by the tab switch, not by this page
             // appearing, so pushed pages keep the same level.
@@ -599,12 +601,15 @@ struct ToolsView: View {
         }
     }
 
+    /// Two square tiles to a row.
+    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
+
     /// Cascade index for rows below Pairing, shifted by one when that row is shown.
     private func rowIndex(_ position: Int) -> Int {
         Engine.deviceCanSelfPair ? position + 1 : position
     }
 
-    /// Just the title: the rows below carry the iconography on this page.
+    /// Just the title: the tiles below carry the iconography on this page.
     private var header: some View {
         Text(L("Tools"))
             .font(.largeTitle.weight(.bold))
@@ -613,30 +618,37 @@ struct ToolsView: View {
     }
 }
 
-/// One Tools menu row: logo, name and chevron. Pages without logo art pass an
-/// SF Symbol, drawn on the brand gradient at the same size.
-private struct ToolRow: View {
+/// One Tools menu tile: a square with the logo above the name. Pages without
+/// logo art pass an SF Symbol, drawn on the brand gradient at the same size.
+private struct ToolTile: View {
     var image: String? = nil
     var icon: String? = nil
     var title: String
-    /// Shows a Beta badge.
+    /// Shows a Beta badge in the top corner.
     var beta: Bool = false
 
     var body: some View {
-        PanelCard {
-            HStack(spacing: 14) {
-                glyph
-                    .frame(width: 46, height: 46)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                Text(title)
-                    .font(.headline)
-                if beta { BetaBadge() }
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+        VStack(spacing: 12) {
+            glyph
+                .frame(width: 64, height: 64)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            Text(title)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .aspectRatio(1, contentMode: .fit)
+        .overlay(alignment: .topTrailing) {
+            if beta {
+                BetaBadge()
+                    .padding(10)
             }
         }
+        .cardSurface(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     @ViewBuilder
@@ -649,7 +661,7 @@ private struct ToolRow: View {
             ZStack {
                 Rectangle().fill(Theme.brand)
                 Image(systemName: icon ?? "questionmark")
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.system(size: 30, weight: .semibold))
                     .foregroundStyle(.white)
             }
         }
