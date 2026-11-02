@@ -134,11 +134,14 @@ final class SideBySideManager: ObservableObject {
         NetworkStatus.interfaces().first { $0.name == "en0" }?.ipv4
     }
 
-    /// Fraction across all five steps, for the progress bar.
+    /// Fraction across all five steps, for the progress bar. The download and
+    /// install steps also fill their own share as they go.
     var overallProgress: Double {
         let total = Double(SideBySideStep.allCases.count)
         let done = Double(SideBySideStep.allCases.filter { stepStates[$0] == .done }.count)
-        let partial = stepStates[.download] == .active ? downloadProgress : 0
+        var partial = 0.0
+        if stepStates[.download] == .active { partial = downloadProgress }
+        if stepStates[.install] == .active { partial = engine.installProgress }
         return min(1, (done + partial) / total)
     }
 
