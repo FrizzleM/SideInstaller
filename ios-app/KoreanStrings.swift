@@ -321,6 +321,24 @@ let koreanStrings: [String: String] = [
     "That link was meant to carry a signing certificate, but what it holds can't be read.":
         "이 링크는 서명 인증서를 전달하려는 것이었지만, 담긴 내용을 읽을 수 없습니다.",
 
+
+    // MARK: - Export certificate (sideinstaller://exportCertificate)
+
+    "Export signing certificate?": "서명 인증서를 내보내시겠습니까?",
+    "Another app (for example LiveContainer) asked SideInstaller to export the certificate it currently signs with. Only continue if you started that request. SideInstaller will send the certificate back; if it has none, it will say so.":
+        "다른 앱(예: LiveContainer)이 SideInstaller에 현재 서명에 사용하는 인증서 내보내기를 요청했습니다. 직접 시작한 요청일 때만 계속하세요. SideInstaller가 인증서를 다시 보냅니다. 없으면 알려 줍니다.",
+    "Export and send": "내보내고 보내기",
+    "That export link is missing a usable callback_template with $(BASE64_CERT).":
+        "해당 내보내기 링크에 $(BASE64_CERT)가 있는 사용 가능한 callback_template이 없습니다.",
+    "SideInstaller has no signing certificate. Sign in and install an app (or import a certificate) first, then try again.":
+        "SideInstaller에 서명 인증서가 없습니다. 먼저 로그인하고 앱을 설치하거나(또는 인증서를 가져오기한 다음) 다시 시도하세요.",
+    "Certificate sent to the other app.": "인증서를 다른 앱으로 보냈습니다.",
+    "Couldn't open the other app to deliver the certificate. Is it still installed?":
+        "인증서를 전달하려고 다른 앱을 열 수 없습니다. 아직 설치되어 있나요?",
+    "Couldn't build the callback URL to send the certificate.": "인증서를 보낼 콜백 URL을 만들 수 없습니다.",
+    "No Apple ID saved, so SideInstaller has no signing certificate to export. Add one in Settings › Account, or install an app first so a certificate is created.":
+        "저장된 Apple ID가 없어 SideInstaller에 내보낼 서명 인증서가 없습니다. Settings › Account에서 추가하거나, 먼저 앱을 설치해 인증서를 만드세요.",
+
     // MARK: - Location tab
 
     "Location spoofing": "위치 변경",
