@@ -482,7 +482,7 @@ let turkishStrings: [String: String] = [
     "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
         "“%@” değil IPv4 ekleress. It should look like 192.168.1.42.",
     "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
-        "%@ is ekleress bu iPhone already holds. Side by Side yükles onto someone else's iPhone — use irs. To yükle on bu one, use Yükle tab.",
+        "%@ bu iPhone'un zaten sahip olduğu bir adres. Yan yana başkasının iPhone'una yükler — onunkini kullan. Buna yüklemek için Yükle sekmesini kullan.",
     "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the Install tab.":
         "iPhone şu paired was bu one. Pair şuradir iPhone's Ayarlar instead. To yükle on bu iPhone, use Yükle tab.",
     "Enter the Apple ID to sign with, and its password.": "Enter Uygulamale kimliği to sign ile, ve its parola.",
@@ -540,9 +540,9 @@ let turkishStrings: [String: String] = [
     "%d%% uploaded": "%%%d yüklendi",
     "Start the install": "Start yükle",
     "Install again": "Yükle yeniden",
-    "Clear their details": "Clear ir details",
+    "Clear their details": "Onların ayrıntılarını temizle",
     "This iPhone is still paired with theirs. Clearing forgets it.":
-        "Bu iPhone is still paired ile irs. Clearing içingets it.",
+        "Bu iPhone hâlâ onunki ile eşli. Temizlemek bunu unutturur.",
     "Last step: they trust %@": "Last step: y trust %@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "On ir iPhone: Ayarlar › General › VPN & Cihaz Management.",
@@ -554,7 +554,7 @@ let turkishStrings: [String: String] = [
     "Settings": "Ayarlar",
     "Done": "Tamam",
     "Language": "Dil",
-    "App language": "Uygulamlanguage",
+    "App language": "Uygulama dili",
     "Sounds": "Sesler",
     "Sound effects": "Ses efektleri",
     "Auto": "Otomatik",
@@ -571,11 +571,11 @@ let turkishStrings: [String: String] = [
     "Start LocalDevVPN now": "LocalDevVPN'i şimdi başlat",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "LocalDevVPN değil yükleed. Get it şurad UygulamStveyae, ve bu cstart it için you.",
-    "Downloaded IPAs": "İndired IPAs",
+    "Downloaded IPAs": "İndirilen IPA'lar",
     "%@ used": "%@ kullanıldı",
     "imported": "içe aktared",
     "No downloaded IPAs. Ones you install from the Install tab are cached here.":
-        "No indired IPAs. Ones you yükle şurad Yükle tab are cached burada.",
+        "İndirilmiş IPA yok. Yükle sekmesinden yüklediklerin burada önbelleğe alınır.",
     "Downloaded %@": "İndired %@",
     "Added %@": "Ekleed %@",
     "Delete this download?": "Sil bu indir?",
@@ -586,14 +586,14 @@ let turkishStrings: [String: String] = [
     "Server": "Sunucu",
     "Custom…": "Özel…",
     "Server URL": "Sunucu URL",
-    "Anisette Server": "Anisette Sunucu",
+    "Anisette Server": "Anisette sunucusu",
     "Starts with %@": "Starts ile %@",
     "Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.":
-        "Auto starts ile sunucu şu imzalveı in last, sonrtries ors, ones most likely to wveyak önce.",
+        "Otomatik, en son oturum açılan sunucuyla başlar, sonra diğerlerini dener; önce çalışması en olası olanları dener.",
     "Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others.":
         "Only bu sunucu is tried. If it fails, so does sign-in: seç Auto to have SideYükleer try ors.",
     "Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.":
-        "Only sunucu picked in Ayarlar › Anisette Sunucu was tried. Seç Auto tburadto let SideYükleer try ors when one fails.",
+        "Yalnızca Ayarlar › Anisette sunucusu'nda seçilen sunucu denendi. Biri başarısız olunca SideInstaller'ın diğerlerini denemesi için orada Otomatik'i seç.",
     "Device IP": "Cihaz IP",
     "Advanced": "Gelişmiş",
     "Clear": "Temizle",
@@ -618,12 +618,12 @@ let turkishStrings: [String: String] = [
     "An install is already running. Wait for it to finish, then try again.":
         "Bir yükleme zaten sürüyor. Bitmesini bekle, sonra yeniden dene.",
     "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
-        "iOS turns Developer Mode on şuradburadonly while bu iPhone has no passcode. Tap “Show Developer Mode in Ayarlar” ve turn it on tburadinstead.",
+        "iOS, Geliştirici Modu'nu buradan yalnızca bu iPhone'da parola yokken açar. Bunun yerine “Ayarlar'da Geliştirici Modu'nu göster”e dokunup oradan aç.",
     "This iPhone didn't take the Developer Mode request: %@": "Bu iPhone yapmadı take Developer Mode request: %@",
     // MARK: - Release channels & downloads
 
-    "Stable": "Stable",
-    "Nightly": "Nightly",
+    "Stable": "Kararlı",
+    "Nightly": "Gecelik",
     // Version picker (Advanced)
 
     "%@ version": "%@ sürümü",
@@ -661,11 +661,11 @@ let turkishStrings: [String: String] = [
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Uygulamale's sign-in sunucu refused request (HTTP 503). It değil senin parolvey anisette sunucu, so trying mveyae sunucus yapmayacak help. Yeniden dene later, veyupdate SideYükleer.",
     "“%@” makes its anisette data with Apple's Android library, and Apple now refuses to finish signing in through those servers (error -80046), after your password and code. In Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
-        "“%@” makes its anisette datile Uygulamale's Veroid library, ve Uygulamale now refuses to bitir imzalamin through those sunucus (hat-80046), after senin parolve code. In Ayarlar › Anisette Sunucu, seç Auto veyMac sunucu such as “SideStveyae (New)”.",
+        "“%@” anisette verisini Apple'ın Android kütüphanesiyle üretir ve Apple artık bu sunucular üzerinden oturum açmayı tamamlamayı reddediyor (hata -80046), parola ve kodundan sonra. Ayarlar › Anisette sunucusu'nda Otomatik veya “SideStore (New)” gibi bir Mac sunucusu seç.",
     "Apple refused to finish signing in (error -80046), even through a Mac anisette server, the kind it still accepted. Try again later, or check for a SideInstaller update.":
         "Uygulamale refused to bitir imzalamin (hat-80046), even through Mac anisette sunucu, kind it still accepted. Yeniden dene later, veycheck için SideYükleer update.",
     "Apple refused to finish signing in through “%@” (error -80046). It now only accepts sign-ins through anisette servers on its macOS library: in Settings › Anisette Server, choose Auto or a Mac server such as “SideStore (New)”.":
-        "Uygulamale refused to bitir imzalamin through “%@” (hat-80046). It now only accepts sign-ins through anisette sunucus on its macOS library: in Ayarlar › Anisette Sunucu, seç Auto veyMac sunucu such as “SideStveyae (New)”.",
+        "Apple, “%@” üzerinden oturum açmayı tamamlamayı reddetti (hata -80046). Artık yalnızca macOS kütüphanesindeki anisette sunucuları üzerinden oturum açmayı kabul ediyor: Ayarlar › Anisette sunucusu'nda Otomatik veya “SideStore (New)” gibi bir Mac sunucusu seç.",
     "Apple won't send a code by text or call to this sign-in, so it was sent to your Apple devices.":
         "Uygulamale yapmayacak send code by text veycall to bu sign-in, so it was sent to senin Uygulamale cihazs.",
     "Apple didn't confirm sending a code to your Apple devices. If one arrived, enter it; if not, try another way.":
@@ -842,7 +842,7 @@ let turkishStrings: [String: String] = [
     "Send the file it writes — a .mobiledevicepairing or .plist — to this iPhone, by AirDrop, iCloud Drive or a cable.":
         "Send dosyit writes — .mobilecihazeşleme vey.plist — to bu iPhone, by AirDrop, iCloud Drive veycable.",
     "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
-        "Come back burada, tap “İçe aktar eşleme dosyası”, ve pick it. Everything after şu wveyaks as it does on iOS %@.",
+        "Buraya dön, “Eşleme dosyasını içe aktar”a dokun ve dosyayı seç. Ondan sonrası iOS %@ üzerindeki gibi çalışır.",
     "Get jitterbugpair": "jitterbugpair al",
     "From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.":
         "ŞuradiOS 26.4 on it has to be remote eşleme dosyası: bu iPhone hangs up on lockdown ones, like jitterbugpair's, when y come through LocalDevVPN.",
@@ -891,15 +891,15 @@ let turkishStrings: [String: String] = [
     "Tap “Import Certificate From SideStore”.": "Tap “İçe aktar SertifikŞuradSideStveyae”.",
     "Wrong device IP": "Wrong cihaz IP",
     "The address in Settings › Advanced › Device IP is one this iPhone already holds, so there's nothing at the other end to connect to.":
-        "ekleress in Ayarlar › Advanced › Cihaz IP is one bu iPhone already holds, so var nothing at or end to connect to.",
+        "Ayarlar › Gelişmiş › Cihaz IP'deki adres bu iPhone'un zaten sahip olduğu bir adres; diğer uçta bağlanacak bir şey yok.",
     "Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end.":
-        "Set it back to 10.7.0.1, default. In LocalDevVPN bu value under Ayarlar › Cihaz IP — not ekleress on its main screen, which is tunnel's own end.",
+        "Varsayılan 10.7.0.1 değerine geri al. LocalDevVPN'de bu, Ayarlar › Cihaz IP altındaki değerdir — ana ekrandaki adres değil; o tünelin kendi ucudur.",
     "If you changed LocalDevVPN's addresses, copy its Device IP here — including the /32, if it shows one.":
-        "If you changed LocalDevVPN's ekleresses, copy its Cihaz IP burad— including /32, if it shows one.",
+        "LocalDevVPN adreslerini değiştirdiysen, Cihaz IP'sini buraya kopyala — /32 gösteriyorsa onu da ekle.",
     "Device IP is %@, one of this iPhone's own addresses, and iOS won't let an app connect to those. In Settings › Advanced, set Device IP to the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default, not the “Connected to” address on its main screen.":
-        "Cihaz IP is %@, one of bu iPhone's own ekleresses, ve iOS yapmayacak let uygulamconnect to those. In Ayarlar › Advanced, set Cihaz IP to ekleress under LocalDevVPN's Ayarlar › Cihaz IP: 10.7.0.1 by default, not “Bağlı to” ekleress on its main screen.",
+        "Cihaz IP %@ — bu iPhone'un kendi adreslerinden biri ve iOS bir uygulamanın bunlara bağlanmasına izin vermez. Ayarlar › Gelişmiş'te Cihaz IP'yi LocalDevVPN'in Ayarlar › Cihaz IP altındaki adresine ayarla: varsayılan 10.7.0.1; ana ekrandaki “Bağlı” adresi değil.",
     "iOS refused the connection to %@ on this iPhone, before anything was sent. It does that for this iPhone's own addresses, like the “Connected to” address on LocalDevVPN's main screen. Device IP, in Settings › Advanced, has to be the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off and on again, then try again.":
-        "iOS refused bağlantı to %@ on bu iPhone, beiçine anything was sent. It does şu için bu iPhone's own ekleresses, like “Bağlı to” ekleress on LocalDevVPN's main screen. Cihaz IP, in Ayarlar › Advanced, has to be ekleress under LocalDevVPN's Ayarlar › Cihaz IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off ve on yeniden, sonryeniden dene.",
+        "iOS, bu iPhone'da %@ adresine bağlantıyı bir şey gönderilmeden reddetti. Bunu bu iPhone'un kendi adresleri için yapar; örneğin LocalDevVPN ana ekranındaki “Bağlı” adresi. Ayarlar › Gelişmiş'teki Cihaz IP, LocalDevVPN'in Ayarlar › Cihaz IP altındaki adres olmalı: varsayılan 10.7.0.1. Zaten öyleyse LocalDevVPN'i kapatıp aç, sonra yeniden dene.",
     "This iPhone hung up on the connection as soon as it opened. From iOS 26.4 on it does that to lockdown pairing files, like this one, when they come through LocalDevVPN. Pair this iPhone with itself instead: tap “Regenerate” under Tools › Pairing, or tap Install, which pairs it first.":
         "Bu iPhone hung up on bağlantı as soon as it açed. ŞuradiOS 26.4 on it does şu to lockdown eşleme dosyasıs, like bu one, when y come through LocalDevVPN. Pair bu iPhone ile itself instead: tap “Regenerate” under Tools › Eşleme, veytap Yükle, which pairs it önce.",
     "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
@@ -913,14 +913,14 @@ let turkishStrings: [String: String] = [
     // MARK: - About
 
     "About": "Hakkında",
-    "Version %@ (%@)": "Version %@ (%@)",
+    "Version %@ (%@)": "Sürüm %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller, bilgisayar olmadan SideStore ve LiveContainer'ı doğrudan iPhone'una yükler.",
-    "Links": "Links",
+    "Links": "Bağlantılar",
     "Source code": "Kaynak kodu",
     "Support the project": "Projeyi destekle",
     "Crypto": "Crypto",
-    "Donation wallets for Bitcoin, Ethereum and Solana.": "Donation wallets için Bitcoin, Etburadaum ve Solana.",
+    "Donation wallets for Bitcoin, Ethereum and Solana.": "Bitcoin, Ethereum ve Solana bağış cüzdanları.",
     "Crypto donations": "Kripto bağışları",
     "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
         "Donations are entirely optional. y yapmbuy anything, unlock any feature veyget you anything in return; y're just way to say thanks if SideYükleer has helped you.",
@@ -932,22 +932,22 @@ let turkishStrings: [String: String] = [
         "Send each coin only on ağ shown. Crypto sent on anor ağ yapılamaz be recovered.",
     "Special thanks": "Özel teşekkürler",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
-        "İçin icihaz, library SideYükleer talks to senin iPhone through. None of bu exists ileout it.",
+        "idevice için — SideInstaller'ın iPhone'unla konuştuğu kütüphane. O olmadan bunların hiçbiri olmazdı.",
     "For the support, and for spotting the bugs that got fixed because of it.":
-        "İçin suppveyat, ve için spotting bugs şu got fixed because of it.",
-    "For the Japanese translation.": "İçin Japanese translation.",
-    "For the Korean translation.": "İçin Kveyaetranslation.",
+        "Destek için ve sayesinde düzeltilen hataları bulduğu için.",
+    "For the Japanese translation.": "Japonca çeviri için.",
+    "For the Korean translation.": "Korece çeviri için.",
     "Built with": "Bunlarla yapıldı",
-    "The open source work this app is built on:": "aç source wveyak bu uygulamis built on:",
+    "The open source work this app is built on:": "Bu uygulamanın üzerine kurulduğu açık kaynak çalışmalar:",
     "Pairing, the tunnel and the install itself. By jkcoxson, MIT.":
-        "Eşleme, tunnel ve yükle itself. By jkcoxson, MIT.",
+        "Eşleme, tünel ve yüklemenin kendisi. jkcoxson, MIT.",
     "Apple ID sign in, certificates and signing on the device. By nab138, MIT.":
-        "Uygulamale kimliği sign in, sertifikas ve imzalamon cihaz. By nab138, MIT.",
-    "The sideloading app this installs for you.": "sideloading uygulambu yükles için you.",
+        "Apple kimliği oturum açma, sertifikalar ve cihazda imzalama. nab138, MIT.",
+    "The sideloading app this installs for you.": "Senin için yüklediği yan yükleme uygulaması.",
     "Runs sideloaded apps without spending an app slot on each one.":
-        "Runs sideloaded uygulamas ileout spending uygulamslot on each one.",
+        "Yan yüklenen uygulamaları her biri için uygulama yuvası harcamadan çalıştırır.",
     "The developer disk image location spoofing mounts. Mirrored by doronz88.":
-        "developer disk image konum spoofing mounts. Mirrveyaed by dveyaonz88.",
+        "Geliştirici disk görüntüsü konum taklidi bağlama noktaları. doronz88 tarafından yansıtıldı.",
     "Where to get it": "Nereden alınır",
     "Only the builds on the official install page and repository are mine. Anyone can fork the source, add a credential stealer and ship it under the same name and icon — so don't trust your Apple ID to a copy from anywhere else.":
         "Only builds on official yükle page ve repositveyay are mine. Anyone ciçink source, ekle credential stealer ve ship it under same name ve icon — so yapmtrust senin Uygulamale kimliği to copy şuradanywburadelse.",
@@ -968,7 +968,7 @@ let turkishStrings: [String: String] = [
     "This pairing file has no RPPairing record, the only kind %@ reads.":
         "Bu eşleme dosyası has no RPEşleme recveyad, only kind %@ reads.",
     "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
-        "Runs Windows PC games on senin iPhone. By Will Faust, GPL-3.0.",
+        "Windows PC oyunlarını iPhone'unda çalıştırır. Will Faust, GPL-3.0.",
     // MARK: - App ID cost
 
     "App IDs for this app": "Bu uygulama için App ID'ler",
@@ -1009,9 +1009,9 @@ let turkishStrings: [String: String] = [
     "This is the pairing file LiveContainer's built-in SideStore has. SideInstaller will connect to this iPhone with it.":
         "Bu is eşleme dosyası LiveContainer's built-in SideStveyae has. SideYükleer will connect to bu iPhone ile it.",
     "In LiveContainer's Multitask Mode, SideInstaller can't open the built-in SideStore's files. Open SideInstaller in LiveContainer without Multitask Mode, then try again, or tap “Import pairing file” and pick the file your computer made.":
-        "In LiveContainer's Multitask Mode, SideYükleer yapılamaz aç built-in SideStveyae's dosyas. Aç SideYükleer in LiveContainer ileout Multitask Mode, sonryeniden dene, veytap “İçe aktar eşleme dosyası” ve pick dosysenin computer made.",
+        "LiveContainer'ın Çoklu Görev Modu'nda SideInstaller yerleşik SideStore dosyalarını açamaz. SideInstaller'ı LiveContainer'da Çoklu Görev Modu olmadan açıp yeniden dene, veya “Eşleme dosyasını içe aktar”a dokunup bilgisayarının oluşturduğu dosyayı seç.",
     "Inside LiveContainer, SideStore can't send its pairing file back to SideInstaller, and LiveContainer's built-in SideStore has none that SideInstaller can use. Tap “Import pairing file” and pick the file your computer made, or import one into SideStore first, then try again here.":
-        "Inside LiveContainer, SideStveyae yapılamaz send its eşleme dosyası back to SideYükleer, ve LiveContainer's built-in SideStveyae has none şu SideYükleer cuse. Tap “İçe aktar eşleme dosyası” ve pick dosysenin computer made, veyiçe aktar one into SideStveyae önce, sonryeniden dene burada.",
+        "LiveContainer içinde SideStore eşleme dosyasını SideInstaller'a geri gönderemez ve LiveContainer'ın yerleşik SideStore'unda SideInstaller'ın kullanabileceği bir dosya yok. “Eşleme dosyasını içe aktar”a dokunup bilgisayarının oluşturduğu dosyayı seç, veya önce SideStore'a bir tane içe aktarıp burada yeniden dene.",
     "That install link has no .ipa in it. It needs ?url= followed by the https:// address the .ipa downloads from.":
         "Bu yükleme bağlantısında .ipa yok. ?url= ve ardından .ipa'nın indirildiği https:// adresi gerekir.",
     "That link was meant to carry a pairing file, but what it holds can't be read.":
@@ -1022,7 +1022,7 @@ let turkishStrings: [String: String] = [
     "Report a problem": "Sorun bildir",
     "Report this problem": "Bu sorunu bildir",
     "Opens a GitHub issue with this app's details, its log and crash logs.":
-        "Açs GitHub issue ile bu uygulama's details, its log ve crash logs.",
+        "Bu uygulamanın ayrıntıları, günlüğü ve çökme günlükleriyle bir GitHub sorunu açar.",
     "What happened?": "Ne oldu?",
     "What were you doing, and what went wrong?": "What were you doing, ve what went wrong?",
     "Say what you tapped, what you expected and what happened instead. English is best, but any language is fine.":
@@ -1042,7 +1042,7 @@ let turkishStrings: [String: String] = [
     "no": "no",
     "latest": "en son",
     "custom server": "özel sunucu",
-    "Auto, starts with %@": "Auto, starts ile %@",
+    "Auto, starts with %@": "Otomatik, %@ ile başlar",
     "Error": "Error",
     "Activity log": "Etkinlik günlüğü",
     "%d lines": "%d satır",
