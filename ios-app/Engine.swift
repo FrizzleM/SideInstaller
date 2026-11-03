@@ -497,6 +497,10 @@ final class Engine: ObservableObject {
     /// A certificate a link brought, for `RootView` to hand to the Certificates
     /// manager, which checks it against the Apple ID's own before using it.
     @Published var certificateToImport: CertificateImport?
+    /// A callback template from `sideinstaller://exportCertificate`, for
+    /// `RootView` / CertManager to export the signing certificate into and open.
+    /// Placeholders: `$(BASE64_CERT)` and `$(PASSWORD)`.
+    @Published var certificateExportTemplate: String?
 
     // 2FA bridge: the FFI callback blocks on this semaphore until the UI answers.
     /// What the two-factor sheet shows; nil while no sign-in is asking.
@@ -3091,6 +3095,9 @@ final class Engine: ObservableObject {
             }
         case .certificate(let cert):
             certificateToImport = CertificateImport(certificate: cert, retryInstall: false)
+        case .exportCertificate(let template):
+            // Handed to CertManager via RootView (same pattern as certificateToImport).
+            certificateExportTemplate = template
         }
     }
 
