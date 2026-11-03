@@ -11,8 +11,8 @@ let turkishStrings: [String: String] = [
     "Cancel": "İptal",
     "Copy": "Kopyala",
     "Copy logs": "Günlükleri kopyala",
-    "Email": "Email",
-    "Password": "Password",
+    "Email": "E-posta",
+    "Password": "Parola",
     "Install": "Yükle",
     "Installing": "Yükleniyor",
     "Cancelling": "İptal ediliyor",
@@ -41,7 +41,7 @@ let turkishStrings: [String: String] = [
     "Edit Apple ID": "Apple kimliğini düzenle",
     "Save": "Kaydet",
     "Enter the password again to save this Apple ID.": "Bu Apple kimliğini kaydetmek için parolayı yeniden gir.",
-    "Account": "Account",
+    "Account": "Hesap",
     "In use": "Kullanımda",
     "Edit": "Düzenle",
     "Remove": "Kaldır",
@@ -459,7 +459,7 @@ let turkishStrings: [String: String] = [
     "Older profiles": "Older prodosyas",
     "Bundle identifier": "Paket tanımlayıcı",
     "App ID": "App ID",
-    "Version": "Version",
+    "Version": "Sürüm",
     "Profile name": "Prodosyname",
     "Team": "Team",
     "Team ID": "Takım kimliği",
@@ -474,7 +474,7 @@ let turkishStrings: [String: String] = [
 
     // The tool's name is left in English everywhere, as SideStore's is.
 
-    "Side by Side": "Side by Side",
+    "Side by Side": "Yan yana",
     "Pair with their iPhone": "Pair ile ir iPhone",
     "Sign in to their Apple ID": "Sign in to ir Uygulamale kimliği",
     "Download SideInstaller": "İndir SideYükleer",
@@ -583,7 +583,7 @@ let turkishStrings: [String: String] = [
     "“%@” (%@) will be removed. You can download it again any time from the Install tab.":
         "“%@” (%@) will be kaldırd. You cindir it yeniden any time şurad Yükle tab.",
     "Couldn't delete %@: %@": "Yapılamadı sil %@: %@",
-    "Server": "Server",
+    "Server": "Sunucu",
     "Custom…": "Özel…",
     "Server URL": "Sunucu URL",
     "Anisette Server": "Anisette Sunucu",
