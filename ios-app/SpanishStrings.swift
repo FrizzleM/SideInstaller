@@ -326,6 +326,25 @@ let spanishStrings: [String: String] = [
     "That link was meant to carry a signing certificate, but what it holds can't be read.":
         "Ese enlace debía traer un certificado de firma, pero su contenido no se puede leer.",
 
+
+    // MARK: - Export certificate (sideinstaller://exportCertificate)
+
+    "Export signing certificate?": "¿Exportar el certificado de firma?",
+    "Another app (for example LiveContainer) asked SideInstaller to export the certificate it currently signs with. Only continue if you started that request. SideInstaller will send the certificate back; if it has none, it will say so.":
+        "Otra app (por ejemplo LiveContainer) pidió a SideInstaller exportar el certificado con el que firma actualmente. Continúa solo si iniciaste esa solicitud. SideInstaller enviará el certificado; si no tiene ninguno, lo indicará.",
+    "Export and send": "Exportar y enviar",
+    "That export link is missing a usable callback_template with $(BASE64_CERT).":
+        "Ese enlace de exportación no tiene un callback_template usable con $(BASE64_CERT).",
+    "SideInstaller has no signing certificate. Sign in and install an app (or import a certificate) first, then try again.":
+        "SideInstaller no tiene un certificado de firma. Inicia sesión e instala una app (o importa un certificado) primero, luego inténtalo de nuevo.",
+    "Certificate sent to the other app.": "Certificado enviado a la otra app.",
+    "Couldn't open the other app to deliver the certificate. Is it still installed?":
+        "No se pudo abrir la otra app para entregar el certificado. ¿Sigue instalada?",
+    "Couldn't build the callback URL to send the certificate.":
+        "No se pudo construir la URL de devolución de llamada para enviar el certificado.",
+    "No Apple ID saved, so SideInstaller has no signing certificate to export. Add one in Settings › Account, or install an app first so a certificate is created.":
+        "No hay un Apple ID guardado, así que SideInstaller no tiene un certificado de firma para exportar. Añade uno en Settings › Account, o instala una app primero para crear un certificado.",
+
     // MARK: - Location tab
 
     "Location spoofing": "Simulación de ubicación",
