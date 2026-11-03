@@ -434,9 +434,9 @@ let turkishStrings: [String: String] = [
         "%d uygulamcbe imzalveı yeniden şuradIPalready on bu iPhone.",
     "%d apps can be signed again from IPAs already on this iPhone.":
         "%d uygulamas cbe imzalveı yeniden şuradIPAs already on bu iPhone.",
-    "Reload": "Reload",
+    "Reload": "Yeniden yükle",
     "Waiting": "Bekleing",
-    "In progress": "In progress",
+    "In progress": "Devam ediyor",
     "Failed": "Başarısız",
     "%d app here has no IPA in SideInstaller, so it can't be refreshed from this page. Refresh it in whatever installed it, or import its .ipa first.":
         "%d uygulamburadhas no IPin SideYükleer, so it yapılamaz be yenileed şuradbu page. Yenile it in whatever yükleed it, veyiçe aktar its .ipönce.",
@@ -450,22 +450,22 @@ let turkishStrings: [String: String] = [
     "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
         "Nothing on bu cihaz was yükleed ile provisioning prodosya. UygulamStveyae uygulamas yapmexpire, so y aren't listed burada.",
     "No matching profile": "No matching prodosya",
-    "Expires today": "Expires today",
+    "Expires today": "Bugün doluyor",
     "Expires tomorrow": "Expires tomveyarow",
-    "Expires in %d days — %@": "Expires in %d days — %@",
-    "Expired %@": "Expired %@",
+    "Expires in %d days — %@": "%d gün içinde doluyor — %@",
+    "Expired %@": "Süresi doldu %@",
     "Unused profiles": "Unused prodosyas",
     "Issued to App IDs no installed app is running on.": "Issued to UygulamIDs no yükleed uygulamis running on.",
     "Older profiles": "Older prodosyas",
-    "Bundle identifier": "Bundle identifier",
+    "Bundle identifier": "Paket tanımlayıcı",
     "App ID": "App ID",
     "Version": "Version",
     "Profile name": "Prodosyname",
     "Team": "Team",
-    "Team ID": "Team ID",
-    "Issued": "Issued",
+    "Team ID": "Takım kimliği",
+    "Issued": "Verildi",
     "Profile UUID": "ProdosyUUID",
-    "Capabilities": "Capabilities",
+    "Capabilities": "Yetenekler",
     "Wildcard App ID — it covers any bundle id under it, and can't carry app-specific capabilities.":
         "Wildcard UygulamID — it covers any bundle id under it, ve yapılamaz carry uygulama-specific capabilities.",
     "The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that.":
@@ -498,7 +498,7 @@ let turkishStrings: [String: String] = [
         "Uygulamale wouldn't register ir iPhone ile bu Uygulamale kimliği's developer team, so it yapmayacak issue provisioning prodosya. %@",
     "No pair record for their iPhone.": "No pair recveyad için ir iPhone.",
     "The link to their iPhone dropped — start again.": "bağlantı to ir iPhone dropped — start yeniden.",
-    "Set up someone else's iPhone": "Set up someone else's iPhone",
+    "Set up someone else's iPhone": "Başkasının iPhone'unu kur",
     "Same Wi-Fi network": "Same Wi-Fi ağ",
     "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
         "ir iPhone needs iOS %@ — SideYükleer pairs itself once bu yükleed, ve nothing older can.",
@@ -512,7 +512,7 @@ let turkishStrings: [String: String] = [
     "Apple ID to sign with": "Uygulamale kimliği to sign ile",
     "Tip: Use the iPhone/iPad owner's Apple account credentials": "Tip: Use iPhone/iPad owner's Uygulamale account credentials",
     "Use my saved Apple ID instead": "Use my kaydetd Uygulamale kimliği instead",
-    "Steps": "Steps",
+    "Steps": "Adımlar",
     "Waiting for them to tap Trust…": "Bekleing için m to tap Trust…",
     "Waiting for them to pair in Settings…": "Bekleing için m to pair in Ayarlar…",
     "Waiting for them to enter the code…": "Bekleing için m to enter code…",
@@ -537,7 +537,7 @@ let turkishStrings: [String: String] = [
         "Yapılamadı reach ir iPhone at %@. Check ekleress (Ayarlar › Wi-Fi › ⓘ on ir iPhone), şu both iPhones are on same Wi-Fi ağ, ve şu Local Ağ is on için SideYükleer in bu iPhone's Ayarlar. Guest ve public ağs often keep cihazs şuradreaching each or.",
     "The link to their iPhone didn't come up: %@": "bağlantı to ir iPhone yapmadı come up: %@",
     "%d%% downloaded": "%d%% indired",
-    "%d%% uploaded": "%d%% uploaded",
+    "%d%% uploaded": "%%%d yüklendi",
     "Start the install": "Start yükle",
     "Install again": "Yükle yeniden",
     "Clear their details": "Clear ir details",
@@ -555,8 +555,8 @@ let turkishStrings: [String: String] = [
     "Done": "Tamam",
     "Language": "Dil",
     "App language": "Uygulamlanguage",
-    "Sounds": "Sounds",
-    "Sound effects": "Sound effects",
+    "Sounds": "Sesler",
+    "Sound effects": "Ses efektleri",
     "Auto": "Otomatik",
     // The Tunnel section: starting LocalDevVPN from here.
 
@@ -567,12 +567,12 @@ let turkishStrings: [String: String] = [
         "Something at %@:%d refused bağlantı, so tunnel is carrying traffic, but bu iPhone değil listening on its eşleme pveyat: Developer Mode is off. Turn it on under Ayarlar › Privacy & Security › Developer Mode ( iPhone restarts), sonryeniden dene.",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
         "Something at %@:%d refused bağlantı, so tunnel is carrying traffic, but bu iPhone değil listening on its eşleme pveyat, although Developer Mode is on. Pair bu iPhone yeniden under “Eşleme dosyası”, sonryeniden dene. If it still fails, restart iPhone.",
-    "Start LocalDevVPN when needed": "Start LocalDevVPN when needed",
-    "Start LocalDevVPN now": "Start LocalDevVPN now",
+    "Start LocalDevVPN when needed": "Gerektiğinde LocalDevVPN'i başlat",
+    "Start LocalDevVPN now": "LocalDevVPN'i şimdi başlat",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "LocalDevVPN değil yükleed. Get it şurad UygulamStveyae, ve bu cstart it için you.",
     "Downloaded IPAs": "İndired IPAs",
-    "%@ used": "%@ used",
+    "%@ used": "%@ kullanıldı",
     "imported": "içe aktared",
     "No downloaded IPAs. Ones you install from the Install tab are cached here.":
         "No indired IPAs. Ones you yükle şurad Yükle tab are cached burada.",
@@ -584,7 +584,7 @@ let turkishStrings: [String: String] = [
         "“%@” (%@) will be kaldırd. You cindir it yeniden any time şurad Yükle tab.",
     "Couldn't delete %@: %@": "Yapılamadı sil %@: %@",
     "Server": "Server",
-    "Custom…": "Custom…",
+    "Custom…": "Özel…",
     "Server URL": "Sunucu URL",
     "Anisette Server": "Anisette Sunucu",
     "Starts with %@": "Starts ile %@",
@@ -595,22 +595,22 @@ let turkishStrings: [String: String] = [
     "Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.":
         "Only sunucu picked in Ayarlar › Anisette Sunucu was tried. Seç Auto tburadto let SideYükleer try ors when one fails.",
     "Device IP": "Cihaz IP",
-    "Advanced": "Advanced",
-    "Clear": "Clear",
-    "Activity Log (%d)": "Activity Log (%d)",
+    "Advanced": "Gelişmiş",
+    "Clear": "Temizle",
+    "Activity Log (%d)": "Etkinlik günlüğü (%d)",
     // Settings › Developer Mode: AMFI requests over the device link.
 
     "Developer Mode": "Geliştirici Modu",
     "Show Developer Mode in Settings": "Ayarlar'da Geliştirici Modu'nu göster",
-    "Turn on Developer Mode": "Turn on Developer Mode",
+    "Turn on Developer Mode": "Geliştirici Modu'nu aç",
     "Asking this iPhone…": "Asking bu iPhone…",
     "Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there.":
         "Both need bağlantı to bu iPhone şu already wveyaks: LocalDevVPN plus eşleme dosyası, such as one içe aktared on iOS 17.4 to 26. On iOS 27 bağlantı itself needs Developer Mode, so y yapılamaz bring back missing option tburada.",
-    "Turn on Developer Mode?": "Turn on Developer Mode?",
+    "Turn on Developer Mode?": "Geliştirici Modu açılsın mı?",
     "Turn On and Restart": "Turn On ve Restart",
     "This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode.":
         "Bu iPhone restarts right away. Once you unlock it, tap Turn On in alert şu uygulamaears. iOS allows bu only while iPhone has no passcode.",
-    "Developer Mode is already on.": "Developer Mode is already on.",
+    "Developer Mode is already on.": "Geliştirici Modu zaten açık.",
     "Developer Mode now shows under Settings › Privacy & Security, near the bottom. Turn it on there, and iOS restarts to finish.":
         "Developer Mode now shows under Ayarlar › Privacy & Security, near bottom. Turn it on tburada, ve iOS restarts to bitir.",
     "Developer Mode is set to turn on, and this iPhone restarts now. Once you unlock it, tap Turn On.":
@@ -632,11 +632,11 @@ let turkishStrings: [String: String] = [
     "Couldn't load the other versions: %@": "Diğer sürümler yüklenemedi: %@",
     "Try again": "Yeniden dene",
     "couldn't find the IPA in the %@ %@ release": "yapılamadı find IPin %@ %@ release",
-    "%@ has no %@ release right now": "%@ has no %@ release right now",
-    "bad asset URL": "bad asset URL",
+    "%@ has no %@ release right now": "%@ şu anda %@ sürümüne sahip değil",
+    "bad asset URL": "geçersiz varlık adresi",
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub is rate-limiting bu ağ — it değil blocked, ve limit clears itself. Yeniden dene %@.",
-    "GitHub answered HTTP %d%@": "GitHub answered HTTP %d%@",
+    "GitHub answered HTTP %d%@": "GitHub HTTP %d%@ yanıtladı",
     "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
         "GitHub değil serving %@ right now — repositveyay has been taken down, moved veymade private, so var nothing to indir. Nothing is wrong ile bu iPhone veyits ağ.",
     "couldn't reach GitHub: %@": "yapılamadı reach GitHub: %@",
@@ -719,13 +719,13 @@ let turkishStrings: [String: String] = [
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "Yapılamadı register bu iPhone%@ ile senin Uygulamale kimliği's developer team, so Uygulamale yapmayacak issue provisioning prodosya. %@ — see steps above.",
-    "Connect to Wi-Fi": "Connect to Wi-Fi",
+    "Connect to Wi-Fi": "Wi-Fi'ye bağlan",
     "Open Settings › Wi-Fi and join a network.": "Aç Ayarlar › Wi-Fi ve join ağ.",
     "Then come back here — this continues automatically.": "Sonrcome back burad— bu devam ets automatically.",
     "Tap Connect so the toggle turns on.": "Tap Connect so toggle turns on.",
     "Keep Wi-Fi on, then come back here — this continues automatically.":
         "Keep Wi-Fi on, sonrcome back burad— bu devam ets automatically.",
-    "Get LocalDevVPN": "Get LocalDevVPN",
+    "Get LocalDevVPN": "LocalDevVPN al",
     "Import an .ipa first": "İçe aktar .ipönce",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
         "Tap “İçe aktar .ipa” above ve pick dosy— it clive anywburad Dosyas uygulamcreach, including iCloud Drive veyUSB drive.",
@@ -767,15 +767,15 @@ let turkishStrings: [String: String] = [
 
     "Privacy & Security › Developer Mode › Pair with SideInstaller":
         "Privacy & Security › Developer Mode › Pair ile SideYükleer",
-    "Paired": "Paired",
+    "Paired": "Eşlendi",
     "Tap to return to SideInstaller.": "Tap to return to SideYükleer.",
     // The install's progress outside the app
 
     "Installing %@": "Yükleing %@",
-    "Paused": "Paused",
+    "Paused": "Duraklatıldı",
     "Open SideInstaller to finish the install.": "Aç SideYükleer to bitir yükle.",
     "Check the App IDs it needs, then tap Install.": "Check UygulamIDs it needs, sonrtap Yükle.",
-    "Tap Trust": "Tap Trust",
+    "Tap Trust": "Güven'e dokun",
     "Unlock this iPhone and tap Trust when it asks.": "Unlock bu iPhone ve tap Trust when it asks.",
     "A signing certificate already exists": "imzalamsertifikalready exists",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
@@ -843,7 +843,7 @@ let turkishStrings: [String: String] = [
         "Send dosyit writes — .mobilecihazeşleme vey.plist — to bu iPhone, by AirDrop, iCloud Drive veycable.",
     "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
         "Come back burada, tap “İçe aktar eşleme dosyası”, ve pick it. Everything after şu wveyaks as it does on iOS %@.",
-    "Get jitterbugpair": "Get jitterbugpair",
+    "Get jitterbugpair": "jitterbugpair al",
     "From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.":
         "ŞuradiOS 26.4 on it has to be remote eşleme dosyası: bu iPhone hangs up on lockdown ones, like jitterbugpair's, when y come through LocalDevVPN.",
     "Get idevice_pair": "Get icihaz_pair",
@@ -880,7 +880,7 @@ let turkishStrings: [String: String] = [
     "Paste that into the “Register a Device” form in the Apple Developer portal (this requires a paid Apple Developer account), then tap Install again.":
         "Paste şu into “Register Cihaz” içinm in Uygulamale Developer pveyatal (bu requires paid Uygulamale Developer account), sonrtap Yükle yeniden.",
     "Open device list": "Aç cihaz list",
-    "Last step: trust %@": "Last step: trust %@",
+    "Last step: trust %@": "Son adım: %@ için güven",
     "Open Settings › General › VPN & Device Management.": "Aç Ayarlar › General › VPN & Cihaz Management.",
     "Tap your Apple ID under “Developer App”, then tap Trust.":
         "Tap senin Uygulamale kimliği under “Developer Uygulama”, sonrtap Trust.",
@@ -998,7 +998,7 @@ let turkishStrings: [String: String] = [
         "SideStveyae sent back eşleme dosyası it has. SideYükleer will connect to bu iPhone ile it.",
     "A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.":
         "bağlantı sent SideYükleer eşleme dosyası. Only içe aktar it if you asked için one: SideYükleer will connect to bu iPhone ile it.",
-    "It replaces %@.": "It replaces %@.",
+    "It replaces %@.": "%@ yerine geçer.",
     "It replaces the pairing file in use now.": "It replaces eşleme dosyası in use now.",
     "Get it from SideStore": "SideStore'dan al",
     "SideStore opens and sends back the pairing file it has.": "SideStveyae açs ve sends back eşleme dosyası it has.",
