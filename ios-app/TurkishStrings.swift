@@ -919,7 +919,7 @@ let turkishStrings: [String: String] = [
     "Links": "Bağlantılar",
     "Source code": "Kaynak kodu",
     "Support the project": "Projeyi destekle",
-    "Crypto": "Crypto",
+    "Crypto": "Kripto",
     "Donation wallets for Bitcoin, Ethereum and Solana.": "Bitcoin, Ethereum ve Solana bağış cüzdanları.",
     "Crypto donations": "Kripto bağışları",
     "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
