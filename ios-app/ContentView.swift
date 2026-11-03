@@ -294,8 +294,8 @@ struct ContentView: View {
                 }
 
                 // A custom IPA has no release, so the importer takes that slot;
-                // a build with no nightly has nothing to pick and no slot.
-                if engine.installSource == .custom || engine.installSource.hasNightly {
+                // a build with one channel has nothing to pick and no slot.
+                if engine.installSource == .custom || engine.channels(for: engine.installSource).count > 1 {
                     ZStack {
                         if engine.installSource == .custom {
                             importControl.transition(.opacity)
@@ -314,17 +314,37 @@ struct ContentView: View {
             }
             // On the whole card, so it also resizes smoothly when the slot goes.
             .animation(.smooth(duration: 0.28), value: engine.installSource)
+            .animation(.smooth(duration: 0.28), value: engine.stableReleased)
         }
         .disabled(engine.isRunning)
+        // Madeira offers Stable only once its first stable release is out.
+        .task(id: engine.installSource) { await engine.checkStableRelease(for: engine.installSource) }
     }
 
     /// The two ways in for a custom build: pick a file, or paste a link.
     private var importControl: some View {
         VStack(spacing: 10) {
             filePickerButton
+            if let build = engine.customIPABuild, !engine.isImportingIPA {
+                recognizedNote(build)
+            }
             orDivider
             linkField
         }
+        .animation(.smooth(duration: 0.25), value: engine.customIPABuild)
+    }
+
+    /// Says the imported IPA is one of SideInstaller's own builds, which the
+    /// install sets up just like its download: a LiveContainer + SideStore
+    /// brought from elsewhere gets its pairing file where SideStore reads it.
+    private func recognizedNote(_ build: InstallSource) -> some View {
+        Text(L("SideInstaller recognizes this as %@ and sets it up just like its own download.",
+               build.displayName))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .transition(.opacity)
     }
 
     /// "or" divider between the file picker and the link field.

@@ -119,13 +119,44 @@ enum InstallSource: String, CaseIterable, Identifiable {
         }
     }
 
-    /// False for a build with no nightly, which is always installed from the
-    /// stable channel.
-    var hasNightly: Bool {
+    /// The channels the picker offers: both for the SideStore builds, stable
+    /// alone for a custom IPA, and for Madeira its nightly alone until a release
+    /// from `firstStableVersion` on is out (`stableReleased`).
+    func channels(stableReleased: Bool) -> [ReleaseChannel] {
         switch self {
-        case .sideStore, .liveContainer, .madeira: return true
-        case .custom:                              return false
+        case .sideStore, .liveContainer: return [.stable, .nightly]
+        case .madeira:                   return stableReleased ? [.stable, .nightly] : [.nightly]
+        case .custom:                    return [.stable]
         }
+    }
+
+    /// The first release the stable channel installs, for a build whose stable
+    /// channel waits for it. Madeira's releases before 0.2.0 predate the
+    /// self-refresh (willfaust/Madeira#264), so until 0.2.0 is out Madeira
+    /// offers only its nightly, the CI build of main.
+    var firstStableVersion: [Int]? {
+        switch self {
+        case .madeira:                            return [0, 2, 0]
+        case .sideStore, .liveContainer, .custom: return nil
+        }
+    }
+
+    /// True when the release tagged `tag` ("v0.2.0", "0.2.1") is one the stable
+    /// channel installs: `firstStableVersion` or later. A pre-release of that
+    /// version ("0.2.0-beta") comes before it, and a tag that isn't a version
+    /// never counts.
+    func isStableRelease(tag: String) -> Bool {
+        guard let minimum = firstStableVersion else { return true }
+        let version = tag.hasPrefix("v") ? tag.dropFirst() : Substring(tag)
+        let core = version.prefix { $0 != "-" && $0 != "+" }
+        let numbers = core.split(separator: ".", omittingEmptySubsequences: false).map { Int($0) }
+        guard !numbers.isEmpty, numbers.allSatisfy({ $0 != nil }) else { return false }
+        let parts = numbers.compactMap { $0 }
+        for i in 0..<max(parts.count, minimum.count) {
+            let have = i < parts.count ? parts[i] : 0, need = i < minimum.count ? minimum[i] : 0
+            if have != need { return have > need }
+        }
+        return !version.dropFirst(core.count).hasPrefix("-")
     }
 
     /// The oldest iOS the build runs on, when that is newer than what
@@ -703,12 +734,32 @@ enum SideStoreDownloader {
         // pre-releases.
         guard channel == .stable, let repo = source.repo else { throw DownloadError.notDownloadable }
         let tag = try await latestTag(of: repo)
+        // Madeira's releases before 0.2.0 aren't its stable channel.
+        guard source.isStableRelease(tag: tag) else {
+            throw DownloadError.noRelease(source.displayName, channel)
+        }
         guard let name = source.assetFileName(forTag: tag),
               let path = "\(repo)/releases/download/\(tag)/\(name)"
                   .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
               let url = URL(string: "https://github.com/\(path)")
         else { throw DownloadError.badURL }
         return (url, name)
+    }
+
+    /// Whether `source`'s stable channel has a release to install: always, but
+    /// for Madeira only once its latest full release is `firstStableVersion` or
+    /// later. Nil when GitHub couldn't be asked.
+    static func hasStableRelease(_ source: InstallSource) async -> Bool? {
+        guard source.firstStableVersion != nil else { return true }
+        guard let repo = source.repo else { return false }
+        do {
+            return source.isStableRelease(tag: try await latestTag(of: repo))
+        } catch DownloadError.badStatus(let status, _, _) where status == 404 {
+            // No full release at all, or the repository is gone.
+            return false
+        } catch {
+            return nil
+        }
     }
 
     /// The tag of a repo's latest full release, read off where its
@@ -1767,6 +1818,31 @@ extension IPALibrary {
             : (bundleName?.isEmpty == false ? bundleName! : bundleID)
         return AppInfo(bundleID: bundleID, name: name,
                        version: dict["CFBundleShortVersionString"] as? String)
+    }
+
+    /// The build of SideInstaller's own that the IPA at `url` is, told by its
+    /// bundle ID rather than its filename: SideStore, LiveContainer carrying
+    /// SideStore, or Madeira. A custom IPA that is one of them is set up just
+    /// like that build's download. Nil for any other app, and for LiveContainer
+    /// without SideStore, which has no SideStore to set up.
+    static func knownSource(ofIPAAt url: URL) -> InstallSource? {
+        guard let id = appInfo(at: url)?.bundleID else { return nil }
+        // As published, or with the team ID an earlier signing appended.
+        let source = InstallSource.allCases.first { source in
+            source.pairingBundleIDBase.map { id == $0 || id.hasPrefix($0 + ".") } ?? false
+        }
+        if source == .liveContainer, !carriesSideStore(url) { return nil }
+        return source
+    }
+
+    /// True when the app holds SideStore where LiveContainer + SideStore keeps
+    /// it, `Frameworks/SideStoreApp.framework`; plain LiveContainer has none.
+    private static func carriesSideStore(_ url: URL) -> Bool {
+        archiveFiles(at: url)?.contains { file in
+            let parts = file.path.split(separator: "/", maxSplits: 4, omittingEmptySubsequences: false)
+            return parts.count == 5 && parts[0] == "Payload" && parts[1].hasSuffix(".app")
+                && parts[2] == "Frameworks" && parts[3] == "SideStoreApp.framework"
+        } ?? false
     }
 
     /// One file inside an IPA, for copying it out without unpacking the rest.

@@ -10,18 +10,18 @@
       "iconURL": "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon~ios-marketing.png",
       "subtitle": "An an app that installs Sidestore on iOS 27, fully on-device",
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
-      "version": "1.6.4",
-      "versionDate": "2026-10-31T14:30:24Z",
-      "versionDescription": "# Fixed\n\n- Inside LiveContainer, “Use SideStore's certificate” now works (#95). SideStore's reply can't reach SideInstaller there, so SideInstaller takes the certificate LiveContainer holds instead (its built-in SideStore's, or the copy LiveContainer imported) and checks it against your Apple ID as before.\n- Inside LiveContainer, “Get it from SideStore” now imports the pairing file LiveContainer's built-in SideStore keeps, asking first, instead of opening SideStore for a reply that never came. In Multitask Mode, or when there's no file to take, it says what to do instead.",
-      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.4/SideInstaller.ipa",
-      "size": 10345806,
+      "version": "1.6.5",
+      "versionDate": "2026-11-02T22:21:12Z",
+      "versionDescription": "# Added\n\n- Madeira gets Stable and Nightly once Madeira 0.2.0 is out. Until then it installs the newest build of its main branch, as before, with nothing to pick. From 0.2.0 on, Stable installs the newest release and Nightly the newest build of main.\n\n# Fixed\n\n- An imported SideStore, LiveContainer + SideStore or Madeira .ipa is now set up just like the download, including SideStore's pairing file and certificate (#108). Where GitHub can't be reached, as in mainland China, a card explains how to bring the .ipa this way.\n- Apps with an ExtensionKit extension (in Extensions rather than PlugIns) install instead of failing with “Mismatched bundle IDs”: those extensions now get the app's new bundle ID, its provisioning profile and their own signature (#110).\n- Apps with data after a binary's signature, such as IPAs taken from a TrollStore install, can be signed instead of stopping with “cannot grow a code signature that is not at the end of the Mach-O slice” (#109).\n- Side by Side's progress bar now moves during “Install on their iPhone” too.\n\n# Changed\n\n- A certificate can be exported without a password (#99). Feather and other signing apps import such a .p12; a Mac's Keychain needs one with a password.",
+      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.5/SideInstaller.ipa",
+      "size": 10380171,
       "versions": [
         {
-          "version": "1.6.4",
-          "date": "2026-10-31T14:30:24Z",
-          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.4/SideInstaller.ipa",
-          "localizedDescription": "# Fixed\n\n- Inside LiveContainer, “Use SideStore's certificate” now works (#95). SideStore's reply can't reach SideInstaller there, so SideInstaller takes the certificate LiveContainer holds instead (its built-in SideStore's, or the copy LiveContainer imported) and checks it against your Apple ID as before.\n- Inside LiveContainer, “Get it from SideStore” now imports the pairing file LiveContainer's built-in SideStore keeps, asking first, instead of opening SideStore for a reply that never came. In Multitask Mode, or when there's no file to take, it says what to do instead.",
-          "size": 10345806
+          "version": "1.6.5",
+          "date": "2026-11-02T22:21:12Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.6.5/SideInstaller.ipa",
+          "localizedDescription": "# Added\n\n- Madeira gets Stable and Nightly once Madeira 0.2.0 is out. Until then it installs the newest build of its main branch, as before, with nothing to pick. From 0.2.0 on, Stable installs the newest release and Nightly the newest build of main.\n\n# Fixed\n\n- An imported SideStore, LiveContainer + SideStore or Madeira .ipa is now set up just like the download, including SideStore's pairing file and certificate (#108). Where GitHub can't be reached, as in mainland China, a card explains how to bring the .ipa this way.\n- Apps with an ExtensionKit extension (in Extensions rather than PlugIns) install instead of failing with “Mismatched bundle IDs”: those extensions now get the app's new bundle ID, its provisioning profile and their own signature (#110).\n- Apps with data after a binary's signature, such as IPAs taken from a TrollStore install, can be signed instead of stopping with “cannot grow a code signature that is not at the end of the Mach-O slice” (#109).\n- Side by Side's progress bar now moves during “Install on their iPhone” too.\n\n# Changed\n\n- A certificate can be exported without a password (#99). Feather and other signing apps import such a .p12; a Mac's Keychain needs one with a password.",
+          "size": 10380171
         }
       ]
     },

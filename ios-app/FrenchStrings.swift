@@ -140,6 +140,8 @@ let frenchStrings: [String: String] = [
     "Replace": "Remplacer",
     "or": "ou",
     "Paste a download link": "Collez un lien de téléchargement",
+    "SideInstaller recognizes this as %@ and sets it up just like its own download.":
+        "SideInstaller reconnaît ici %@ et le configure comme s'il l'avait téléchargé lui-même.",
     "Downloading… %d%%": "Téléchargement… %d%%",
     "iOS %@ required": "iOS %@ requis",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
@@ -817,6 +819,15 @@ let frenchStrings: [String: String] = [
         "Pour l'installer quand même, récupérez son .ipa auprès d'une source de confiance, nommez-le %@ et copiez-le dans Fichiers › Sur mon iPhone › SideInstaller.",
     "Then tap Install again — SideInstaller uses your file instead of downloading one.":
         "Touchez ensuite à nouveau Installer — SideInstaller utilise votre fichier au lieu d'en télécharger un.",
+    "If you reach GitHub through a VPN or proxy app, turn off LocalDevVPN and turn that one on: iOS runs only one VPN at a time.":
+        "Si vous accédez à GitHub via une app VPN ou proxy, désactivez LocalDevVPN et activez celle-ci : iOS n'exécute qu'un seul VPN à la fois.",
+    "Tap “Get the .ipa” below and save the file, or download it on another device and bring it over.":
+        "Touchez « Obtenir le .ipa » ci-dessous et enregistrez le fichier, ou téléchargez-le sur un autre appareil et transférez-le ici.",
+    "Back in SideInstaller, pick Custom .ipa under Install, tap “Import .ipa” and choose the file. SideInstaller recognizes %@ and sets it up just like its own download.":
+        "De retour dans SideInstaller, choisissez IPA personnalisé sous Installer, touchez « Importer un .ipa » et sélectionnez le fichier. SideInstaller reconnaît %@ et le configure comme s'il l'avait téléchargé lui-même.",
+    "Turn LocalDevVPN back on, then tap Install.":
+        "Réactivez LocalDevVPN, puis touchez Installer.",
+    "Get the .ipa": "Obtenir le .ipa",
     "Pair this iPhone in Settings": "Jumelez cet iPhone dans Réglages",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "Ouvrez l'app Réglages, puis allez dans Confidentialité et sécurité › Mode développeur.",

@@ -5,20 +5,43 @@ All notable changes to SideInstaller are documented here.
 ## 1.6.5
 
 ### Added
-- **Madeira has Stable and Nightly, like SideStore and LiveContainer.** Stable installs the newest
-  release from [willfaust/Madeira](https://github.com/willfaust/Madeira)'s releases (0.1.3 today).
-  Nightly installs the newest build of its main branch from GitHub Actions, as Latest did until
-  now, and is the one that renews its own signing until a release does. Advanced lists the
+- **Madeira gets Stable and Nightly once Madeira 0.2.0 is out.** Until
+  [willfaust/Madeira](https://github.com/willfaust/Madeira) publishes 0.2.0, Madeira installs the
+  newest build of its main branch from GitHub Actions, as before, with nothing to pick. From
+  0.2.0 on, SideInstaller offers Stable and Nightly as it does for SideStore and LiveContainer:
+  Stable installs the newest release, Nightly the newest build of main. Advanced then lists the
   releases under Stable and recent builds by commit and date under Nightly. A build an earlier
-  version downloaded stays on as the nightly, so it isn't fetched again.
+  version downloaded is kept as the nightly, so it isn't fetched again.
 
 ### Fixed
+- **A LiveContainer + SideStore you import is set up like the download.** Where GitHub can't be
+  reached, as in mainland China, the download step can't fetch the build, and the VPN that would
+  reach GitHub can't run beside LocalDevVPN, since iOS runs one VPN at a time (#108). Importing
+  the .ipa as a Custom .ipa got past that step, but left LiveContainer's built-in SideStore
+  without its pairing file and certificate. SideInstaller now recognizes SideStore,
+  LiveContainer + SideStore and Madeira in an imported .ipa, says so under Import .ipa, and sets
+  each up just as it does its own download. When a download can't reach GitHub, a card explains
+  how to bring the .ipa this way.
 - **Apps with an ExtensionKit extension install.** Some apps keep an extension in an Extensions
   folder rather than PlugIns, such as Mornye's Now Playing remote controls on iOS 27. SideInstaller
   added your team ID to the app's bundle ID but left those extensions' IDs as they were, so iOS
   refused the app with “Mismatched bundle IDs” (#110), and it didn't sign them either. They now
   get the new ID, the app's provisioning profile and a signature of their own, like the
   extensions in PlugIns.
+- **Apps with data after a binary's signature can be signed.** Signing stopped at “Sign the
+  app” with “cannot grow a code signature that is not at the end of the Mach-O slice” (#109).
+  TrollStore's signer, for one, leaves spare bytes after each signature it writes, so an IPA
+  taken from a TrollStore install could hit this, as could a tweak signed that way.
+  SideInstaller now leaves those bytes where they are and puts the new signature after them.
+- **Side by Side's progress bar moves during the install.** It filled as the download went, but
+  then sat still through “Install on their iPhone” until the app was on, while the step's
+  “% uploaded” line counted up. The bar now fills that step's share as the upload goes too.
+
+### Changed
+- **A certificate can be exported without a password.** The Certificates page's Export no longer
+  insists on one (#99): leave the password empty, and Feather and other signing apps import the
+  .p12 file without one. A Mac's Keychain imports only a file with a password, so choose one for
+  a Mac.
 
 ### Changed
 - **A certificate can be exported without a password.** The Certificates page's Export no longer

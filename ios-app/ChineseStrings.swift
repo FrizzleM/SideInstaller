@@ -138,6 +138,8 @@ let chineseStrings: [String: String] = [
     "Replace": "更换",
     "or": "或",
     "Paste a download link": "粘贴下载链接",
+    "SideInstaller recognizes this as %@ and sets it up just like its own download.":
+        "SideInstaller 识别出这是 %@，会像它自己下载的版本一样完成设置。",
     "Downloading… %d%%": "正在下载… %d%%",
     "iOS %@ required": "需要 iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
@@ -788,6 +790,14 @@ let chineseStrings: [String: String] = [
         "如果仍想安装，请从你信任的来源取得它的 .ipa，命名为 %@，然后复制到 文件 › 我的 iPhone › SideInstaller。",
     "Then tap Install again — SideInstaller uses your file instead of downloading one.":
         "然后再次轻点“安装”—— SideInstaller 会使用你的文件，而不再下载。",
+    "If you reach GitHub through a VPN or proxy app, turn off LocalDevVPN and turn that one on: iOS runs only one VPN at a time.":
+        "如果你需要通过 VPN 或代理 App 才能访问 GitHub，请关闭 LocalDevVPN，再打开那个 App：iOS 一次只能运行一个 VPN。",
+    "Tap “Get the .ipa” below and save the file, or download it on another device and bring it over.":
+        "轻点下方的“获取 .ipa”并保存文件，或者在另一台设备上下载后再传到这台 iPhone。",
+    "Back in SideInstaller, pick Custom .ipa under Install, tap “Import .ipa” and choose the file. SideInstaller recognizes %@ and sets it up just like its own download.":
+        "回到 SideInstaller，在“安装”下选择“自定义 .ipa”，轻点“导入 .ipa”并选取该文件。SideInstaller 会识别出 %@，并像它自己下载的版本一样完成设置。",
+    "Turn LocalDevVPN back on, then tap Install.": "重新打开 LocalDevVPN，然后轻点“安装”。",
+    "Get the .ipa": "获取 .ipa",
     "Pair this iPhone in Settings": "在 设置 中配对此 iPhone",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "打开 设置 应用，然后进入 隐私与安全性 › 开发者模式。",
