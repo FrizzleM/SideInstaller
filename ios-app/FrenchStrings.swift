@@ -325,6 +325,25 @@ let frenchStrings: [String: String] = [
     "That link was meant to carry a signing certificate, but what it holds can't be read.":
         "Ce lien devait contenir un certificat de signature, mais son contenu est illisible.",
 
+
+    // MARK: - Export certificate (sideinstaller://exportCertificate)
+
+    "Export signing certificate?": "Exporter le certificat de signature ?",
+    "Another app (for example LiveContainer) asked SideInstaller to export the certificate it currently signs with. Only continue if you started that request. SideInstaller will send the certificate back; if it has none, it will say so.":
+        "Une autre app (par exemple LiveContainer) a demandé à SideInstaller d’exporter le certificat avec lequel il signe actuellement. Continuez uniquement si vous avez initié cette demande. SideInstaller renverra le certificat ; s’il n’en a pas, il l’indiquera.",
+    "Export and send": "Exporter et envoyer",
+    "That export link is missing a usable callback_template with $(BASE64_CERT).":
+        "Ce lien d’export n’a pas de callback_template utilisable avec $(BASE64_CERT).",
+    "SideInstaller has no signing certificate. Sign in and install an app (or import a certificate) first, then try again.":
+        "SideInstaller n’a pas de certificat de signature. Connectez-vous et installez une app (ou importez un certificat) d’abord, puis réessayez.",
+    "Certificate sent to the other app.": "Certificat envoyé à l’autre app.",
+    "Couldn't open the other app to deliver the certificate. Is it still installed?":
+        "Impossible d’ouvrir l’autre app pour livrer le certificat. Est-elle toujours installée ?",
+    "Couldn't build the callback URL to send the certificate.":
+        "Impossible de construire l’URL de rappel pour envoyer le certificat.",
+    "No Apple ID saved, so SideInstaller has no signing certificate to export. Add one in Settings › Account, or install an app first so a certificate is created.":
+        "Aucun identifiant Apple enregistré, donc SideInstaller n’a pas de certificat de signature à exporter. Ajoutez-en un dans Settings › Account, ou installez d’abord une app pour en créer un.",
+
     // MARK: - Location tab
 
     "Location spoofing": "Simulation de position",
