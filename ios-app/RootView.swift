@@ -106,6 +106,14 @@ struct RootView: View {
             engine.certificateToImport = nil
             certManager.importCertificate(request)
         }
+        // LiveContainer (or another app) asked for the signing certificate via
+        // sideinstaller://exportCertificate. Export after the user already
+        // confirmed in the link popup.
+        .onChange(of: engine.certificateExportTemplate) { _, template in
+            guard let template else { return }
+            engine.certificateExportTemplate = nil
+            certManager.exportSigningCertificate(toCallbackTemplate: template)
+        }
         // Over the tab bar too, so the whole app dims behind the popups.
         .popupStack(entries, onBackdropTap: backdropTap) { entry in
             card(for: entry)
