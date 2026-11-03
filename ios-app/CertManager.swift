@@ -273,9 +273,12 @@ final class CertManager: ObservableObject {
                     let data = try Data(contentsOf: file)
                     try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
                     let b64 = data.base64EncodedString()
-                    // Encode for use inside a query value (base64 can contain + / =).
-                    let b64Enc = b64.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? b64
-                    let pwEnc = password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password
+                    // Encode for use inside a query value. urlQueryAllowed still allows
+                    // + / = which break base64 when a hop treats + as space — force them.
+                    var queryValueAllowed = CharacterSet.urlQueryAllowed
+                    queryValueAllowed.remove(charactersIn: "+/=")
+                    let b64Enc = b64.addingPercentEncoding(withAllowedCharacters: queryValueAllowed) ?? b64
+                    let pwEnc = password.addingPercentEncoding(withAllowedCharacters: queryValueAllowed) ?? password
                     let filled = template
                         .replacingOccurrences(of: "$(BASE64_CERT)", with: b64Enc)
                         .replacingOccurrences(of: "$(PASSWORD)", with: pwEnc)
