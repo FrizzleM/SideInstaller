@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import SideInstallerFFI
 
 /// One iOS development certificate, decoded from `si_cert_list`'s JSON, where
@@ -231,6 +232,97 @@ final class CertManager: ObservableObject {
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Certificates: \(lastError ?? "export failed")")
+            }
+        }
+    }
+
+    /// Exports the certificate SideInstaller currently signs with into a
+    /// callback template (placeholders `$(BASE64_CERT)` and `$(PASSWORD)`),
+    /// then opens the resulting URL. Used by `sideinstaller://exportCertificate`
+    /// from LiveContainer. An empty password is used so signing apps that
+    /// accept password-less .p12 (LiveContainer, Feather, …) import cleanly.
+    /// Reports clearly when there is no signing certificate.
+    @MainActor
+    func exportSigningCertificate(toCallbackTemplate template: String) {
+        guard !isBusy else { return }
+        lastError = nil
+        lastSuccess = nil
+
+        let finish: (DevCert) -> Void = { [weak self] cert in
+            guard let self else { return }
+            let serial = cert.serialNumber
+            guard !serial.isEmpty else {
+                self.lastError = ErrorHelp.explained(L("This certificate has no serial number, so it can't be exported."))
+                self.engine.log("⛔️ Certificates: \(self.lastError ?? "")")
+                return
+            }
+            // Empty password matches SideStore-style export and works with LiveContainer.
+            let password = ""
+            self.exportingID = cert.id
+            self.engine.log("Certificates: exporting \(cert.displayName) (\(serial)) for callback …")
+            Task { @MainActor in
+                defer { self.exportingID = nil }
+                do {
+                    let file = try Self.exportFile(for: cert)
+                    do {
+                        try await self.onQueue { try self.performExport(serial: serial, password: password, to: file) }
+                    } catch {
+                        try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+                        throw error
+                    }
+                    let data = try Data(contentsOf: file)
+                    try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+                    let b64 = data.base64EncodedString()
+                    // Encode for use inside a query value (base64 can contain + / =).
+                    let b64Enc = b64.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? b64
+                    let pwEnc = password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? password
+                    let filled = template
+                        .replacingOccurrences(of: "$(BASE64_CERT)", with: b64Enc)
+                        .replacingOccurrences(of: "$(PASSWORD)", with: pwEnc)
+                    guard let url = URL(string: filled) else {
+                        self.lastError = ErrorHelp.explained(L("Couldn't build the callback URL to send the certificate."))
+                        self.engine.log("⛔️ Certificates: \(self.lastError ?? "")")
+                        return
+                    }
+                    self.engine.log("Certificates: opening callback with exported certificate (\(data.count) bytes).")
+                    UIApplication.shared.open(url) { opened in
+                        Task { @MainActor in
+                            if opened {
+                                self.lastSuccess = L("Certificate sent to the other app.")
+                                self.engine.log("Certificates: callback opened.")
+                            } else {
+                                self.lastError = ErrorHelp.explained(L("Couldn't open the other app to deliver the certificate. Is it still installed?"))
+                                self.engine.log("⛔️ Certificates: \(self.lastError ?? "")")
+                            }
+                        }
+                    }
+                } catch {
+                    self.lastError = self.short(error)
+                    self.engine.log("⛔️ Certificates: \(self.lastError ?? "export failed")")
+                }
+            }
+        }
+
+        if let signing = certs.first(where: { $0.isSigning }) {
+            finish(signing)
+            return
+        }
+
+        // Not listed yet (or none): load, then export or report clearly.
+        let id = engine.normalizedAppleID, pw = engine.applePassword
+        guard !id.isEmpty, !pw.isEmpty else {
+            lastError = ErrorHelp.explained(L("No Apple ID saved, so SideInstaller has no signing certificate to export. Add one in Settings › Account, or install an app first so a certificate is created."))
+            engine.log("⛔️ Certificates: \(lastError ?? "")")
+            return
+        }
+        engine.log("Certificates: loading list to find the signing certificate for export …")
+        loadCerts { [weak self] in
+            guard let self else { return }
+            if let signing = self.certs.first(where: { $0.isSigning }) {
+                finish(signing)
+            } else {
+                self.lastError = ErrorHelp.explained(L("SideInstaller has no signing certificate. Sign in and install an app (or import a certificate) first, then try again."))
+                self.engine.log("⛔️ Certificates: \(self.lastError ?? "")")
             }
         }
     }
