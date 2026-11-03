@@ -467,7 +467,7 @@ let turkishStrings: [String: String] = [
     "Profile UUID": "ProdosyUUID",
     "Capabilities": "Yetenekler",
     "Wildcard App ID — it covers any bundle id under it, and can't carry app-specific capabilities.":
-        "Wildcard UygulamID — it covers any bundle id under it, ve yapılamaz carry uygulama-specific capabilities.",
+        "Joker App ID — altındaki herhangi bir paket kimliğini kapsar ve uygulamaya özel yetenekler taşıyamaz.",
     "The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that.":
         "Cihazda bu App ID için sağlama profili yok. Uygulama zaten açılmayı bırakmış olabilir — düzeltmek için yeniden yükle.",
     // MARK: - Side by Side tool
@@ -753,7 +753,7 @@ let turkishStrings: [String: String] = [
         "Aşağıda “.ipa'yı al”a dokunup dosyayı kaydet veya başka cihazda indirip buraya getir.",
     "Back in SideInstaller, pick Custom .ipa under Install, tap “Import .ipa” and choose the file. SideInstaller recognizes %@ and sets it up just like its own download.":
         "SideInstaller'a dön, Yükle altında Özel .ipa'yı seç, “.ipa içe aktar”a dokun ve dosyayı seç. SideInstaller %@ olarak tanır ve kendi indirmesi gibi kurar.",
-    "Turn LocalDevVPN back on, then tap Install.": "Turn LocalDevVPN back on, sonrtap Yükle.",
+    "Turn LocalDevVPN back on, then tap Install.": "LocalDevVPN'i yeniden aç, sonra Yükle'ye dokun.",
     "Get the .ipa": "Get .ipa",
     "Pair this iPhone in Settings": "Pair bu iPhone in Ayarlar",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
@@ -777,7 +777,7 @@ let turkishStrings: [String: String] = [
     "Installing %@": "Yükleing %@",
     "Paused": "Duraklatıldı",
     "Open SideInstaller to finish the install.": "Yüklemeyi bitirmek için SideInstaller'ı aç.",
-    "Check the App IDs it needs, then tap Install.": "Check UygulamIDs it needs, sonrtap Yükle.",
+    "Check the App IDs it needs, then tap Install.": "İhtiyacı olan App ID'leri kontrol et, sonra Yükle'ye dokun.",
     "Tap Trust": "Güven'e dokun",
     "Unlock this iPhone and tap Trust when it asks.": "Unlock bu iPhone ve tap Trust when it asks.",
     "A signing certificate already exists": "Bir imzalama sertifikası zaten var",
@@ -823,11 +823,11 @@ let turkishStrings: [String: String] = [
     "Sign in at account.apple.com with this Apple Account and verify its email address when Apple asks. Apple sends the code or link to that address, so check its spam folder too.":
         "account.apple.com'da bu Apple Hesabıyla oturum aç ve Apple istediğinde e-posta adresini doğrula. Apple kodu veya bağlantıyı o adrese gönderir; spam klasörünü de kontrol et.",
     "Open Apple Account": "Apple Hesabını aç",
-    "No App IDs left this week": "No UygulamIDs left bu week",
+    "No App IDs left this week": "Bu hafta App ID kalmadı",
     "Every app SideInstaller signs needs an App ID, which its extensions share. A free Apple ID can register 10 a week, and each one counts for 7 days.":
         "SideInstaller'ın imzaladığı her uygulama bir App ID ister; uzantıları da onu paylaşır. Ücretsiz Apple kimliği haftada 10 tane kaydedebilir ve her biri 7 gün sayılır.",
     "They can't be deleted sooner. Wait until some expire, then tap Install again.":
-        "y yapılamaz be sild sooner. Bekle until some expire, sonrtap Yükle yeniden.",
+        "Daha erken silinemezler. Bazılarının süresi dolana kadar bekle, sonra Yükle'ye yeniden dokun.",
     "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
         "Veya Ayarlar › Hesap'ta farklı (veya yedek) bir Apple kimliğiyle oturum aç, sonra Yükle'ye yeniden dokun.",
     "Three sideloaded apps already": "Three sideloaded uygulamas already",
@@ -985,7 +985,7 @@ let turkishStrings: [String: String] = [
     "Your Apple ID already has every App ID this app needs, so installing it uses none.":
         "Apple kimliğin bu uygulamanın istediği tüm App ID'lere zaten sahip; yüklemek hiçbirini kullanmaz.",
     "Signing registers one App ID for the app, and its extensions share it. It counts for 7 days.":
-        "İmzalamregisters one UygulamID için uygulama, ve its extensions share it. It counts için 7 days.",
+        "İmzalama uygulama için bir App ID kaydeder; uzantıları da onu paylaşır. 7 gün sayılır.",
     "This Apple ID can register %d a week.": "Bu Apple kimliği haftada %d tane kaydedebilir.",
     // MARK: - Links (sideinstaller://install, sideinstaller://pairingFile)
 
