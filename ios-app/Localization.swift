@@ -12,6 +12,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case japanese
     case korean
     case portuguese
+    case turkish
 
     var id: String { rawValue }
 
@@ -28,6 +29,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .japanese:   return "日本語"
         case .korean:     return "한국어"
         case .portuguese: return "Português"
+        case .turkish:    return "Türkçe"
         }
     }
 
@@ -47,6 +49,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "ko": return .korean
         // All Portuguese variants use the Brazilian Portuguese translation.
         case "pt": return .portuguese
+        case "tr": return .turkish
         default:   return .english
         }
     }
@@ -62,6 +65,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .japanese:       return japaneseStrings
         case .korean:         return koreanStrings
         case .portuguese:     return portugueseStrings
+        case .turkish:        return turkishStrings
         case .auto, .english: return nil
         }
     }
@@ -116,6 +120,7 @@ extension Localizer {
         case .japanese:   return Locale(identifier: "ja_JP")
         case .korean:     return Locale(identifier: "ko_KR")
         case .portuguese: return Locale(identifier: "pt_BR")
+        case .turkish:    return Locale(identifier: "tr_TR")
         }
     }
 
@@ -134,6 +139,7 @@ extension Localizer {
         case .japanese:       language = "ja"
         case .korean:         language = "ko"
         case .portuguese:     language = "pt"
+        case .turkish:        language = "tr"
         case .auto, .english: return .autoupdatingCurrent
         }
         guard let region = Locale.autoupdatingCurrent.region?.identifier else {
