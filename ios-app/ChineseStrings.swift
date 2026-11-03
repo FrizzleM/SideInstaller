@@ -319,6 +319,24 @@ let chineseStrings: [String: String] = [
     "That link was meant to carry a signing certificate, but what it holds can't be read.":
         "该链接本应包含签名证书，但其内容无法读取。",
 
+
+    // MARK: - Export certificate (sideinstaller://exportCertificate)
+
+    "Export signing certificate?": "导出签名证书？",
+    "Another app (for example LiveContainer) asked SideInstaller to export the certificate it currently signs with. Only continue if you started that request. SideInstaller will send the certificate back; if it has none, it will say so.":
+        "另一个 App（例如 LiveContainer）请求 SideInstaller 导出它当前用于签名的证书。仅在你主动发起该请求时继续。SideInstaller 会把证书发回；如果没有签名证书，它会说明。",
+    "Export and send": "导出并发送",
+    "That export link is missing a usable callback_template with $(BASE64_CERT).":
+        "该导出链接缺少可用的带 $(BASE64_CERT) 的 callback_template。",
+    "SideInstaller has no signing certificate. Sign in and install an app (or import a certificate) first, then try again.":
+        "SideInstaller 没有签名证书。请先登录并安装一个 App（或导入证书），然后重试。",
+    "Certificate sent to the other app.": "证书已发送到另一个 App。",
+    "Couldn't open the other app to deliver the certificate. Is it still installed?":
+        "无法打开另一个 App 以送达证书。它是否仍已安装？",
+    "Couldn't build the callback URL to send the certificate.": "无法构建用于发送证书的回调链接。",
+    "No Apple ID saved, so SideInstaller has no signing certificate to export. Add one in Settings › Account, or install an app first so a certificate is created.":
+        "尚未保存 Apple ID，因此 SideInstaller 没有可导出的签名证书。请在 Settings › Account 中添加一个，或先安装一个 App 以生成证书。",
+
     // MARK: - Location tab
 
     "Location spoofing": "位置模拟",
