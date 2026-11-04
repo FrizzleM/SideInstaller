@@ -2,6 +2,19 @@
 
 All notable changes to SideInstaller are documented here.
 
+## Unreleased
+
+### Changed
+- **Side by Side goes step by step, and installs SideStore and LiveContainer too.** It was one
+  long form that could only put SideInstaller on someone else's iPhone. It now takes one page at
+  a time: what to install, their iPhone's IP address (optional, with Skip), which Apple ID signs
+  it, and getting their iPhone ready, with a summary to check and edit before the install starts.
+  Like iLoader, it installs SideInstaller, SideStore or LiveContainer + SideStore, Stable or
+  Nightly. A SideStore build gets its pairing file and settings on their iPhone, as on the Install
+  tab, so it opens ready to use. The pairing code, the Trust prompt, what went wrong and the last
+  steps on their iPhone show on the page instead of in popups, and a wrong IP address fails in
+  seconds instead of after a minute.
+
 ## 1.6.5
 
 ### Added

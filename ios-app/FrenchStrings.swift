@@ -518,8 +518,6 @@ let frenchStrings: [String: String] = [
     // The tool's name is left in English everywhere, as SideStore's is.
     "Side by Side": "Side by Side",
     "Pair with their iPhone": "Jumeler avec leur iPhone",
-    "Sign in to their Apple ID": "Se connecter à leur Apple ID",
-    "Download SideInstaller": "Télécharger SideInstaller",
     "Install on their iPhone": "Installer sur leur iPhone",
     "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
         "« %@ » n'est pas une adresse IPv4. Elle doit ressembler à 192.168.1.42.",
@@ -546,8 +544,6 @@ let frenchStrings: [String: String] = [
         "La liaison avec leur iPhone a été perdue — recommencez.",
     "Set up someone else's iPhone": "Configurer l'iPhone de quelqu'un d'autre",
     "Same Wi-Fi network": "Même réseau Wi-Fi",
-    "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
-        "Leur iPhone doit être sous iOS %@ : une fois installé, SideInstaller se jumelle tout seul, ce que les versions antérieures ne peuvent pas faire.",
     "Their iPhone": "Leur iPhone",
     "IP address (optional)": "Adresse IP (facultative)",
     "Optional: leave it empty, and it fills in when their iPhone pairs.":
@@ -557,10 +553,6 @@ let frenchStrings: [String: String] = [
     "This iPhone is %@, so theirs will look similar.":
         "Cet iPhone est %@, le leur y ressemblera.",
     "Apple ID to sign with": "Apple ID avec lequel signer",
-    "Tip: Use the iPhone/iPad owner's Apple account credentials":
-        "Astuce : utilisez les identifiants du compte Apple du propriétaire de l'iPhone/iPad",
-    "Use my saved Apple ID instead": "Utiliser plutôt mon Apple ID enregistré",
-    "Steps": "Étapes",
     "Waiting for them to tap Trust…": "En attente qu'ils touchent Faire confiance…",
     "Waiting for them to pair in Settings…":
         "En attente qu'ils jumellent l'iPhone dans Réglages…",
@@ -595,17 +587,106 @@ let frenchStrings: [String: String] = [
     "%d%% downloaded": "%d%% téléchargés",
     "%d%% uploaded": "%d%% envoyés",
     "Start the install": "Lancer l'installation",
-    "Install again": "Installer à nouveau",
     "Clear their details": "Effacer leurs informations",
     "This iPhone is still paired with theirs. Clearing forgets it.":
         "Cet iPhone est toujours jumelé avec le leur. Effacer supprime ce jumelage.",
-    "Last step: they trust %@": "Dernière étape : ils font confiance à %@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "Sur leur iPhone : Réglages › Général › VPN et gestion des appareils.",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
         "Touchez l'Apple ID sous « App de développeur », puis touchez Faire confiance.",
     "Open it from their Home Screen — they're set up.":
         "Ouvrez-la depuis leur écran d'accueil — c'est terminé.",
+
+    // MARK: - Side by Side, step by step
+
+    "This app. Their iPhone pairs itself, then installs SideStore, LiveContainer and more on its own.":
+        "Cette app. Leur iPhone se jumelle tout seul, puis installe SideStore, LiveContainer et d'autres apps de lui-même.",
+    "Installs and refreshes apps right on their iPhone. It gets its pairing file from this iPhone, ready to go.":
+        "Installe et actualise des apps directement sur leur iPhone. Il reçoit son fichier de jumelage de cet iPhone, prêt à l'emploi.",
+    "Runs apps without installing them, with SideStore built in — past the three-app limit of a free Apple ID.":
+        "Exécute des apps sans les installer, avec SideStore intégré : au-delà de la limite de trois apps d'un Apple ID gratuit.",
+    "Needs iOS %@ on their iPhone": "Nécessite iOS %@ sur leur iPhone",
+    "Needs LocalDevVPN on their iPhone": "Nécessite LocalDevVPN sur leur iPhone",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again with the IP address left empty.":
+        "Leur iPhone est sous iOS %@. À partir d'iOS 26.4, %@ ne peut pas utiliser le jumelage que leur iPhone donne via le Wi-Fi. iOS 27 se jumelle plutôt depuis ses propres Réglages, ce qui fonctionne : mettez à jour leur iPhone, puis réessayez en laissant l'adresse IP vide.",
+    "Couldn't download %@: %@": "Impossible de télécharger %@ : %@",
+    "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
+        "Leur iPhone a déjà trois apps signées avec un Apple ID gratuit, le maximum autorisé par iOS, apps expirées comprises. Ils doivent en supprimer une, puis vous pourrez réessayer.",
+    "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
+        "%@ est sur leur iPhone, mais son fichier de jumelage n'a pas pu être ajouté (%@). Relancez Side by Side, ou importez un fichier de jumelage dans %@.",
+    "How it works": "Comment ça marche",
+    "Pick an app": "Choisissez une app",
+    "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
+        "SideInstaller, SideStore, ou LiveContainer avec SideStore intégré.",
+    "Pair their iPhone": "Jumelez leur iPhone",
+    "They open their Settings and type in a code this iPhone shows.":
+        "Ils ouvrent leurs Réglages et saisissent un code affiché par cet iPhone.",
+    "Install over Wi-Fi": "Installation via le Wi-Fi",
+    "This iPhone signs the app and sends it across. No computer needed.":
+        "Cet iPhone signe l'app et la leur envoie. Aucun ordinateur nécessaire.",
+    "What you need": "Ce qu'il vous faut",
+    "Both iPhones on the same Wi-Fi network": "Les deux iPhone sur le même réseau Wi-Fi",
+    "Their iPhone on iOS %@ or later, unlocked and nearby":
+        "Leur iPhone sous iOS %@ ou ultérieur, déverrouillé et à proximité",
+    "An Apple ID to sign with — ideally theirs": "Un Apple ID pour signer, idéalement le leur",
+    "Get started": "C'est parti",
+    "What should go on their iPhone?": "Que faut-il installer sur leur iPhone ?",
+    "Pick one. You can come back for another one later.":
+        "Choisissez-en une. Vous pourrez revenir pour une autre plus tard.",
+    "Stable is the release most people use. Nightly is built from the newest code.":
+        "Stable est la version que la plupart des gens utilisent. Nightly est compilée à partir du code le plus récent.",
+    "Do you know their iPhone's IP address?": "Connaissez-vous l'adresse IP de leur iPhone ?",
+    "Without it": "Sans elle",
+    "Their iPhone pairs from its own Settings, the way iOS %@ pairs over Wi-Fi.":
+        "Leur iPhone se jumelle depuis ses propres Réglages, comme iOS %@ le fait via le Wi-Fi.",
+    "With it": "Avec elle",
+    "SideInstaller asks their iPhone directly first, and reuses the pairing from an earlier try.":
+        "SideInstaller contacte d'abord leur iPhone directement, et réutilise le jumelage d'une tentative précédente.",
+    "Skip": "Passer",
+    "Which Apple ID signs it?": "Quel Apple ID la signe ?",
+    "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
+        "L'app est signée avec cet Apple ID, et en a de nouveau besoin tous les 7 jours pour continuer à s'ouvrir. Utilisez celui du propriétaire de l'iPhone.",
+    "Their Apple ID": "Leur Apple ID",
+    "Recommended — they keep their apps signed with it.":
+        "Recommandé : ils gardent leurs apps signées avec.",
+    "My Apple ID": "Mon Apple ID",
+    "Only if you'll keep their apps signed yourself: they won't have this Apple ID's password.":
+        "Seulement si vous gardez vous-même leurs apps signées : ils n'auront pas le mot de passe de cet Apple ID.",
+    "Used for this install only, and never saved.":
+        "Utilisé uniquement pour cette installation, et jamais enregistré.",
+    "Apple may send a code to their devices — keep their iPhone close.":
+        "Apple peut envoyer un code à leurs appareils : gardez leur iPhone à portée de main.",
+    "Get their iPhone ready": "Préparez leur iPhone",
+    "Do this on their iPhone, then start.":
+        "Faites ceci sur leur iPhone, puis lancez l'installation.",
+    "Connect their iPhone to the same Wi-Fi network as this one.":
+        "Connectez leur iPhone au même réseau Wi-Fi que celui-ci.",
+    "Turn on Developer Mode under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "Activez le Mode développeur dans Réglages › Confidentialité et sécurité › Mode développeur, et confirmez-le après le redémarrage.",
+    "Unlock their iPhone and keep it next to this one.":
+        "Déverrouillez leur iPhone et gardez-le à côté de celui-ci.",
+    "Pairs from its Settings": "Se jumelle depuis ses Réglages",
+    "Installing %@ on their iPhone": "Installation de %@ sur leur iPhone",
+    "Waiting for their iPhone…": "En attente de leur iPhone…",
+    "Looking for their iPhone…": "Recherche de leur iPhone…",
+    "Tap Trust on their iPhone": "Touchez Faire confiance sur leur iPhone",
+    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
+        "Déverrouillez leur iPhone, puis touchez Faire confiance dans la demande qui s'affiche.",
+    "Handing over the pairing file…": "Transmission du fichier de jumelage…",
+    "Change details": "Modifier les détails",
+    "%@ is on their iPhone": "%@ est sur leur iPhone",
+    "Finish on their iPhone": "À terminer sur leur iPhone",
+    "Their iPhone runs iOS %@. SideInstaller pairs itself only from iOS %@, so there it needs a pairing file made on a computer.":
+        "Leur iPhone est sous iOS %@. SideInstaller ne se jumelle tout seul qu'à partir d'iOS %@ ; il lui faut donc là un fichier de jumelage créé sur un ordinateur.",
+    "This iPhone no longer keeps a pairing with theirs.":
+        "Cet iPhone ne garde plus de jumelage avec le leur.",
+    "Install another app": "Installer une autre app",
+    "Get LocalDevVPN from the App Store and connect it: SideStore works through it.":
+        "Installez LocalDevVPN depuis l'App Store et connectez-le : SideStore passe par lui.",
+    "Open SideStore and sign in with the same Apple ID. Its pairing file is already in place.":
+        "Ouvrez SideStore et connectez-vous avec le même Apple ID. Son fichier de jumelage est déjà en place.",
+    "Open LiveContainer, go to its Settings tab, and tap “Import Certificate From SideStore”.":
+        "Ouvrez LiveContainer, allez dans son onglet Settings, et touchez « Import Certificate From SideStore ».",
 
     // MARK: - Settings
 

@@ -469,6 +469,12 @@ struct ReleaseCatalog {
 /// into Documents.
 enum SideStoreDownloader {
 
+    /// Told how much of a release download has arrived (0…1) as it does, for
+    /// a caller that shows it, as Side by Side does. Set for the task that
+    /// downloads (`$reportProgress.withValue`); unset, nothing is reported.
+    /// Called on the download's own queue.
+    @TaskLocal static var reportProgress: (@Sendable (Double) -> Void)?
+
     struct GHAsset: Decodable {
         let name: String
         let browser_download_url: String
@@ -870,7 +876,8 @@ enum SideStoreDownloader {
                               idleTimeout: TimeInterval = 30,
                               log: @escaping (String) -> Void) async throws -> Fetched {
         log("Downloading \(name) …")
-        let download = ResumingDownload(from: url, name: name, idleTimeout: idleTimeout, log: log)
+        let download = ResumingDownload(from: url, name: name, idleTimeout: idleTimeout,
+                                        progress: reportProgress, log: log)
         do {
             let file = try await download.run()
             let tag = download.tag.map { ", release \($0)" } ?? ""
@@ -1282,6 +1289,8 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
     /// A transfer that gets no data for this long has stalled, once the file
     /// has started arriving.
     private let idleTimeout: TimeInterval
+    /// Told the fraction that has arrived, once the file's size is known.
+    private let progress: (@Sendable (Double) -> Void)?
     private let log: (String) -> Void
     private let queue: OperationQueue = {
         let queue = OperationQueue()
@@ -1314,10 +1323,12 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
     private var writeError: Error?
     private var finish: CheckedContinuation<Error?, Never>?
 
-    init(from start: URL, name: String, idleTimeout: TimeInterval, log: @escaping (String) -> Void) {
+    init(from start: URL, name: String, idleTimeout: TimeInterval,
+         progress: (@Sendable (Double) -> Void)? = nil, log: @escaping (String) -> Void) {
         self.start = start
         self.name = name
         self.idleTimeout = idleTimeout
+        self.progress = progress
         self.log = log
         file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).download")
     }
@@ -1490,6 +1501,9 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
         do {
             try output?.write(contentsOf: data)
             written += data.count
+            if let progress, let total, total > 0 {
+                progress(min(1, Double(written) / Double(total)))
+            }
         } catch {
             writeError = error
             dataTask.cancel()

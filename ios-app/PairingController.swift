@@ -206,13 +206,19 @@ final class PairingController {
     /// pairing file, its stored `altIRK`, or the Install tab's status and PIN.
     /// The PIN goes to `onPIN` instead. An existing file at `outPath` lends its
     /// key pair and identifier, as for this iPhone's own file.
+    ///
+    /// `identifier` names the record their iPhone keeps for this pairing; nil
+    /// uses this install's own (`peerHostIdentifier`), so pairing them again
+    /// replaces that record. A pairing handed on to an app on their iPhone
+    /// (SideStore) gets one of its own, so a later pairing can't replace it.
     func pairPeer(outPath: String,
+                  identifier: String? = nil,
                   onPIN: @escaping @MainActor (String) -> Void) async throws -> PairedDevice {
         if running { throw PairingError.busy }
         return try await withCheckedThrowingContinuation { cont in
             // No stored altIRK: a fresh one each run, as StikPair does.
             begin(HostRun(name: Self.peerHostName, outPath: outPath, altIRK: "",
-                          identifier: Self.peerHostIdentifier,
+                          identifier: identifier ?? Self.peerHostIdentifier,
                           peerPIN: onPIN, continuation: cont))
         }
     }

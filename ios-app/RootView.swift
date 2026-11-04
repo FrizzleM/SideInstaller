@@ -23,7 +23,6 @@ struct RootView: View {
     /// One popup, tagged with the page that raised it.
     private enum PopupItem: Hashable {
         case install(Engine.Popup)
-        case sideBySide(SideBySideManager.Popup)
         case pairing(PairingManager.Popup)
         case certificates(ToolPopup)
         case entitlements(EntitlementsManager.Popup)
@@ -42,8 +41,6 @@ struct RootView: View {
         /// A finished install: the news, the trust step, and LiveContainer's
         /// certificate import.
         case installFinished
-        /// Side by Side's pairing code and the steps for their iPhone.
-        case sideBySidePairing
         /// The Pairing page's code and the steps for Settings.
         case pairingPage
     }
@@ -164,7 +161,6 @@ struct RootView: View {
     /// never pushed down out of sight.
     private var popups: [PopupItem] {
         let pages = [engine.popups.map(PopupItem.install),
-                     sideBySideManager.popups.map(PopupItem.sideBySide),
                      pairingManager.popups.map(PopupItem.pairing),
                      certManager.popups.map(PopupItem.certificates),
                      entitlementsManager.popups.map(PopupItem.entitlements),
@@ -198,10 +194,10 @@ struct RootView: View {
     /// What a popup sounds like as it comes up, if anything.
     private func sound(for item: PopupItem) -> UISound? {
         switch item {
-        case .install(.error), .install(.certConflict), .sideBySide(.error), .pairing(.error),
+        case .install(.error), .install(.certConflict), .pairing(.error),
              .certificates(.error), .entitlements(.error), .location(.error), .apps(.error):
             .error
-        case .install(.success), .sideBySide(.success), .pairing(.success),
+        case .install(.success), .pairing(.success),
              .certificates(.success), .location(.success), .apps(.success):
             .success
         // Apple granting nothing it was asked for is a failure.
@@ -213,8 +209,7 @@ struct RootView: View {
             engine.isRunning ? .attention : nil
         // Waiting on the user: a code to type, steps to follow, a go-ahead.
         case .install(.pairingCode), .install(.liveContainerImport), .install(.appIDCost),
-             .install(.link), .sideBySide(.pairingCode), .sideBySide(.pairInSettings),
-             .pairing(.pairingCode), .pairing(.pairInSettings):
+             .install(.link), .pairing(.pairingCode), .pairing(.pairInSettings):
             .attention
         }
     }
@@ -223,7 +218,6 @@ struct RootView: View {
     private func blocks(_ item: PopupItem) -> Bool {
         switch item {
         case .install(let popup):    engine.blocks(popup)
-        case .sideBySide(let popup): sideBySideManager.blocks(popup)
         case .pairing(let popup):    pairingManager.blocks(popup)
         // The Tools pages only report; nothing waits on their popups.
         case .certificates, .entitlements, .location, .apps: false
@@ -261,11 +255,9 @@ struct RootView: View {
         // Up on its own, waiting for the go-ahead to sign, or to act on a link.
         case .install(.appIDCost), .install(.link):
             nil
-        case .sideBySide(.pairingCode), .sideBySide(.pairInSettings):
-            .sideBySidePairing
         case .pairing(.pairingCode), .pairing(.pairInSettings):
             .pairingPage
-        case .sideBySide, .pairing, .certificates, .entitlements, .location, .apps:
+        case .pairing, .certificates, .entitlements, .location, .apps:
             nil
         }
     }
@@ -290,8 +282,6 @@ struct RootView: View {
                     "exclamationmark.triangle.fill", .red)
         case .installFinished:
             return (L("Success: last steps"), "checkmark.seal.fill", .green)
-        case .sideBySidePairing:
-            return (SideBySidePopup.pairInSettingsTitle, "lock.iphone", Theme.accent)
         case .pairingPage:
             return (PairingPopup.pairInSettingsTitle, "lock.iphone", Theme.accent)
         }
@@ -300,7 +290,6 @@ struct RootView: View {
     private func close(_ item: PopupItem) {
         switch item {
         case .install(let popup):      engine.closePopup(popup)
-        case .sideBySide(let popup):   sideBySideManager.closePopup(popup)
         case .pairing(let popup):      pairingManager.closePopup(popup)
         case .certificates(let popup): certManager.closePopup(popup)
         case .entitlements(let popup): entitlementsManager.closePopup(popup)
@@ -335,8 +324,6 @@ struct RootView: View {
         switch item {
         case .install(let popup):
             InstallPopup(popup: popup)
-        case .sideBySide(let popup):
-            SideBySidePopup(manager: sideBySideManager, popup: popup)
         case .pairing(let popup):
             PairingPopup(manager: pairingManager, popup: popup)
         case .certificates(let popup):
@@ -539,9 +526,7 @@ struct ToolsView: View {
                         NavigationLink {
                             SideBySideView(manager: sideBySideManager)
                         } label: {
-                            ToolTile(image: "SideBySideLogo",
-                                     title: L("Side by Side"),
-                                     beta: true)
+                            ToolTile(image: "SideBySideLogo", title: L("Side by Side"))
                         }
                         .buttonStyle(.plain, sound: .tick)
                         .cascadeItem(1)

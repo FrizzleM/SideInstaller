@@ -405,6 +405,48 @@ instructions, Cancel ending the host, and a second run starting cleanly. The PIN
 exchange and the tunnel need a second iPhone; the reporter ran the same mechanism
 (pairable host → RPPairing tunnel → RSD → install) end to end on two iOS 27 iPhones.
 
+#### Side by Side, step by step: SideStore and LiveContainer too
+
+Side by Side is a wizard (`SideBySideManager.Stage`): a welcome, four numbered pages (what to
+install, their IP address, the Apple ID, getting their iPhone ready, with an editable summary),
+then the run and its outcome on the same page. Pages slide in the direction of travel
+(`movingForward` is published a beat before `stage`, so the leaving page is drawn with it). The
+pairing code, the Trust prompt, errors and the last steps are inline, so `RootView` no longer
+stacks Side by Side popups. The page keeps the screen awake while a run goes.
+
+It installs `SideBySideApp`: SideInstaller (its latest release, as before), or SideStore /
+LiveContainer + SideStore, downloaded exactly as the Install tab does
+(`SideStoreDownloader.downloadLatest`, shared Documents copy, imported IPAs used as they are;
+`$reportProgress` reports the download's fraction). The SideStore builds get a `setUp` step that
+mirrors `Engine.performWritePairing` over the peer link: the pair record the run connected with
+(XML, UDID stamped into a lockdown record) as `ALTPairingFile`, the split files and
+`isPairingReset`/`activePairingProtocol`, the anisette settings, and `Account.sideconf`.
+
+- **The record lives on in their SideStore**, so it gets an identifier of its own:
+  `pairPeer(outPath:identifier:)` takes a fresh UUID for those runs (SideInstaller's still use the
+  per-install `peerHostIdentifier`). With the shared one, a later Side by Side pairing of the same
+  iPhone would replace the record and break the file SideStore holds. This iPhone still forgets
+  its copy once the run succeeds.
+- **No certificate for an Apple ID saved on this iPhone.** `Account.sideconf` carries the
+  certificate's private key; handing the user's own over would leave it on someone else's iPhone.
+  Their SideStore then asks to resign itself on first sign-in.
+- **Lockdown-only on 26.4+ stops early.** A SideStore build can't use a lockdown record through
+  LocalDevVPN from 26.4 on (see below), so `checkCompatibility` stops before anything is signed.
+  SideInstaller onto an iPhone below 27 installs, and the last page says it needs a computer-made
+  pairing file there.
+- **A typed address is probed first** (`NetworkStatus.probeConnect`, 6 s, port 62078): silence
+  fails at once with the unreachable advice instead of after the system's ~75 s connect timeout,
+  and a refusal goes straight to Remote Pairing. The Trust card only shows once lockdownd has
+  answered (`lockdownPairRecordDirect(onConnected:)`), after 1.2 s, so a lockdownd that resets the
+  connection at once (iOS 27) never flashes it.
+- A blocking call that ends in an error after Cancel counts as the cancel.
+
+Verified in the iPhone 17e simulator (iOS 27.2): every page and run state, English, Italian and
+Japanese; a real run against 192.0.2.1 (fails in ~6 s; Try again and Change details); a real
+Remote Pairing wait with the per-run identifier seen in the advertisement from the Mac, then
+Cancel. **Not run on a second iPhone**: the pairing itself, sign-in, install and the SideStore
+hand-off on their side.
+
 #### The pairing Live Activity
 
 Pairing this iPhone means typing a code SideInstaller shows into a prompt in
