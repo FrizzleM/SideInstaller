@@ -59,10 +59,17 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
         self == .sideInstaller ? "iphone" : "network"
     }
 
-    /// Icon art, for the one that has some in the app.
-    var image: String? { self == .sideInstaller ? "AppLogo" : nil }
+    /// The app's own icon: SideInstaller's, and the official SideStore and
+    /// LiveContainer icons from their repositories (AGPL-3.0), at 256 px.
+    var image: String? {
+        switch self {
+        case .sideInstaller: return "AppLogo"
+        case .sideStore:     return "SideStoreLogo"
+        case .liveContainer: return "LiveContainerLogo"
+        }
+    }
 
-    /// SF Symbol drawn on `tint` for the others.
+    /// SF Symbol drawn on `tint` if the icon art is missing.
     var symbol: String {
         switch self {
         case .sideInstaller: return "arrow.down.app.fill"
