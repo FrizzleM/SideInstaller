@@ -56,6 +56,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>sideinstaller</string>
+				<string>sideinstaller-export</string>
 			</array>
 		</dict>
 	</array>
