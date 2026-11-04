@@ -21,8 +21,11 @@ enum DeepLink: Hashable {
     /// replaced and the resulting URL is opened.
     case exportCertificate(callbackTemplate: String)
 
-    /// The scheme registered in Info.plist.
+    /// The primary scheme registered in Info.plist (shared with official SideInstaller).
     static let scheme = "sideinstaller"
+    /// Fork-only scheme so LiveContainer can open this build when official
+    /// SideInstaller is also installed (iOS allows only one app per scheme).
+    static let exportScheme = "sideinstaller-export"
 
     /// What a `sideinstaller://` URL asks for.
     enum Parsed {
@@ -49,7 +52,8 @@ enum DeepLink: Hashable {
     /// reply; `answersCertificateRequest` says the same of its certificate.
     static func parse(_ url: URL, answersSideStore: Bool,
                       answersCertificateRequest: Bool = false) -> Parsed {
-        guard url.scheme?.lowercased() == scheme,
+        let incoming = url.scheme?.lowercased()
+        guard incoming == scheme || incoming == exportScheme,
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let action = components.host?.lowercased(), !action.isEmpty
         else { return .ignored(action: nil) }
