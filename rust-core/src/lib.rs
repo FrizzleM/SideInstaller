@@ -37,6 +37,14 @@ pub extern "C" fn si_log_init(cb: logging::LogCallback, ctx: *mut c_void) -> i32
     logging::init(cb, ctx)
 }
 
+/// Settings › Verbose logging: nonzero lets idevice's DEBUG lines (every
+/// plist, XPC message and pairing step it exchanges) into the log, zero holds
+/// them back, as at launch. Callable before or after `si_log_init`.
+#[no_mangle]
+pub extern "C" fn si_log_set_verbose(verbose: i32) {
+    logging::set_verbose(verbose != 0)
+}
+
 /// Liveness probe: logs through `tracing` and returns a string to free.
 #[no_mangle]
 pub extern "C" fn si_ping() -> *mut c_char {

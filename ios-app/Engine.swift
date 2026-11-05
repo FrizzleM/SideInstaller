@@ -192,6 +192,22 @@ final class Engine: ObservableObject {
     /// carries over.
     static let autoStartVPNKey = "autoStartLocalDevVPN"
 
+    /// Settings › Activity Log › Verbose logging: idevice's DEBUG lines, every
+    /// plist, XPC message and pairing step exchanged with iOS, go into the log.
+    /// Off by default, since they quickly fill it.
+    @Published var verboseLogging: Bool = UserDefaults.standard.bool(forKey: Engine.verboseLoggingKey) {
+        didSet {
+            guard verboseLogging != oldValue else { return }
+            UserDefaults.standard.set(verboseLogging, forKey: Engine.verboseLoggingKey)
+            si_log_set_verbose(verboseLogging ? 1 : 0)
+            log(verboseLogging
+                ? "Verbose logging on: idevice's DEBUG lines now go into this log."
+                : "Verbose logging off.")
+        }
+    }
+
+    static let verboseLoggingKey = "verboseLogging"
+
     // The loopback VPN's device-side IP; configurable in Advanced.
     @Published var deviceIP: String = Engine.defaultDeviceIP
     /// Device IP's default: LocalDevVPN's far end of the tunnel.
@@ -550,11 +566,16 @@ final class Engine: ObservableObject {
     // MARK: - Logging
 
     private func installLogging() {
+        // Before init, so the first idevice line is already filtered.
+        si_log_set_verbose(verboseLogging ? 1 : 0)
         let rc = si_log_init(siLogCallback, nil)
         if rc == 0 {
             log("si_log_init: OK — idevice tracing is now piped into this console.")
         } else {
             log("si_log_init: already initialised (rc=\(rc)).")
+        }
+        if verboseLogging {
+            log("Verbose logging is on: idevice's DEBUG lines are included.")
         }
     }
 

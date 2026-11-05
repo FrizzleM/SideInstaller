@@ -26,6 +26,11 @@ typedef void (*SILogCallback)(void *ctx, const char *msg);
 // was already initialised. Call once at launch.
 int32_t si_log_init(SILogCallback cb, void *ctx);
 
+// Settings › Verbose logging: nonzero lets idevice's DEBUG lines (every plist,
+// XPC message and pairing step it exchanges) into the log; zero, the launch
+// default, holds them back at INFO. Callable before or after si_log_init.
+void si_log_set_verbose(int32_t verbose);
+
 // Liveness probe. Logs through tracing and returns a heap string describing
 // the linked core. Free with si_string_free().
 char *si_ping(void);

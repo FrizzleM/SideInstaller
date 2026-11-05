@@ -59,6 +59,9 @@ struct ProblemReport {
             developerMode,
             liveContainer,
             anisette(engine),
+            // Says whether idevice's DEBUG lines are missing from the log by choice.
+            Detail(label: "Verbose logging", value: engine.verboseLogging ? "on" : "off",
+                   shown: engine.verboseLogging ? L("on") : L("off")),
             Detail(label: "Language", value: Localizer.shared.language.resolved.rawValue,
                    shown: Localizer.shared.language.resolved.displayName),
         ]

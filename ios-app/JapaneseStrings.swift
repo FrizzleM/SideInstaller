@@ -544,6 +544,9 @@ let japaneseStrings: [String: String] = [
     "Advanced": "詳細設定",
     "Clear": "消去",
     "Activity Log (%d)": "アクティビティログ（%d）",
+    "Verbose logging": "詳細ログ",
+    "Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log.":
+        "iOS とやり取りするメッセージをログに追加し、接続の問題を調べられるようにします。すぐにログがいっぱいになるため、それ以外のときはオフにしておいてください。",
 
     // Settings › Developer Mode: AMFI requests over the device link.
     "Developer Mode": "デベロッパモード",

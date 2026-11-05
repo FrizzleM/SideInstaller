@@ -10,8 +10,10 @@ import Foundation
 /// Every line passes through `redact` before it's shown, copied or mirrored
 /// to stdout. The rules match how the plists, XPC messages and pairing
 /// structures are printed (idevice's pretty printer and Rust's `{:#?}`), plus
-/// Swift's `  Key = value` lines. Then Rust's one-item-per-line byte lists are
-/// put on one line (`compactions`).
+/// Swift's `  Key = value` lines. Any list of more than 32 numbers that's left
+/// becomes its count, since a key name can't be matched when a whole file is
+/// printed as bytes. Then Rust's one-item-per-line lists are put on one line
+/// (`compactions`).
 enum LogRedactor {
 
     // MARK: Public
@@ -127,7 +129,22 @@ enum LogRedactor {
         replacing(#"\b(team:? )[^\n]+ (\([A-Z0-9]{10}\))"#) { m, s in
             "\(s.group(m, 1))‹name› \(s.group(m, 2))"
         },
+        // Last, as a backstop: any other list of more than `longList` numbers,
+        // on one line or one per line. A file read back over AFC was logged
+        // that way, a pairing file's private keys and a .p12 with its password
+        // included. Shorter lists stay: a public key, a salt, a TLV's state.
+        // A plain greedy run of one character class: with a repeated group or
+        // a possessive run, ICU silently stops matching past ~100,000 entries.
+        replacing(#"\[[0-9\s,\-]*\]"#) { m, s in
+            let list = s.group(m, 0)
+            let entries = list.split(whereSeparator: { !$0.isNumber && $0 != "-" })
+            return entries.count > longList ? numbersMarker(entries) : list
+        },
     ]
+
+    /// How many numbers a list can hold before it's taken out: a 32-byte key
+    /// is still shown.
+    private static let longList = 32
 
     // MARK: Compaction
 
@@ -141,7 +158,8 @@ enum LogRedactor {
             let numbers = s.group(m, 0).split(whereSeparator: { !$0.isNumber && $0 != "-" })
             return "[\(numbers.joined(separator: ", "))]"
         },
-        replacing(#"\b([A-Za-z_][A-Za-z0-9_]*)\([ \t]*\n[ \t]*(\[[^\]\n]*\]|"(?:[^"\\\n]|\\.)*"|-?\d+(?:\.\d+)?|true|false),[ \t]*\n[ \t]*\)"#) { m, s in
+        // A marker counts as one value, for `Data(‹40 bytes redacted›)`.
+        replacing(#"\b([A-Za-z_][A-Za-z0-9_]*)\([ \t]*\n[ \t]*(\[[^\]\n]*\]|‹[^›\n]*›|"(?:[^"\\\n]|\\.)*"|-?\d+(?:\.\d+)?|true|false),[ \t]*\n[ \t]*\)"#) { m, s in
             "\(s.group(m, 1))(\(s.group(m, 2)))"
         },
     ]
@@ -162,6 +180,13 @@ enum LogRedactor {
     }
 
     private static func bytesMarker(count: Int) -> String { "‹\(count) bytes redacted›" }
+
+    /// What a long list of numbers becomes: its count, as bytes when every
+    /// entry fits in one.
+    private static func numbersMarker(_ entries: [Substring]) -> String {
+        let bytes = entries.allSatisfy { Int($0).map { (0...255).contains($0) } ?? false }
+        return bytes ? bytesMarker(count: entries.count) : "‹\(entries.count) numbers redacted›"
+    }
 
     /// Entries in a printed byte list: `[\n 225,\n 120,\n ]` or `[225, 120]`.
     private static func byteCount(_ list: String) -> Int {

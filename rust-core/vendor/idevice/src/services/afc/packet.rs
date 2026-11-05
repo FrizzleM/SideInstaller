@@ -1,5 +1,7 @@
 // Jackson Coxson
 
+use std::fmt;
+
 use tracing::debug;
 
 use super::errors::AfcError;
@@ -16,11 +18,24 @@ pub struct AfcPacketHeader {
     pub operation: AfcOpcode,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct AfcPacket {
     pub header: AfcPacketHeader,
     pub header_payload: Vec<u8>,
     pub payload: Vec<u8>,
+}
+
+/// The header and the lengths, never the bytes (SideInstaller change). `read`
+/// logs every packet it receives, and a derived `Debug` printed whole files
+/// into the log as decimal bytes, private keys included.
+impl fmt::Debug for AfcPacket {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AfcPacket")
+            .field("header", &self.header)
+            .field("header_payload_len", &self.header_payload.len())
+            .field("payload_len", &self.payload.len())
+            .finish()
+    }
 }
 
 impl AfcPacketHeader {
@@ -95,5 +110,29 @@ impl AfcPacket {
         };
         debug!("Recv afc: {res:?}");
         Ok(res)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_prints_lengths_not_bytes() {
+        let packet = AfcPacket {
+            header: AfcPacketHeader {
+                magic: super::super::MAGIC,
+                entire_len: AfcPacketHeader::LEN + 8 + 5,
+                header_payload_len: AfcPacketHeader::LEN + 8,
+                packet_num: 1,
+                operation: AfcOpcode::Data,
+            },
+            header_payload: 7u64.to_le_bytes().to_vec(),
+            payload: b"<key>".to_vec(),
+        };
+        let printed = format!("{packet:?}");
+        assert!(printed.contains("header_payload_len: 8"), "{printed}");
+        assert!(printed.contains("payload_len: 5"), "{printed}");
+        assert!(!printed.contains('['), "a byte list got through: {printed}");
     }
 }

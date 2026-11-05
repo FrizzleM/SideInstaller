@@ -545,6 +545,9 @@ let koreanStrings: [String: String] = [
     "Advanced": "고급",
     "Clear": "지우기",
     "Activity Log (%d)": "활동 로그 (%d)",
+    "Verbose logging": "상세 로그",
+    "Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log.":
+        "iOS와 주고받는 메시지를 로그에 추가해 연결 문제를 찾을 수 있게 합니다. 로그가 금방 가득 차므로 그 밖에는 꺼 두세요.",
 
     // Settings › Developer Mode: AMFI requests over the device link.
     "Developer Mode": "개발자 모드",

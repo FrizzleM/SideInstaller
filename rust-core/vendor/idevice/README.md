@@ -12,7 +12,7 @@ keeps cargo unifying a single `idevice` instance.
 
 ## Local changes
 
-**One file: `src/remote_pairing/opack.rs` — OPACK back-reference decoding.**
+**1. `src/remote_pairing/opack.rs` — OPACK back-reference decoding.**
 
 OPACK deduplicates: when a value repeats, the encoder emits a one-byte pointer
 (`0xA0`–`0xC0`, or `0xC1`–`0xC4` with an out-of-line index) at the position of
@@ -52,9 +52,24 @@ never learned" failure:
 Still unimplemented, as upstream: `0x04` (null), `0x05` (UUID), `0x06`. None has
 been observed in a pair record.
 
+**2. `src/services/afc/packet.rs` — an AFC packet prints its lengths, not its
+bytes.**
+
+`AfcPacket::read` logs every packet it receives at DEBUG (`Recv afc: {res:?}`),
+and the derived `Debug` printed `header_payload` and `payload` as lists of
+decimal bytes. `DeviceConnection.writeVerified` reads back each file it writes,
+so the pairing file, SideStore's `Account.sideconf` (a .p12 with its private key
+and password, and the anisette `adi.pb`) and Madeira's sign-in hand-off all went
+into the activity log, and from there into problem reports. `AfcPacket` now has
+a hand-written `Debug` that prints the header and both lengths; a test checks
+that no byte list gets through.
+
 ## Re-vendoring
 
-Upstream had not fixed this as of `master` @ `7fe8adb` (2026-08). Re-copying the
-crate from a newer revision drops the patch unless upstream has landed an
+Upstream had not fixed change 1 as of `master` @ `7fe8adb` (2026-08). Re-copying
+the crate from a newer revision drops the patches unless upstream has landed an
 equivalent — check `src/remote_pairing/opack.rs` for `0xA0` handling first, and
-keep the tests either way.
+keep the tests either way. Change 2 has to be carried over unless upstream's
+`AfcPacket` stops printing its payload: `rust-core/src/logging.rs` holds
+idevice's DEBUG output back unless Verbose logging is on, but the switch exists
+for exactly the runs where it is.

@@ -498,8 +498,11 @@ struct SettingsView: View {
                 Label(L("Report a problem"), systemImage: "exclamationmark.bubble")
             }
             .font(.subheadline)
+            Toggle(L("Verbose logging"), isOn: $engine.verboseLogging)
         } header: {
             Text(L("Activity Log (%d)", engine.lines.count))
+        } footer: {
+            Text(L("Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log."))
         }
     }
 }

@@ -17,6 +17,16 @@ All notable changes to SideInstaller are documented here.
   earlier move over the next time SideInstaller opens. After restoring from a backup, expect to
   sign in to Apple and pair again.
 
+### Fixed
+- **Keys and passwords stay out of the activity log.** SideInstaller reads back each file it
+  hands SideStore, LiveContainer or Madeira, to check it arrived, and the device library logged
+  what it read byte by byte: the pairing file with its private keys, SideStore's
+  `Account.sideconf` (the signing certificate's private key, its password and the anisette
+  identity) and Madeira's sign-in. Copying the log and Report a problem took them along, so a
+  log posted to a GitHub issue could hold them. The log now says only how many bytes were read,
+  the device library's protocol messages are left out unless Settings › Activity Log › Verbose
+  logging is on, and any long run of numbers is taken out of the log, whatever wrote it.
+
 ## 1.6.5
 
 ### Added
