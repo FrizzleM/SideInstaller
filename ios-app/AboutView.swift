@@ -120,6 +120,11 @@ struct AboutView: View {
                          title: "kes158",
                          detail: L("For the Korean translation."),
                          urlString: "https://github.com/kes158")
+                AboutRow(systemImage: "character.bubble.fill",
+                         tint: .teal,
+                         title: "Mr3242-Scripter",
+                         detail: L("For the Turkish translation."),
+                         urlString: "https://github.com/Mr3242-Scripter")
             }
         }
     }

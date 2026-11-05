@@ -1024,6 +1024,7 @@ let portugueseStrings: [String: String] = [
         "Pelo apoio e por apontar os erros que foram corrigidos por causa dele.",
     "For the Japanese translation.": "Pela tradução para o japonês.",
     "For the Korean translation.": "Pela tradução para o coreano.",
+    "For the Turkish translation.": "Pela tradução para o turco.",
 
     "Built with": "Feito com",
     "The open source work this app is built on:":

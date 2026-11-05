@@ -2,6 +2,13 @@
 
 All notable changes to SideInstaller are documented here.
 
+## 1.6.6
+
+### Added
+- **SideInstaller is now in Turkish.** Pick Türkçe in Settings › Language, or leave it on Auto
+  with your iPhone set to Turkish. Thanks to [Mr3242-Scripter](https://github.com/Mr3242-Scripter)
+  for the translation (#111), who's now in About › Special thanks.
+
 ## 1.6.5
 
 ### Added

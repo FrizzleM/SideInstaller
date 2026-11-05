@@ -1002,6 +1002,7 @@ let chineseStrings: [String: String] = [
         "感谢一路以来的支持，以及发现了那些因此得到修复的问题。",
     "For the Japanese translation.": "感谢提供日语翻译。",
     "For the Korean translation.": "感谢提供韩语翻译。",
+    "For the Turkish translation.": "感谢提供土耳其语翻译。",
 
     "Built with": "基于以下项目",
     "The open source work this app is built on:": "这个应用所依赖的开源成果：",

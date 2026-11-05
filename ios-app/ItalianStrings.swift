@@ -1030,6 +1030,7 @@ let italianStrings: [String: String] = [
         "Per il supporto e per aver individuato i bug poi corretti.",
     "For the Japanese translation.": "Per la traduzione in giapponese.",
     "For the Korean translation.": "Per la traduzione in coreano.",
+    "For the Turkish translation.": "Per la traduzione in turco.",
 
     "Built with": "Realizzato con",
     "The open source work this app is built on:":

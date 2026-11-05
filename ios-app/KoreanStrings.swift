@@ -1008,6 +1008,7 @@ let koreanStrings: [String: String] = [
         "응원해 주시고, 버그를 찾아내 고칠 수 있게 도와주셔서 감사합니다.",
     "For the Japanese translation.": "일본어 번역에 감사드립니다.",
     "For the Korean translation.": "한국어 번역에 감사드립니다.",
+    "For the Turkish translation.": "터키어 번역에 감사드립니다.",
 
     "Built with": "사용된 오픈 소스",
     "The open source work this app is built on:": "이 앱의 기반이 된 오픈 소스 작업물입니다:",
