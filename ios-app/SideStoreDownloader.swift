@@ -2117,6 +2117,7 @@ extension IPALibrary {
 
 /// State kept in Application Support rather than the file-sharing-visible
 /// Documents: the device pairing record, and isideload's certificate store.
+/// The folder is excluded from backups (`keptOutOfBackups`).
 enum PrivateStore {
 
     /// The device pairing file (from the RPPairing host, or imported).
@@ -2198,8 +2199,24 @@ enum PrivateStore {
     private static var directory: URL {
         let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        _ = keptOutOfBackups
         return url
     }
+
+    /// Marks Application Support as excluded from iCloud and computer backups,
+    /// once per launch. It holds the developer token, the signing key, the
+    /// anisette identity and the pairing files: none of them should reach a
+    /// backup or another iPhone restored from one.
+    ///
+    /// Set on the folder rather than on each file, because the folder covers
+    /// everything inside it, and files written atomically (by this app and by
+    /// the Rust core) are new files that wouldn't keep a per-file mark.
+    private static let keptOutOfBackups: Void = {
+        var url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? url.setResourceValues(values)
+    }()
 
     /// The private location, or the old Documents copy if migration left one
     /// there.

@@ -9,6 +9,14 @@ All notable changes to SideInstaller are documented here.
   with your iPhone set to Turkish. Thanks to [Mr3242-Scripter](https://github.com/Mr3242-Scripter)
   for the translation (#111), who's now in About › Special thanks.
 
+### Changed
+- **Your Apple ID session and pairing stay on this iPhone.** SideInstaller's private files (the
+  developer token, the signing key, the anisette identity and the pairing files) were included in
+  iCloud and computer backups. They're now left out, and the saved Apple ID password is kept in
+  the Keychain for this iPhone only, so a backup can't carry it to another device; passwords saved
+  earlier move over the next time SideInstaller opens. After restoring from a backup, expect to
+  sign in to Apple and pair again.
+
 ## 1.6.5
 
 ### Added

@@ -46,6 +46,10 @@ final class AccountStore: ObservableObject {
     private static let activeKey = "activeAppleAccountID"
     /// Keychain service every saved password is filed under.
     private static let service = "com.frizzle.SideInstaller.appleID"
+    /// When a saved password can be read: while locked (after the first unlock
+    /// since restart), since signing can run unattended, and on this iPhone
+    /// only, so a backup can't carry it to another device.
+    private static let accessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 
     /// Passwords the keychain rejected, kept in memory for this launch only.
     private var volatilePasswords: [UUID: String] = [:]
@@ -62,6 +66,7 @@ final class AccountStore: ObservableObject {
         } else {
             activeID = accounts.first?.id
         }
+        Self.keepPasswordsOnThisDevice()
     }
 
     // MARK: - The active account
@@ -192,17 +197,28 @@ final class AccountStore: ObservableObject {
     private static func keychainWrite(_ password: String, for id: UUID) -> OSStatus? {
         let data = Data(password.utf8)
         let update = SecItemUpdate(query(id) as CFDictionary,
-                                   [kSecValueData as String: data] as CFDictionary)
+                                   [kSecValueData as String: data,
+                                    kSecAttrAccessible as String: accessibility] as CFDictionary)
         if update == errSecSuccess { return nil }
         guard update == errSecItemNotFound else { return update }
 
         var add = query(id)
         add[kSecValueData as String] = data
-        // Readable while locked (after first unlock), since signing can run
-        // unattended.
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        add[kSecAttrAccessible as String] = accessibility
         let status = SecItemAdd(add as CFDictionary, nil)
         return status == errSecSuccess ? nil : status
+    }
+
+    /// Moves passwords saved by earlier versions, readable after first unlock
+    /// on any device a backup is restored to, to `accessibility`. Matches only
+    /// those, so it does nothing once they're moved; one the keychain can't
+    /// update yet (say, before the first unlock) is tried again next launch.
+    private static func keepPasswordsOnThisDevice() {
+        let saved: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                    kSecAttrService as String: service,
+                                    kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock]
+        SecItemUpdate(saved as CFDictionary,
+                      [kSecAttrAccessible as String: accessibility] as CFDictionary)
     }
 
     private static func keychainDelete(_ id: UUID) {
