@@ -147,8 +147,11 @@ enum SideBySideStep: Int, CaseIterable, Identifiable {
 ///    later Side by Side pairing can't replace it.
 ///
 /// Credentials are kept in memory only, never saved to `AccountStore` or the
-/// keychain. Pair records with their iPhone are forgotten once the app is on
-/// it, or on Clear: from then on only what was handed to SideStore holds one.
+/// keychain. Someone else's Apple ID signs in from a temporary folder, where
+/// isideload keeps its signing key and anisette identity. That folder, the
+/// Apple ID session and the pair records with their iPhone are forgotten once
+/// the app is set up on it, or on Clear: from then on only what was handed to
+/// SideStore on their iPhone holds them.
 final class SideBySideManager: ObservableObject {
 
     /// Unsigned IPA from SideInstaller's latest GitHub release.
@@ -256,6 +259,10 @@ final class SideBySideManager: ObservableObject {
     private var signSession: OpaquePointer?          // SignSession*
     /// The Apple ID `signSession` belongs to, so another one signs out.
     private var signedInAs: String?
+    /// The temporary folder someone else's Apple ID signs in from, which holds
+    /// its signing key once the app is signed. Nil for an Apple ID saved on
+    /// this iPhone, which signs in from `PrivateStore.isideload`.
+    private var temporarySignIn: TemporarySignIn?
     /// Where the pair record for the current target lives: a lockdown record,
     /// or an RPPairing file from Remote Pairing.
     private var pairRecordPath: String?
@@ -280,8 +287,20 @@ final class SideBySideManager: ObservableObject {
 
     private var engine: Engine { Engine.shared }
 
+    private struct TemporarySignIn {
+        let appleID: String
+        let folder: URL
+    }
+
+    init() {
+        // Left with someone's signing key in it if SideInstaller was closed
+        // before a run ended.
+        PrivateStore.forgetEarlierPeerSignIns()
+    }
+
     deinit {
         if let signSession { si_sign_session_free(signSession) }
+        if let folder = temporarySignIn?.folder { try? FileManager.default.removeItem(at: folder) }
         connection.disconnect()
         discardDownload()
     }
@@ -319,7 +338,10 @@ final class SideBySideManager: ObservableObject {
     }
 
     /// From a finished run back to the choice of app, for another one on the
-    /// same iPhone. The Apple ID stays.
+    /// same iPhone. The Apple ID and password stay, but the finished run forgot
+    /// the pairing and signed out, so the next one pairs and signs in again.
+    /// Someone else's Apple ID gets a new temporary folder: Apple may ask their
+    /// iPhone for a code again, and a new certificate is made.
     @MainActor
     func installAnother() {
         guard !isRunning else { return }
@@ -481,8 +503,10 @@ final class SideBySideManager: ObservableObject {
         task?.cancel()
     }
 
-    /// Frees the Apple ID session so the next run signs in again. Called when
-    /// the Apple ID changes and by Clear, so another person's session isn't kept.
+    /// Frees the Apple ID session so the next run signs in again, and deletes
+    /// the temporary folder someone else's Apple ID signed in from. Called when
+    /// the Apple ID changes, once the app is set up on their iPhone, and by
+    /// Clear, so another person's session and signing key aren't kept.
     ///
     /// Not main-actor isolated: the work runs on `signQueue`, and the session
     /// pointer isn't `Sendable`.
@@ -494,6 +518,27 @@ final class SideBySideManager: ObservableObject {
             guard let self, let session = self.signSession else { return }
             si_sign_session_free(session)
             self.signSession = nil
+        }
+        // The key was made for this session, and a later one would make
+        // another.
+        discardTemporarySignIn()
+    }
+
+    /// Deletes the temporary sign-in folder, signing key included. Queued on
+    /// `signQueue`, so whatever is still signing with it finishes first.
+    private func discardTemporarySignIn() {
+        guard let signIn = temporarySignIn else { return }
+        temporarySignIn = nil
+        let who = LogRedactor.maskAppleID(signIn.appleID)
+        signQueue.async {
+            do {
+                try FileManager.default.removeItem(at: signIn.folder)
+                Engine.shared.log("Side by Side: deleted the temporary folder \(who) signed in from, with its signing key and anisette identity.")
+            } catch let error as CocoaError where error.code == .fileNoSuchFile {
+                // Already gone.
+            } catch {
+                Engine.shared.log("⚠️ Side by Side: couldn't delete the temporary folder \(who) signed in from (\(error.localizedDescription)). SideInstaller deletes it the next time it opens.")
+            }
         }
     }
 
@@ -568,10 +613,13 @@ final class SideBySideManager: ObservableObject {
         finished = true
         let name = installedAppName ?? runApp.displayName
         engine.log("✅ Side by Side done — \(name) is on their iPhone. One trust step left, on their side.")
-        // Theirs pairs itself, or SideStore now holds the record: this iPhone
-        // has no more use for it.
+        // Theirs pairs itself and signs itself in, or SideStore now holds the
+        // record and signs in itself: this iPhone has no more use for the
+        // pairing, their Apple ID session or their signing key. Nothing reads
+        // the key after `setUp`, which builds SideStore's certificate from it.
+        signOut()
         forgetTheirIPhone()
-        engine.log("Side by Side: forgot the pairing with their iPhone.")
+        engine.log("Side by Side: signed out and forgot the pairing with their iPhone.")
     }
 
     // MARK: - Step 0: Local Network permission
@@ -881,7 +929,19 @@ final class SideBySideManager: ObservableObject {
         // Anisette servers go down often, so with Auto on try each one before
         // giving up. A server picked in Settings is the only one tried.
         let servers = engine.anisetteCandidates()
-        let dir = PrivateStore.isideload.path
+        // An Apple ID saved here is this iPhone's owner's, so it signs in from
+        // their own folder and keeps reusing their signing key and certificate.
+        // Anyone else's signs in from a temporary folder, deleted with the
+        // session, so their key doesn't stay on this iPhone.
+        let isSavedHere = AccountStore.shared.isSaved(id)
+        let dir: String
+        if isSavedHere {
+            discardTemporarySignIn()
+            engine.log("Side by Side: \(LogRedactor.maskAppleID(id)) is saved in Settings › Account, so it signs in with this iPhone's own signing key.")
+            dir = PrivateStore.isideload.path
+        } else {
+            dir = try temporarySignInFolder(for: id).path
+        }
         engine.twoFactorWasCancelled = false
         var failures = AnisetteServer.SignInFailures()
         var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
@@ -898,7 +958,14 @@ final class SideBySideManager: ObservableObject {
                 let summary = try await onSignQueue {
                     try self.performSignIn(id: id, pw: pw, anisette: anisette, dir: dir)
                 }
-                engine.anisetteSignedIn(anisette)
+                if isSavedHere {
+                    engine.anisetteSignedIn(anisette)
+                } else {
+                    // Not made the server tried first, as `anisetteSignedIn`
+                    // does with Auto on: the identity it kept is in the
+                    // temporary folder, not this iPhone's own.
+                    AnisetteServer.RecentFailures.clear(anisette)
+                }
                 signedInAs = id
                 engine.log("Side by Side: signed in (\(summary)).")
                 setStep(.signIn, .done)
@@ -973,6 +1040,25 @@ final class SideBySideManager: ObservableObject {
             }
         }
         throw EngineError.message(engine.anisetteSignInFailure(failures))
+    }
+
+    /// The temporary folder `id` signs in from: the one made for it by an
+    /// earlier attempt, so a retry signs in as the same device, or a new one.
+    /// Another Apple ID's folder is deleted first.
+    @MainActor
+    private func temporarySignInFolder(for id: String) throws -> URL {
+        if let current = temporarySignIn, current.appleID.caseInsensitiveCompare(id) == .orderedSame {
+            return current.folder
+        }
+        discardTemporarySignIn()
+        do {
+            let folder = try PrivateStore.newPeerSignInFolder()
+            temporarySignIn = TemporarySignIn(appleID: id, folder: folder)
+            engine.log("Side by Side: \(LogRedactor.maskAppleID(id)) signs in from a new temporary folder, deleted once the app is set up on their iPhone or on Clear.")
+            return folder
+        } catch {
+            throw EngineError.message(error.localizedDescription)
+        }
     }
 
     /// One sign-in attempt against a specific anisette server. Uses the machine
@@ -1327,10 +1413,7 @@ final class SideBySideManager: ObservableObject {
     @MainActor
     private func certificateHandOff(for app: SideBySideApp, appleID: String) async -> String? {
         guard let session = signSession, let signed = signedAppPath else { return nil }
-        let savedHere = AccountStore.shared.accounts.contains {
-            $0.normalized.caseInsensitiveCompare(appleID) == .orderedSame
-        }
-        if savedHere {
+        if AccountStore.shared.isSaved(appleID) {
             engine.log("Not handing \(app.displayName) the signing certificate: it belongs to an Apple ID saved on this iPhone, and its private key shouldn't stay on theirs. \(app.displayName) asks to resign itself the first time it signs in.")
             return nil
         }

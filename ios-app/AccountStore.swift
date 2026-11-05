@@ -86,6 +86,12 @@ final class AccountStore: ObservableObject {
     /// True when `account` is the one in use.
     func isActive(_ account: SavedAccount) -> Bool { account.id == activeID }
 
+    /// True when `appleID` is one of the saved accounts, active or not.
+    func isSaved(_ appleID: String) -> Bool {
+        let email = appleID.trimmingCharacters(in: .whitespacesAndNewlines)
+        return accounts.contains { $0.normalized.caseInsensitiveCompare(email) == .orderedSame }
+    }
+
     func password(for account: SavedAccount) -> String {
         volatilePasswords[account.id] ?? Self.keychainRead(account.id) ?? ""
     }

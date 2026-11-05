@@ -15,6 +15,16 @@ All notable changes to SideInstaller are documented here.
   steps on their iPhone show on the page instead of in popups, and a wrong IP address fails in
   seconds instead of after a minute.
 
+### Fixed
+- **Side by Side no longer keeps the other person's signing key.** It signed their Apple ID in
+  with your iPhone's own sign-in files, so the private key for the certificate it made stayed on
+  your iPhone after the run. Their Apple ID now signs in from a temporary folder, deleted once
+  the app is set up on their iPhone, when you tap Clear their details or when the Apple ID
+  changes; one left by a run that was cut short goes the next time SideInstaller opens. An Apple
+  ID saved in Settings › Account still signs with your own key. Setting up the same person
+  again, Install another app included, now asks Apple for a new certificate, since the old key is
+  gone, and Apple may send their iPhone a code again.
+
 ## 1.6.5
 
 ### Added

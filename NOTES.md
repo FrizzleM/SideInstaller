@@ -447,6 +447,57 @@ Remote Pairing wait with the per-run identifier seen in the advertisement from t
 Cancel. **Not run on a second iPhone**: the pairing itself, sign-in, install and the SideStore
 hand-off on their side.
 
+#### Side by Side: someone else's Apple ID signs in from a temporary folder
+
+isideload's `FsStorage` folder holds the signing key (`<sha256(email)>/key`) and
+the anisette identities (`anisette_state*`, `anisette_slots.json`). Side by Side
+used to sign the other person in from `PrivateStore.isideload`, this iPhone's own
+folder, so their private key stayed here after the run, able to sign as them with
+the certificate it made. Now an Apple ID that isn't saved in Settings › Account
+signs in from `tmp/peer-sign-ins/<UUID>/` (`PrivateStore.newPeerSignInFolder`).
+`SideBySideManager.signOut` deletes it with the session: when the Apple ID
+changes, at the end of a successful run (`finishSuccess` signs out now) and on
+Clear their details. Folders left by a launch that ended mid-run go when the next
+launch creates the manager (`RootView`'s `@StateObject`). A failed or cancelled
+run keeps both, so a retry signs with the same key and finds the certificate it
+made.
+
+- **The key is needed until the run ends, not just until the install.** `setUp`
+  builds SideStore's `Account.sideconf` from it (`si_account_config` reads the
+  session's `storage_dir`), so the folder goes in `finishSuccess`, after `setUp`;
+  the deletion is queued on `signQueue`, behind anything still signing. The
+  signed `.app` isn't in the folder: isideload unpacks it into
+  `tmp/<name>_extracted`.
+- **Install another app signs in again.** The finished run signed out, so someone
+  else's Apple ID gets a new folder: a new anisette identity, so Apple may ask
+  their iPhone for a code again, and a new certificate. Keeping the session until
+  Done would save both, but the key would then stay on this iPhone for as long as
+  the done page is left open, and Done is easy to skip. The run already forgets
+  the pairing at the same point, so Install another app pairs again anyway.
+- **A saved Apple ID still uses `PrivateStore.isideload`**, so "My Apple ID" keeps
+  reusing this iPhone's own key and certificate instead of minting a certificate
+  for a key that is thrown away. It gets no `Account.sideconf` (see above).
+- **Each new session mints a certificate on their account**, since the key that
+  matched the last one is gone. A free account has three; when they're taken, the
+  run stops with 7460 (`MaxCertsBehavior::Error`, nothing is revoked) until one is
+  revoked. Never revoke the run's certificate at the end: the app just installed
+  on their iPhone is signed with it, and their SideStore was handed it.
+- **The server it signed in through doesn't become the Auto pick.**
+  `anisetteSignedIn` moves Auto to a server because it keeps this iPhone's
+  identity and the saved token with it; a temporary folder's identity is thrown
+  away, so only the server's recent failure is cleared.
+
+Keys earlier versions left in `isideload` stay: nothing tells them apart from
+the folders of Apple IDs removed from Settings › Account, whose keys still match
+certificates.
+
+Checked in the iPhone 17e simulator (iOS 27.2) with a hook in a scratch copy and
+no anisette server, so nothing reached Apple: the real sign-in step making,
+reusing and replacing the folder, `start()` with another Apple ID, `finishSuccess`,
+Install another app, Clear, a saved Apple ID signing in from `isideload`, `deinit`,
+and the launch sweep. Not run with a real Apple ID or a second iPhone, so a real
+key and the SideStore certificate hand-off before the deletion are unchecked.
+
 #### The pairing Live Activity
 
 Pairing this iPhone means typing a code SideInstaller shows into a prompt in
