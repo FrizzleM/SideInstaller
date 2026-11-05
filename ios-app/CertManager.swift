@@ -243,7 +243,7 @@ final class CertManager: ObservableObject {
     /// accept password-less .p12 (LiveContainer, Feather, …) import cleanly.
     /// Reports clearly when there is no signing certificate.
     @MainActor
-    func exportSigningCertificate(toCallbackTemplate template: String) {
+    func exportSigningCertificate(to destination: CertificateExportDestination, linkTemplate: String? = nil) {
         guard !isBusy else { return }
         lastError = nil
         lastSuccess = nil
@@ -279,24 +279,28 @@ final class CertManager: ObservableObject {
                     queryValueAllowed.remove(charactersIn: "+/=")
                     let b64Enc = b64.addingPercentEncoding(withAllowedCharacters: queryValueAllowed) ?? b64
                     let pwEnc = password.addingPercentEncoding(withAllowedCharacters: queryValueAllowed) ?? password
-                    let filled = template
-                        .replacingOccurrences(of: "$(BASE64_CERT)", with: b64Enc)
-                        .replacingOccurrences(of: "$(PASSWORD)", with: pwEnc)
-                    guard let url = URL(string: filled) else {
+
+                    if destination == .other {
+                        self.shareP12Data(data, successMessage: L("Share or save the .p12, then import it in the other app."))
+                        return
+                    }
+
+                    guard let url = destination.callbackURL(base64Cert: b64Enc, password: pwEnc, linkTemplate: linkTemplate) else {
                         self.lastError = ErrorHelp.explained(L("Couldn't build the callback URL to send the certificate."))
                         self.engine.log("⛔️ Certificates: \(self.lastError ?? "")")
                         return
                     }
-                    self.engine.log("Certificates: opening callback with exported certificate (\(data.count) bytes).")
+                    self.engine.log("Certificates: opening \(destination.title) callback with exported certificate (\(data.count) bytes).")
                     UIApplication.shared.open(url) { opened in
                         Task { @MainActor in
                             if opened {
                                 self.lastSuccess = L("Certificate sent to the other app.")
                                 self.engine.log("Certificates: callback opened.")
-                            } else {
-                                self.lastError = ErrorHelp.explained(L("Couldn't open the other app to deliver the certificate. Is it still installed?"))
-                                self.engine.log("⛔️ Certificates: \(self.lastError ?? "")")
+                                return
                             }
+                            // Target app missing — still give the user the .p12.
+                            self.engine.log("Certificates: \(destination.title) did not open; sharing .p12 instead.")
+                            self.shareP12Data(data, successMessage: L("The other app isn't installed (or couldn't open). Share or save the .p12 instead, then import it there."))
                         }
                     }
                 } catch {
@@ -653,6 +657,41 @@ final class CertManager: ObservableObject {
 
     /// Error 3 from `si_cert_export`: not the certificate SideInstaller signs with.
     private static let exportNotSigning: Int32 = 3
+
+
+    /// Writes `data` to a temporary .p12 and presents the system share sheet.
+    @MainActor
+    private func shareP12Data(_ data: Data, successMessage: String) {
+        do {
+            let folder = FileManager.default.temporaryDirectory
+                .appendingPathComponent("si-export-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let file = folder.appendingPathComponent("SigningCertificate.p12")
+            try data.write(to: file, options: .atomic)
+            var top = UIApplication.shared.topViewController
+            while let leaving = top, leaving.isBeingDismissed {
+                top = leaving.presentingViewController
+            }
+            guard let top else {
+                try? FileManager.default.removeItem(at: folder)
+                lastError = ErrorHelp.explained(L("Couldn't open the other app to deliver the certificate. Is it still installed?"))
+                return
+            }
+            let sheet = UIActivityViewController(activityItems: [file], applicationActivities: nil)
+            sheet.completionWithItemsHandler = { _, _, _, _ in
+                try? FileManager.default.removeItem(at: folder)
+            }
+            sheet.popoverPresentationController?.sourceView = top.view
+            sheet.popoverPresentationController?.sourceRect = CGRect(
+                x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+            top.present(sheet, animated: true)
+            lastSuccess = successMessage
+            engine.log("Certificates: share sheet presented for .p12 (\(data.count) bytes).")
+        } catch {
+            lastError = short(error)
+            engine.log("⛔️ Certificates: \(lastError ?? "share failed")")
+        }
+    }
 
     private func performExport(serial: String, password: String, to file: URL) throws {
         guard let session = self.session else { throw EngineError.message("Not signed in.") }
