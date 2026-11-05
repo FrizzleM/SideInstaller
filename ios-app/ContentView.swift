@@ -1265,17 +1265,16 @@ struct InstallPopup: View {
                     linkButtons(L("Use it"), systemImage: "checkmark.seal.fill")
                 }
             }
-        case .exportCertificate:
-            PopupCard(title: L("Export signing certificate?"), systemImage: "square.and.arrow.up.fill",
-                      tint: Theme.accent, onClose: close) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text(L("Another app (for example LiveContainer) asked SideInstaller to export the certificate it currently signs with. Only continue if you started that request. SideInstaller will send the certificate back; if it has none, it will say so."))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    linkButtons(L("Export and send"), systemImage: "square.and.arrow.up.fill")
-                }
-            }
+        case .exportCertificate(let template):
+            ExportCertificatePopup(
+                linkTemplate: template,
+                onClose: close,
+                onConfirm: { dest in
+                    engine.certificateExportDestination = dest
+                    engine.answerLink(true)
+                },
+                onCancel: { engine.answerLink(false) }
+            )
         }
     }
 
