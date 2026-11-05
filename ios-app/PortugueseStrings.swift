@@ -324,25 +324,6 @@ let portugueseStrings: [String: String] = [
     "That link was meant to carry a signing certificate, but what it holds can't be read.":
         "Esse link deveria trazer um certificado de assinatura, mas o conteúdo não pode ser lido.",
 
-
-    // MARK: - Export certificate (sideinstaller://exportCertificate)
-
-    "Export signing certificate?": "Exportar o certificado de assinatura?",
-    "Another app (for example LiveContainer) asked SideInstaller to export the certificate it currently signs with. Only continue if you started that request. SideInstaller will send the certificate back; if it has none, it will say so.":
-        "Outro app (por exemplo o LiveContainer) pediu ao SideInstaller para exportar o certificado com o qual ele assina no momento. Continue só se você iniciou esse pedido. O SideInstaller enviará o certificado de volta; se não tiver nenhum, ele dirá.",
-    "Export and send": "Exportar e enviar",
-    "That export link is missing a usable callback_template with $(BASE64_CERT).":
-        "Esse link de exportação não tem um callback_template utilizável com $(BASE64_CERT).",
-    "SideInstaller has no signing certificate. Sign in and install an app (or import a certificate) first, then try again.":
-        "O SideInstaller não tem um certificado de assinatura. Entre e instale um app (ou importe um certificado) primeiro e depois tente de novo.",
-    "Certificate sent to the other app.": "Certificado enviado para o outro app.",
-    "Couldn't open the other app to deliver the certificate. Is it still installed?":
-        "Não foi possível abrir o outro app para entregar o certificado. Ele ainda está instalado?",
-    "Couldn't build the callback URL to send the certificate.":
-        "Não foi possível montar a URL de retorno para enviar o certificado.",
-    "No Apple ID saved, so SideInstaller has no signing certificate to export. Add one in Settings › Account, or install an app first so a certificate is created.":
-        "Nenhum Apple ID salvo, então o SideInstaller não tem um certificado de assinatura para exportar. Adicione um em Settings › Account, ou instale um app primeiro para criar um certificado.",
-
     // MARK: - Location tab
 
     "Location spoofing": "Simulação de localização",

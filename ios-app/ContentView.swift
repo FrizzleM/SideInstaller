@@ -1265,16 +1265,6 @@ struct InstallPopup: View {
                     linkButtons(L("Use it"), systemImage: "checkmark.seal.fill")
                 }
             }
-        case .exportCertificate(let template):
-            ExportCertificatePopup(
-                linkTemplate: template,
-                onClose: close,
-                onConfirm: { dest in
-                    engine.certificateExportDestination = dest
-                    engine.answerLink(true)
-                },
-                onCancel: { engine.answerLink(false) }
-            )
         }
     }
 

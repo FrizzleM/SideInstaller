@@ -14,14 +14,8 @@ enum DeepLink: Hashable {
     /// a signing certificate and its private key to sign with. SideStore sends
     /// its own when asked with `sidestore://certificate?callback_template=`.
     case certificate(LinkedCertificate)
-    /// `sideinstaller://exportCertificate?callback_template=<url with placeholders>`:
-    /// LiveContainer (or another app) asks SideInstaller to export the
-    /// certificate it currently signs with. After the user confirms, the
-    /// placeholders `$(BASE64_CERT)` and `$(PASSWORD)` in the template are
-    /// replaced and the resulting URL is opened.
-    case exportCertificate(callbackTemplate: String)
 
-    /// Scheme registered in Info.plist (same as official SideInstaller).
+    /// The scheme registered in Info.plist.
     static let scheme = "sideinstaller"
 
     /// What a `sideinstaller://` URL asks for.
@@ -49,8 +43,7 @@ enum DeepLink: Hashable {
     /// reply; `answersCertificateRequest` says the same of its certificate.
     static func parse(_ url: URL, answersSideStore: Bool,
                       answersCertificateRequest: Bool = false) -> Parsed {
-        let incoming = url.scheme?.lowercased()
-        guard incoming == scheme,
+        guard url.scheme?.lowercased() == scheme,
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let action = components.host?.lowercased(), !action.isEmpty
         else { return .ignored(action: nil) }
@@ -89,18 +82,6 @@ enum DeepLink: Hashable {
             return .link(.certificate(LinkedCertificate(data: data, password: query["password"] ?? "",
                                                         fromSideStore: answersCertificateRequest)))
 
-        case "exportcertificate":
-            // LiveContainer opens this so SideInstaller can send back the
-            // certificate it signs with. The template must contain the
-            // placeholders SideStore-style export uses.
-            guard let template = query["callback_template"],
-                  !template.isEmpty,
-                  template.contains("$(BASE64_CERT)")
-            else {
-                return .invalid(L("That export link is missing a usable callback_template with $(BASE64_CERT)."))
-            }
-            return .link(.exportCertificate(callbackTemplate: template))
-
         default:
             return .ignored(action: action)
         }
@@ -131,8 +112,6 @@ enum DeepLink: Hashable {
             return "pairing file\(file.fromSideStore ? " from SideStore" : "") (\(file.data.count) bytes, \(records))"
         case .certificate(let cert):
             return "signing certificate\(cert.fromSideStore ? " from SideStore" : "") (\(cert.data.count) bytes)"
-        case .exportCertificate:
-            return "export signing certificate to another app"
         }
     }
 }

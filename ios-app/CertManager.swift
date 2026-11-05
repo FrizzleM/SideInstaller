@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 import SideInstallerFFI
 
 /// One iOS development certificate, decoded from `si_cert_list`'s JSON, where
@@ -232,104 +231,6 @@ final class CertManager: ObservableObject {
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Certificates: \(lastError ?? "export failed")")
-            }
-        }
-    }
-
-    /// Exports the certificate SideInstaller currently signs with into a
-    /// callback template (placeholders `$(BASE64_CERT)` and `$(PASSWORD)`),
-    /// then opens the resulting URL. Used by `sideinstaller://exportCertificate`
-    /// from LiveContainer. An empty password is used so signing apps that
-    /// accept password-less .p12 (LiveContainer, Feather, …) import cleanly.
-    /// Reports clearly when there is no signing certificate.
-    @MainActor
-    func exportSigningCertificate(to destination: CertificateExportDestination, linkTemplate: String? = nil) {
-        guard !isBusy else { return }
-        lastError = nil
-        lastSuccess = nil
-
-        let finish: (DevCert) -> Void = { [weak self] cert in
-            guard let self else { return }
-            let serial = cert.serialNumber
-            guard !serial.isEmpty else {
-                self.lastError = ErrorHelp.explained(L("This certificate has no serial number, so it can't be exported."))
-                self.engine.log("⛔️ Certificates: \(self.lastError ?? "")")
-                return
-            }
-            // Empty password matches SideStore-style export and works with LiveContainer.
-            let password = ""
-            self.exportingID = cert.id
-            self.engine.log("Certificates: exporting \(cert.displayName) (\(serial)) for callback …")
-            Task { @MainActor in
-                defer { self.exportingID = nil }
-                do {
-                    let file = try Self.exportFile(for: cert)
-                    do {
-                        try await self.onQueue { try self.performExport(serial: serial, password: password, to: file) }
-                    } catch {
-                        try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
-                        throw error
-                    }
-                    let data = try Data(contentsOf: file)
-                    try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
-                    let b64 = data.base64EncodedString()
-                    // Encode for use inside a query value. urlQueryAllowed still allows
-                    // + / = which break base64 when a hop treats + as space — force them.
-                    var queryValueAllowed = CharacterSet.urlQueryAllowed
-                    queryValueAllowed.remove(charactersIn: "+/=")
-                    let b64Enc = b64.addingPercentEncoding(withAllowedCharacters: queryValueAllowed) ?? b64
-                    let pwEnc = password.addingPercentEncoding(withAllowedCharacters: queryValueAllowed) ?? password
-
-                    if destination == .other {
-                        self.shareP12Data(data, successMessage: L("Share or save the .p12, then import it in the other app."))
-                        return
-                    }
-
-                    guard let url = destination.callbackURL(base64Cert: b64Enc, password: pwEnc, linkTemplate: linkTemplate) else {
-                        self.lastError = ErrorHelp.explained(L("Couldn't build the callback URL to send the certificate."))
-                        self.engine.log("⛔️ Certificates: \(self.lastError ?? "")")
-                        return
-                    }
-                    self.engine.log("Certificates: opening \(destination.title) callback with exported certificate (\(data.count) bytes).")
-                    UIApplication.shared.open(url) { opened in
-                        Task { @MainActor in
-                            if opened {
-                                self.lastSuccess = L("Certificate sent to the other app.")
-                                self.engine.log("Certificates: callback opened.")
-                                return
-                            }
-                            // Target app missing — still give the user the .p12.
-                            self.engine.log("Certificates: \(destination.title) did not open; sharing .p12 instead.")
-                            self.shareP12Data(data, successMessage: L("The other app isn't installed (or couldn't open). Share or save the .p12 instead, then import it there."))
-                        }
-                    }
-                } catch {
-                    self.lastError = self.short(error)
-                    self.engine.log("⛔️ Certificates: \(self.lastError ?? "export failed")")
-                }
-            }
-        }
-
-        if let signing = certs.first(where: { $0.isSigning }) {
-            finish(signing)
-            return
-        }
-
-        // Not listed yet (or none): load, then export or report clearly.
-        let id = engine.normalizedAppleID, pw = engine.applePassword
-        guard !id.isEmpty, !pw.isEmpty else {
-            lastError = ErrorHelp.explained(L("No Apple ID saved, so SideInstaller has no signing certificate to export. Add one in Settings › Account, or install an app first so a certificate is created."))
-            engine.log("⛔️ Certificates: \(lastError ?? "")")
-            return
-        }
-        engine.log("Certificates: loading list to find the signing certificate for export …")
-        loadCerts { [weak self] in
-            guard let self else { return }
-            if let signing = self.certs.first(where: { $0.isSigning }) {
-                finish(signing)
-            } else {
-                self.lastError = ErrorHelp.explained(L("SideInstaller has no signing certificate. Sign in and install an app (or import a certificate) first, then try again."))
-                self.engine.log("⛔️ Certificates: \(self.lastError ?? "")")
             }
         }
     }
@@ -657,41 +558,6 @@ final class CertManager: ObservableObject {
 
     /// Error 3 from `si_cert_export`: not the certificate SideInstaller signs with.
     private static let exportNotSigning: Int32 = 3
-
-
-    /// Writes `data` to a temporary .p12 and presents the system share sheet.
-    @MainActor
-    private func shareP12Data(_ data: Data, successMessage: String) {
-        do {
-            let folder = FileManager.default.temporaryDirectory
-                .appendingPathComponent("si-export-\(UUID().uuidString)", isDirectory: true)
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let file = folder.appendingPathComponent("SigningCertificate.p12")
-            try data.write(to: file, options: .atomic)
-            var top = UIApplication.shared.topViewController
-            while let leaving = top, leaving.isBeingDismissed {
-                top = leaving.presentingViewController
-            }
-            guard let top else {
-                try? FileManager.default.removeItem(at: folder)
-                lastError = ErrorHelp.explained(L("Couldn't open the other app to deliver the certificate. Is it still installed?"))
-                return
-            }
-            let sheet = UIActivityViewController(activityItems: [file], applicationActivities: nil)
-            sheet.completionWithItemsHandler = { _, _, _, _ in
-                try? FileManager.default.removeItem(at: folder)
-            }
-            sheet.popoverPresentationController?.sourceView = top.view
-            sheet.popoverPresentationController?.sourceRect = CGRect(
-                x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
-            top.present(sheet, animated: true)
-            lastSuccess = successMessage
-            engine.log("Certificates: share sheet presented for .p12 (\(data.count) bytes).")
-        } catch {
-            lastError = short(error)
-            engine.log("⛔️ Certificates: \(lastError ?? "share failed")")
-        }
-    }
 
     private func performExport(serial: String, password: String, to file: URL) throws {
         guard let session = self.session else { throw EngineError.message("Not signed in.") }

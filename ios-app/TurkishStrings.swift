@@ -281,23 +281,6 @@ let turkishStrings: [String: String] = [
     "Use it": "Kullan",
     "That link was meant to carry a signing certificate, but what it holds can't be read.":
         "Bu bağlantı bir imzalama sertifikası taşıyacaktı, ancak içeriği okunamıyor.",
-    // MARK: - Export certificate (sideinstaller://exportCertificate)
-
-    "Export signing certificate?": "İmzalama sertifikası dışa aktarılsın mı?",
-    "Another app (for example LiveContainer) asked SideInstaller to export the certificate it currently signs with. Only continue if you started that request. SideInstaller will send the certificate back; if it has none, it will say so.":
-        "Başka bir uygulama (örneğin LiveContainer) SideInstaller'dan şu anda imzaladığı sertifikayı dışa aktarmasını istedi. Yalnızca bu isteği sen başlattıysan devam et. SideInstaller sertifikayı geri gönderecek; yoksa bunu bildirecek.",
-    "Export and send": "Dışa aktar ve gönder",
-    "That export link is missing a usable callback_template with $(BASE64_CERT).":
-        "Bu dışa aktarma bağlantısında $(BASE64_CERT) içeren kullanılabilir bir callback_template yok.",
-    "SideInstaller has no signing certificate. Sign in and install an app (or import a certificate) first, then try again.":
-        "SideInstaller'ın imzalama sertifikası yok. Önce oturum açıp bir uygulama yükle (veya bir sertifika içe aktar), sonra yeniden dene.",
-    "Certificate sent to the other app.": "Sertifika diğer uygulamaya gönderildi.",
-    "Couldn't open the other app to deliver the certificate. Is it still installed?":
-        "Sertifikayı iletmek için diğer uygulama açılamadı. Hâlâ yüklü mü?",
-    "Couldn't build the callback URL to send the certificate.":
-        "Sertifikayı göndermek için geri çağırma bağlantısı oluşturulamadı.",
-    "No Apple ID saved, so SideInstaller has no signing certificate to export. Add one in Settings › Account, or install an app first so a certificate is created.":
-        "Kayıtlı Apple kimliği yok, bu yüzden SideInstaller'ın dışa aktaracak imzalama sertifikası yok. Ayarlar › Hesap bölümünden bir tane ekle veya önce bir uygulama yükleyerek sertifika oluştur.",
     // MARK: - Location tab
 
     "Location spoofing": "Konum taklidi",

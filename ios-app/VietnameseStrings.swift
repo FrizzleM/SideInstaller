@@ -325,24 +325,6 @@ let vietnameseStrings: [String: String] = [
     "That link was meant to carry a signing certificate, but what it holds can't be read.":
         "Liên kết đó lẽ ra chứa một chứng chỉ ký, nhưng không đọc được nội dung.",
 
-
-    // MARK: - Export certificate (sideinstaller://exportCertificate)
-
-    "Export signing certificate?": "Xuất chứng chỉ ký?",
-    "Another app (for example LiveContainer) asked SideInstaller to export the certificate it currently signs with. Only continue if you started that request. SideInstaller will send the certificate back; if it has none, it will say so.":
-        "Một app khác (ví dụ LiveContainer) đã yêu cầu SideInstaller xuất chứng chỉ đang dùng để ký. Chỉ tiếp tục nếu bạn đã bắt đầu yêu cầu đó. SideInstaller sẽ gửi chứng chỉ lại; nếu không có, nó sẽ báo.",
-    "Export and send": "Xuất và gửi",
-    "That export link is missing a usable callback_template with $(BASE64_CERT).":
-        "Liên kết xuất đó thiếu callback_template hợp lệ có $(BASE64_CERT).",
-    "SideInstaller has no signing certificate. Sign in and install an app (or import a certificate) first, then try again.":
-        "SideInstaller không có chứng chỉ ký. Hãy đăng nhập và cài một app (hoặc nhập chứng chỉ) trước, rồi thử lại.",
-    "Certificate sent to the other app.": "Đã gửi chứng chỉ tới app kia.",
-    "Couldn't open the other app to deliver the certificate. Is it still installed?":
-        "Không mở được app kia để gửi chứng chỉ. App đó vẫn còn được cài không?",
-    "Couldn't build the callback URL to send the certificate.": "Không tạo được URL callback để gửi chứng chỉ.",
-    "No Apple ID saved, so SideInstaller has no signing certificate to export. Add one in Settings › Account, or install an app first so a certificate is created.":
-        "Chưa lưu Apple ID, nên SideInstaller không có chứng chỉ ký để xuất. Thêm một tài khoản trong Settings › Account, hoặc cài một app trước để tạo chứng chỉ.",
-
     // MARK: - Location tab
 
     "Location spoofing": "Giả lập vị trí",

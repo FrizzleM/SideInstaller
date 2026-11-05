@@ -320,24 +320,6 @@ let japaneseStrings: [String: String] = [
     "That link was meant to carry a signing certificate, but what it holds can't be read.":
         "このリンクには署名用証明書が含まれているはずですが、内容を読み取れません。",
 
-
-    // MARK: - Export certificate (sideinstaller://exportCertificate)
-
-    "Export signing certificate?": "署名証明書を書き出しますか？",
-    "Another app (for example LiveContainer) asked SideInstaller to export the certificate it currently signs with. Only continue if you started that request. SideInstaller will send the certificate back; if it has none, it will say so.":
-        "別のアプリ（例: LiveContainer）が、SideInstaller が現在署名に使っている証明書の書き出しを要求しました。この要求を自分が始めた場合のみ続行してください。SideInstaller は証明書を送り返します。ない場合はその旨を表示します。",
-    "Export and send": "書き出して送信",
-    "That export link is missing a usable callback_template with $(BASE64_CERT).":
-        "その書き出しリンクには、$(BASE64_CERT) を含む使える callback_template がありません。",
-    "SideInstaller has no signing certificate. Sign in and install an app (or import a certificate) first, then try again.":
-        "SideInstaller には署名証明書がありません。サインインしてアプリをインストールする（または証明書を取り込む）とから、もう一度試してください。",
-    "Certificate sent to the other app.": "証明書をほかのアプリに送りました。",
-    "Couldn't open the other app to deliver the certificate. Is it still installed?":
-        "証明書を渡すためにほかのアプリを開けませんでした。まだインストールされていますか？",
-    "Couldn't build the callback URL to send the certificate.": "証明書を送るためのコールバック URL を組み立てられませんでした。",
-    "No Apple ID saved, so SideInstaller has no signing certificate to export. Add one in Settings › Account, or install an app first so a certificate is created.":
-        "Apple ID が保存されていないため、SideInstaller に書き出せる署名証明書がありません。Settings › Account で追加するか、先にアプリをインストールして証明書を作成してください。",
-
     // MARK: - Location tab
 
     "Location spoofing": "位置情報の偽装",

@@ -324,25 +324,6 @@ let italianStrings: [String: String] = [
     "That link was meant to carry a signing certificate, but what it holds can't be read.":
         "Quel link doveva contenere un certificato di firma, ma il contenuto non si può leggere.",
 
-
-    // MARK: - Export certificate (sideinstaller://exportCertificate)
-
-    "Export signing certificate?": "Esportare il certificato di firma?",
-    "Another app (for example LiveContainer) asked SideInstaller to export the certificate it currently signs with. Only continue if you started that request. SideInstaller will send the certificate back; if it has none, it will say so.":
-        "Un’altra app (ad esempio LiveContainer) ha chiesto a SideInstaller di esportare il certificato con cui firma attualmente. Continua solo se hai avviato tu quella richiesta. SideInstaller invierà il certificato; se non ne ha, lo indicherà.",
-    "Export and send": "Esporta e invia",
-    "That export link is missing a usable callback_template with $(BASE64_CERT).":
-        "Quel link di esportazione non ha un callback_template utilizzabile con $(BASE64_CERT).",
-    "SideInstaller has no signing certificate. Sign in and install an app (or import a certificate) first, then try again.":
-        "SideInstaller non ha un certificato di firma. Accedi e installa un’app (o importa un certificato) prima, poi riprova.",
-    "Certificate sent to the other app.": "Certificato inviato all’altra app.",
-    "Couldn't open the other app to deliver the certificate. Is it still installed?":
-        "Impossibile aprire l’altra app per consegnare il certificato. È ancora installata?",
-    "Couldn't build the callback URL to send the certificate.":
-        "Impossibile costruire l’URL di callback per inviare il certificato.",
-    "No Apple ID saved, so SideInstaller has no signing certificate to export. Add one in Settings › Account, or install an app first so a certificate is created.":
-        "Nessun Apple ID salvato, quindi SideInstaller non ha un certificato di firma da esportare. Aggiungine uno in Settings › Account, oppure installa prima un’app per crearne uno.",
-
     // MARK: - Location tab
 
     "Location spoofing": "Simulazione posizione",
