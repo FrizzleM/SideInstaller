@@ -497,11 +497,10 @@ final class Engine: ObservableObject {
     /// A certificate a link brought, for `RootView` to hand to the Certificates
     /// manager, which checks it against the Apple ID's own before using it.
     @Published var certificateToImport: CertificateImport?
-    /// A certificate export the user confirmed: destination + optional link template.
-    @Published var certificateExportRequest: CertificateExportRequest?
-    /// Destination selected in the export-certificate link popup.
-    /// Kept until `answerLink(_:)` consumes it, then reset to nil.
-    @Published var certificateExportDestination: CertificateExportDestination?
+    /// A callback template from `sideinstaller://exportCertificate`, for
+    /// `RootView` / CertManager to export the signing certificate into and open.
+    /// Placeholders: `$(BASE64_CERT)` and `$(PASSWORD)`.
+    @Published var certificateExportTemplate: String?
 
     // 2FA bridge: the FFI callback blocks on this semaphore until the UI answers.
     /// What the two-factor sheet shows; nil while no sign-in is asking.
@@ -3097,11 +3096,8 @@ final class Engine: ObservableObject {
         case .certificate(let cert):
             certificateToImport = CertificateImport(certificate: cert, retryInstall: false)
         case .exportCertificate(let template):
-            // Destination chosen in the link popup (see certificateExportDestination).
-            let dest = certificateExportDestination
-                ?? CertificateExportDestination.preferred(hasLinkTemplate: !template.isEmpty)
-            certificateExportRequest = CertificateExportRequest(destination: dest, linkTemplate: template)
-            certificateExportDestination = nil
+            // Handed to CertManager via RootView (same pattern as certificateToImport).
+            certificateExportTemplate = template
         }
     }
 
@@ -4375,4 +4371,95 @@ struct TwoFactorPrompt: Decodable, Equatable {
     let selectedNumberId: UInt32?
     let lastError: String?
     let numbers: [Number]
-    
+
+    /// The errors isideload itself writes into `lastError` when Apple turns a
+    /// way of getting the code away (`PHONE_CODE_REFUSED`,
+    /// `DEVICE_CODE_UNCONFIRMED` in `apple_account.rs`); keep them in step.
+    static let isideloadErrors: Set<String> = [
+        "Apple won't send a code by text or call to this sign-in, so it was sent to your Apple devices.",
+        "Apple didn't confirm sending a code to your Apple devices. If one arrived, enter it; if not, try another way.",
+    ]
+
+    /// `lastError` as the sheet shows it: Apple's own as it came, isideload's
+    /// in the app's language.
+    var shownError: String? {
+        lastError.map { Self.isideloadErrors.contains($0) ? L($0) : $0 }
+    }
+
+    /// For a request that can't be read: the one prompt that always makes sense.
+    static let deviceOnly = TwoFactorPrompt(method: .device, selectedNumberId: nil, lastError: nil, numbers: [])
+
+    var selectedNumber: Number? { numbers.first { $0.id == selectedNumberId } }
+
+    /// Whether a code is on its way, so the sheet should ask for it.
+    var expectsCode: Bool { method != .choose }
+
+    var logLine: String {
+        let what = switch method {
+        case .device: "2FA required — a code was sent to your trusted devices."
+        case .sms:    "2FA: a code was texted to \(selectedNumber?.number ?? "your phone")."
+        case .voice:  "2FA: Apple is calling \(selectedNumber?.number ?? "your phone") with a code."
+        case .choose: "2FA: that method didn't work — choose another."
+        }
+        return lastError.map { "\(what) Apple said: \($0)" } ?? what
+    }
+}
+
+extension TwoFactorPrompt {
+    init?(json: String) {
+        guard let prompt = try? JSONDecoder().decode(TwoFactorPrompt.self, from: Data(json.utf8)) else {
+            return nil
+        }
+        self = prompt
+    }
+}
+
+/// The sheet's reply, encoded as the JSON Rust's `TwoFactorAnswer` reads.
+enum TwoFactorAnswer: Equatable {
+    case code(String)
+    case sms(UInt32)
+    case voice(UInt32)
+    case devices
+    case resend
+
+    var json: String? {
+        struct Wire: Encodable {
+            let action: String
+            var code: String?
+            var id: UInt32?
+        }
+        let wire = switch self {
+        case .code(let code): Wire(action: "code", code: code)
+        case .sms(let id):    Wire(action: "sms", id: id)
+        case .voice(let id):  Wire(action: "voice", id: id)
+        case .devices:        Wire(action: "devices")
+        case .resend:         Wire(action: "resend")
+        }
+        return (try? JSONEncoder().encode(wire)).flatMap { String(data: $0, encoding: .utf8) }
+    }
+
+    /// For the console, which must never carry the code itself.
+    var logLine: String {
+        switch self {
+        case .code:    "2FA: checking the code…"
+        case .sms:     "2FA: asking Apple to text a code…"
+        case .voice:   "2FA: asking Apple to call with a code…"
+        case .devices: "2FA: asking Apple to send a code to your devices…"
+        case .resend:  "2FA: asking Apple for a new code…"
+        }
+    }
+}
+
+/// The two-factor sheet's state.
+enum TwoFactorPhase: Equatable {
+    /// Apple is waiting on the user.
+    case asking(TwoFactorPrompt)
+    /// The user answered and the sign-in is acting on it.
+    case working(TwoFactorPrompt, TwoFactorAnswer)
+
+    var prompt: TwoFactorPrompt {
+        switch self {
+        case .asking(let prompt), .working(let prompt, _): prompt
+        }
+    }
+}
