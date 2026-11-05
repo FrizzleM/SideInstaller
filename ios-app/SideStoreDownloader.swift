@@ -2187,6 +2187,32 @@ enum PrivateStore {
         return dir
     }
 
+    /// A new, empty folder for signing in someone else's Apple ID (Side by
+    /// Side), in the app's temporary folder. isideload keeps that Apple ID's
+    /// signing key and anisette identity in it, apart from `isideload`, which
+    /// holds this iPhone's own. Side by Side deletes it when the session ends.
+    static func newPeerSignInFolder() throws -> URL {
+        forgetEarlierPeerSignIns()
+        let folder = peerSignInsDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
+    /// Deletes the sign-in folders an earlier launch left behind, closed before
+    /// Side by Side could delete them. Runs once per launch, before the first
+    /// new folder is made, so it never deletes one in use.
+    static func forgetEarlierPeerSignIns() {
+        _ = sweptPeerSignIns
+    }
+
+    private static let sweptPeerSignIns: Void = {
+        try? FileManager.default.removeItem(at: peerSignInsDirectory)
+    }()
+
+    private static var peerSignInsDirectory: URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("peer-sign-ins", isDirectory: true)
+    }
+
     /// isideload's `FsStorage` root, created on demand as isideload expects.
     static var isideload: URL {
         let url = resolve(private: directory.appendingPathComponent("isideload", isDirectory: true),

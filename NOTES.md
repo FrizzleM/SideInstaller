@@ -405,6 +405,37 @@ instructions, Cancel ending the host, and a second run starting cleanly. The PIN
 exchange and the tunnel need a second iPhone; the reporter ran the same mechanism
 (pairable host → RPPairing tunnel → RSD → install) end to end on two iOS 27 iPhones.
 
+#### Side by Side: someone else's Apple ID signs in from a temporary folder
+
+isideload's `FsStorage` folder holds the signing key (`<sha256(email)>/key`) and
+the anisette identities (`anisette_state*`, `anisette_slots.json`). Side by Side
+used to sign the other person in from `PrivateStore.isideload`, this iPhone's own
+folder, so their private key stayed here after the run, able to sign as them with
+the certificate it made. Now an Apple ID that isn't saved in Settings › Account
+signs in from `tmp/peer-sign-ins/<UUID>/` (`PrivateStore.newPeerSignInFolder`).
+`SideBySideManager.signOut` deletes it with the session: when the Apple ID
+changes, once the app is on their iPhone (`finishSuccess` signs out now) and on
+Clear. Folders left by a launch that ended mid-run go when the next launch creates
+the manager. A failed run keeps both, so a retry signs with the same key and
+finds the certificate it made.
+
+- **A saved Apple ID still uses `PrivateStore.isideload`**, so "Use my saved Apple
+  ID instead" keeps reusing this iPhone's own key and certificate instead of
+  minting a certificate for a key that is thrown away.
+- **Each new session mints a certificate on their account**, since the key that
+  matched the last one is gone. A free account has three; when they're taken, the
+  run stops with 7460 (`MaxCertsBehavior::Error`, nothing is revoked) until one is
+  revoked. Never revoke the run's certificate at the end: the app just installed on
+  their iPhone is signed with it.
+- **The server it signed in through doesn't become the Auto pick.**
+  `anisetteSignedIn` moves Auto to a server because it keeps this iPhone's
+  identity and the saved token with it; a temporary folder's identity is thrown
+  away, so only the server's recent failure is cleared.
+
+Keys earlier versions left in `isideload` stay: nothing tells them apart from
+the folders of Apple IDs removed from Settings › Account, whose keys still match
+certificates.
+
 #### The pairing Live Activity
 
 Pairing this iPhone means typing a code SideInstaller shows into a prompt in

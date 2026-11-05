@@ -47,8 +47,10 @@ enum SideBySideStep: Int, CaseIterable, Identifiable {
 ///    entered on this page and the target's UDID.
 ///
 /// Credentials are kept in memory only, never saved to `AccountStore` or the
-/// keychain. Pair records with their iPhone are forgotten once the app is on
-/// it, or on Clear.
+/// keychain. Someone else's Apple ID signs in from a temporary folder, where
+/// isideload keeps its signing key and anisette identity. That folder, the
+/// Apple ID session and the pair records with their iPhone are forgotten once
+/// the app is on it, or on Clear.
 final class SideBySideManager: ObservableObject {
 
     /// Unsigned IPA from SideInstaller's latest GitHub release.
@@ -101,6 +103,10 @@ final class SideBySideManager: ObservableObject {
     private var signSession: OpaquePointer?          // SignSession*
     /// The Apple ID `signSession` belongs to, so editing the field signs out.
     private var signedInAs: String?
+    /// The temporary folder someone else's Apple ID signs in from, which holds
+    /// its signing key once the app is signed. Nil for an Apple ID saved on
+    /// this iPhone, which signs in from `PrivateStore.isideload`.
+    private var temporarySignIn: TemporarySignIn?
     /// Where the pair record for the current target lives: a lockdown record,
     /// or an RPPairing file from Remote Pairing.
     private var pairRecordPath: String?
@@ -115,8 +121,20 @@ final class SideBySideManager: ObservableObject {
 
     private var engine: Engine { Engine.shared }
 
+    private struct TemporarySignIn {
+        let appleID: String
+        let folder: URL
+    }
+
+    init() {
+        // Left with someone's signing key in it if SideInstaller was closed
+        // before a run ended.
+        PrivateStore.forgetEarlierPeerSignIns()
+    }
+
     deinit {
         if let signSession { si_sign_session_free(signSession) }
+        if let folder = temporarySignIn?.folder { try? FileManager.default.removeItem(at: folder) }
         connection.disconnect()
         discardDownload()
     }
@@ -275,8 +293,10 @@ final class SideBySideManager: ObservableObject {
         task?.cancel()
     }
 
-    /// Frees the Apple ID session so the next run signs in again. Called when
-    /// the Apple ID changes and by Clear, so another person's session isn't kept.
+    /// Frees the Apple ID session so the next run signs in again, and deletes
+    /// the temporary folder someone else's Apple ID signed in from. Called when
+    /// the Apple ID changes, once the app is on their iPhone, and by Clear, so
+    /// another person's session and signing key aren't kept.
     ///
     /// Not main-actor isolated: the work runs on `signQueue`, and the session
     /// pointer isn't `Sendable`.
@@ -288,6 +308,27 @@ final class SideBySideManager: ObservableObject {
             guard let self, let session = self.signSession else { return }
             si_sign_session_free(session)
             self.signSession = nil
+        }
+        // The key was made for this session, and a later one would make
+        // another.
+        discardTemporarySignIn()
+    }
+
+    /// Deletes the temporary sign-in folder, signing key included. Queued on
+    /// `signQueue`, so whatever is still signing with it finishes first.
+    private func discardTemporarySignIn() {
+        guard let signIn = temporarySignIn else { return }
+        temporarySignIn = nil
+        let who = LogRedactor.maskAppleID(signIn.appleID)
+        signQueue.async {
+            do {
+                try FileManager.default.removeItem(at: signIn.folder)
+                Engine.shared.log("Side by Side: deleted the temporary folder \(who) signed in from, with its signing key and anisette identity.")
+            } catch let error as CocoaError where error.code == .fileNoSuchFile {
+                // Already gone.
+            } catch {
+                Engine.shared.log("⚠️ Side by Side: couldn't delete the temporary folder \(who) signed in from (\(error.localizedDescription)). SideInstaller deletes it the next time it opens.")
+            }
         }
     }
 
@@ -359,9 +400,11 @@ final class SideBySideManager: ObservableObject {
         showsSuccess = true
         let name = installedAppName ?? "SideInstaller"
         engine.log("✅ Side by Side done — \(name) is on their iPhone. One trust step left, on their side.")
-        // It pairs itself from there, so this iPhone has no more use for theirs.
+        // It pairs itself and signs itself in from there, so this iPhone has no
+        // more use for theirs, their Apple ID session or their signing key.
+        signOut()
         forgetTheirIPhone()
-        engine.log("Side by Side: forgot the pairing with their iPhone.")
+        engine.log("Side by Side: signed out and forgot the pairing with their iPhone.")
     }
 
     // MARK: - Step 0: Local Network permission
@@ -606,7 +649,19 @@ final class SideBySideManager: ObservableObject {
         // Anisette servers go down often, so with Auto on try each one before
         // giving up. A server picked in Settings is the only one tried.
         let servers = anisetteCandidates()
-        let dir = PrivateStore.isideload.path
+        // An Apple ID saved here is this iPhone's owner's, so it signs in from
+        // their own folder and keeps reusing their signing key and certificate.
+        // Anyone else's signs in from a temporary folder, deleted with the
+        // session, so their key doesn't stay on this iPhone.
+        let isSavedHere = AccountStore.shared.isSaved(id)
+        let dir: String
+        if isSavedHere {
+            discardTemporarySignIn()
+            engine.log("Side by Side: \(LogRedactor.maskAppleID(id)) is saved in Settings › Account, so it signs in with this iPhone's own signing key.")
+            dir = PrivateStore.isideload.path
+        } else {
+            dir = try temporarySignInFolder(for: id).path
+        }
         engine.twoFactorWasCancelled = false
         var failures = AnisetteServer.SignInFailures()
         var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
@@ -623,7 +678,14 @@ final class SideBySideManager: ObservableObject {
                 let summary = try await onSignQueue {
                     try self.performSignIn(id: id, pw: pw, anisette: anisette, dir: dir)
                 }
-                engine.anisetteSignedIn(anisette)
+                if isSavedHere {
+                    engine.anisetteSignedIn(anisette)
+                } else {
+                    // Not made the server tried first, as `anisetteSignedIn`
+                    // does with Auto on: the identity it kept is in the
+                    // temporary folder, not this iPhone's own.
+                    AnisetteServer.RecentFailures.clear(anisette)
+                }
                 signedInAs = id
                 engine.log("Side by Side: signed in (\(summary)).")
                 setStep(.signIn, .done)
@@ -698,6 +760,25 @@ final class SideBySideManager: ObservableObject {
             }
         }
         throw EngineError.message(engine.anisetteSignInFailure(failures))
+    }
+
+    /// The temporary folder `id` signs in from: the one made for it by an
+    /// earlier attempt, so a retry signs in as the same device, or a new one.
+    /// Another Apple ID's folder is deleted first.
+    @MainActor
+    private func temporarySignInFolder(for id: String) throws -> URL {
+        if let current = temporarySignIn, current.appleID.caseInsensitiveCompare(id) == .orderedSame {
+            return current.folder
+        }
+        discardTemporarySignIn()
+        do {
+            let folder = try PrivateStore.newPeerSignInFolder()
+            temporarySignIn = TemporarySignIn(appleID: id, folder: folder)
+            engine.log("Side by Side: \(LogRedactor.maskAppleID(id)) signs in from a new temporary folder, deleted once the app is on their iPhone or on Clear.")
+            return folder
+        } catch {
+            throw EngineError.message(error.localizedDescription)
+        }
     }
 
     /// One sign-in attempt against a specific anisette server. Uses the machine

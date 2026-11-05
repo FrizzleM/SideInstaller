@@ -26,6 +26,13 @@ All notable changes to SideInstaller are documented here.
   log posted to a GitHub issue could hold them. The log now says only how many bytes were read,
   the device library's protocol messages are left out unless Settings › Activity Log › Verbose
   logging is on, and any long run of numbers is taken out of the log, whatever wrote it.
+- **Side by Side no longer keeps the other person's signing key.** It signed their Apple ID in
+  with your iPhone's own sign-in files, so the private key for the certificate it made stayed on
+  your iPhone after the run. Their Apple ID now signs in from a temporary folder, deleted once
+  SideInstaller is on their iPhone, when you tap Clear their details or when the Apple ID changes;
+  one left by a run that was cut short goes the next time SideInstaller opens. An Apple ID saved
+  in Settings › Account still signs with your own key. Setting up the same person again now asks
+  Apple for a new certificate, since the old key is gone.
 
 ## 1.6.5
 
