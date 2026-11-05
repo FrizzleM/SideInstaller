@@ -20,6 +20,7 @@ let turkishStrings: [String: String] = [
     "Something went wrong": "Bir şeyler ters gitti",
     "an app by Frizzle": "Frizzle tarafından bir uygulama",
     "device": "cihaz",
+
     // MARK: - Welcome
 
     "I have accepted the": "Kabul ettim:",
@@ -29,6 +30,7 @@ let turkishStrings: [String: String] = [
     "You'll need a pairing file": "Bir eşleme dosyasına ihtiyacın olacak",
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "Bu iPhone iOS %@ çalıştırıyor. Yalnızca iOS %@ kendi kendine eşlenebilir, bu yüzden bilgisayarda — jitterbugpair veya pymobiledevice3 ile — bir eşleme dosyası oluşturup uygulamaya içe aktarman gerekir. SideInstaller adım adım gösterir.",
+
     // MARK: - Account setup & Settings › Account
 
     "Sign in with your Apple ID": "Apple kimliğinle oturum aç",
@@ -60,9 +62,11 @@ let turkishStrings: [String: String] = [
     "Open Settings with the gear at the top right.": "Sağ üstteki dişli ile Ayarlar'ı aç.",
     "Under Account, tap “Add Apple ID” and enter your email and password.":
         "Hesap altında “Apple kimliği ekle”ye dokun ve e-posta ile parolanı gir.",
+
     // MARK: - Tabs, Tools menu & two-factor prompt
 
     "Tools": "Araçlar",
+
     // MARK: - Tabs & two-factor prompt
 
     "Pairing": "Eşleme",
@@ -90,6 +94,7 @@ let turkishStrings: [String: String] = [
     "Sending a code to your devices…": "Cihazlarına kod gönderiliyor…",
     "Texting a code to %@…": "%@ numarasına kod mesajı gönderiliyor…",
     "Calling %@…": "%@ aranıyor…",
+
     // MARK: - Install tab
 
     "Tunnel connected": "Tünel bağlı",
@@ -122,7 +127,7 @@ let turkishStrings: [String: String] = [
     "Install stopped": "Yükleme durdu",
     "Close": "Kapat",
     "Yes": "Evet",
-    "No": "No",
+    "No": "Hayır",
     "Closing this popup will end the process. Are you sure?": "Bu pencereyi kapatmak işlemi sonlandırır. Emin misin?",
     "Cancel the install?": "Yükleme iptal edilsin mi?",
     "%@ is installed. Finish the trust step above to open it.": "%@ yüklendi. Açmak için yukarıdaki güven adımını tamamla.",
@@ -132,6 +137,7 @@ let turkishStrings: [String: String] = [
     "Step %@ of %@": "Adım %@ / %@",
     "Show all steps": "Tüm adımları göster",
     "Show fewer steps": "Daha az adım göster",
+
     // MARK: - LocalDevVPN
 
     "LocalDevVPN required": "LocalDevVPN gerekli",
@@ -146,6 +152,7 @@ let turkishStrings: [String: String] = [
     "Install LocalDevVPN from the App Store and open it.": "LocalDevVPN'i App Store'dan yükle ve aç.",
     "If GitHub is blocked where you are, use a VPN that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through.":
         "Bulunduğun yerde GitHub engelleniyorsa, trafiği de vekilleyebilen bir VPN kullan: iOS aynı anda tek VPN çalıştırır; yalnızca yerel bir tünel SideStore indirmeye yetmez.",
+
     // MARK: - Install steps
 
     "Connect the VPN": "VPN'e bağlan",
@@ -156,6 +163,7 @@ let turkishStrings: [String: String] = [
     "Use your imported IPA": "İçe aktardığın IPA'yı kullan",
     "Sign the app": "Uygulamayı imzala",
     "Finish setup": "Kurulumu bitir",
+
     // MARK: - Pairing tab
 
     "Pairing file ready": "Eşleme dosyası hazır",
@@ -197,6 +205,7 @@ let turkishStrings: [String: String] = [
         "%@ bir eşleme dosyası değil. Bilgisayarının oluşturduğu dosyayı seç — bu iPhone'un eşleme kaydını tutan .mobiledevicepairing veya .plist.",
     "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
         "iOS %@ kendi eşleme dosyasını oluşturamaz — bunun için iOS %@ gerekir. “Eşleme dosyası” altında bilgisayarda yapılmış birini içe aktar, sonra yeniden dene.",
+
     // MARK: - Pairing service status
 
     "not paired": "eşlenmedi",
@@ -215,6 +224,7 @@ let turkishStrings: [String: String] = [
         "Yerel Ağ izni kapalı. Ayarlar › SideInstaller › Yerel Ağ'dan aç, sonra yeniden dene.",
     "Pairing produced an empty file. Make sure you approved the pairing request, then try again.":
         "Eşleme boş bir dosya üretti. Eşleme isteğini onayladığından emin ol, sonra yeniden dene.",
+
     // MARK: - Certificates tab
 
     "Revoke this certificate?": "Bu sertifika iptal edilsin mi?",
@@ -251,6 +261,7 @@ let turkishStrings: [String: String] = [
     "SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it.":
         "SideInstaller yalnızca imzaladığı sertifikayı dışa aktarabilir ve bunların hiçbiri o değil: bir sertifikanın özel anahtarı, Apple'dan onu isteyen cihazda kalır.",
     "SideInstaller signs with this one": "SideInstaller bununla imzalıyor",
+
     // MARK: - SideStore's certificate (sidestore://certificate)
 
     "Use SideStore's certificate": "SideStore'un sertifikasını kullan",
@@ -270,9 +281,9 @@ let turkishStrings: [String: String] = [
     "SideStore isn't installed on this iPhone, so there's no certificate to get from it.":
         "Bu iPhone'da SideStore yüklü değil, bu yüzden ondan alınacak sertifika yok.",
     "Inside LiveContainer, SideStore can't send its certificate back to SideInstaller, and LiveContainer doesn't hold one yet. In LiveContainer's Settings, tap “Import Certificate From SideStore” (sign in to SideStore first if it has no certificate), then try again here.":
-        "LiveContainer içinde SideStore sertifikasını SideInstaller'a geri gönderemez ve LiveContainer henüz bir tane tutmuyor. LiveContainer Ayarları'nda “SideStore'dan Sertifika İçe Aktar”a dokun (sertifikası yoksa önce SideStore'da oturum aç), sonra burada yeniden dene.",
+        "LiveContainer içinde SideStore sertifikasını SideInstaller'a geri gönderemez ve LiveContainer henüz bir tane tutmuyor. LiveContainer'ın Ayarlar sekmesinde “Sertifikayı SideStore'dan içe aktar”a dokun (sertifikası yoksa önce SideStore'da oturum aç), sonra burada yeniden dene.",
     "The certificate LiveContainer holds for SideStore isn't one of this Apple ID's: it has been revoked, or it belongs to another Apple ID. Nothing was changed. If SideStore has made a new one since, tap “Refresh Certificate from SideStore” in LiveContainer's Settings, then try again here.":
-        "LiveContainer'ın SideStore için tuttuğu sertifika bu Apple kimliğine ait değil: iptal edilmiş veya başka bir kimliğe ait. Hiçbir şey değişmedi. SideStore o zamandan beri yeni bir tane oluşturduysa LiveContainer Ayarları'nda “SideStore'dan Sertifikayı Yenile”ye dokun, sonra burada yeniden dene.",
+        "LiveContainer'ın SideStore için tuttuğu sertifika bu Apple kimliğine ait değil: iptal edilmiş veya başka bir Apple kimliğine ait. Hiçbir şey değiştirilmedi. SideStore o zamandan beri yeni bir tane oluşturduysa LiveContainer'ın Ayarlar sekmesinde “Sertifikayı SideStore'dan yenile”ye dokun, sonra burada yeniden dene.",
     "SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.":
         "SideInstaller, SideStore'un sertifikasını LiveContainer'dan alır ve onunla da imzalar; böylece ücretsiz bir Apple kimliğinde iki uygulama birbirininkini iptal etmek zorunda kalmaz.",
     "Sign with this certificate?": "Bu sertifika ile imzalansın mı?",
@@ -281,6 +292,7 @@ let turkishStrings: [String: String] = [
     "Use it": "Kullan",
     "That link was meant to carry a signing certificate, but what it holds can't be read.":
         "Bu bağlantı bir imzalama sertifikası taşıyacaktı, ancak içeriği okunamıyor.",
+
     // MARK: - Location tab
 
     "Location spoofing": "Konum taklidi",
@@ -350,7 +362,7 @@ let turkishStrings: [String: String] = [
         "Rotalar OpenStreetMap'ten, © OpenStreetMap katkıda bulunanlar",
     "Speed limits are mapped for all of it.": "Hız sınırlarının tümü haritalanmış.",
     "Speed limits are mapped for %d%% of it; the rest is estimated.":
-        "Hız sınırlarının %%%d'i haritalanmış; geri kalanı tahmin.",
+        "Hız sınırlarının %%%d kadarı haritalanmış; geri kalanı tahmini.",
     "Average %@": "Ortalama %@",
     "Speed limit %@": "Hız sınırı %@",
     "No speed limit · going %@": "Hız sınırı yok · %@ ile gidiliyor",
@@ -369,24 +381,27 @@ let turkishStrings: [String: String] = [
         "Bu rota rota sunucusu için çok uzun. Kısalt veya böl.",
     "The route server is busy. Try again in a minute.": "Rota sunucusu meşgul. Bir dakika sonra yeniden dene.",
     "The route server couldn't plan this route (%@).": "Rota sunucusu bu rotayı planlayamadı (%@).",
+
     // MARK: - Entitlements tab
 
-    "Entitlements": "Entitlements",
+    "Entitlements": "Yetkiler",
     "Load apps": "Uygulamaları yükle",
     "%d App ID": "%d App ID",
-    "%d App IDs": "%d App IDs",
+    "%d App IDs": "%d App ID",
     "No App IDs": "App ID yok",
     "This Apple ID hasn't registered any apps yet. Install something with SideInstaller first, then come back.":
         "Bu Apple kimliği henüz hiç uygulama kaydetmemiş. Önce SideInstaller ile bir şey yükle, sonra dön.",
     "Memory and performance": "Bellek ve performans",
     "Other free capabilities": "Diğer ücretsiz yetenekler",
+    "Beta": "Beta",
     "Recommended": "Önerilen",
     "Select all": "Tümünü seç",
     "None": "Hiçbiri",
-    "Enable %d selected": "Seçilen %d'yi etkinleştir",
+    "Enable %d selected": "Seçilenleri etkinleştir (%d)",
     "Asking Apple": "Apple'a soruluyor",
     "%d of %d enabled": "%d / %d etkin",
     "Install the app again for these to take effect.": "Bunların geçerli olması için uygulamayı yeniden yükle.",
+
     // MARK: - Sideloaded apps tab
 
     "Sideloaded apps": "Yan yüklenen uygulamalar",
@@ -408,7 +423,7 @@ let turkishStrings: [String: String] = [
     "Nothing was refreshed.": "Hiçbir şey yenilenmedi.",
     "Refreshed %d of %d apps.": "%d / %d uygulama yenilendi.",
     "Refresh all apps?": "Tüm uygulamalar yenilensin mi?",
-    "Refresh all": "Yenile all",
+    "Refresh all": "Tümünü yenile",
     "%@ will be signed again with your Apple ID and installed over the copy on this device. It keeps its data, and its seven days start over.":
         "%@ Apple kimliğinle yeniden imzalanıp bu cihazdaki kopyanın üzerine yüklenecek. Verileri korunur ve yedi günü yeniden başlar.",
     "%d apps will be signed again with your Apple ID and installed over the copies on this device. They keep their data, and their seven days start over.":
@@ -418,23 +433,23 @@ let turkishStrings: [String: String] = [
     "%d apps can be signed again from IPAs already on this iPhone.":
         "%d uygulama, bu iPhone'da zaten bulunan IPA'lardan yeniden imzalanabilir.",
     "Reload": "Yeniden yükle",
-    "Waiting": "Bekleing",
+    "Waiting": "Bekliyor",
     "In progress": "Devam ediyor",
     "Failed": "Başarısız",
     "%d app here has no IPA in SideInstaller, so it can't be refreshed from this page. Refresh it in whatever installed it, or import its .ipa first.":
         "Buradaki %d uygulamanın SideInstaller'da IPA'sı yok, bu yüzden bu sayfadan yenilenemez. Onu yükleyen uygulamada yenile veya önce .ipa dosyasını içe aktar.",
     "%d apps here have no IPA in SideInstaller, so they can't be refreshed from this page. Refresh them in whatever installed them, or import their .ipa first.":
         "Buradaki %d uygulamanın SideInstaller'da IPA'sı yok, bu yüzden bu sayfadan yenilenemez. Onları yükleyen uygulamada yenile veya önce .ipa dosyalarını içe aktar.",
-    "%d app": "%d app",
-    "%d apps": "%d apps",
-    "%d app needs refreshing": "%d uygulamneeds yenileing",
-    "%d apps need refreshing": "%d uygulamas need yenileing",
-    "No sideloaded apps": "No sideloaded uygulamas",
+    "%d app": "%d uygulama",
+    "%d apps": "%d uygulama",
+    "%d app needs refreshing": "%d uygulamanın yenilenmesi gerekiyor",
+    "%d apps need refreshing": "%d uygulamanın yenilenmesi gerekiyor",
+    "No sideloaded apps": "Yan yüklenen uygulama yok",
     "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
         "Bu cihazda hiçbir şey sağlama profiliyle yüklenmemiş. App Store uygulamalarının süresi dolmaz, bu yüzden burada listelenmezler.",
     "No matching profile": "Eşleşen profil yok",
     "Expires today": "Bugün doluyor",
-    "Expires tomorrow": "Expires tomveyarow",
+    "Expires tomorrow": "Yarın doluyor",
     "Expires in %d days — %@": "%d gün içinde doluyor — %@",
     "Expired %@": "Süresi doldu %@",
     "Unused profiles": "Kullanılmayan profiller",
@@ -443,95 +458,97 @@ let turkishStrings: [String: String] = [
     "Bundle identifier": "Paket tanımlayıcı",
     "App ID": "App ID",
     "Version": "Sürüm",
-    "Profile name": "Prodosyname",
-    "Team": "Team",
-    "Team ID": "Takım kimliği",
+    "Profile name": "Profil adı",
+    "Team": "Ekip",
+    "Team ID": "Ekip kimliği",
     "Issued": "Verildi",
-    "Profile UUID": "ProdosyUUID",
+    "Profile UUID": "Profil UUID'si",
     "Capabilities": "Yetenekler",
     "Wildcard App ID — it covers any bundle id under it, and can't carry app-specific capabilities.":
         "Joker App ID — altındaki herhangi bir paket kimliğini kapsar ve uygulamaya özel yetenekler taşıyamaz.",
     "The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that.":
         "Cihazda bu App ID için sağlama profili yok. Uygulama zaten açılmayı bırakmış olabilir — düzeltmek için yeniden yükle.",
+
     // MARK: - Side by Side tool
 
     // The tool's name is left in English everywhere, as SideStore's is.
 
-    "Side by Side": "Yan yana",
-    "Pair with their iPhone": "Pair ile ir iPhone",
-    "Sign in to their Apple ID": "Onların Apple kimliği ile oturum aç",
+    "Side by Side": "Side by Side",
+    "Pair with their iPhone": "Diğer iPhone ile eşle",
+    "Sign in to their Apple ID": "iPhone sahibinin Apple kimliğiyle oturum aç",
     "Download SideInstaller": "SideInstaller'ı indir",
-    "Install on their iPhone": "Yükle on ir iPhone",
+    "Install on their iPhone": "Diğer iPhone'a yükle",
     "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
         "“%@” bir IPv4 adresi değil. 192.168.1.42 gibi görünmeli.",
     "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
-        "%@ bu iPhone'un zaten sahip olduğu bir adres. Yan yana başkasının iPhone'una yükler — onunkini kullan. Buna yüklemek için Yükle sekmesini kullan.",
+        "%@ bu iPhone'un zaten sahip olduğu bir adres. Side by Side başkasının iPhone'una yükler — onunkini kullan. Buna yüklemek için Yükle sekmesini kullan.",
     "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the Install tab.":
-        "iPhone şu paired was bu one. Pair şuradir iPhone's Ayarlar instead. To yükle on bu iPhone, use Yükle tab.",
+        "Eşlenen iPhone bu iPhone'du. Bunun yerine diğer iPhone'un Ayarlar'ından eşle. Bu iPhone'a yüklemek için Yükle sekmesini kullan.",
     "Enter the Apple ID to sign with, and its password.": "İmzalamak için Apple kimliğini ve parolasını gir.",
     "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
         "Wi-Fi kapalı. Bunun çalışması için her iki iPhone'un da aynı Wi-Fi ağında olması gerekir.",
     "The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute.":
-        "release indir değildi IPA. GitHub may be returning hatpage — yeniden dene in minute.",
+        "İndirilen sürüm bir IPA değildi. GitHub bir hata sayfası döndürüyor olabilir — bir dakika sonra yeniden dene.",
     "Couldn't download the latest SideInstaller release: %@": "En son SideInstaller sürümü indirilemedi: %@",
     "No SideInstaller IPA downloaded.": "SideInstaller IPA indirilmedi.",
     "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first — with the Certificates tool if this is the Apple ID saved in Settings › Account, and at developer.apple.com signed in as it otherwise.":
         "Apple bu Apple kimliği için imzalama sertifikası vermiyor: zaten bir tane olduğunu bildiriyor (hata 7460). Önce birinin iptal edilmesi gerekir — bu Ayarlar › Hesap'ta kayıtlı Apple kimliğiyse Sertifikalar aracıyla; değilse developer.apple.com'da o hesapla oturum açarak.",
     "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
-        "Apple onların iPhone'unu bu Apple kimliğinin geliştirici ekibine kaydetmedi, bu yüzden sağlama profili vermiyor. %@",
-    "No pair record for their iPhone.": "No pair recveyad için ir iPhone.",
-    "The link to their iPhone dropped — start again.": "bağlantı to ir iPhone dropped — start yeniden.",
+        "Apple diğer iPhone'u bu Apple kimliğinin geliştirici ekibine kaydetmedi, bu yüzden sağlama profili vermiyor. %@",
+    "No pair record for their iPhone.": "Diğer iPhone için eşleme kaydı yok.",
+    "The link to their iPhone dropped — start again.": "Diğer iPhone ile bağlantı koptu — yeniden başla.",
     "Set up someone else's iPhone": "Başkasının iPhone'unu kur",
-    "Same Wi-Fi network": "Same Wi-Fi ağ",
+    "Same Wi-Fi network": "Aynı Wi-Fi ağı",
     "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
-        "Onların iPhone'u iOS %@ gerektirir — SideInstaller yüklendikten sonra kendini eşler; daha eskisi eşlenemez.",
-    "Their iPhone": "ir iPhone",
+        "Diğer iPhone'da iOS %@ gerekir — SideInstaller yüklendikten sonra kendini eşler, daha eski bir sürüm bunu yapamaz.",
+    "Their iPhone": "Diğer iPhone",
     "IP address (optional)": "IP adresi (isteğe bağlı)",
     "Optional: leave it empty, and it fills in when their iPhone pairs.":
-        "Optional: leave it empty, ve it fills in when ir iPhone pairs.",
+        "İsteğe bağlı: boş bırakırsan diğer iPhone eşlendiğinde kendiliğinden dolar.",
     "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
-        "On ir iPhone: Ayarlar › Wi-Fi › ⓘ next to ağ, sonr“IP Ekleress”.",
-    "This iPhone is %@, so theirs will look similar.": "Bu iPhone is %@, so irs will look similar.",
+        "Diğer iPhone'da: Ayarlar › Wi-Fi › ağın yanındaki ⓘ, sonra “IP Adresi”.",
+    "This iPhone is %@, so theirs will look similar.": "Bu iPhone'un adresi %@; diğerininki de buna benzer olur.",
     "Apple ID to sign with": "İmzalamak için Apple kimliği",
     "Tip: Use the iPhone/iPad owner's Apple account credentials": "İpucu: iPhone/iPad sahibinin Apple hesap bilgilerini kullan",
     "Use my saved Apple ID instead": "Bunun yerine kayıtlı Apple kimliğimi kullan",
     "Steps": "Adımlar",
-    "Waiting for them to tap Trust…": "Bekleing için m to tap Trust…",
-    "Waiting for them to pair in Settings…": "Bekleing için m to pair in Ayarlar…",
-    "Waiting for them to enter the code…": "Bekleing için m to enter code…",
-    "Pair their iPhone in Settings": "Pair ir iPhone in Ayarlar",
+    "Waiting for them to tap Trust…": "Diğer iPhone'da Güven'e dokunulması bekleniyor…",
+    "Waiting for them to pair in Settings…": "Diğer iPhone'un Ayarlar'da eşlenmesi bekleniyor…",
+    "Waiting for them to enter the code…": "Diğer iPhone'da kodun girilmesi bekleniyor…",
+    "Pair their iPhone in Settings": "Diğer iPhone'u Ayarlar'da eşle",
     "Their iPhone won't ask by itself — pairing starts from its Settings.":
-        "ir iPhone yapmayacak ask by itself — eşleme starts şuradits Ayarlar.",
+        "Diğer iPhone kendiliğinden sormaz — eşleme onun Ayarlar'ından başlar.",
     "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
-        "On ir iPhone, aç Ayarlar › Privacy & Security › Developer Mode.",
+        "Diğer iPhone'da Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'nu aç.",
     "Tap “Pair with %@”.": "“%@ ile eşle”ye dokun.",
-    "Enter their iPhone’s passcode if it asks for it.": "Enter ir iPhone’s passcode if it asks için it.",
+    "Enter their iPhone’s passcode if it asks for it.": "Sorarsa diğer iPhone'un parolasını gir.",
     "Type the code that appears here into the prompt on their iPhone.":
-        "Type code şu uygulamaears buradinto prompt on ir iPhone.",
-    "Type this into the prompt on their iPhone.": "Type bu into prompt on ir iPhone.",
+        "Burada görünen kodu diğer iPhone'daki istem alanına yaz.",
+    "Type this into the prompt on their iPhone.": "Bunu diğer iPhone'daki istem alanına yaz.",
     "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
-        "y tuygulamaed “YapmTrust” on ir iPhone. Start yeniden, ve have m tap Trust.",
+        "Diğer iPhone'da “Güvenme”ye dokunuldu. Yeniden başla ve bu kez Güven'e dokunulmasını iste.",
     "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
         "SideInstaller zaten bir iPhone'un eşlenmesini bekliyor — Yükle sekmesinden, Eşleme sayfasından veya buradaki önceki bir denemeden. O eşlemeyi bitir veya SideInstaller'ı kapatıp aç, sonra yeniden dene.",
-    "Pairing with their iPhone didn't finish: %@": "Eşleme ile ir iPhone yapmadı bitir: %@",
+    "Pairing with their iPhone didn't finish: %@": "Diğer iPhone ile eşleme tamamlanmadı: %@",
     "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
-        "ir iPhone at %@ refused bağlantı. It only accepts one while Developer Mode is on, ve iOS asks to confirm Developer Mode yeniden after every restart: on ir iPhone, turn it on under Ayarlar › Privacy & Security › Developer Mode, sonryeniden dene.",
+        "%@ adresindeki diğer iPhone bağlantıyı reddetti. Yalnızca Geliştirici Modu açıkken bağlantı kabul eder ve iOS her yeniden başlatmadan sonra Geliştirici Modu'nu yeniden onaylatır: diğer iPhone'da Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'ndan aç, sonra yeniden dene.",
     "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
-        "Onların iPhone'una %@ adresinden ulaşılamadı. Adresi kontrol et (onların iPhone'unda Ayarlar › Wi-Fi › ⓘ), her iki iPhone'un aynı Wi-Fi ağında olduğunu ve bu iPhone'un Ayarları'nda SideInstaller için Yerel Ağ'ın açık olduğunu doğrula. Misafir ve genel ağlar cihazların birbirine ulaşmasını sıkça engeller.",
-    "The link to their iPhone didn't come up: %@": "bağlantı to ir iPhone yapmadı come up: %@",
-    "%d%% downloaded": "%d%% indired",
+        "Diğer iPhone'a %@ adresinden ulaşılamadı. Adresi (diğer iPhone'da Ayarlar › Wi-Fi › ⓘ), iki iPhone'un aynı Wi-Fi ağında olduğunu ve bu iPhone'un Ayarlar'ında SideInstaller için Yerel Ağ'ın açık olduğunu kontrol et. Misafir ve genel ağlar cihazların birbirine ulaşmasını sıkça engeller.",
+    "The link to their iPhone didn't come up: %@": "Diğer iPhone ile bağlantı kurulamadı: %@",
+    "%d%% downloaded": "%%%d indirildi",
     "%d%% uploaded": "%%%d yüklendi",
-    "Start the install": "Start yükle",
-    "Install again": "Yükle yeniden",
-    "Clear their details": "Onların ayrıntılarını temizle",
+    "Start the install": "Yüklemeyi başlat",
+    "Install again": "Yeniden yükle",
+    "Clear their details": "Diğer iPhone'un bilgilerini temizle",
     "This iPhone is still paired with theirs. Clearing forgets it.":
-        "Bu iPhone hâlâ onunki ile eşli. Temizlemek bunu unutturur.",
-    "Last step: they trust %@": "Last step: y trust %@",
+        "Bu iPhone hâlâ diğer iPhone ile eşli. Temizlersen bu eşleme unutulur.",
+    "Last step: they trust %@": "Son adım: diğer iPhone'da %@ için güven",
     "On their iPhone: Settings › General › VPN & Device Management.":
-        "On ir iPhone: Ayarlar › General › VPN & Cihaz Management.",
+        "Diğer iPhone'da: Ayarlar › Genel › VPN ve Aygıt Yönetimi.",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
         "“Geliştirici Uygulaması” altındaki Apple kimliğine dokun, sonra Güven'e dokun.",
-    "Open it from their Home Screen — they're set up.": "Aç it şuradir Home Screen — y're set up.",
+    "Open it from their Home Screen — they're set up.": "Diğer iPhone'da uygulamayı Ana Ekran'dan aç — kurulum tamam.",
+
     // MARK: - Settings
 
     "Settings": "Ayarlar",
@@ -543,34 +560,34 @@ let turkishStrings: [String: String] = [
     "Auto": "Otomatik",
     // The Tunnel section: starting LocalDevVPN from here.
 
-    "Tunnel": "Tunnel",
+    "Tunnel": "Tünel",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "%@:%d adresindeki bir şey bağlantıyı reddetti; tünel trafik taşıyor — cihaz yalnızca eşleme bağlantı noktasında dinlemiyor. Bu bağlantı noktası yalnızca Geliştirici Modu açıkken açılır ve iOS her yeniden başlatmadan sonra yeniden ister: Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'ndan aç, sonra yeniden dene. Zaten açıksa “Eşleme dosyası” altında bu iPhone'u yeniden eşle.",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port: Developer Mode is off. Turn it on under Settings › Privacy & Security › Developer Mode (the iPhone restarts), then try again.":
-        "Something at %@:%d refused bağlantı, so tunnel is carrying traffic, but bu iPhone değil listening on its eşleme pveyat: Developer Mode is off. Turn it on under Ayarlar › Privacy & Security › Developer Mode ( iPhone restarts), sonryeniden dene.",
+        "%@:%d adresindeki bir şey bağlantıyı reddetti; yani tünel trafik taşıyor, ama bu iPhone eşleme bağlantı noktasını dinlemiyor: Geliştirici Modu kapalı. Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'ndan aç (iPhone yeniden başlar), sonra yeniden dene.",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
-        "Something at %@:%d refused bağlantı, so tunnel is carrying traffic, but bu iPhone değil listening on its eşleme pveyat, although Developer Mode is on. Pair bu iPhone yeniden under “Eşleme dosyası”, sonryeniden dene. If it still fails, restart iPhone.",
+        "%@:%d adresindeki bir şey bağlantıyı reddetti; yani tünel trafik taşıyor, ama Geliştirici Modu açık olduğu hâlde bu iPhone eşleme bağlantı noktasını dinlemiyor. “Eşleme dosyası” altında bu iPhone'u yeniden eşle, sonra yeniden dene. Yine olmazsa iPhone'u yeniden başlat.",
     "Start LocalDevVPN when needed": "Gerektiğinde LocalDevVPN'i başlat",
     "Start LocalDevVPN now": "LocalDevVPN'i şimdi başlat",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "LocalDevVPN yüklü değil. App Store'dan al; bu senin için başlatabilir.",
     "Downloaded IPAs": "İndirilen IPA'lar",
     "%@ used": "%@ kullanıldı",
-    "imported": "içe aktared",
+    "imported": "içe aktarıldı",
     "No downloaded IPAs. Ones you install from the Install tab are cached here.":
         "İndirilmiş IPA yok. Yükle sekmesinden yüklediklerin burada önbelleğe alınır.",
-    "Downloaded %@": "İndired %@",
-    "Added %@": "Ekleed %@",
-    "Delete this download?": "Sil bu indir?",
+    "Downloaded %@": "İndirildi: %@",
+    "Added %@": "Eklendi: %@",
+    "Delete this download?": "Bu indirme silinsin mi?",
     "Delete": "Sil",
     "“%@” (%@) will be removed. You can download it again any time from the Install tab.":
         "“%@” (%@) kaldırılacak. Yükle sekmesinden istediğin zaman yeniden indirebilirsin.",
-    "Couldn't delete %@: %@": "Yapılamadı sil %@: %@",
+    "Couldn't delete %@: %@": "%@ silinemedi: %@",
     "Server": "Sunucu",
     "Custom…": "Özel…",
     "Server URL": "Sunucu URL",
     "Anisette Server": "Anisette sunucusu",
-    "Starts with %@": "Starts ile %@",
+    "Starts with %@": "%@ ile başlar",
     "Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.":
         "Otomatik, en son oturum açılan sunucuyla başlar, sonra diğerlerini dener; önce çalışması en olası olanları dener.",
     "Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others.":
@@ -586,23 +603,24 @@ let turkishStrings: [String: String] = [
     "Developer Mode": "Geliştirici Modu",
     "Show Developer Mode in Settings": "Ayarlar'da Geliştirici Modu'nu göster",
     "Turn on Developer Mode": "Geliştirici Modu'nu aç",
-    "Asking this iPhone…": "Asking bu iPhone…",
+    "Asking this iPhone…": "Bu iPhone'a soruluyor…",
     "Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there.":
         "İkisi de bu iPhone'a zaten çalışan bir bağlantı ister: LocalDevVPN artı bir eşleme dosyası (örneğin iOS 17.4–26'da içe aktarılmış biri). iOS 27'de bağlantının kendisi Geliştirici Modu ister; bu yüzden orada eksik bir seçeneği geri getiremezler.",
     "Turn on Developer Mode?": "Geliştirici Modu açılsın mı?",
-    "Turn On and Restart": "Turn On ve Restart",
+    "Turn On and Restart": "Aç ve yeniden başlat",
     "This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode.":
         "Bu iPhone hemen yeniden başlar. Kilit açtıktan sonra görünen uyarıda Aç'a dokun. iOS bunu yalnızca iPhone'da parola yokken izin verir.",
     "Developer Mode is already on.": "Geliştirici Modu zaten açık.",
     "Developer Mode now shows under Settings › Privacy & Security, near the bottom. Turn it on there, and iOS restarts to finish.":
         "Geliştirici Modu artık Ayarlar › Gizlilik ve Güvenlik'te, altlara doğru görünür. Oradan aç; bitirmek için iOS yeniden başlar.",
     "Developer Mode is set to turn on, and this iPhone restarts now. Once you unlock it, tap Turn On.":
-        "Developer Mode is set to turn on, ve bu iPhone restarts now. Once you unlock it, tap Turn On.",
+        "Geliştirici Modu açılmaya ayarlandı ve bu iPhone şimdi yeniden başlıyor. Kilidi açınca Aç'a dokun.",
     "An install is already running. Wait for it to finish, then try again.":
         "Bir yükleme zaten sürüyor. Bitmesini bekle, sonra yeniden dene.",
     "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
         "iOS, Geliştirici Modu'nu buradan yalnızca bu iPhone'da parola yokken açar. Bunun yerine “Ayarlar'da Geliştirici Modu'nu göster”e dokunup oradan aç.",
-    "This iPhone didn't take the Developer Mode request: %@": "Bu iPhone yapmadı take Developer Mode request: %@",
+    "This iPhone didn't take the Developer Mode request: %@": "Bu iPhone Geliştirici Modu isteğini kabul etmedi: %@",
+
     // MARK: - Release channels & downloads
 
     "Stable": "Kararlı",
@@ -614,27 +632,28 @@ let turkishStrings: [String: String] = [
     "Latest (%@)": "En son (%@)",
     "Couldn't load the other versions: %@": "Diğer sürümler yüklenemedi: %@",
     "Try again": "Yeniden dene",
-    "couldn't find the IPA in the %@ %@ release": "yapılamadı find IPin %@ %@ release",
-    "%@ has no %@ release right now": "%@ şu anda %@ sürümüne sahip değil",
+    "couldn't find the IPA in the %@ %@ release": "%@ %@ sürümünde IPA bulunamadı",
+    "%@ has no %@ release right now": "%@ için şu anda %@ sürüm yok",
     "bad asset URL": "geçersiz varlık adresi",
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
-        "GitHub is rate-limiting bu ağ — it değil blocked, ve limit clears itself. Yeniden dene %@.",
+        "GitHub bu ağa hız sınırı uyguluyor — engellenmiş değil ve sınır kendiliğinden kalkar. %@ yeniden dene.",
     "GitHub answered HTTP %d%@": "GitHub HTTP %d%@ yanıtladı",
     "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
-        "GitHub değil serving %@ right now — repositveyay has been taken down, moved veymade private, so var nothing to indir. Nothing is wrong ile bu iPhone veyits ağ.",
-    "couldn't reach GitHub: %@": "yapılamadı reach GitHub: %@",
+        "GitHub şu anda %@ deposunu sunmuyor — depo kaldırılmış, taşınmış veya gizli yapılmış, bu yüzden indirilecek bir şey yok. Bu iPhone'da veya ağında bir sorun yok.",
+    "couldn't reach GitHub: %@": "GitHub'a ulaşılamadı: %@",
     "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
-        "GitHub's answer değildi release iniçinmation (%@) — something on bu ağ may have replaced it.",
+        "GitHub'ın yanıtı sürüm bilgisi değildi (%@) — bu ağdaki bir şey onu değiştirmiş olabilir.",
     "what downloaded as %@ isn't an IPA — something on this network returned a page instead, or the transfer stopped partway.":
         "%@ olarak inen şey bir IPA değil — bu ağda bir sayfa döndü veya aktarım yarıda kaldı.",
     "that link answered HTTP %d — it isn't a direct download, or it needs a sign-in.":
-        "şu bağlantı answered HTTP %d — it değil direct indir, veyit needs sign-in.",
+        "bu bağlantı HTTP %d yanıtı verdi — doğrudan indirme değil ya da oturum açmayı gerektiriyor.",
     "GitHub has no build of %@'s %@ branch to download right now.":
         "GitHub'da şu an %@ dalının %@ derlemesi indirilecek durumda değil.",
     "couldn't download %@ through nightly.link, which passes on GitHub's builds: %@":
         "GitHub derlemelerini ileten nightly.link üzerinden %@ indirilemedi: %@",
     "the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.":
         "Gelen %@ derlemesi GitHub'ın kaydettiği dosya değil, bu yüzden yüklenmedi. Daha sonra yeniden dene.",
+
     // MARK: - Engine failures
 
     "Two-factor verification was cancelled.": "İki adımlı doğrulama iptal edildi.",
@@ -671,9 +690,9 @@ let turkishStrings: [String: String] = [
         "Parolanın doğru olduğundan eminsen Apple oturum açma denemelerini sınırlıyor olabilir: yeniden denemeden önce bir süre bekle.",
     "Apple has locked this Apple Account for security reasons (error -20209), so every sign-in fails until it's unlocked. Reset its password at iforgot.apple.com, then sign in again with the new password.":
         "Apple güvenlik nedeniyle bu Apple Hesabını kilitledi (hata -20209); kilit açılana kadar her oturum açma başarısız olur. Parolasını iforgot.apple.com'da sıfırla, sonra yeni parolayla yeniden oturum aç.",
-    "the anisette server": "anisette sunucu",
-    "all %d anisette servers": "all %d anisette sunucus",
-    "%d anisette servers (%d skipped)": "%d anisette sunucus (%d skipped)",
+    "the anisette server": "anisette sunucusu",
+    "all %d anisette servers": "tüm %d anisette sunucusu",
+    "%d anisette servers (%d skipped)": "%d anisette sunucusu (%d atlandı)",
     "Not signed in.": "Oturum açılmadı.",
     "No SideStore IPA downloaded.": "SideStore IPA indirilmedi.",
     "Signing failed: %@": "İmzalama başarısız: %@",
@@ -691,28 +710,28 @@ let turkishStrings: [String: String] = [
         "%@ bir IPA değil. .ipa dosyasının kendisini seç — doğru görünüyorsa indirme hata sayfası kaydetmiş veya yarıda kalmış olabilir.",
     "No IPA imported yet. Tap “Import .ipa” and pick one.":
         "Henüz IPA içe aktarılmadı. “.ipa içe aktar”a dokun ve bir tane seç.",
-    "Couldn't import %@: %@": "Yapılamadı içe aktar %@: %@",
+    "Couldn't import %@: %@": "%@ içe aktarılamadı: %@",
     "That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.":
         "Bu, SideInstaller'ın indirebileceği bir bağlantı değil. .ipa'nın indirildiği tam https:// adresini yapıştır.",
     "That link didn't return an IPA. It has to download the file itself — a page that only links to the .ipa, or one that asks you to sign in first, arrives here as a web page.":
-        "Şu bağlantı yapmadı return IPA. It has to indir dosyitself — page şu only bağlantıs to .ipa, veyone şu asks you to sign in önce, arrives buradas web page.",
-    "Couldn't download that link: %@": "Yapılamadı indir şu bağlantı: %@",
+        "Bu bağlantı bir IPA döndürmedi. Dosyanın kendisini indirmesi gerekir — yalnızca .ipa'ya bağlantı veren ya da önce oturum açmanı isteyen bir sayfa buraya web sayfası olarak gelir.",
+    "Couldn't download that link: %@": "Bu bağlantı indirilemedi: %@",
     "there's nothing to download for a custom IPA — import one first":
-        "var nothing to indir için custom IP— içe aktar one önce",
-    "your app": "senin uygulama",
+        "özel IPA için indirilecek bir şey yok — önce bir tane içe aktar",
+    "your app": "uygulaman",
     "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists, or that a request for one is still pending (error 7460). SideInstaller couldn't reuse the certificate that's already there, so it stopped instead of replacing it. See the steps above.":
         "Apple bu Apple kimliği için imzalama sertifikası vermiyor: zaten bir tane olduğunu veya isteğin hâlâ beklemede olduğunu bildiriyor (hata 7460). SideInstaller oradaki sertifikayı yeniden kullanamadı, bu yüzden değiştirmek yerine durdu. Yukarıdaki adımlara bak.",
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "Bu iPhone%@ Apple kimliğinin geliştirici ekibine kaydedilemedi; Apple sağlama profili vermiyor. %@ — yukarıdaki adımlara bak.",
     "Connect to Wi-Fi": "Wi-Fi'ye bağlan",
-    "Open Settings › Wi-Fi and join a network.": "Aç Ayarlar › Wi-Fi ve join ağ.",
+    "Open Settings › Wi-Fi and join a network.": "Ayarlar › Wi-Fi'yi aç ve bir ağa katıl.",
     "Then come back here — this continues automatically.": "Sonra buraya dön — bu otomatik devam eder.",
-    "Tap Connect so the toggle turns on.": "Tap Connect so toggle turns on.",
+    "Tap Connect so the toggle turns on.": "Anahtarın açılması için Connect'e dokun.",
     "Keep Wi-Fi on, then come back here — this continues automatically.":
         "Wi-Fi'yi açık tut, sonra buraya dön — bu otomatik devam eder.",
     "Get LocalDevVPN": "LocalDevVPN al",
-    "Import an .ipa first": "İçe aktar .ipönce",
+    "Import an .ipa first": "Önce bir .ipa içe aktar",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
         "Yukarıda “.ipa içe aktar”a dokun ve dosyayı seç — Dosyalar uygulamasının erişebildiği her yerde olabilir; iCloud Drive veya USB sürücü dahil.",
     "Or paste a direct download link under that button, and SideInstaller fetches the .ipa itself.":
@@ -722,27 +741,27 @@ let turkishStrings: [String: String] = [
     "Or copy it into Files › On My iPhone › SideInstaller, where SideInstaller also finds it.":
         "Veya Dosyalar › iPhone'umda › SideInstaller'a kopyala; SideInstaller orada da bulur.",
     "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
-        "Bu is way in wburadGitHub is blocked: fetch IPon any cihaz, bring it over, ve yükle it burada.",
-    "Bring the .ipa yourself": "Bring .ipseninself",
+        "GitHub'ın engellendiği yerlerde yol bu: IPA'yı herhangi bir cihazda indir, buraya getir ve buradan yükle.",
+    "Bring the .ipa yourself": ".ipa'yı kendin getir",
     "%@ can't be downloaded while its GitHub repository is offline. The other apps still install as usual.":
-        "%@ yapılamaz be indired while its GitHub repositveyay is offline. or uygulamas still yükle as usual.",
+        "%@, GitHub deposu çevrimdışıyken indirilemez. Diğer uygulamalar her zamanki gibi yüklenir.",
     "To install it anyway, get its .ipa from somewhere you trust, name it %@, and copy it into Files › On My iPhone › SideInstaller.":
         "Yine de yüklemek için .ipa'sını güvendiğin bir yerden al, adını %@ koy ve Dosyalar › iPhone'umda › SideInstaller'a kopyala.",
     "Then tap Install again — SideInstaller uses your file instead of downloading one.":
         "Sonra Yükle'ye yeniden dokun — SideInstaller indirmek yerine senin dosyanı kullanır.",
     "If you reach GitHub through a VPN or proxy app, turn off LocalDevVPN and turn that one on: iOS runs only one VPN at a time.":
-        "If you reach GitHub through VPN veyproxy uygulama, turn off LocalDevVPN ve turn şu one on: iOS runs only one VPN at time.",
+        "GitHub'a bir VPN veya proxy uygulamasıyla ulaşıyorsan LocalDevVPN'i kapat ve onu aç: iOS aynı anda yalnızca bir VPN çalıştırır.",
     "Tap “Get the .ipa” below and save the file, or download it on another device and bring it over.":
         "Aşağıda “.ipa'yı al”a dokunup dosyayı kaydet veya başka cihazda indirip buraya getir.",
     "Back in SideInstaller, pick Custom .ipa under Install, tap “Import .ipa” and choose the file. SideInstaller recognizes %@ and sets it up just like its own download.":
         "SideInstaller'a dön, Yükle altında Özel .ipa'yı seç, “.ipa içe aktar”a dokun ve dosyayı seç. SideInstaller %@ olarak tanır ve kendi indirmesi gibi kurar.",
     "Turn LocalDevVPN back on, then tap Install.": "LocalDevVPN'i yeniden aç, sonra Yükle'ye dokun.",
-    "Get the .ipa": "Get .ipa",
-    "Pair this iPhone in Settings": "Pair bu iPhone in Ayarlar",
+    "Get the .ipa": ".ipa'yı al",
+    "Pair this iPhone in Settings": "Bu iPhone'u Ayarlar'da eşle",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
-        "Aç Ayarlar uygulama, sonrgo to Privacy & Security › Developer Mode.",
+        "Ayarlar uygulamasını aç, sonra Gizlilik ve Güvenlik › Geliştirici Modu'na git.",
     "Tap “Pair with SideInstaller”.": "“SideInstaller ile eşle”ye dokun.",
-    "Enter your iPhone’s passcode if it asks for it.": "Enter senin iPhone’s passcode if it asks için it.",
+    "Enter your iPhone’s passcode if it asks for it.": "Sorarsa iPhone'unun parolasını gir.",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "SideInstaller'a dön, gösterdiği kodu oku, sonra aynı kodu Ayarlar'daki istem alanına yaz.",
     "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
@@ -757,12 +776,12 @@ let turkishStrings: [String: String] = [
     "Tap to return to SideInstaller.": "SideInstaller'a dönmek için dokun.",
     // The install's progress outside the app
 
-    "Installing %@": "Yükleing %@",
+    "Installing %@": "%@ yükleniyor",
     "Paused": "Duraklatıldı",
     "Open SideInstaller to finish the install.": "Yüklemeyi bitirmek için SideInstaller'ı aç.",
     "Check the App IDs it needs, then tap Install.": "İhtiyacı olan App ID'leri kontrol et, sonra Yükle'ye dokun.",
     "Tap Trust": "Güven'e dokun",
-    "Unlock this iPhone and tap Trust when it asks.": "Unlock bu iPhone ve tap Trust when it asks.",
+    "Unlock this iPhone and tap Trust when it asks.": "Bu iPhone'un kilidini aç ve sorduğunda Güven'e dokun.",
     "A signing certificate already exists": "Bir imzalama sertifikası zaten var",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple hata 7460 döndürdü: bu Apple kimliğinde zaten bir iOS geliştirici sertifikası var veya isteği hâlâ beklemede.",
@@ -774,6 +793,7 @@ let turkishStrings: [String: String] = [
         "İptal kalıcıdır: o sertifikayla imzalanmış her uygulama, her cihazda açılmayı bırakır.",
     "Alternatively, sign in with a different (or spare) Apple ID above, then tap Install again.":
         "Alternatif olarak yukarıda farklı (veya yedek) bir Apple kimliğiyle oturum aç, sonra Yükle'ye yeniden dokun.",
+
     // MARK: - Guide cards
 
     // Guide: reset a locked Apple Account
@@ -785,8 +805,8 @@ let turkishStrings: [String: String] = [
         "iForgot'u aç, bu Apple Hesabının e-postasını gir ve kilidi açıp parolayı sıfırlamak için Apple'ın adımlarını izle.",
     "Back in SideInstaller, open Settings › Account, swipe left on this Apple ID, tap Edit, and enter the new password.":
         "SideInstaller'a dön, Ayarlar › Hesap'ı aç, bu Apple kimliğinde sola kaydır, Düzenle'ye dokun ve yeni parolayı gir.",
-    "Then tap Install again.": "Sonrtap Yükle yeniden.",
-    "Open iForgot": "Aç iİçingot",
+    "Then tap Install again.": "Sonra Yükle'ye yeniden dokun.",
+    "Open iForgot": "iForgot'u aç",
     "Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.":
         "Apple, hesap sahibinin yaşı nedeniyle bu Apple Hesabının geliştirici hizmetlerini kullanmasına izin vermiyor (hata 1102). Bunun yerine bir yetişkinin Apple Hesabıyla oturum aç.",
     "This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
@@ -813,27 +833,27 @@ let turkishStrings: [String: String] = [
         "Daha erken silinemezler. Bazılarının süresi dolana kadar bekle, sonra Yükle'ye yeniden dokun.",
     "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
         "Veya Ayarlar › Hesap'ta farklı (veya yedek) bir Apple kimliğiyle oturum aç, sonra Yükle'ye yeniden dokun.",
-    "Three sideloaded apps already": "Three sideloaded uygulamas already",
+    "Three sideloaded apps already": "Zaten üç yan yüklenmiş uygulama var",
     "iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth.":
         "iOS bir iPhone'da ücretsiz Apple kimliğiyle imzalanmış en fazla üç uygulamaya izin verir ve dördüncüyü reddetti.",
     "Expired apps count too. Delete one you no longer need from the Home Screen.":
-        "Expired uygulamas count too. Sil one you no longer need şurad Home Screen.",
+        "Süresi dolmuş uygulamalar da sayılır. Artık ihtiyacın olmayan birini Ana Ekran'dan sil.",
     // Guide: import a pairing file
 
-    "Import a pairing file": "İçe aktar eşleme dosyası",
+    "Import a pairing file": "Bir eşleme dosyası içe aktar",
     "iOS %@ is the first version an iPhone can pair with itself on. On this one the pairing file has to be made on a computer.":
-        "iOS %@ is önce version iPhone cpair ile itself on. On bu one eşleme dosyası has to be made on computer.",
+        "iOS %@, bir iPhone'un kendi kendine eşlenebildiği ilk sürüm. Bu iPhone'da eşleme dosyasının bir bilgisayarda oluşturulması gerekir.",
     "On a Mac, Windows PC or Linux box, plug this iPhone in, trust the computer, and run jitterbugpair (or “pymobiledevice3 lockdown pair”).":
         "Mac, Windows PC veya Linux bilgisayarda bu iPhone'u bağla, bilgisayara güven ve jitterbugpair (veya “pymobiledevice3 lockdown pair”) çalıştır.",
     "Send the file it writes — a .mobiledevicepairing or .plist — to this iPhone, by AirDrop, iCloud Drive or a cable.":
-        "Send dosyit writes — .mobilecihazeşleme vey.plist — to bu iPhone, by AirDrop, iCloud Drive veycable.",
+        "Oluşturduğu dosyayı — bir .mobiledevicepairing veya .plist — AirDrop, iCloud Drive ya da kabloyla bu iPhone'a gönder.",
     "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
         "Buraya dön, “Eşleme dosyasını içe aktar”a dokun ve dosyayı seç. Ondan sonrası iOS %@ üzerindeki gibi çalışır.",
     "Get jitterbugpair": "jitterbugpair al",
     "From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.":
-        "ŞuradiOS 26.4 on it has to be remote eşleme dosyası: bu iPhone hangs up on lockdown ones, like jitterbugpair's, when y come through LocalDevVPN.",
+        "iOS 26.4'ten itibaren uzaktan eşleme dosyası olmalı: bu iPhone, jitterbugpair'inki gibi lockdown dosyaları LocalDevVPN üzerinden geldiğinde bağlantıyı keser.",
     "Get idevice_pair": "idevice_pair al",
-    "Make a remote pairing file": "Make remote eşleme dosyası",
+    "Make a remote pairing file": "Uzaktan eşleme dosyası oluştur",
     "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
         "İçe aktardığın eşleme dosyası bir lockdown dosyası. iOS 26.4'ten beri bu iPhone, LocalDevVPN üzerinden gelen bu tür dosyalarda bağlantıyı keser; bağlanamaz ve aynı türden yenisi de işe yaramaz.",
     "Come back here, tap “Replace” on the Pairing file card, and pick it.":
@@ -842,40 +862,41 @@ let turkishStrings: [String: String] = [
         "Mac, Windows PC veya Linux bilgisayarda idevice_pair'i aç, bu iPhone'u bağla ve isterse Güven'e dokun. Seç, “Remote pairing”i seç, “Create”e tıkla ve bitene kadar bu iPhone'un kilidini açık tut.",
     "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
         "“Save to file…”e tıkla ve dosyayı AirDrop, iCloud Drive veya kabloyla bu iPhone'a gönder. iLoader'dan dışa aktarılmış eşleme dosyası da çalışır.",
+
     // MARK: - Revoke-and-retry (Apple error 7460)
 
     "A certificate already exists": "Bir sertifika zaten var",
     "Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone.":
         "Apple bu Apple kimliği için ikinci bir imzalama sertifikası vermez. Zaten olanı iptal etmek yüklemenin sürmesini sağlar — ama geri alınamaz.",
-    "Loading certificates": "Loading sertifikas",
-    "Revoke and retry": "İptal et ve retry",
-    "Which certificate should be revoked?": "Which sertifikshould be iptal etd?",
+    "Loading certificates": "Sertifikalar yükleniyor",
+    "Revoke and retry": "İptal et ve yeniden dene",
+    "Which certificate should be revoked?": "Hangi sertifika iptal edilsin?",
     "Apple reports a certificate on this Apple ID, but none came back in the list. It may be a request that's still pending — wait a few minutes and tap Install again.":
         "Apple bu Apple kimliğinde bir sertifika olduğunu bildiriyor ama listede hiçbiri gelmedi. Hâlâ beklemede olan bir istek olabilir — birkaç dakika bekle ve Yükle'ye yeniden dokun.",
     "Every app already signed with the certificate you pick will stop launching, on every device — including apps installed by AltStore, SideStore, or a computer. This can't be undone. The install retries straight afterwards.":
         "Seçtiğin sertifikayla imzalanmış her uygulama, her cihazda açılmayı bırakır — AltStore, SideStore veya bilgisayarla yüklenenler dahil. Bu geri alınamaz. Yükleme hemen ardından yeniden dener.",
-    " (expired)": "(expired)",
-    "Couldn't register this device": "Yapılamadı register bu cihaz",
+    " (expired)": " (süresi dolmuş)",
+    "Couldn't register this device": "Bu cihaz kaydedilemedi",
     "Your Apple ID has hit its limit of registered devices. Free accounts can only register a handful of devices per year and can't remove old ones until the year resets.":
         "Apple kimliğin kayıtlı cihaz sınırına ulaştı. Ücretsiz hesaplar yılda yalnızca birkaç cihaz kaydedebilir ve yıl sıfırlanana kadar eskileri kaldıramaz.",
     "Easiest fix: put a different (or spare) Apple ID in the fields above, then tap Install again.":
         "En kolay çözüm: yukarıdaki alanlara farklı (veya yedek) bir Apple kimliği yaz, sonra Yükle'ye yeniden dokun.",
     "SideInstaller couldn't add this iPhone to your Apple ID's developer team automatically. Tapping Install again often works — Apple's developer service is sometimes briefly unavailable.":
         "SideInstaller bu iPhone'u Apple kimliğinin geliştirici ekibine otomatik ekleyemedi. Yükle'ye yeniden dokunmak sıkça işe yarar — Apple'ın geliştirici hizmeti bazen kısa süre kullanılamaz.",
-    "If it keeps failing, add the device by hand. Its UDID is:": "If it keeps failing, ekle cihaz by hve. Its UDID is:",
+    "If it keeps failing, add the device by hand. Its UDID is:": "Hata sürerse cihazı elle ekle. UDID'si:",
     "Paste that into the “Register a Device” form in the Apple Developer portal (this requires a paid Apple Developer account), then tap Install again.":
         "Bunu Apple Developer portalındaki “Register a Device” formuna yapıştır (ücretli Apple Developer hesabı gerekir), sonra Yükle'ye yeniden dokun.",
-    "Open device list": "Aç cihaz list",
+    "Open device list": "Cihaz listesini aç",
     "Last step: trust %@": "Son adım: %@ için güven",
-    "Open Settings › General › VPN & Device Management.": "Aç Ayarlar › General › VPN & Cihaz Management.",
+    "Open Settings › General › VPN & Device Management.": "Ayarlar › Genel › VPN ve Aygıt Yönetimi'ni aç.",
     "Tap your Apple ID under “Developer App”, then tap Trust.":
         "“Geliştirici Uygulaması” altındaki Apple kimliğine dokun, sonra Güven'e dokun.",
-    "Open %@ from your Home Screen — you're done.": "Aç %@ şuradsenin Home Screen — sen done.",
-    "Import the certificate into LiveContainer": "İçe aktar sertifikinto LiveContainer",
-    "Open LiveContainer from your Home Screen.": "Aç LiveContainer şuradsenin Home Screen.",
-    "Tap the Settings tab.": "Tap Ayarlar tab.",
-    "Tap “Import Certificate From SideStore”.": "“SideStore'dan Sertifika İçe Aktar”a dokun.",
-    "Wrong device IP": "Wrong cihaz IP",
+    "Open %@ from your Home Screen — you're done.": "%@ artık Ana Ekran'da — oradan aç, hepsi bu.",
+    "Import the certificate into LiveContainer": "Sertifikayı LiveContainer'a içe aktar",
+    "Open LiveContainer from your Home Screen.": "LiveContainer'ı Ana Ekran'dan aç.",
+    "Tap the Settings tab.": "Ayarlar sekmesine dokun.",
+    "Tap “Import Certificate From SideStore”.": "“Sertifikayı SideStore'dan içe aktar”a dokun.",
+    "Wrong device IP": "Yanlış cihaz IP'si",
     "The address in Settings › Advanced › Device IP is one this iPhone already holds, so there's nothing at the other end to connect to.":
         "Ayarlar › Gelişmiş › Cihaz IP'deki adres bu iPhone'un zaten sahip olduğu bir adres; diğer uçta bağlanacak bir şey yok.",
     "Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end.":
@@ -887,15 +908,16 @@ let turkishStrings: [String: String] = [
     "iOS refused the connection to %@ on this iPhone, before anything was sent. It does that for this iPhone's own addresses, like the “Connected to” address on LocalDevVPN's main screen. Device IP, in Settings › Advanced, has to be the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off and on again, then try again.":
         "iOS, bu iPhone'da %@ adresine bağlantıyı bir şey gönderilmeden reddetti. Bunu bu iPhone'un kendi adresleri için yapar; örneğin LocalDevVPN ana ekranındaki “Bağlı” adresi. Ayarlar › Gelişmiş'teki Cihaz IP, LocalDevVPN'in Ayarlar › Cihaz IP altındaki adres olmalı: varsayılan 10.7.0.1. Zaten öyleyse LocalDevVPN'i kapatıp aç, sonra yeniden dene.",
     "This iPhone hung up on the connection as soon as it opened. From iOS 26.4 on it does that to lockdown pairing files, like this one, when they come through LocalDevVPN. Pair this iPhone with itself instead: tap “Regenerate” under Tools › Pairing, or tap Install, which pairs it first.":
-        "Bu iPhone hung up on bağlantı as soon as it açed. ŞuradiOS 26.4 on it does şu to lockdown eşleme dosyasıs, like bu one, when y come through LocalDevVPN. Pair bu iPhone ile itself instead: tap “Regenerate” under Tools › Eşleme, veytap Yükle, which pairs it önce.",
+        "Bu iPhone bağlantıyı açılır açılmaz kesti. iOS 26.4'ten itibaren, bunun gibi lockdown eşleme dosyaları LocalDevVPN üzerinden geldiğinde bunu yapar. Bunun yerine bu iPhone'u kendisiyle eşle: Araçlar › Eşleme altında “Yeniden oluştur”a dokun ya da önce eşlemeyi yapan Yükle'ye dokun.",
     "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
         "Bu iPhone bağlantı açılır açılmaz kesti. iOS 26.4'ten beri LocalDevVPN üzerinden gelen lockdown eşleme dosyalarında (bunun gibi) bunu yapar; aynı türden yenisi yardımcı olmaz. Uzaktan eşleme dosyası hâlâ çalışır: bilgisayarda idevice_pair'i aç, “Remote pairing” seç, “Create” sonra “Save to file…”e tıkla ve dosyayı “Eşleme dosyası” altında içe aktar.",
     "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
-        "Bu iPhone hung up on bağlantı: şuradiOS 26.4 on, it does şu to lockdown eşleme dosyasıs like bu one when y come through LocalDevVPN. See steps above.",
+        "Bu iPhone bağlantıyı kesti: iOS 26.4'ten itibaren, bunun gibi lockdown eşleme dosyaları LocalDevVPN üzerinden geldiğinde bunu yapar. Yukarıdaki adımlara bak.",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "Bu iPhone'u eşlemek için gerekir: SideInstaller, Ayarlar'ın bulması için kendini yerel ağda duyurur.",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
         "Bir Wi-Fi ağına bağlan. Bu iPhone'u eşlemek için gerekir — SideInstaller yerel ağda bulunabilir olmalı.",
+
     // MARK: - About
 
     "About": "Hakkında",
@@ -910,12 +932,12 @@ let turkishStrings: [String: String] = [
     "Crypto donations": "Kripto bağışları",
     "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
         "Bağışlar tamamen isteğe bağlıdır. Bir şey satın almaz, özellik açmaz veya karşılığında bir şey vermez; SideInstaller yardımcı olduysa teşekkür etmenin bir yoludur.",
-    "Coin": "Coin",
+    "Coin": "Kripto para",
     "Network: %@": "Ağ: %@",
     "QR code for the %@ address": "%@ adresi için QR kodu",
     "Copied": "Kopyalandı",
     "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
-        "Send each coin only on ağ shown. Crypto sent on anor ağ yapılamaz be recovered.",
+        "Her kripto parayı yalnızca gösterilen ağda gönder. Başka bir ağda gönderilen kripto para geri alınamaz.",
     "Special thanks": "Özel teşekkürler",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
         "idevice için — SideInstaller'ın iPhone'unla konuştuğu kütüphane. O olmadan bunların hiçbiri olmazdı.",
@@ -923,6 +945,7 @@ let turkishStrings: [String: String] = [
         "Destek için ve sayesinde düzeltilen hataları bulduğu için.",
     "For the Japanese translation.": "Japonca çeviri için.",
     "For the Korean translation.": "Korece çeviri için.",
+    "For the Turkish translation.": "Türkçe çeviri için.",
     "Built with": "Bunlarla yapıldı",
     "The open source work this app is built on:": "Bu uygulamanın üzerine kurulduğu açık kaynak çalışmalar:",
     "Pairing, the tunnel and the install itself. By jkcoxson, MIT.":
@@ -939,22 +962,24 @@ let turkishStrings: [String: String] = [
         "Yalnızca resmi yükleme sayfası ve depodaki derlemeler bana aittir. Herkes kaynağı çatallayıp kimlik bilgisi çalan bir şey ekleyip aynı ad ve simgeyle yayınlayabilir — bu yüzden Apple kimliğini başka yerden gelen bir kopyaya emanet etme.",
     "Install page": "Yükleme sayfası",
     "Terms": "Koşullar",
+
     // MARK: - Madeira
 
-    "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ needs iOS %d veylater. Bu iPhone runs iOS %@.",
-    "Open Madeira from your Home Screen.": "Aç Madeirşuradsenin Home Screen.",
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ için iOS %d veya sonrası gerekir. Bu iPhone iOS %@ çalıştırıyor.",
+    "Open Madeira from your Home Screen.": "Madeira'yı Ana Ekran'dan aç.",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
         "Kurulumunda “Set up JIT” altında “In-app with pairing file” seç: SideInstaller dosyayı zaten oraya koydu, “Continue”e dokun.",
     "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
-        "In its setup, under “Set up JIT”, pick how bu iPhone gets JIT.",
+        "Kurulumunda “Set up JIT” altında bu iPhone'un JIT'i nasıl alacağını seç.",
     "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
         "Madeira bundan sonra kendi imzasını yeniler; açıkken ve LocalDevVPN bağlıyken. SideInstaller bunun için bir oturum verdi: Apple'ın geliştirici hizmeti için jeton, parolan değil. Madeira Ayarlar › İmzalama altında bunu unutabilir.",
     "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
-        "Its imzalamlasts 7 days. Beiçine y run out, yenile it buradunder Tools › Sideloaded uygulamas.",
+        "İmzası 7 gün geçerli. Süre dolmadan burada, Araçlar › Yan yüklenen uygulamalar altında yenile.",
     "This pairing file has no RPPairing record, the only kind %@ reads.":
-        "Bu eşleme dosyasında RPPairing kaydı yok; %@'nin okuduğu tek tür o.",
+        "Bu eşleme dosyasında RPPairing kaydı yok; %@ yalnızca bu türü okur.",
     "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
         "Windows PC oyunlarını iPhone'unda çalıştırır. Will Faust, GPL-3.0.",
+
     // MARK: - App ID cost
 
     "App IDs for this app": "Bu uygulama için App ID'ler",
@@ -964,19 +989,20 @@ let turkishStrings: [String: String] = [
     "New App IDs": "Yeni App ID'ler",
     "This Apple ID doesn't have enough App IDs left: this app needs %d, and %d are left. Each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
         "Bu Apple kimliğinde yeterli App ID kalmadı: bu uygulama %d ister, %d kaldı. Her biri 7 gün sayılır; bazılarının süresinin dolmasını bekle veya başka Apple kimliğiyle oturum aç.",
-    "The next one frees up on %@.": "next one frees up on %@.",
+    "The next one frees up on %@.": "Bir sonraki %@ tarihinde boşalır.",
     "Your Apple ID already has every App ID this app needs, so installing it uses none.":
         "Apple kimliğin bu uygulamanın istediği tüm App ID'lere zaten sahip; yüklemek hiçbirini kullanmaz.",
     "Signing registers one App ID for the app, and its extensions share it. It counts for 7 days.":
         "İmzalama uygulama için bir App ID kaydeder; uzantıları da onu paylaşır. 7 gün sayılır.",
     "This Apple ID can register %d a week.": "Bu Apple kimliği haftada %d tane kaydedebilir.",
+
     // MARK: - Links (sideinstaller://install, sideinstaller://pairingFile)
 
     "Install from a link?": "Bağlantıdan yüklensin mi?",
     "Download and install": "İndir ve yükle",
     "SideInstaller will download this .ipa, then sign it with your Apple ID and install it. Only go ahead if you trust where the link came from.":
         "SideInstaller bu .ipa'yı indirir, Apple kimliğinle imzalar ve yükler. Yalnızca bağlantının geldiği yere güveniyorsan devam et.",
-    "It replaces %@, the custom .ipa you have now.": "It replaces %@, custom .ipyou have now.",
+    "It replaces %@, the custom .ipa you have now.": "Şu anki özel .ipa'nın (%@) yerine geçer.",
     "Use SideStore's pairing file?": "SideStore'un eşleme dosyası kullanılsın mı?",
     "Import this pairing file?": "Bu eşleme dosyası içe aktarılsın mı?",
     "Import": "İçe aktar",
@@ -985,7 +1011,7 @@ let turkishStrings: [String: String] = [
     "A link sent SideInstaller a pairing file. Only import it if you asked for one: SideInstaller will connect to this iPhone with it.":
         "Bir bağlantı SideInstaller'a eşleme dosyası gönderdi. Yalnızca sen istediysen içe aktar: SideInstaller bu iPhone'a onunla bağlanacak.",
     "It replaces %@.": "%@ yerine geçer.",
-    "It replaces the pairing file in use now.": "It replaces eşleme dosyası in use now.",
+    "It replaces the pairing file in use now.": "Şu an kullanılan eşleme dosyasının yerine geçer.",
     "Get it from SideStore": "SideStore'dan al",
     "SideStore opens and sends back the pairing file it has.": "SideStore açılır ve elindeki eşleme dosyasını geri gönderir.",
     "SideStore isn't installed on this iPhone, so there's no pairing file to get from it.":
@@ -1003,6 +1029,7 @@ let turkishStrings: [String: String] = [
     "That link was meant to carry a pairing file, but what it holds can't be read.":
         "Bu bağlantı bir eşleme dosyası taşıyacaktı, ancak içeriği okunamıyor.",
     "That link carries a file, but it isn't a pairing file.": "Bu bağlantı bir dosya taşıyor, ancak eşleme dosyası değil.",
+
     // MARK: - Report a problem
 
     "Report a problem": "Sorun bildir",
@@ -1010,12 +1037,12 @@ let turkishStrings: [String: String] = [
     "Opens a GitHub issue with this app's details, its log and crash logs.":
         "Bu uygulamanın ayrıntıları, günlüğü ve çökme günlükleriyle bir GitHub sorunu açar.",
     "What happened?": "Ne oldu?",
-    "What were you doing, and what went wrong?": "What were you doing, ve what went wrong?",
+    "What were you doing, and what went wrong?": "Ne yapıyordun ve ne ters gitti?",
     "Say what you tapped, what you expected and what happened instead. English is best, but any language is fine.":
-        "Say what you tuygulamaed, what you expected ve what huygulamaened instead. English is best, but any language is fine.",
+        "Neye dokunduğunu, ne beklediğini ve bunun yerine ne olduğunu yaz. En iyisi İngilizce, ama her dil olur.",
     "Included": "Dahil",
     "Device": "Cihaz",
-    "App": "App",
+    "App": "Uygulama",
     "Stopped at": "Durduğu yer",
     "not connected": "bağlı değil",
     "none": "yok",
@@ -1025,11 +1052,11 @@ let turkishStrings: [String: String] = [
     "off": "kapalı",
     "unknown": "bilinmiyor",
     "yes": "evet",
-    "no": "no",
+    "no": "hayır",
     "latest": "en son",
     "custom server": "özel sunucu",
     "Auto, starts with %@": "Otomatik, %@ ile başlar",
-    "Error": "Error",
+    "Error": "Hata",
     "Activity log": "Etkinlik günlüğü",
     "%d lines": "%d satır",
     "Your Apple ID, device name, serial numbers and keys are taken out of the log first.":
@@ -1056,6 +1083,7 @@ let turkishStrings: [String: String] = [
         "Tam günlük doldurulamayacak kadar uzun, bu yüzden SideInstaller kopyaladı. GitHub'da metnin sonuna dokun, Yapıştır'ı seç, sonra sorunu gönder.",
     "Describe the problem above first.": "Önce yukarıda sorunu açıkla.",
     "Couldn't save the report: %@": "Rapor kaydedilemedi: %@",
+
     // MARK: - Official download check
 
     "Did you download SideInstaller from sideinstaller.net?": "SideInstaller'ı sideinstaller.net'ten mi indirdin?",

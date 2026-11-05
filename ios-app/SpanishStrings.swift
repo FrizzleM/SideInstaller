@@ -1033,6 +1033,7 @@ let spanishStrings: [String: String] = [
         "Por el apoyo y por detectar los fallos que se corrigieron gracias a ello.",
     "For the Japanese translation.": "Por la traducción al japonés.",
     "For the Korean translation.": "Por la traducción al coreano.",
+    "For the Turkish translation.": "Por la traducción al turco.",
 
     "Built with": "Creado con",
     "The open source work this app is built on:":

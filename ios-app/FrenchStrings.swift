@@ -1036,6 +1036,7 @@ let frenchStrings: [String: String] = [
         "Pour le soutien et pour avoir repéré les bugs qui ont ensuite été corrigés.",
     "For the Japanese translation.": "Pour la traduction japonaise.",
     "For the Korean translation.": "Pour la traduction coréenne.",
+    "For the Turkish translation.": "Pour la traduction turque.",
 
     "Built with": "Construit avec",
     "The open source work this app is built on:":
