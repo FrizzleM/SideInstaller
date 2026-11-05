@@ -56,7 +56,7 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 
 ## Requirements
 
-- An iPhone (the iPhone Duo too, open or closed) or iPad on iOS 27+ (iOS 17.4+ with a pairing file
+- An iPhone or iPad on iOS 27+ (iOS 17.4+ with a pairing file
   made on a computer; from iOS 26.4, a [remote pairing one](#ios-264-to-26x-a-remote-pairing-file))
 - Wi-Fi (first time only)
 - Your Apple account credentials (not collected)
