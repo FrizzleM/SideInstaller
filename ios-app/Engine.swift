@@ -514,16 +514,15 @@ final class Engine: ObservableObject {
     /// manager, which checks it against the Apple ID's own before using it.
     @Published var certificateToImport: CertificateImport?
 
-    // 2FA bridge: the FFI callback blocks on this semaphore until the UI answers.
+    /// Lets one Apple ID sign-in talk to Apple at a time, whichever feature
+    /// started it.
+    let appleSignIns = AppleSignInQueue { Engine.shared.log($0) }
+
+    // 2FA bridge: a sign-in's FFI callback blocks until the sheet answers its
+    // request.
     /// What the two-factor sheet shows; nil while no sign-in is asking.
     @Published private(set) var twoFactor: TwoFactorPhase?
-    private let twoFactorSem = DispatchSemaphore(value: 0)
-    /// Guards the answer handed from the main thread to the waiting Rust worker.
-    private let twoFactorLock = NSLock()
-    private var twoFactorAnswer: TwoFactorAnswer?
-    private var awaitingTwoFactor = false
-    /// Set when the user cancels the 2FA prompt, so sign-in stops re-prompting.
-    var twoFactorWasCancelled = false
+    private let twoFactorRequests = TwoFactorRequests()
 
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -1183,12 +1182,14 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// Signs in to the Apple ID, trying each anisette server in turn.
+    /// Signs in to the Apple ID, trying each anisette server in turn, once the
+    /// sign-ins queued ahead of it are done (`AppleSignInQueue`).
     /// Pass `updatingChecklist: false` from flows outside the Install tab (e.g.
     /// app refresh) so they don't change its checklist. `run` tags a run's
     /// background sign-in; see `finishedRuns`.
     @MainActor
-    private func signIn(updatingChecklist: Bool = true, run: Int? = nil) async throws {
+    private func signIn(updatingChecklist: Bool = true, run: Int? = nil,
+                        purpose: AppleSignInPurpose = .install) async throws {
         if signSession != nil {
             log("Already signed in this session — skipping.")
             if updatingChecklist { setStep(.signIn, .done) }
@@ -1199,11 +1200,19 @@ final class Engine: ObservableObject {
         }
         if updatingChecklist { setStep(.signIn, .active) }
 
+        let id = normalizedAppleID, pw = applePassword, dir = storageDir
+        let ticket = try await appleSignIns.waitForTurn(purpose, appleID: id, run: run)
+        defer { appleSignIns.finished(ticket) }
+        // A sign-in that went first may have signed this session in.
+        if signSession != nil {
+            log("Already signed in this session — skipping.")
+            if updatingChecklist { setStep(.signIn, .done) }
+            return
+        }
+
         // Anisette servers go down often, so with Auto on try each one before
         // giving up. A server picked in Settings is the only one tried.
         let servers = anisetteCandidates()
-        let id = normalizedAppleID, pw = applePassword, dir = storageDir
-        twoFactorWasCancelled = false
         var failures = AnisetteServer.SignInFailures()
         var appleRefusals = AnisetteServer.AppleRefusals(servers: anisetteServers)
         var appleUnreachable = 0
@@ -1224,7 +1233,7 @@ final class Engine: ObservableObject {
             }
             do {
                 let summary = try await onSignQueue {
-                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, run: run)
+                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, ticket: ticket)
                 }
                 anisetteSignedIn(ani)
                 signInStatus = "signed in (\(summary))"
@@ -1234,7 +1243,7 @@ final class Engine: ObservableObject {
                 let failure = error.errorDescription ?? "sign-in failed"
 
                 // A cancelled 2FA prompt isn't the server's fault.
-                if twoFactorWasCancelled {
+                if ticket.twoFactorWasCancelled {
                     log("Two-factor verification cancelled — stopping.")
                     signInStatus = "signed out"
                     throw EngineError.message(L("Two-factor verification was cancelled."))
@@ -1333,19 +1342,16 @@ final class Engine: ObservableObject {
 
     /// One sign-in attempt against a specific anisette server.
     private func performSignIn(id: String, pw: String, ani: String, dir: String,
-                               run: Int? = nil) throws -> String {
-        defer { endTwoFactor() }
+                               ticket: AppleSignInTicket) throws -> String {
+        defer { endTwoFactor(for: ticket) }
         log("Apple ID sign-in for \(LogRedactor.maskAppleID(id)) via anisette \(Self.oneLine(ani)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        // The run rides along as the callback's context (offset by one, since a
-        // null context means none), so its 2FA requests can be told apart.
-        let context = run.flatMap { UnsafeMutableRawPointer(bitPattern: $0 + 1) }
         // 1 = save and reuse the developer session, so repeat sign-ins skip
         // Apple authentication until the token expires.
         let rc = si_apple_signin(id, pw, ani, "SideInstaller", dir, 1,
-                                 twoFactorCallback, context,
+                                 appleSignInTwoFactorCallback, ticket.context,
                                  &session, &summary, &error)
         if rc == 0 {
             if let old = self.signSession { si_sign_session_free(old) }
@@ -3511,7 +3517,7 @@ final class Engine: ObservableObject {
             throw EngineError.message(L("No Apple ID saved. Add one in Settings › Account."))
         }
         try await ensurePairingConnection()
-        try await signIn(updatingChecklist: false)
+        try await signIn(updatingChecklist: false, purpose: .refresh)
     }
 
     /// Re-signs `ipaPath` (issuing a new provisioning profile) and installs it
@@ -3808,45 +3814,42 @@ final class Engine: ObservableObject {
     // MARK: 2FA bridge
 
     /// Called from a Rust worker thread with isideload's request as JSON; blocks
-    /// until the sheet answers. Writes the JSON answer into `outBuf` and returns
-    /// 1, or returns 0 to cancel.
+    /// until the sheet answers this request. Writes the JSON answer into
+    /// `outBuf` and returns 1, or returns 0 to cancel.
     ///
-    /// `run` is the run a background sign-in belongs to; a request from one whose
-    /// run has ended is declined, so no sheet appears after an install stopped.
-    func answerTwoFactor(request: UnsafePointer<CChar>?, outBuf: UnsafeMutablePointer<CChar>?, len: Int,
-                         run: Int? = nil) -> Int32 {
+    /// `ticket` is the sign-in asking. A request from an install's background
+    /// sign-in whose run has ended is declined, so no sheet appears after an
+    /// install stopped.
+    func answerTwoFactor(request json: UnsafePointer<CChar>?, outBuf: UnsafeMutablePointer<CChar>?, len: Int,
+                         for ticket: AppleSignInTicket) -> Int32 {
         guard let outBuf, len > 1 else { return 0 }
-        let prompt = request.flatMap { TwoFactorPrompt(json: String(cString: $0)) } ?? .deviceOnly
+        let prompt = json.flatMap { TwoFactorPrompt(json: String(cString: $0)) } ?? .deviceOnly
         // Don't cover a Trust prompt; the wait blocks, so never on main.
         if !Thread.isMainThread { attention.waitUntilFree() }
-        twoFactorLock.lock()
-        twoFactorAnswer = nil
-        awaitingTwoFactor = true
-        twoFactorLock.unlock()
+        guard let request = twoFactorRequests.open(for: ticket) else {
+            // The queue lets one sign-in ask at a time, so this shouldn't happen.
+            // Declining stops the sign-in rather than leave it waiting on a
+            // sheet that shows another request.
+            ticket.markTwoFactorCancelled()
+            log("⚠️ \(ticket.purpose.name): 2FA requested while another sign-in waits for a code — declined.")
+            return 0
+        }
         setMain {
-            // A cancel can land between the lock above and this block running.
-            self.twoFactorLock.lock()
-            let stillWaiting = self.awaitingTwoFactor
+            // A cancel can land between opening the request and this block running.
+            guard self.twoFactorRequests.isWaiting(request.id) else { return }
             // Checked here, on main, where a stopping run has already counted
             // itself finished by the time this block runs.
-            let abandoned = run.map { $0 < self.finishedRuns } ?? false
-            if abandoned { self.awaitingTwoFactor = false }
-            self.twoFactorLock.unlock()
-            guard stillWaiting else { return }
-            if abandoned {
+            if let run = ticket.run, run < self.finishedRuns {
                 self.log("2FA requested by the sign-in of an install that already stopped — declined.")
-                self.twoFactorSem.signal()      // no answer, so the sign-in aborts
+                self.twoFactorRequests.cancel(request.id)   // no answer, so the sign-in aborts
                 return
             }
-            self.twoFactor = .asking(prompt)
+            self.twoFactor = TwoFactorPhase(request: request.id, signIn: ticket.id,
+                                            appleID: ticket.appleID, prompt: prompt)
             self.log(prompt.logLine)
         }
-        twoFactorSem.wait()
-        twoFactorLock.lock()
-        let answer = twoFactorAnswer
-        twoFactorAnswer = nil
-        twoFactorLock.unlock()
-        guard let bytes = answer?.json.map({ Array($0.utf8) }), bytes.count < len else { return 0 }
+        guard let answer = twoFactorRequests.wait(request),
+              let bytes = answer.json.map({ Array($0.utf8) }), bytes.count < len else { return 0 }
         outBuf.withMemoryRebound(to: UInt8.self, capacity: len) { dst in
             for (i, b) in bytes.enumerated() { dst[i] = b }
             dst[bytes.count] = 0
@@ -3854,43 +3857,31 @@ final class Engine: ObservableObject {
         return 1
     }
 
-    /// Hand the sheet's choice to the waiting sign-in. The sheet stays up showing
-    /// progress until the next prompt arrives or the sign-in returns.
-    func answerTwoFactor(_ answer: TwoFactorAnswer) {
-        twoFactorLock.lock()
-        guard awaitingTwoFactor else {
-            twoFactorLock.unlock()
-            return
-        }
-        awaitingTwoFactor = false
-        twoFactorAnswer = answer
-        twoFactorLock.unlock()
-        twoFactorWasCancelled = false
-        if case .asking(let prompt) = twoFactor { twoFactor = .working(prompt, answer) }
+    /// Hand the sheet's choice to the request it shows. The sheet stays up
+    /// showing progress until that sign-in's next prompt arrives or it returns.
+    func answerTwoFactor(_ answer: TwoFactorAnswer, to phase: TwoFactorPhase) {
+        // Not waiting anymore: answered already, or cancelled.
+        guard twoFactorRequests.answer(phase.request, with: answer) else { return }
+        if twoFactor?.request == phase.request { twoFactor?.answer = answer }
         log(answer.logLine)
-        twoFactorSem.signal()
     }
 
-    /// Close the sheet. While Apple waits on the user this cancels the sign-in;
-    /// mid-request it only hides, and a further prompt brings it back.
-    func cancelTwoFactor() {
+    /// Close the sheet showing `phase`. While Apple waits on the user this
+    /// cancels that sign-in; mid-request it only hides, and the sign-in's next
+    /// prompt brings it back.
+    func cancelTwoFactor(_ phase: TwoFactorPhase) {
         // Already closed because the sign-in returned: nothing to cancel.
-        guard twoFactor != nil else { return }
+        guard twoFactor?.request == phase.request else { return }
         twoFactor = nil
-        twoFactorLock.lock()
-        let waiting = awaitingTwoFactor
-        awaitingTwoFactor = false
-        twoFactorAnswer = nil
-        twoFactorLock.unlock()
-        guard waiting else { return }
-        twoFactorWasCancelled = true
-        twoFactorSem.signal()
+        twoFactorRequests.cancel(phase.request)
     }
 
-    /// Close the sheet once a sign-in attempt returns, however it went. Safe from
-    /// any thread.
-    func endTwoFactor() {
-        setMain { self.twoFactor = nil }
+    /// Close the sheet once a sign-in attempt returns, however it went, if it
+    /// shows that sign-in's request. Safe from any thread.
+    func endTwoFactor(for ticket: AppleSignInTicket) {
+        setMain {
+            if self.twoFactor?.signIn == ticket.id { self.twoFactor = nil }
+        }
     }
     // MARK: - Storage
 
@@ -4300,10 +4291,12 @@ private let siLogCallback: SILogCallback = { _, msg in
     }
 }
 
-/// Bridges isideload's 2FA request to the engine's blocking prompt.
-private let twoFactorCallback: SITwoFactorCb = { ctx, request, outBuf, bufLen in
-    Engine.shared.answerTwoFactor(request: request, outBuf: outBuf, len: Int(bufLen),
-                                  run: ctx.map { Int(bitPattern: $0) - 1 })
+/// The 2FA callback every Apple ID sign-in hands Rust, with its
+/// `AppleSignInTicket` as the context, so the sheet answers each request for
+/// the sign-in that made it.
+let appleSignInTwoFactorCallback: SITwoFactorCb = { ctx, request, outBuf, bufLen in
+    guard let ticket = AppleSignInTicket.from(context: ctx) else { return 0 }
+    return Engine.shared.answerTwoFactor(request: request, outBuf: outBuf, len: Int(bufLen), for: ticket)
 }
 
 /// Counts what currently has the user's attention — a Trust prompt — so a 2FA
@@ -4464,16 +4457,18 @@ enum TwoFactorAnswer: Equatable {
     }
 }
 
-/// The two-factor sheet's state.
-enum TwoFactorPhase: Equatable {
-    /// Apple is waiting on the user.
-    case asking(TwoFactorPrompt)
-    /// The user answered and the sign-in is acting on it.
-    case working(TwoFactorPrompt, TwoFactorAnswer)
+/// The two-factor sheet's state: the request it shows, whose it is, and
+/// where it stands.
+struct TwoFactorPhase: Equatable {
+    /// The request the sheet answers (`TwoFactorRequests`).
+    let request: Int
+    /// The sign-in that made it (`AppleSignInTicket.id`).
+    let signIn: Int
+    /// The Apple ID the code is for.
+    let appleID: String
+    let prompt: TwoFactorPrompt
+    /// The answer the sign-in is acting on; nil while Apple waits on the user.
+    var answer: TwoFactorAnswer?
 
-    var prompt: TwoFactorPrompt {
-        switch self {
-        case .asking(let prompt), .working(let prompt, _): prompt
-        }
-    }
+    var isAsking: Bool { answer == nil }
 }

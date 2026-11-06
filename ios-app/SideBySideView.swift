@@ -645,6 +645,9 @@ final class SideBySideManager: ObservableObject {
             return
         }
         setStep(.signIn, .active)
+        // One Apple ID sign-in at a time (`AppleSignInQueue`).
+        let ticket = try await engine.appleSignIns.waitForTurn(.sideBySide, appleID: id)
+        defer { engine.appleSignIns.finished(ticket) }
 
         // Anisette servers go down often, so with Auto on try each one before
         // giving up. A server picked in Settings is the only one tried.
@@ -662,7 +665,6 @@ final class SideBySideManager: ObservableObject {
         } else {
             dir = try temporarySignInFolder(for: id).path
         }
-        engine.twoFactorWasCancelled = false
         var failures = AnisetteServer.SignInFailures()
         var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
         var appleUnreachable = 0
@@ -676,7 +678,7 @@ final class SideBySideManager: ObservableObject {
             }
             do {
                 let summary = try await onSignQueue {
-                    try self.performSignIn(id: id, pw: pw, anisette: anisette, dir: dir)
+                    try self.performSignIn(id: id, pw: pw, anisette: anisette, dir: dir, ticket: ticket)
                 }
                 if isSavedHere {
                     engine.anisetteSignedIn(anisette)
@@ -693,7 +695,7 @@ final class SideBySideManager: ObservableObject {
             } catch let error as EngineError {
                 let failure = error.errorDescription ?? "sign-in failed"
                 // A cancelled 2FA prompt isn't the server's fault.
-                if engine.twoFactorWasCancelled {
+                if ticket.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
                 // A locked account fails everywhere, and retrying keeps it locked.
@@ -783,15 +785,16 @@ final class SideBySideManager: ObservableObject {
 
     /// One sign-in attempt against a specific anisette server. Uses the machine
     /// name `SideInstaller`, so an existing certificate is recognized as reusable.
-    private func performSignIn(id: String, pw: String, anisette: String, dir: String) throws -> String {
-        defer { engine.endTwoFactor() }
+    private func performSignIn(id: String, pw: String, anisette: String, dir: String,
+                               ticket: AppleSignInTicket) throws -> String {
+        defer { engine.endTwoFactor(for: ticket) }
         engine.log("Apple ID sign-in for \(LogRedactor.maskAppleID(id)) via anisette \(Engine.oneLine(anisette)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         // 0 = don't save the session: it's someone else's Apple ID.
         let rc = si_apple_signin(id, pw, anisette, "SideInstaller", dir, 0,
-                                 sideBySideTwoFactorCallback, nil,
+                                 appleSignInTwoFactorCallback, ticket.context,
                                  &session, &summary, &error)
         if rc == 0 {
             if let old = signSession { si_sign_session_free(old) }
@@ -996,14 +999,6 @@ final class SideBySideManager: ObservableObject {
             }
         }
     }
-}
-
-// MARK: - C 2FA callback
-
-/// Bridges a 2FA request during a Side by Side sign-in to the engine's shared
-/// prompt, which `RootView` presents over whichever tab is showing.
-private let sideBySideTwoFactorCallback: SITwoFactorCb = { _, request, outBuf, bufLen in
-    Engine.shared.answerTwoFactor(request: request, outBuf: outBuf, len: Int(bufLen))
 }
 
 // MARK: - View

@@ -40,6 +40,15 @@ All notable changes to SideInstaller are documented here.
   at any point. A pairing also gives up if the iPhone connects but doesn't ask for a code within
   30 seconds, or if the code isn't entered within 5 minutes. An internal error while pairing now
   shows a message instead of closing SideInstaller.
+- **Two sign-ins no longer share one 2FA code.** The install, Certificates, Entitlements and Side
+  by Side each sign in to Apple on their own, and could do it at the same time: opening
+  Certificates during an install, say. They shared one code prompt, so a code could reach the
+  other sign-in, and the first to finish closed the prompt the other was still waiting on, which
+  then waited forever. Sign-ins now take turns, and each code goes to the sign-in that asked for
+  it. The ones that wait reuse the sign-in that went first, so you usually enter one code. The
+  code prompt now shows which Apple ID it's for.
+- **The number pad comes back after a wrong 2FA code.** The code field emptied for the next try,
+  but the number pad stayed down until you tapped the field.
 
 ## 1.6.5
 

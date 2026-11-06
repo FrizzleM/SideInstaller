@@ -237,9 +237,12 @@ final class EntitlementsManager: ObservableObject {
 
     @MainActor
     private func signIn(id: String, pw: String) async throws {
+        // One Apple ID sign-in at a time (`AppleSignInQueue`).
+        let ticket = try await engine.appleSignIns.waitForTurn(.entitlements, appleID: id)
+        defer { engine.appleSignIns.finished(ticket) }
+
         let servers = anisetteCandidates()
         let dir = storageDir
-        engine.twoFactorWasCancelled = false
         var failures = AnisetteServer.SignInFailures()
         var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
         var appleUnreachable = 0
@@ -252,7 +255,7 @@ final class EntitlementsManager: ObservableObject {
             }
             do {
                 let summary = try await onQueue {
-                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir)
+                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, ticket: ticket)
                 }
                 engine.anisetteSignedIn(ani)
                 teamSummary = summary
@@ -260,7 +263,7 @@ final class EntitlementsManager: ObservableObject {
                 return
             } catch let error as EngineError {
                 let failure = error.errorDescription ?? "sign-in failed"
-                if engine.twoFactorWasCancelled {
+                if ticket.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
                 if Engine.isAccountLocked(failure) {
@@ -324,13 +327,14 @@ final class EntitlementsManager: ObservableObject {
         throw EngineError.message(engine.anisetteSignInFailure(failures))
     }
 
-    private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {
-        defer { engine.endTwoFactor() }
+    private func performSignIn(id: String, pw: String, ani: String, dir: String,
+                               ticket: AppleSignInTicket) throws -> String {
+        defer { engine.endTwoFactor(for: ticket) }
         var newSession: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_cert_signin(id, pw, ani, "SideInstaller", dir,
-                                entitlementsTwoFactorCallback, nil,
+                                appleSignInTwoFactorCallback, ticket.context,
                                 &newSession, &summary, &error)
         if rc == 0 {
             if let old = self.session { si_cert_session_free(old) }
@@ -408,11 +412,6 @@ final class EntitlementsManager: ObservableObject {
             }
         }
     }
-}
-
-/// Bridges a 2FA request during entitlement sign-in to the engine's prompt.
-private let entitlementsTwoFactorCallback: SITwoFactorCb = { _, request, outBuf, bufLen in
-    Engine.shared.answerTwoFactor(request: request, outBuf: outBuf, len: Int(bufLen))
 }
 
 // MARK: - View

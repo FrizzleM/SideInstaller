@@ -129,7 +129,7 @@ struct RootView: View {
         // A swipe down is a cancel; the sign-in closing it is not.
         .sheet(isPresented: Binding(
             get: { engine.twoFactor != nil },
-            set: { if !$0 { engine.cancelTwoFactor() } }
+            set: { if !$0, let phase = engine.twoFactor { engine.cancelTwoFactor(phase) } }
         )) {
             if let phase = engine.twoFactor ?? shownTwoFactor {
                 TwoFactorSheet(phase: phase)
@@ -138,10 +138,10 @@ struct RootView: View {
         .onChange(of: engine.twoFactor) { old, phase in
             if let phase { shownTwoFactor = phase }
             // A code is wanted, or the one entered was turned down.
-            if case .asking(let prompt) = phase {
-                if old == nil {
+            if let phase, phase.isAsking {
+                if old?.signIn != phase.signIn {
                     SoundEffects.play(.attention)
-                } else if case .working = old, prompt.lastError != nil {
+                } else if old?.isAsking == false, phase.prompt.lastError != nil {
                     SoundEffects.play(.error)
                 }
             }
@@ -382,9 +382,7 @@ struct TwoFactorSheet: View {
     private var prompt: TwoFactorPrompt { phase.prompt }
 
     /// The answer the sign-in is acting on, while it does.
-    private var pending: TwoFactorAnswer? {
-        if case .working(_, let answer) = phase { answer } else { nil }
-    }
+    private var pending: TwoFactorAnswer? { phase.answer }
 
     var body: some View {
         NavigationStack {
@@ -418,6 +416,10 @@ struct TwoFactorSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                } footer: {
+                    // Whose code it is: Side by Side signs in with someone
+                    // else's Apple ID, and can be queued behind the install's.
+                    Label(phase.appleID, systemImage: "person.crop.circle")
                 }
                 Section {
                     options
@@ -430,11 +432,11 @@ struct TwoFactorSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(L("Cancel")) { engine.cancelTwoFactor() }
+                    Button(L("Cancel")) { engine.cancelTwoFactor(phase) }
                 }
                 if prompt.expectsCode {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button(L("Verify")) { engine.answerTwoFactor(.code(code)) }
+                        Button(L("Verify")) { engine.answerTwoFactor(.code(code), to: phase) }
                             .disabled(pending != nil || code.count != 6)
                     }
                 }
@@ -442,11 +444,18 @@ struct TwoFactorSheet: View {
         }
         .onAppear { codeFocused = prompt.expectsCode }
         .onChange(of: phase) { _, phase in
+            // Checking an answer disables the field, which takes the keyboard
+            // away. Unfocused here too, so focusing it again below is a change.
+            guard phase.isAsking else {
+                codeFocused = false
+                return
+            }
             // A fresh prompt — after a wrong code, or with a new code on its way —
             // starts from an empty field.
-            guard case .asking(let prompt) = phase else { return }
             code = ""
-            codeFocused = prompt.expectsCode
+            // Focused a turn later: until then the field is still disabled, or
+            // not there yet after choosing how to get a code, and can't take it.
+            Task { @MainActor in codeFocused = phase.prompt.expectsCode }
         }
     }
 
@@ -475,7 +484,7 @@ struct TwoFactorSheet: View {
     }
 
     private func option(_ title: String, _ systemImage: String, _ answer: TwoFactorAnswer) -> some View {
-        Button { engine.answerTwoFactor(answer) } label: {
+        Button { engine.answerTwoFactor(answer, to: phase) } label: {
             Label(title, systemImage: systemImage)
         }
     }

@@ -580,8 +580,11 @@ stays, next to the pairing activity.
 - `si_apple_signin` — `AppleAccount::builder().anisette_provider(RemoteV3…)
   .login(password, 2fa_cb)` → `DeveloperSession::from_account` →
   `SideloaderBuilder` (team `First`, `FsStorage`, machine name) → opaque
-  `SignSession`. 2FA is bridged to a Swift prompt via a blocking semaphore
-  callback (`SITwoFactorCb`).
+  `SignSession`. 2FA is bridged to a Swift prompt via a blocking callback
+  (`SITwoFactorCb`). Every Apple ID sign-in in the app (this one, Certificates,
+  Entitlements, Side by Side) waits its turn in `AppleSignInQueue`, one at a
+  time, and hands its `AppleSignInTicket` to the callback as the context, so the
+  sheet answers each request (`TwoFactorRequests`) for the sign-in that made it.
 - `si_sign_ipa(session, ipa, udid, device_name, …)` — first calls
   `DeveloperSession::ensure_device_registered(team, name, udid)` so the team has
   the connected device, then `Sideloader::sign_app(ipa, None, memory_limit, …)` → signed

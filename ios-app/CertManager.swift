@@ -407,11 +407,16 @@ final class CertManager: ObservableObject {
 
     @MainActor
     private func signIn(id: String, pw: String) async throws {
+        // One Apple ID sign-in at a time (`AppleSignInQueue`).
+        let ticket = try await engine.appleSignIns.waitForTurn(.certificates, appleID: id)
+        defer { engine.appleSignIns.finished(ticket) }
+        // A load and an import can both have been waiting; the first signed in.
+        if session != nil { return }
+
         // Try each anisette server (only the one picked in Settings with Auto
         // off); a credential or 2FA error stops the loop.
         let servers = anisetteCandidates()
         let dir = storageDir
-        engine.twoFactorWasCancelled = false
         var failures = AnisetteServer.SignInFailures()
         var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
         var appleUnreachable = 0
@@ -424,7 +429,7 @@ final class CertManager: ObservableObject {
             }
             do {
                 let summary = try await onQueue {
-                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir)
+                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, ticket: ticket)
                 }
                 engine.anisetteSignedIn(ani)
                 teamSummary = summary
@@ -433,7 +438,7 @@ final class CertManager: ObservableObject {
                 return
             } catch let error as EngineError {
                 let failure = error.errorDescription ?? "sign-in failed"
-                if engine.twoFactorWasCancelled {
+                if ticket.twoFactorWasCancelled {
                     engine.log("Two-factor verification cancelled — stopping.")
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
@@ -502,13 +507,14 @@ final class CertManager: ObservableObject {
     }
 
     /// One sign-in attempt against a specific anisette server.
-    private func performSignIn(id: String, pw: String, ani: String, dir: String) throws -> String {
-        defer { engine.endTwoFactor() }
+    private func performSignIn(id: String, pw: String, ani: String, dir: String,
+                               ticket: AppleSignInTicket) throws -> String {
+        defer { engine.endTwoFactor(for: ticket) }
         var newSession: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_cert_signin(id, pw, ani, "SideInstaller", dir,
-                                certTwoFactorCallback, nil,
+                                appleSignInTwoFactorCallback, ticket.context,
                                 &newSession, &summary, &error)
         if rc == 0 {
             if let old = self.session { si_cert_session_free(old) }
@@ -629,11 +635,4 @@ final class CertManager: ObservableObject {
             }
         }
     }
-}
-
-// MARK: - C 2FA callback
-
-/// Bridges a 2FA request during cert sign-in to the engine's shared prompt.
-private let certTwoFactorCallback: SITwoFactorCb = { _, request, outBuf, bufLen in
-    Engine.shared.answerTwoFactor(request: request, outBuf: outBuf, len: Int(bufLen))
 }

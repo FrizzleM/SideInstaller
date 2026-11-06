@@ -250,7 +250,8 @@ final class InstallActivity {
     /// one: its own Live Activity has that.
     private func currentNeed() -> (title: String, detail: String, symbol: String)? {
         let engine = Engine.shared
-        if case .asking(let prompt) = engine.twoFactor {
+        if let phase = engine.twoFactor, phase.isAsking {
+            let prompt = phase.prompt
             // Without the number Apple masks: this shows on the Lock Screen.
             let detail = switch prompt.method {
             case .device: L("Enter the code Apple just sent to your trusted device.")
