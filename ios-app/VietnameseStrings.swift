@@ -515,48 +515,35 @@ let vietnameseStrings: [String: String] = [
     "Side by Side": "Side by Side",
     "Pair with their iPhone": "Ghép nối với iPhone của họ",
     "Install on their iPhone": "Cài lên iPhone của họ",
-    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
-        "“%@” không phải là địa chỉ IPv4. Nó phải có dạng 192.168.1.42.",
-    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
-        "%@ là địa chỉ mà chính chiếc iPhone này đang dùng. Side by Side cài lên iPhone của người khác — hãy dùng địa chỉ của họ. Để cài lên máy này, hãy dùng tab Cài ứng dụng.",
     "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the Install tab.":
         "iPhone vừa ghép nối là chính máy này. Hãy ghép nối từ Cài đặt trên iPhone của họ. Để cài lên iPhone này, hãy dùng tab Cài ứng dụng.",
     "Enter the Apple ID to sign with, and its password.":
         "Nhập Apple ID dùng để ký và mật khẩu của nó.",
     "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
         "Wi-Fi đang tắt. Cả hai iPhone phải cùng một mạng Wi-Fi thì mới hoạt động.",
-    "The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute.":
-        "Bản tải về không phải là tệp IPA. Có thể GitHub đang trả về trang lỗi — hãy thử lại sau một phút.",
+    "The release download wasn't an IPA. GitHub may be returning an error page, so try again in a minute.":
+        "Bản tải về không phải là tệp IPA. Có thể GitHub đang trả về trang lỗi, hãy thử lại sau một phút.",
     "Couldn't download the latest SideInstaller release: %@":
         "Không tải được bản phát hành SideInstaller mới nhất: %@",
     "No SideInstaller IPA downloaded.": "Chưa tải IPA của SideInstaller.",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first — with the Certificates tool if this is the Apple ID saved in Settings › Account, and at developer.apple.com signed in as it otherwise.":
-        "Apple không cấp chứng chỉ ký cho Apple ID này: nó báo rằng đã có một chứng chỉ (lỗi 7460). Phải thu hồi bớt một chứng chỉ trước — bằng công cụ Chứng chỉ nếu đây là Apple ID đã lưu trong Cài đặt › Tài khoản, còn không thì vào developer.apple.com và đăng nhập bằng tài khoản đó.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first. Use the Certificates tool if this is the Apple ID saved in Settings › Account, or developer.apple.com signed in as it otherwise.":
+        "Apple không cấp chứng chỉ ký cho Apple ID này: nó báo rằng đã có một chứng chỉ (lỗi 7460). Phải thu hồi bớt một chứng chỉ trước: bằng công cụ Chứng chỉ nếu đây là Apple ID đã lưu trong Cài đặt › Tài khoản, còn không thì vào developer.apple.com và đăng nhập bằng tài khoản đó.",
     "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
         "Apple không đăng ký được iPhone của họ với nhóm nhà phát triển của Apple ID này, nên sẽ không cấp hồ sơ provisioning. %@",
     "No pair record for their iPhone.": "Không có bản ghi ghép nối cho iPhone của họ.",
-    "The link to their iPhone dropped — start again.":
-        "Kết nối tới iPhone của họ đã rớt — hãy bắt đầu lại.",
+    "The link to their iPhone dropped. Start again.":
+        "Kết nối tới iPhone của họ đã rớt. Hãy bắt đầu lại.",
     "Set up someone else's iPhone": "Thiết lập iPhone cho người khác",
     "Same Wi-Fi network": "Cùng một mạng Wi-Fi",
-    "Their iPhone": "iPhone của họ",
-    "IP address (optional)": "Địa chỉ IP (không bắt buộc)",
-    "Optional: leave it empty, and it fills in when their iPhone pairs.":
-        "Không bắt buộc: để trống, địa chỉ sẽ tự điền khi iPhone của họ ghép nối.",
-    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
-        "Trên iPhone của họ: Cài đặt › Wi-Fi › ⓘ cạnh tên mạng, rồi xem “Địa chỉ IP”.",
-    "This iPhone is %@, so theirs will look similar.":
-        "iPhone này là %@, nên địa chỉ của họ sẽ tương tự.",
     "Apple ID to sign with": "Apple ID dùng để ký",
-    "Waiting for them to tap Trust…": "Đang đợi họ chạm Tin cậy…",
     "Waiting for them to pair in Settings…":
         "Đang đợi họ ghép nối trong Cài đặt…",
     "Waiting for them to enter the code…":
         "Đang đợi họ nhập mã…",
     "Pair their iPhone in Settings":
         "Ghép nối iPhone của họ trong Cài đặt",
-    "Their iPhone won't ask by itself — pairing starts from its Settings.":
-        "iPhone của họ sẽ không tự hỏi — việc ghép nối bắt đầu từ Cài đặt của máy.",
+    "Their iPhone won't ask by itself. Pairing starts from its Settings.":
+        "iPhone của họ sẽ không tự hỏi. Việc ghép nối bắt đầu từ Cài đặt của máy.",
     "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
         "Trên iPhone của họ, mở Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển.",
     "Tap “Pair with %@”.":
@@ -567,16 +554,14 @@ let vietnameseStrings: [String: String] = [
         "Nhập mã hiển thị tại đây vào hộp thoại trên iPhone của họ.",
     "Type this into the prompt on their iPhone.":
         "Nhập mã này vào hộp thoại trên iPhone của họ.",
-    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
-        "Họ đã chạm “Không tin cậy” trên iPhone của họ. Hãy bắt đầu lại và nhờ họ chạm Tin cậy.",
-    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
-        "SideInstaller đang đợi một iPhone ghép nối với nó — từ thẻ Cài ứng dụng, trang Ghép nối, hoặc một lần thử trước ở đây. Hãy hoàn tất lần ghép nối đó, hoặc đóng rồi mở lại SideInstaller, sau đó thử lại.",
+    "SideInstaller is already waiting for an iPhone to pair with it, from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+        "SideInstaller đang đợi một iPhone ghép nối với nó, từ thẻ Cài ứng dụng, trang Ghép nối, hoặc một lần thử trước ở đây. Hãy hoàn tất lần ghép nối đó, hoặc đóng rồi mở lại SideInstaller, sau đó thử lại.",
     "Pairing with their iPhone didn't finish: %@":
         "Ghép nối với iPhone của họ chưa hoàn tất: %@",
     "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
         "iPhone của họ ở %@ đã từ chối kết nối. Máy chỉ chấp nhận khi bật Chế độ nhà phát triển, và iOS yêu cầu xác nhận lại sau mỗi lần khởi động lại: trên iPhone của họ, hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển rồi thử lại.",
-    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
-        "Không kết nối được tới iPhone của họ ở %@. Hãy kiểm tra địa chỉ (Cài đặt › Wi-Fi › ⓘ trên iPhone của họ), hai iPhone có cùng một mạng Wi-Fi không, và Mạng cục bộ đã được bật cho SideInstaller trong Cài đặt của iPhone này chưa. Mạng khách và mạng công cộng thường ngăn các thiết bị kết nối với nhau.",
+    "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "Không kết nối được tới iPhone của họ ở %@. Hãy kiểm tra xem hai iPhone có cùng một mạng Wi-Fi không, và Mạng cục bộ đã được bật cho SideInstaller trong Cài đặt của iPhone này chưa. Mạng khách và mạng công cộng thường ngăn các thiết bị kết nối với nhau.",
     "The link to their iPhone didn't come up: %@":
         "Không mở được kết nối tới iPhone của họ: %@",
     "%d%% downloaded": "Đã tải %d%%",
@@ -589,21 +574,10 @@ let vietnameseStrings: [String: String] = [
         "Trên iPhone của họ: Cài đặt › Cài đặt chung › VPN & Quản lý thiết bị.",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
         "Chạm vào Apple ID trong mục “Ứng dụng nhà phát triển”, rồi chạm vào Tin cậy.",
-    "Open it from their Home Screen — they're set up.":
-        "Mở ứng dụng từ màn hình chính của họ — vậy là xong.",
 
     // MARK: - Side by Side, step by step
 
-    "This app. Their iPhone pairs itself, then installs SideStore, LiveContainer and more on its own.":
-        "Chính ứng dụng này. iPhone của họ tự ghép nối, rồi tự cài SideStore, LiveContainer và nhiều ứng dụng khác.",
-    "Installs and refreshes apps right on their iPhone. It gets its pairing file from this iPhone, ready to go.":
-        "Cài và làm mới ứng dụng ngay trên iPhone của họ. Nhận tệp ghép nối từ iPhone này, dùng được ngay.",
-    "Runs apps without installing them, with SideStore built in — past the three-app limit of a free Apple ID.":
-        "Chạy ứng dụng mà không cần cài, có sẵn SideStore — vượt giới hạn ba ứng dụng của Apple ID miễn phí.",
-    "Needs iOS %@ on their iPhone": "Cần iOS %@ trên iPhone của họ",
     "Needs LocalDevVPN on their iPhone": "Cần LocalDevVPN trên iPhone của họ",
-    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again with the IP address left empty.":
-        "iPhone của họ đang chạy iOS %@. Từ iOS 26.4 trở đi, %@ không dùng được kiểu ghép nối mà iPhone của họ cấp qua Wi-Fi. iOS 27 thì ghép nối từ Cài đặt của chính nó, cách này hoạt động: hãy cập nhật iPhone của họ, rồi thử lại và để trống địa chỉ IP.",
     "Couldn't download %@: %@": "Không tải được %@: %@",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "iPhone của họ đã có ba ứng dụng được ký bằng Apple ID miễn phí, mức tối đa iOS cho phép, tính cả ứng dụng đã hết hạn. Họ cần xóa một ứng dụng, rồi bạn có thể thử lại.",
@@ -614,43 +588,31 @@ let vietnameseStrings: [String: String] = [
     "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
         "SideInstaller, SideStore, hoặc LiveContainer có sẵn SideStore.",
     "Pair their iPhone": "Ghép nối iPhone của họ",
-    "They open their Settings and type in a code this iPhone shows.":
-        "Họ mở Cài đặt và nhập mã mà iPhone này hiển thị.",
     "Install over Wi-Fi": "Cài qua Wi-Fi",
     "This iPhone signs the app and sends it across. No computer needed.":
         "iPhone này ký ứng dụng và gửi sang. Không cần máy tính.",
     "What you need": "Bạn cần gì",
     "Both iPhones on the same Wi-Fi network": "Hai iPhone cùng một mạng Wi-Fi",
-    "Their iPhone on iOS %@ or later, unlocked and nearby":
-        "iPhone của họ chạy iOS %@ trở lên, đã mở khóa và ở gần",
-    "An Apple ID to sign with — ideally theirs": "Một Apple ID để ký — tốt nhất là của họ",
+    "An Apple ID to sign with, ideally theirs": "Một Apple ID để ký, tốt nhất là của họ",
     "Get started": "Bắt đầu thôi",
     "What should go on their iPhone?": "Cài gì lên iPhone của họ?",
     "Pick one. You can come back for another one later.":
         "Chọn một. Bạn có thể quay lại cài thêm sau.",
     "Stable is the release most people use. Nightly is built from the newest code.":
         "Stable là bản phát hành mà phần lớn mọi người dùng. Nightly được build từ mã mới nhất.",
-    "Do you know their iPhone's IP address?": "Bạn có biết địa chỉ IP của iPhone họ không?",
-    "Without it": "Không có địa chỉ",
-    "Their iPhone pairs from its own Settings, the way iOS %@ pairs over Wi-Fi.":
-        "iPhone của họ ghép nối từ Cài đặt của chính nó, theo cách iOS %@ ghép nối qua Wi-Fi.",
-    "With it": "Có địa chỉ",
-    "SideInstaller asks their iPhone directly first, and reuses the pairing from an earlier try.":
-        "SideInstaller hỏi trực tiếp iPhone của họ trước, và dùng lại phần ghép nối từ lần thử trước.",
-    "Skip": "Bỏ qua",
     "Which Apple ID signs it?": "Apple ID nào sẽ ký?",
     "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
         "Ứng dụng được ký bằng Apple ID này, và cứ 7 ngày lại cần nó để tiếp tục mở được. Hãy dùng Apple ID của chủ iPhone.",
     "Their Apple ID": "Apple ID của họ",
-    "Recommended — they keep their apps signed with it.":
-        "Khuyến nghị — họ dùng nó để giữ ứng dụng luôn được ký.",
+    "Recommended: they keep their apps signed with it.":
+        "Khuyến nghị: họ dùng nó để giữ ứng dụng luôn được ký.",
     "My Apple ID": "Apple ID của tôi",
     "Only if you'll keep their apps signed yourself: they won't have this Apple ID's password.":
         "Chỉ chọn nếu chính bạn sẽ giữ ứng dụng của họ luôn được ký: họ sẽ không có mật khẩu của Apple ID này.",
     "Used for this install only, and never saved.":
         "Chỉ dùng cho lần cài này, và không bao giờ được lưu.",
-    "Apple may send a code to their devices — keep their iPhone close.":
-        "Apple có thể gửi mã đến thiết bị của họ — hãy để iPhone của họ ở gần.",
+    "Apple may send a code to their devices, so keep their iPhone close.":
+        "Apple có thể gửi mã đến thiết bị của họ, vì vậy hãy để iPhone của họ ở gần.",
     "Get their iPhone ready": "Chuẩn bị iPhone của họ",
     "Do this on their iPhone, then start.": "Làm những việc này trên iPhone của họ, rồi bắt đầu.",
     "Connect their iPhone to the same Wi-Fi network as this one.":
@@ -659,19 +621,13 @@ let vietnameseStrings: [String: String] = [
         "Bật Chế độ nhà phát triển trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển, và xác nhận sau khi khởi động lại.",
     "Unlock their iPhone and keep it next to this one.":
         "Mở khóa iPhone của họ và để nó cạnh iPhone này.",
-    "Pairs from its Settings": "Ghép nối từ Cài đặt",
     "Installing %@ on their iPhone": "Đang cài %@ lên iPhone của họ",
     "Waiting for their iPhone…": "Đang chờ iPhone của họ…",
     "Looking for their iPhone…": "Đang tìm iPhone của họ…",
-    "Tap Trust on their iPhone": "Chạm Tin cậy trên iPhone của họ",
-    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
-        "Mở khóa iPhone của họ, rồi chạm Tin cậy trong lời nhắc hiện ra.",
     "Handing over the pairing file…": "Đang chuyển tệp ghép nối…",
     "Change details": "Đổi thông tin",
     "%@ is on their iPhone": "%@ đã có trên iPhone của họ",
     "Finish on their iPhone": "Hoàn tất trên iPhone của họ",
-    "Their iPhone runs iOS %@. SideInstaller pairs itself only from iOS %@, so there it needs a pairing file made on a computer.":
-        "iPhone của họ đang chạy iOS %@. SideInstaller chỉ tự ghép nối được từ iOS %@, nên trên máy đó cần tệp ghép nối tạo trên máy tính.",
     "This iPhone no longer keeps a pairing with theirs.":
         "iPhone này không còn giữ phần ghép nối với iPhone của họ.",
     "Install another app": "Cài ứng dụng khác",
@@ -1282,4 +1238,45 @@ let vietnameseStrings: [String: String] = [
         "Dùng bản không chính thức?",
     "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
         "Nếu bản này đã bị chỉnh sửa, nó có thể gửi Apple ID và mật khẩu của bạn cho người khác. Chỉ tiếp tục nếu bạn tin tưởng nguồn tải.",
+
+    // MARK: - Side by Side: their address, and the pairing file SideInstaller gets
+
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "Không kết nối được tới iPhone của họ ở %@. Hãy kiểm tra địa chỉ (Cài đặt › Wi-Fi › ⓘ trên iPhone của họ), hai iPhone có cùng một mạng Wi-Fi không, và Mạng cục bộ đã được bật cho SideInstaller trong Cài đặt của iPhone này chưa. Mạng khách và mạng công cộng thường ngăn các thiết bị kết nối với nhau.",
+    "Their iPhone": "iPhone của họ",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "Họ đã chạm “Không tin cậy” trên iPhone của họ. Hãy bắt đầu lại và nhờ họ chạm Tin cậy.",
+    "Pairs from its Settings": "Ghép nối từ Cài đặt",
+    "Waiting for them to tap Trust…": "Đang đợi họ chạm Tin cậy…",
+    "Tap Trust on their iPhone": "Chạm Tin cậy trên iPhone của họ",
+    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
+        "Trên iPhone của họ: Cài đặt › Wi-Fi › ⓘ cạnh tên mạng, rồi xem “Địa chỉ IP”.",
+    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
+        "Mở khóa iPhone của họ, rồi chạm Tin cậy trong lời nhắc hiện ra.",
+    "This iPhone is %@, so theirs will look similar.": "iPhone này là %@, nên địa chỉ của họ sẽ tương tự.",
+    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
+        "“%@” không phải là địa chỉ IPv4. Nó phải có dạng 192.168.1.42.",
+    "Do you have the device's IP?": "Bạn có địa chỉ IP của thiết bị không?",
+    "Optional": "Không bắt buộc",
+    "SideInstaller asks their iPhone to pair directly. Needed below iOS 27.":
+        "SideInstaller yêu cầu iPhone của họ ghép nối trực tiếp. Cần thiết với iOS dưới 27.",
+    "Their iPhone pairs from its own Settings, which needs iOS 27.":
+        "iPhone của họ tự ghép nối từ Cài đặt của máy, việc này cần iOS 27.",
+    "IP address": "Địa chỉ IP",
+    "On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust.":
+        "Trên iOS 27, họ nhập mã mà iPhone này hiển thị. Trên iOS cũ hơn, họ chạm Tin cậy.",
+    "Their iPhone unlocked and nearby": "iPhone của họ đã mở khóa và ở gần",
+    "Below iOS 27, their iPhone's IP address": "Với iOS dưới 27, địa chỉ IP của iPhone của họ",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
+        "iPhone của họ đang chạy iOS %@. Từ iOS 26.4 trở đi, SideInstaller không dùng được kiểu ghép nối mà iPhone của họ cấp qua Wi-Fi, nên cần tệp ghép nối tạo trên máy tính.",
+    "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":
+        "Tải LocalDevVPN từ App Store và kết nối: SideInstaller hoạt động thông qua nó.",
+    "Open SideInstaller. Its pairing file is already in place.":
+        "Mở SideInstaller. Tệp ghép nối đã có sẵn trong đó.",
+    "Open SideInstaller and import a pairing file made on a computer.":
+        "Mở SideInstaller và nhập tệp ghép nối tạo trên máy tính.",
+    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone, so use theirs. To install on this one, use the Install tab.":
+        "%@ là địa chỉ mà chính chiếc iPhone này đang dùng. Side by Side cài lên iPhone của người khác, nên hãy dùng địa chỉ của họ. Để cài lên máy này, hãy dùng tab Cài ứng dụng.",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
+        "iPhone của họ đang chạy iOS %@. Từ iOS 26.4 trở đi, %@ không dùng được kiểu ghép nối mà iPhone của họ cấp qua Wi-Fi. iOS 27 thì ghép nối từ Cài đặt của chính nó, cách này hoạt động: hãy cập nhật iPhone của họ, rồi thử lại và chọn Không khi được hỏi địa chỉ IP.",
 ]

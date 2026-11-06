@@ -517,48 +517,35 @@ let spanishStrings: [String: String] = [
     "Side by Side": "Side by Side",
     "Pair with their iPhone": "Emparejar con su iPhone",
     "Install on their iPhone": "Instalar en su iPhone",
-    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
-        "“%@” no es una dirección IPv4. Debe tener este aspecto: 192.168.1.42.",
-    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
-        "%@ es una dirección que este iPhone ya tiene. Side by Side instala en el iPhone de otra persona: usa el suyo. Para instalar en este, usa la pestaña Instalar.",
     "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the Install tab.":
         "El iPhone que se emparejó es este. Empareja desde los Ajustes de su iPhone. Para instalar en este iPhone, usa la pestaña Instalar.",
     "Enter the Apple ID to sign with, and its password.":
         "Introduce el Apple ID con el que firmar y su contraseña.",
     "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
         "El Wi-Fi está apagado. Ambos iPhone tienen que estar en la misma red Wi-Fi para que esto funcione.",
-    "The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute.":
+    "The release download wasn't an IPA. GitHub may be returning an error page, so try again in a minute.":
         "La descarga de la versión no era un IPA. Puede que GitHub esté devolviendo una página de error: inténtalo de nuevo en un minuto.",
     "Couldn't download the latest SideInstaller release: %@":
         "No se pudo descargar la última versión de SideInstaller: %@",
     "No SideInstaller IPA downloaded.": "No se ha descargado ningún IPA de SideInstaller.",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first — with the Certificates tool if this is the Apple ID saved in Settings › Account, and at developer.apple.com signed in as it otherwise.":
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first. Use the Certificates tool if this is the Apple ID saved in Settings › Account, or developer.apple.com signed in as it otherwise.":
         "Apple no emite un certificado de firma para este Apple ID: informa de que ya existe uno (error 7460). Primero hay que revocar uno: con la herramienta Certificados si este es el Apple ID guardado en Ajustes › Cuenta, y si no, en developer.apple.com con la sesión iniciada en él.",
     "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
         "Apple no ha registrado su iPhone en el equipo de desarrollo de este Apple ID, así que no emitirá un perfil de aprovisionamiento. %@",
     "No pair record for their iPhone.":
         "No hay registro de emparejamiento para su iPhone.",
-    "The link to their iPhone dropped — start again.":
+    "The link to their iPhone dropped. Start again.":
         "Se ha perdido el enlace con su iPhone: empieza de nuevo.",
     "Set up someone else's iPhone": "Configura el iPhone de otra persona",
     "Same Wi-Fi network": "Misma red Wi-Fi",
-    "Their iPhone": "Su iPhone",
-    "IP address (optional)": "Dirección IP (opcional)",
-    "Optional: leave it empty, and it fills in when their iPhone pairs.":
-        "Opcional: déjala vacía y se rellena sola cuando su iPhone se empareje.",
-    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
-        "En su iPhone: Ajustes › Wi-Fi › ⓘ junto a la red y luego “Dirección IP”.",
-    "This iPhone is %@, so theirs will look similar.":
-        "Este iPhone es %@, así que el suyo se parecerá.",
     "Apple ID to sign with": "Apple ID con el que firmar",
-    "Waiting for them to tap Trust…": "Esperando a que toquen Confiar…",
     "Waiting for them to pair in Settings…":
         "Esperando a que emparejen en Ajustes…",
     "Waiting for them to enter the code…":
         "Esperando a que introduzcan el código…",
     "Pair their iPhone in Settings":
         "Empareja su iPhone en Ajustes",
-    "Their iPhone won't ask by itself — pairing starts from its Settings.":
+    "Their iPhone won't ask by itself. Pairing starts from its Settings.":
         "Su iPhone no lo pedirá por sí solo: el emparejamiento empieza en sus Ajustes.",
     "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
         "En su iPhone, abre Ajustes › Privacidad y seguridad › Modo desarrollador.",
@@ -570,16 +557,14 @@ let spanishStrings: [String: String] = [
         "Escribe el código que aparece aquí en el mensaje de su iPhone.",
     "Type this into the prompt on their iPhone.":
         "Escribe este código en el mensaje que aparece en su iPhone.",
-    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
-        "Han tocado “No confiar” en su iPhone. Empieza de nuevo y pídeles que toquen Confiar.",
-    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+    "SideInstaller is already waiting for an iPhone to pair with it, from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
         "SideInstaller ya está esperando a que un iPhone se empareje con él, desde la pestaña Instalar, la página Emparejamiento o un intento anterior aquí. Termina ese emparejamiento, o cierra y vuelve a abrir SideInstaller, y vuelve a intentarlo.",
     "Pairing with their iPhone didn't finish: %@":
         "El emparejamiento con su iPhone no ha terminado: %@",
     "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
         "Su iPhone en %@ rechazó la conexión. Solo la acepta con el Modo desarrollador activado, y iOS pide confirmarlo de nuevo tras cada reinicio: en su iPhone, actívalo en Ajustes › Privacidad y seguridad › Modo desarrollador y vuelve a intentarlo.",
-    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
-        "No se pudo contactar con su iPhone en %@. Comprueba la dirección (Ajustes › Wi-Fi › ⓘ en su iPhone), que ambos iPhone estén en la misma red Wi-Fi y que la red local esté activada para SideInstaller en los Ajustes de este iPhone. Las redes de invitados y las públicas a menudo impiden que los dispositivos se comuniquen entre sí.",
+    "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "No se pudo contactar con su iPhone en %@. Comprueba que ambos iPhone estén en la misma red Wi-Fi y que la red local esté activada para SideInstaller en los Ajustes de este iPhone. Las redes de invitados y las públicas a menudo impiden que los dispositivos se comuniquen entre sí.",
     "The link to their iPhone didn't come up: %@":
         "No se pudo abrir el enlace con su iPhone: %@",
     "%d%% downloaded": "%d%% descargado",
@@ -592,21 +577,10 @@ let spanishStrings: [String: String] = [
         "En su iPhone: Ajustes › General › VPN y gestión de dispositivos.",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
         "Toca el Apple ID en “App de desarrollador” y luego toca Confiar.",
-    "Open it from their Home Screen — they're set up.":
-        "Ábrela desde su pantalla de inicio: ya está listo.",
 
     // MARK: - Side by Side, step by step
 
-    "This app. Their iPhone pairs itself, then installs SideStore, LiveContainer and more on its own.":
-        "Esta app. Su iPhone se empareja solo y luego instala SideStore, LiveContainer y más por su cuenta.",
-    "Installs and refreshes apps right on their iPhone. It gets its pairing file from this iPhone, ready to go.":
-        "Instala y renueva apps directamente en su iPhone. Recibe su archivo de emparejamiento desde este iPhone, listo para usar.",
-    "Runs apps without installing them, with SideStore built in — past the three-app limit of a free Apple ID.":
-        "Ejecuta apps sin instalarlas, con SideStore integrado: supera el límite de tres apps de un Apple ID gratuito.",
-    "Needs iOS %@ on their iPhone": "Necesita iOS %@ en su iPhone",
     "Needs LocalDevVPN on their iPhone": "Necesita LocalDevVPN en su iPhone",
-    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again with the IP address left empty.":
-        "Su iPhone tiene iOS %@. Desde iOS 26.4, %@ no puede usar el emparejamiento que su iPhone da por Wi-Fi. iOS 27 se empareja desde sus propios Ajustes, y así sí funciona: actualiza su iPhone y vuelve a intentarlo dejando vacía la dirección IP.",
     "Couldn't download %@: %@": "No se pudo descargar %@: %@",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "Su iPhone ya tiene tres apps firmadas con un Apple ID gratuito, el máximo que permite iOS, contando las caducadas. Tienen que borrar una y luego puedes volver a intentarlo.",
@@ -617,42 +591,30 @@ let spanishStrings: [String: String] = [
     "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
         "SideInstaller, SideStore o LiveContainer con SideStore integrado.",
     "Pair their iPhone": "Empareja su iPhone",
-    "They open their Settings and type in a code this iPhone shows.":
-        "Abren sus Ajustes y escriben un código que muestra este iPhone.",
     "Install over Wi-Fi": "Instala por Wi-Fi",
     "This iPhone signs the app and sends it across. No computer needed.":
         "Este iPhone firma la app y se la envía. No hace falta un ordenador.",
     "What you need": "Qué necesitas",
     "Both iPhones on the same Wi-Fi network": "Los dos iPhone en la misma red Wi-Fi",
-    "Their iPhone on iOS %@ or later, unlocked and nearby":
-        "Su iPhone con iOS %@ o posterior, desbloqueado y cerca",
-    "An Apple ID to sign with — ideally theirs": "Un Apple ID para firmar, mejor si es el suyo",
+    "An Apple ID to sign with, ideally theirs": "Un Apple ID para firmar, mejor si es el suyo",
     "Get started": "Empezar",
     "What should go on their iPhone?": "¿Qué quieres instalar en su iPhone?",
     "Pick one. You can come back for another one later.":
         "Elige una. Puedes volver por otra más tarde.",
     "Stable is the release most people use. Nightly is built from the newest code.":
         "Stable es la versión que usa la mayoría. Nightly se compila con el código más reciente.",
-    "Do you know their iPhone's IP address?": "¿Sabes la dirección IP de su iPhone?",
-    "Without it": "Sin ella",
-    "Their iPhone pairs from its own Settings, the way iOS %@ pairs over Wi-Fi.":
-        "Su iPhone se empareja desde sus propios Ajustes, como se empareja iOS %@ por Wi-Fi.",
-    "With it": "Con ella",
-    "SideInstaller asks their iPhone directly first, and reuses the pairing from an earlier try.":
-        "SideInstaller pregunta primero directamente a su iPhone y reutiliza el emparejamiento de un intento anterior.",
-    "Skip": "Omitir",
     "Which Apple ID signs it?": "¿Qué Apple ID la firma?",
     "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
         "La app se firma con él y lo necesita de nuevo cada 7 días para seguir abriéndose. Usa el del propietario del iPhone.",
     "Their Apple ID": "Su Apple ID",
-    "Recommended — they keep their apps signed with it.":
+    "Recommended: they keep their apps signed with it.":
         "Recomendado: con él mantienen firmadas sus apps.",
     "My Apple ID": "Mi Apple ID",
     "Only if you'll keep their apps signed yourself: they won't have this Apple ID's password.":
         "Solo si vas a mantener tú firmadas sus apps: no tendrán la contraseña de este Apple ID.",
     "Used for this install only, and never saved.":
         "Solo se usa para esta instalación y nunca se guarda.",
-    "Apple may send a code to their devices — keep their iPhone close.":
+    "Apple may send a code to their devices, so keep their iPhone close.":
         "Apple puede enviar un código a sus dispositivos: ten su iPhone cerca.",
     "Get their iPhone ready": "Prepara su iPhone",
     "Do this on their iPhone, then start.": "Haz esto en su iPhone y luego empieza.",
@@ -662,19 +624,13 @@ let spanishStrings: [String: String] = [
         "Activa el Modo desarrollador en Ajustes › Privacidad y seguridad › Modo desarrollador, y confírmalo después del reinicio.",
     "Unlock their iPhone and keep it next to this one.":
         "Desbloquea su iPhone y déjalo junto a este.",
-    "Pairs from its Settings": "Se empareja desde sus Ajustes",
     "Installing %@ on their iPhone": "Instalando %@ en su iPhone",
     "Waiting for their iPhone…": "Esperando a su iPhone…",
     "Looking for their iPhone…": "Buscando su iPhone…",
-    "Tap Trust on their iPhone": "Toca Confiar en su iPhone",
-    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
-        "Desbloquea su iPhone y toca Confiar en el aviso que aparece.",
     "Handing over the pairing file…": "Entregando el archivo de emparejamiento…",
     "Change details": "Cambiar datos",
     "%@ is on their iPhone": "%@ está en su iPhone",
     "Finish on their iPhone": "Termina en su iPhone",
-    "Their iPhone runs iOS %@. SideInstaller pairs itself only from iOS %@, so there it needs a pairing file made on a computer.":
-        "Su iPhone tiene iOS %@. SideInstaller solo se empareja por sí mismo a partir de iOS %@, así que ahí necesita un archivo de emparejamiento hecho en un ordenador.",
     "This iPhone no longer keeps a pairing with theirs.":
         "Este iPhone ya no guarda ningún emparejamiento con el suyo.",
     "Install another app": "Instalar otra app",
@@ -1287,4 +1243,45 @@ let spanishStrings: [String: String] = [
         "¿Usar una copia no oficial?",
     "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
         "Si esta copia fue modificada, puede enviar tu Apple ID y tu contraseña a otra persona. Continúa solo si confías en su origen.",
+
+    // MARK: - Side by Side: their address, and the pairing file SideInstaller gets
+
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "No se pudo contactar con su iPhone en %@. Comprueba la dirección (Ajustes › Wi-Fi › ⓘ en su iPhone), que ambos iPhone estén en la misma red Wi-Fi y que la red local esté activada para SideInstaller en los Ajustes de este iPhone. Las redes de invitados y las públicas a menudo impiden que los dispositivos se comuniquen entre sí.",
+    "Their iPhone": "Su iPhone",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "Han tocado “No confiar” en su iPhone. Empieza de nuevo y pídeles que toquen Confiar.",
+    "Pairs from its Settings": "Se empareja desde sus Ajustes",
+    "Waiting for them to tap Trust…": "Esperando a que toquen Confiar…",
+    "Tap Trust on their iPhone": "Toca Confiar en su iPhone",
+    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
+        "En su iPhone: Ajustes › Wi-Fi › ⓘ junto a la red y luego “Dirección IP”.",
+    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
+        "Desbloquea su iPhone y toca Confiar en el aviso que aparece.",
+    "This iPhone is %@, so theirs will look similar.": "Este iPhone es %@, así que el suyo se parecerá.",
+    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
+        "“%@” no es una dirección IPv4. Debe tener este aspecto: 192.168.1.42.",
+    "Do you have the device's IP?": "¿Tienes la IP del dispositivo?",
+    "Optional": "Opcional",
+    "SideInstaller asks their iPhone to pair directly. Needed below iOS 27.":
+        "SideInstaller pide a su iPhone que se empareje directamente. Necesario por debajo de iOS 27.",
+    "Their iPhone pairs from its own Settings, which needs iOS 27.":
+        "Su iPhone se empareja desde sus propios Ajustes, lo que requiere iOS 27.",
+    "IP address": "Dirección IP",
+    "On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust.":
+        "En iOS 27 escriben un código que muestra este iPhone. En versiones anteriores, tocan Confiar.",
+    "Their iPhone unlocked and nearby": "Su iPhone desbloqueado y cerca",
+    "Below iOS 27, their iPhone's IP address": "Por debajo de iOS 27, la dirección IP de su iPhone",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
+        "Su iPhone tiene iOS %@. Desde iOS 26.4, SideInstaller no puede usar el emparejamiento que su iPhone da por Wi-Fi, así que necesita un archivo de emparejamiento hecho en un ordenador.",
+    "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":
+        "Descarga LocalDevVPN desde la App Store y conéctala: SideInstaller funciona a través de ella.",
+    "Open SideInstaller. Its pairing file is already in place.":
+        "Abre SideInstaller. Su archivo de emparejamiento ya está en su sitio.",
+    "Open SideInstaller and import a pairing file made on a computer.":
+        "Abre SideInstaller e importa un archivo de emparejamiento hecho en un ordenador.",
+    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone, so use theirs. To install on this one, use the Install tab.":
+        "%@ es una dirección que este iPhone ya tiene. Side by Side instala en el iPhone de otra persona: usa el suyo. Para instalar en este, usa la pestaña Instalar.",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
+        "Su iPhone tiene iOS %@. Desde iOS 26.4, %@ no puede usar el emparejamiento que su iPhone da por Wi-Fi. iOS 27 se empareja desde sus propios Ajustes, y así sí funciona: actualiza su iPhone y vuelve a intentarlo respondiendo No cuando se te pida su IP.",
 ]

@@ -498,16 +498,7 @@ let koreanStrings: [String: String] = [
 
     // MARK: - Side by Side, step by step
 
-    "This app. Their iPhone pairs itself, then installs SideStore, LiveContainer and more on its own.":
-        "바로 이 앱입니다. 상대방 iPhone이 스스로 페어링한 뒤 SideStore, LiveContainer 등을 직접 설치합니다.",
-    "Installs and refreshes apps right on their iPhone. It gets its pairing file from this iPhone, ready to go.":
-        "상대방 iPhone에서 바로 앱을 설치하고 갱신합니다. 페어링 파일은 이 iPhone에서 받아 바로 쓸 수 있습니다.",
-    "Runs apps without installing them, with SideStore built in — past the three-app limit of a free Apple ID.":
-        "앱을 설치하지 않고 실행하며 SideStore가 내장되어 있습니다. 무료 Apple ID의 3개 앱 제한을 넘을 수 있습니다.",
-    "Needs iOS %@ on their iPhone": "상대방 iPhone에 iOS %@ 필요",
     "Needs LocalDevVPN on their iPhone": "상대방 iPhone에 LocalDevVPN 필요",
-    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again with the IP address left empty.":
-        "상대방 iPhone은 iOS %@입니다. iOS 26.4부터는 상대방 iPhone이 Wi-Fi로 주는 페어링을 %@에서 쓸 수 없습니다. iOS 27은 대신 자체 설정에서 페어링하며, 이 방법은 작동합니다. 상대방 iPhone을 업데이트한 뒤 IP 주소를 비워 두고 다시 시도하세요.",
     "Couldn't download %@: %@": "%@을(를) 다운로드할 수 없습니다: %@",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "상대방 iPhone에는 이미 무료 Apple ID로 서명된 앱이 3개 있습니다. 만료된 앱을 포함해 iOS가 허용하는 최대치입니다. 상대방이 하나를 삭제한 뒤 다시 시도하세요.",
@@ -518,38 +509,27 @@ let koreanStrings: [String: String] = [
     "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
         "SideInstaller, SideStore, 또는 SideStore가 내장된 LiveContainer.",
     "Pair their iPhone": "상대방 iPhone 페어링",
-    "They open their Settings and type in a code this iPhone shows.":
-        "상대방이 설정을 열고 이 iPhone에 표시되는 코드를 입력합니다.",
     "Install over Wi-Fi": "Wi-Fi로 설치",
     "This iPhone signs the app and sends it across. No computer needed.":
         "이 iPhone이 앱에 서명해서 보내 줍니다. 컴퓨터가 필요 없습니다.",
     "What you need": "준비물",
     "Both iPhones on the same Wi-Fi network": "같은 Wi-Fi 네트워크에 연결된 두 iPhone",
-    "Their iPhone on iOS %@ or later, unlocked and nearby": "iOS %@ 이상이며 잠금 해제되어 가까이 있는 상대방 iPhone",
-    "An Apple ID to sign with — ideally theirs": "서명할 Apple ID — 가능하면 상대방 것",
+    "An Apple ID to sign with, ideally theirs": "서명할 Apple ID, 가능하면 상대방 것",
     "Get started": "시작하기",
     "What should go on their iPhone?": "상대방 iPhone에 무엇을 설치할까요?",
     "Pick one. You can come back for another one later.": "하나를 고르세요. 나중에 돌아와 다른 것도 설치할 수 있습니다.",
     "Stable is the release most people use. Nightly is built from the newest code.":
         "Stable은 대부분의 사람이 쓰는 릴리즈입니다. Nightly는 최신 코드로 빌드됩니다.",
-    "Do you know their iPhone's IP address?": "상대방 iPhone의 IP 주소를 알고 있나요?",
-    "Without it": "입력하지 않으면",
-    "Their iPhone pairs from its own Settings, the way iOS %@ pairs over Wi-Fi.":
-        "상대방 iPhone이 자체 설정에서 페어링합니다. iOS %@가 Wi-Fi로 페어링하는 방식입니다.",
-    "With it": "입력하면",
-    "SideInstaller asks their iPhone directly first, and reuses the pairing from an earlier try.":
-        "SideInstaller가 먼저 상대방 iPhone에 직접 요청하고, 이전 시도의 페어링을 다시 사용합니다.",
-    "Skip": "건너뛰기",
     "Which Apple ID signs it?": "어떤 Apple ID로 서명할까요?",
     "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
         "앱은 이 Apple ID로 서명되며, 계속 열리려면 7일마다 다시 필요합니다. iPhone 소유자의 Apple ID를 쓰세요.",
     "Their Apple ID": "상대방 Apple ID",
-    "Recommended — they keep their apps signed with it.": "추천 — 상대방이 이 계정으로 앱 서명을 유지합니다.",
+    "Recommended: they keep their apps signed with it.": "추천: 상대방이 이 계정으로 앱 서명을 유지합니다.",
     "My Apple ID": "내 Apple ID",
     "Only if you'll keep their apps signed yourself: they won't have this Apple ID's password.":
         "상대방 앱의 서명을 직접 유지할 때만 선택하세요. 상대방은 이 Apple ID의 암호를 모릅니다.",
     "Used for this install only, and never saved.": "이번 설치에만 쓰고 저장하지 않습니다.",
-    "Apple may send a code to their devices — keep their iPhone close.":
+    "Apple may send a code to their devices, so keep their iPhone close.":
         "Apple이 상대방 기기로 코드를 보낼 수 있으니 상대방 iPhone을 가까이 두세요.",
     "Get their iPhone ready": "상대방 iPhone 준비",
     "Do this on their iPhone, then start.": "상대방 iPhone에서 다음을 마친 뒤 시작하세요.",
@@ -558,19 +538,13 @@ let koreanStrings: [String: String] = [
     "Turn on Developer Mode under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
         "설정 › 개인정보 보호 및 보안 › 개발자 모드에서 개발자 모드를 켜고, 재시동 후 확인하세요.",
     "Unlock their iPhone and keep it next to this one.": "상대방 iPhone의 잠금을 해제하고 이 iPhone 옆에 두세요.",
-    "Pairs from its Settings": "설정에서 페어링",
     "Installing %@ on their iPhone": "상대방 iPhone에 %@ 설치 중",
     "Waiting for their iPhone…": "상대방 iPhone을 기다리는 중…",
     "Looking for their iPhone…": "상대방 iPhone을 찾는 중…",
-    "Tap Trust on their iPhone": "상대방 iPhone에서 신뢰를 탭하세요",
-    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
-        "상대방 iPhone의 잠금을 해제한 뒤 나타나는 메시지에서 신뢰를 탭하세요.",
     "Handing over the pairing file…": "페어링 파일 전달 중…",
     "Change details": "정보 변경",
     "%@ is on their iPhone": "%@이(가) 상대방 iPhone에 설치됨",
     "Finish on their iPhone": "상대방 iPhone에서 마무리",
-    "Their iPhone runs iOS %@. SideInstaller pairs itself only from iOS %@, so there it needs a pairing file made on a computer.":
-        "상대방 iPhone은 iOS %@입니다. SideInstaller는 iOS %@부터만 스스로 페어링하므로, 그 iPhone에서는 컴퓨터로 만든 페어링 파일이 필요합니다.",
     "This iPhone no longer keeps a pairing with theirs.":
         "이 iPhone은 더 이상 상대방 iPhone과의 페어링을 보관하지 않습니다.",
     "Install another app": "다른 앱 설치",
@@ -984,31 +958,20 @@ let koreanStrings: [String: String] = [
     "Side by Side": "Side by Side",
     "Set up someone else's iPhone": "다른 사람의 iPhone 설정해 주기",
     "Same Wi-Fi network": "같은 Wi-Fi 네트워크",
-    "Their iPhone": "상대방 iPhone",
-    "This iPhone is %@, so theirs will look similar.": "이 iPhone의 주소는 %@입니다. 상대방 주소도 이와 비슷한 형태입니다.",
-    "IP address (optional)": "IP 주소(선택)",
-    "Optional: leave it empty, and it fills in when their iPhone pairs.":
-        "선택 사항입니다. 비워 두면 상대방 iPhone이 페어링될 때 자동으로 채워집니다.",
-    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
-        "상대방 iPhone에서: 설정 › Wi-Fi › 네트워크 옆 ⓘ를 탭한 뒤 “IP 주소”를 확인하세요.",
-    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
-        "“%@” 값은 IPv4 주소가 아닙니다. 192.168.1.42 같은 형태여야 합니다.",
-    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
-        "%@ 주소는 이 iPhone이 이미 가지고 있는 주소입니다. Side by Side는 다른 사람의 iPhone에 설치하는 기능이니 상대방 주소를 입력하세요. 이 iPhone에 설치하려면 설치 탭을 사용하세요.",
     "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the Install tab.":
         "페어링된 기기는 이 iPhone이었습니다. 대신 상대방 iPhone의 설정에서 페어링하세요. 이 iPhone에 설치하려면 설치 탭을 사용하세요.",
     "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
         "Wi-Fi가 꺼져 있습니다. 이 기능을 쓰려면 두 iPhone이 같은 Wi-Fi 네트워크에 있어야 합니다.",
     "Pair with their iPhone": "상대방 iPhone과 페어링",
     "No pair record for their iPhone.": "상대방 iPhone의 페어 레코드가 없습니다.",
-    "The link to their iPhone dropped — start again.": "상대방 iPhone과의 연결이 끊어졌습니다. 처음부터 다시 시작하세요.",
+    "The link to their iPhone dropped. Start again.": "상대방 iPhone과의 연결이 끊어졌습니다. 처음부터 다시 시작하세요.",
     "Apple ID to sign with": "서명에 사용할 Apple ID",
     "Enter the Apple ID to sign with, and its password.": "서명에 사용할 Apple ID와 암호를 입력하세요.",
     "Clear their details": "상대방 정보 지우기",
     "This iPhone is still paired with theirs. Clearing forgets it.":
         "이 iPhone은 아직 상대방 iPhone과 페어링되어 있습니다. 지우면 해당 정보가 삭제됩니다.",
     "Couldn't download the latest SideInstaller release: %@": "최신 SideInstaller 릴리즈를 다운로드하지 못했습니다: %@",
-    "The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute.":
+    "The release download wasn't an IPA. GitHub may be returning an error page, so try again in a minute.":
         "다운로드한 릴리즈가 IPA가 아닙니다. GitHub이 오류 페이지를 돌려줬을 수 있으니 잠시 후 다시 시도하세요.",
     "No SideInstaller IPA downloaded.": "다운로드한 SideInstaller IPA가 없습니다.",
     "Start the install": "설치 시작",
@@ -1017,16 +980,15 @@ let koreanStrings: [String: String] = [
     "%d%% uploaded": "%d%% 업로드됨",
     "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
         "Apple이 상대방 iPhone을 이 Apple ID의 개발자 팀에 등록해 주지 않아서 프로비저닝 프로파일을 발급하지 않습니다. %@",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first — with the Certificates tool if this is the Apple ID saved in Settings › Account, and at developer.apple.com signed in as it otherwise.":
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first. Use the Certificates tool if this is the Apple ID saved in Settings › Account, or developer.apple.com signed in as it otherwise.":
         "이 Apple ID로는 서명 인증서를 발급받을 수 없습니다. Apple이 이미 인증서가 있다고 응답했습니다(오류 7460). 먼저 인증서 하나를 폐기해야 합니다. 설정 › 계정에 저장된 Apple ID라면 인증서 도구에서, 그렇지 않다면 해당 Apple ID로 developer.apple.com에 로그인해 폐기하세요.",
-    "Waiting for them to tap Trust…": "상대방이 신뢰를 탭하기를 기다리는 중…",
     "Waiting for them to pair in Settings…":
         "상대방이 설정에서 페어링하기를 기다리는 중…",
     "Waiting for them to enter the code…":
         "상대방이 코드를 입력하기를 기다리는 중…",
     "Pair their iPhone in Settings":
         "설정에서 상대방 iPhone 페어링",
-    "Their iPhone won't ask by itself — pairing starts from its Settings.":
+    "Their iPhone won't ask by itself. Pairing starts from its Settings.":
         "상대방 iPhone은 스스로 요청하지 않습니다. 페어링은 그 iPhone의 설정에서 시작됩니다.",
     "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
         "상대방 iPhone에서 설정 › 개인정보 보호 및 보안 › 개발자 모드를 여세요.",
@@ -1038,23 +1000,20 @@ let koreanStrings: [String: String] = [
         "여기에 나타나는 코드를 상대방 iPhone의 입력창에 입력하세요.",
     "Type this into the prompt on their iPhone.":
         "이 코드를 상대방 iPhone의 입력창에 입력하세요.",
-    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
-        "상대방이 iPhone에서 “신뢰 안 함”을 탭했습니다. 처음부터 다시 시작하고, 신뢰를 탭하도록 해 주세요.",
-    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+    "SideInstaller is already waiting for an iPhone to pair with it, from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
         "SideInstaller가 이미 페어링할 iPhone을 기다리고 있습니다. 설치 탭, 페어링 화면 또는 이전 시도에서 시작된 것입니다. 그 페어링을 마치거나 SideInstaller를 닫았다가 다시 연 뒤 시도하세요.",
     "Pairing with their iPhone didn't finish: %@":
         "상대방 iPhone과의 페어링이 끝나지 않았습니다: %@",
     "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
         "%@에 있는 상대방 iPhone이 연결을 거부했습니다. 개발자 모드가 켜져 있을 때만 연결을 받으며, iOS는 재시동할 때마다 개발자 모드를 다시 확인하라고 요청합니다. 상대방 iPhone에서 설정 › 개인정보 보호 및 보안 › 개발자 모드를 켠 뒤 다시 시도하세요.",
-    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
-        "%@에 있는 상대방 iPhone에 연결할 수 없습니다. 주소(상대방 iPhone의 설정 › Wi-Fi › ⓘ)가 맞는지, 두 iPhone이 같은 Wi-Fi 네트워크에 있는지, 이 iPhone의 설정에서 SideInstaller의 로컬 네트워크가 켜져 있는지 확인하세요. 게스트 네트워크나 공용 네트워크는 기기끼리 연결되지 않는 경우가 많습니다.",
+    "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "%@에 있는 상대방 iPhone에 연결할 수 없습니다. 두 iPhone이 같은 Wi-Fi 네트워크에 있는지, 이 iPhone의 설정에서 SideInstaller의 로컬 네트워크가 켜져 있는지 확인하세요. 게스트 네트워크나 공용 네트워크는 기기끼리 연결되지 않는 경우가 많습니다.",
     "The link to their iPhone didn't come up: %@":
         "상대방 iPhone과의 연결이 만들어지지 않았습니다: %@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "상대방 iPhone에서: 설정 › 일반 › VPN 및 기기 관리.",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
         "“개발자 앱” 아래의 Apple ID를 탭한 뒤 신뢰를 탭하세요.",
-    "Open it from their Home Screen — they're set up.": "상대방의 홈 화면에서 앱을 열면 설정이 모두 끝납니다.",
 
     // MARK: - About
 
@@ -1252,4 +1211,44 @@ let koreanStrings: [String: String] = [
         "비공식 복사본을 사용하시겠습니까?",
     "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
         "이 복사본이 변경되었다면 Apple ID와 암호를 다른 사람에게 보낼 수 있습니다. 출처를 신뢰하는 경우에만 계속하세요.",
+
+    // MARK: - Side by Side: their address, and the pairing file SideInstaller gets
+
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "%@에 있는 상대방 iPhone에 연결할 수 없습니다. 주소(상대방 iPhone의 설정 › Wi-Fi › ⓘ)가 맞는지, 두 iPhone이 같은 Wi-Fi 네트워크에 있는지, 이 iPhone의 설정에서 SideInstaller의 로컬 네트워크가 켜져 있는지 확인하세요. 게스트 네트워크나 공용 네트워크는 기기끼리 연결되지 않는 경우가 많습니다.",
+    "Their iPhone": "상대방 iPhone",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "상대방이 iPhone에서 “신뢰 안 함”을 탭했습니다. 처음부터 다시 시작하고, 신뢰를 탭하도록 해 주세요.",
+    "Pairs from its Settings": "설정에서 페어링",
+    "Waiting for them to tap Trust…": "상대방이 신뢰를 탭하기를 기다리는 중…",
+    "Tap Trust on their iPhone": "상대방 iPhone에서 신뢰를 탭하세요",
+    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
+        "상대방 iPhone에서: 설정 › Wi-Fi › 네트워크 옆 ⓘ를 탭한 뒤 “IP 주소”를 확인하세요.",
+    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
+        "상대방 iPhone의 잠금을 해제한 뒤 나타나는 메시지에서 신뢰를 탭하세요.",
+    "This iPhone is %@, so theirs will look similar.": "이 iPhone의 주소는 %@입니다. 상대방 주소도 이와 비슷한 형태입니다.",
+    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
+        "“%@” 값은 IPv4 주소가 아닙니다. 192.168.1.42 같은 형태여야 합니다.",
+    "Do you have the device's IP?": "기기의 IP 주소를 알고 있나요?",
+    "Optional": "선택 사항",
+    "SideInstaller asks their iPhone to pair directly. Needed below iOS 27.":
+        "SideInstaller가 상대방 iPhone에 직접 페어링을 요청합니다. iOS 27 미만에서는 필요합니다.",
+    "Their iPhone pairs from its own Settings, which needs iOS 27.":
+        "상대방 iPhone이 자체 설정에서 페어링하며, iOS 27이 필요합니다.",
+    "IP address": "IP 주소",
+    "On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust.":
+        "iOS 27에서는 이 iPhone에 표시되는 코드를 상대방이 입력합니다. 이전 iOS에서는 신뢰를 탭합니다.",
+    "Their iPhone unlocked and nearby": "잠금 해제되어 가까이 있는 상대방 iPhone",
+    "Below iOS 27, their iPhone's IP address": "iOS 27 미만이라면 상대방 iPhone의 IP 주소",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
+        "상대방 iPhone은 iOS %@입니다. iOS 26.4부터는 상대방 iPhone이 Wi-Fi로 주는 페어링을 SideInstaller에서 쓸 수 없으므로, 컴퓨터로 만든 페어링 파일이 필요합니다.",
+    "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":
+        "App Store에서 LocalDevVPN을 받아 연결하세요. SideInstaller는 이를 통해 작동합니다.",
+    "Open SideInstaller. Its pairing file is already in place.": "SideInstaller를 여세요. 페어링 파일은 이미 들어 있습니다.",
+    "Open SideInstaller and import a pairing file made on a computer.":
+        "SideInstaller를 열고 컴퓨터로 만든 페어링 파일을 가져오세요.",
+    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone, so use theirs. To install on this one, use the Install tab.":
+        "%@ 주소는 이 iPhone이 이미 가지고 있는 주소입니다. Side by Side는 다른 사람의 iPhone에 설치하는 기능이니 상대방 주소를 입력하세요. 이 iPhone에 설치하려면 설치 탭을 사용하세요.",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
+        "상대방 iPhone은 iOS %@입니다. iOS 26.4부터는 상대방 iPhone이 Wi-Fi로 주는 페어링을 %@에서 쓸 수 없습니다. iOS 27은 대신 자체 설정에서 페어링하며, 이 방법은 작동합니다. 상대방 iPhone을 업데이트한 뒤 다시 시도하고, IP를 물으면 아니요를 선택하세요.",
 ]

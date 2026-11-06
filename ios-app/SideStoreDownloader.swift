@@ -2170,7 +2170,8 @@ enum PrivateStore {
         peerPairingsFile(prefix: "remote", host: host)
     }
 
-    /// Where Side by Side pairs another device that has no address typed in.
+    /// Where Side by Side pairs another device from its Settings, before it
+    /// knows the address it's reached at.
     /// The pairing reports the address it connected from, and the file then
     /// moves to `peerRemotePairing(host:)`.
     static var unaddressedPeerRemotePairing: URL {

@@ -519,48 +519,35 @@ let frenchStrings: [String: String] = [
     "Side by Side": "Side by Side",
     "Pair with their iPhone": "Jumeler avec leur iPhone",
     "Install on their iPhone": "Installer sur leur iPhone",
-    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
-        "« %@ » n'est pas une adresse IPv4. Elle doit ressembler à 192.168.1.42.",
-    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
-        "%@ est une adresse que cet iPhone possède déjà. Side by Side installe sur l'iPhone de quelqu'un d'autre : utilisez le sien. Pour installer sur celui-ci, utilisez l'onglet Installer.",
     "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the Install tab.":
         "L'iPhone qui s'est jumelé est celui-ci. Jumelez depuis les Réglages de leur iPhone. Pour installer sur cet iPhone, utilisez l'onglet Installer.",
     "Enter the Apple ID to sign with, and its password.":
         "Saisissez l'Apple ID avec lequel signer, et son mot de passe.",
     "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
         "Le Wi-Fi est désactivé. Les deux iPhone doivent être sur le même réseau Wi-Fi pour que cela fonctionne.",
-    "The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute.":
-        "Le téléchargement de la version n'était pas un IPA. GitHub renvoie peut-être une page d'erreur — réessayez dans une minute.",
+    "The release download wasn't an IPA. GitHub may be returning an error page, so try again in a minute.":
+        "Le téléchargement de la version n'était pas un IPA. GitHub renvoie peut-être une page d'erreur : réessayez dans une minute.",
     "Couldn't download the latest SideInstaller release: %@":
         "Impossible de télécharger la dernière version de SideInstaller : %@",
     "No SideInstaller IPA downloaded.": "Aucun IPA SideInstaller téléchargé.",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first — with the Certificates tool if this is the Apple ID saved in Settings › Account, and at developer.apple.com signed in as it otherwise.":
-        "Apple refuse de délivrer un certificat de signature pour cet Apple ID : elle indique qu'il en existe déjà un (erreur 7460). Il faut d'abord en révoquer un — avec l'outil Certificats s'il s'agit de l'Apple ID enregistré dans Réglages › Compte, sinon sur developer.apple.com en vous y connectant avec.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first. Use the Certificates tool if this is the Apple ID saved in Settings › Account, or developer.apple.com signed in as it otherwise.":
+        "Apple refuse de délivrer un certificat de signature pour cet Apple ID : elle indique qu'il en existe déjà un (erreur 7460). Il faut d'abord en révoquer un. Utilisez l'outil Certificats s'il s'agit de l'Apple ID enregistré dans Réglages › Compte, sinon developer.apple.com en vous y connectant avec.",
     "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
         "Apple n'a pas enregistré leur iPhone auprès de l'équipe de développement de cet Apple ID, elle ne délivrera donc pas de profil de provisionnement. %@",
     "No pair record for their iPhone.":
         "Aucun enregistrement de jumelage pour leur iPhone.",
-    "The link to their iPhone dropped — start again.":
-        "La liaison avec leur iPhone a été perdue — recommencez.",
+    "The link to their iPhone dropped. Start again.":
+        "La liaison avec leur iPhone a été perdue. Recommencez.",
     "Set up someone else's iPhone": "Configurer l'iPhone de quelqu'un d'autre",
     "Same Wi-Fi network": "Même réseau Wi-Fi",
-    "Their iPhone": "Leur iPhone",
-    "IP address (optional)": "Adresse IP (facultative)",
-    "Optional: leave it empty, and it fills in when their iPhone pairs.":
-        "Facultative : laissez-la vide, elle se remplit quand leur iPhone se jumelle.",
-    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
-        "Sur leur iPhone : Réglages › Wi-Fi › ⓘ à côté du réseau, puis « Adresse IP ».",
-    "This iPhone is %@, so theirs will look similar.":
-        "Cet iPhone est %@, le leur y ressemblera.",
     "Apple ID to sign with": "Apple ID avec lequel signer",
-    "Waiting for them to tap Trust…": "En attente qu'ils touchent Faire confiance…",
     "Waiting for them to pair in Settings…":
         "En attente qu'ils jumellent l'iPhone dans Réglages…",
     "Waiting for them to enter the code…":
         "En attente qu'ils saisissent le code…",
     "Pair their iPhone in Settings":
         "Jumelez leur iPhone dans Réglages",
-    "Their iPhone won't ask by itself — pairing starts from its Settings.":
+    "Their iPhone won't ask by itself. Pairing starts from its Settings.":
         "Leur iPhone ne le demandera pas de lui-même : le jumelage se lance depuis ses Réglages.",
     "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
         "Sur leur iPhone, ouvrez Réglages › Confidentialité et sécurité › Mode développeur.",
@@ -572,16 +559,14 @@ let frenchStrings: [String: String] = [
         "Saisissez le code qui s'affiche ici dans la demande affichée sur leur iPhone.",
     "Type this into the prompt on their iPhone.":
         "Saisissez ce code dans la demande affichée sur leur iPhone.",
-    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
-        "Ils ont touché « Ne pas faire confiance » sur leur iPhone. Recommencez et demandez-leur de toucher Faire confiance.",
-    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
-        "SideInstaller attend déjà qu'un iPhone se jumelle avec lui — depuis l'onglet Installer, la page Jumelage ou une tentative précédente ici. Terminez ce jumelage, ou fermez puis rouvrez SideInstaller, puis réessayez.",
+    "SideInstaller is already waiting for an iPhone to pair with it, from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+        "SideInstaller attend déjà qu'un iPhone se jumelle avec lui, depuis l'onglet Installer, la page Jumelage ou une tentative précédente ici. Terminez ce jumelage, ou fermez puis rouvrez SideInstaller, puis réessayez.",
     "Pairing with their iPhone didn't finish: %@":
         "Le jumelage avec leur iPhone n'a pas abouti : %@",
     "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
         "Leur iPhone à l'adresse %@ a refusé la connexion. Il n'en accepte qu'avec le mode développeur activé, et iOS demande de le confirmer de nouveau après chaque redémarrage : sur leur iPhone, activez-le dans Réglages › Confidentialité et sécurité › Mode développeur, puis réessayez.",
-    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
-        "Impossible de joindre leur iPhone à l'adresse %@. Vérifiez l'adresse (Réglages › Wi-Fi › ⓘ sur leur iPhone), que les deux iPhone sont sur le même réseau Wi-Fi et que Réseau local est activé pour SideInstaller dans les Réglages de cet iPhone. Les réseaux invités et publics empêchent souvent les appareils de communiquer entre eux.",
+    "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "Impossible de joindre leur iPhone à l'adresse %@. Vérifiez que les deux iPhone sont sur le même réseau Wi-Fi et que Réseau local est activé pour SideInstaller dans les Réglages de cet iPhone. Les réseaux invités et publics empêchent souvent les appareils de communiquer entre eux.",
     "The link to their iPhone didn't come up: %@":
         "La liaison avec leur iPhone n'a pas pu s'établir : %@",
     "%d%% downloaded": "%d%% téléchargés",
@@ -594,21 +579,10 @@ let frenchStrings: [String: String] = [
         "Sur leur iPhone : Réglages › Général › VPN et gestion des appareils.",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
         "Touchez l'Apple ID sous « App de développeur », puis touchez Faire confiance.",
-    "Open it from their Home Screen — they're set up.":
-        "Ouvrez-la depuis leur écran d'accueil — c'est terminé.",
 
     // MARK: - Side by Side, step by step
 
-    "This app. Their iPhone pairs itself, then installs SideStore, LiveContainer and more on its own.":
-        "Cette app. Leur iPhone se jumelle tout seul, puis installe SideStore, LiveContainer et d'autres apps de lui-même.",
-    "Installs and refreshes apps right on their iPhone. It gets its pairing file from this iPhone, ready to go.":
-        "Installe et actualise des apps directement sur leur iPhone. Il reçoit son fichier de jumelage de cet iPhone, prêt à l'emploi.",
-    "Runs apps without installing them, with SideStore built in — past the three-app limit of a free Apple ID.":
-        "Exécute des apps sans les installer, avec SideStore intégré : au-delà de la limite de trois apps d'un Apple ID gratuit.",
-    "Needs iOS %@ on their iPhone": "Nécessite iOS %@ sur leur iPhone",
     "Needs LocalDevVPN on their iPhone": "Nécessite LocalDevVPN sur leur iPhone",
-    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again with the IP address left empty.":
-        "Leur iPhone est sous iOS %@. À partir d'iOS 26.4, %@ ne peut pas utiliser le jumelage que leur iPhone donne via le Wi-Fi. iOS 27 se jumelle plutôt depuis ses propres Réglages, ce qui fonctionne : mettez à jour leur iPhone, puis réessayez en laissant l'adresse IP vide.",
     "Couldn't download %@: %@": "Impossible de télécharger %@ : %@",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "Leur iPhone a déjà trois apps signées avec un Apple ID gratuit, le maximum autorisé par iOS, apps expirées comprises. Ils doivent en supprimer une, puis vous pourrez réessayer.",
@@ -619,42 +593,30 @@ let frenchStrings: [String: String] = [
     "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
         "SideInstaller, SideStore, ou LiveContainer avec SideStore intégré.",
     "Pair their iPhone": "Jumelez leur iPhone",
-    "They open their Settings and type in a code this iPhone shows.":
-        "Ils ouvrent leurs Réglages et saisissent un code affiché par cet iPhone.",
     "Install over Wi-Fi": "Installation via le Wi-Fi",
     "This iPhone signs the app and sends it across. No computer needed.":
         "Cet iPhone signe l'app et la leur envoie. Aucun ordinateur nécessaire.",
     "What you need": "Ce qu'il vous faut",
     "Both iPhones on the same Wi-Fi network": "Les deux iPhone sur le même réseau Wi-Fi",
-    "Their iPhone on iOS %@ or later, unlocked and nearby":
-        "Leur iPhone sous iOS %@ ou ultérieur, déverrouillé et à proximité",
-    "An Apple ID to sign with — ideally theirs": "Un Apple ID pour signer, idéalement le leur",
+    "An Apple ID to sign with, ideally theirs": "Un Apple ID pour signer, idéalement le leur",
     "Get started": "C'est parti",
     "What should go on their iPhone?": "Que faut-il installer sur leur iPhone ?",
     "Pick one. You can come back for another one later.":
         "Choisissez-en une. Vous pourrez revenir pour une autre plus tard.",
     "Stable is the release most people use. Nightly is built from the newest code.":
         "Stable est la version que la plupart des gens utilisent. Nightly est compilée à partir du code le plus récent.",
-    "Do you know their iPhone's IP address?": "Connaissez-vous l'adresse IP de leur iPhone ?",
-    "Without it": "Sans elle",
-    "Their iPhone pairs from its own Settings, the way iOS %@ pairs over Wi-Fi.":
-        "Leur iPhone se jumelle depuis ses propres Réglages, comme iOS %@ le fait via le Wi-Fi.",
-    "With it": "Avec elle",
-    "SideInstaller asks their iPhone directly first, and reuses the pairing from an earlier try.":
-        "SideInstaller contacte d'abord leur iPhone directement, et réutilise le jumelage d'une tentative précédente.",
-    "Skip": "Passer",
     "Which Apple ID signs it?": "Quel Apple ID la signe ?",
     "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
         "L'app est signée avec cet Apple ID, et en a de nouveau besoin tous les 7 jours pour continuer à s'ouvrir. Utilisez celui du propriétaire de l'iPhone.",
     "Their Apple ID": "Leur Apple ID",
-    "Recommended — they keep their apps signed with it.":
+    "Recommended: they keep their apps signed with it.":
         "Recommandé : ils gardent leurs apps signées avec.",
     "My Apple ID": "Mon Apple ID",
     "Only if you'll keep their apps signed yourself: they won't have this Apple ID's password.":
         "Seulement si vous gardez vous-même leurs apps signées : ils n'auront pas le mot de passe de cet Apple ID.",
     "Used for this install only, and never saved.":
         "Utilisé uniquement pour cette installation, et jamais enregistré.",
-    "Apple may send a code to their devices — keep their iPhone close.":
+    "Apple may send a code to their devices, so keep their iPhone close.":
         "Apple peut envoyer un code à leurs appareils : gardez leur iPhone à portée de main.",
     "Get their iPhone ready": "Préparez leur iPhone",
     "Do this on their iPhone, then start.":
@@ -665,19 +627,13 @@ let frenchStrings: [String: String] = [
         "Activez le Mode développeur dans Réglages › Confidentialité et sécurité › Mode développeur, et confirmez-le après le redémarrage.",
     "Unlock their iPhone and keep it next to this one.":
         "Déverrouillez leur iPhone et gardez-le à côté de celui-ci.",
-    "Pairs from its Settings": "Se jumelle depuis ses Réglages",
     "Installing %@ on their iPhone": "Installation de %@ sur leur iPhone",
     "Waiting for their iPhone…": "En attente de leur iPhone…",
     "Looking for their iPhone…": "Recherche de leur iPhone…",
-    "Tap Trust on their iPhone": "Touchez Faire confiance sur leur iPhone",
-    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
-        "Déverrouillez leur iPhone, puis touchez Faire confiance dans la demande qui s'affiche.",
     "Handing over the pairing file…": "Transmission du fichier de jumelage…",
     "Change details": "Modifier les détails",
     "%@ is on their iPhone": "%@ est sur leur iPhone",
     "Finish on their iPhone": "À terminer sur leur iPhone",
-    "Their iPhone runs iOS %@. SideInstaller pairs itself only from iOS %@, so there it needs a pairing file made on a computer.":
-        "Leur iPhone est sous iOS %@. SideInstaller ne se jumelle tout seul qu'à partir d'iOS %@ ; il lui faut donc là un fichier de jumelage créé sur un ordinateur.",
     "This iPhone no longer keeps a pairing with theirs.":
         "Cet iPhone ne garde plus de jumelage avec le leur.",
     "Install another app": "Installer une autre app",
@@ -1291,4 +1247,45 @@ let frenchStrings: [String: String] = [
         "Utiliser une copie non officielle ?",
     "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
         "Si cette copie a été modifiée, elle peut envoyer votre identifiant Apple et votre mot de passe à quelqu'un d'autre. Ne continuez que si vous faites confiance à sa provenance.",
+
+    // MARK: - Side by Side: their address, and the pairing file SideInstaller gets
+
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "Impossible de joindre leur iPhone à l'adresse %@. Vérifiez l'adresse (Réglages › Wi-Fi › ⓘ sur leur iPhone), que les deux iPhone sont sur le même réseau Wi-Fi et que Réseau local est activé pour SideInstaller dans les Réglages de cet iPhone. Les réseaux invités et publics empêchent souvent les appareils de communiquer entre eux.",
+    "Their iPhone": "Leur iPhone",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "Ils ont touché « Ne pas faire confiance » sur leur iPhone. Recommencez et demandez-leur de toucher Faire confiance.",
+    "Pairs from its Settings": "Se jumelle depuis ses Réglages",
+    "Waiting for them to tap Trust…": "En attente qu'ils touchent Faire confiance…",
+    "Tap Trust on their iPhone": "Touchez Faire confiance sur leur iPhone",
+    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
+        "Sur leur iPhone : Réglages › Wi-Fi › ⓘ à côté du réseau, puis « Adresse IP ».",
+    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
+        "Déverrouillez leur iPhone, puis touchez Faire confiance dans la demande qui s'affiche.",
+    "This iPhone is %@, so theirs will look similar.": "Cet iPhone est %@, le leur y ressemblera.",
+    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
+        "« %@ » n'est pas une adresse IPv4. Elle doit ressembler à 192.168.1.42.",
+    "Do you have the device's IP?": "Avez-vous l'adresse IP de l'appareil ?",
+    "Optional": "Facultatif",
+    "SideInstaller asks their iPhone to pair directly. Needed below iOS 27.":
+        "SideInstaller demande directement à leur iPhone de se jumeler. Nécessaire avant iOS 27.",
+    "Their iPhone pairs from its own Settings, which needs iOS 27.":
+        "Leur iPhone se jumelle depuis ses propres Réglages, ce qui nécessite iOS 27.",
+    "IP address": "Adresse IP",
+    "On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust.":
+        "Sous iOS 27, ils saisissent un code affiché par cet iPhone. Sur un iOS plus ancien, ils touchent Faire confiance.",
+    "Their iPhone unlocked and nearby": "Leur iPhone déverrouillé et à proximité",
+    "Below iOS 27, their iPhone's IP address": "Avant iOS 27, l'adresse IP de leur iPhone",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
+        "Leur iPhone est sous iOS %@. À partir d'iOS 26.4, SideInstaller ne peut pas utiliser le jumelage que leur iPhone donne via le Wi-Fi ; il lui faut donc un fichier de jumelage créé sur un ordinateur.",
+    "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":
+        "Installez LocalDevVPN depuis l'App Store et connectez-le : SideInstaller passe par lui.",
+    "Open SideInstaller. Its pairing file is already in place.":
+        "Ouvrez SideInstaller. Son fichier de jumelage est déjà en place.",
+    "Open SideInstaller and import a pairing file made on a computer.":
+        "Ouvrez SideInstaller et importez un fichier de jumelage créé sur un ordinateur.",
+    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone, so use theirs. To install on this one, use the Install tab.":
+        "%@ est une adresse que cet iPhone possède déjà. Side by Side installe sur l'iPhone de quelqu'un d'autre : utilisez le sien. Pour installer sur celui-ci, utilisez l'onglet Installer.",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
+        "Leur iPhone est sous iOS %@. À partir d'iOS 26.4, %@ ne peut pas utiliser le jumelage que leur iPhone donne via le Wi-Fi. iOS 27 se jumelle plutôt depuis ses propres Réglages, ce qui fonctionne : mettez à jour leur iPhone, puis réessayez en répondant Non quand son IP est demandée.",
 ]
