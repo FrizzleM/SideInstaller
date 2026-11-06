@@ -1459,6 +1459,32 @@ final class DeviceConnection {
         }
     }
 
+    /// Writes `data` at `containerPath` (relative to the container root) in
+    /// `bundleID`'s container, anywhere in it rather than only in Documents,
+    /// reads it back to verify, and returns the byte count.
+    @discardableResult
+    func writeFile(intoBundleID bundleID: String, containerPath: String, data: Data) throws -> Int {
+        // Anything outside Documents needs the whole container.
+        let reachingLibrary = !containerPath.hasPrefix("Documents/")
+        return try withAppContainer(bundleID, reachingLibrary: reachingLibrary) { afc in
+            try writeVerified(afc, remotePath: "/\(containerPath)", data: data)
+        }
+    }
+
+    /// Deletes the file at `containerPath` (relative to the container root) in
+    /// `bundleID`'s container. No file there is no error.
+    func removeFile(inBundleID bundleID: String, containerPath: String) throws {
+        let remotePath = "/\(containerPath)"
+        let reachingLibrary = !containerPath.hasPrefix("Documents/")
+        try withAppContainer(bundleID, reachingLibrary: reachingLibrary) { afc in
+            if let error = ffiError(remotePath.withCString { afc_remove_path(afc, $0) },
+                                    "afc_remove_path(\(remotePath)) failed") {
+                // AFC error 106, sub-code 8: ObjectNotFound.
+                guard error.code == 106 && error.subCode == 8 else { throw error }
+            }
+        }
+    }
+
     /// Opens an AFC client on `bundleID`'s container over house_arrest and runs
     /// `body` with it.
     ///

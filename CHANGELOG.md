@@ -12,13 +12,15 @@ All notable changes to SideInstaller are documented here.
 ### Changed
 - **Side by Side goes step by step, and installs SideStore and LiveContainer too.** It was one
   long form that could only put SideInstaller on someone else's iPhone. It now takes one page at
-  a time: what to install, their iPhone's IP address (optional, with Skip), which Apple ID signs
-  it, and getting their iPhone ready, with a summary to check and edit before the install starts.
-  Like iLoader, it installs SideInstaller, SideStore or LiveContainer + SideStore, Stable or
-  Nightly. A SideStore build gets its pairing file and settings on their iPhone, as on the Install
-  tab, so it opens ready to use. The pairing code, the Trust prompt, what went wrong and the last
-  steps on their iPhone show on the page instead of in popups, and a wrong IP address fails in
-  seconds instead of after a minute.
+  a time: what to install, whether you have their iPhone's IP address (optional: without it,
+  their iPhone pairs from its own Settings, on iOS 27), which Apple ID signs it, and getting their
+  iPhone ready, with a summary to check and edit before the install starts. Like iLoader, it
+  installs SideInstaller, SideStore or LiveContainer + SideStore, Stable or Nightly. Whichever it
+  installs gets the pairing file on their iPhone, so it opens ready to use: a SideStore build with
+  its settings, as on the Install tab, and SideInstaller as an imported pairing file, so it no
+  longer needs iOS 27 (from iOS 26.4 up to 27 it still needs one made on a computer). The pairing
+  code, the Trust prompt, what went wrong and the last steps on their iPhone show on the page
+  instead of in popups, and a wrong IP address fails in seconds instead of after a minute.
 - **Your Apple ID session and pairing stay on this iPhone.** SideInstaller's private files (the
   developer token, the signing key, the anisette identity and the pairing files) were included in
   iCloud and computer backups. They're now left out, and the saved Apple ID password is kept in

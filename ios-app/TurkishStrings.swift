@@ -478,46 +478,34 @@ let turkishStrings: [String: String] = [
     "Sign in to their Apple ID": "iPhone sahibinin Apple kimliğiyle oturum aç",
     "Download SideInstaller": "SideInstaller'ı indir",
     "Install on their iPhone": "Diğer iPhone'a yükle",
-    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
-        "“%@” bir IPv4 adresi değil. 192.168.1.42 gibi görünmeli.",
-    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone — use theirs. To install on this one, use the Install tab.":
-        "%@ bu iPhone'un zaten sahip olduğu bir adres. Side by Side başkasının iPhone'una yükler — onunkini kullan. Buna yüklemek için Yükle sekmesini kullan.",
     "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the Install tab.":
         "Eşlenen iPhone bu iPhone'du. Bunun yerine diğer iPhone'un Ayarlar'ından eşle. Bu iPhone'a yüklemek için Yükle sekmesini kullan.",
     "Enter the Apple ID to sign with, and its password.": "İmzalamak için Apple kimliğini ve parolasını gir.",
     "Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work.":
         "Wi-Fi kapalı. Bunun çalışması için her iki iPhone'un da aynı Wi-Fi ağında olması gerekir.",
-    "The release download wasn't an IPA. GitHub may be returning an error page — try again in a minute.":
-        "İndirilen sürüm bir IPA değildi. GitHub bir hata sayfası döndürüyor olabilir — bir dakika sonra yeniden dene.",
+    "The release download wasn't an IPA. GitHub may be returning an error page, so try again in a minute.":
+        "İndirilen sürüm bir IPA değildi. GitHub bir hata sayfası döndürüyor olabilir, bir dakika sonra yeniden dene.",
     "Couldn't download the latest SideInstaller release: %@": "En son SideInstaller sürümü indirilemedi: %@",
     "No SideInstaller IPA downloaded.": "SideInstaller IPA indirilmedi.",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first — with the Certificates tool if this is the Apple ID saved in Settings › Account, and at developer.apple.com signed in as it otherwise.":
-        "Apple bu Apple kimliği için imzalama sertifikası vermiyor: zaten bir tane olduğunu bildiriyor (hata 7460). Önce birinin iptal edilmesi gerekir — bu Ayarlar › Hesap'ta kayıtlı Apple kimliğiyse Sertifikalar aracıyla; değilse developer.apple.com'da o hesapla oturum açarak.",
+    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). One has to be revoked first. Use the Certificates tool if this is the Apple ID saved in Settings › Account, or developer.apple.com signed in as it otherwise.":
+        "Apple bu Apple kimliği için imzalama sertifikası vermiyor: zaten bir tane olduğunu bildiriyor (hata 7460). Önce birinin iptal edilmesi gerekir. Bu Ayarlar › Hesap'ta kayıtlı Apple kimliğiyse Sertifikalar aracıyla; değilse developer.apple.com'da o hesapla oturum açarak.",
     "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
         "Apple diğer iPhone'u bu Apple kimliğinin geliştirici ekibine kaydetmedi, bu yüzden sağlama profili vermiyor. %@",
     "No pair record for their iPhone.": "Diğer iPhone için eşleme kaydı yok.",
-    "The link to their iPhone dropped — start again.": "Diğer iPhone ile bağlantı koptu — yeniden başla.",
+    "The link to their iPhone dropped. Start again.": "Diğer iPhone ile bağlantı koptu. Yeniden başla.",
     "Set up someone else's iPhone": "Başkasının iPhone'unu kur",
     "Same Wi-Fi network": "Aynı Wi-Fi ağı",
     "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
         "Diğer iPhone'da iOS %@ gerekir — SideInstaller yüklendikten sonra kendini eşler, daha eski bir sürüm bunu yapamaz.",
-    "Their iPhone": "Diğer iPhone",
-    "IP address (optional)": "IP adresi (isteğe bağlı)",
-    "Optional: leave it empty, and it fills in when their iPhone pairs.":
-        "İsteğe bağlı: boş bırakırsan diğer iPhone eşlendiğinde kendiliğinden dolar.",
-    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
-        "Diğer iPhone'da: Ayarlar › Wi-Fi › ağın yanındaki ⓘ, sonra “IP Adresi”.",
-    "This iPhone is %@, so theirs will look similar.": "Bu iPhone'un adresi %@; diğerininki de buna benzer olur.",
     "Apple ID to sign with": "İmzalamak için Apple kimliği",
     "Tip: Use the iPhone/iPad owner's Apple account credentials": "İpucu: iPhone/iPad sahibinin Apple hesap bilgilerini kullan",
     "Use my saved Apple ID instead": "Bunun yerine kayıtlı Apple kimliğimi kullan",
     "Steps": "Adımlar",
-    "Waiting for them to tap Trust…": "Diğer iPhone'da Güven'e dokunulması bekleniyor…",
     "Waiting for them to pair in Settings…": "Diğer iPhone'un Ayarlar'da eşlenmesi bekleniyor…",
     "Waiting for them to enter the code…": "Diğer iPhone'da kodun girilmesi bekleniyor…",
     "Pair their iPhone in Settings": "Diğer iPhone'u Ayarlar'da eşle",
-    "Their iPhone won't ask by itself — pairing starts from its Settings.":
-        "Diğer iPhone kendiliğinden sormaz — eşleme onun Ayarlar'ından başlar.",
+    "Their iPhone won't ask by itself. Pairing starts from its Settings.":
+        "Diğer iPhone kendiliğinden sormaz. Eşleme onun Ayarlar'ından başlar.",
     "On their iPhone, open Settings › Privacy & Security › Developer Mode.":
         "Diğer iPhone'da Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'nu aç.",
     "Tap “Pair with %@”.": "“%@ ile eşle”ye dokun.",
@@ -525,15 +513,13 @@ let turkishStrings: [String: String] = [
     "Type the code that appears here into the prompt on their iPhone.":
         "Burada görünen kodu diğer iPhone'daki istem alanına yaz.",
     "Type this into the prompt on their iPhone.": "Bunu diğer iPhone'daki istem alanına yaz.",
-    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
-        "Diğer iPhone'da “Güvenme”ye dokunuldu. Yeniden başla ve bu kez Güven'e dokunulmasını iste.",
-    "SideInstaller is already waiting for an iPhone to pair with it — from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
-        "SideInstaller zaten bir iPhone'un eşlenmesini bekliyor — Yükle sekmesinden, Eşleme sayfasından veya buradaki önceki bir denemeden. O eşlemeyi bitir veya SideInstaller'ı kapatıp aç, sonra yeniden dene.",
+    "SideInstaller is already waiting for an iPhone to pair with it, from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.":
+        "SideInstaller zaten bir iPhone'un eşlenmesini bekliyor: Yükle sekmesinden, Eşleme sayfasından veya buradaki önceki bir denemeden. O eşlemeyi bitir veya SideInstaller'ı kapatıp aç, sonra yeniden dene.",
     "Pairing with their iPhone didn't finish: %@": "Diğer iPhone ile eşleme tamamlanmadı: %@",
     "Their iPhone at %@ refused the connection. It only accepts one while Developer Mode is on, and iOS asks to confirm Developer Mode again after every restart: on their iPhone, turn it on under Settings › Privacy & Security › Developer Mode, then try again.":
         "%@ adresindeki diğer iPhone bağlantıyı reddetti. Yalnızca Geliştirici Modu açıkken bağlantı kabul eder ve iOS her yeniden başlatmadan sonra Geliştirici Modu'nu yeniden onaylatır: diğer iPhone'da Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'ndan aç, sonra yeniden dene.",
-    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
-        "Diğer iPhone'a %@ adresinden ulaşılamadı. Adresi (diğer iPhone'da Ayarlar › Wi-Fi › ⓘ), iki iPhone'un aynı Wi-Fi ağında olduğunu ve bu iPhone'un Ayarlar'ında SideInstaller için Yerel Ağ'ın açık olduğunu kontrol et. Misafir ve genel ağlar cihazların birbirine ulaşmasını sıkça engeller.",
+    "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "Diğer iPhone'a %@ adresinden ulaşılamadı. İki iPhone'un aynı Wi-Fi ağında olduğunu ve bu iPhone'un Ayarlar'ında SideInstaller için Yerel Ağ'ın açık olduğunu kontrol et. Misafir ve genel ağlar cihazların birbirine ulaşmasını sıkça engeller.",
     "The link to their iPhone didn't come up: %@": "Diğer iPhone ile bağlantı kurulamadı: %@",
     "%d%% downloaded": "%%%d indirildi",
     "%d%% uploaded": "%%%d yüklendi",
@@ -547,7 +533,6 @@ let turkishStrings: [String: String] = [
         "Diğer iPhone'da: Ayarlar › Genel › VPN ve Aygıt Yönetimi.",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
         "“Geliştirici Uygulaması” altındaki Apple kimliğine dokun, sonra Güven'e dokun.",
-    "Open it from their Home Screen — they're set up.": "Diğer iPhone'da uygulamayı Ana Ekran'dan aç — kurulum tamam.",
 
     // MARK: - Settings
 
@@ -1103,4 +1088,46 @@ let turkishStrings: [String: String] = [
     "Use an unofficial copy?": "Resmi olmayan bir kopya kullanılsın mı?",
     "If this copy was changed, it can send your Apple ID and password to someone else. Continue only if you trust where it came from.":
         "Bu kopya değiştirildiyse Apple kimliğini ve parolanı başkasına gönderebilir. Yalnızca geldiği yere güveniyorsan devam et.",
+
+    // MARK: - Side by Side: their address, and the pairing file SideInstaller gets
+
+    "Couldn't reach their iPhone at %@. Check the address (Settings › Wi-Fi › ⓘ on their iPhone), that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
+        "Diğer iPhone'a %@ adresinden ulaşılamadı. Adresi (diğer iPhone'da Ayarlar › Wi-Fi › ⓘ), iki iPhone'un aynı Wi-Fi ağında olduğunu ve bu iPhone'un Ayarlar'ında SideInstaller için Yerel Ağ'ın açık olduğunu kontrol et. Misafir ve genel ağlar cihazların birbirine ulaşmasını sıkça engeller.",
+    "Their iPhone": "Diğer iPhone",
+    "They tapped “Don't Trust” on their iPhone. Start again, and have them tap Trust.":
+        "Diğer iPhone'da “Güvenme”ye dokunuldu. Yeniden başla ve bu kez Güven'e dokunulmasını iste.",
+    "Pairs from its Settings": "Kendi Ayarlar'ından eşlenir",
+    "Waiting for them to tap Trust…": "Diğer iPhone'da Güven'e dokunulması bekleniyor…",
+    "Tap Trust on their iPhone": "Diğer iPhone'da Güven'e dokun",
+    "On their iPhone: Settings › Wi-Fi › ⓘ next to the network, then “IP Address”.":
+        "Diğer iPhone'da: Ayarlar › Wi-Fi › ağın yanındaki ⓘ, sonra “IP Adresi”.",
+    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
+        "Diğer iPhone'un kilidini aç, sonra çıkan istemde Güven'e dokun.",
+    "This iPhone is %@, so theirs will look similar.":
+        "Bu iPhone'un adresi %@; diğerininki de buna benzer olur.",
+    "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
+        "“%@” bir IPv4 adresi değil. 192.168.1.42 gibi görünmeli.",
+    "Do you have the device's IP?": "Cihazın IP adresini biliyor musun?",
+    "Optional": "İsteğe bağlı",
+    "SideInstaller asks their iPhone to pair directly. Needed below iOS 27.":
+        "SideInstaller diğer iPhone'dan doğrudan eşlenmesini ister. iOS 27'nin altında gerekir.",
+    "Their iPhone pairs from its own Settings, which needs iOS 27.":
+        "Diğer iPhone kendi Ayarlar'ından eşlenir, bunun için iOS 27 gerekir.",
+    "IP address": "IP adresi",
+    "On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust.":
+        "iOS 27'de bu iPhone'un gösterdiği kodu girerler. Daha eski iOS'ta Güven'e dokunurlar.",
+    "Their iPhone unlocked and nearby": "Diğer iPhone kilidi açık ve yakında",
+    "Below iOS 27, their iPhone's IP address": "iOS 27'nin altındaysa diğer iPhone'un IP adresi",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
+        "Diğer iPhone iOS %@ kullanıyor. iOS 26.4'ten itibaren SideInstaller, diğer iPhone'un Wi-Fi üzerinden verdiği eşlemeyi kullanamaz, bu yüzden bilgisayarda yapılmış bir eşleme dosyası gerekir.",
+    "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":
+        "App Store'dan LocalDevVPN'i indir ve bağla: SideInstaller onun üzerinden çalışır.",
+    "Open SideInstaller. Its pairing file is already in place.":
+        "SideInstaller'ı aç. Eşleme dosyası zaten yerinde.",
+    "Open SideInstaller and import a pairing file made on a computer.":
+        "SideInstaller'ı aç ve bilgisayarda yapılmış bir eşleme dosyasını içe aktar.",
+    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone, so use theirs. To install on this one, use the Install tab.":
+        "%@ bu iPhone'un zaten sahip olduğu bir adres. Side by Side başkasının iPhone'una yükler, o yüzden onunkini kullan. Buna yüklemek için Yükle sekmesini kullan.",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
+        "Diğer iPhone iOS %@ kullanıyor. iOS 26.4'ten itibaren %@, diğer iPhone'un Wi-Fi üzerinden verdiği eşlemeyi kullanamaz. iOS 27 bunun yerine kendi Ayarlar'ından eşlenir ve bu çalışır: diğer iPhone'u güncelle, sonra yeniden dene ve IP'si sorulduğunda Hayır'ı seç.",
 ]
