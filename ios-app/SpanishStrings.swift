@@ -516,8 +516,6 @@ let spanishStrings: [String: String] = [
     // The tool's name is left in English everywhere, as SideStore's is.
     "Side by Side": "Side by Side",
     "Pair with their iPhone": "Emparejar con su iPhone",
-    "Sign in to their Apple ID": "Iniciar sesión en su Apple ID",
-    "Download SideInstaller": "Descargar SideInstaller",
     "Install on their iPhone": "Instalar en su iPhone",
     "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
         "“%@” no es una dirección IPv4. Debe tener este aspecto: 192.168.1.42.",
@@ -544,8 +542,6 @@ let spanishStrings: [String: String] = [
         "Se ha perdido el enlace con su iPhone: empieza de nuevo.",
     "Set up someone else's iPhone": "Configura el iPhone de otra persona",
     "Same Wi-Fi network": "Misma red Wi-Fi",
-    "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
-        "Su iPhone necesita iOS %@: una vez instalado, SideInstaller se empareja solo, y las versiones anteriores no pueden.",
     "Their iPhone": "Su iPhone",
     "IP address (optional)": "Dirección IP (opcional)",
     "Optional: leave it empty, and it fills in when their iPhone pairs.":
@@ -555,10 +551,6 @@ let spanishStrings: [String: String] = [
     "This iPhone is %@, so theirs will look similar.":
         "Este iPhone es %@, así que el suyo se parecerá.",
     "Apple ID to sign with": "Apple ID con el que firmar",
-    "Tip: Use the iPhone/iPad owner's Apple account credentials":
-        "Consejo: usa las credenciales de la cuenta de Apple del propietario del iPhone/iPad",
-    "Use my saved Apple ID instead": "Usar mi Apple ID guardado",
-    "Steps": "Pasos",
     "Waiting for them to tap Trust…": "Esperando a que toquen Confiar…",
     "Waiting for them to pair in Settings…":
         "Esperando a que emparejen en Ajustes…",
@@ -593,17 +585,105 @@ let spanishStrings: [String: String] = [
     "%d%% downloaded": "%d%% descargado",
     "%d%% uploaded": "%d%% subido",
     "Start the install": "Iniciar la instalación",
-    "Install again": "Instalar otra vez",
     "Clear their details": "Borrar sus datos",
     "This iPhone is still paired with theirs. Clearing forgets it.":
         "Este iPhone sigue emparejado con el suyo. Al borrar, se olvida ese emparejamiento.",
-    "Last step: they trust %@": "Último paso: confían en %@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "En su iPhone: Ajustes › General › VPN y gestión de dispositivos.",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
         "Toca el Apple ID en “App de desarrollador” y luego toca Confiar.",
     "Open it from their Home Screen — they're set up.":
         "Ábrela desde su pantalla de inicio: ya está listo.",
+
+    // MARK: - Side by Side, step by step
+
+    "This app. Their iPhone pairs itself, then installs SideStore, LiveContainer and more on its own.":
+        "Esta app. Su iPhone se empareja solo y luego instala SideStore, LiveContainer y más por su cuenta.",
+    "Installs and refreshes apps right on their iPhone. It gets its pairing file from this iPhone, ready to go.":
+        "Instala y renueva apps directamente en su iPhone. Recibe su archivo de emparejamiento desde este iPhone, listo para usar.",
+    "Runs apps without installing them, with SideStore built in — past the three-app limit of a free Apple ID.":
+        "Ejecuta apps sin instalarlas, con SideStore integrado: supera el límite de tres apps de un Apple ID gratuito.",
+    "Needs iOS %@ on their iPhone": "Necesita iOS %@ en su iPhone",
+    "Needs LocalDevVPN on their iPhone": "Necesita LocalDevVPN en su iPhone",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again with the IP address left empty.":
+        "Su iPhone tiene iOS %@. Desde iOS 26.4, %@ no puede usar el emparejamiento que su iPhone da por Wi-Fi. iOS 27 se empareja desde sus propios Ajustes, y así sí funciona: actualiza su iPhone y vuelve a intentarlo dejando vacía la dirección IP.",
+    "Couldn't download %@: %@": "No se pudo descargar %@: %@",
+    "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
+        "Su iPhone ya tiene tres apps firmadas con un Apple ID gratuito, el máximo que permite iOS, contando las caducadas. Tienen que borrar una y luego puedes volver a intentarlo.",
+    "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
+        "%@ está en su iPhone, pero no se pudo añadir su archivo de emparejamiento (%@). Ejecuta Side by Side otra vez o importa un archivo de emparejamiento en %@.",
+    "How it works": "Cómo funciona",
+    "Pick an app": "Elige una app",
+    "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
+        "SideInstaller, SideStore o LiveContainer con SideStore integrado.",
+    "Pair their iPhone": "Empareja su iPhone",
+    "They open their Settings and type in a code this iPhone shows.":
+        "Abren sus Ajustes y escriben un código que muestra este iPhone.",
+    "Install over Wi-Fi": "Instala por Wi-Fi",
+    "This iPhone signs the app and sends it across. No computer needed.":
+        "Este iPhone firma la app y se la envía. No hace falta un ordenador.",
+    "What you need": "Qué necesitas",
+    "Both iPhones on the same Wi-Fi network": "Los dos iPhone en la misma red Wi-Fi",
+    "Their iPhone on iOS %@ or later, unlocked and nearby":
+        "Su iPhone con iOS %@ o posterior, desbloqueado y cerca",
+    "An Apple ID to sign with — ideally theirs": "Un Apple ID para firmar, mejor si es el suyo",
+    "Get started": "Empezar",
+    "What should go on their iPhone?": "¿Qué quieres instalar en su iPhone?",
+    "Pick one. You can come back for another one later.":
+        "Elige una. Puedes volver por otra más tarde.",
+    "Stable is the release most people use. Nightly is built from the newest code.":
+        "Stable es la versión que usa la mayoría. Nightly se compila con el código más reciente.",
+    "Do you know their iPhone's IP address?": "¿Sabes la dirección IP de su iPhone?",
+    "Without it": "Sin ella",
+    "Their iPhone pairs from its own Settings, the way iOS %@ pairs over Wi-Fi.":
+        "Su iPhone se empareja desde sus propios Ajustes, como se empareja iOS %@ por Wi-Fi.",
+    "With it": "Con ella",
+    "SideInstaller asks their iPhone directly first, and reuses the pairing from an earlier try.":
+        "SideInstaller pregunta primero directamente a su iPhone y reutiliza el emparejamiento de un intento anterior.",
+    "Skip": "Omitir",
+    "Which Apple ID signs it?": "¿Qué Apple ID la firma?",
+    "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
+        "La app se firma con él y lo necesita de nuevo cada 7 días para seguir abriéndose. Usa el del propietario del iPhone.",
+    "Their Apple ID": "Su Apple ID",
+    "Recommended — they keep their apps signed with it.":
+        "Recomendado: con él mantienen firmadas sus apps.",
+    "My Apple ID": "Mi Apple ID",
+    "Only if you'll keep their apps signed yourself: they won't have this Apple ID's password.":
+        "Solo si vas a mantener tú firmadas sus apps: no tendrán la contraseña de este Apple ID.",
+    "Used for this install only, and never saved.":
+        "Solo se usa para esta instalación y nunca se guarda.",
+    "Apple may send a code to their devices — keep their iPhone close.":
+        "Apple puede enviar un código a sus dispositivos: ten su iPhone cerca.",
+    "Get their iPhone ready": "Prepara su iPhone",
+    "Do this on their iPhone, then start.": "Haz esto en su iPhone y luego empieza.",
+    "Connect their iPhone to the same Wi-Fi network as this one.":
+        "Conecta su iPhone a la misma red Wi-Fi que este.",
+    "Turn on Developer Mode under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "Activa el Modo desarrollador en Ajustes › Privacidad y seguridad › Modo desarrollador, y confírmalo después del reinicio.",
+    "Unlock their iPhone and keep it next to this one.":
+        "Desbloquea su iPhone y déjalo junto a este.",
+    "Pairs from its Settings": "Se empareja desde sus Ajustes",
+    "Installing %@ on their iPhone": "Instalando %@ en su iPhone",
+    "Waiting for their iPhone…": "Esperando a su iPhone…",
+    "Looking for their iPhone…": "Buscando su iPhone…",
+    "Tap Trust on their iPhone": "Toca Confiar en su iPhone",
+    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
+        "Desbloquea su iPhone y toca Confiar en el aviso que aparece.",
+    "Handing over the pairing file…": "Entregando el archivo de emparejamiento…",
+    "Change details": "Cambiar datos",
+    "%@ is on their iPhone": "%@ está en su iPhone",
+    "Finish on their iPhone": "Termina en su iPhone",
+    "Their iPhone runs iOS %@. SideInstaller pairs itself only from iOS %@, so there it needs a pairing file made on a computer.":
+        "Su iPhone tiene iOS %@. SideInstaller solo se empareja por sí mismo a partir de iOS %@, así que ahí necesita un archivo de emparejamiento hecho en un ordenador.",
+    "This iPhone no longer keeps a pairing with theirs.":
+        "Este iPhone ya no guarda ningún emparejamiento con el suyo.",
+    "Install another app": "Instalar otra app",
+    "Get LocalDevVPN from the App Store and connect it: SideStore works through it.":
+        "Descarga LocalDevVPN desde la App Store y conéctala: SideStore funciona a través de ella.",
+    "Open SideStore and sign in with the same Apple ID. Its pairing file is already in place.":
+        "Abre SideStore e inicia sesión con el mismo Apple ID. Su archivo de emparejamiento ya está en su sitio.",
+    "Open LiveContainer, go to its Settings tab, and tap “Import Certificate From SideStore”.":
+        "Abre LiveContainer, ve a su pestaña Settings y toca “Import Certificate From SideStore”.",
 
     // MARK: - Settings
 

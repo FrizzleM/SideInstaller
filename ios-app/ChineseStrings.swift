@@ -498,8 +498,6 @@ let chineseStrings: [String: String] = [
     // The tool's name is left in English everywhere, as SideStore's is.
     "Side by Side": "Side by Side",
     "Pair with their iPhone": "与对方的 iPhone 配对",
-    "Sign in to their Apple ID": "登录对方的 Apple ID",
-    "Download SideInstaller": "下载 SideInstaller",
     "Install on their iPhone": "安装到对方的 iPhone",
     "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
         "“%@”不是 IPv4 地址。它应该形如 192.168.1.42。",
@@ -523,8 +521,6 @@ let chineseStrings: [String: String] = [
     "The link to their iPhone dropped — start again.": "与对方 iPhone 的连接已断开——请重新开始。",
     "Set up someone else's iPhone": "为别人的 iPhone 完成设置",
     "Same Wi-Fi network": "同一个 Wi-Fi 网络",
-    "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
-        "对方的 iPhone 需要 iOS %@：装好之后 SideInstaller 会自己配对，更早的版本做不到。",
     "Their iPhone": "对方的 iPhone",
     "IP address (optional)": "IP 地址（可选）",
     "Optional: leave it empty, and it fills in when their iPhone pairs.":
@@ -533,10 +529,6 @@ let chineseStrings: [String: String] = [
         "在对方的 iPhone 上：设置 › 无线局域网 › 网络旁的 ⓘ，然后查看“IP 地址”。",
     "This iPhone is %@, so theirs will look similar.": "这台 iPhone 是 %@，对方的地址会与之相近。",
     "Apple ID to sign with": "用于签名的 Apple ID",
-    "Tip: Use the iPhone/iPad owner's Apple account credentials":
-        "提示：请使用该 iPhone/iPad 机主的 Apple 账户凭据",
-    "Use my saved Apple ID instead": "改用我保存的 Apple ID",
-    "Steps": "步骤",
     "Waiting for them to tap Trust…": "等待对方轻点“信任”…",
     "Waiting for them to pair in Settings…":
         "等待对方在 设置 中配对…",
@@ -571,16 +563,97 @@ let chineseStrings: [String: String] = [
     "%d%% downloaded": "已下载 %d%%",
     "%d%% uploaded": "已上传 %d%%",
     "Start the install": "开始安装",
-    "Install again": "再次安装",
     "Clear their details": "清除对方的信息",
     "This iPhone is still paired with theirs. Clearing forgets it.":
         "这台 iPhone 仍与对方的 iPhone 配对。清除后会忘记这次配对。",
-    "Last step: they trust %@": "最后一步：让对方信任 %@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "在对方的 iPhone 上：设置 › 通用 › VPN 与设备管理。",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
         "在“开发者 App”下轻点该 Apple ID，然后轻点“信任”。",
     "Open it from their Home Screen — they're set up.": "从他们的主屏幕打开它——设置完成。",
+
+    // MARK: - Side by Side, step by step
+
+    "This app. Their iPhone pairs itself, then installs SideStore, LiveContainer and more on its own.":
+        "就是这个 App。对方的 iPhone 会自己配对，然后自行安装 SideStore、LiveContainer 等 App。",
+    "Installs and refreshes apps right on their iPhone. It gets its pairing file from this iPhone, ready to go.":
+        "直接在对方的 iPhone 上安装和续签 App。它会从这台 iPhone 拿到配对文件，装好就能用。",
+    "Runs apps without installing them, with SideStore built in — past the three-app limit of a free Apple ID.":
+        "无需安装即可运行 App，并内置 SideStore——突破免费 Apple ID 只能装三个 App 的限制。",
+    "Needs iOS %@ on their iPhone": "对方的 iPhone 需要 iOS %@",
+    "Needs LocalDevVPN on their iPhone": "对方的 iPhone 需要 LocalDevVPN",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again with the IP address left empty.":
+        "对方的 iPhone 运行 iOS %@。从 iOS 26.4 起，%@ 无法使用对方 iPhone 通过 Wi-Fi 给出的配对。iOS 27 改为在自己的设置中配对，这样可行：请先更新对方的 iPhone，再将 IP 地址留空重试。",
+    "Couldn't download %@: %@": "无法下载 %@：%@",
+    "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
+        "对方的 iPhone 上已有三个用免费 Apple ID 签名的 App（已过期的也算），这是 iOS 允许的上限。请对方先删除一个，然后再试。",
+    "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
+        "%@ 已在对方的 iPhone 上，但无法放入它的配对文件（%@）。请再运行一次 Side by Side，或在 %@ 中导入配对文件。",
+    "How it works": "工作原理",
+    "Pick an app": "选择一个 App",
+    "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
+        "SideInstaller、SideStore，或内置 SideStore 的 LiveContainer。",
+    "Pair their iPhone": "配对对方的 iPhone",
+    "They open their Settings and type in a code this iPhone shows.": "对方打开设置，输入这台 iPhone 上显示的代码。",
+    "Install over Wi-Fi": "通过 Wi-Fi 安装",
+    "This iPhone signs the app and sends it across. No computer needed.":
+        "这台 iPhone 会为 App 签名并发送过去，无需电脑。",
+    "What you need": "你需要准备",
+    "Both iPhones on the same Wi-Fi network": "两台 iPhone 连接同一个 Wi-Fi 网络",
+    "Their iPhone on iOS %@ or later, unlocked and nearby": "对方的 iPhone 运行 iOS %@ 或更高版本，已解锁并在旁边",
+    "An Apple ID to sign with — ideally theirs": "一个用于签名的 Apple ID——最好是对方的",
+    "Get started": "开始",
+    "What should go on their iPhone?": "要在对方的 iPhone 上安装什么？",
+    "Pick one. You can come back for another one later.": "选择一个。之后可以回来再装另一个。",
+    "Stable is the release most people use. Nightly is built from the newest code.":
+        "Stable 是大多数人使用的版本。Nightly 由最新代码构建。",
+    "Do you know their iPhone's IP address?": "你知道对方 iPhone 的 IP 地址吗？",
+    "Without it": "不填写",
+    "Their iPhone pairs from its own Settings, the way iOS %@ pairs over Wi-Fi.":
+        "对方的 iPhone 会在自己的设置中配对，这是 iOS %@ 通过 Wi-Fi 配对的方式。",
+    "With it": "填写后",
+    "SideInstaller asks their iPhone directly first, and reuses the pairing from an earlier try.":
+        "SideInstaller 会先直接询问对方的 iPhone，并重用之前尝试留下的配对。",
+    "Skip": "跳过",
+    "Which Apple ID signs it?": "用哪个 Apple ID 签名？",
+    "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
+        "App 会用这个 Apple ID 签名，并且每 7 天需要再次用它才能继续打开。请使用 iPhone 机主的 Apple ID。",
+    "Their Apple ID": "对方的 Apple ID",
+    "Recommended — they keep their apps signed with it.": "推荐——对方可以用它让自己的 App 保持签名。",
+    "My Apple ID": "我的 Apple ID",
+    "Only if you'll keep their apps signed yourself: they won't have this Apple ID's password.":
+        "仅当你会亲自为对方的 App 续签时才选：对方不会有这个 Apple ID 的密码。",
+    "Used for this install only, and never saved.": "只用于这次安装，绝不保存。",
+    "Apple may send a code to their devices — keep their iPhone close.":
+        "Apple 可能会向对方的设备发送验证码——请把对方的 iPhone 放在身边。",
+    "Get their iPhone ready": "准备好对方的 iPhone",
+    "Do this on their iPhone, then start.": "在对方的 iPhone 上完成以下步骤，然后开始。",
+    "Connect their iPhone to the same Wi-Fi network as this one.":
+        "将对方的 iPhone 连接到与这台 iPhone 相同的 Wi-Fi 网络。",
+    "Turn on Developer Mode under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "在 设置 › 隐私与安全性 › 开发者模式 中打开开发者模式，并在重启后确认。",
+    "Unlock their iPhone and keep it next to this one.": "解锁对方的 iPhone，并放在这台 iPhone 旁边。",
+    "Pairs from its Settings": "在其设置中配对",
+    "Installing %@ on their iPhone": "正在将 %@ 安装到对方的 iPhone",
+    "Waiting for their iPhone…": "正在等待对方的 iPhone…",
+    "Looking for their iPhone…": "正在查找对方的 iPhone…",
+    "Tap Trust on their iPhone": "在对方的 iPhone 上轻点“信任”",
+    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
+        "解锁对方的 iPhone，然后在弹出的提示中轻点“信任”。",
+    "Handing over the pairing file…": "正在交付配对文件…",
+    "Change details": "更改信息",
+    "%@ is on their iPhone": "%@ 已安装到对方的 iPhone",
+    "Finish on their iPhone": "在对方的 iPhone 上完成",
+    "Their iPhone runs iOS %@. SideInstaller pairs itself only from iOS %@, so there it needs a pairing file made on a computer.":
+        "对方的 iPhone 运行 iOS %@。SideInstaller 只有在 iOS %@ 及以上才能自己配对，所以在那台 iPhone 上需要用电脑制作的配对文件。",
+    "This iPhone no longer keeps a pairing with theirs.": "这台 iPhone 不再保留与对方 iPhone 的配对。",
+    "Install another app": "安装另一个 App",
+    "Get LocalDevVPN from the App Store and connect it: SideStore works through it.":
+        "从 App Store 获取 LocalDevVPN 并连接：SideStore 要通过它工作。",
+    "Open SideStore and sign in with the same Apple ID. Its pairing file is already in place.":
+        "打开 SideStore，用同一个 Apple ID 登录。它的配对文件已经放好了。",
+    "Open LiveContainer, go to its Settings tab, and tap “Import Certificate From SideStore”.":
+        "打开 LiveContainer，进入它的 Settings 标签页，轻点“Import Certificate From SideStore”。",
 
     // MARK: - Settings
 

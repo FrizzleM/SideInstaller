@@ -514,8 +514,6 @@ let vietnameseStrings: [String: String] = [
     // The tool's name is left in English everywhere, as SideStore's is.
     "Side by Side": "Side by Side",
     "Pair with their iPhone": "Ghép nối với iPhone của họ",
-    "Sign in to their Apple ID": "Đăng nhập Apple ID của họ",
-    "Download SideInstaller": "Tải SideInstaller",
     "Install on their iPhone": "Cài lên iPhone của họ",
     "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
         "“%@” không phải là địa chỉ IPv4. Nó phải có dạng 192.168.1.42.",
@@ -541,8 +539,6 @@ let vietnameseStrings: [String: String] = [
         "Kết nối tới iPhone của họ đã rớt — hãy bắt đầu lại.",
     "Set up someone else's iPhone": "Thiết lập iPhone cho người khác",
     "Same Wi-Fi network": "Cùng một mạng Wi-Fi",
-    "Their iPhone needs iOS %@ — SideInstaller pairs itself once it's installed, and nothing older can.":
-        "iPhone của họ cần iOS %@: sau khi cài, SideInstaller tự ghép nối, còn các phiên bản cũ hơn thì không thể.",
     "Their iPhone": "iPhone của họ",
     "IP address (optional)": "Địa chỉ IP (không bắt buộc)",
     "Optional: leave it empty, and it fills in when their iPhone pairs.":
@@ -552,10 +548,6 @@ let vietnameseStrings: [String: String] = [
     "This iPhone is %@, so theirs will look similar.":
         "iPhone này là %@, nên địa chỉ của họ sẽ tương tự.",
     "Apple ID to sign with": "Apple ID dùng để ký",
-    "Tip: Use the iPhone/iPad owner's Apple account credentials":
-        "Mẹo: Hãy dùng thông tin đăng nhập tài khoản Apple của chủ nhân iPhone/iPad",
-    "Use my saved Apple ID instead": "Dùng Apple ID đã lưu của tôi",
-    "Steps": "Các bước",
     "Waiting for them to tap Trust…": "Đang đợi họ chạm Tin cậy…",
     "Waiting for them to pair in Settings…":
         "Đang đợi họ ghép nối trong Cài đặt…",
@@ -590,17 +582,105 @@ let vietnameseStrings: [String: String] = [
     "%d%% downloaded": "Đã tải %d%%",
     "%d%% uploaded": "Đã tải lên %d%%",
     "Start the install": "Bắt đầu cài đặt",
-    "Install again": "Cài lại",
     "Clear their details": "Xóa thông tin của họ",
     "This iPhone is still paired with theirs. Clearing forgets it.":
         "iPhone này vẫn đang ghép nối với iPhone của họ. Xóa sẽ bỏ ghép nối đó.",
-    "Last step: they trust %@": "Bước cuối: họ tin cậy %@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "Trên iPhone của họ: Cài đặt › Cài đặt chung › VPN & Quản lý thiết bị.",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
         "Chạm vào Apple ID trong mục “Ứng dụng nhà phát triển”, rồi chạm vào Tin cậy.",
     "Open it from their Home Screen — they're set up.":
         "Mở ứng dụng từ màn hình chính của họ — vậy là xong.",
+
+    // MARK: - Side by Side, step by step
+
+    "This app. Their iPhone pairs itself, then installs SideStore, LiveContainer and more on its own.":
+        "Chính ứng dụng này. iPhone của họ tự ghép nối, rồi tự cài SideStore, LiveContainer và nhiều ứng dụng khác.",
+    "Installs and refreshes apps right on their iPhone. It gets its pairing file from this iPhone, ready to go.":
+        "Cài và làm mới ứng dụng ngay trên iPhone của họ. Nhận tệp ghép nối từ iPhone này, dùng được ngay.",
+    "Runs apps without installing them, with SideStore built in — past the three-app limit of a free Apple ID.":
+        "Chạy ứng dụng mà không cần cài, có sẵn SideStore — vượt giới hạn ba ứng dụng của Apple ID miễn phí.",
+    "Needs iOS %@ on their iPhone": "Cần iOS %@ trên iPhone của họ",
+    "Needs LocalDevVPN on their iPhone": "Cần LocalDevVPN trên iPhone của họ",
+    "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again with the IP address left empty.":
+        "iPhone của họ đang chạy iOS %@. Từ iOS 26.4 trở đi, %@ không dùng được kiểu ghép nối mà iPhone của họ cấp qua Wi-Fi. iOS 27 thì ghép nối từ Cài đặt của chính nó, cách này hoạt động: hãy cập nhật iPhone của họ, rồi thử lại và để trống địa chỉ IP.",
+    "Couldn't download %@: %@": "Không tải được %@: %@",
+    "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
+        "iPhone của họ đã có ba ứng dụng được ký bằng Apple ID miễn phí, mức tối đa iOS cho phép, tính cả ứng dụng đã hết hạn. Họ cần xóa một ứng dụng, rồi bạn có thể thử lại.",
+    "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
+        "%@ đã có trên iPhone của họ, nhưng không thêm được tệp ghép nối (%@). Hãy chạy lại Side by Side, hoặc nhập tệp ghép nối trong %@.",
+    "How it works": "Cách hoạt động",
+    "Pick an app": "Chọn một ứng dụng",
+    "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
+        "SideInstaller, SideStore, hoặc LiveContainer có sẵn SideStore.",
+    "Pair their iPhone": "Ghép nối iPhone của họ",
+    "They open their Settings and type in a code this iPhone shows.":
+        "Họ mở Cài đặt và nhập mã mà iPhone này hiển thị.",
+    "Install over Wi-Fi": "Cài qua Wi-Fi",
+    "This iPhone signs the app and sends it across. No computer needed.":
+        "iPhone này ký ứng dụng và gửi sang. Không cần máy tính.",
+    "What you need": "Bạn cần gì",
+    "Both iPhones on the same Wi-Fi network": "Hai iPhone cùng một mạng Wi-Fi",
+    "Their iPhone on iOS %@ or later, unlocked and nearby":
+        "iPhone của họ chạy iOS %@ trở lên, đã mở khóa và ở gần",
+    "An Apple ID to sign with — ideally theirs": "Một Apple ID để ký — tốt nhất là của họ",
+    "Get started": "Bắt đầu thôi",
+    "What should go on their iPhone?": "Cài gì lên iPhone của họ?",
+    "Pick one. You can come back for another one later.":
+        "Chọn một. Bạn có thể quay lại cài thêm sau.",
+    "Stable is the release most people use. Nightly is built from the newest code.":
+        "Stable là bản phát hành mà phần lớn mọi người dùng. Nightly được build từ mã mới nhất.",
+    "Do you know their iPhone's IP address?": "Bạn có biết địa chỉ IP của iPhone họ không?",
+    "Without it": "Không có địa chỉ",
+    "Their iPhone pairs from its own Settings, the way iOS %@ pairs over Wi-Fi.":
+        "iPhone của họ ghép nối từ Cài đặt của chính nó, theo cách iOS %@ ghép nối qua Wi-Fi.",
+    "With it": "Có địa chỉ",
+    "SideInstaller asks their iPhone directly first, and reuses the pairing from an earlier try.":
+        "SideInstaller hỏi trực tiếp iPhone của họ trước, và dùng lại phần ghép nối từ lần thử trước.",
+    "Skip": "Bỏ qua",
+    "Which Apple ID signs it?": "Apple ID nào sẽ ký?",
+    "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
+        "Ứng dụng được ký bằng Apple ID này, và cứ 7 ngày lại cần nó để tiếp tục mở được. Hãy dùng Apple ID của chủ iPhone.",
+    "Their Apple ID": "Apple ID của họ",
+    "Recommended — they keep their apps signed with it.":
+        "Khuyến nghị — họ dùng nó để giữ ứng dụng luôn được ký.",
+    "My Apple ID": "Apple ID của tôi",
+    "Only if you'll keep their apps signed yourself: they won't have this Apple ID's password.":
+        "Chỉ chọn nếu chính bạn sẽ giữ ứng dụng của họ luôn được ký: họ sẽ không có mật khẩu của Apple ID này.",
+    "Used for this install only, and never saved.":
+        "Chỉ dùng cho lần cài này, và không bao giờ được lưu.",
+    "Apple may send a code to their devices — keep their iPhone close.":
+        "Apple có thể gửi mã đến thiết bị của họ — hãy để iPhone của họ ở gần.",
+    "Get their iPhone ready": "Chuẩn bị iPhone của họ",
+    "Do this on their iPhone, then start.": "Làm những việc này trên iPhone của họ, rồi bắt đầu.",
+    "Connect their iPhone to the same Wi-Fi network as this one.":
+        "Kết nối iPhone của họ với cùng mạng Wi-Fi như iPhone này.",
+    "Turn on Developer Mode under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "Bật Chế độ nhà phát triển trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển, và xác nhận sau khi khởi động lại.",
+    "Unlock their iPhone and keep it next to this one.":
+        "Mở khóa iPhone của họ và để nó cạnh iPhone này.",
+    "Pairs from its Settings": "Ghép nối từ Cài đặt",
+    "Installing %@ on their iPhone": "Đang cài %@ lên iPhone của họ",
+    "Waiting for their iPhone…": "Đang chờ iPhone của họ…",
+    "Looking for their iPhone…": "Đang tìm iPhone của họ…",
+    "Tap Trust on their iPhone": "Chạm Tin cậy trên iPhone của họ",
+    "Unlock their iPhone, then tap Trust in the prompt that comes up.":
+        "Mở khóa iPhone của họ, rồi chạm Tin cậy trong lời nhắc hiện ra.",
+    "Handing over the pairing file…": "Đang chuyển tệp ghép nối…",
+    "Change details": "Đổi thông tin",
+    "%@ is on their iPhone": "%@ đã có trên iPhone của họ",
+    "Finish on their iPhone": "Hoàn tất trên iPhone của họ",
+    "Their iPhone runs iOS %@. SideInstaller pairs itself only from iOS %@, so there it needs a pairing file made on a computer.":
+        "iPhone của họ đang chạy iOS %@. SideInstaller chỉ tự ghép nối được từ iOS %@, nên trên máy đó cần tệp ghép nối tạo trên máy tính.",
+    "This iPhone no longer keeps a pairing with theirs.":
+        "iPhone này không còn giữ phần ghép nối với iPhone của họ.",
+    "Install another app": "Cài ứng dụng khác",
+    "Get LocalDevVPN from the App Store and connect it: SideStore works through it.":
+        "Tải LocalDevVPN từ App Store và kết nối: SideStore hoạt động thông qua nó.",
+    "Open SideStore and sign in with the same Apple ID. Its pairing file is already in place.":
+        "Mở SideStore và đăng nhập bằng cùng Apple ID đó. Tệp ghép nối đã có sẵn trong đó.",
+    "Open LiveContainer, go to its Settings tab, and tap “Import Certificate From SideStore”.":
+        "Mở LiveContainer, vào tab Settings, rồi chạm “Import Certificate From SideStore”.",
 
     // MARK: - Settings
 

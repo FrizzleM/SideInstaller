@@ -10,6 +10,15 @@ All notable changes to SideInstaller are documented here.
   for the translation (#111), who's now in About › Special thanks.
 
 ### Changed
+- **Side by Side goes step by step, and installs SideStore and LiveContainer too.** It was one
+  long form that could only put SideInstaller on someone else's iPhone. It now takes one page at
+  a time: what to install, their iPhone's IP address (optional, with Skip), which Apple ID signs
+  it, and getting their iPhone ready, with a summary to check and edit before the install starts.
+  Like iLoader, it installs SideInstaller, SideStore or LiveContainer + SideStore, Stable or
+  Nightly. A SideStore build gets its pairing file and settings on their iPhone, as on the Install
+  tab, so it opens ready to use. The pairing code, the Trust prompt, what went wrong and the last
+  steps on their iPhone show on the page instead of in popups, and a wrong IP address fails in
+  seconds instead of after a minute.
 - **Your Apple ID session and pairing stay on this iPhone.** SideInstaller's private files (the
   developer token, the signing key, the anisette identity and the pairing files) were included in
   iCloud and computer backups. They're now left out, and the saved Apple ID password is kept in
@@ -29,10 +38,11 @@ All notable changes to SideInstaller are documented here.
 - **Side by Side no longer keeps the other person's signing key.** It signed their Apple ID in
   with your iPhone's own sign-in files, so the private key for the certificate it made stayed on
   your iPhone after the run. Their Apple ID now signs in from a temporary folder, deleted once
-  SideInstaller is on their iPhone, when you tap Clear their details or when the Apple ID changes;
-  one left by a run that was cut short goes the next time SideInstaller opens. An Apple ID saved
-  in Settings › Account still signs with your own key. Setting up the same person again now asks
-  Apple for a new certificate, since the old key is gone.
+  the app is set up on their iPhone, when you tap Clear their details or when the Apple ID
+  changes; one left by a run that was cut short goes the next time SideInstaller opens. An Apple
+  ID saved in Settings › Account still signs with your own key. Setting up the same person
+  again, Install another app included, now asks Apple for a new certificate, since the old key is
+  gone, and Apple may send their iPhone a code again.
 - **A pairing that stalls can be cancelled, and gives up by itself.** Once Settings had connected,
   cancelling a pairing (on the Install tab, the Pairing page or in Side by Side) didn't stop it,
   and nothing timed it out. If the iPhone then stopped responding, every later try said

@@ -1454,8 +1454,9 @@ private extension AnyTransition {
 
 /// Install progress bar: a gradient fill with a moving sheen and a glowing head
 /// while running. Both effects are driven by `TimelineView` time rather than a
-/// repeating animation, so progress changes don't disrupt them.
-private struct InstallProgressBar: View {
+/// repeating animation, so progress changes don't disrupt them. Side by Side
+/// shows its runs with it too.
+struct InstallProgressBar: View {
     let progress: Double
     let tint: Color
     let gradient: LinearGradient
@@ -1602,9 +1603,9 @@ private struct CurrentStepRow: View {
 
 // MARK: - Step parts
 
-/// Status circle for a step, used by both timelines. The active step gets a
-/// pulsing halo.
-private struct StepNode: View {
+/// Status circle for a step, used by both timelines and by Side by Side's. The
+/// active step gets a pulsing halo.
+struct StepNode: View {
     let state: StepState
 
     var body: some View {
