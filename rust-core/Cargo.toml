@@ -78,7 +78,7 @@ isideload = { git = "https://github.com/nab138/isideload.git", package = "isidel
   "fs-storage",
 ] }
 
-tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "fs"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "fs", "sync", "time"] }
 
 # Serialize the certificate list across the FFI boundary as JSON (decoded by
 # Swift). Both are already in the tree via isideload, so this adds no new deps.

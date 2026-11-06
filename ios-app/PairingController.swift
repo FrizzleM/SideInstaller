@@ -1,5 +1,4 @@
 import Foundation
-import Darwin
 import SideInstallerFFI
 
 /// Somewhere outside the app that shows this iPhone's pairing code while the
@@ -137,11 +136,13 @@ final class PairingController {
         let peerPIN: (@MainActor (String) -> Void)?
         /// Resolved when the run ends, or when it's cancelled; nil for `start()`.
         var continuation: CheckedContinuation<PairedDevice, Error>?
-        /// The port the host listens on, once it's known.
-        var port: UInt16?
-        /// Set by `cancelPeer` and `softCancel`, so the run stops advertising
-        /// and its end isn't reported as a failure.
+        /// Set by `cancel(_:)`, so the run stops advertising and its end isn't
+        /// reported as a failure.
         var cancelled = false
+        /// Stops the Rust host whatever stage it's at (`si_pairing_cancel`).
+        /// Freed with the run: the background call holds the run until
+        /// `si_pairing_run_host` has returned, and only the main actor cancels.
+        nonisolated(unsafe) let cancelHandle: OpaquePointer = si_pairing_cancel_new()
 
         var isThisDevice: Bool { peerPIN == nil }
 
@@ -155,6 +156,8 @@ final class PairingController {
             self.peerPIN = peerPIN
             self.continuation = continuation
         }
+
+        deinit { si_pairing_cancel_free(cancelHandle) }
     }
 
     /// Where the pairing file is written, and read back from; see `PrivateStore`.
@@ -171,19 +174,13 @@ final class PairingController {
         return paired.path
     }
 
-    /// Stop pairing this iPhone: resolve the run as cancelled, stop advertising,
-    /// and end the host if Settings hasn't connected yet, so no code turns up
-    /// after the run that asked for it has gone. Leaves a Side by Side run alone.
-    ///
-    /// A host Settings has already connected to runs until that pairing
-    /// finishes or gives up, since nothing interrupts the FFI call.
+    /// Stop pairing this iPhone, whatever stage it's at, so no code turns up
+    /// after the run that asked for it has gone. Leaves a Side by Side run
+    /// alone.
     func softCancel() {
         guard let run = current, run.isThisDevice, !run.cancelled else { return }
-        run.cancelled = true
-        resolve(run, .failure(CancellationError()))
+        cancel(run)
         overSettings.finish(paired: false)
-        stopAdvertising()
-        if let port = run.port { Self.wakeHost(port: port) }
     }
 
     func start() {
@@ -217,17 +214,21 @@ final class PairingController {
         }
     }
 
-    /// Stop a `pairPeer` run: resolve it as cancelled, stop advertising, and end
-    /// the host if it's still waiting for their iPhone to connect.
-    ///
-    /// A host their iPhone has already connected to runs until that iPhone
-    /// finishes or gives up, since nothing interrupts the FFI call.
+    /// Stop a `pairPeer` run, whatever stage it's at.
     func cancelPeer() {
         guard let run = current, !run.isThisDevice, !run.cancelled else { return }
+        cancel(run)
+    }
+
+    /// Resolve `run` as cancelled, stop advertising, and stop the Rust host,
+    /// whether it's waiting for an iPhone, mid-handshake or waiting for the
+    /// code. `si_pairing_run_host` returns a moment later, which frees the host
+    /// for the next run.
+    private func cancel(_ run: HostRun) {
         run.cancelled = true
         resolve(run, .failure(CancellationError()))
         stopAdvertising()
-        if let port = run.port { Self.wakeHost(port: port) }
+        si_pairing_cancel(run.cancelHandle)
     }
 
     // MARK: Running the host
@@ -281,6 +282,9 @@ final class PairingController {
         // `nonisolated(unsafe)`: the raw pointer isn't `Sendable`, but only the
         // closure below uses it, and it's released once.
         nonisolated(unsafe) let ctx = UnsafeMutableRawPointer(Unmanaged.passRetained(self).toOpaque())
+        // Lives as long as `run`, which the closure below holds until it has
+        // reported back.
+        nonisolated(unsafe) let cancelHandle = run.cancelHandle
 
         engine.log("RPPairing: invoking si_pairing_run_host (out=\(outPath))")
 
@@ -294,7 +298,8 @@ final class PairingController {
                                 identifier.withCString { idC in
                                     si_pairing_run_host(
                                         bindC, 0, nameC, modelC, outC, irkC, idC,
-                                        pairReadyCallback, pairPinCallback, ctx, &result)
+                                        pairReadyCallback, pairPinCallback, ctx,
+                                        cancelHandle, &result)
                                 }
                             }
                         }
@@ -380,7 +385,7 @@ final class PairingController {
                                                    address: address)))
             }
         case let .failure(message):
-            // A cancelled run ends with whatever the woken host failed on.
+            // A cancelled run ends with “pairing cancelled”: not a failure.
             engine.log(run.cancelled ? "RPPairing: stopped." : "RPPairing: FAILED — \(message)")
             engine.pairingStatus = L("failed: %@", message)
             overSettings.finish(paired: false)
@@ -401,7 +406,7 @@ final class PairingController {
                                                    address: address)))
             }
         case let .failure(message):
-            // A cancelled run ends with whatever the woken host failed on.
+            // A cancelled run ends with “pairing cancelled”: not a failure.
             engine.log(run.cancelled ? "RPPairing: stopped." : "RPPairing: FAILED — \(message)")
             resolve(run, .failure(PairingError.failed(message)))
         }
@@ -410,13 +415,9 @@ final class PairingController {
     // MARK: Bonjour advertising
 
     fileprivate func startAdvertising(serviceID: String, port: Int32, txt: [String: Data]) {
-        guard let run = current else { return }
-        run.port = UInt16(truncatingIfNeeded: port)
-        // Cancelled before the host was ready: don't advertise it, end it.
-        if run.cancelled {
-            if let port = run.port { Self.wakeHost(port: port) }
-            return
-        }
+        // Cancelled before the host was ready: it's stopping, so don't
+        // advertise it.
+        guard let run = current, !run.cancelled else { return }
         stopAdvertising()
         engine.log("RPPairing: advertising _remotepairing-pairable-host._tcp \(serviceID) on port \(port)")
         let service = NetService(
@@ -449,28 +450,6 @@ final class PairingController {
     private func stopAdvertising() {
         netService?.stop()
         netService = nil
-    }
-
-    /// Ends a host still blocked waiting for a device, by connecting to it and
-    /// hanging up: the handshake then fails on the empty connection and
-    /// `si_pairing_run_host` returns. The listener is bound to 0.0.0.0, so
-    /// loopback reaches it.
-    private nonisolated static func wakeHost(port: UInt16) {
-        DispatchQueue.global(qos: .utility).async {
-            let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
-            guard fd >= 0 else { return }
-            defer { Darwin.close(fd) }
-            var addr = sockaddr_in()
-            addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
-            addr.sin_family = sa_family_t(AF_INET)
-            addr.sin_port = port.bigEndian
-            addr.sin_addr.s_addr = inet_addr("127.0.0.1")
-            _ = withUnsafePointer(to: &addr) { aptr in
-                aptr.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                    Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
-                }
-            }
-        }
     }
 }
 

@@ -33,6 +33,13 @@ All notable changes to SideInstaller are documented here.
   one left by a run that was cut short goes the next time SideInstaller opens. An Apple ID saved
   in Settings › Account still signs with your own key. Setting up the same person again now asks
   Apple for a new certificate, since the old key is gone.
+- **A pairing that stalls can be cancelled, and gives up by itself.** Once Settings had connected,
+  cancelling a pairing (on the Install tab, the Pairing page or in Side by Side) didn't stop it,
+  and nothing timed it out. If the iPhone then stopped responding, every later try said
+  “Pairing is already in progress” until SideInstaller was closed. Cancelling now ends a pairing
+  at any point. A pairing also gives up if the iPhone connects but doesn't ask for a code within
+  30 seconds, or if the code isn't entered within 5 minutes. An internal error while pairing now
+  shows a message instead of closing SideInstaller.
 
 ## 1.6.5
 

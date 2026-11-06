@@ -68,9 +68,19 @@ typedef struct {
     char *device_address;
 } SIPairResult;
 
-// Run the RPPairing host. BLOCKS until a device pairs or an error occurs — run
-// it off the main thread. Returns 0 on success, non-zero on error (with
-// `out->error` set). `port` 0 lets the OS pick a port.
+// Stops one si_pairing_run_host call from another thread.
+typedef struct SIPairCancel SIPairCancel;
+
+// Run the RPPairing host. BLOCKS until a device pairs, the run fails or it's
+// cancelled — run it off the main thread. `port` 0 lets the OS pick a port.
+// Returns 0 once paired; 1 if pairing failed; 2 if `out` is NULL or the host
+// panicked; 3 if it was cancelled through `cancel`. For 1–3, `out->error`
+// says why.
+// Waiting for a device to connect has no time limit (cancel ends it). Once
+// one has, it has 30 s to ask for a code, and from then on 5 minutes to finish
+// pairing (the user types the code into Settings); past either, it returns 1.
+// `cancel` comes from si_pairing_cancel_new, or is NULL for a run nothing can
+// stop.
 // `host_alt_irk_hex` is the `host_alt_irk_hex` a previous successful run
 // returned, or NULL/"" the first time. Passing it back keeps this host's
 // identity stable, so a device that has paired before recognises it instead of
@@ -90,10 +100,27 @@ int32_t si_pairing_run_host(const char *bind_addr,
                             SIPairReadyCb ready_cb,
                             SIPairPinCb pin_cb,
                             void *ctx,
+                            const SIPairCancel *cancel,
                             SIPairResult *out);
 
 // Free the heap strings inside a SIPairResult.
 void si_pairing_result_free(SIPairResult *r);
+
+// A handle that stops one si_pairing_run_host call. Free it with
+// si_pairing_cancel_free.
+SIPairCancel *si_pairing_cancel_new(void);
+
+// Stop the run `cancel` was passed to, whatever stage it's at — waiting for a
+// device, mid-handshake or waiting for the code — closing the device's
+// connection; si_pairing_run_host then returns 3. Returns at once. Callable
+// from any thread and more than once: before the run starts, it never
+// listens; after it ends, this does nothing. NULL is ignored.
+void si_pairing_cancel(const SIPairCancel *cancel);
+
+// Free a handle from si_pairing_cancel_new once no si_pairing_run_host call
+// that was given it is still running and nothing will cancel through it
+// again. NULL is ignored.
+void si_pairing_cancel_free(SIPairCancel *cancel);
 
 // ---------------------------------------------------------------------------
 // Account — Apple ID sign-in + on-device signing (STEP 3)

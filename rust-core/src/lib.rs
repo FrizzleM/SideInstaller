@@ -26,7 +26,7 @@ use ffi_util::cstr;
 // Re-export FFI types so the generated header / Swift see them.
 pub use account::{SignSession, TwoFactorCb};
 pub use certs::CertSession;
-pub use pairing::{PairResult, PinCb, ReadyCb};
+pub use pairing::{PairCancel, PairResult, PinCb, ReadyCb};
 
 /// Initialise the logging spine. `cb` receives every formatted log line
 /// (idevice's tracing output included). `ctx` is passed back untouched.
@@ -76,7 +76,8 @@ pub unsafe extern "C" fn si_string_free(p: *mut c_char) {
 
 /// Run the RPPairing host, blocking until a device pairs, so run it off the
 /// main thread. `ready_cb` carries the Bonjour details and `pin_cb` the PIN;
-/// `out` receives the device info and the pairing file's path.
+/// `out` receives the device info and the pairing file's path. `cancel`, from
+/// `si_pairing_cancel_new`, stops it from another thread; NULL for none.
 ///
 /// # Safety
 /// See `pairing::run_host`. `out` must point to a writable `PairResult`.
@@ -93,6 +94,7 @@ pub unsafe extern "C" fn si_pairing_run_host(
     ready_cb: ReadyCb,
     pin_cb: PinCb,
     ctx: *mut c_void,
+    cancel: *const PairCancel,
     out: *mut PairResult,
 ) -> i32 {
     pairing::run_host(
@@ -106,8 +108,42 @@ pub unsafe extern "C" fn si_pairing_run_host(
         ready_cb,
         pin_cb,
         ctx,
+        cancel,
         out,
     )
+}
+
+/// A handle that stops one `si_pairing_run_host` call. Free it with
+/// `si_pairing_cancel_free`.
+#[no_mangle]
+pub extern "C" fn si_pairing_cancel_new() -> *mut PairCancel {
+    Box::into_raw(Box::default())
+}
+
+/// Stop the run `cancel` was passed to, whatever stage it's at; it returns 3.
+/// Returns at once, from any thread, as often as needed: before the run starts
+/// it never listens, and after it ends this does nothing.
+///
+/// # Safety
+/// `cancel` must be null or a handle from `si_pairing_cancel_new` not yet freed.
+#[no_mangle]
+pub unsafe extern "C" fn si_pairing_cancel(cancel: *const PairCancel) {
+    if let Some(cancel) = cancel.as_ref() {
+        cancel.cancel();
+    }
+}
+
+/// Free a handle from `si_pairing_cancel_new`.
+///
+/// # Safety
+/// `cancel` must be null or a handle from `si_pairing_cancel_new` not yet
+/// freed, which no `si_pairing_run_host` call still running was given and no
+/// other thread can still cancel through.
+#[no_mangle]
+pub unsafe extern "C" fn si_pairing_cancel_free(cancel: *mut PairCancel) {
+    if !cancel.is_null() {
+        drop(Box::from_raw(cancel));
+    }
 }
 
 /// Free the heap strings inside a `PairResult`.

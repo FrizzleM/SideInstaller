@@ -394,10 +394,17 @@ Things the peer run must not do, all of which the plain `startAndWait` path does
   RPPairing-only file, which stores *this* iPhone's record and dials its own
   lockdownd on 127.0.0.1. Side by Side passes `allowLockdownMinting: false`.
 
-`cancelPeer` resolves the wait, stops advertising, and connects to the host's own
-listener on 127.0.0.1 and hangs up, so a host still blocked in `accept()` fails its
-handshake and returns — otherwise the next run would find the host busy. A target
-that has already connected keeps the host until it finishes or gives up.
+`cancelPeer` (and `softCancel` for this iPhone) resolves the wait, stops
+advertising, and fires the run's `si_pairing_cancel` handle, which drops the Rust
+host wherever it is — in `accept()`, mid-handshake or waiting for the code — and
+closes the device's connection, so the next run doesn't find the host busy.
+idevice's pairing conversation has no timeouts of its own, so `pairing.rs` gives a
+connected device 30 s to ask for a code and then 5 minutes to finish (#28's log:
+the code came 40 ms after the connection, the PIN 10 s later). The wait for a
+device to connect has no limit. Before the handle, cancelling connected to the
+host's own listener on 127.0.0.1 and hung up, which only ended a host still in
+`accept()`; a target that had connected and gone quiet kept the host until the
+app was closed.
 
 Verified here in the simulator against an address that refuses :62078: the switch
 to Remote Pairing, the advertisement (seen from a Mac with `dns-sd`), the
