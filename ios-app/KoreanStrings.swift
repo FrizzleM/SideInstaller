@@ -516,13 +516,13 @@ let koreanStrings: [String: String] = [
     "Both iPhones on the same Wi-Fi network": "같은 Wi-Fi 네트워크에 연결된 두 iPhone",
     "An Apple ID to sign with, ideally theirs": "서명할 Apple ID, 가능하면 상대방 것",
     "Get started": "시작하기",
-    "What should go on their iPhone?": "상대방 iPhone에 무엇을 설치할까요?",
-    "Pick one. You can come back for another one later.": "하나를 고르세요. 나중에 돌아와 다른 것도 설치할 수 있습니다.",
+    "What should go on their iPhone?": "상대방 iPhone에 무엇을 설치하시겠습니까?",
+    "Pick one. You can come back for another one later.": "하나를 선택하세요. 나중에 돌아와 다른 것도 설치할 수 있습니다.",
     "Stable is the release most people use. Nightly is built from the newest code.":
         "Stable은 대부분의 사람이 쓰는 릴리즈입니다. Nightly는 최신 코드로 빌드됩니다.",
-    "Which Apple ID signs it?": "어떤 Apple ID로 서명할까요?",
+    "Which Apple ID signs it?": "어떤 Apple ID로 서명하시겠습니까?",
     "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
-        "앱은 이 Apple ID로 서명되며, 계속 열리려면 7일마다 다시 필요합니다. iPhone 소유자의 Apple ID를 쓰세요.",
+        "앱은 이 Apple ID로 서명되며, 계속 열리려면 7일마다 다시 필요합니다. iPhone 소유자의 Apple ID를 사용하세요.",
     "Their Apple ID": "상대방 Apple ID",
     "Recommended: they keep their apps signed with it.": "추천: 상대방이 이 계정으로 앱 서명을 유지합니다.",
     "My Apple ID": "내 Apple ID",
@@ -773,7 +773,7 @@ let koreanStrings: [String: String] = [
     "Tap “Get the .ipa” below and save the file, or download it on another device and bring it over.":
         "아래의 “.ipa 받기”를 탭하고 파일을 저장하거나, 다른 기기에서 다운로드한 다음 이쪽으로 옮기세요.",
     "Back in SideInstaller, pick Custom .ipa under Install, tap “Import .ipa” and choose the file. SideInstaller recognizes %@ and sets it up just like its own download.":
-        "SideInstaller로 돌아와 설치에서 “사용자 지정 .ipa”를 선택하고 “.ipa 가져오기”를 탭한 다음 파일을 고르세요. SideInstaller가 %@을(를) 인식하여 직접 다운로드한 경우와 똑같이 설정합니다.",
+        "SideInstaller로 돌아와 설치에서 “사용자 지정 .ipa”를 선택하고 “.ipa 가져오기”를 탭한 다음 파일을 선택하세요. SideInstaller가 %@을(를) 인식하여 직접 다운로드한 경우와 똑같이 설정합니다.",
     "Turn LocalDevVPN back on, then tap Install.":
         "LocalDevVPN을 다시 켠 다음 설치를 탭하세요.",
     "Get the .ipa": ".ipa 받기",
@@ -1229,7 +1229,7 @@ let koreanStrings: [String: String] = [
     "This iPhone is %@, so theirs will look similar.": "이 iPhone의 주소는 %@입니다. 상대방 주소도 이와 비슷한 형태입니다.",
     "“%@” isn't an IPv4 address. It should look like 192.168.1.42.":
         "“%@” 값은 IPv4 주소가 아닙니다. 192.168.1.42 같은 형태여야 합니다.",
-    "Do you have the device's IP?": "기기의 IP 주소를 알고 있나요?",
+    "Do you have the device's IP?": "기기의 IP 주소를 알고 계십니까?",
     "Optional": "선택 사항",
     "SideInstaller asks their iPhone to pair directly. Needed below iOS 27.":
         "SideInstaller가 상대방 iPhone에 직접 페어링을 요청합니다. iOS 27 미만에서는 필요합니다.",
@@ -1241,7 +1241,7 @@ let koreanStrings: [String: String] = [
     "Their iPhone unlocked and nearby": "잠금 해제되어 가까이 있는 상대방 iPhone",
     "Below iOS 27, their iPhone's IP address": "iOS 27 미만이라면 상대방 iPhone의 IP 주소",
     "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
-        "상대방 iPhone은 iOS %@입니다. iOS 26.4부터는 상대방 iPhone이 Wi-Fi로 주는 페어링을 SideInstaller에서 쓸 수 없으므로, 컴퓨터로 만든 페어링 파일이 필요합니다.",
+        "상대방 iPhone은 iOS %@입니다. iOS 26.4부터는 상대방 iPhone이 Wi-Fi로 주는 페어링을 SideInstaller에서 사용할 수 없으므로, 컴퓨터로 만든 페어링 파일이 필요합니다.",
     "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":
         "App Store에서 LocalDevVPN을 받아 연결하세요. SideInstaller는 이를 통해 작동합니다.",
     "Open SideInstaller. Its pairing file is already in place.": "SideInstaller를 여세요. 페어링 파일은 이미 들어 있습니다.",
@@ -1250,5 +1250,5 @@ let koreanStrings: [String: String] = [
     "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone, so use theirs. To install on this one, use the Install tab.":
         "%@ 주소는 이 iPhone이 이미 가지고 있는 주소입니다. Side by Side는 다른 사람의 iPhone에 설치하는 기능이니 상대방 주소를 입력하세요. 이 iPhone에 설치하려면 설치 탭을 사용하세요.",
     "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
-        "상대방 iPhone은 iOS %@입니다. iOS 26.4부터는 상대방 iPhone이 Wi-Fi로 주는 페어링을 %@에서 쓸 수 없습니다. iOS 27은 대신 자체 설정에서 페어링하며, 이 방법은 작동합니다. 상대방 iPhone을 업데이트한 뒤 다시 시도하고, IP를 물으면 아니요를 선택하세요.",
+        "상대방 iPhone은 iOS %@입니다. iOS 26.4부터는 상대방 iPhone이 Wi-Fi로 주는 페어링을 %@에서 사용할 수 없습니다. iOS 27은 자체 설정에서 페어링하므로 문제없이 작동합니다. 상대방 iPhone을 업데이트한 뒤 다시 시도하고, IP 주소를 물으면 아니요를 선택하세요.",
 ]
