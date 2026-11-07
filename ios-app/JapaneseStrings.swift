@@ -1052,6 +1052,8 @@ let japaneseStrings: [String: String] = [
         "ペアリング、トンネル、インストール本体。jkcoxson 開発、MIT ライセンス。",
     "Apple ID sign in, certificates and signing on the device. By nab138, MIT.":
         "Apple ID サインイン、証明書、デバイス上での署名。nab138 開発、MIT ライセンス。",
+    "The code signer isideload uses for each app. By Dadoum, LGPL-2.1.":
+        "isideload が各アプリの署名に使うコード署名ツール。Dadoum 開発、LGPL-2.1 ライセンス。",
     "The sideloading app this installs for you.":
         "このアプリがインストールするサイドロード用アプリです。",
     "Runs sideloaded apps without spending an app slot on each one.":

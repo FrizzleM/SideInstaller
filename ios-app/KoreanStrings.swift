@@ -1053,6 +1053,8 @@ let koreanStrings: [String: String] = [
         "페어링, 터널, 설치 자체를 담당합니다. jkcoxson 개발, MIT 라이선스.",
     "Apple ID sign in, certificates and signing on the device. By nab138, MIT.":
         "Apple ID 로그인, 인증서, 기기에서의 서명을 담당합니다. nab138 개발, MIT 라이선스.",
+    "The code signer isideload uses for each app. By Dadoum, LGPL-2.1.":
+        "isideload가 각 앱에 사용하는 코드 서명 도구입니다. Dadoum 개발, LGPL-2.1 라이선스.",
     "The sideloading app this installs for you.":
         "SideInstaller가 대신 설치해 주는 사이드로딩 앱입니다.",
     "Runs sideloaded apps without spending an app slot on each one.":

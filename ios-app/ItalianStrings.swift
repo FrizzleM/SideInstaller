@@ -1078,6 +1078,8 @@ let italianStrings: [String: String] = [
         "Associazione, tunnel e installazione vera e propria. Di jkcoxson, MIT.",
     "Apple ID sign in, certificates and signing on the device. By nab138, MIT.":
         "Accesso con Apple ID, certificati e firma sul dispositivo. Di nab138, MIT.",
+    "The code signer isideload uses for each app. By Dadoum, LGPL-2.1.":
+        "Lo strumento di firma del codice che isideload usa per ogni app. Di Dadoum, LGPL-2.1.",
     "The sideloading app this installs for you.":
         "L’app di sideloading che questa installa per te.",
     "Runs sideloaded apps without spending an app slot on each one.":

@@ -1076,6 +1076,8 @@ let vietnameseStrings: [String: String] = [
         "Ghép nối, đường hầm và chính việc cài đặt. Của jkcoxson, giấy phép MIT.",
     "Apple ID sign in, certificates and signing on the device. By nab138, MIT.":
         "Đăng nhập Apple ID, chứng chỉ và ký ngay trên máy. Của nab138, giấy phép MIT.",
+    "The code signer isideload uses for each app. By Dadoum, LGPL-2.1.":
+        "Công cụ ký mã mà isideload dùng cho từng ứng dụng. Của Dadoum, giấy phép LGPL-2.1.",
     "The sideloading app this installs for you.":
         "Ứng dụng sideload mà ứng dụng này cài giúp bạn.",
     "Runs sideloaded apps without spending an app slot on each one.":

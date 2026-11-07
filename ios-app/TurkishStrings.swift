@@ -940,6 +940,8 @@ let turkishStrings: [String: String] = [
         "Eşleme, tünel ve yüklemenin kendisi. jkcoxson, MIT.",
     "Apple ID sign in, certificates and signing on the device. By nab138, MIT.":
         "Apple kimliği oturum açma, sertifikalar ve cihazda imzalama. nab138, MIT.",
+    "The code signer isideload uses for each app. By Dadoum, LGPL-2.1.":
+        "isideload’un her uygulama için kullandığı kod imzalayıcı. Dadoum, LGPL-2.1.",
     "The sideloading app this installs for you.": "Senin için yüklediği yan yükleme uygulaması.",
     "Runs sideloaded apps without spending an app slot on each one.":
         "Yan yüklenen uygulamaları her biri için uygulama yuvası harcamadan çalıştırır.",

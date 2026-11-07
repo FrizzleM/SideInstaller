@@ -149,6 +149,11 @@ struct AboutView: View {
                          title: "isideload",
                          detail: L("Apple ID sign in, certificates and signing on the device. By nab138, MIT."),
                          urlString: "https://github.com/nab138/isideload")
+                AboutRow(systemImage: "checkmark.seal.fill",
+                         tint: Theme.accent2,
+                         title: "apple-codesign-quick",
+                         detail: L("The code signer isideload uses for each app. By Dadoum, LGPL-2.1."),
+                         urlString: "https://github.com/Dadoum/apple-crates")
                 AboutRow(systemImage: "shippingbox.fill",
                          tint: .green,
                          title: "SideStore",

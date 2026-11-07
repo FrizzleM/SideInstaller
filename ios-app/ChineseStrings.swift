@@ -1046,6 +1046,8 @@ let chineseStrings: [String: String] = [
         "配对、隧道以及安装本身，由 jkcoxson 开发，MIT 许可证。",
     "Apple ID sign in, certificates and signing on the device. By nab138, MIT.":
         "Apple ID 登录、证书与本机签名，由 nab138 开发，MIT 许可证。",
+    "The code signer isideload uses for each app. By Dadoum, LGPL-2.1.":
+        "isideload 用来为每个 App 签名的代码签名工具，由 Dadoum 开发，LGPL-2.1 许可证。",
     "The sideloading app this installs for you.":
         "本应用为你安装的侧载应用。",
     "Runs sideloaded apps without spending an app slot on each one.":
