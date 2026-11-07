@@ -603,8 +603,6 @@ let frenchStrings: [String: String] = [
     "What should go on their iPhone?": "Que faut-il installer sur leur iPhone ?",
     "Pick one. You can come back for another one later.":
         "Choisissez-en une. Vous pourrez revenir pour une autre plus tard.",
-    "Stable is the release most people use. Nightly is built from the newest code.":
-        "Stable est la version que la plupart des gens utilisent. Nightly est compilée à partir du code le plus récent.",
     "Which Apple ID signs it?": "Quel Apple ID la signe ?",
     "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
         "L'app est signée avec cet Apple ID, et en a de nouveau besoin tous les 7 jours pour continuer à s'ouvrir. Utilisez celui du propriétaire de l'iPhone.",

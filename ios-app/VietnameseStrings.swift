@@ -598,8 +598,6 @@ let vietnameseStrings: [String: String] = [
     "What should go on their iPhone?": "Cài gì lên iPhone của họ?",
     "Pick one. You can come back for another one later.":
         "Chọn một. Bạn có thể quay lại cài thêm sau.",
-    "Stable is the release most people use. Nightly is built from the newest code.":
-        "Stable là bản phát hành mà phần lớn mọi người dùng. Nightly được build từ mã mới nhất.",
     "Which Apple ID signs it?": "Apple ID nào sẽ ký?",
     "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
         "Ứng dụng được ký bằng Apple ID này, và cứ 7 ngày lại cần nó để tiếp tục mở được. Hãy dùng Apple ID của chủ iPhone.",

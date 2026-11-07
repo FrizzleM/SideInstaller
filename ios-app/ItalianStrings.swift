@@ -597,8 +597,6 @@ let italianStrings: [String: String] = [
     "What should go on their iPhone?": "Cosa vuoi mettere sul loro iPhone?",
     "Pick one. You can come back for another one later.":
         "Scegline una. Potrai tornare per un'altra più tardi.",
-    "Stable is the release most people use. Nightly is built from the newest code.":
-        "Stable è la release che usa la maggior parte delle persone. Nightly è compilata dal codice più recente.",
     "Which Apple ID signs it?": "Quale Apple ID la firma?",
     "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
         "L'app viene firmata con questo Apple ID, e ne ha di nuovo bisogno ogni 7 giorni per continuare ad aprirsi. Usa quello del proprietario dell'iPhone.",

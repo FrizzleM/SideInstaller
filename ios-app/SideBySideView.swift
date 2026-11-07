@@ -1898,10 +1898,6 @@ struct SideBySideView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                Text(L("Stable is the release most people use. Nightly is built from the newest code."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

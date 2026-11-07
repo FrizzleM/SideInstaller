@@ -518,8 +518,6 @@ let koreanStrings: [String: String] = [
     "Get started": "시작하기",
     "What should go on their iPhone?": "상대방 iPhone에 무엇을 설치할까요?",
     "Pick one. You can come back for another one later.": "하나를 고르세요. 나중에 돌아와 다른 것도 설치할 수 있습니다.",
-    "Stable is the release most people use. Nightly is built from the newest code.":
-        "Stable은 대부분의 사람이 쓰는 릴리즈입니다. Nightly는 최신 코드로 빌드됩니다.",
     "Which Apple ID signs it?": "어떤 Apple ID로 서명할까요?",
     "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
         "앱은 이 Apple ID로 서명되며, 계속 열리려면 7일마다 다시 필요합니다. iPhone 소유자의 Apple ID를 쓰세요.",

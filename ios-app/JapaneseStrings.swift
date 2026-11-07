@@ -517,8 +517,6 @@ let japaneseStrings: [String: String] = [
     "Get started": "はじめる",
     "What should go on their iPhone?": "相手の iPhone に何を入れますか？",
     "Pick one. You can come back for another one later.": "1 つ選んでください。あとで戻って別のものも入れられます。",
-    "Stable is the release most people use. Nightly is built from the newest code.":
-        "Stable は多くの人が使うリリースです。Nightly は最新のコードからビルドされます。",
     "Which Apple ID signs it?": "どの Apple ID で署名しますか？",
     "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
         "アプリはこの Apple ID で署名され、開き続けるには 7 日ごとに再びこの Apple ID が必要です。iPhone の持ち主のものを使ってください。",

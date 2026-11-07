@@ -579,8 +579,6 @@ let chineseStrings: [String: String] = [
     "Get started": "开始",
     "What should go on their iPhone?": "要在对方的 iPhone 上安装什么？",
     "Pick one. You can come back for another one later.": "选择一个。之后可以回来再装另一个。",
-    "Stable is the release most people use. Nightly is built from the newest code.":
-        "Stable 是大多数人使用的版本。Nightly 由最新代码构建。",
     "Which Apple ID signs it?": "用哪个 Apple ID 签名？",
     "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
         "App 会用这个 Apple ID 签名，并且每 7 天需要再次用它才能继续打开。请使用 iPhone 机主的 Apple ID。",
