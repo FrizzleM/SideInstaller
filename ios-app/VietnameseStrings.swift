@@ -583,17 +583,6 @@ let vietnameseStrings: [String: String] = [
         "iPhone của họ đã có ba ứng dụng được ký bằng Apple ID miễn phí, mức tối đa iOS cho phép, tính cả ứng dụng đã hết hạn. Họ cần xóa một ứng dụng, rồi bạn có thể thử lại.",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
         "%@ đã có trên iPhone của họ, nhưng không thêm được tệp ghép nối (%@). Hãy chạy lại Side by Side, hoặc nhập tệp ghép nối trong %@.",
-    "How it works": "Cách hoạt động",
-    "Pick an app": "Chọn một ứng dụng",
-    "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
-        "SideInstaller, SideStore, hoặc LiveContainer có sẵn SideStore.",
-    "Pair their iPhone": "Ghép nối iPhone của họ",
-    "Install over Wi-Fi": "Cài qua Wi-Fi",
-    "This iPhone signs the app and sends it across. No computer needed.":
-        "iPhone này ký ứng dụng và gửi sang. Không cần máy tính.",
-    "What you need": "Bạn cần gì",
-    "Both iPhones on the same Wi-Fi network": "Hai iPhone cùng một mạng Wi-Fi",
-    "An Apple ID to sign with, ideally theirs": "Một Apple ID để ký, tốt nhất là của họ",
     "Get started": "Bắt đầu thôi",
     "What should go on their iPhone?": "Cài gì lên iPhone của họ?",
     "Pick one. You can come back for another one later.":
@@ -1263,10 +1252,6 @@ let vietnameseStrings: [String: String] = [
     "Their iPhone pairs from its own Settings, which needs iOS 27.":
         "iPhone của họ tự ghép nối từ Cài đặt của máy, việc này cần iOS 27.",
     "IP address": "Địa chỉ IP",
-    "On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust.":
-        "Trên iOS 27, họ nhập mã mà iPhone này hiển thị. Trên iOS cũ hơn, họ chạm Tin cậy.",
-    "Their iPhone unlocked and nearby": "iPhone của họ đã mở khóa và ở gần",
-    "Below iOS 27, their iPhone's IP address": "Với iOS dưới 27, địa chỉ IP của iPhone của họ",
     "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
         "iPhone của họ đang chạy iOS %@. Từ iOS 26.4 trở đi, SideInstaller không dùng được kiểu ghép nối mà iPhone của họ cấp qua Wi-Fi, nên cần tệp ghép nối tạo trên máy tính.",
     "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":

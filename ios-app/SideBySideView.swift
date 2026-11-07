@@ -1804,40 +1804,13 @@ struct SideBySideView: View {
             }
             .cascadeItem(0)
 
-            PanelCard {
-                VStack(alignment: .leading, spacing: 16) {
-                    sectionTitle(L("How it works"), systemImage: "sparkles")
-                    FeatureRow(symbol: "square.grid.2x2.fill",
-                               title: L("Pick an app"),
-                               detail: L("SideInstaller, SideStore, or LiveContainer with SideStore built in."))
-                    FeatureRow(symbol: "lock.iphone",
-                               title: L("Pair their iPhone"),
-                               detail: L("On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust."))
-                    FeatureRow(symbol: "wifi",
-                               title: L("Install over Wi-Fi"),
-                               detail: L("This iPhone signs the app and sends it across. No computer needed."))
-                }
-            }
-            .cascadeItem(1)
-
-            PanelCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    sectionTitle(L("What you need"), systemImage: "checklist")
-                    CheckRow(symbol: "wifi", text: L("Both iPhones on the same Wi-Fi network"))
-                    CheckRow(symbol: "iphone", text: L("Their iPhone unlocked and nearby"))
-                    CheckRow(symbol: "network", text: L("Below iOS 27, their iPhone's IP address"))
-                    CheckRow(symbol: "person.crop.circle", text: L("An Apple ID to sign with, ideally theirs"))
-                }
-            }
-            .cascadeItem(2)
-
             if manager.remembersTheirIPhone {
-                rememberedCard.cascadeItem(3)
+                rememberedCard.cascadeItem(1)
             }
 
             Button { manager.go(to: .app) } label: { continueLabel(L("Get started")) }
                 .buttonStyle(PrimaryButtonStyle())
-                .cascadeItem(4)
+                .cascadeItem(2)
         }
     }
 
@@ -2749,32 +2722,6 @@ private struct OptionRow: View {
         }
         .buttonStyle(.plain, sound: .tick)
         .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-}
-
-/// A line of the welcome page: a glyph on the brand gradient, a title, a line.
-private struct FeatureRow: View {
-    let symbol: String
-    let title: String
-    let detail: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.brand))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(detail)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
     }
 }
 

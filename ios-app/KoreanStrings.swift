@@ -504,17 +504,6 @@ let koreanStrings: [String: String] = [
         "상대방 iPhone에는 이미 무료 Apple ID로 서명된 앱이 3개 있습니다. 만료된 앱을 포함해 iOS가 허용하는 최대치입니다. 상대방이 하나를 삭제한 뒤 다시 시도하세요.",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
         "%@은(는) 상대방 iPhone에 설치되었지만 페어링 파일을 넣지 못했습니다(%@). Side by Side를 다시 실행하거나 %@에서 페어링 파일을 가져오세요.",
-    "How it works": "작동 방식",
-    "Pick an app": "앱 선택",
-    "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
-        "SideInstaller, SideStore, 또는 SideStore가 내장된 LiveContainer.",
-    "Pair their iPhone": "상대방 iPhone 페어링",
-    "Install over Wi-Fi": "Wi-Fi로 설치",
-    "This iPhone signs the app and sends it across. No computer needed.":
-        "이 iPhone이 앱에 서명해서 보내 줍니다. 컴퓨터가 필요 없습니다.",
-    "What you need": "준비물",
-    "Both iPhones on the same Wi-Fi network": "같은 Wi-Fi 네트워크에 연결된 두 iPhone",
-    "An Apple ID to sign with, ideally theirs": "서명할 Apple ID, 가능하면 상대방 것",
     "Get started": "시작하기",
     "What should go on their iPhone?": "상대방 iPhone에 무엇을 설치할까요?",
     "Pick one. You can come back for another one later.": "하나를 고르세요. 나중에 돌아와 다른 것도 설치할 수 있습니다.",
@@ -1236,10 +1225,6 @@ let koreanStrings: [String: String] = [
     "Their iPhone pairs from its own Settings, which needs iOS 27.":
         "상대방 iPhone이 자체 설정에서 페어링하며, iOS 27이 필요합니다.",
     "IP address": "IP 주소",
-    "On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust.":
-        "iOS 27에서는 이 iPhone에 표시되는 코드를 상대방이 입력합니다. 이전 iOS에서는 신뢰를 탭합니다.",
-    "Their iPhone unlocked and nearby": "잠금 해제되어 가까이 있는 상대방 iPhone",
-    "Below iOS 27, their iPhone's IP address": "iOS 27 미만이라면 상대방 iPhone의 IP 주소",
     "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
         "상대방 iPhone은 iOS %@입니다. iOS 26.4부터는 상대방 iPhone이 Wi-Fi로 주는 페어링을 SideInstaller에서 쓸 수 없으므로, 컴퓨터로 만든 페어링 파일이 필요합니다.",
     "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":

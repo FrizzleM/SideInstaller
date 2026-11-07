@@ -565,17 +565,6 @@ let chineseStrings: [String: String] = [
         "对方的 iPhone 上已有三个用免费 Apple ID 签名的 App（已过期的也算），这是 iOS 允许的上限。请对方先删除一个，然后再试。",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
         "%@ 已在对方的 iPhone 上，但无法放入它的配对文件（%@）。请再运行一次 Side by Side，或在 %@ 中导入配对文件。",
-    "How it works": "工作原理",
-    "Pick an app": "选择一个 App",
-    "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
-        "SideInstaller、SideStore，或内置 SideStore 的 LiveContainer。",
-    "Pair their iPhone": "配对对方的 iPhone",
-    "Install over Wi-Fi": "通过 Wi-Fi 安装",
-    "This iPhone signs the app and sends it across. No computer needed.":
-        "这台 iPhone 会为 App 签名并发送过去，无需电脑。",
-    "What you need": "你需要准备",
-    "Both iPhones on the same Wi-Fi network": "两台 iPhone 连接同一个 Wi-Fi 网络",
-    "An Apple ID to sign with, ideally theirs": "一个用于签名的 Apple ID，最好是对方的",
     "Get started": "开始",
     "What should go on their iPhone?": "要在对方的 iPhone 上安装什么？",
     "Pick one. You can come back for another one later.": "选择一个。之后可以回来再装另一个。",
@@ -1225,10 +1214,6 @@ let chineseStrings: [String: String] = [
         "SideInstaller 直接请求对方的 iPhone 配对。iOS 27 以下需要这样做。",
     "Their iPhone pairs from its own Settings, which needs iOS 27.": "对方的 iPhone 在自己的 设置 中配对，这需要 iOS 27。",
     "IP address": "IP 地址",
-    "On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust.":
-        "在 iOS 27 上，对方输入这台 iPhone 显示的代码；在较旧的 iOS 上，对方轻点“信任”。",
-    "Their iPhone unlocked and nearby": "对方的 iPhone 已解锁并在旁边",
-    "Below iOS 27, their iPhone's IP address": "iOS 27 以下：对方 iPhone 的 IP 地址",
     "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
         "对方的 iPhone 运行 iOS %@。从 iOS 26.4 起，SideInstaller 无法使用对方 iPhone 通过 Wi-Fi 给出的配对，所以需要用电脑制作的配对文件。",
     "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":

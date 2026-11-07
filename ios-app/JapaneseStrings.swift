@@ -503,17 +503,6 @@ let japaneseStrings: [String: String] = [
         "相手の iPhone には、無料 Apple ID で署名されたアプリがすでに 3 つあります（期限切れのものも含む）。これが iOS の上限です。1 つ削除してもらってから、もう一度お試しください。",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
         "%@ は相手の iPhone に入りましたが、ペアリングファイルを追加できませんでした（%@）。Side by Side をもう一度実行するか、%@ でペアリングファイルを読み込んでください。",
-    "How it works": "しくみ",
-    "Pick an app": "アプリを選ぶ",
-    "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
-        "SideInstaller、SideStore、または SideStore 内蔵の LiveContainer。",
-    "Pair their iPhone": "相手の iPhone をペアリング",
-    "Install over Wi-Fi": "Wi-Fi でインストール",
-    "This iPhone signs the app and sends it across. No computer needed.":
-        "この iPhone がアプリに署名して送ります。コンピュータは不要です。",
-    "What you need": "必要なもの",
-    "Both iPhones on the same Wi-Fi network": "同じ Wi-Fi ネットワークにある 2 台の iPhone",
-    "An Apple ID to sign with, ideally theirs": "署名に使う Apple ID（できれば相手のもの）",
     "Get started": "はじめる",
     "What should go on their iPhone?": "相手の iPhone に何を入れますか？",
     "Pick one. You can come back for another one later.": "1 つ選んでください。あとで戻って別のものも入れられます。",
@@ -1235,10 +1224,6 @@ let japaneseStrings: [String: String] = [
     "Their iPhone pairs from its own Settings, which needs iOS 27.":
         "相手の iPhone が自分の「設定」からペアリングします。iOS 27 が必要です。",
     "IP address": "IP アドレス",
-    "On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust.":
-        "iOS 27 では、この iPhone に表示されるコードを相手が入力します。それより前の iOS では「信頼」をタップします。",
-    "Their iPhone unlocked and nearby": "ロックを解除して近くに置いた相手の iPhone",
-    "Below iOS 27, their iPhone's IP address": "iOS 27 より前の場合は、相手の iPhone の IP アドレス",
     "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
         "相手の iPhone は iOS %@ です。iOS 26.4 以降では、相手の iPhone が Wi-Fi 経由で渡すペアリングを SideInstaller は使えないため、コンピュータで作ったペアリングファイルが必要です。",
     "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":

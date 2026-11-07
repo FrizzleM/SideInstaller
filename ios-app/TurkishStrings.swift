@@ -1116,10 +1116,6 @@ let turkishStrings: [String: String] = [
     "Their iPhone pairs from its own Settings, which needs iOS 27.":
         "Diğer iPhone kendi Ayarlar'ından eşlenir, bunun için iOS 27 gerekir.",
     "IP address": "IP adresi",
-    "On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust.":
-        "iOS 27'de bu iPhone'un gösterdiği kodu girerler. Daha eski iOS'ta Güven'e dokunurlar.",
-    "Their iPhone unlocked and nearby": "Diğer iPhone kilidi açık ve yakında",
-    "Below iOS 27, their iPhone's IP address": "iOS 27'nin altındaysa diğer iPhone'un IP adresi",
     "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
         "Diğer iPhone iOS %@ kullanıyor. iOS 26.4'ten itibaren SideInstaller, diğer iPhone'un Wi-Fi üzerinden verdiği eşlemeyi kullanamaz, bu yüzden bilgisayarda yapılmış bir eşleme dosyası gerekir.",
     "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":

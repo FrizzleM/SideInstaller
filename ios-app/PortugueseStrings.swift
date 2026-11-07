@@ -583,17 +583,6 @@ let portugueseStrings: [String: String] = [
         "O iPhone dele já tem três apps assinados com um Apple ID gratuito, o máximo que o iOS permite, contando os expirados. É preciso apagar um, e então você pode tentar de novo.",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
         "%@ está no iPhone dele, mas não foi possível adicionar o arquivo de pareamento (%@). Rode o Side by Side de novo ou importe um arquivo de pareamento no %@.",
-    "How it works": "Como funciona",
-    "Pick an app": "Escolha um app",
-    "SideInstaller, SideStore, or LiveContainer with SideStore built in.":
-        "SideInstaller, SideStore ou LiveContainer com o SideStore embutido.",
-    "Pair their iPhone": "Pareie o iPhone dele",
-    "Install over Wi-Fi": "Instale pelo Wi-Fi",
-    "This iPhone signs the app and sends it across. No computer needed.":
-        "Este iPhone assina o app e o envia. Não precisa de computador.",
-    "What you need": "Do que você precisa",
-    "Both iPhones on the same Wi-Fi network": "Os dois iPhones na mesma rede Wi-Fi",
-    "An Apple ID to sign with, ideally theirs": "Um Apple ID para assinar, de preferência o dele",
     "Get started": "Começar",
     "What should go on their iPhone?": "O que vai para o iPhone dele?",
     "Pick one. You can come back for another one later.":
@@ -1257,10 +1246,6 @@ let portugueseStrings: [String: String] = [
     "Their iPhone pairs from its own Settings, which needs iOS 27.":
         "O iPhone dele se pareia pelos próprios Ajustes, o que exige o iOS 27.",
     "IP address": "Endereço IP",
-    "On iOS 27 they type in a code this iPhone shows. On older iOS, they tap Trust.":
-        "No iOS 27, a pessoa digita um código que este iPhone mostra. Em versões anteriores, toca em Confiar.",
-    "Their iPhone unlocked and nearby": "O iPhone dele desbloqueado e por perto",
-    "Below iOS 27, their iPhone's IP address": "Abaixo do iOS 27, o endereço IP do iPhone dele",
     "Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.":
         "O iPhone dele está no iOS %@. A partir do iOS 26.4, o SideInstaller não consegue usar o pareamento que o iPhone dele dá pelo Wi-Fi, então precisa de um arquivo de pareamento feito num computador.",
     "Get LocalDevVPN from the App Store and connect it: SideInstaller works through it.":
