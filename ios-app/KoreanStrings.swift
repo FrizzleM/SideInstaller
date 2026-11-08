@@ -33,6 +33,13 @@ let koreanStrings: [String: String] = [
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "이 iPhone의 iOS 버전은 %@입니다. 자기 자신과 페어링할 수 있는 것은 iOS %@ 이상뿐이라서, 컴퓨터에서 jitterbugpair나 pymobiledevice3로 페어링 파일을 만들어 앱으로 가져와야 합니다. 방법은 SideInstaller가 안내해 드립니다.",
 
+    // iOS 27 runs on this iPhone: recommended at setup
+
+    "Update to iOS %@": "iOS %@로 업데이트하세요",
+    "This iPhone can run iOS %@, where SideInstaller works without a computer: the iPhone pairs with itself, so there's no pairing file to make. Update in Settings › General › Software Update.":
+        "이 iPhone은 iOS %@ 업데이트를 받을 수 있습니다. 업데이트하면 iPhone이 자기 자신과 페어링하므로 컴퓨터 없이 SideInstaller를 사용할 수 있고, 페어링 파일을 만들 필요도 없습니다. 설정 › 일반 › 소프트웨어 업데이트에서 업데이트하세요.",
+    "OK": "확인",
+
     // MARK: - Account setup & Settings › Account
 
     "Sign in with your Apple ID": "Apple ID로 로그인",

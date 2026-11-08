@@ -8,6 +8,9 @@ All notable changes to SideInstaller are documented here.
 - **SideInstaller is now in Turkish.** Pick Türkçe in Settings › Language, or leave it on Auto
   with your iPhone set to Turkish. Thanks to [Mr3242-Scripter](https://github.com/Mr3242-Scripter)
   for the translation (#111), who's now in About › Special thanks.
+- **A nudge to update to iOS 27 at setup.** On an iPhone or iPad below iOS 27 that can run it,
+  the welcome page now suggests updating first: on iOS 27 the iPhone pairs with itself, so
+  SideInstaller works without a computer and there's no pairing file to make.
 
 ### Changed
 - **Side by Side goes step by step, and installs SideStore and LiveContainer too.** It was one

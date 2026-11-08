@@ -284,6 +284,32 @@ final class Engine: ObservableObject {
 
     var canSelfPair: Bool { Engine.deviceCanSelfPair }
 
+    /// True below iOS 27 on hardware that can update to it, where updating
+    /// makes the computer-made pairing file unnecessary. iOS 27 runs on the
+    /// same iPhones as iOS 26 (iPhone 11 and SE 2nd generation on); iPadOS 27
+    /// drops the A12/A12X iPads (8th generation iPad, mini 5, Air 3, the 2018
+    /// iPad Pros) but keeps the 2020 A12Z iPad Pros.
+    static var canUpdateToSelfPairingOS: Bool {
+        guard !deviceCanSelfPair else { return false }
+        let model = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"]
+            ?? ProblemReport.sysctlString("hw.machine")
+        return model.map(supportsSelfPairingOS) ?? false
+    }
+
+    /// Whether a hardware model, e.g. "iPhone12,8", is on the iOS/iPadOS 27 list.
+    static func supportsSelfPairingOS(model: String) -> Bool {
+        let family = model.prefix { $0.isLetter }
+        let numbers = model.dropFirst(family.count).split(separator: ",").compactMap { Int($0) }
+        guard numbers.count == 2 else { return false }
+        let (major, minor) = (numbers[0], numbers[1])
+        switch family {
+        case "iPhone": return major >= 12               // iPhone12,1 = iPhone 11
+        case "iPad": return major >= 12                 // iPad12,1 = iPad (9th generation)
+            || (major == 8 && minor >= 9)               // iPad8,9–8,12 = 2020 iPad Pros
+        default: return false
+        }
+    }
+
     /// Whether Developer Mode is on, from the `security.mac.amfi.developer_mode_status`
     /// sysctl AMFI publishes; nil when this iOS won't let the app read it.
     /// Static so non-isolated code can read it.

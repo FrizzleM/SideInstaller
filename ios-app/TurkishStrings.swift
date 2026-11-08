@@ -31,6 +31,13 @@ let turkishStrings: [String: String] = [
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "Bu iPhone iOS %@ çalıştırıyor. Yalnızca iOS %@ kendi kendine eşlenebilir, bu yüzden bilgisayarda — jitterbugpair veya pymobiledevice3 ile — bir eşleme dosyası oluşturup uygulamaya içe aktarman gerekir. SideInstaller adım adım gösterir.",
 
+    // iOS 27 runs on this iPhone: recommended at setup
+
+    "Update to iOS %@": "iOS %@ sürümüne güncelle",
+    "This iPhone can run iOS %@, where SideInstaller works without a computer: the iPhone pairs with itself, so there's no pairing file to make. Update in Settings › General › Software Update.":
+        "Bu iPhone iOS %@ çalıştırabilir; bu sürümde SideInstaller bilgisayarsız çalışır: iPhone kendi kendine eşlenir, böylece eşleme dosyası oluşturman gerekmez. Ayarlar › Genel › Yazılım Güncelleme'den güncelle.",
+    "OK": "Tamam",
+
     // MARK: - Account setup & Settings › Account
 
     "Sign in with your Apple ID": "Apple kimliğinle oturum aç",

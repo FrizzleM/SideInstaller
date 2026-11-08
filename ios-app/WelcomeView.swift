@@ -7,6 +7,8 @@ struct WelcomeView: View {
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @State private var accepted = false
+    /// The "Update to iOS 27" popup, for an iPhone below 27 that can run it.
+    @State private var recommendingUpdate = false
 
     var body: some View {
         ZStack {
@@ -49,6 +51,19 @@ struct WelcomeView: View {
             }
         }
         .preferredColorScheme(.dark)
+        // An iPhone that can update to iOS 27 is told so once the page has
+        // come in: there it pairs with itself, with no computer involved.
+        .task {
+            guard Engine.canUpdateToSelfPairingOS else { return }
+            try? await Task.sleep(for: .seconds(1.4))
+            recommendingUpdate = true
+        }
+        .alert(L("Update to iOS %@", Engine.minimumOSText), isPresented: $recommendingUpdate) {
+            Button(L("OK"), role: .cancel) {}
+        } message: {
+            Text(L("This iPhone can run iOS %@, where SideInstaller works without a computer: the iPhone pairs with itself, so there's no pairing file to make. Update in Settings › General › Software Update.",
+                   Engine.minimumOSText))
+        }
     }
 
     /// Notice for iOS below 27, explaining the extra pairing-file step.

@@ -32,6 +32,13 @@ let vietnameseStrings: [String: String] = [
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "iPhone này chạy iOS %@. Chỉ iOS %@ mới tự ghép nối được, nên bạn phải tạo tệp ghép nối trên máy tính — bằng jitterbugpair hoặc pymobiledevice3 — rồi nhập vào ứng dụng. SideInstaller sẽ hướng dẫn bạn từng bước.",
 
+    // iOS 27 runs on this iPhone: recommended at setup
+
+    "Update to iOS %@": "Cập nhật lên iOS %@",
+    "This iPhone can run iOS %@, where SideInstaller works without a computer: the iPhone pairs with itself, so there's no pairing file to make. Update in Settings › General › Software Update.":
+        "iPhone này có thể chạy iOS %@. Trên phiên bản đó, SideInstaller hoạt động mà không cần máy tính: iPhone tự ghép nối, nên không phải tạo tệp ghép nối. Cập nhật trong Cài đặt › Cài đặt chung › Cập nhật phần mềm.",
+    "OK": "OK",
+
     // MARK: - Account setup & Settings › Account
 
     "Sign in with your Apple ID": "Đăng nhập bằng Apple ID của bạn",

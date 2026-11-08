@@ -32,6 +32,13 @@ let chineseStrings: [String: String] = [
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "本机运行 iOS %@。只有 iOS %@ 能与自身配对，因此你需要在电脑上用 jitterbugpair 或 pymobiledevice3 生成配对文件，再导入到 App 中。SideInstaller 会逐步引导你。",
 
+    // iOS 27 runs on this iPhone: recommended at setup
+
+    "Update to iOS %@": "更新到 iOS %@",
+    "This iPhone can run iOS %@, where SideInstaller works without a computer: the iPhone pairs with itself, so there's no pairing file to make. Update in Settings › General › Software Update.":
+        "此 iPhone 可以运行 iOS %@。在该版本上，SideInstaller 无需电脑即可使用：iPhone 会与自身配对，因此无需生成配对文件。请在 设置 › 通用 › 软件更新 中更新。",
+    "OK": "好",
+
     // MARK: - Account setup & Settings › Account
 
     "Sign in with your Apple ID": "使用你的 Apple ID 登录",

@@ -30,6 +30,13 @@ let italianStrings: [String: String] = [
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "Questo iPhone usa iOS %@. Solo iOS %@ può abbinarsi da solo, quindi dovrai creare un file di abbinamento su un computer — con jitterbugpair o pymobiledevice3 — e importarlo nell'app. SideInstaller ti guida passo passo.",
 
+    // iOS 27 runs on this iPhone: recommended at setup
+
+    "Update to iOS %@": "Aggiorna a iOS %@",
+    "This iPhone can run iOS %@, where SideInstaller works without a computer: the iPhone pairs with itself, so there's no pairing file to make. Update in Settings › General › Software Update.":
+        "Questo iPhone può usare iOS %@, dove SideInstaller funziona senza computer: l'iPhone si abbina da solo, quindi non serve creare un file di abbinamento. Aggiorna in Impostazioni › Generali › Aggiornamento software.",
+    "OK": "OK",
+
     // MARK: - Account setup & Settings › Account
 
     "Sign in with your Apple ID": "Accedi con il tuo Apple ID",

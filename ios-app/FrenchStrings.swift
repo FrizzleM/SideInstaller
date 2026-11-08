@@ -31,6 +31,13 @@ let frenchStrings: [String: String] = [
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "Cet iPhone est sous iOS %@. Seul iOS %@ peut se jumeler tout seul : vous devrez créer un fichier de jumelage sur un ordinateur — avec jitterbugpair ou pymobiledevice3 — puis l'importer dans l'app. SideInstaller vous guide pas à pas.",
 
+    // iOS 27 runs on this iPhone: recommended at setup
+
+    "Update to iOS %@": "Passez à iOS %@",
+    "This iPhone can run iOS %@, where SideInstaller works without a computer: the iPhone pairs with itself, so there's no pairing file to make. Update in Settings › General › Software Update.":
+        "Cet iPhone peut passer à iOS %@, où SideInstaller fonctionne sans ordinateur : l'iPhone se jumelle tout seul, donc aucun fichier de jumelage à créer. Mettez à jour dans Réglages › Général › Mise à jour logicielle.",
+    "OK": "OK",
+
     // MARK: - Account setup & Settings › Account
 
     "Sign in with your Apple ID": "Connectez-vous avec votre Apple ID",

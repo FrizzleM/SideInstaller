@@ -32,6 +32,13 @@ let japaneseStrings: [String: String] = [
     "This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.":
         "この iPhone は iOS %@ で動作しています。自分自身とペアリングできるのは iOS %@ 以降のみのため、パソコンで jitterbugpair または pymobiledevice3 を使ってペアリングファイルを作成し、アプリにインポートする必要があります。手順は SideInstaller が案内します。",
 
+    // iOS 27 runs on this iPhone: recommended at setup
+
+    "Update to iOS %@": "iOS %@ にアップデート",
+    "This iPhone can run iOS %@, where SideInstaller works without a computer: the iPhone pairs with itself, so there's no pairing file to make. Update in Settings › General › Software Update.":
+        "この iPhone は iOS %@ にアップデートできます。アップデートすると iPhone が自分自身とペアリングするため、SideInstaller をパソコンなしで使え、ペアリングファイルを作成する必要もありません。「設定 › 一般 › ソフトウェア・アップデート」からアップデートしてください。",
+    "OK": "OK",
+
     // MARK: - Account setup & Settings › Account
 
     "Sign in with your Apple ID": "Apple ID でサインイン",
