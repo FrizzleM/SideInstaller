@@ -199,6 +199,10 @@ let vietnameseStrings: [String: String] = [
     "Sign in to Apple ID": "Đăng nhập Apple ID",
     "Download %@": "Tải %@",
     "Use your imported IPA": "Dùng IPA đã nhập",
+    "Use a custom .ipa instead": "Dùng tệp .ipa tùy chỉnh",
+    "Pick an .ipa to install.": "Hãy chọn tệp .ipa cần cài.",
+    "Signed with the Apple ID and installed as it is, without a pairing file.": "Được ký bằng Apple ID và cài nguyên trạng, không kèm tệp ghép nối.",
+    "Open %@.": "Mở %@.",
     "Sign the app": "Ký ứng dụng",
     "Finish setup": "Hoàn tất thiết lập",
 

@@ -168,6 +168,10 @@ let turkishStrings: [String: String] = [
     "Sign in to Apple ID": "Apple kimliği ile oturum aç",
     "Download %@": "%@ indir",
     "Use your imported IPA": "İçe aktardığın IPA'yı kullan",
+    "Use a custom .ipa instead": "Bunun yerine özel bir .ipa kullan",
+    "Pick an .ipa to install.": "Yüklenecek .ipa dosyasını seç.",
+    "Signed with the Apple ID and installed as it is, without a pairing file.": "Apple kimliğiyle imzalanır ve eşleme dosyası olmadan olduğu gibi yüklenir.",
+    "Open %@.": "%@ uygulamasını aç.",
     "Sign the app": "Uygulamayı imzala",
     "Finish setup": "Kurulumu bitir",
 

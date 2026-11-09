@@ -196,6 +196,10 @@ let koreanStrings: [String: String] = [
     "Sign in to Apple ID": "Apple ID로 로그인",
     "Download %@": "%@ 다운로드",
     "Use your imported IPA": "가져온 IPA 사용",
+    "Use a custom .ipa instead": "대신 사용자 지정 .ipa 사용",
+    "Pick an .ipa to install.": "설치할 .ipa 파일을 선택하세요.",
+    "Signed with the Apple ID and installed as it is, without a pairing file.": "Apple ID로 서명해 페어링 파일 없이 그대로 설치합니다.",
+    "Open %@.": "%@ 앱을 여세요.",
     "Sign the app": "앱 서명",
     "Finish setup": "설정 마무리",
 

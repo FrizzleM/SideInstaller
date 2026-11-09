@@ -1,44 +1,62 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import SideInstallerFFI
 
 // MARK: - What goes on their iPhone
 
 /// What Side by Side can put on another iPhone, the choice iLoader offers:
-/// SideInstaller itself, or one of the two SideStore builds the Install tab
-/// sets up.
+/// SideInstaller itself, one of the two SideStore builds the Install tab sets
+/// up, or an IPA picked from Files.
 enum SideBySideApp: String, CaseIterable, Identifiable {
     case sideInstaller
     case sideStore
     case liveContainer
+    /// An IPA picked from Files (`SideBySideManager.customIPA`). One of the
+    /// three above is set up like that build; any other app is signed and
+    /// installed as it is, without a pairing file.
+    case custom
 
     var id: String { rawValue }
+
+    /// The choices with a card of their own; `.custom` is picked from the
+    /// text under Continue.
+    static let builtIn: [SideBySideApp] = [.sideInstaller, .sideStore, .liveContainer]
 
     /// The Install tab's build, for the two SideStore builds: downloaded from
     /// the same place, and handed the pairing file the same way. Nil for
     /// SideInstaller, which comes from its own latest release and is handed the
-    /// pairing file as an imported one.
+    /// pairing file as an imported one, and for a custom IPA.
     var source: InstallSource? {
         switch self {
         case .sideInstaller: return nil
         case .sideStore:     return .sideStore
         case .liveContainer: return .liveContainer
+        case .custom:        return nil
         }
     }
 
     /// Full name, for titles and the log.
     var displayName: String {
-        source?.displayName ?? "SideInstaller"
+        switch self {
+        case .sideInstaller: return "SideInstaller"
+        case .custom:        return L("Custom .ipa")
+        default:             return source?.displayName ?? "SideInstaller"
+        }
     }
 
     /// What it's called on their Home Screen.
     var homeScreenName: String {
-        source?.pairingAppDisplayName ?? "SideInstaller"
+        switch self {
+        case .sideInstaller: return "SideInstaller"
+        case .custom:        return L("Custom .ipa")
+        default:             return source?.pairingAppDisplayName ?? "SideInstaller"
+        }
     }
 
-    /// What their iPhone needs for it. Each one works through LocalDevVPN
-    /// with the pairing file this iPhone hands it, on any iOS that pairing
-    /// works on.
+    /// What their iPhone needs for it. Each of SideInstaller's own works
+    /// through LocalDevVPN with the pairing file this iPhone hands it, on any
+    /// iOS that pairing works on.
     var requirement: String {
         L("Needs LocalDevVPN on their iPhone")
     }
@@ -52,6 +70,7 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
         case .sideInstaller: return "AppLogo"
         case .sideStore:     return "SideStoreLogo"
         case .liveContainer: return "LiveContainerLogo"
+        case .custom:        return nil
         }
     }
 
@@ -61,6 +80,7 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
         case .sideInstaller: return "arrow.down.app.fill"
         case .sideStore:     return "storefront.fill"
         case .liveContainer: return "shippingbox.fill"
+        case .custom:        return "app.dashed"
         }
     }
 
@@ -69,6 +89,7 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
         case .sideInstaller: return Theme.accent
         case .sideStore:     return Color(red: 0.56, green: 0.36, blue: 0.96)
         case .liveContainer: return Color(red: 0.10, green: 0.68, blue: 0.64)
+        case .custom:        return .orange
         }
     }
 }
@@ -89,24 +110,25 @@ enum SideBySideStep: Int, CaseIterable, Identifiable {
         switch self {
         case .connect:  return L("Pair with their iPhone")
         case .signIn:   return L("Sign in to Apple ID")
-        case .download: return L("Download %@", app.displayName)
+        case .download: return app == .custom ? L("Use your imported IPA") : L("Download %@", app.displayName)
         case .sign:     return L("Sign the app")
         case .install:  return L("Install on their iPhone")
         case .setUp:    return L("Finish setup")
         }
     }
 
-    /// The steps a run installing `app` goes through: all of them, for every
-    /// app.
-    static func steps(for app: SideBySideApp) -> [SideBySideStep] {
-        allCases
+    /// The steps a run goes through: all of them, unless the app it installs
+    /// gets no pairing file (`setsUp` false), which leaves out the last.
+    static func steps(setsUp: Bool) -> [SideBySideStep] {
+        setsUp ? allCases : allCases.filter { $0 != .setUp }
     }
 }
 
 // MARK: - Manager
 
-/// Installs SideInstaller, SideStore or LiveContainer + SideStore onto
-/// *another* iPhone on the same Wi-Fi network, one page at a time.
+/// Installs SideInstaller, SideStore, LiveContainer + SideStore or an IPA
+/// picked from Files onto *another* iPhone on the same Wi-Fi network, one page
+/// at a time.
 ///
 /// The pages (`Stage`) gather what to install, their address if they have it,
 /// and the Apple ID, then have their iPhone made ready before the run starts.
@@ -204,9 +226,35 @@ final class SideBySideManager: ObservableObject {
     @Published var appleID = ""
     @Published var password = ""
 
+    /// An IPA picked for `SideBySideApp.custom`: this page's own copy, in a
+    /// temporary folder of its own, and what it holds.
+    struct CustomIPA: Equatable {
+        let file: URL
+        /// Its Home Screen name, or the file's name when its Info.plist can't
+        /// be read.
+        let name: String
+        let version: String?
+        /// The build of SideInstaller's own it is, set up just like that build;
+        /// nil for any other app, which gets no pairing file.
+        let build: SideBySideApp?
+    }
+
+    /// The IPA picked for `.custom`. Kept until another is picked or
+    /// SideInstaller closes, like the choice of app; Clear keeps it too.
+    @Published private(set) var customIPA: CustomIPA?
+    @Published private(set) var isImportingIPA = false
+    /// Why the last pick didn't take.
+    @Published private(set) var importError: String?
+
+    /// SideInstaller's bundle ID as released, which tells a picked IPA of it
+    /// apart; a build signed earlier has `.<team ID>` after it.
+    static let sideInstallerBundleID = "com.frizzlem.sideinstaller"
+
     private static let appKey = "sideBySideApp"
     private static var savedApp: SideBySideApp {
-        UserDefaults.standard.string(forKey: appKey).flatMap(SideBySideApp.init(rawValue:)) ?? .sideInstaller
+        // Not `.custom`: the IPA picked for it goes when SideInstaller closes.
+        UserDefaults.standard.string(forKey: appKey).flatMap(SideBySideApp.init(rawValue:))
+            .flatMap { $0 == .custom ? nil : $0 } ?? .sideInstaller
     }
 
     // MARK: Run state
@@ -220,6 +268,13 @@ final class SideBySideManager: ObservableObject {
     @Published private(set) var finished = false
     /// What the current or last run installs, as it was when it started.
     @Published private(set) var runApp: SideBySideApp = .sideInstaller
+    /// Its name: the picked IPA's for `.custom`.
+    @Published private(set) var runName = "SideInstaller"
+    /// The build the run sets up, which gets the pairing file: `runApp`, or
+    /// the one a picked IPA is. Nil for any other app.
+    @Published private(set) var runSetsUp: SideBySideApp? = .sideInstaller
+    /// The steps the run goes through.
+    @Published private(set) var runSteps = SideBySideStep.steps(setsUp: true)
     /// The far device's name and iOS version, once the link is open.
     @Published private(set) var targetSummary: String?
     /// Their iPhone's iOS version ("27.1"), once the link is open.
@@ -295,6 +350,8 @@ final class SideBySideManager: ObservableObject {
         // Left with someone's signing key in it if SideInstaller was closed
         // before a run ended.
         PrivateStore.forgetEarlierPeerSignIns()
+        // IPAs picked before SideInstaller last closed.
+        try? FileManager.default.removeItem(at: Self.customIPAFolder)
     }
 
     deinit {
@@ -302,6 +359,7 @@ final class SideBySideManager: ObservableObject {
         if let folder = temporarySignIn?.folder { try? FileManager.default.removeItem(at: folder) }
         connection.disconnect()
         discardDownload()
+        try? FileManager.default.removeItem(at: Self.customIPAFolder)
     }
 
     // MARK: - Moving between pages
@@ -407,7 +465,7 @@ final class SideBySideManager: ObservableObject {
     /// Fraction across the run's steps, for the progress bar. The download and
     /// install steps also fill their own share as they go.
     var overallProgress: Double {
-        let steps = SideBySideStep.steps(for: runApp)
+        let steps = runSteps
         let done = Double(steps.filter { stepStates[$0] == .done }.count)
         var partial = 0.0
         if stepStates[.download] == .active { partial = downloadProgress }
@@ -430,6 +488,14 @@ final class SideBySideManager: ObservableObject {
             lastError = ErrorHelp.explained(L("Enter the Apple ID to sign with, and its password."))
             return
         }
+        if app == .custom {
+            // iOS may clear the temporary folder it was copied into.
+            guard let picked = customIPA, FileManager.default.fileExists(atPath: picked.file.path) else {
+                if customIPA != nil { discardCustomIPA() }
+                lastError = ErrorHelp.explained(L("Pick an .ipa to install."))
+                return
+            }
+        }
         engine.refreshNetworkStatus()
         guard engine.wifiConnected else {
             lastError = ErrorHelp.explained(L("Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work."))
@@ -442,14 +508,25 @@ final class SideBySideManager: ObservableObject {
 
         let app = self.app
         let channel = self.channel
+        let custom = app == .custom ? customIPA : nil
+        let setsUp: SideBySideApp? = custom != nil ? custom?.build : app
         resetRun()
         runApp = app
+        runName = custom?.name ?? app.displayName
+        runSetsUp = setsUp
+        runSteps = SideBySideStep.steps(setsUp: setsUp != nil)
         isRunning = true
         // Their iPhone has the user's attention while it pairs, and a locked
         // screen would stop the run, with the code on it.
         UIApplication.shared.isIdleTimerDisabled = true
         go(to: .run)
-        let build = app.source == nil ? app.displayName : "\(channel.displayName) \(app.displayName)"
+        let build: String
+        if let custom {
+            build = "\(custom.name) from \(custom.file.lastPathComponent)"
+                + (custom.build.map { ", set up as \($0.displayName)" } ?? ", with no pairing file")
+        } else {
+            build = app.source == nil ? app.displayName : "\(channel.displayName) \(app.displayName)"
+        }
         let target = (typedAddress ?? pairedAddress).map { "their iPhone at \($0)" }
             ?? "the iPhone that pairs from its Settings"
         engine.log("=== Side by Side: installing \(build) onto \(target) ===")
@@ -458,12 +535,12 @@ final class SideBySideManager: ObservableObject {
             do {
                 await ensureLocalNetwork()
                 let address = try await connectToTarget(app: app)
-                try checkCompatibility(of: app)
+                if let setsUp { try checkCompatibility(of: setsUp) }
                 try await signIn(id: credentials.id, pw: credentials.password)
-                try await download(app, channel: channel)
+                try await download(app, channel: channel, custom: custom)
                 try await signApp(app)
                 try await install(ip: address)
-                try await setUp(app, ip: address, appleID: credentials.id)
+                if let setsUp { try await setUp(setsUp, ip: address, appleID: credentials.id) }
                 finishSuccess()
             } catch let error where error is CancellationError || Task.isCancelled {
                 // A blocking call that was under way when Cancel was tapped can
@@ -611,7 +688,7 @@ final class SideBySideManager: ObservableObject {
     @MainActor
     private func finishSuccess() {
         finished = true
-        let name = installedAppName ?? runApp.displayName
+        let name = installedAppName ?? runName
         engine.log("✅ Side by Side done: \(name) is on their iPhone. One trust step left, on their side.")
         // Theirs pairs itself and signs itself in, or SideStore now holds the
         // record and signs in itself: this iPhone has no more use for the
@@ -620,6 +697,96 @@ final class SideBySideManager: ObservableObject {
         signOut()
         forgetTheirIPhone()
         engine.log("Side by Side: signed out and forgot the pairing with their iPhone.")
+    }
+
+    // MARK: - A custom .ipa
+
+    /// Where picked IPAs are copied, one folder each. Emptied when SideInstaller
+    /// opens, as nothing in it outlives a launch.
+    private static var customIPAFolder: URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("side-by-side-ipa", isDirectory: true)
+    }
+
+    /// Takes the IPA picked in Files as the one `.custom` installs, replacing
+    /// any picked before, and picks `.custom`. Only a complete IPA replaces it.
+    @MainActor
+    func importCustomIPA(from url: URL) async {
+        guard !isImportingIPA, !isRunning else { return }
+        isImportingIPA = true
+        importError = nil
+        defer { isImportingIPA = false }
+        engine.log("Side by Side: importing \(url.lastPathComponent) …")
+        do {
+            let picked: CustomIPA = try await withCheckedThrowingContinuation { cont in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do { cont.resume(returning: try Self.stageCustomIPA(from: url)) }
+                    catch { cont.resume(throwing: error) }
+                }
+            }
+            discardCustomIPA()
+            customIPA = picked
+            app = .custom
+            let setUp = picked.build.map { "It's \($0.displayName), so it's set up like SideInstaller's own." }
+                ?? "Any other app is signed and installed as it is, with no pairing file."
+            engine.log("Side by Side: picked \(picked.name)\(picked.version.map { " \($0)" } ?? "") (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(picked.file.path)), countStyle: .file))). \(setUp)")
+        } catch IPALibrary.ImportError.notAnIPA {
+            importError = L("%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.",
+                            url.lastPathComponent)
+            engine.log("⛔️ Side by Side import: \(importError ?? "")")
+        } catch {
+            importError = L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
+            engine.log("⛔️ Side by Side import: \(importError ?? "")")
+        }
+    }
+
+    /// Copies the picked file into a folder of its own and reads what it is.
+    /// The picker's temporary copy is moved instead. Blocking.
+    private static func stageCustomIPA(from url: URL) throws -> CustomIPA {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let fm = FileManager.default
+        let folder = customIPAFolder.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        let base = url.deletingPathExtension().lastPathComponent
+        let file = folder.appendingPathComponent((base.isEmpty ? "App" : base) + ".ipa")
+        do {
+            let tmp = fm.temporaryDirectory.resolvingSymlinksInPath().path
+            if url.resolvingSymlinksInPath().path.hasPrefix(tmp + "/") {
+                try fm.moveItem(at: url, to: file)
+            } else {
+                try fm.copyItem(at: url, to: file)
+            }
+            guard IPALibrary.looksLikeIPA(file) else { throw IPALibrary.ImportError.notAnIPA }
+            // No Info.plist read (a ZIP64 archive, say) still signs; it's just
+            // named after its file.
+            let info = IPALibrary.appInfo(at: file)
+            return CustomIPA(file: file,
+                             name: info?.name ?? (base.isEmpty ? L("Custom .ipa") : base),
+                             version: info?.version,
+                             build: info.flatMap { knownBuild(ofIPAAt: file, bundleID: $0.bundleID) })
+        } catch {
+            try? fm.removeItem(at: folder)
+            throw error
+        }
+    }
+
+    /// The build of SideInstaller's own an IPA is, by its bundle ID: SideInstaller,
+    /// SideStore, or LiveContainer carrying SideStore. Nil for any other app.
+    private static func knownBuild(ofIPAAt url: URL, bundleID id: String) -> SideBySideApp? {
+        if id == sideInstallerBundleID || id.hasPrefix(sideInstallerBundleID + ".") { return .sideInstaller }
+        switch IPALibrary.knownSource(ofIPAAt: url) {
+        case .sideStore?:     return .sideStore
+        case .liveContainer?: return .liveContainer
+        default:              return nil
+        }
+    }
+
+    /// Deletes the picked IPA's copy.
+    private func discardCustomIPA() {
+        guard let picked = customIPA else { return }
+        customIPA = nil
+        if downloadedIPA == picked.file { downloadedIPA = nil }
+        try? FileManager.default.removeItem(at: picked.file.deletingLastPathComponent())
     }
 
     // MARK: - Step 0: Local Network permission
@@ -1129,8 +1296,20 @@ final class SideBySideManager: ObservableObject {
     // MARK: - Step 3: download the build
 
     @MainActor
-    private func download(_ app: SideBySideApp, channel: ReleaseChannel) async throws {
+    private func download(_ app: SideBySideApp, channel: ReleaseChannel, custom: CustomIPA?) async throws {
         try Task.checkCancellation()
+        if let custom {
+            guard FileManager.default.fileExists(atPath: custom.file.path) else {
+                throw EngineError.message(ErrorHelp.explained(L("Pick an .ipa to install.")))
+            }
+            discardDownload()
+            // The picked file stays this page's until another is picked, so it
+            // isn't the download's to delete.
+            downloadedIPA = custom.file
+            engine.log("Using \(custom.file.lastPathComponent), the .ipa picked for Side by Side (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(custom.file.path)), countStyle: .file))).")
+            setStep(.download, .done)
+            return
+        }
         let key = app.source == nil ? app.rawValue : "\(app.rawValue)-\(channel.rawValue)"
         if let existing = downloadedIPA, downloadedKey == key,
            FileManager.default.fileExists(atPath: existing.path) {
@@ -1226,8 +1405,9 @@ final class SideBySideManager: ObservableObject {
         try Task.checkCancellation()
         guard let session = signSession else { throw EngineError.message(L("Not signed in.")) }
         guard let ipa = downloadedIPA else {
-            throw EngineError.message(app.source == nil ? L("No SideInstaller IPA downloaded.")
-                                                        : L("No SideStore IPA downloaded."))
+            throw EngineError.message(app == .custom ? L("Pick an .ipa to install.")
+                                      : app.source == nil ? L("No SideInstaller IPA downloaded.")
+                                                          : L("No SideStore IPA downloaded."))
         }
         // Their UDID is registered with the team before the profile is asked
         // for, or Apple refuses it with error 8220.
@@ -1243,7 +1423,7 @@ final class SideBySideManager: ObservableObject {
         signedAppPath = path
         let info = Self.bundleInfo(at: path)
         signedBundleID = info?.id
-        installedAppName = info?.name ?? app.homeScreenName
+        installedAppName = info?.name ?? (app == .custom ? runName : app.homeScreenName)
         setStep(.sign, .done)
     }
 
@@ -1670,6 +1850,7 @@ struct SideBySideView: View {
 
     @State private var showSettings = false
     @State private var showReport = false
+    @State private var showImporter = false
     @State private var confirmingCancel = false
     /// Set by Continue on the address page while what's typed isn't usable.
     @State private var showsAddressProblem = false
@@ -1725,6 +1906,13 @@ struct SideBySideView: View {
         }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showReport) { ReportProblemView() }
+        .sheet(isPresented: $showImporter) {
+            FileImporterRepresentableView(allowedContentTypes: [.ipa]) { urls in
+                guard let url = urls.first else { return }   // empty means cancelled
+                Task { await manager.importCustomIPA(from: url) }
+            }
+            .ignoresSafeArea()
+        }
         .scrollDismissesKeyboard(.interactively)
         .alert(L("Cancel the install?"), isPresented: $confirmingCancel) {
             Button(L("Yes"), role: .destructive) { manager.cancel() }
@@ -1843,8 +2031,9 @@ struct SideBySideView: View {
                         subtitle: L("Pick one. You can come back for another one later."))
                 .cascadeItem(0)
             VStack(spacing: 12) {
-                ForEach(Array(SideBySideApp.allCases.enumerated()), id: \.element) { index, app in
-                    AppChoiceCard(app: app, selected: manager.app == app) {
+                ForEach(Array(SideBySideApp.builtIn.enumerated()), id: \.element) { index, app in
+                    AppChoiceCard(app: app, detail: app.requirement,
+                                  selected: manager.app == app) {
                         manager.app = app
                     }
                     .cascadeItem(index + 1)
@@ -1852,12 +2041,115 @@ struct SideBySideView: View {
             }
             if manager.app.source != nil {
                 channelCard.transition(.cardAppear)
+            } else if manager.app == .custom {
+                customIPACard.transition(.cardAppear)
             }
             Button { manager.go(to: .address) } label: { continueLabel(L("Continue")) }
                 .buttonStyle(PrimaryButtonStyle())
-                .cascadeItem(5)
+                .disabled(manager.app == .custom && manager.customIPA == nil)
+                .cascadeItem(SideBySideApp.builtIn.count + 1)
+            if manager.app != .custom {
+                customIPALink
+                    .transition(.opacity)
+                    .cascadeItem(SideBySideApp.builtIn.count + 2)
+            }
         }
         .animation(.smooth(duration: 0.3), value: manager.app)
+        .animation(.smooth(duration: 0.3), value: manager.customIPA)
+        .animation(.smooth(duration: 0.3), value: manager.importError)
+    }
+
+    /// Small grey text under Continue that picks an IPA from Files instead,
+    /// and says why the last pick didn't take.
+    private var customIPALink: some View {
+        VStack(spacing: 6) {
+            Button { showImporter = true } label: {
+                HStack(spacing: 6) {
+                    if manager.isImportingIPA { ProgressView().controlSize(.mini) }
+                    Text(manager.isImportingIPA ? L("Importing…") : L("Use a custom .ipa instead"))
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain, sound: .tap)
+            .disabled(manager.isImportingIPA)
+            if let error = manager.importError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// The picked IPA, a button to pick another, and what's done with it.
+    private var customIPACard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    AppGlyph(app: .custom, size: 40)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(manager.customIPA.map { [$0.name, $0.version].compactMap { $0 }.joined(separator: " ") }
+                             ?? SideBySideApp.custom.displayName)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        if manager.customIPA != nil {
+                            Text(SideBySideApp.custom.displayName)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Button { showImporter = true } label: {
+                    HStack(spacing: 8) {
+                        if manager.isImportingIPA {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: manager.customIPA == nil
+                                  ? "square.and.arrow.down" : "checkmark.circle.fill")
+                                .contentTransition(.symbolEffect(.replace))
+                                .foregroundStyle(manager.customIPA == nil ? Color.secondary : Theme.accent2)
+                        }
+                        Text(manager.isImportingIPA ? L("Importing…")
+                             : manager.customIPA?.file.lastPathComponent ?? L("Import .ipa"))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        if manager.customIPA != nil, !manager.isImportingIPA {
+                            Text(L("Replace"))
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(Theme.accent2)
+                        }
+                    }
+                    .fieldBackground()
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain, sound: .tap)
+                .disabled(manager.isImportingIPA)
+
+                if let error = manager.importError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .transition(.opacity)
+                } else if let picked = manager.customIPA {
+                    Text(picked.build.map {
+                        L("SideInstaller recognizes this as %@ and sets it up just like its own download.", $0.displayName)
+                    } ?? L("Signed with the Apple ID and installed as it is, without a pairing file."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .transition(.opacity)
+                }
+            }
+        }
     }
 
     /// Stable or Nightly, for the SideStore builds, as on the Install tab.
@@ -2136,6 +2428,7 @@ struct SideBySideView: View {
     }
 
     private var appSummary: String {
+        if manager.app == .custom { return manager.customIPA?.name ?? manager.app.displayName }
         guard manager.app.source != nil else { return manager.app.displayName }
         return "\(manager.app.displayName) · \(manager.channel.displayName)"
     }
@@ -2231,7 +2524,7 @@ struct SideBySideView: View {
 
     private var runTitle: String {
         if manager.lastError != nil, !manager.isRunning { return L("Install stopped") }
-        return L("Installing %@ on their iPhone", manager.runApp.displayName)
+        return L("Installing %@ on their iPhone", manager.runName)
     }
 
     /// What their iPhone asks for while it pairs from Settings: the steps to
@@ -2312,7 +2605,7 @@ struct SideBySideView: View {
     }
 
     private var progressCard: some View {
-        let steps = SideBySideStep.steps(for: manager.runApp)
+        let steps = manager.runSteps
         return PanelCard {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 10) {
@@ -2349,7 +2642,7 @@ struct SideBySideView: View {
     /// The header says the run stopped, so then the card says where.
     private var progressTitle: String {
         if manager.isCancelling { return L("Cancelling") }
-        let steps = SideBySideStep.steps(for: manager.runApp)
+        let steps = manager.runSteps
         if let failed = steps.firstIndex(where: { manager.stepStates[$0] == .failed }) {
             return L("Step %@ of %@", "\(failed + 1)", "\(steps.count)")
         }
@@ -2476,7 +2769,7 @@ struct SideBySideView: View {
                         .foregroundStyle(.green)
                         .symbolEffect(.bounce, options: .nonRepeating, value: manager.finished)
                 }
-                Text(L("%@ is on their iPhone", manager.installedAppName ?? manager.runApp.displayName))
+                Text(L("%@ is on their iPhone", manager.installedAppName ?? manager.runName))
                     .font(.title2.weight(.bold))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2536,16 +2829,18 @@ struct SideBySideView: View {
             L("On their iPhone: Settings › General › VPN & Device Management."),
             L("Tap the Apple ID under “Developer App”, then tap Trust."),
         ]
-        switch manager.runApp {
-        case .sideInstaller:
+        switch manager.runSetsUp {
+        case nil, .custom?:
+            steps.append(L("Open %@.", manager.installedAppName ?? manager.runName))
+        case .sideInstaller?:
             steps.append(L("Get LocalDevVPN from the App Store and connect it: SideInstaller works through it."))
             steps.append(manager.pairingLeftOutOn == nil
                          ? L("Open SideInstaller. Its pairing file is already in place.")
                          : L("Open SideInstaller and import a pairing file made on a computer."))
-        case .sideStore:
+        case .sideStore?:
             steps.append(L("Get LocalDevVPN from the App Store and connect it: SideStore works through it."))
             steps.append(L("Open SideStore and sign in with the same Apple ID. Its pairing file is already in place."))
-        case .liveContainer:
+        case .liveContainer?:
             steps.append(L("Get LocalDevVPN from the App Store and connect it: SideStore works through it."))
             steps.append(L("Open LiveContainer, go to its Settings tab, and tap “Import Certificate From SideStore”."))
         }
@@ -2630,6 +2925,8 @@ private struct AppGlyph: View {
 /// One of the apps to pick from, ticked when picked.
 private struct AppChoiceCard: View {
     let app: SideBySideApp
+    /// The line under its name.
+    let detail: String
     let selected: Bool
     let action: () -> Void
 
@@ -2647,7 +2944,7 @@ private struct AppChoiceCard: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    Label(app.requirement, systemImage: app.requirementSymbol)
+                    Label(detail, systemImage: app.requirementSymbol)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(selected ? Theme.accent2 : .secondary)
                         .multilineTextAlignment(.leading)

@@ -198,6 +198,10 @@ let italianStrings: [String: String] = [
     "Sign in to Apple ID": "Accedere con l'Apple ID",
     "Download %@": "Scaricare %@",
     "Use your imported IPA": "Usa l'IPA importato",
+    "Use a custom .ipa instead": "Usa invece un .ipa personalizzato",
+    "Pick an .ipa to install.": "Scegli il file .ipa da installare.",
+    "Signed with the Apple ID and installed as it is, without a pairing file.": "Firmato con l'Apple ID e installato così com'è, senza file di abbinamento.",
+    "Open %@.": "Apri %@.",
     "Sign the app": "Firmare l'app",
     "Finish setup": "Completare la configurazione",
 

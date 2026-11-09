@@ -195,6 +195,10 @@ let japaneseStrings: [String: String] = [
     "Sign in to Apple ID": "Apple ID でサインイン",
     "Download %@": "%@ をダウンロード",
     "Use your imported IPA": "インポート済みの IPA を使用",
+    "Use a custom .ipa instead": "カスタム .ipa を使う",
+    "Pick an .ipa to install.": "インストールする .ipa を選択してください。",
+    "Signed with the Apple ID and installed as it is, without a pairing file.": "Apple ID で署名し、ペアリングファイルなしでそのままインストールします。",
+    "Open %@.": "%@ を開きます。",
     "Sign the app": "アプリに署名",
     "Finish setup": "設定を完了",
 

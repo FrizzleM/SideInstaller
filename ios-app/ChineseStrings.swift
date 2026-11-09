@@ -195,6 +195,10 @@ let chineseStrings: [String: String] = [
     "Sign in to Apple ID": "登录 Apple ID",
     "Download %@": "下载 %@",
     "Use your imported IPA": "使用已导入的 IPA",
+    "Use a custom .ipa instead": "改用自定义 .ipa",
+    "Pick an .ipa to install.": "请选择要安装的 .ipa。",
+    "Signed with the Apple ID and installed as it is, without a pairing file.": "用该 Apple ID 签名后原样安装，不附带配对文件。",
+    "Open %@.": "打开 %@。",
     "Sign the app": "为应用签名",
     "Finish setup": "完成设置",
 
