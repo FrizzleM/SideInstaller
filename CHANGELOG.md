@@ -2,7 +2,7 @@
 
 All notable changes to SideInstaller are documented here.
 
-## 1.6.6
+## 1.7.0
 
 ### Added
 - **SideInstaller is now in Turkish.** Pick Türkçe in Settings › Language, or leave it on Auto
