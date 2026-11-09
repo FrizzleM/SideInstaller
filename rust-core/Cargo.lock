@@ -1575,50 +1575,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "idevice"
-version = "0.1.65"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7484b3a39a089068167a8ab0b3da6a05b5f6f8969daf1a893da1c7087cb2e09a"
-dependencies = [
- "aes 0.8.4",
- "async-stream",
- "async_zip",
- "base64 0.22.1",
- "cbc 0.1.2",
- "chacha20poly1305",
- "chrono",
- "ed25519-dalek",
- "futures",
- "hkdf",
- "hmac 0.12.1",
- "idevice-srp",
- "indexmap",
- "libc",
- "plist",
- "plist-macro",
- "rand 0.10.2",
- "rsa",
- "rustls",
- "serde",
- "serde_json",
- "sha1 0.10.7",
- "sha2 0.10.9",
- "siphasher",
- "thiserror",
- "tokio",
- "tokio-rustls",
- "tracing",
- "uuid",
- "x25519-dalek",
-]
-
-[[package]]
 name = "idevice-ffi"
 version = "0.1.0"
 dependencies = [
  "cbindgen",
  "futures",
- "idevice 0.1.63",
+ "idevice",
  "libc",
  "mdns-sd",
  "once_cell",
@@ -1735,7 +1697,6 @@ dependencies = [
  "futures-util",
  "hex",
  "hmac 0.13.0",
- "idevice 0.1.65",
  "isideload-p12-keystore",
  "pbkdf2",
  "plist",
@@ -3141,7 +3102,7 @@ dependencies = [
  "base64 0.22.1",
  "der 0.8.1",
  "hex",
- "idevice 0.1.63",
+ "idevice",
  "idevice-ffi",
  "isideload",
  "isideload-p12-keystore",

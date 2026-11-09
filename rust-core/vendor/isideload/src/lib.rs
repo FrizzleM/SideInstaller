@@ -1,3 +1,4 @@
+#[cfg(feature = "install")]
 use idevice::IdeviceError;
 use rootcause::{
     hooks::{Hooks, context_formatter::ContextFormatterHook},
@@ -27,6 +28,7 @@ pub enum SideloadError {
     #[error("Invalid bundle: {0}")]
     InvalidBundle(String),
 
+    #[cfg(feature = "install")]
     #[error("{0}")]
     IdeviceError(#[from] IdeviceError),
 }

@@ -556,7 +556,7 @@ struct AppsView: View {
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     /// Observed for `installProgress` during a refresh.
-    @EnvironmentObject private var engine: Engine
+    @Environment(Engine.self) private var engine
     @ObservedObject var manager: SideloadedAppsManager
 
     @State private var showSettings = false

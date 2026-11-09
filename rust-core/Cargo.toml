@@ -54,27 +54,24 @@ idevice = { git = "https://github.com/jkcoxson/idevice.git", rev = "7bd551c16c6d
 # symbols are re-exported into our staticlib (see `extern crate` in lib.rs).
 # We do NOT enable its mdns-based remote_pairing host; our forked pairing.rs
 # advertises via Swift NetService to avoid the multicast entitlement.
-# idevice-ffi, vendored under vendor/idevice-ffi with ONE change: crate-type is
-# rlib-only (upstream is staticlib+cdylib+rlib; rustc emits all in one pass and
-# the standalone cdylib link fails on the iOS *device* target). Its `idevice`
-# dep points at the same git rev as our direct dep above, so cargo unifies the
-# single idevice instance — no duplicate symbols. `full` features match the
-# config StikDebug ships, avoiding per-module feature-gate breakage.
+# idevice-ffi is vendored under vendor/idevice-ffi; its README lists the local
+# changes (rlib-only crate-type, so the iOS *device* link works; a multi-host
+# tunnel dial with a classified failure kind). Its `idevice` dep points at the
+# same git rev as our direct dep above, so cargo unifies the single idevice
+# instance — no duplicate symbols. `full` features match the config StikDebug
+# ships, avoiding per-module feature-gate breakage.
 idevice-ffi = { path = "vendor/idevice-ffi", default-features = false, features = [
   "full",
   "aws-lc",
 ] }
 
-# Apple ID auth + dev cert/App ID/profile + on-device IPA signing.
-# isideload references `idevice` unconditionally (its `install` feature-gate is
-# incomplete), so `install` must be enabled — that pulls idevice 0.1.61 from
-# crates.io. It coexists with our git idevice 0.1.63 as a *separate* version
-# (different symbols, no link collision). We only ever call the sign-only path
-# (`Sideloader::sign_app`, which takes no provider and never touches idevice);
-# isideload's install code is compiled-but-unused. We do the real install
-# ourselves via idevice-ffi over RSD (step 4). `fs-storage` avoids keyring.
+# Apple ID auth + dev cert/App ID/profile + on-device IPA signing. We only call
+# the sign-only path (`Sideloader::sign_app`, which takes no device provider);
+# the install itself goes through idevice-ffi over RSD (step 4). So `install` is
+# off: it would pull a second idevice from crates.io for code we never call (the
+# vendored copy gates its idevice uses behind it — vendor/isideload/README.md,
+# change 15). `fs-storage` avoids keyring.
 isideload = { git = "https://github.com/nab138/isideload.git", package = "isideload", default-features = false, features = [
-  "install",
   "fs-storage",
 ] }
 
@@ -120,7 +117,8 @@ tracing-subscriber = "0.3"
 # device emits when a pair record repeats a string — an iPad reporting `name`
 # equal to `model` sends 0xAB, and pairing died on "unsupported OPACK tag: 0xab"
 # right after the PIN was accepted. Upstream is still unfixed at the pinned rev,
-# so the crate is vendored with that one change (see vendor/idevice/README.md).
+# so the crate is vendored with that fix and a few logging changes (see
+# vendor/idevice/README.md).
 # Patching the git source rather than repointing the dependency means
 # idevice-ffi's own `idevice` dep resolves here too, keeping cargo's single
 # unified instance and the matching-rev intent above.

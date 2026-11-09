@@ -71,6 +71,23 @@ All notable changes to SideInstaller are documented here.
   code prompt now shows which Apple ID it's for.
 - **The number pad comes back after a wrong 2FA code.** The code field emptied for the next try,
   but the number pad stayed down until you tapped the field.
+- **Local Network turned off is noticed in seconds.** iOS reports a refused Local Network
+  permission as the check waiting, not failing, and SideInstaller only counted a failure. So
+  with Local Network off, pairing waited a full minute before saying so, and connecting with an
+  imported pairing file or in Side by Side waited 8 seconds before carrying on. It now knows
+  within about two seconds. iOS can also refuse while its Local Network alert is still on
+  screen, so SideInstaller waits for your answer before deciding.
+- **Pairing keeps going through a call or AirPods connecting.** While you enter the pairing code
+  in Settings, or while a location is simulated, SideInstaller stays running in the background by
+  playing silent audio. A call, Siri, an alarm or the audio output changing (AirPods connecting,
+  headphones unplugged) stopped that audio for good, so iOS could suspend SideInstaller
+  mid-pairing. The silent audio now starts again after each of these.
+- **The app stays smooth while the log fills.** Every line the device library logged was
+  cleaned of keys and personal details on the main thread, and every new line redrew the whole
+  app. During a busy install, or with Verbose logging on, scrolling and taps could stutter. Lines
+  are now cleaned in the background and only the activity log redraws: in a test burst of 2000
+  lines, the longest freeze dropped from about a quarter of a second to under 20 ms. The activity
+  log also keeps scrolling to the newest line once it holds its 2000 lines.
 
 ## 1.6.5
 

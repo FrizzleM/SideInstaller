@@ -12,6 +12,12 @@ keeps cargo unifying a single `idevice` instance.
 
 ## Local changes
 
+Four files differ from upstream: `src/remote_pairing/opack.rs`,
+`src/services/afc/packet.rs`, `src/remote_pairing/mod.rs` and
+`src/remote_pairing/tls_psk.rs`, plus this README. To list them again, diff
+against cargo's checkout of the pinned revision:
+`diff -rq ~/.cargo/git/checkouts/idevice-*/7bd551c/idevice rust-core/vendor/idevice`.
+
 **1. `src/remote_pairing/opack.rs` — OPACK back-reference decoding.**
 
 OPACK deduplicates: when a value repeats, the encoder emits a one-byte pointer
@@ -64,12 +70,36 @@ into the activity log, and from there into problem reports. `AfcPacket` now has
 a hand-written `Debug` that prints the header and both lengths; a test checks
 that no byte list gets through.
 
+**3. `src/remote_pairing/mod.rs` — log the device's `attemptPairVerify` reply.**
+
+Upstream logs only that the reply arrived. The reply carries the device's wire
+protocol version and, under `deviceOptions`, what it says it will and won't do,
+which is the first thing to look at when a device later accepts a tunnel
+connection and then closes it without a reason. One `debug!` line, so it only
+shows with Verbose logging on.
+
+**4. `src/remote_pairing/tls_psk.rs` — name the TLS alert a device sends.**
+
+- A shared `describe_alert` turns an alert body into words
+  (`fatal handshake_failure (level=2 desc=40)`), covering every TLS 1.2 alert
+  code instead of the eight the handshake error named before.
+- The handshake loop uses it, and compares against a `CT_ALERT` constant rather
+  than a bare `21`.
+- `read_app_data` used to report an alert after the handshake as
+  `Expected application data, got ct=21`. That alert is encrypted, so it is now
+  decrypted (advancing the read sequence number) and named, which is what tells
+  "the device hung up" (`close_notify`) apart from "the device rejected us". If
+  it can't be decrypted, the error says so.
+
 ## Re-vendoring
 
-Upstream had not fixed change 1 as of `master` @ `7fe8adb` (2026-08). Re-copying
-the crate from a newer revision drops the patches unless upstream has landed an
-equivalent — check `src/remote_pairing/opack.rs` for `0xA0` handling first, and
-keep the tests either way. Change 2 has to be carried over unless upstream's
-`AfcPacket` stops printing its payload: `rust-core/src/logging.rs` holds
-idevice's DEBUG output back unless Verbose logging is on, but the switch exists
-for exactly the runs where it is.
+Upstream merged change 1 as `6fb49ae` (2026-09-12, "fix(rppairing): decode
+OPACK back-references"), copied from this file, so a re-vendor from a revision
+at or after it can take upstream's `opack.rs` — diff it against this one and
+keep the tests. Changes 2–4 are not upstream as of `master` @ `8970209`
+(2026-10-27) and have to be carried over. Change 2 matters most:
+`rust-core/src/logging.rs` holds idevice's DEBUG output back unless Verbose
+logging is on, but the switch exists for exactly the runs where it is.
+
+A re-vendor moves the pin in `rust-core/Cargo.toml` and `vendor/idevice-ffi` to
+the same revision.

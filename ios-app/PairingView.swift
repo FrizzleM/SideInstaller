@@ -5,7 +5,7 @@ import UIKit
 /// supported app installed on this iPhone over the loopback tunnel. Pushed from
 /// Tools, whose `NavigationStack` this relies on.
 struct PairingView: View {
-    @EnvironmentObject private var engine: Engine
+    @Environment(Engine.self) private var engine
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: PairingManager

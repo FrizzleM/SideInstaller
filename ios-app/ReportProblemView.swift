@@ -7,7 +7,7 @@ import SafariServices
 /// GitHub issue. A log too long for the link is copied for the user to paste
 /// into it. See `ProblemReport`.
 struct ReportProblemView: View {
-    @EnvironmentObject private var engine: Engine
+    @Environment(Engine.self) private var engine
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @ObservedObject private var ownCrashes = CrashDiagnostics.shared

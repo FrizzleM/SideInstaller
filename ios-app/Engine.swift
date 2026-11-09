@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Observation
 import UIKit
 import SideInstallerFFI
 
@@ -109,19 +110,10 @@ enum EngineError: LocalizedError {
 }
 
 /// All install logic. A singleton so the C log callback can reach it.
-final class Engine: ObservableObject {
+@Observable
+final class Engine {
 
     static let shared = Engine()
-
-    // MARK: Log console
-
-    struct LogEntry: Identifiable {
-        let id = UUID()
-        let stamp: String
-        let text: String
-    }
-
-    @Published private(set) var lines: [LogEntry] = []
 
     // MARK: Inputs
 
@@ -131,7 +123,7 @@ final class Engine: ObservableObject {
     var applePassword: String { AccountStore.shared.activePassword }
     /// Anisette server in use: the one picked in Settings or, with Auto on,
     /// the one the last successful sign-in used. Persisted.
-    @Published var anisetteURL: String = Engine.savedAnisetteURL() {
+    var anisetteURL: String = Engine.savedAnisetteURL() {
         didSet {
             guard anisetteURL != oldValue else { return }
             UserDefaults.standard.set(anisetteURL, forKey: Engine.anisetteURLKey)
@@ -144,7 +136,7 @@ final class Engine: ObservableObject {
     /// of how likely they are to work, from `anisetteURL` (see
     /// `anisetteCandidates`). Off, the server picked there is the only one
     /// tried. On by default, as every sign-in tried them all before 1.6.
-    @Published var anisetteAuto: Bool =
+    var anisetteAuto: Bool =
         (UserDefaults.standard.object(forKey: Engine.anisetteAutoKey) as? Bool) ?? true {
         didSet {
             guard anisetteAuto != oldValue else { return }
@@ -172,12 +164,12 @@ final class Engine: ObservableObject {
         return start.address
     }
     /// Servers for the picker; a bundled snapshot until the live list loads.
-    @Published private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
+    private(set) var anisetteServers: [AnisetteServer] = AnisetteServer.bundledDefaults
     /// "Start LocalDevVPN when needed" setting: whatever needs the tunnel starts
     /// LocalDevVPN when it's down, instead of asking for it. On by default.
     /// Stored here (not `@AppStorage`) so the engine and the Settings toggle
     /// share one value.
-    @Published var autoStartVPN: Bool =
+    var autoStartVPN: Bool =
         (UserDefaults.standard.object(forKey: Engine.autoStartVPNKey) as? Bool) ?? true {
         didSet {
             guard autoStartVPN != oldValue else { return }
@@ -195,7 +187,7 @@ final class Engine: ObservableObject {
     /// Settings › Activity Log › Verbose logging: idevice's DEBUG lines, every
     /// plist, XPC message and pairing step exchanged with iOS, go into the log.
     /// Off by default, since they quickly fill it.
-    @Published var verboseLogging: Bool = UserDefaults.standard.bool(forKey: Engine.verboseLoggingKey) {
+    var verboseLogging: Bool = UserDefaults.standard.bool(forKey: Engine.verboseLoggingKey) {
         didSet {
             guard verboseLogging != oldValue else { return }
             UserDefaults.standard.set(verboseLogging, forKey: Engine.verboseLoggingKey)
@@ -209,16 +201,16 @@ final class Engine: ObservableObject {
     static let verboseLoggingKey = "verboseLogging"
 
     // The loopback VPN's device-side IP; configurable in Advanced.
-    @Published var deviceIP: String = Engine.defaultDeviceIP
+    var deviceIP: String = Engine.defaultDeviceIP
     /// Device IP's default: LocalDevVPN's far end of the tunnel.
     static let defaultDeviceIP = "10.7.0.1"
     /// `deviceIP` normalized to a dialable host, e.g. `10.7.0.1/32` → `10.7.0.1`.
     var deviceHost: String { NetworkStatus.host(deviceIP) }
     // Which build to install (SideStore, LiveContainer + SideStore, Madeira, or
     // an imported IPA).
-    @Published var installSource: InstallSource = .sideStore
+    var installSource: InstallSource = .sideStore
     // Which release track to pull that build from (stable or nightly).
-    @Published var releaseChannel: ReleaseChannel = .stable
+    var releaseChannel: ReleaseChannel = .stable
     /// The track the selected build is installed from: the picked one, or the
     /// only one the build offers.
     var selectedChannel: ReleaseChannel {
@@ -232,13 +224,13 @@ final class Engine: ObservableObject {
     /// Builds whose stable channel waits for a first release (Madeira, until
     /// 0.2.0) that GitHub has shown is out. Remembered across launches and
     /// checked again whenever the build is picked (`checkStableRelease`).
-    @Published private(set) var stableReleased: Set<InstallSource> =
+    private(set) var stableReleased: Set<InstallSource> =
         Set((UserDefaults.standard.stringArray(forKey: Engine.stableReleasedKey) ?? [])
             .compactMap(InstallSource.init(rawValue:)))
     private static let stableReleasedKey = "stableReleased"
     /// Versions picked under Advanced, per build and channel; a missing entry
     /// installs the latest release. Not persisted, like the channel.
-    @Published private var pickedVersions: [InstallSource: [ReleaseChannel: ReleaseVersion]] = [:]
+    private var pickedVersions: [InstallSource: [ReleaseChannel: ReleaseVersion]] = [:]
 
     /// The version picked for the selected build and channel; nil installs the
     /// latest release.
@@ -248,20 +240,20 @@ final class Engine: ObservableObject {
     }
 
     /// Each build's releases, listed by the version picker under Advanced.
-    @Published private(set) var releaseCatalogs: [InstallSource: ReleaseCatalog] = [:]
+    private(set) var releaseCatalogs: [InstallSource: ReleaseCatalog] = [:]
     /// The build whose releases are being fetched, if any.
-    @Published private(set) var loadingCatalog: InstallSource?
+    private(set) var loadingCatalog: InstallSource?
     /// Why the last fetch of a build's releases failed.
-    @Published private(set) var catalogErrors: [InstallSource: String] = [:]
+    private(set) var catalogErrors: [InstallSource: String] = [:]
 
     // MARK: Plain-text status readouts
 
     /// Loopback-tunnel state, polled by `startStatusMonitor`.
-    @Published var vpnConnected: Bool = false
+    var vpnConnected: Bool = false
     /// Wi-Fi (`en0`) state, polled alongside the tunnel.
-    @Published var wifiConnected: Bool = false
-    @Published var vpnStatus: String = "unknown"
-    @Published var wifiStatus: String = "unknown"
+    var wifiConnected: Bool = false
+    var vpnStatus: String = "unknown"
+    var wifiStatus: String = "unknown"
 
     /// Minimum iOS that can create its own pairing file (RPPairing host and the
     /// Settings pairing prompt).
@@ -366,96 +358,96 @@ final class Engine: ObservableObject {
 
     /// Filename of the imported pairing file, if the one on disk was imported.
     /// Persisted across launches.
-    @Published private(set) var importedPairingName: String? =
+    private(set) var importedPairingName: String? =
         UserDefaults.standard.string(forKey: Engine.importedPairingNameKey)
     /// True while a picked pairing file is being read in.
-    @Published private(set) var isImportingPairing = false
+    private(set) var isImportingPairing = false
 
     static let importedPairingNameKey = "importedPairingFileName"
-    @Published var pairingStatus: String = L("not paired")
-    @Published var signInStatus: String = "signed out"
+    var pairingStatus: String = L("not paired")
+    var signInStatus: String = "signed out"
 
     // Path to the pairing file in use (generated by RPPairing or imported).
-    @Published var pairingFilePath: String?
+    var pairingFilePath: String?
 
     // MARK: One-click orchestration state
 
     /// Per-step status, behind the checklist and progress bar.
-    @Published var stepStates: [Step: StepState] = Dictionary(
+    var stepStates: [Step: StepState] = Dictionary(
         uniqueKeysWithValues: Step.allCases.map { ($0, .pending) })
 
     /// Install percentage (0…1) streamed from installation_proxy.
-    @Published var installProgress: Double = 0
+    var installProgress: Double = 0
 
     /// The pairing PIN to display prominently, when one has been issued.
-    @Published var pairingPIN: String?
+    var pairingPIN: String?
 
     /// Short human summary of the connected device, e.g. "iPhone · iOS 17.5".
-    @Published var deviceSummary: String?
+    var deviceSummary: String?
 
     /// The connected iPhone's UDID and name, from the lockdown handshake.
     private(set) var deviceUDID: String?
     private(set) var deviceName: String?
 
     /// The current contextual instruction card (nil = none).
-    @Published var guide: Guide?
+    var guide: Guide?
 
     /// True when signing stopped on error 7460; offers revoke-and-retry.
-    @Published var certConflict: Bool = false
+    var certConflict: Bool = false
 
     /// True while the one-click pipeline is running.
-    @Published var isRunning: Bool = false
+    var isRunning: Bool = false
 
     /// True from a cancel until the run stops, which waits for the step in
     /// flight to reach a safe point.
-    @Published private(set) var isCancelling: Bool = false
+    private(set) var isCancelling: Bool = false
 
     /// Set when the pipeline stops on an error; cleared on a new run.
-    @Published var lastError: String?
+    var lastError: String?
 
     /// Set once the whole pipeline has completed successfully.
-    @Published var finished: Bool = false
+    var finished: Bool = false
 
     /// What this run put into Madeira, so the last steps can say what's there.
     private var madeiraHandoff = MadeiraHandoff()
 
     /// Set when the success popup, or the LiveContainer certificate popup, is
     /// closed; a new run brings them back.
-    @Published private var successClosed = false
-    @Published private var liveContainerImportClosed = false
+    private var successClosed = false
+    private var liveContainerImportClosed = false
 
     /// True once the Local Network prompt has been raised this launch, so the
     /// imported-pairing path asks at most once.
-    private var askedLocalNetwork = false
+    @ObservationIgnored private var askedLocalNetwork = false
 
-    private var pipelineTask: Task<Void, Never>?
+    @ObservationIgnored private var pipelineTask: Task<Void, Never>?
     /// The IPA download a run starts as soon as the network is up, so it runs
     /// alongside pairing and sign-in instead of after them.
-    private var prefetch: (source: InstallSource, channel: ReleaseChannel, version: String?,
+    @ObservationIgnored private var prefetch: (source: InstallSource, channel: ReleaseChannel, version: String?,
                            task: Task<String, Error>)?
     /// The Apple ID sign-in a run starts once pairing is settled, so it runs
     /// while the device link opens.
-    private var backgroundSignIn: Task<Void, Error>?
+    @ObservationIgnored private var backgroundSignIn: Task<Void, Error>?
     /// Device work a run starts once the link is open, so it overlaps sign-in,
     /// download and signing; see `startDevicePreparation`.
-    private var devicePreparation: Task<PreparedPairing, Never>?
+    @ObservationIgnored private var devicePreparation: Task<PreparedPairing, Never>?
     /// The files signing won't change, copied to the device from the downloaded
     /// IPA while signing runs; see `startPrestage`.
-    private var prestage: Task<DeviceConnection.PrestagedBundle?, Never>?
+    @ObservationIgnored private var prestage: Task<DeviceConnection.PrestagedBundle?, Never>?
     /// Runs that have ended. A background sign-in carries the count from when it
     /// started, so a 2FA request it makes after its run stopped can be declined.
     /// Main thread only.
-    private var finishedRuns = 0
+    @ObservationIgnored private var finishedRuns = 0
     /// Held while a Trust prompt has the user's attention, so a 2FA sheet waits
     /// instead of covering it.
     let attention = AttentionGate()
     /// Poll that keeps `vpnConnected` live; NWPathMonitor never fires for a
     /// loopback tunnel, which carries no default route.
-    private var statusTimer: Timer?
+    @ObservationIgnored private var statusTimer: Timer?
     /// The last probe of a full-tunnel VPN, and the one running, if any; see
     /// `fullTunnelAnswer`. Main thread only.
-    private var lastFullTunnelProbe: (key: String, result: NetworkStatus.ProbeResult, date: Date)?
-    private var fullTunnelProbe: (key: String, task: Task<NetworkStatus.ProbeResult, Never>)?
+    @ObservationIgnored private var lastFullTunnelProbe: (key: String, result: NetworkStatus.ProbeResult, date: Date)?
+    @ObservationIgnored private var fullTunnelProbe: (key: String, task: Task<NetworkStatus.ProbeResult, Never>)?
 
     /// The build installed, or being installed: the one picked, or the build
     /// of SideInstaller's own that a custom IPA turned out to be, which is set
@@ -500,11 +492,11 @@ final class Engine: ObservableObject {
 
     // Apple ID sign-in and signing (isideload), serialized on signQueue.
     private let signQueue = DispatchQueue(label: "sideinstaller.sign")
-    private var signSession: OpaquePointer?          // SignSession*
+    @ObservationIgnored private var signSession: OpaquePointer?          // SignSession*
     /// Team ID of the signed-in account, parsed from the sign-in summary. Only
     /// apps signed by this team can be refreshed in place.
-    @Published private(set) var signingTeamID: String?
-    @Published var downloadedIPAPath: String?
+    private(set) var signingTeamID: String?
+    var downloadedIPAPath: String?
     // Source, channel and picked version (nil: latest) the current download
     // corresponds to.
     private var downloadedSource: InstallSource?
@@ -513,32 +505,32 @@ final class Engine: ObservableObject {
     /// For a custom IPA, the build of SideInstaller's own it is, if it is one
     /// (`IPALibrary.knownSource`).
     private var recognizedSource: InstallSource?
-    @Published var signedAppPath: String?
+    var signedAppPath: String?
     /// CFBundleDisplayName read off the signed bundle.
-    @Published private(set) var signedDisplayName: String?
+    private(set) var signedDisplayName: String?
     /// Filename of the IPA imported for `InstallSource.custom`, if any.
-    @Published private(set) var customIPAName: String?
+    private(set) var customIPAName: String?
     /// The build of SideInstaller's own that the imported IPA is, if it is one.
-    @Published private(set) var customIPABuild: InstallSource?
+    private(set) var customIPABuild: InstallSource?
     /// True while a picked IPA is being copied in.
-    @Published private(set) var isImportingIPA = false
+    private(set) var isImportingIPA = false
     /// Download progress of a link import (0…1); nil for file imports.
-    @Published private(set) var importProgress: Double?
+    private(set) var importProgress: Double?
     /// The App ID cost a custom IPA's run is waiting on the go-ahead for.
-    @Published private(set) var appIDCost: AppIDCost?
+    private(set) var appIDCost: AppIDCost?
     /// Resumed with the answer to `appIDCost`: true to sign and install.
-    private var appIDCostReply: CheckedContinuation<Bool, Never>?
+    @ObservationIgnored private var appIDCostReply: CheckedContinuation<Bool, Never>?
     /// The `sideinstaller://` link waiting for the go-ahead.
-    @Published private(set) var pendingLink: DeepLink?
+    private(set) var pendingLink: DeepLink?
     /// When SideStore was last asked for its pairing file, so the file it sends
     /// back can be told from one some other link brought.
-    private var sideStorePairingRequestedAt: Date?
+    @ObservationIgnored private var sideStorePairingRequestedAt: Date?
     /// When SideStore was last asked for its certificate, and whether the
     /// install that stopped on error 7460 runs again once it's in.
-    private var sideStoreCertificateRequest: (at: Date, retryInstall: Bool)?
+    @ObservationIgnored private var sideStoreCertificateRequest: (at: Date, retryInstall: Bool)?
     /// A certificate a link brought, for `RootView` to hand to the Certificates
     /// manager, which checks it against the Apple ID's own before using it.
-    @Published var certificateToImport: CertificateImport?
+    var certificateToImport: CertificateImport?
 
     /// Lets one Apple ID sign-in talk to Apple at a time, whichever feature
     /// started it.
@@ -547,14 +539,8 @@ final class Engine: ObservableObject {
     // 2FA bridge: a sign-in's FFI callback blocks until the sheet answers its
     // request.
     /// What the two-factor sheet shows; nil while no sign-in is asking.
-    @Published private(set) var twoFactor: TwoFactorPhase?
+    private(set) var twoFactor: TwoFactorPhase?
     private let twoFactorRequests = TwoFactorRequests()
-
-    private let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss.SSS"
-        return f
-    }()
 
     private init() {
         installLogging()
@@ -570,6 +556,11 @@ final class Engine: ObservableObject {
         showCustomImport(IPALibrary.customImport()?.url)
         // A Madeira CI build from before Madeira had channels is its nightly.
         IPALibrary.moveMadeiraCIBuildsToNightly()
+        // What's installed may have changed while the app was away.
+        NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                                               object: nil, queue: .main) { [weak self] _ in
+            self?.foregroundVisits += 1
+        }
     }
 
     // MARK: - Anisette servers
@@ -604,55 +595,10 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// Append a line from Swift. Safe to call from any thread.
+    /// Append a line from Swift to the activity log (`LogStore`). Safe to call
+    /// from any thread.
     func log(_ message: String) {
-        appendLine(message)
-    }
-
-    /// Append a line that originated in the Rust core's tracing output.
-    func appendRustLine(_ message: String) {
-        appendLine("[rust] " + message)
-    }
-
-    /// How many log lines to keep; the oldest are dropped first.
-    private static let maxLogLines = 2000
-
-    /// True when launched with `SIDEINSTALLER_LOG_STDOUT` set, which mirrors every
-    /// line to stdout so a run on an iPhone can be followed and timed from a Mac
-    /// (`xcrun devicectl device process launch --console`).
-    private static let mirrorsLogToStdout =
-        ProcessInfo.processInfo.environment["SIDEINSTALLER_LOG_STDOUT"] != nil
-
-    private func appendLine(_ raw: String) {
-        // Before anything keeps it: the console, Copy logs, and the stdout mirror.
-        let message = LogRedactor.redact(raw)
-        let stamp = dateFormatter.string(from: Date())
-        if Self.mirrorsLogToStdout {
-            fputs("\(stamp)  \(message)\n", stdout)
-            fflush(stdout)
-        }
-        let entry = LogEntry(stamp: stamp, text: message)
-        if Thread.isMainThread {
-            store(entry)
-        } else {
-            DispatchQueue.main.async { [weak self] in self?.store(entry) }
-        }
-    }
-
-    private func store(_ entry: LogEntry) {
-        lines.append(entry)
-        if lines.count > Self.maxLogLines {
-            lines.removeFirst(lines.count - Self.maxLogLines)
-        }
-    }
-
-    func clearLog() {
-        lines.removeAll()
-    }
-
-    /// One big string for the “Copy logs” button.
-    func logText() -> String {
-        lines.map { "\($0.stamp)  \($0.text)" }.joined(separator: "\n")
+        LogStore.shared.append(message)
     }
 
     // MARK: - Step / guide helpers
@@ -2823,12 +2769,12 @@ final class Engine: ObservableObject {
     /// `canOpenURL` can't see it (see `appPresence`), so it counts as
     /// installed there and opening it is what tells.
     var localDevVPNInstalled: Bool {
-        Self.appPresence(scheme: Self.localDevVPNScheme) != .missing
+        mayBeInstalled(scheme: Self.localDevVPNScheme)
     }
 
     /// Time of the last handover, so a second caller waits for it instead of
     /// opening LocalDevVPN again.
-    private var lastVPNStartAttempt: Date?
+    @ObservationIgnored private var lastVPNStartAttempt: Date?
 
     /// Opens LocalDevVPN to connect its tunnel and return. Returns false if
     /// nothing opened, so it isn't installed; whether the tunnel connects
@@ -3166,7 +3112,7 @@ final class Engine: ObservableObject {
     /// True unless SideStore is known to be missing (see `appPresence`).
     /// Opening it reports when it isn't there.
     var sideStoreInstalled: Bool {
-        Self.appPresence(scheme: "sidestore") != .missing
+        mayBeInstalled(scheme: "sidestore")
     }
 
     /// True when “Use SideStore's certificate” has somewhere to get it: SideStore
@@ -3179,7 +3125,19 @@ final class Engine: ObservableObject {
     /// True unless LiveContainer is known to be missing (see `appPresence`).
     /// Opening it reports when it isn't there.
     var liveContainerInstalled: Bool {
-        Self.appPresence(scheme: "livecontainer") != .missing
+        mayBeInstalled(scheme: "livecontainer")
+    }
+
+    /// Bumped each time SideInstaller comes back to the front. Apps installed
+    /// or deleted meanwhile aren't observed, so what looks them up reads this
+    /// first, and the views showing it redraw then.
+    private(set) var foregroundVisits = 0
+
+    /// True unless the app opening `scheme://` links is known to be missing,
+    /// read again each time SideInstaller is back in front.
+    private func mayBeInstalled(scheme: String) -> Bool {
+        _ = foregroundVisits
+        return Self.appPresence(scheme: scheme) != .missing
     }
 
     // Is another app installed?
@@ -3258,7 +3216,8 @@ final class Engine: ObservableObject {
     /// carries the built-in SideStore whose file is read instead. A SideStore
     /// installed on its own can't hand its file to a LiveContainer guest.
     var canGetSideStorePairing: Bool {
-        Self.runsInLiveContainer
+        _ = foregroundVisits
+        return Self.runsInLiveContainer
             ? LiveContainerSideStorePairing.hasBuiltInSideStore != false
             : sideStoreInstalled
     }
@@ -3956,7 +3915,7 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// Run a closure on the main queue (for @Published mutations off-thread).
+    /// Run a closure on the main queue (for observed state changed off-thread).
     func setMain(_ work: @escaping () -> Void) {
         if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
     }
@@ -4308,13 +4267,11 @@ enum Guides {
 
 // MARK: - C logging callback
 
-/// Forwards Rust log lines to the engine on the main queue.
+/// Forwards Rust log lines to the activity log, which redacts them off the
+/// main thread.
 private let siLogCallback: SILogCallback = { _, msg in
     guard let msg = msg else { return }
-    let text = String(cString: msg)
-    DispatchQueue.main.async {
-        Engine.shared.appendRustLine(text)
-    }
+    LogStore.shared.append("[rust] " + String(cString: msg))
 }
 
 /// The 2FA callback every Apple ID sign-in hands Rust, with its

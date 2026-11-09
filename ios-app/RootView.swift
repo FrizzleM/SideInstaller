@@ -44,7 +44,7 @@ struct RootView: View {
         var id: AnyHashable { group.map { AnyHashable($0) } ?? AnyHashable(items[0]) }
     }
 
-    @EnvironmentObject private var engine: Engine
+    @Environment(Engine.self) private var engine
     /// Declared so a language change relabels the tab bar.
     @EnvironmentObject private var loc: Localizer
     /// Watched so switching Apple ID invalidates every cached sign-in below.
@@ -345,7 +345,7 @@ struct RootView: View {
 /// devices, text or call). Stays open through wrong codes and resends; closes
 /// when the sign-in returns.
 struct TwoFactorSheet: View {
-    @EnvironmentObject private var engine: Engine
+    @Environment(Engine.self) private var engine
     /// Declared so every label redraws when the language changes.
     @EnvironmentObject private var loc: Localizer
 

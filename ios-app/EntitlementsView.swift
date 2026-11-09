@@ -420,7 +420,7 @@ final class EntitlementsManager: ObservableObject {
 /// enable capabilities on one. Pushed from Tools, whose `NavigationStack` this
 /// relies on.
 struct EntitlementsView: View {
-    @EnvironmentObject private var engine: Engine
+    @Environment(Engine.self) private var engine
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: EntitlementsManager

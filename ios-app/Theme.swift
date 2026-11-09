@@ -471,7 +471,7 @@ struct CopyLogsButton: View {
 
     var body: some View {
         Button {
-            UIPasteboard.general.string = Engine.shared.logText()
+            UIPasteboard.general.string = LogStore.shared.text
             copied = true
             Task {
                 try? await Task.sleep(for: .seconds(2))

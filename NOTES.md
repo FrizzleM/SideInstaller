@@ -25,7 +25,7 @@ Toolchain used here: Xcode 27.0 beta (iOS 27.0 SDK), Rust 1.96 with targets
 |---|---|---|
 | idevice (jkcoxson) | rev `7bd551c16c6dd2e058740d85a2d9399a51a776e9` | `remote_pairing tunnel_tcp_stack rsd tcp xpc core_device_proxy installation_proxy installcoordination_proxy afc house_arrest misagent heartbeat mobile_image_mounter pair usbmuxd aws-lc` |
 | idevice-ffi (vendored) | same rev, `vendor/idevice-ffi` | `full aws-lc` |
-| isideload (nab138) | git `main` | `install fs-storage` (no keyring) |
+| isideload (nab138, vendored) | rev `e319d93`, `vendor/isideload` | `fs-storage` (no keyring, no `install`) |
 
 The idevice rev matches StikPair's (RPPairing host) and StikDebug's
 (`tunnel_create_rppairing` loopback connection), so both replicated mechanisms
@@ -44,10 +44,12 @@ clients by hand (untestable here, high risk), `rust-core` depends on **both**:
   `#[no_mangle]` symbols into our single staticlib; cargo unifies the one
   `idevice` instance (no duplicate symbols — verified with `nm`).
 
-idevice-ffi is **vendored** under `rust-core/vendor/idevice-ffi` with exactly
-one change — `crate-type = ["rlib"]` (upstream is `staticlib+cdylib+rlib`;
-rustc emits all in one pass and the standalone **cdylib** link fails on the iOS
-*device* target). Swift gets both headers via the module map and calls idevice's
+idevice-ffi is **vendored** under `rust-core/vendor/idevice-ffi`. The first
+change was `crate-type = ["rlib"]` (upstream is `staticlib+cdylib+rlib`; rustc
+emits all in one pass and the standalone **cdylib** link fails on the iOS
+*device* target); it has since gained `tunnel_create_rppairing_multihost` and a
+few build fixes, all listed in `rust-core/vendor/idevice-ffi/README.md`.
+Swift gets both headers via the module map and calls idevice's
 FFI directly from `DeviceConnection.swift`, exactly as StikDebug does.
 
 The generated `idevice.h` (8948 lines, cbindgen, plist.h appended) is copied to
@@ -741,6 +743,9 @@ incomplete) while the rest of the app uses idevice **0.1.63** (git). The two
 versions coexist as distinct crates (different symbol hashes, no collision). We
 only call the sign-only path, which takes no provider and never touches
 idevice, so isideload's 0.1.61 install code is compiled-but-unused.
+*(2026-11-09: no longer true. The vendored isideload gates those uses behind
+`install` (its README, change 15) and `rust-core` leaves `install` off, so only
+the git idevice is built.)*
 
 `SideStoreDownloader.swift` fetches the latest SideStore release IPA from the
 GitHub API into `Documents/SideStore.ipa`.
