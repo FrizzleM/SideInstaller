@@ -64,6 +64,12 @@ All notable changes to SideInstaller are documented here.
   code prompt now shows which Apple ID it's for.
 - **The number pad comes back after a wrong 2FA code.** The code field emptied for the next try,
   but the number pad stayed down until you tapped the field.
+- **Local Network turned off is noticed in seconds.** iOS reports a refused Local Network
+  permission as the check waiting, not failing, and SideInstaller only counted a failure. So
+  with Local Network off, pairing waited a full minute before saying so, and connecting with an
+  imported pairing file or in Side by Side waited 8 seconds before carrying on. It now knows
+  within about two seconds. iOS can also refuse while its Local Network alert is still on
+  screen, so SideInstaller waits for your answer before deciding.
 
 ## 1.6.5
 
