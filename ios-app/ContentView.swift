@@ -274,21 +274,34 @@ struct ContentView: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 sectionTitle(L("Install"), systemImage: "square.and.arrow.down")
+                // Each app with its own icon, in the menu and in the field.
                 Menu {
                     Picker(L("Install"), selection: Bindable(engine).installSource) {
                         ForEach(InstallSource.allCases) { src in
-                            Text(src.displayName).tag(src)
+                            Label {
+                                Text(src.displayName)
+                            } icon: {
+                                Image(uiImage: AppIconMenuImage.image(for: src))
+                            }
+                            .tag(src)
                         }
                     }
                 } label: {
-                    HStack {
+                    HStack(spacing: 12) {
+                        AppIconTile(source: engine.installSource, side: 28)
+                            .id(engine.installSource)
+                            .transition(.opacity)
                         Text(engine.installSource.displayName)
                             .foregroundStyle(.primary)
+                            .lineLimit(1)
                         Spacer()
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.footnote.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
+                    // Kept to a plain field's height, the icon included.
+                    .padding(.vertical, -4)
+                    .padding(.leading, -6)
                     .fieldBackground()
                     .contentShape(Rectangle())
                 }
@@ -1687,5 +1700,73 @@ struct FileImporterRepresentableView: UIViewControllerRepresentable {
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
             onDocumentsPicked([])
         }
+    }
+}
+
+// MARK: - App icons
+
+extension InstallSource {
+    /// The app's own icon in the asset catalog: the official SideStore,
+    /// LiveContainer, Madeira and AltStore icons from their repositories
+    /// (AGPL-3.0 and GPL-3.0), at 256 px. Nil for a custom IPA.
+    var iconImage: String? {
+        switch self {
+        case .sideStore:     return "SideStoreLogo"
+        case .liveContainer: return "LiveContainerLogo"
+        case .madeira:       return "MadeiraLogo"
+        case .altStore:      return "AltStoreLogo"
+        case .custom:        return nil
+        }
+    }
+
+    /// The symbol on a custom IPA's plain tile, which has no icon to show.
+    var iconSymbol: String { "app.dashed" }
+}
+
+/// An app's tile on the Install tab: its own icon, in its own colours so each
+/// app is easy to tell apart, or a symbol on a plain tile for a custom IPA.
+struct AppIconTile: View {
+    let source: InstallSource
+    var side: CGFloat = 28
+
+    var body: some View {
+        let tile = RoundedRectangle(cornerRadius: side * 23 / 86, style: .continuous)
+        Group {
+            if let image = source.iconImage {
+                Image(image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    Rectangle().fill(Theme.raised)
+                    Image(systemName: source.iconSymbol)
+                        .font(.system(size: side * 0.5, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+        }
+        .frame(width: side, height: side)
+        .clipShape(tile)
+        // A dark icon would melt into the field without it.
+        .overlay(tile.strokeBorder(Theme.hairline, lineWidth: 1))
+        .accessibilityHidden(true)
+    }
+}
+
+/// An app's tile drawn into an image for its row in a menu. A menu draws a
+/// plain image as a template, in the text colour; this one keeps its own
+/// colours and corners.
+@MainActor
+enum AppIconMenuImage {
+    private static var drawn: [InstallSource: UIImage] = [:]
+
+    static func image(for source: InstallSource) -> UIImage {
+        if let image = drawn[source] { return image }
+        let renderer = ImageRenderer(content: AppIconTile(source: source, side: 28)
+            .environment(\.colorScheme, .dark))
+        renderer.scale = 3
+        let image = (renderer.uiImage ?? UIImage()).withRenderingMode(.alwaysOriginal)
+        drawn[source] = image
+        return image
     }
 }

@@ -7,13 +7,14 @@ import SideInstallerFFI
 
 /// What Side by Side can put on another iPhone, the choice iLoader offers:
 /// SideInstaller itself, one of the two SideStore builds the Install tab sets
-/// up, or an IPA picked from Files.
+/// up, AltStore, or an IPA picked from Files.
 enum SideBySideApp: String, CaseIterable, Identifiable {
     case sideInstaller
     case sideStore
     case liveContainer
+    case altStore
     /// An IPA picked from Files (`SideBySideManager.customIPA`). One of the
-    /// three above is set up like that build; any other app is signed and
+    /// four above is set up like that build; any other app is signed and
     /// installed as it is, without a pairing file.
     case custom
 
@@ -21,17 +22,18 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
 
     /// The choices with a card of their own; `.custom` is picked from the
     /// text under Continue.
-    static let builtIn: [SideBySideApp] = [.sideInstaller, .sideStore, .liveContainer]
+    static let builtIn: [SideBySideApp] = [.sideInstaller, .sideStore, .liveContainer, .altStore]
 
-    /// The Install tab's build, for the two SideStore builds: downloaded from
-    /// the same place, and handed the pairing file the same way. Nil for
-    /// SideInstaller, which comes from its own latest release and is handed the
-    /// pairing file as an imported one, and for a custom IPA.
+    /// The Install tab's build, for the two SideStore builds and AltStore:
+    /// downloaded from the same place, and handed the pairing file the same
+    /// way. Nil for SideInstaller, which comes from its own latest release and
+    /// is handed the pairing file as an imported one, and for a custom IPA.
     var source: InstallSource? {
         switch self {
         case .sideInstaller: return nil
         case .sideStore:     return .sideStore
         case .liveContainer: return .liveContainer
+        case .altStore:      return .altStore
         case .custom:        return nil
         }
     }
@@ -63,13 +65,15 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
 
     var requirementSymbol: String { "network" }
 
-    /// The app's own icon: SideInstaller's, and the official SideStore and
-    /// LiveContainer icons from their repositories (AGPL-3.0), at 256 px.
+    /// The app's own icon: SideInstaller's, and the official SideStore,
+    /// LiveContainer and AltStore icons from their repositories (AGPL-3.0),
+    /// at 256 px.
     var image: String? {
         switch self {
         case .sideInstaller: return "AppLogo"
         case .sideStore:     return "SideStoreLogo"
         case .liveContainer: return "LiveContainerLogo"
+        case .altStore:      return "AltStoreLogo"
         case .custom:        return nil
         }
     }
@@ -80,6 +84,7 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
         case .sideInstaller: return "arrow.down.app"
         case .sideStore:     return "storefront"
         case .liveContainer: return "shippingbox"
+        case .altStore:      return "diamond"
         case .custom:        return "app.dashed"
         }
     }
@@ -285,6 +290,10 @@ final class SideBySideManager: ObservableObject {
     /// use the pairing it gave, so none was handed over: a lockdown record on
     /// iOS 26.4 or later. It then needs a pairing file made on a computer.
     @Published private(set) var pairingLeftOutOn: String?
+    /// True when AltStore went on without the pairing, which it can't connect
+    /// with as a lockdown record only: it pairs as its Remote AltServer is set
+    /// up instead.
+    @Published private(set) var altStorePairsItself = false
     /// Why the run stopped, or couldn't start.
     @Published private(set) var lastError: String?
     /// True while a pair record with someone else's iPhone is saved here.
@@ -498,7 +507,9 @@ final class SideBySideManager: ObservableObject {
         }
 
         let app = self.app
-        let channel = self.channel
+        // AltStore has a stable channel only, whatever was picked for another.
+        let offered = app.source?.channels(stableReleased: true) ?? ReleaseChannel.allCases
+        let channel = offered.contains(self.channel) ? self.channel : offered[0]
         let custom = app == .custom ? customIPA : nil
         let setsUp: SideBySideApp? = custom != nil ? custom?.build : app
         resetRun()
@@ -658,6 +669,7 @@ final class SideBySideManager: ObservableObject {
         pairingPIN = nil
         setTrustWait(false)
         pairingLeftOutOn = nil
+        altStorePairsItself = false
         targetSummary = nil
         targetOSVersion = nil
         installedAppName = nil
@@ -762,12 +774,14 @@ final class SideBySideManager: ObservableObject {
     }
 
     /// The build of SideInstaller's own an IPA is, by its bundle ID: SideInstaller,
-    /// SideStore, or LiveContainer carrying SideStore. Nil for any other app.
+    /// SideStore, LiveContainer carrying SideStore, or AltStore. Nil for any
+    /// other app.
     private static func knownBuild(ofIPAAt url: URL, bundleID id: String) -> SideBySideApp? {
         if id == sideInstallerBundleID || id.hasPrefix(sideInstallerBundleID + ".") { return .sideInstaller }
         switch IPALibrary.knownSource(ofIPAAt: url) {
         case .sideStore?:     return .sideStore
         case .liveContainer?: return .liveContainer
+        case .altStore?:      return .altStore
         default:              return nil
         }
     }
@@ -1073,9 +1087,11 @@ final class SideBySideManager: ObservableObject {
     /// from its Settings, which gives the RPPairing record that works.
     /// SideInstaller is installed all the same, without the record
     /// (`pairingLeftOutOn`): a pairing file made on a computer gets it going.
+    /// So is AltStore, which pairs itself as its Remote AltServer is set up
+    /// when the record is one it can't use (`handOffToAltStore`).
     @MainActor
     private func checkCompatibility(of app: SideBySideApp) throws {
-        guard let version = targetOSVersion, let path = pairRecordPath else { return }
+        guard app != .altStore, let version = targetOSVersion, let path = pairRecordPath else { return }
         let kind = PairingFileKind.of(path: path)
         guard kind.hasLockdown, !kind.hasRemotePairing, Self.version(version, isAtLeast: 26, 4) else { return }
         guard app.source != nil else {
@@ -1346,9 +1362,10 @@ final class SideBySideManager: ObservableObject {
         }
     }
 
-    /// A SideStore build's latest release on `channel`, as the Install tab
-    /// fetches it: into Documents, skipped when the copy there is still the one
-    /// GitHub serves, and an IPA the user put there themselves is used as it is.
+    /// A SideStore build's latest release on `channel`, or AltStore's newest
+    /// version their iOS runs, as the Install tab fetches it: into Documents,
+    /// skipped when the copy there is still the file being served, and an IPA
+    /// the user put there themselves is used as it is.
     @MainActor
     private func downloadBuild(_ source: InstallSource, channel: ReleaseChannel) async throws -> URL {
         let onDisk = IPALibrary.entry(source: source, channel: channel)
@@ -1360,9 +1377,13 @@ final class SideBySideManager: ObservableObject {
         let report: @Sendable (Double) -> Void = { [weak self] fraction in
             Task { @MainActor in self?.downloadProgress = fraction }
         }
+        // Their iOS, not this iPhone's, decides which AltStore version goes on.
+        let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion)
+            ?? ProcessInfo.processInfo.operatingSystemVersion
         do {
             let path = try await SideStoreDownloader.$reportProgress.withValue(report) {
-                try await SideStoreDownloader.downloadLatest(source: source, channel: channel) { [weak self] line in
+                try await SideStoreDownloader.downloadLatest(source: source, channel: channel,
+                                                             runningOn: theirOS) { [weak self] line in
                     self?.engine.log(line)
                 }
             }
@@ -1423,10 +1444,11 @@ final class SideBySideManager: ObservableObject {
         engine.log("Signing \(ipa) for \(udid.isEmpty ? "their iPhone" : udid) …")
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        // No bundled pairing file (only AltStore takes one), and no Increased
+        // No bundled pairing file: only AltStore 2.3 read one, and from 2.3.1
+        // on it takes the file `setUp` writes into its Documents. No Increased
         // Memory Limit: SideInstaller has no use for it, and the SideStore
-        // builds re-register their App IDs without it. Every app gets its app
-        // group, as on the Install tab.
+        // builds and AltStore re-register their App IDs without it. Every app
+        // gets its app group, as on the Install tab.
         let rc = si_sign_ipa(session, ipa, udid, deviceName, nil, 0, 1, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
@@ -1508,9 +1530,10 @@ final class SideBySideManager: ObservableObject {
 
     /// Puts the pair record into the app on their iPhone, so it opens ready to
     /// go without pairing itself: into SideStore as the Install tab hands over
-    /// this iPhone's (`handOffToSideStore`), and into SideInstaller as an
-    /// imported pairing file (`handOffToSideInstaller`), which it connects with
-    /// below iOS 27 too.
+    /// this iPhone's (`handOffToSideStore`), into AltStore where AltServer
+    /// puts it (`handOffToAltStore`), and into SideInstaller as an imported
+    /// pairing file (`handOffToSideInstaller`), which it connects with below
+    /// iOS 27 too.
     @MainActor
     private func setUp(_ app: SideBySideApp, ip: String, appleID: String) async throws {
         try Task.checkCancellation()
@@ -1518,7 +1541,9 @@ final class SideBySideManager: ObservableObject {
         guard let bundleID = signedBundleID else { throw EngineError.message(L("No signed bundle to install.")) }
         setStep(.setUp, .active)
         do {
-            if let source = app.source {
+            if app == .altStore {
+                try await handOffToAltStore(ip: ip, record: record, bundleID: bundleID)
+            } else if let source = app.source {
                 try await handOffToSideStore(source, app: app, appleID: appleID, ip: ip,
                                              record: record, bundleID: bundleID)
             } else {
@@ -1557,6 +1582,36 @@ final class SideBySideManager: ObservableObject {
             if let certificate {
                 self.handOffCertificate(certificate, bundleID: bundleID, appName: appName, home: home)
             }
+        }
+    }
+
+    /// Puts their RPPairing record into AltStore on their iPhone, where
+    /// AltServer puts it (`AltStorePairingHandoff`), so setting up its Remote
+    /// AltServer skips pairing. AltStore pairs during that setup instead
+    /// (`altStorePairsItself`) when the pairing is a lockdown record only,
+    /// which it can't connect with, or the file couldn't be written, which
+    /// doesn't stop the run: as on the Install tab, AltStore works without it.
+    @MainActor
+    private func handOffToAltStore(ip: String, record: String, bundleID: String) async throws {
+        let pairing = try Data(contentsOf: URL(fileURLWithPath: record))
+        guard let rpRecord = AltStorePairingHandoff.record(from: pairing) else {
+            altStorePairsItself = true
+            engine.log("Their pairing is a lockdown record only, which AltStore can't connect with, so none was written. Setting up AltStore's Remote AltServer pairs it instead.")
+            return
+        }
+        do {
+            try await onDeviceQueue {
+                try self.reconnectIfNeeded(ip: ip, record: record)
+                let rel = AltStorePairingHandoff.remoteRelativePath
+                self.engine.log("Writing the RPPairing record into \(bundleID) /Documents/\(rel) …")
+                let written = try self.connection.writeFile(intoBundleID: bundleID,
+                                                            remoteRelativePath: rel, data: rpRecord)
+                self.engine.log("Pairing file written into AltStore on their iPhone and read back VERIFIED (\(written) bytes). Setting up its Remote AltServer skips pairing.")
+            }
+        } catch {
+            if Task.isCancelled { throw CancellationError() }
+            altStorePairsItself = true
+            engine.log("⚠️ Couldn't put the pairing file into AltStore on their iPhone (\(short(error))). It's installed: setting up its Remote AltServer pairs it instead.")
         }
     }
 
@@ -2030,7 +2085,8 @@ struct SideBySideView: View {
                     .cascadeItem(index + 1)
                 }
             }
-            if manager.app.source != nil {
+            // AltStore has one channel, so nothing to pick.
+            if let source = manager.app.source, source.channels(stableReleased: true).count > 1 {
                 channelCard.transition(.cardAppear)
             } else if manager.app == .custom {
                 customIPACard.transition(.cardAppear)
@@ -2418,7 +2474,10 @@ struct SideBySideView: View {
 
     private var appSummary: String {
         if manager.app == .custom { return manager.customIPA?.name ?? manager.app.displayName }
-        guard manager.app.source != nil else { return manager.app.displayName }
+        // A build with one channel (AltStore) has none to name.
+        guard let source = manager.app.source, source.channels(stableReleased: true).count > 1 else {
+            return manager.app.displayName
+        }
         return "\(manager.app.displayName) · \(manager.channel.displayName)"
     }
 
@@ -2805,6 +2864,11 @@ struct SideBySideView: View {
         case .liveContainer?:
             steps.append(L("Get LocalDevVPN from the App Store and connect it: SideStore works through it."))
             steps.append(L("Open LiveContainer, go to its Settings tab, and tap “Import Certificate From SideStore”."))
+        case .altStore?:
+            steps.append(L("Open AltStore and sign in with the same Apple ID."))
+            steps.append(manager.altStorePairsItself
+                         ? L("To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings and follow its steps.")
+                         : L("To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings. Its pairing file is already in place, so the setup skips pairing."))
         }
         return steps
     }

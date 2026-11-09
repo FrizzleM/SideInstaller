@@ -11,8 +11,25 @@ All notable changes to SideInstaller are documented here.
 - **A nudge to update to iOS 27 at setup.** On an iPhone or iPad below iOS 27 that can run it,
   the welcome page now suggests updating first: on iOS 27 the iPhone pairs with itself, so
   SideInstaller works without a computer and there's no pairing file to make.
+- **AltStore on the Install tab and in Side by Side.** AltStore Classic now sits in the list of
+  apps next to SideStore, LiveContainer + SideStore and Madeira, and Side by Side can put it on
+  someone else's iPhone too. It comes from AltStore's own source (apps.altstore.io), the one
+  AltServer installs it from, in the newest version the iPhone can run, and the download has to
+  match the SHA-256 the source lists. Advanced lists its other versions from 2.3 on, the first
+  with Remote AltServer. It's set up the way AltServer sets it up: the pairing file goes into
+  AltStore, so setting up its Remote AltServer (“Set up Remote AltServer” in its Settings), which
+  installs and refreshes apps without a computer, skips pairing. A pairing file without an
+  RPPairing record isn't passed on, since AltStore can't connect with one; it pairs during that
+  setup instead.
 
 ### Changed
+- **Setup takes three pages.** The terms, the sideinstaller.net question and the Apple ID sign-in
+  are now three pages under a progress bar that fills a segment for each. Moving on, a page's
+  pieces slide out to the left one after another while the next page's come in from the right,
+  and every page keeps its buttons at its foot. Setup left halfway still picks up where it
+  stopped.
+- **The app picker shows each app's icon.** What to install on the Install tab is picked from a
+  dropdown that shows each app with its own icon, and the field shows the picked app's.
 - **A quieter look.** The swaying blue backdrop, the glowing gradient buttons and the tinted
   cards are gone. Every page sits on a still, near-black background with plain cards, so the
   logo tiles, an install's progress and the pairing code are what stand out. The main button is
@@ -39,6 +56,12 @@ All notable changes to SideInstaller are documented here.
   sign in to Apple and pair again.
 
 ### Fixed
+- **AltStore installed as a custom IPA gets its pairing file again.** AltStore 2.3.1 and later
+  no longer read the pairing file SideInstaller put inside the app when signing it: they read it
+  from their Documents, where AltServer now writes it after installing (altstoreio/AltStore
+  5811912). SideInstaller writes it there too, so setting up Remote AltServer skips pairing
+  again. An imported AltStore is also recognized and set up just like the download, without the
+  App ID check other custom IPAs get.
 - **Keys and passwords stay out of the activity log.** SideInstaller reads back each file it
   hands SideStore, LiveContainer or Madeira, to check it arrived, and the device library logged
   what it read byte by byte: the pairing file with its private keys, SideStore's

@@ -410,6 +410,9 @@ final class Engine {
 
     /// What this run put into Madeira, so the last steps can say what's there.
     private var madeiraHandoff = MadeiraHandoff()
+    /// True once this run put the pairing file into AltStore, whose Remote
+    /// AltServer setup then skips pairing.
+    private var altStoreHoldsPairing = false
 
     /// Set when the success popup, or the LiveContainer certificate popup, is
     /// closed; a new run brings them back.
@@ -627,6 +630,7 @@ final class Engine {
             self.certConflict = false
             self.appIDCost = nil
             self.madeiraHandoff = MadeiraHandoff()
+            self.altStoreHoldsPairing = false
         }
     }
 
@@ -1923,13 +1927,16 @@ final class Engine {
             return
         }
         guard (error as? SideStoreDownloader.DownloadError)?.manualSideloadHelps ?? true else { return }
-        log("Can't reach GitHub? Download \(source.displayName) on another device or through a proxy, then import it under Custom .ipa (it's recognized and set up the same way), or rename it to \(wanted) and copy it into Files › On My iPhone › SideInstaller. Then tap Install again.")
+        log("Can't reach \(source.feed?.name ?? "GitHub")? Download \(source.displayName) on another device or through a proxy, then import it under Custom .ipa (it's recognized and set up the same way), or rename it to \(wanted) and copy it into Files › On My iPhone › SideInstaller. Then tap Install again.")
     }
 
     /// Where to get the build in a browser when SideInstaller can't download
     /// it: the file itself when it has a fixed link, otherwise the releases page.
+    /// None for a build from an AltStore source: the card it's for is about
+    /// reaching GitHub.
     private static func manualDownloadLink(source: InstallSource, channel: ReleaseChannel,
                                            version: ReleaseVersion?) -> URL? {
+        guard source.feed == nil else { return nil }
         let releases = source.repo.flatMap { URL(string: "https://github.com/\($0)/releases") }
         // A GitHub Actions build comes zipped, so the releases page stands in.
         if let version { return version.artifactSHA256 == nil ? version.assetURL : releases }
@@ -2023,8 +2030,9 @@ final class Engine {
         if udid.isEmpty {
             log("⚠️ No device UDID captured — run the Connect step first, or signing may fail with error 8220.")
         }
-        // Bundled into AltStore for its Remote AltServer setup; other apps
-        // get the pairing file after the install instead.
+        // Bundled into AltStore for its Remote AltServer setup, which only
+        // AltStore 2.3 reads there; 2.3.1 and later, like the other apps, get
+        // the pairing file after the install instead.
         let pairingPath = pairingFilePath ?? PairingController.pairingFilePath()
         let source = downloadedSource ?? installSource
         setStep(.sign, .active)
@@ -2303,16 +2311,21 @@ final class Engine {
         }
         let udid = deviceUDID
         do {
-            madeiraHandoff = try await onDeviceQueue {
+            let handed = try await onDeviceQueue {
                 try self.performWritePairing(path: path, udid: udid, source: source,
                                              accountConfig: accountConfig, prepared: prepared)
             }
+            madeiraHandoff = handed.madeira
+            altStoreHoldsPairing = handed.altStorePairing
         } catch {
             // SideStore can't work without this file. Madeira can pair itself or
-            // use StikDebug, and an imported IPA may not want one at all.
+            // use StikDebug, AltStore pairs as its Remote AltServer is set up,
+            // and an imported IPA may not want one at all.
             guard source.pairingIsOptional else { throw error }
             if signedAppIsMadeira(source) {
                 log("⚠️ Couldn't reach Madeira's container (\(short(error))). It's installed: set up JIT in Madeira, and refresh it under Tools › Sideloaded apps.")
+            } else if source == .altStore {
+                log("⚠️ Couldn't put the pairing file into AltStore (\(short(error))). It's installed: setting up its Remote AltServer pairs it instead.")
             } else {
                 log("⚠️ Couldn't seed the pairing file into \(installedAppName) (\(short(error))). It's installed and ready — only AltStore-family apps need that file.")
             }
@@ -2320,10 +2333,18 @@ final class Engine {
         setStep(.writePairing, .done)
     }
 
-    /// Returns what Madeira was handed, when the app is Madeira.
+    /// What step 8 handed to the app it installed, for the last steps' card.
+    private struct Handed {
+        var madeira = MadeiraHandoff()
+        /// AltStore got the pairing file.
+        var altStorePairing = false
+    }
+
+    /// Returns what Madeira was handed, when the app is Madeira, and whether
+    /// AltStore got the pairing file, when it's AltStore.
     private func performWritePairing(path: String, udid: String?, source: InstallSource,
                                      accountConfig: String?,
-                                     prepared: PreparedPairing? = nil) throws -> MadeiraHandoff {
+                                     prepared: PreparedPairing? = nil) throws -> Handed {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
         let size = fileSize(path)
         guard FileManager.default.fileExists(atPath: path), size > 0 else {
@@ -2362,7 +2383,11 @@ final class Engine {
                 log("⚠️ Couldn't hand Madeira the pairing file (\(short(error))). Pair it under its Settings › JIT › JIT setup, or write the file again from Tools › Pairing.")
             }
             handed.signIn = handOffMadeiraSignIn(accountConfig, bundleID: bundleID)
-            return handed
+            return Handed(madeira: handed)
+        }
+        if source == .altStore {
+            return Handed(altStorePairing: try handOffAltStorePairing(placementPath: placement,
+                                                                      bundleID: bundleID))
         }
         // SideStore reads the file at its Documents root, LiveContainer deeper.
         let remoteRel = source.pairingRemoteRelativePath
@@ -2396,7 +2421,23 @@ final class Engine {
                 log("⚠️ Couldn't hand \(appName) the signing certificate (\(short(error))). It's installed and ready, but it will ask to resign itself on first sign-in.")
             }
         }
-        return MadeiraHandoff()
+        return Handed()
+    }
+
+    /// Gives AltStore the RPPairing record on its own, where AltServer puts it
+    /// (see `AltStorePairingHandoff`). Returns false, writing nothing, when the
+    /// pairing file has none. Runs on `deviceQueue`.
+    private func handOffAltStorePairing(placementPath: String, bundleID: String) throws -> Bool {
+        let file = try Data(contentsOf: URL(fileURLWithPath: placementPath))
+        guard let record = AltStorePairingHandoff.record(from: file) else {
+            log("This pairing file has no RPPairing record, the only kind AltStore connects with, so none was written. Setting up AltStore's Remote AltServer pairs it instead.")
+            return false
+        }
+        let rel = AltStorePairingHandoff.remoteRelativePath
+        log("Writing the RPPairing record into \(bundleID) /Documents/\(rel) …")
+        let written = try connection.writeFile(intoBundleID: bundleID, remoteRelativePath: rel, data: record)
+        log("Pairing file written into AltStore and read-back VERIFIED (\(written) bytes). AltStore takes it in when its Remote AltServer is set up, which then skips pairing.")
+        return true
     }
 
     /// Gives Madeira the RPPairing record on its own (see
@@ -2557,9 +2598,9 @@ final class Engine {
     /// counts only if its signed bundle ID starts with `com.SideStore.SideStore`.
     private func accountConfigRemoteRelativePath(source: InstallSource) -> String? {
         switch source {
-        case .sideStore:     return "Account.sideconf"
-        case .liveContainer: return "SideStore/Documents/Account.sideconf"
-        case .madeira:       return nil
+        case .sideStore:          return "Account.sideconf"
+        case .liveContainer:      return "SideStore/Documents/Account.sideconf"
+        case .madeira, .altStore: return nil
         case .custom:
             guard signedAppBundleID()?.hasPrefix("com.SideStore.SideStore") == true else { return nil }
             return "Account.sideconf"
@@ -2587,9 +2628,13 @@ final class Engine {
     private func finishSuccess() {
         finished = true
         let source = installedBuild
-        setGuide(signedAppIsMadeira(source)
-                 ? Guides.trustMadeira(holding: madeiraHandoff)
-                 : Guides.trust(appName: installedAppName))
+        if signedAppIsMadeira(source) {
+            setGuide(Guides.trustMadeira(holding: madeiraHandoff))
+        } else if source == .altStore {
+            setGuide(Guides.trustAltStore(holdingPairing: altStoreHoldsPairing))
+        } else {
+            setGuide(Guides.trust(appName: installedAppName))
+        }
         log("✅ Done — \(installedSourceName) is installed. One trust step left (see the card).")
     }
 
@@ -4248,6 +4293,18 @@ enum Guides {
         guide.steps.append(handoff.signIn
             ? L("Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.")
             : L("Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps."))
+        return guide
+    }
+
+    /// The trust step for AltStore, then what it needs to install and refresh
+    /// apps without a computer: its Remote AltServer, whose setup skips pairing
+    /// when the pairing file is already inside.
+    static func trustAltStore(holdingPairing: Bool) -> Guide {
+        var guide = trust(appName: AltStorePairingHandoff.appName)
+        guide.steps[guide.steps.count - 1] = L("Open AltStore from your Home Screen and sign in with your Apple ID.")
+        guide.steps.append(holdingPairing
+            ? L("To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings. Its pairing file is already in place, so the setup skips pairing.")
+            : L("To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings and follow its steps."))
         return guide
     }
 

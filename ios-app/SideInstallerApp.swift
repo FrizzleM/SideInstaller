@@ -10,8 +10,8 @@ struct SideInstallerApp: App {
     @StateObject private var localizer = Localizer.shared
     // The saved Apple IDs, shared by every screen that signs in.
     @StateObject private var accounts = AccountStore.shared
-    /// False until the TOS is accepted, after which the welcome page is gone.
-    @AppStorage("hasAcceptedTOS") private var hasAcceptedTOS = false
+    /// False until the TOS is accepted on the first setup page.
+    @AppStorage(SetupView.acceptedTermsKey) private var hasAcceptedTOS = false
     /// False until account setup is completed or skipped. Never reset, even if
     /// all accounts are removed later.
     @AppStorage("hasCompletedAccountSetup") private var hasCompletedAccountSetup = false
@@ -39,19 +39,12 @@ struct SideInstallerApp: App {
                         .environmentObject(accounts)
                         .task { await updateChecker.check() }
                         .transition(.opacity)
-                } else if hasAcceptedTOS {
-                    AccountSetupView()
+                } else {
+                    // The terms, the sideinstaller.net question and the Apple
+                    // ID, a page each; the pages move among themselves.
+                    SetupView()
                         .environmentObject(localizer)
                         .environmentObject(accounts)
-                        .transition(.asymmetric(
-                            insertion: .identity,
-                            removal: .opacity.combined(with: .scale(scale: 1.06))))
-                        // Layered between the welcome page and the app, so each
-                        // zooms out over the next screen.
-                        .zIndex(0.5)
-                } else {
-                    WelcomeView()
-                        .environmentObject(localizer)
                         // Zoom past the camera while the app fades in beneath.
                         .transition(.asymmetric(
                             insertion: .identity,
@@ -59,7 +52,6 @@ struct SideInstallerApp: App {
                         .zIndex(1)
                 }
             }
-            .animation(.smooth(duration: 0.5), value: hasAcceptedTOS)
             .animation(.smooth(duration: 0.5), value: hasCompletedAccountSetup)
             // Every switch in the app clicks on and off.
             .toggleStyle(SoundingToggleStyle())

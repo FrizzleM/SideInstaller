@@ -1246,4 +1246,25 @@ let japaneseStrings: [String: String] = [
         "%@ はこの iPhone 自身のアドレスです。Side by Side は他の人の iPhone にインストールするための機能なので、相手のアドレスを入力してください。この iPhone にインストールするには「インストール」タブを使用してください。",
     "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
         "相手の iPhone は iOS %@ です。iOS 26.4 以降では、相手の iPhone が Wi-Fi 経由で渡すペアリングを %@ は使えません。iOS 27 なら自分の「設定」からペアリングするので動作します。相手の iPhone をアップデートしてからもう一度お試しください。IP を聞かれたら「いいえ」を選びます。",
+
+    // MARK: - AltStore
+
+    "couldn't reach %@: %@":
+        "%@ に接続できませんでした：%@",
+    "%@ answered HTTP %d":
+        "%@ が HTTP %d を返しました",
+    "%@'s list of apps couldn't be read (%@). Something on this network may have replaced it.":
+        "%@ のアプリ一覧を読み取れませんでした（%@）。このネットワーク上の何かが内容を置き換えている可能性があります。",
+    "the %@ that arrived isn't the file %@ lists, so it isn't installed. Try again later.":
+        "届いた %@ は %@ に記載されたファイルではないため、インストールしません。しばらくしてからもう一度お試しください。",
+    "%@ lists no version of %@ that runs on iOS %@.":
+        "%@ には、%@ の iOS %@ 対応バージョンがありません。",
+    "Open AltStore from your Home Screen and sign in with your Apple ID.":
+        "ホーム画面から AltStore を開き、お使いの Apple ID でサインインします。",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings. Its pairing file is already in place, so the setup skips pairing.":
+        "パソコンなしでアプリをインストール・更新するには、AltStore の設定で「Set up Remote AltServer」をタップします。ペアリングファイルはすでに入っているので、設定ではペアリングが省かれます。",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings and follow its steps.":
+        "パソコンなしでアプリをインストール・更新するには、AltStore の設定で「Set up Remote AltServer」をタップし、表示される手順に従ってください。",
+    "Open AltStore and sign in with the same Apple ID.":
+        "AltStore を開き、同じ Apple ID でサインインします。",
 ]
