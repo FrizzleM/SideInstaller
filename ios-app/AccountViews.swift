@@ -24,7 +24,7 @@ struct AccountSetupView: View {
         ZStack {
             AppBackground()
             ScrollView {
-                VStack(spacing: 22) {
+                VStack(spacing: 24) {
                     if confirmedOfficialSource {
                         header.cascadeItem(0)
                         card.cascadeItem(1)
@@ -55,14 +55,13 @@ struct AccountSetupView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "person.crop.circle.fill.badge.checkmark")
-                .font(.system(size: 52, weight: .semibold))
-                .foregroundStyle(Theme.brand)
-                .shadow(color: Theme.glow, radius: 20, x: 0, y: 12)
+        VStack(spacing: 12) {
+            Image(systemName: "person.crop.circle.badge.checkmark")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
                 .padding(.bottom, 4)
             Text(L("Sign in with your Apple ID"))
-                .font(.title.weight(.bold))
+                .font(.title.weight(.semibold))
                 .multilineTextAlignment(.center)
             Text(L("Don't worry, these are stored locally"))
                 .font(.subheadline)
@@ -96,18 +95,17 @@ struct AccountSetupView: View {
     }
 
     private var buttons: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             Button(L("Continue")) {
                 accounts.save(appleID: email, password: password)
                 hasCompletedAccountSetup = true
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(!canSave)
-            .opacity(canSave ? 1 : 0.35)
-            .animation(.snappy(duration: 0.25), value: canSave)
+            .animation(.smooth(duration: 0.2), value: canSave)
 
             Button(L("Set this up later")) { hasCompletedAccountSetup = true }
-                .font(.subheadline.weight(.semibold))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
                 .buttonStyle(.plain, sound: .tap)
         }
@@ -131,7 +129,7 @@ struct OfficialSourceCheck: View {
     let onConfirm: () -> Void
 
     var body: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: 24) {
             if unofficial {
                 warning.transition(.cardAppear)
             } else {
@@ -142,15 +140,14 @@ struct OfficialSourceCheck: View {
     }
 
     private var question: some View {
-        VStack(spacing: 22) {
-            VStack(spacing: 10) {
-                Image(systemName: "checkmark.shield.fill")
-                    .font(.system(size: 52, weight: .semibold))
-                    .foregroundStyle(Theme.brand)
-                    .shadow(color: Theme.glow, radius: 20, x: 0, y: 12)
+        VStack(spacing: 24) {
+            VStack(spacing: 12) {
+                Image(systemName: "checkmark.shield")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.secondary)
                     .padding(.bottom, 4)
                 Text(L("Did you download SideInstaller from sideinstaller.net?"))
-                    .font(.title2.weight(.bold))
+                    .font(.title2.weight(.semibold))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(L("SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official."))
@@ -159,50 +156,45 @@ struct OfficialSourceCheck: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            VStack(spacing: 14) {
+            VStack(spacing: 12) {
                 Button(L("Yes, from sideinstaller.net"), action: onConfirm)
                     .buttonStyle(PrimaryButtonStyle())
-                Button(L("No, or I'm not sure")) { unofficial = true }
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(.white.opacity(0.08)))
-                    .buttonStyle(.plain, sound: .press)
+                Button { unofficial = true } label: {
+                    Text(L("No, or I'm not sure"))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SecondaryButtonStyle(), sound: .press)
+                .controlSize(.large)
             }
         }
     }
 
     private var warning: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: 24) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 6) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.title3)
+                    .foregroundStyle(Theme.warning)
+                VStack(alignment: .leading, spacing: 4) {
                     Text(L("Don't sign in with this copy"))
                         .font(.headline)
                     Text(L("Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there."))
                         .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.75))
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(16)
+            .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.orange.opacity(0.12)))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1))
+            .cardSurface(in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
 
-            VStack(spacing: 14) {
+            VStack(spacing: 16) {
                 Link(destination: Self.websiteURL) {
                     Text(L("Open sideinstaller.net"))
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 Button(L("Back")) { unofficial = false }
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
                     .buttonStyle(.plain, sound: .tap)
             }

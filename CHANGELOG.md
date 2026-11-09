@@ -13,6 +13,13 @@ All notable changes to SideInstaller are documented here.
   SideInstaller works without a computer and there's no pairing file to make.
 
 ### Changed
+- **A quieter look.** The swaying blue backdrop, the glowing gradient buttons and the tinted
+  cards are gone. Every page sits on a still, near-black background with plain cards, so the
+  logo tiles, an install's progress and the pairing code are what stand out. The main button is
+  off-white, the blue marks only progress, selections and links, and the tunnel's and the
+  device's state show as a small coloured dot. The pairing code takes one key per digit, on the
+  Lock Screen too, icons are line drawings in one colour, and nothing pulses, breathes or bounces
+  any more.
 - **Side by Side goes step by step, and installs SideStore and LiveContainer too.** It was one
   long form that could only put SideInstaller on someone else's iPhone. It now takes one page at
   a time: what to install, whether you have their iPhone's IP address (optional: without it,

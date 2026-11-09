@@ -126,7 +126,7 @@ struct SettingsView: View {
                         }
                         // Set explicitly: the row's `.plain` style removes the
                         // destructive red.
-                        .tint(.red)
+                        .tint(Theme.negative)
                         Button {
                             editorTarget = .existing(account)
                         } label: {
@@ -141,12 +141,12 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Button { editorTarget = .new } label: {
-                Label(L("Add Apple ID"), systemImage: "plus.circle.fill")
+                Label(L("Add Apple ID"), systemImage: "plus.circle")
             }
             if let warning = accounts.keychainWarning {
-                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                Label(warning, systemImage: "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
             }
         } header: {
             Text(L("Account"))
@@ -157,12 +157,12 @@ struct SettingsView: View {
     private func accountRow(_ account: SavedAccount) -> some View {
         let isActive = accounts.isActive(account)
         return HStack(spacing: 12) {
-            Image(systemName: "person.crop.circle.fill")
+            Image(systemName: "person.crop.circle")
                 .font(.title3)
-                .foregroundStyle(isActive ? AnyShapeStyle(Theme.brand) : AnyShapeStyle(.secondary))
+                .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.appleID)
-                    .font(.subheadline.weight(isActive ? .semibold : .regular))
+                    .font(.subheadline.weight(isActive ? .medium : .regular))
                     .lineLimit(1)
                     .truncationMode(.middle)
                 if isActive {
@@ -174,8 +174,8 @@ struct SettingsView: View {
             Spacer(minLength: 8)
             if isActive {
                 Image(systemName: "checkmark")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Theme.accent2)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
             }
         }
         .foregroundStyle(.primary)
@@ -262,10 +262,10 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             } else if let note = developerModeNote {
-                Label(note.text, systemImage: note.failed ? "exclamationmark.triangle.fill"
-                                                          : "checkmark.circle.fill")
+                Label(note.text, systemImage: note.failed ? "exclamationmark.triangle"
+                                                          : "checkmark.circle")
                     .font(.caption)
-                    .foregroundStyle(note.failed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(note.failed ? AnyShapeStyle(Theme.negative) : AnyShapeStyle(.secondary))
             }
         } header: {
             Text(L("Developer Mode"))
@@ -312,9 +312,9 @@ struct SettingsView: View {
     private var downloadsSection: some View {
         Section {
             if let error = downloadsManager.lastError {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
+                Label(error, systemImage: "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
             }
             if downloadsManager.hasLoaded && downloadsManager.downloads.isEmpty {
                 Text(L("No downloaded IPAs. Ones you install from the Install tab are cached here."))
@@ -344,9 +344,9 @@ struct SettingsView: View {
 
     private func downloadRow(_ item: DownloadedIPA) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "shippingbox.fill")
+            Image(systemName: "shippingbox")
                 .font(.title3)
-                .foregroundStyle(Theme.brand)
+                .foregroundStyle(Theme.muted)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.displayName)
                     .font(.subheadline.weight(.medium))
@@ -362,11 +362,8 @@ struct SettingsView: View {
             }
             Spacer()
             Text(item.sizeText)
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(Theme.accent2)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(Theme.accent.opacity(0.16)))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(Theme.muted)
         }
     }
 

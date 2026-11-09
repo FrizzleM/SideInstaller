@@ -15,7 +15,7 @@ struct AboutView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 16) {
                     header.cascadeItem(0)
                     summary.cascadeItem(1)
                     links.cascadeItem(2)
@@ -25,7 +25,6 @@ struct AboutView: View {
                 .padding(20)
                 .pageColumn()
             }
-            // Uses the same bright backdrop level as the Install tab.
             .background(AppBackground())
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
             .sheet(isPresented: $showSettings) { SettingsView() }
@@ -37,9 +36,11 @@ struct AboutView: View {
     // MARK: Header
 
     private var header: some View {
-        BrandHeader(icon: "info.circle.fill", image: "AppLogo", title: "SideInstaller",
+        BrandHeader(icon: "info.circle", image: "AppLogo", title: "SideInstaller",
                     subtitle: L("an app by Frizzle")) {
-            StatusPill(text: versionText, systemImage: "tag.fill", color: Theme.accent2)
+            Text(versionText)
+                .font(.footnote.monospaced())
+                .foregroundStyle(Theme.muted)
         }
     }
 
@@ -54,8 +55,8 @@ struct AboutView: View {
 
     private var summary: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 10) {
-                sectionTitle(L("About"), systemImage: "info.circle.fill")
+            VStack(alignment: .leading, spacing: 12) {
+                sectionTitle(L("About"), systemImage: "info.circle")
                 Text(L("SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved."))
                     .font(.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
@@ -70,24 +71,19 @@ struct AboutView: View {
             VStack(alignment: .leading, spacing: 16) {
                 sectionTitle(L("Links"), systemImage: "link")
                 AboutRow(systemImage: "chevron.left.forwardslash.chevron.right",
-                         tint: Theme.accent2,
                          title: L("Source code"),
                          urlString: "https://github.com/FrizzleM/SideInstaller/tree/main")
-                AboutRow(systemImage: "exclamationmark.bubble.fill",
-                         tint: .orange,
+                AboutRow(systemImage: "exclamationmark.bubble",
                          title: L("Report a problem"),
                          detail: L("Opens a GitHub issue with this app's details, its log and crash logs."),
                          action: { showReport = true })
-                AboutRow(systemImage: "bubble.left.and.bubble.right.fill",
-                         tint: Color(red: 0.35, green: 0.40, blue: 0.95),
+                AboutRow(systemImage: "bubble.left.and.bubble.right",
                          title: L("Discord"),
                          urlString: "https://discord.gg/sQ5Y8vbYJS")
-                AboutRow(systemImage: "cup.and.saucer.fill",
-                         tint: Color(red: 1.0, green: 0.36, blue: 0.42),
+                AboutRow(systemImage: "cup.and.saucer",
                          title: L("Support the project"),
                          urlString: "https://ko-fi.com/frizzlem")
-                AboutRow(systemImage: "bitcoinsign.circle.fill",
-                         tint: Color(red: 0.97, green: 0.58, blue: 0.10),
+                AboutRow(systemImage: "bitcoinsign.circle",
                          title: L("Crypto"),
                          detail: L("Donation wallets for Bitcoin, Ethereum and Solana."),
                          action: { showCrypto = true })
@@ -100,28 +96,23 @@ struct AboutView: View {
     private var thanks: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 16) {
-                sectionTitle(L("Special thanks"), systemImage: "heart.fill")
-                AboutRow(systemImage: "hammer.fill",
-                         tint: Theme.accent,
+                sectionTitle(L("Special thanks"), systemImage: "heart")
+                AboutRow(systemImage: "hammer",
                          title: "jkcoxson",
                          detail: L("For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it."),
                          urlString: "https://github.com/jkcoxson/idevice")
-                AboutRow(systemImage: "ladybug.fill",
-                         tint: .orange,
+                AboutRow(systemImage: "ladybug",
                          title: "Vexon",
                          detail: L("For the support, and for spotting the bugs that got fixed because of it."))
-                AboutRow(systemImage: "character.bubble.fill",
-                         tint: Color(red: 0.95, green: 0.35, blue: 0.45),
+                AboutRow(systemImage: "character.bubble",
                          title: "so-5699",
                          detail: L("For the Japanese translation."),
                          urlString: "https://github.com/so-5699")
-                AboutRow(systemImage: "character.bubble.fill",
-                         tint: Color(red: 0.25, green: 0.55, blue: 0.95),
+                AboutRow(systemImage: "character.bubble",
                          title: "kes158",
                          detail: L("For the Korean translation."),
                          urlString: "https://github.com/kes158")
-                AboutRow(systemImage: "character.bubble.fill",
-                         tint: .teal,
+                AboutRow(systemImage: "character.bubble",
                          title: "Mr3242-Scripter",
                          detail: L("For the Turkish translation."),
                          urlString: "https://github.com/Mr3242-Scripter")
@@ -134,43 +125,36 @@ struct AboutView: View {
     private var builtWith: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 16) {
-                sectionTitle(L("Built with"), systemImage: "shippingbox.fill")
+                sectionTitle(L("Built with"), systemImage: "shippingbox")
                 Text(L("The open source work this app is built on:"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 AboutRow(systemImage: "iphone.gen3",
-                         tint: Theme.accent2,
                          title: "idevice",
                          detail: L("Pairing, the tunnel and the install itself. By jkcoxson, MIT."),
                          urlString: "https://github.com/jkcoxson/idevice")
                 AboutRow(systemImage: "signature",
-                         tint: Theme.accent2,
                          title: "isideload",
                          detail: L("Apple ID sign in, certificates and signing on the device. By nab138, MIT."),
                          urlString: "https://github.com/nab138/isideload")
-                AboutRow(systemImage: "checkmark.seal.fill",
-                         tint: Theme.accent2,
+                AboutRow(systemImage: "checkmark.seal",
                          title: "apple-codesign-quick",
                          detail: L("The code signer isideload uses for each app. By Dadoum, LGPL-2.1."),
                          urlString: "https://github.com/Dadoum/apple-crates")
-                AboutRow(systemImage: "shippingbox.fill",
-                         tint: .green,
+                AboutRow(systemImage: "shippingbox",
                          title: "SideStore",
                          detail: L("The sideloading app this installs for you."),
                          urlString: "https://github.com/SideStore/SideStore")
-                AboutRow(systemImage: "square.stack.3d.up.fill",
-                         tint: .green,
+                AboutRow(systemImage: "square.stack.3d.up",
                          title: "LiveContainer",
                          detail: L("Runs sideloaded apps without spending an app slot on each one."),
                          urlString: "https://github.com/LiveContainer/LiveContainer")
-                AboutRow(systemImage: "gamecontroller.fill",
-                         tint: .green,
+                AboutRow(systemImage: "gamecontroller",
                          title: "Madeira",
                          detail: L("Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0."),
                          urlString: "https://github.com/willfaust/Madeira")
-                AboutRow(systemImage: "externaldrive.fill",
-                         tint: .purple,
+                AboutRow(systemImage: "externaldrive",
                          title: "DeveloperDiskImage",
                          detail: L("The developer disk image location spoofing mounts. Mirrored by doronz88."),
                          urlString: "https://github.com/doronz88/DeveloperDiskImage")
@@ -181,23 +165,17 @@ struct AboutView: View {
     // MARK: Helpers
 
     private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        Label {
-            Text(title).font(.headline)
-        } icon: {
-            Image(systemName: systemImage)
-                .foregroundStyle(Theme.brand)
-        }
+        SectionTitle(title: title, systemImage: systemImage)
     }
 }
 
 // MARK: - Row
 
-/// A row with a tinted icon, a title and an optional detail line. Rows with a
+/// A row with an icon, a title and an optional detail line. Rows with a
 /// `urlString` open it and show an arrow; rows with an `action` run it and
 /// show a chevron.
 private struct AboutRow: View {
     var systemImage: String
-    var tint: Color
     var title: String
     var detail: String? = nil
     var urlString: String? = nil
@@ -221,13 +199,13 @@ private struct AboutRow: View {
     private func content(accessory: String?) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: systemImage)
-                .font(.title3)
-                .foregroundStyle(Theme.gradient(tint))
+                .font(.body)
+                .foregroundStyle(Theme.muted)
                 // Fixed width so the icons line up.
-                .frame(width: 26, alignment: .leading)
-            VStack(alignment: .leading, spacing: 3) {
+                .frame(width: 24, alignment: .center)
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.medium))
                 if let detail {
                     Text(detail)
                         .font(.caption)
@@ -238,8 +216,8 @@ private struct AboutRow: View {
             Spacer(minLength: 8)
             if let accessory {
                 Image(systemName: accessory)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.tertiary)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Theme.muted)
             }
         }
         .foregroundStyle(.primary)
@@ -285,7 +263,7 @@ private struct CryptoDonationsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 16) {
                     Text(L("Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you."))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -299,7 +277,7 @@ private struct CryptoDonationsView: View {
                         walletCard(wallet)
                     }
                     Label(L("Send each coin only on the network shown. Crypto sent on another network can't be recovered."),
-                          systemImage: "exclamationmark.triangle.fill")
+                          systemImage: "exclamationmark.triangle")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -322,12 +300,12 @@ private struct CryptoDonationsView: View {
     private func walletCard(_ wallet: DonationWallet) -> some View {
         let isCopied = copied == wallet.address
         return PanelCard {
-            VStack(spacing: 14) {
+            VStack(spacing: 16) {
                 QRCodeView(text: wallet.address)
                     .frame(width: 200, height: 200)
                     .accessibilityLabel(L("QR code for the %@ address", wallet.name))
                 Text(L("Network: %@", wallet.network))
-                    .font(.caption.weight(.semibold))
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
                 // One line, shrunk to fit: wrapped, it gets hyphenated in some
                 // languages, and a hyphen copied by hand breaks the address.
@@ -371,7 +349,7 @@ private struct QRCodeView: View {
                 .resizable()
                 .scaledToFit()
                 .padding(12)
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white))
+                .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous).fill(.white))
         }
     }
 

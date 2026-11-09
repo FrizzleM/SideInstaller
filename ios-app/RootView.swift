@@ -1,23 +1,13 @@
 import SwiftUI
 
 /// Tab container (Install, Tools, About). Each page draws its own
-/// `AppBackground`, since `TabView` would hide a shared one; they stay in sync
-/// because the background animates off the clock. Also hosts the 2FA sheet and
-/// the pages' popups, so they show over any tab.
+/// `AppBackground`, since `TabView` would hide a shared one. Also hosts the
+/// 2FA sheet and the pages' popups, so they show over any tab.
 struct RootView: View {
-    /// The tabs and their backdrop level. The selection is tracked so a tab
-    /// switch can animate `Backdrop` to the new level.
+    /// The tabs. The selection is tracked so a tab switch can tick, and a
+    /// link can bring the Install tab forward.
     private enum Page: Hashable {
         case install, tools, about
-
-        var wash: Backdrop.Level {
-            switch self {
-            case .install: .bright
-            case .tools:   .dark
-            // Same as Install, so switching between them doesn't change the backdrop.
-            case .about:   .bright
-            }
-        }
     }
 
     /// One popup, tagged with the page that raised it.
@@ -89,8 +79,6 @@ struct RootView: View {
                 .tabItem { Label(L("About"), systemImage: "info.circle") }
                 .tag(Page.about)
         }
-        // Animate the backdrop to the new tab's level.
-        .onChange(of: page) { _, page in Backdrop.settle(on: page.wash) }
         // A link's install or pairing file ends up on the Install tab, so its
         // popup comes up over that.
         .onChange(of: engine.pendingLink) { _, link in
@@ -279,9 +267,9 @@ struct RootView: View {
                 if case .install(.error(_, let stoppedRun)) = item { stoppedRun } else { nil }
             }.first
             return (InstallPopup.errorTitle(stoppedRun: stoppedRun ?? true),
-                    "exclamationmark.triangle.fill", .red)
+                    "exclamationmark.triangle", Theme.negative)
         case .installFinished:
-            return (L("Success: last steps"), "checkmark.seal.fill", .green)
+            return (L("Success: last steps"), "checkmark.seal", Theme.positive)
         case .pairingPage:
             return (PairingPopup.pairInSettingsTitle, "lock.iphone", Theme.accent)
         }
@@ -376,8 +364,8 @@ struct TwoFactorSheet: View {
             Form {
                 if let error = prompt.shownError {
                     Section {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(Theme.warning)
                     }
                 }
                 Section {
@@ -397,7 +385,7 @@ struct TwoFactorSheet: View {
                             }
                     }
                     if let pending {
-                        HStack(spacing: 10) {
+                        HStack(spacing: 8) {
                             ProgressView()
                             Text(status(for: pending))
                                 .foregroundStyle(.secondary)
@@ -529,7 +517,7 @@ struct ToolsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 16) {
                     header.cascadeItem(0)
                     LazyVGrid(columns: Self.columns, spacing: 12) {
                         NavigationLink {
@@ -587,8 +575,6 @@ struct ToolsView: View {
             }
             // Still unless the tiles don't all fit on the screen.
             .scrollBounceBehavior(.basedOnSize)
-            // The darker backdrop is set by the tab switch, not by this page
-            // appearing, so pushed pages keep the same level.
             .background(AppBackground())
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
             .sheet(isPresented: $showSettings) { SettingsView() }
@@ -606,14 +592,14 @@ struct ToolsView: View {
     /// Just the title: the tiles below carry the iconography on this page.
     private var header: some View {
         Text(L("Tools"))
-            .font(.largeTitle.weight(.bold))
+            .font(.largeTitle.weight(.medium))
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
     }
 }
 
 /// One Tools menu tile: a square with the logo above the name. Pages without
-/// logo art pass an SF Symbol, drawn on the brand gradient at the same size.
+/// logo art pass an SF Symbol, drawn on a plain tile at the same size.
 private struct ToolTile: View {
     var image: String? = nil
     var icon: String? = nil
@@ -622,27 +608,31 @@ private struct ToolTile: View {
     var beta: Bool = false
 
     var body: some View {
-        VStack(spacing: 12) {
+        let logo = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        let tile = RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+        return VStack(spacing: 12) {
             glyph
                 .frame(width: 64, height: 64)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .clipShape(logo)
+                // The art's black tile would melt into the card without it.
+                .overlay(logo.strokeBorder(Theme.hairline, lineWidth: 1))
             Text(title)
-                .font(.headline)
+                .font(.body.weight(.medium))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
         }
-        .padding(10)
+        .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .aspectRatio(1, contentMode: .fit)
         .overlay(alignment: .topTrailing) {
             if beta {
                 BetaBadge()
-                    .padding(10)
+                    .padding(12)
             }
         }
-        .cardSurface(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .cardSurface(in: tile)
+        .contentShape(tile)
     }
 
     @ViewBuilder
@@ -653,10 +643,10 @@ private struct ToolTile: View {
                 .scaledToFill()
         } else {
             ZStack {
-                Rectangle().fill(Theme.brand)
+                Rectangle().fill(Theme.raised)
                 Image(systemName: icon ?? "questionmark")
-                    .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 28))
+                    .foregroundStyle(.secondary)
             }
         }
     }

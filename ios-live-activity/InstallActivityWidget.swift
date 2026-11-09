@@ -103,25 +103,18 @@ private extension Stage {
         }
     }
 
-    /// Orange for the user's turn, as the Install tab's "Action needed" badge,
-    /// and red for an error, as its error popup.
+    /// Amber for the user's turn, as the Install tab's "Action needed", and
+    /// red for an error, as its error popup.
     var tint: Color {
         switch self {
-        case .running:          Brand.accent2
-        case .waiting, .paused: .orange
-        case .installed:        .green
-        case .stopped:          .red
+        case .running:          Brand.accent
+        case .waiting, .paused: Brand.warning
+        case .installed:        Brand.positive
+        case .stopped:          Brand.negative
         }
     }
 
-    var fill: AnyShapeStyle {
-        switch self {
-        case .running:          AnyShapeStyle(Brand.gradient)
-        case .waiting, .paused: AnyShapeStyle(Color.orange.gradient)
-        case .installed:        AnyShapeStyle(Color.green.gradient)
-        case .stopped:          AnyShapeStyle(Color.red.gradient)
-        }
-    }
+    var fill: AnyShapeStyle { AnyShapeStyle(tint) }
 
     /// The compact island's mark where the percentage was: the user's turn,
     /// or how the install ended.
@@ -175,7 +168,7 @@ private struct InstallLockScreenCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity)
-        .background(Brand.backdrop(glow: state.needsUser ? state.stage.tint : Brand.accent))
+        .background(Brand.backdrop)
         .overlay {
             // The user's turn, outlined.
             if state.needsUser {
@@ -214,8 +207,7 @@ private struct InstallSymbol: View {
     var body: some View {
         Image(systemName: state.shownSymbol)
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(state.stage == .running ? AnyShapeStyle(Brand.gradient)
-                                                     : AnyShapeStyle(state.stage.tint))
+            .foregroundStyle(state.stage.tint)
     }
 }
 
