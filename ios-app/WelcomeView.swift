@@ -98,8 +98,7 @@ struct WelcomeView: View {
     private var logo: some View {
         let tile = RoundedRectangle(cornerRadius: 96 * 23 / 86, style: .continuous)
         return Image("AppLogo")
-            .resizable()
-            .scaledToFill()
+            .logoArt()
             .frame(width: 96, height: 96)
             .clipShape(tile)
             // The art's black tile would melt into the page without it.

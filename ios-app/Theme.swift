@@ -614,6 +614,16 @@ struct BetaBadge: View {
     }
 }
 
+extension Image {
+    /// A SideInstaller logo tile's art, filling its frame in greys: the blue
+    /// patterns would compete with the one accent.
+    func logoArt() -> some View {
+        resizable()
+            .scaledToFill()
+            .grayscale(1)
+    }
+}
+
 /// The top of each screen: the page's logo tile, the title, and an accessory.
 ///
 /// In a short window (an iPhone on its side, or a closed iPhone Duo stood up
@@ -676,8 +686,7 @@ struct BrandHeader<Accessory: View>: View {
     private var glyph: some View {
         if let image {
             Image(image)
-                .resizable()
-                .scaledToFill()
+                .logoArt()
                 .clipShape(tile)
                 // The art's black tile would melt into the page without it.
                 .overlay(tile.strokeBorder(Theme.hairline, lineWidth: 1))

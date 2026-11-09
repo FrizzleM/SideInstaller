@@ -2858,9 +2858,13 @@ private struct AppGlyph: View {
     var body: some View {
         Group {
             if let image = app.image {
-                Image(image)
-                    .resizable()
-                    .scaledToFill()
+                // SideStore's and LiveContainer's logos keep their own
+                // colors, so each app is easy to tell apart.
+                if app == .sideInstaller {
+                    Image(image).logoArt()
+                } else {
+                    Image(image).resizable().scaledToFill()
+                }
             } else {
                 ZStack {
                     Rectangle().fill(Theme.raised)

@@ -639,8 +639,7 @@ private struct ToolTile: View {
     private var glyph: some View {
         if let image {
             Image(image)
-                .resizable()
-                .scaledToFill()
+                .logoArt()
         } else {
             ZStack {
                 Rectangle().fill(Theme.raised)
