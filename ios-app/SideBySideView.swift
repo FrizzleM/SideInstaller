@@ -1843,7 +1843,7 @@ struct SideBySideView: View {
     @EnvironmentObject private var loc: Localizer
     /// Read for Wi-Fi and the install step's progress, which installd reports
     /// globally.
-    @EnvironmentObject private var engine: Engine
+    @Environment(Engine.self) private var engine
     /// Observed so the Apple ID choice follows the saved account.
     @EnvironmentObject private var accounts: AccountStore
     @ObservedObject var manager: SideBySideManager

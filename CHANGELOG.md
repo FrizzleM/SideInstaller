@@ -75,6 +75,12 @@ All notable changes to SideInstaller are documented here.
   playing silent audio. A call, Siri, an alarm or the audio output changing (AirPods connecting,
   headphones unplugged) stopped that audio for good, so iOS could suspend SideInstaller
   mid-pairing. The silent audio now starts again after each of these.
+- **The app stays smooth while the log fills.** Every line the device library logged was
+  cleaned of keys and personal details on the main thread, and every new line redrew the whole
+  app. During a busy install, or with Verbose logging on, scrolling and taps could stutter. Lines
+  are now cleaned in the background and only the activity log redraws: in a test burst of 2000
+  lines, the longest freeze dropped from about a quarter of a second to under 20 ms. The activity
+  log also keeps scrolling to the newest line once it holds its 2000 lines.
 
 ## 1.6.5
 

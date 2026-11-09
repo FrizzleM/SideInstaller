@@ -68,7 +68,7 @@ struct ProblemReport {
         return ProblemReport(details: details,
                              failedStepName: failed.map { englishTitle($0, source) },
                              error: engine.lastError.map(LogRedactor.redact),
-                             logLines: engine.lines.map { "\($0.stamp)  \($0.text)" })
+                             logLines: LogStore.shared.lines.map { "\($0.stamp)  \($0.text)" })
     }
 
     // MARK: Details

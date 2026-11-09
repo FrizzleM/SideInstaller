@@ -871,7 +871,7 @@ final class LocationManager: ObservableObject {
 /// The Location page: a map to pick a point, and the controls that push it to
 /// the device. Pushed from Tools, whose `NavigationStack` this relies on.
 struct LocationView: View {
-    @EnvironmentObject private var engine: Engine
+    @Environment(Engine.self) private var engine
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: LocationManager

@@ -2,8 +2,8 @@ import SwiftUI
 
 @main
 struct SideInstallerApp: App {
-    // Held here so SwiftUI observes the same instance the C log callback targets.
-    @StateObject private var engine = Engine.shared
+    // The one engine, handed to every screen through the environment.
+    @State private var engine = Engine.shared
     // Checks GitHub for a newer release and drives the update banner.
     @StateObject private var updateChecker = UpdateChecker()
     // Held here so every screen redraws when the language setting changes.
@@ -33,7 +33,7 @@ struct SideInstallerApp: App {
             ZStack {
                 if hasAcceptedTOS && hasCompletedAccountSetup {
                     RootView()
-                        .environmentObject(engine)
+                        .environment(engine)
                         .environmentObject(updateChecker)
                         .environmentObject(localizer)
                         .environmentObject(accounts)

@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 /// The Install screen: an Apple ID, a build, and a step timeline while it runs.
 struct ContentView: View {
-    @EnvironmentObject private var engine: Engine
+    @Environment(Engine.self) private var engine
     @EnvironmentObject private var updateChecker: UpdateChecker
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
@@ -275,7 +275,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 sectionTitle(L("Install"), systemImage: "square.and.arrow.down.fill")
                 Menu {
-                    Picker(L("Install"), selection: $engine.installSource) {
+                    Picker(L("Install"), selection: Bindable(engine).installSource) {
                         ForEach(InstallSource.allCases) { src in
                             Text(src.displayName).tag(src)
                         }
@@ -300,7 +300,7 @@ struct ContentView: View {
                         if engine.installSource == .custom {
                             importControl.transition(.opacity)
                         } else {
-                            Picker(L("Release"), selection: $engine.releaseChannel) {
+                            Picker(L("Release"), selection: Bindable(engine).releaseChannel) {
                                 ForEach(ReleaseChannel.allCases) { channel in
                                     Text(channel.displayName).tag(channel)
                                 }
@@ -730,7 +730,7 @@ struct ContentView: View {
             Label(L("%@ version", source.shortName), systemImage: "clock.arrow.circlepath")
                 .font(.subheadline.weight(.semibold))
             Menu {
-                Picker(L("Version"), selection: $engine.selectedVersion) {
+                Picker(L("Version"), selection: Bindable(engine).selectedVersion) {
                     Text(latestLabel(latest)).tag(ReleaseVersion?.none)
                     ForEach(catalog?.others[engine.selectedChannel] ?? []) { version in
                         Text(version.menuTitle).tag(Optional(version))
@@ -1015,7 +1015,7 @@ struct ContentView: View {
 struct InstallPopup: View {
     let popup: Engine.Popup
 
-    @EnvironmentObject private var engine: Engine
+    @Environment(Engine.self) private var engine
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     /// Shared with the Certificates page; revoke-and-retry runs through it.
