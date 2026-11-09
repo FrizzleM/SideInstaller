@@ -39,7 +39,9 @@ All notable changes to SideInstaller are documented here.
   identity) and Madeira's sign-in. Copying the log and Report a problem took them along, so a
   log posted to a GitHub issue could hold them. The log now says only how many bytes were read,
   the device library's protocol messages are left out unless Settings › Activity Log › Verbose
-  logging is on, and any long run of numbers is taken out of the log, whatever wrote it.
+  logging is on, and any long run of numbers is taken out of the log, whatever wrote it. A key
+  printed as a plain list of numbers (`private_key: [225, 120, …]`) is now taken out whole too:
+  only its first number was, and the rest of the key stayed in the log.
 - **Side by Side no longer keeps the other person's signing key.** It signed their Apple ID in
   with your iPhone's own sign-in files, so the private key for the certificate it made stayed on
   your iPhone after the run. Their Apple ID now signs in from a temporary folder, deleted once

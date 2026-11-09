@@ -42,6 +42,26 @@ targets:
         # idevice's static lib pulls in C++ symbols (aws-lc); link libc++.
         OTHER_LDFLAGS: "-lc++"
         GENERATE_INFOPLIST_FILE: NO
+    # `xcodebuild test -scheme SideInstaller` runs SideInstallerTests too. A
+    # build or archive of the scheme still builds the app alone.
+    scheme:
+      testTargets:
+        - SideInstallerTests
+
+  # Unit tests (Swift Testing), run inside the app on a simulator, so they can
+  # reach its internal types with `@testable import SideInstaller`.
+  # scripts/check-ios.sh builds and runs them, as the pull-request workflow does.
+  SideInstallerTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ios-tests
+    dependencies:
+      - target: SideInstaller
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.frizzle.sideinstaller.tests
+        GENERATE_INFOPLIST_FILE: YES
 
   # Draws the pairing Live Activity: the code Settings asks for, in the Dynamic
   # Island and on the Lock Screen. A Live Activity's views have to live in a
