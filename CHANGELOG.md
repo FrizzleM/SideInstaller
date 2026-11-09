@@ -70,6 +70,11 @@ All notable changes to SideInstaller are documented here.
   imported pairing file or in Side by Side waited 8 seconds before carrying on. It now knows
   within about two seconds. iOS can also refuse while its Local Network alert is still on
   screen, so SideInstaller waits for your answer before deciding.
+- **Pairing keeps going through a call or AirPods connecting.** While you enter the pairing code
+  in Settings, or while a location is simulated, SideInstaller stays running in the background by
+  playing silent audio. A call, Siri, an alarm or the audio output changing (AirPods connecting,
+  headphones unplugged) stopped that audio for good, so iOS could suspend SideInstaller
+  mid-pairing. The silent audio now starts again after each of these.
 
 ## 1.6.5
 
