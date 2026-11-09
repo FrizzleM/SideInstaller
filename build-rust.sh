@@ -4,7 +4,8 @@
 # the project with `xcodegen generate`.
 #
 # SIMULATOR=0 builds the device slice only, which is all an IPA needs
-# (scripts/build-ipa.sh does that).
+# (scripts/build-ipa.sh does that). DEVICE=0 builds the simulator slice only,
+# which is all a simulator build needs (scripts/check-ios.sh does that).
 set -euo pipefail
 
 SIMULATOR="${SIMULATOR:-1}"
@@ -32,9 +33,18 @@ export TARGET_CFLAGS="${TARGET_CFLAGS:-} -ffile-prefix-map=${HOME}=/build"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT/rust-core"
 
+DEVICE="${DEVICE:-1}"
+if [ "$DEVICE" = 0 ] && [ "$SIMULATOR" = 0 ]; then
+  echo "error: DEVICE=0 and SIMULATOR=0 leave nothing to build" >&2
+  exit 1
+fi
+
 echo "==> Building Rust static libs (release)"
-cargo build --release --target aarch64-apple-ios
-slices=(-library rust-core/target/aarch64-apple-ios/release/libsideinstaller_ffi.a -headers rust-core/include)
+slices=()
+if [ "$DEVICE" != 0 ]; then
+  cargo build --release --target aarch64-apple-ios
+  slices+=(-library rust-core/target/aarch64-apple-ios/release/libsideinstaller_ffi.a -headers rust-core/include)
+fi
 if [ "$SIMULATOR" != 0 ]; then
   cargo build --release --target aarch64-apple-ios-sim
   slices+=(-library rust-core/target/aarch64-apple-ios-sim/release/libsideinstaller_ffi.a -headers rust-core/include)

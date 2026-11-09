@@ -91,13 +91,23 @@ shows with Verbose logging on.
   "the device hung up" (`close_notify`) apart from "the device rejected us". If
   it can't be decrypted, the error says so.
 
+**5. `Cargo.toml` — no `tun-rs` dev-dependency.**
+
+Only upstream's `tests/` and `examples/` use it, and neither is vendored, but
+cargo still builds every dev-dependency for `cargo test`. Resolved fresh by
+`scripts/test-rust.sh`, its newest release didn't compile against the tokio
+rust-core locks (2026-11-09: `AsyncFd::register` not found), which failed the
+pull-request checks for no change of ours. The app never builds dev-dependencies,
+so nothing else is affected.
+
 ## Re-vendoring
 
 Upstream merged change 1 as `6fb49ae` (2026-09-12, "fix(rppairing): decode
 OPACK back-references"), copied from this file, so a re-vendor from a revision
 at or after it can take upstream's `opack.rs` — diff it against this one and
 keep the tests. Changes 2–4 are not upstream as of `master` @ `8970209`
-(2026-10-27) and have to be carried over. Change 2 matters most:
+(2026-10-27) and have to be carried over, as does change 5 while upstream's
+`tun-rs` requirement lets cargo pick a release that doesn't build. Change 2 matters most:
 `rust-core/src/logging.rs` holds idevice's DEBUG output back unless Verbose
 logging is on, but the switch exists for exactly the runs where it is.
 

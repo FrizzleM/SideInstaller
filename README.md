@@ -148,9 +148,10 @@ anyone can inspect exactly what it does.
 | :-- | :-- |
 | `ios-app/` | The SwiftUI app — UI, install engine, certificate handling, translations |
 | `ios-live-activity/` | The widget extension that draws the pairing code in the Dynamic Island and on the Lock Screen |
+| `ios-tests/` | The app's unit tests (`SideInstallerTests`) |
 | `rust-core/` | Rust core compiled into `SideInstallerFFI.xcframework` |
-| `scripts/` | Build and release scripts |
-| `.github/` | Workflows that build the unsigned IPA, publish it as a release and hand it to the signer |
+| `scripts/` | Build, check and release scripts |
+| `.github/` | Workflows that check pull requests, build the unsigned IPA, publish it as a release and hand it to the signer |
 
 Signed builds and the install page live in [FrizzleM/SideInstaller-Signed](https://github.com/FrizzleM/SideInstaller-Signed):
 it signs each release's IPA with every certificate, attaches the signed IPAs to a release of its own and
@@ -160,6 +161,12 @@ deploys [sideinstaller.net](https://sideinstaller.net/). No IPA is ever committe
 
 Issues and pull requests are welcome. If you're reporting a bug, please include your iOS version, the app
 version, and the step where it failed.
+
+Every pull request is checked by the `checks` workflow: the Rust tests and clippy, a simulator build with
+the app's unit tests, and the translations (a string added to the app needs an entry in each
+`ios-app/*Strings.swift`). The same checks run on a Mac with `scripts/test-rust.sh`,
+`scripts/check-ios.sh` (in a clean clone, since it generates the Xcode project) and
+`scripts/check_translations.py`.
 
 ## License
 

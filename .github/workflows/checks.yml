@@ -1,0 +1,203 @@
+name: checks
+
+# Checks every pull request, and every push to main, in three jobs that run
+# side by side:
+#
+#   rust          the Rust tests (scripts/test-rust.sh: rust-core's own, then
+#                 those of the crates vendored under rust-core/vendor/, such as
+#                 idevice's OPACK decoder and isideload's 2FA handling) and
+#                 clippy, with warnings as errors, on rust-core
+#   ios           the app built for the simulator and its unit tests
+#                 (scripts/check-ios.sh: SideInstallerTests, ios-tests/)
+#   translations  every string passed to L("…") against each language's table
+#                 (scripts/check_translations.py): a string left untranslated
+#                 by this change fails, as do a duplicate key (it stops the app)
+#                 and a translation whose %@ / %d differ from the English
+#
+# Each script runs the same on a Mac, so a failure can be reproduced locally;
+# scripts/check-ios.sh wants a clean clone or worktree, since it generates the
+# Xcode project.
+#
+# Pushes to main run it too: a direct push is checked like a pull request, and
+# the caches it saves are the ones pull requests start from (GitHub doesn't let
+# one pull request read another's).
+#
+# Nothing here signs, publishes or needs a secret, so pull requests from forks
+# run it as they are.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  # A newer push to a pull request replaces its run; main's runs all finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust tests and clippy
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      # No debug info or incremental files: the tests don't need them, and they
+      # would make the build folder (cached below) several times larger.
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup component add clippy
+          rustc --version
+          cargo clippy --version
+
+      # Only rust-core/Cargo.lock names the key, so a change to the code itself
+      # starts from the last build of the same dependencies.
+      - name: Restore the Rust build folder
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            rust-core/target
+          key: cargo-test-${{ runner.os }}-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: cargo-test-${{ runner.os }}-
+
+      - name: Tests
+        shell: bash
+        env:
+          # Stop when rust-core/Cargo.lock doesn't match Cargo.toml.
+          LOCKED: "1"
+        run: bash scripts/test-rust.sh
+
+      - name: Clippy
+        shell: bash
+        working-directory: rust-core
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+  ios:
+    name: Simulator build and Swift tests
+    # The code needs the iOS 27 SDK, which only the xcode-27 runner has for now
+    # (as in release-sideinstaller.yml).
+    runs-on: xcode-27
+    timeout-minutes: 60
+    env:
+      XCODE_VERSION: "27.1"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Select Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          app=""
+          for candidate in "/Applications/Xcode_${XCODE_VERSION}.app" /Applications/Xcode_"${XCODE_VERSION}"_*.app; do
+            if [[ -d "$candidate" ]]; then app="$candidate"; break; fi
+          done
+          if [[ -z "$app" ]]; then
+            app="$(xcode-select -p)"
+            app="${app%/Contents/Developer}"
+            echo "::warning::Xcode $XCODE_VERSION isn't on this runner; building with $app"
+            ls -d /Applications/Xcode*.app
+          fi
+          echo "DEVELOPER_DIR=$app/Contents/Developer" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$app/Contents/Developer" xcodebuild -version
+
+      - name: Install build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v xcodegen >/dev/null || brew install xcodegen
+          rustup target add aarch64-apple-ios-sim
+          echo "xcodegen $(xcodegen --version 2>/dev/null | tail -1)"
+          rustc --version
+
+      # The Rust library only changes with rust-core/, so it's kept between
+      # runs and the Rust build is skipped when nothing there moved. This has
+      # to come before the build-folder cache below, which puts rust-core/target
+      # in place and would end up in the hash.
+      - name: Restore the Rust library
+        id: ffi-cache
+        uses: actions/cache@v4
+        with:
+          path: SideInstallerFFI.xcframework
+          key: ffi-sim-${{ env.XCODE_VERSION }}-${{ hashFiles('rust-core/**', 'build-rust.sh') }}
+
+      - name: Restore the Rust build folder
+        if: steps.ffi-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            rust-core/target
+          key: cargo-sim-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: cargo-sim-
+
+      - name: Build for the simulator and run the Swift tests
+        shell: bash
+        env:
+          DERIVED_DATA: ${{ runner.temp }}/DerivedData
+          RESULT_BUNDLE: ${{ runner.temp }}/SideInstallerTests.xcresult
+        run: bash scripts/check-ios.sh
+
+      # Opens in Xcode (File › Open) with each test's failure and the logs.
+      - name: Keep the test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SideInstallerTests-xcresult
+          path: ${{ runner.temp }}/SideInstallerTests.xcresult
+          if-no-files-found: ignore
+          retention-days: 7
+
+  translations:
+    name: Translations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # A pull request is checked out as its merge into the base branch, whose
+      # first parent is the base branch: that's what it's compared with.
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Check the translations
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base=""
+          if [[ "$EVENT" == "pull_request" ]]; then
+            base="$(git rev-parse HEAD^1)"
+          elif [[ -n "$BEFORE" && ! "$BEFORE" =~ ^0+$ ]] &&
+               git fetch --no-tags --depth=1 origin "$BEFORE" 2>/dev/null; then
+            base="$BEFORE"
+          fi
+          if [[ -n "$base" ]]; then
+            python3 scripts/check_translations.py --base "$base"
+          else
+            echo "::notice::No earlier commit to compare with, so missing translations are listed, not failed."
+            python3 scripts/check_translations.py
+          fi

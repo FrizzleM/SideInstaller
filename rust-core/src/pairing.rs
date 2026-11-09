@@ -410,7 +410,7 @@ async fn within_limits<T>(
 /// "30 seconds", "5 minutes".
 fn spoken(d: Duration) -> String {
     let secs = d.as_secs();
-    let (n, unit) = if secs >= 60 && secs % 60 == 0 {
+    let (n, unit) = if secs >= 60 && secs.is_multiple_of(60) {
         (secs / 60, "minute")
     } else {
         (secs, "second")
