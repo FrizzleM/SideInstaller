@@ -1,3 +1,4 @@
+#[cfg(feature = "install")]
 pub mod device;
 #[cfg(feature = "fs-storage")]
 pub mod fs_storage;

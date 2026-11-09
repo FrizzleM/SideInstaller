@@ -698,6 +698,30 @@ Tests: `cargo test -p isideload --lib sideload::`
 `cargo test -p apple-codesign-quick --lib`
 (`signs_app_extensions_in_extensions`, which fails against 0.1.0).
 
+**15. `Cargo.toml`, `src/lib.rs`, `src/util/mod.rs`, `src/sideload/sideloader.rs`
+— build without idevice when `install` is off.**
+
+The `install` feature is meant to be what pulls in `idevice`
+(`install = ["dep:idevice"]`), but three uses sat outside it:
+`use idevice::IdeviceError` and the `SideloadError::IdeviceError` variant in
+`lib.rs`, the `util::device` module (lockdown-based `IdeviceInfo`), and the
+`IdeviceInfo` / `IdeviceProvider` imports in `sideloader.rs`. All of them only
+serve `install_app`, so they are now behind `#[cfg(feature = "install")]`, as
+`sideload::install` already was. `delete_app_after_install` is only read by
+`install_app` and gets an `allow(dead_code)` when it is off.
+
+Turning `install` off also showed that `serde`'s `derive` feature had only been
+reaching isideload through idevice, so `Cargo.toml` now asks for it.
+
+SideInstaller only calls `sign_app` and installs through idevice-ffi, so
+`rust-core/Cargo.toml` now leaves `install` off. Before, it had to turn it on,
+which compiled a second `idevice` (0.1.65 from crates.io) next to the patched
+git one for code that was never called. Checked with
+`cargo check --no-default-features --features fs-storage` and with
+`--features install,fs-storage` on this crate, and with
+`cargo tree -i idevice` on `rust-core` (one copy left). Upstream `main`
+(`326e562`) still has the same three ungated uses.
+
 Checked on the Mac (2026-11-01) with an IPA of that layout (arm64 binaries from
 the iOS 27.2 SDK), a self-signed test certificate and a CMS-signed profile, run
 through `Application::new`, `update_bundle_id` and `sign` as `sign_app` calls
@@ -733,7 +757,15 @@ Change 7 is upstream on `main` from `5992f00` (isideload 0.4.0), without the
 
 Upstream still looks for app extensions in `PlugIns/` only (`326e562`), so a
 re-vendor has to keep change 14, and the vendored apple-codesign-quick with it,
-or apps with an extension in `Extensions/` fail to install again.
+or apps with an extension in `Extensions/` fail to install again. An upstream
+pull request does the `bundle.rs` half of it: nab138/isideload#28 by
+LosFarmosCTL ("Load app extensions from both supported directories", open since
+2026-10-20). Its apple-codesign-quick counterpart, Dadoum/apple-crates#6, was
+closed because Dadoum fixed it in the Tangled repository instead; crates.io
+still has only 0.1.0 (checked 2026-11-09).
+
+A re-vendor has to keep change 15 too, unless upstream gates those uses itself,
+or `rust-core/Cargo.toml` has to turn `install` back on.
 
 Change 2 is upstream on the `apple-codesign-quick` branch at `f6a4d5d` (what
 iLoader 2.3.3 pins) but was not on `main` (`b6d1113`) as of 2026-09-13. A

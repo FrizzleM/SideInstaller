@@ -13,12 +13,15 @@ use crate::{
         cert_identity::CertificateIdentity,
         sign,
     },
-    util::{device::IdeviceInfo, storage::SideloadingStorage},
+    util::storage::SideloadingStorage,
 };
+#[cfg(feature = "install")]
+use crate::util::device::IdeviceInfo;
 
 use std::path::PathBuf;
 
 use futures_util::future::{try_join, try_join3, try_join_all};
+#[cfg(feature = "install")]
 use idevice::provider::IdeviceProvider;
 use rootcause::{option_ext::OptionExt, prelude::*};
 use tracing::{info, warn};
@@ -73,6 +76,8 @@ pub struct Sideloader {
     apple_email: String,
     max_certs_behavior: MaxCertsBehavior,
     //extensions_behavior: ExtensionsBehavior,
+    // Only `install_app` reads it.
+    #[cfg_attr(not(feature = "install"), allow(dead_code))]
     delete_app_after_install: bool,
     team: Option<DeveloperTeam>,
 }
