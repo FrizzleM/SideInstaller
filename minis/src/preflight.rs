@@ -17,6 +17,9 @@ use crate::{ui, Advertiser, Args, Command};
 
 /// What the checks found, for the steps after them.
 pub struct Ready {
+    /// Minis can advertise a pairing host, so siboot can pair here. Without it
+    /// (Minis's App Store build so far) the pairing comes from rootshell.
+    pub can_pair: bool,
     /// Notifications from Minis are allowed, so the pairing code can be shown
     /// over Settings.
     pub notifications: bool,
@@ -24,15 +27,44 @@ pub struct Ready {
     pub device_reachable: bool,
 }
 
+/// Where a pairing file made elsewhere (by `siboot-pair` in rootshell) turns
+/// up once copied into Files › Minis › shared: `/home` in Minis's builds so
+/// far, `/var/minis/shared` per its source.
+const SHARED_PAIRING: &[&str] = &[
+    "/home/rp_pairing_file.plist",
+    "/var/minis/shared/rp_pairing_file.plist",
+];
+
+/// The rootshell route, for when Minis can't pair.
+pub const ROOTSHELL_ROUTE: &str = "Pair with rootshell (App Store) first: turn on its Settings › \
+     Location Diary Mode › Session Only, then run in its local shell \
+     `curl -fsSLO https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/rootshell/bin/siboot-pair.wasm && ifconfig en0 | ./siboot-pair.wasm`. \
+     Once it has paired, leave it running and run siboot here again: it asks for the \
+     transfer code rootshell shows. (Or copy rp_pairing_file.plist from Files › rootshell \
+     into Files › Minis › shared, and run siboot again.)";
+
 pub async fn run(bridge: &Bridge, args: &Args) -> Result<Ready> {
     let mut ready = Ready {
+        can_pair: args.advertiser != Advertiser::Minis,
         notifications: false,
         device_reachable: false,
     };
 
+    import_shared_pairing(args);
     if args.advertiser == Advertiser::Minis {
-        check_bonjour(bridge).await?;
-        ready.notifications = check_notifications(bridge).await;
+        ready.can_pair = check_bonjour(bridge).await?;
+        if ready.can_pair {
+            ready.notifications = check_notifications(bridge).await;
+        } else if args.pairing_path().exists() {
+            ui::ok("siboot will use the pairing file made elsewhere, as this Minis can't pair");
+        } else if fetch_from_rootshell(&args.pairing_path()).await? {
+            ui::ok("siboot will use the pairing file from rootshell");
+        } else {
+            return Err(Fail::new(
+                format!("This Minis build can't pair the iPhone with itself (it has no minis-bonjour). {ROOTSHELL_ROUTE}"),
+                "no minis-bonjour, no pairing file",
+            ));
+        }
     }
 
     // Pairing and the tunnel stay on this iPhone; sign-in and the download don't.
@@ -63,23 +95,156 @@ pub async fn run(bridge: &Bridge, args: &Args) -> Result<Ready> {
     Ok(ready)
 }
 
-/// `minis-bonjour` is here and may advertise a pairable host.
-async fn check_bonjour(bridge: &Bridge) -> Result<()> {
-    let types = bridge.bonjour_types().await.map_err(|e| match e {
-        BridgeError::Missing(_) => Fail::new(
-            "This isn't Open Minis, or its build has no minis-bonjour command. Run siboot in \
-             Open Minis's terminal (Minis › Settings › Terminal), on its TestFlight build from late \
-             October 2026 or later.",
-            e.to_string(),
-        ),
-        other => Fail::new("Minis's Bonjour bridge didn't answer.", other.to_string()),
-    })?;
+/// Where rootshell's siboot-pair offers the pairing file once it has paired,
+/// on this iPhone's own loopback (rootshell/src/main.rs, `HANDOFF_PORT`).
+const HANDOFF_PORT: u16 = 61207;
+
+/// Take the pairing file siboot-pair is offering, if it is: the transfer code
+/// it shows proves the request comes from the person at the iPhone, not
+/// another app. False when nothing is offering one.
+async fn fetch_from_rootshell(path: &std::path::Path) -> Result<bool> {
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], HANDOFF_PORT));
+    let connect = || timeout(Duration::from_secs(2), TcpStream::connect(addr));
+    let Ok(Ok(mut stream)) = connect().await else {
+        return Ok(false);
+    };
+    ui::ok("rootshell is offering the pairing file it made");
+    for attempt in 1..=3 {
+        let Some(typed) = ui::ask("Transfer code shown in rootshell: ") else {
+            return Ok(false);
+        };
+        let code: String = typed.chars().filter(char::is_ascii_digit).collect();
+        if attempt > 1 {
+            stream = match connect().await {
+                Ok(Ok(s)) => s,
+                _ => {
+                    return Err(Fail::new(
+                        "rootshell stopped offering the pairing file.",
+                        "",
+                    ))
+                }
+            };
+        }
+        let raw =
+            |e: std::io::Error| Fail::new("The hand-over from rootshell broke off.", e.to_string());
+        stream
+            .write_all(format!("SIBOOT1 {code}\n").as_bytes())
+            .await
+            .map_err(raw)?;
+        let mut reader = BufReader::new(&mut stream);
+        let mut answer = String::new();
+        reader.read_line(&mut answer).await.map_err(raw)?;
+        if let Some(len) = answer
+            .trim()
+            .strip_prefix("OK ")
+            .and_then(|n| n.parse::<usize>().ok())
+        {
+            if len == 0 || len > 64 * 1024 {
+                return Err(Fail::new(
+                    "rootshell sent something that isn't a pairing file.",
+                    answer,
+                ));
+            }
+            let mut file = vec![0u8; len];
+            reader.read_exact(&mut file).await.map_err(raw)?;
+            if let Some(dir) = path.parent() {
+                std::fs::create_dir_all(dir)
+                    .map_err(|e| Fail::new("Couldn't save the pairing file.", e.to_string()))?;
+            }
+            std::fs::write(path, &file)
+                .map_err(|e| Fail::new("Couldn't save the pairing file.", e.to_string()))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+            }
+            ui::ok(&format!(
+                "took the pairing file from rootshell ({len} bytes)"
+            ));
+            return Ok(true);
+        }
+        ui::warn("That isn't the code rootshell shows.");
+    }
+    Err(Fail::new(
+        "The transfer code didn't match. Run siboot again and type the code rootshell shows.",
+        "",
+    ))
+}
+
+/// Copy a pairing file from Minis's shared folder into `~/.siboot`, when one
+/// is there and newer than the one siboot has (or siboot has none). Not when
+/// `--pairing-file` names one.
+fn import_shared_pairing(args: &Args) {
+    if args.pairing_file.is_some() {
+        return;
+    }
+    let target = args.pairing_path();
+    let modified = |p: &std::path::Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
+    let Some(source) = SHARED_PAIRING
+        .iter()
+        .map(std::path::Path::new)
+        .filter(|p| p.is_file())
+        .max_by_key(|p| modified(p))
+    else {
+        return;
+    };
+    if let (Some(have), Some(offered)) = (modified(&target), modified(source)) {
+        if have >= offered {
+            return;
+        }
+    }
+    let copied = std::fs::read(source).and_then(|bytes| {
+        if let Some(dir) = target.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        std::fs::write(&target, bytes)
+    });
+    match copied {
+        Ok(()) => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600));
+            }
+            ui::ok(&format!(
+                "took the pairing file from Minis › shared ({})",
+                source.display()
+            ));
+        }
+        Err(e) => ui::warn(&format!(
+            "couldn't take the pairing file from {}: {e}",
+            source.display()
+        )),
+    }
+}
+
+/// Whether `minis-bonjour` is here and may advertise a pairable host. False
+/// when the command is missing or can't use the type; siboot then needs a
+/// pairing file made elsewhere.
+async fn check_bonjour(bridge: &Bridge) -> Result<bool> {
+    let types = match bridge.bonjour_types().await {
+        Ok(types) => types,
+        Err(BridgeError::Missing(_)) => {
+            ui::info(
+                "this Minis build has no minis-bonjour, so it can't pair the iPhone with itself",
+            );
+            return Ok(false);
+        }
+        Err(other) => {
+            return Err(Fail::new(
+                "Minis's Bonjour bridge didn't answer.",
+                other.to_string(),
+            ))
+        }
+    };
     if !types.declares(PAIRABLE_HOST_TYPE) {
-        return Err(Fail::new(
-            "This Minis build doesn't declare _remotepairing-pairable-host._tcp, so iOS won't let it \
-             advertise a pairing host. Update Open Minis.",
-            format!("declared: {}", types.types.join(", ")),
-        ));
+        ui::info(
+            "this Minis build doesn't declare _remotepairing-pairable-host._tcp, so it can't pair",
+        );
+        ui::detail(&format!("declared: {}", types.types.join(", ")));
+        return Ok(false);
     }
     ui::ok("Minis may advertise a pairing host (_remotepairing-pairable-host._tcp is declared)");
     ui::detail(&format!(
@@ -115,7 +280,7 @@ async fn check_bonjour(bridge: &Bridge) -> Result<()> {
         }
         Err(e) => ui::detail(&format!("minis-bonjour list failed: {e}")),
     }
-    Ok(())
+    Ok(true)
 }
 
 /// Whether the pairing code can reach the user over Settings as a notification.
@@ -228,20 +393,24 @@ pub async fn probe(addr: SocketAddr) -> Result<Found> {
     let mut client = RemotePairingClient::new(RpPairingSocket::new(stream), "siboot");
     let reply = match timeout(Duration::from_secs(10), client.attempt_pair_verify()).await {
         Ok(Ok(reply)) => reply,
-        Ok(Err(e)) => return Err(Fail::new(
-            format!(
+        Ok(Err(e)) => {
+            return Err(Fail::new(
+                format!(
                 "Something at {addr} took the connection but didn't answer as an iPhone. Turn on \
                      Developer Mode (Settings › Privacy & Security › Developer Mode) and check \
                      LocalDevVPN is the VPN that's on."
             ),
-            chain(&e),
-        )),
-        Err(_) => return Err(Fail::new(
-            format!(
+                chain(&e),
+            ))
+        }
+        Err(_) => {
+            return Err(Fail::new(
+                format!(
                 "The iPhone took the connection at {addr} but never answered. Restart LocalDevVPN."
             ),
-            "handshake timed out after 10 s",
-        )),
+                "handshake timed out after 10 s",
+            ))
+        }
     };
     let wire_version = reply
         .as_dictionary()

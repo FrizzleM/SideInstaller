@@ -61,6 +61,28 @@ const MAX_ATTEMPTS: u32 = 3;
 /// Pair unless the saved pairing file still works, then check the result over
 /// LocalDevVPN when it's there.
 pub async fn ensure(bridge: &Bridge, args: &Args, ready: &Ready, path: &Path) -> Result<()> {
+    // Minis's App Store build can't advertise: the pairing was made elsewhere
+    // (rootshell's siboot-pair), and preflight made sure there is one.
+    if !ready.can_pair {
+        if !ready.device_reachable {
+            ui::info("the pairing file can't be checked without LocalDevVPN");
+            return Ok(());
+        }
+        return match tunnel::verify(args.device, path).await {
+            Ok(()) => {
+                ui::ok("this iPhone trusts the pairing file made with rootshell");
+                Ok(())
+            }
+            Err(f) => Err(Fail::new(
+                format!(
+                    "This iPhone doesn't accept the pairing file ({}). {}",
+                    f.advice,
+                    crate::preflight::ROOTSHELL_ROUTE
+                ),
+                f.raw,
+            )),
+        };
+    }
     if path.exists() && !args.repair {
         if ready.device_reachable {
             match tunnel::verify(args.device, path).await {

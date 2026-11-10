@@ -1,0 +1,39 @@
+[package]
+name = "siboot-pair"
+version = "0.1.0"
+edition = "2021"
+description = "siboot's pairing step for rootshell's WASM runtime: pairs the iPhone with itself from an App Store app"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "siboot-pair"
+path = "src/main.rs"
+
+# Its own workspace: builds for wasm32-wasip1 only.
+[workspace]
+
+[dependencies]
+futures = { version = "0.3", default-features = false, features = ["executor", "std"] }
+tokio = { version = "1", default-features = false, features = ["io-util"] }
+uuid = { version = "1", features = ["v4"] }
+hex = "0.4"
+
+# Only the pairing code: PairableHost and the pairing file. idevice's `wasm`
+# feature is meant for browsers (wasm32-unknown-unknown), but on WASI its
+# randomness shims fall back to WASI's own `random_get`, and none of its
+# timer or JS shims are linked: the module imports nothing but WASI and
+# `rootshell_socket`.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+idevice = { path = "../rust-core/vendor/idevice", default-features = false, features = ["remote_pairing", "wasm"] }
+
+# Host builds, for `cargo test`, need a TLS backend picked.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+idevice = { path = "../rust-core/vendor/idevice", default-features = false, features = ["remote_pairing", "ring"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

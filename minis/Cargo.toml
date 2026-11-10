@@ -2,7 +2,7 @@
 name = "siboot"
 # Continues the version line of ../ashell/siboot.py (0.10.0, the last a-Shell
 # build). ../ish-bootstrap was an earlier Rust line that stopped at 0.1.0.
-version = "0.11.1"
+version = "0.12.0"
 edition = "2021"
 description = "PC-free bootstrap that installs SideInstaller onto the iPhone it runs on, from Open Minis's Linux shell"
 license = "MIT"

@@ -73,6 +73,33 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 6. Wait while your selection installs.
 7. That's it. No PC and no extra steps required.
 
+### Without a certificate: from the iPhone itself
+
+No install page, no certificate, no computer: two free App Store apps put SideInstaller on the
+iPhone they run on, signed with your own Apple account. iOS 27 or later, Developer Mode on,
+Wi-Fi and LocalDevVPN connected.
+
+1. Install [rootshell](https://apps.apple.com/app/rootshell-local-terminal-ssh/id6755794662) and
+   [Open Minis](https://apps.apple.com/app/id6759188481) from the App Store.
+2. In rootshell, turn on **Settings › Location Diary Mode › Session Only**, then in its local shell run:
+
+   ```sh
+   curl -fsSLO https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/rootshell/bin/siboot-pair.wasm && ifconfig en0 | ./siboot-pair.wasm
+   ```
+
+   Open **Settings › Privacy & Security › Developer Mode**, scroll down, tap **Pair with siboot**,
+   and enter your passcode and the code rootshell shows. Leave rootshell running. (If it says it
+   found no address, run `./siboot-pair.wasm` followed by the IP address in **Settings › Wi-Fi › ⓘ**.)
+3. In Minis's terminal (**Minis › Settings › Terminal**), run:
+
+   ```sh
+   wget -qO- https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/minis/install.sh | sh
+   ```
+
+   Type the transfer code rootshell shows, then your Apple account email, password and code.
+
+How and why it works: [`minis/`](minis/) and [`rootshell/`](rootshell/).
+
 ### Links
 
 SideInstaller opens three kinds of `sideinstaller://` link, and asks before acting on any of them:
@@ -151,6 +178,8 @@ anyone can inspect exactly what it does.
 | `ios-tests/` | The app's unit tests (`SideInstallerTests`) |
 | `rust-core/` | Rust core compiled into `SideInstallerFFI.xcframework` |
 | `scripts/` | Build, check and release scripts |
+| `minis/` | siboot for Open Minis: installs SideInstaller from the iPhone it runs on, no computer |
+| `rootshell/` | siboot's pairing step for rootshell, so the iPhone pairs with itself from an App Store app |
 | `.github/` | Workflows that check pull requests, build the unsigned IPA, publish it as a release and hand it to the signer |
 
 Signed builds and the install page live in [FrizzleM/SideInstaller-Signed](https://github.com/FrizzleM/SideInstaller-Signed):

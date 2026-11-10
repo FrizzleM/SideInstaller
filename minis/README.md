@@ -13,6 +13,20 @@ with itself in Settings, signed in, installed SideInstaller and handed it the
 pairing, all from Minis. One device, one run so far; the rest is under
 [What's been tested](#whats-been-tested).
 
+## On Minis's App Store build
+
+Minis's App Store release (1.15, 2026-10-11) predates `minis-bonjour`, so it
+can't pair. From 0.12.0 siboot doesn't stop there: it runs the other six steps
+with a pairing file made by [`../rootshell`](../rootshell)'s `siboot-pair` in
+rootshell, another App Store app (it has Apple's multicast entitlement). It
+takes the file from rootshell over the iPhone's loopback, for the transfer
+code rootshell shows, or from Files › Minis › shared (`/home` or
+`/var/minis/shared` in the shell), into `~/.siboot`. So no step needs a
+TestFlight build. The shared-folder route worked end to end on an iPhone
+(2026-11-10); the loopback hand-off has only run off the iPhone.
+
+The whole route, for users, is in the top-level [README](../README.md#without-a-certificate-from-the-iphone-itself).
+
 ## Install
 
 In Open Minis's terminal (Minis › Settings › Terminal):
