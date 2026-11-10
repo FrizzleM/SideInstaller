@@ -1,5 +1,13 @@
 # siboot for a-Shell
 
+> **Moved on to Open Minis (2026-11-10): see [`../minis`](../minis).** Pairing the
+> iPhone with itself needs a Bonjour advertisement of
+> `_remotepairing-pairable-host._tcp`, and iOS only lets an app advertise the
+> types its Info.plist declares. a-Shell (and Terminus, a-Shell mini, iSH)
+> declares none; Open Minis declares this one and runs real aarch64 binaries,
+> so siboot there is Rust on SideInstaller's own crates. This build stays as
+> the record of how the route was found.
+
 A PC-free, certificate-free bootstrap for SideInstaller that runs on the iPhone
 it installs to — using [a-Shell](https://apps.apple.com/us/app/a-shell/id1473805438)
 from the App Store instead of iSH.
