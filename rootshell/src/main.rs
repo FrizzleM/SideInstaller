@@ -30,6 +30,8 @@ const HOST_MODEL: &str = "Mac17,7";
 /// Connections tried before giving up: a stray one, a mistyped code, the one that pairs.
 const MAX_ATTEMPTS: u32 = 3;
 const ALT_IRK_FILE: &str = "host_alt_irk";
+/// Where `ifconfig en0 > ifconfig.txt` leaves the address for us.
+const IFCONFIG_FILE: &str = "ifconfig.txt";
 const INSTALL: &str =
     "wget -qO- https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/minis/install.sh | sh";
 
@@ -46,10 +48,11 @@ fn usage() {
         "siboot-pair {VERSION} — pairs this iPhone with itself, from rootshell.
 
 USAGE
+    ifconfig en0 > ifconfig.txt     (then)     ./siboot-pair.wasm [options]
     ifconfig en0 | ./siboot-pair.wasm [options]
     ./siboot-pair.wasm <this iPhone's Wi-Fi IP address> [options]
 
-    It needs this iPhone's Wi-Fi address: piped from ifconfig, or as given
+    It needs this iPhone's Wi-Fi address: from ifconfig.txt, piped, or as given
     (Settings › Wi-Fi › ⓘ next to your network › IP Address).
     Before running it, turn on rootshell's Settings › Location Diary Mode ›
     Session Only, which keeps rootshell running while you're in Settings.
@@ -111,10 +114,21 @@ fn parse_args() -> Result<Option<Args>, String> {
                  Settings › Wi-Fi › ⓘ › IP Address",
             )?
         }
+        // `ifconfig en0 > ifconfig.txt`, for shells that won't pipe into WASM.
+        None if std::path::Path::new(IFCONFIG_FILE).exists() => {
+            let saved = std::fs::read_to_string(IFCONFIG_FILE)
+                .map_err(|e| format!("couldn't read {IFCONFIG_FILE}: {e}"))?;
+            wifi_address(&saved).ok_or(format!(
+                "no IPv4 address in {IFCONFIG_FILE}. Is Wi-Fi on? Run `ifconfig en0 > {IFCONFIG_FILE}` \
+                 again, or give the address: Settings › Wi-Fi › ⓘ › IP Address"
+            ))?
+        }
         None => {
-            return Err("give this iPhone's Wi-Fi address: run `ifconfig en0 | ./siboot-pair.wasm`, \
-                        or `./siboot-pair.wasm <address>` with the one in Settings › Wi-Fi › ⓘ"
-                .into())
+            return Err(format!(
+                "give this iPhone's Wi-Fi address: run `ifconfig en0 > {IFCONFIG_FILE}` and then \
+                 `./siboot-pair.wasm`, or `./siboot-pair.wasm <address>` with the one in \
+                 Settings › Wi-Fi › ⓘ"
+            ))
         }
     };
     Ok(Some(args))

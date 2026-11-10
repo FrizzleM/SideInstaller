@@ -37,8 +37,9 @@ const SHARED_PAIRING: &[&str] = &[
 
 /// The rootshell route, for when Minis can't pair.
 pub const ROOTSHELL_ROUTE: &str = "Pair with rootshell (App Store) first: turn on its Settings › \
-     Location Diary Mode › Session Only, then run in its local shell \
-     `curl -fsSLO https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/rootshell/bin/siboot-pair.wasm && ifconfig en0 | ./siboot-pair.wasm`. \
+     Location Diary Mode › Session Only, then run in its local shell, one line at a time: \
+     `curl -fsSLO https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/rootshell/bin/siboot-pair.wasm`, \
+     `ifconfig en0 > ifconfig.txt`, `./siboot-pair.wasm`. \
      Once it has paired, leave it running and run siboot here again: it asks for the \
      transfer code rootshell shows. (Or copy rp_pairing_file.plist from Files › rootshell \
      into Files › Minis › shared, and run siboot again.)";

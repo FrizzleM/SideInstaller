@@ -81,15 +81,19 @@ Wi-Fi and LocalDevVPN connected.
 
 1. Install [rootshell](https://apps.apple.com/app/rootshell-local-terminal-ssh/id6755794662) and
    [Open Minis](https://apps.apple.com/app/id6759188481) from the App Store.
-2. In rootshell, turn on **Settings › Location Diary Mode › Session Only**, then in its local shell run:
+2. In rootshell, turn on **Settings › Location Diary Mode › Session Only**, then in its local shell run, one line at a time:
 
    ```sh
-   curl -fsSLO https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/rootshell/bin/siboot-pair.wasm && ifconfig en0 | ./siboot-pair.wasm
+   curl -fsSLO https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/rootshell/bin/siboot-pair.wasm
+   ifconfig en0 > ifconfig.txt
+   ./siboot-pair.wasm
    ```
 
+   One line at a time: rootshell doesn't run the three joined with `&&`.
+
    Open **Settings › Privacy & Security › Developer Mode**, scroll down, tap **Pair with siboot**,
-   and enter your passcode and the code rootshell shows. Leave rootshell running. (If it says it
-   found no address, run `./siboot-pair.wasm` followed by the IP address in **Settings › Wi-Fi › ⓘ**.)
+   and enter your passcode and the code rootshell shows. Leave rootshell running. (If it finds no address,
+   run `./siboot-pair.wasm` followed by the IP address in **Settings › Wi-Fi › ⓘ**.)
 3. In Minis's terminal (**Minis › Settings › Terminal**), run:
 
    ```sh

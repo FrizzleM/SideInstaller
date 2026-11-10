@@ -9,9 +9,9 @@ SideInstaller installs with two App Store apps and no TestFlight build.
 
 **Status (2026-11-10): worked end to end on an iPhone** — paired in
 rootshell, then Minis's App Store build installed SideInstaller with the file.
-That run took the address as an argument and moved the file over the LAN; the
-`ifconfig` pipe and the hand-off to Minis below came after it and have only
-run off the iPhone. See [What's been tested](#whats-been-tested).
+That run took the address as an argument and moved the file over the LAN;
+reading it from `ifconfig` and the hand-off to Minis came after it and have
+only run off the iPhone. See [What's been tested](#whats-been-tested).
 
 ## Why rootshell
 
@@ -38,8 +38,8 @@ other), so the iPhone's should cache its own app's announcement for Settings.
 1. Builds the pairable host's records: PTR, SRV (port), TXT (the seven keys
    idevice's `PairableHostInfo` gives) and an A record for this iPhone's Wi-Fi
    address. The program can't find that out itself (rootshell's `getsockname`
-   always says 0.0.0.0), so it reads `ifconfig en0` piped into it
-   (rootshell has `ifconfig`), or takes it as an argument.
+   always says 0.0.0.0), so it reads the output of rootshell's `ifconfig en0`
+   from `ifconfig.txt` or a pipe, or takes it as an argument.
 2. Listens on a random port and sends the announcement three times, each on a
    fresh UDP socket, with a 75-minute TTL. It can't answer queries — the ABI
    has no poll and the program then blocks in `accept` — so Settings is
@@ -71,11 +71,15 @@ Network access, and Location Diary on as above.
 In rootshell's local shell:
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/rootshell/bin/siboot-pair.wasm && ifconfig en0 | ./siboot-pair.wasm
+curl -fsSLO https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/rootshell/bin/siboot-pair.wasm
+ifconfig en0 > ifconfig.txt
+./siboot-pair.wasm
 ```
 
-(or `./siboot-pair.wasm 192.168.1.20`, with the address in Settings › Wi-Fi ›
-ⓘ). Then Settings › Privacy & Security › Developer Mode, scroll down, **Pair
+one line at a time: rootshell's shell said `wasm: command not found` for
+`curl … && ifconfig en0 | ./siboot-pair.wasm` on one line. siboot-pair reads
+the address from `ifconfig.txt`, from a pipe, or as an argument
+(`./siboot-pair.wasm 192.168.1.20`, with the address in Settings › Wi-Fi › ⓘ). Then Settings › Privacy & Security › Developer Mode, scroll down, **Pair
 with siboot**, passcode, code. Leave rootshell running, and in Minis's
 terminal run siboot ([`../minis`](../minis)):
 
@@ -118,6 +122,7 @@ the module imports only `wasi_snapshot_preview1` and `rootshell_socket`.
   Mac, and inside Minis's emulator) for the transfer code it printed; a wrong
   code got another try. The file arrived byte for byte, mode 600.
 
-Not tested on the iPhone: the `ifconfig` pipe, the hand-off over the
+Not tested on the iPhone: `ifconfig en0 > ifconfig.txt` (a pipe into it failed
+there, on one line with `curl … &&`), the hand-off over the
 iPhone's loopback (two apps, rather than two processes on a Mac), and the
 OSC 777 notification.
