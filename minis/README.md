@@ -75,7 +75,11 @@ silent audio through pairing for the same reason.
 
 Minis has background audio, and `apple-player play` plays a file with the
 playback session category, so siboot writes 16 minutes of silence (8 kHz, 8-bit
-WAV, 7.7 MB) to `~/.siboot` and plays it until pairing ends. Minis's own
+WAV, 7.7 MB) to `~/.siboot` and plays it until pairing ends and you're back in
+Minis: the code is typed in Settings, so pairing ends with Minis behind it, and
+the rest of the run needs Minis awake (and its terminal), so siboot posts a
+"go back to Minis" notification and waits for `minis-bonjour list` to report
+Minis in front before closing the player. Minis's own
 Settings › Background › Enhanced Background does something similar, but only
 while an agent task runs, not for a command typed into its terminal.
 
@@ -123,8 +127,13 @@ binary that doesn't match.
   build with `minis-bonjour`, LocalDevVPN: `siboot check` passed, then `siboot`
   ran all seven steps. "Pair with siboot" showed in Settings with the silence
   playing, the code came as a notification, and SideInstaller was signed with a
-  free Apple Account, installed, and handed the pairing. This binary
-  (`bin/siboot-aarch64`, SHA-256 `85c8d112…`) is the one that ran.
+  free Apple Account, installed, and handed the pairing (0.11.0). On some runs
+  the terminal stopped updating right after "paired with …": pairing ends with
+  Minis still behind Settings, and 0.11.0 stopped the silence there, closing the
+  player while Minis was in the background and letting iOS suspend it. 0.11.1
+  keeps the silence playing, asks you back with a notification, and closes the
+  player only once Minis is in front again (`minis-bonjour list`); not yet run
+  on the iPhone.
 - **Pairing, end to end, in tests.** `src/fake_iphone.rs` plays the iPhone's
   side of device-initiated pair-setup (handshake, SRP M1–M6 with the PIN, its
   identity in M5) against idevice's real `PairableHost`, and checks the host's

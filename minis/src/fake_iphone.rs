@@ -345,18 +345,22 @@ fn opack_dict(entries: &[(&str, Opack)]) -> Vec<u8> {
 /// Stand-ins for Minis's commands, in `<home>/stub-bin`. Each logs its
 /// arguments to `<home>/minis-calls.log` and answers with the envelope
 /// bonjour.md describes. `advertise` reports the guest port as Minis's own:
-/// there is no app in between to forward.
+/// there is no app in between to forward. `list` reports Minis in the
+/// background while `<home>/minis-background` exists.
 pub fn minis_stub(home: &Path) -> PathBuf {
     let dir = home.join("stub-bin");
     std::fs::create_dir_all(&dir).unwrap();
     let log = home.join("minis-calls.log");
     let log = log.to_string_lossy();
+    let background = home.join("minis-background");
+    let background = background.to_string_lossy();
     let scripts = [
         (
             "minis-bonjour",
             r#"case "$1" in
 types) echo '{"ok":true,"tool":"minis-bonjour","action":"types","data":{"types":["_remotepairing-pairable-host._tcp","_http._tcp"],"source":"Info.plist NSBonjourServices","restricted":true}}' ;;
-list) echo '{"ok":true,"tool":"minis-bonjour","action":"list","data":{"advertisements":[],"forwards":[],"declared_types":["_remotepairing-pairable-host._tcp"],"app_in_background":false}}' ;;
+list) if [ -e "$BACKGROUND" ]; then bg=true; else bg=false; fi
+  echo '{"ok":true,"tool":"minis-bonjour","action":"list","data":{"advertisements":[],"forwards":[],"declared_types":["_remotepairing-pairable-host._tcp"],"app_in_background":'$bg'}}' ;;
 advertise) printf '{"ok":true,"tool":"minis-bonjour","action":"advertise","data":{"id":"adv-1","kind":"advertise","type":"%s","name":"%s","requested_name":"%s","guest_port":%s,"listener_port":%s,"state":"ready"}}\n' "$2" "$3" "$3" "$4" "$4" ;;
 stop) echo '{"ok":true,"tool":"minis-bonjour","action":"stop","data":{"stopped":["adv-1"],"count":1}}' ;;
 *) echo '{"ok":false,"tool":"minis-bonjour","action":"?","error":{"code":"invalid_args","message":"unknown command"}}'; exit 2 ;;
@@ -381,7 +385,9 @@ esac"#,
         let path = dir.join(name);
         std::fs::write(
             &path,
-            format!("#!/bin/sh\necho \"{name} $*\" >> '{log}'\n{body}\n"),
+            format!(
+                "#!/bin/sh\nBACKGROUND='{background}'\necho \"{name} $*\" >> '{log}'\n{body}\n"
+            ),
         )
         .unwrap();
         #[cfg(unix)]

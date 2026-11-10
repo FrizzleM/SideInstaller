@@ -332,6 +332,12 @@ pub async fn run_host(
     // outlive the listener behind it.
     published.stop().await;
     if let Some(k) = keepalive {
+        // Pairing ends the moment the code is typed, with Minis still behind
+        // Settings. Stopping the silence then lets iOS suspend Minis mid-step,
+        // and closes the player's sheet while Minis is in the background, after
+        // which its terminal can stop redrawing. So the silence plays on until
+        // the user is back in Minis.
+        wait_for_return(&setup).await;
         k.stop().await;
     }
 
@@ -340,6 +346,51 @@ pub async fn run_host(
         model: peer.model,
         udid: peer.remotepairing_udid,
     })
+}
+
+/// How long a paired run waits for the user to come back to Minis before
+/// carrying on regardless.
+const RETURN_WAIT: Duration = Duration::from_secs(10 * 60);
+
+/// Until Minis is in front again, as `minis-bonjour list` reports it, asking
+/// the user back with a notification. Returns at once if Minis is already in
+/// front, or if the bridge can't say.
+async fn wait_for_return(setup: &HostSetup) {
+    let in_background = |setup: &HostSetup| {
+        let bridge = setup.bridge.clone();
+        async move {
+            bridge
+                .bonjour_list()
+                .await
+                .map(|l| l.app_in_background)
+                .unwrap_or(false)
+        }
+    };
+    if !in_background(setup).await {
+        return;
+    }
+    ui::ok("paired — go back to Minis to carry on");
+    if setup.notify {
+        if let Err(e) = setup
+            .bridge
+            .notify(
+                "siboot paired this iPhone",
+                "Go back to Minis to finish installing SideInstaller.",
+            )
+            .await
+        {
+            tracing::warn!("couldn't post the paired notification: {e}");
+        }
+    }
+    let deadline = tokio::time::Instant::now() + RETURN_WAIT;
+    while tokio::time::Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        if !in_background(setup).await {
+            // Let Minis finish coming forward before its sheet is closed.
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            return;
+        }
+    }
 }
 
 fn pairing_failed(e: &idevice::IdeviceError) -> Fail {
@@ -726,6 +777,47 @@ mod tests {
                 .any(|l| l.starts_with("minis-bonjour stop adv-1")),
             "the advertisement wasn't withdrawn: {calls}"
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn the_silence_plays_until_the_user_is_back_in_minis() {
+        let home = temp_home("back");
+        let stub = fake_iphone::minis_stub(&home);
+        let marker = home.join("minis-background");
+        std::fs::write(&marker, b"").unwrap();
+        let out = home.join("rp_pairing_file.plist");
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (pin_tx, mut pin_rx) = mpsc::unbounded_channel();
+        let mut setup = test_setup(Bridge::in_dir(&stub), Advertiser::Minis, Some(pin_tx));
+        setup.keepalive_dir = Some(home.clone());
+        setup.notify = true;
+        let identity = Identity::load(&out, &home, "siboot test").await;
+        let host = run_host(listener, setup, identity, &out, &home);
+        let log = home.join("minis-calls.log");
+        let phone = async {
+            let paired = fake_iphone::pair(addr, async move { pin_rx.recv().await.unwrap() }).await;
+            // Still in Settings for a moment after typing the code.
+            tokio::time::sleep(Duration::from_millis(1500)).await;
+            let calls = std::fs::read_to_string(&log).unwrap();
+            assert!(
+                !calls.contains("apple-player stop"),
+                "the silence stopped with Minis in the background: {calls}"
+            );
+            std::fs::remove_file(&marker).unwrap();
+            paired
+        };
+        let (host, phone) = tokio::join!(host, phone);
+        host.expect("host paired");
+        phone.expect("phone paired");
+        let calls = std::fs::read_to_string(&log).unwrap();
+        let asked_back = calls
+            .find("--title siboot paired this iPhone")
+            .expect("asked back to Minis");
+        let stopped = calls
+            .find("apple-player stop")
+            .expect("the silence was stopped");
+        assert!(asked_back < stopped, "{calls}");
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
