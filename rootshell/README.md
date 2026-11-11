@@ -29,7 +29,9 @@ and in Open Minis's terminal run:
 wget -qO- https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/minis/install.sh | sh
 ```
 
-siboot asks for the transfer code siboot-pair shows, and takes the pairing file.
+The first time, siboot asks for the transfer code siboot-pair shows and takes
+the pairing file. After that it uses the file it saved and doesn't ask, so
+siboot-pair keeps offering until you close its tab.
 
 ## How it works
 
@@ -91,3 +93,4 @@ offer), the announcement's records and the address out of `ifconfig` output.
   only from `ifconfig.txt` (no pipe, no address argument), `--name` and `--out`
   are gone, and so is the Files app fallback. Its `.wasm` imports a subset of
   what 0.1.0's did. Tested with `cargo test` on a Mac; not yet run on an iPhone.
+- **0.2.1** only adds a line saying siboot may go ahead without asking.

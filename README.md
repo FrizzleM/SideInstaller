@@ -98,8 +98,9 @@ Wi-Fi, and LocalDevVPN connected.
    wget -qO- https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/minis/install.sh | sh
    ```
 
-   Type the transfer code rootshell shows, then your Apple account email, password and verification
-   code. Keep Minis open until it says it's done.
+   The first time, type the transfer code rootshell shows (after that, siboot uses the pairing file
+   it saved and doesn't ask). Then type your Apple account email, password and verification code.
+   Keep Minis open until it says it's done.
 4. The first time, trust your Apple account in **Settings › General › VPN & Device Management**, then
    open SideInstaller.
 

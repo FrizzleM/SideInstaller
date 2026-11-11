@@ -223,6 +223,8 @@ fn hand_off(pairing: &[u8]) -> Result<(), String> {
     println!("    {} {}", &code[..3], &code[3..]);
     println!();
     println!("Leave rootshell running until siboot has the file (Ctrl-C stops the offer).");
+    println!("siboot only asks when it has no pairing file that works yet. If it goes");
+    println!("ahead without asking, close this tab once Minis is done.");
     if offer(&listener, &code, pairing) {
         println!("OK siboot has the pairing file. You can close rootshell's tab.");
         Ok(())

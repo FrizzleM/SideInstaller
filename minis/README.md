@@ -15,7 +15,8 @@ connected, and siboot-pair in rootshell paired and still running
 wget -qO- https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/minis/install.sh | sh
 ```
 
-Type the transfer code rootshell shows, then your Apple Account email,
+The first time, type the transfer code rootshell shows; after that siboot uses
+the pairing file it saved and doesn't ask. Then type your Apple Account email,
 password and verification code. Keep Minis open until siboot says it's done:
 iOS pauses it in the background. The first time, trust your Apple Account in
 Settings › General › VPN & Device Management. Free accounts' apps last 7 days;
@@ -24,15 +25,14 @@ SideInstaller can renew itself from then on.
 [`install.sh`](install.sh) downloads [`bin/siboot-aarch64`](bin) from this
 repository, checks it against the SHA-256 the script carries, keeps it at
 `~/.siboot/bin/siboot` (and `/usr/local/bin/siboot`), and runs it. After that,
-`siboot` on its own runs it again without downloading, with the pairing file
-saved in `~/.siboot` while the iPhone still accepts it.
+`siboot` on its own runs it again without downloading.
 
 ## The steps
 
 | # | Step | How |
 |---|---|---|
 | 1 | Check | GitHub and Apple's sign-in server answer; the iPhone answers RPPairing on `10.7.0.1:49152` through LocalDevVPN |
-| 2 | Pairing | the file siboot-pair offers on `127.0.0.1:61207`, for its transfer code (or the one saved on an earlier run), pair-verified with the iPhone |
+| 2 | Pairing | the file saved in `~/.siboot` on an earlier run, while the iPhone accepts it; else the one siboot-pair offers on `127.0.0.1:61207`, for its transfer code (20 s for each answer), pair-verified with the iPhone |
 | 3 | Connect | pair-verify → `createListener` → TLS-PSK → CDTunnel → software TCP → RSD, as `tunnel_create_rppairing_multihost` does; lockdownd gives the UDID |
 | 4 | Apple ID | rust-core's `apple_session.rs`, compiled unchanged: saved token first, then GrandSlam + 2FA, Mac-ADI anisette servers in SideInstaller's Auto order |
 | 5 | Sign | the latest `SideInstaller.ipa` release, signed with isideload's `sign_app` (device registered, app group, no Increased Memory Limit), as Side by Side does |
@@ -70,7 +70,9 @@ against a stand-in for siboot-pair's side (the right code, a mistyped one, three
 wrong ones, something that isn't a pairing file, nothing offered), argument
 parsing, the bundle walk, 2FA answers, server order, the sign-in errors that
 stop it, install refusals, and rust-core's own `apple_session.rs` and
-`error_text.rs` tests. siboot-pair's own tests, with a fake iPhone, are in
+`error_text.rs` tests. A test also stands in for a rootshell that iOS has
+paused: the connection goes through and nothing answers. siboot-pair's own
+tests, with a fake iPhone, are in
 [`../rootshell`](../rootshell#tests).
 
 ## What's been tested
@@ -82,8 +84,14 @@ stop it, install refusals, and rust-core's own `apple_session.rs` and
   Minis (through `minis-bonjour`, which only Minis's TestFlight builds have),
   its silent-audio keep-alive and notifications, and the Files › Minis › shared
   import. Steps 3–7 are unchanged. Tested on macOS and Alpine aarch64 (29 tests;
-  `install.sh` installed it, skipped a current copy and refused a tampered one);
-  not yet run on an iPhone.
+  `install.sh` installed it, skipped a current copy and refused a tampered one).
+  On the iPhone it got stuck with rootshell offering: it took rootshell's offer
+  before the saved file, and rootshell showed no request.
+- **0.13.1** goes back to 0.12.0's order, the saved file first, and stops
+  waiting for rootshell's answer after 20 s. Tested the same way; not yet run on
+  an iPhone. The hand-off itself (two apps on one iPhone's loopback) hasn't
+  completed on an iPhone yet: the runs that worked there used a file moved over
+  the LAN or saved by an earlier run.
 
 Not tested yet: other iPhones and iOS versions, an Apple Account at its
 certificate or App ID limit (siboot then asks which certificate to revoke), and

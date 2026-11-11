@@ -5,9 +5,12 @@
 //! Security › Developer Mode lists as "Pair with …". Minis's App Store build
 //! can't advertise that; rootshell (App Store) can, so its siboot-pair
 //! (../rootshell) pairs and then offers the pairing file on this iPhone's own
-//! loopback, behind the 6-digit transfer code it shows. siboot takes it here,
-//! or reuses the one it saved on an earlier run, and checks that the iPhone
-//! accepts it before signing anything.
+//! loopback, behind the 6-digit transfer code it shows.
+//!
+//! The file siboot saved on an earlier run comes first, while the iPhone
+//! accepts it: siboot-pair keeps its host identity, so pairing again there
+//! doesn't change it, and rootshell's offer is only needed the first time.
+//! Either way the iPhone has to accept the file before anything is signed.
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -27,6 +30,9 @@ const HANDOFF_PORT: u16 = 61207;
 const CODE_TRIES: u32 = 3;
 /// Far larger than a pairing file, which is about 1 KB.
 const MAX_FILE: usize = 64 * 1024;
+/// How long siboot-pair may take to answer a code. It answers at once while
+/// rootshell runs, so silence means iOS has paused it.
+const ANSWER_WAIT: Duration = Duration::from_secs(20);
 
 /// How to make the pairing, for when there's none to take.
 pub const ROOTSHELL_ROUTE: &str = "Pair in rootshell (App Store) first: turn on its Settings › \
@@ -36,28 +42,79 @@ pub const ROOTSHELL_ROUTE: &str = "Pair in rootshell (App Store) first: turn on 
      and run siboot here again: it asks for the transfer code rootshell shows.";
 
 pub async fn ensure(args: &Args, path: &Path) -> Result<()> {
+    let mut saved_refused = None;
+    if path.exists() {
+        match tunnel::verify(args.device, path).await {
+            Ok(()) => {
+                ui::ok("this iPhone accepts the pairing file saved on an earlier run");
+                return Ok(());
+            }
+            Err(f) => {
+                ui::info("this iPhone doesn't accept the saved pairing file; taking the one from rootshell");
+                ui::detail(&f.raw);
+                saved_refused = Some(f);
+            }
+        }
+    }
     let offer = SocketAddr::from(([127, 0, 0, 1], HANDOFF_PORT));
-    let what = if take(offer, path, || ui::ask("Transfer code shown in rootshell: ")).await? {
-        "the pairing file from rootshell"
-    } else if path.exists() {
-        ui::detail(&format!("rootshell isn't offering a file; using {}", path.display()));
-        "the pairing file saved on an earlier run"
-    } else {
-        return Err(Fail::new(
-            format!("rootshell isn't offering a pairing file. {ROOTSHELL_ROUTE}"),
-            format!("nothing answered on {offer}, and there's no {}", path.display()),
-        ));
-    };
+    let ask = || ui::ask("Transfer code shown in rootshell: ");
+    if !take(offer, path, ask, ANSWER_WAIT).await? {
+        return Err(saved_refused.unwrap_or_else(|| {
+            Fail::new(
+                format!("rootshell isn't offering a pairing file. {ROOTSHELL_ROUTE}"),
+                format!("nothing answered on {offer}, and there's no {}", path.display()),
+            )
+        }));
+    }
     tunnel::verify(args.device, path).await?;
-    ui::ok(&format!("this iPhone accepts {what}"));
+    ui::ok("this iPhone accepts the pairing file from rootshell");
     Ok(())
+}
+
+/// siboot-pair's answer to one code.
+enum Reply {
+    File(Vec<u8>),
+    WrongCode,
+    Unexpected(String),
+}
+
+/// Send one code on `stream` and read siboot-pair's answer: `NO`, or
+/// `OK <length>` and the file.
+async fn exchange(stream: &mut TcpStream, code: &str) -> std::io::Result<Reply> {
+    stream.write_all(format!("SIBOOT1 {code}\n").as_bytes()).await?;
+    let mut reader = BufReader::new(stream);
+    let mut answer = String::new();
+    if reader.read_line(&mut answer).await? == 0 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "rootshell closed the connection without answering",
+        ));
+    }
+    let answer = answer.trim();
+    if answer == "NO" {
+        return Ok(Reply::WrongCode);
+    }
+    let Some(len) = answer.strip_prefix("OK ").and_then(|n| n.parse::<usize>().ok()) else {
+        return Ok(Reply::Unexpected(answer.to_string()));
+    };
+    if len == 0 || len > MAX_FILE {
+        return Ok(Reply::Unexpected(answer.to_string()));
+    }
+    let mut file = vec![0u8; len];
+    reader.read_exact(&mut file).await?;
+    Ok(Reply::File(file))
 }
 
 /// Take the pairing file siboot-pair is offering at `offer`, for the transfer
 /// code it shows, into `path`. The code proves the request comes from the
 /// person at the iPhone, not another app. False when nothing is offering one,
-/// or no code was typed.
-async fn take(offer: SocketAddr, path: &Path, mut ask: impl FnMut() -> Option<String>) -> Result<bool> {
+/// or no code was typed. Each answer may take up to `wait`.
+async fn take(
+    offer: SocketAddr,
+    path: &Path,
+    mut ask: impl FnMut() -> Option<String>,
+    wait: Duration,
+) -> Result<bool> {
     let connect = || timeout(Duration::from_secs(2), TcpStream::connect(offer));
     let Ok(Ok(mut stream)) = connect().await else {
         return Ok(false);
@@ -81,29 +138,37 @@ async fn take(offer: SocketAddr, path: &Path, mut ask: impl FnMut() -> Option<St
                 }
             };
         }
-        let broke = |e: std::io::Error| Fail::new("The hand-over from rootshell broke off.", e.to_string());
-        stream
-            .write_all(format!("SIBOOT1 {code}\n").as_bytes())
-            .await
-            .map_err(broke)?;
-        let mut reader = BufReader::new(&mut stream);
-        let mut answer = String::new();
-        reader.read_line(&mut answer).await.map_err(broke)?;
-        if let Some(len) = answer.trim().strip_prefix("OK ").and_then(|n| n.parse::<usize>().ok()) {
-            if len == 0 || len > MAX_FILE {
-                return Err(Fail::new("rootshell sent something that isn't a pairing file.", answer));
+        let file = match timeout(wait, exchange(&mut stream, &code)).await {
+            Err(_) => {
+                return Err(Fail::new(
+                    "rootshell didn't answer: iOS has probably paused it. Check its Settings › \
+                     Location Diary Mode is on Session Only, open rootshell for a moment, then \
+                     come back here and run siboot again.",
+                    format!("no answer on {offer} within {} s", wait.as_secs()),
+                ))
             }
-            let mut file = vec![0u8; len];
-            reader.read_exact(&mut file).await.map_err(broke)?;
-            // Checked before it replaces a file that may still work.
-            if let Err(e) = RpPairingFile::from_bytes(&file) {
-                return Err(Fail::new("rootshell sent something that isn't a pairing file.", e.to_string()));
+            Ok(Err(e)) => {
+                return Err(Fail::new(
+                    "The hand-over from rootshell broke off. Run siboot again.",
+                    e.to_string(),
+                ))
             }
-            save(path, &file)?;
-            ui::ok(&format!("took the pairing file from rootshell ({len} bytes)"));
-            return Ok(true);
+            Ok(Ok(Reply::Unexpected(answer))) => {
+                return Err(Fail::new("rootshell sent something that isn't a pairing file.", answer))
+            }
+            Ok(Ok(Reply::WrongCode)) => {
+                ui::warn("That isn't the code rootshell shows.");
+                continue;
+            }
+            Ok(Ok(Reply::File(file))) => file,
+        };
+        // Checked before it replaces a file that may still work.
+        if let Err(e) = RpPairingFile::from_bytes(&file) {
+            return Err(Fail::new("rootshell sent something that isn't a pairing file.", e.to_string()));
         }
-        ui::warn("That isn't the code rootshell shows.");
+        save(path, &file)?;
+        ui::ok(&format!("took the pairing file from rootshell ({} bytes)", file.len()));
+        return Ok(true);
     }
     Err(Fail::new(
         "The transfer code didn't match. Run siboot again and type the code rootshell shows.",
@@ -131,6 +196,8 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
     use tokio::net::TcpListener;
+
+    const QUICK: Duration = Duration::from_secs(5);
 
     fn temp_home(tag: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("siboot-test-{tag}-{}", std::process::id()));
@@ -175,7 +242,7 @@ mod tests {
         let path = home.join("rp_pairing_file.plist");
         let file = a_pairing_file();
         let offer = rootshell_offering("481516", file.clone()).await;
-        assert!(take(offer, &path, typing(&["481 516"])).await.unwrap());
+        assert!(take(offer, &path, typing(&["481 516"]), QUICK).await.unwrap());
         assert_eq!(std::fs::read(&path).unwrap(), file);
         #[cfg(unix)]
         {
@@ -189,7 +256,7 @@ mod tests {
         let home = temp_home("retry");
         let path = home.join("rp_pairing_file.plist");
         let offer = rootshell_offering("481516", a_pairing_file()).await;
-        assert!(take(offer, &path, typing(&["481517", "481516"])).await.unwrap());
+        assert!(take(offer, &path, typing(&["481517", "481516"]), QUICK).await.unwrap());
         assert!(path.exists());
     }
 
@@ -199,7 +266,7 @@ mod tests {
         let path = home.join("rp_pairing_file.plist");
         std::fs::write(&path, b"the old file").unwrap();
         let offer = rootshell_offering("481516", a_pairing_file()).await;
-        let failure = take(offer, &path, typing(&["1", "2", "3"])).await.err().unwrap();
+        let failure = take(offer, &path, typing(&["1", "2", "3"]), QUICK).await.err().unwrap();
         assert!(failure.advice.contains("didn't match"), "{}", failure.advice);
         assert_eq!(std::fs::read(&path).unwrap(), b"the old file");
     }
@@ -209,9 +276,33 @@ mod tests {
         let home = temp_home("junk");
         let path = home.join("rp_pairing_file.plist");
         let offer = rootshell_offering("481516", b"not a plist".to_vec()).await;
-        let failure = take(offer, &path, typing(&["481516"])).await.err().unwrap();
+        let failure = take(offer, &path, typing(&["481516"]), QUICK).await.err().unwrap();
         assert!(failure.advice.contains("isn't a pairing file"), "{}", failure.advice);
         assert!(!path.exists());
+    }
+
+    /// What siboot met on the iPhone with rootshell in the background: the
+    /// connection goes through, and then nothing answers.
+    #[tokio::test]
+    async fn a_rootshell_that_never_answers_is_given_up_on() {
+        let home = temp_home("silent");
+        let path = home.join("rp_pairing_file.plist");
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let offer = listener.local_addr().unwrap();
+        let held = tokio::spawn(async move {
+            let (conn, _) = listener.accept().await.unwrap();
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            drop(conn);
+        });
+        let started = std::time::Instant::now();
+        let failure = take(offer, &path, typing(&["481516"]), Duration::from_millis(300))
+            .await
+            .err()
+            .expect("a silent rootshell should end the wait");
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert!(failure.advice.contains("didn't answer"), "{}", failure.advice);
+        assert!(!path.exists());
+        held.abort();
     }
 
     #[tokio::test]
@@ -222,7 +313,7 @@ mod tests {
             let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             listener.local_addr().unwrap()
         };
-        assert!(!take(closed, &path, typing(&[])).await.unwrap());
+        assert!(!take(closed, &path, typing(&[]), QUICK).await.unwrap());
         assert!(!path.exists());
     }
 }
