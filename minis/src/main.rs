@@ -3,14 +3,12 @@
 //!
 //! Open Minis (App Store) runs Alpine Linux on an ARM64 build of iSH, so this is
 //! an ordinary static aarch64 Linux binary built on the same vendored idevice
-//! and isideload as SideInstaller. What no Linux program can do on iOS is
-//! advertise over Bonjour. Minis's `minis-bonjour` does that for it, from the
-//! app, and Minis declares `_remotepairing-pairable-host._tcp`: the type iOS 27's
-//! Settings › Developer Mode lists hosts by. That lets this iPhone pair with
-//! itself here, which a-Shell, Terminus and iSH can't (see README.md).
+//! and isideload as SideInstaller. The pairing comes from rootshell, another
+//! App Store app: its siboot-pair (../rootshell) pairs this iPhone with itself
+//! and hands the file over on the iPhone's loopback (see README.md).
 //!
-//! The steps keep the numbering of ../ashell and ../ish-bootstrap:
-//! 1 check · 2 pair · 3 connect · 4 Apple ID · 5 sign · 6 install · 7 hand over.
+//! The steps:
+//! 1 check · 2 pairing · 3 connect · 4 Apple ID · 5 sign · 6 install · 7 hand over.
 //!
 //! The Apple ID password goes only to Apple (as an SRP proof, via isideload) and
 //! is never written to disk or logged. Like SideInstaller, the developer token
@@ -18,10 +16,8 @@
 //! sign in again.
 
 mod account;
-mod bridge;
 mod fail;
 mod install;
-mod keepalive;
 mod pairing;
 mod preflight;
 mod seed;
@@ -38,9 +34,6 @@ mod apple_session;
 #[allow(dead_code)]
 #[path = "../../rust-core/src/error_text.rs"]
 mod error_text;
-
-#[cfg(test)]
-mod fake_iphone;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
@@ -66,21 +59,8 @@ pub enum Command {
     All,
     /// Step 1 only.
     Check,
-    /// Steps 1-2: leave a pairing file and stop.
-    Pair,
-    /// Steps 1-3 with the saved pairing file: prove the tunnel works.
+    /// Steps 1-3: take the pairing and prove the tunnel works with it.
     Connect,
-}
-
-/// How the pairing host is advertised.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Advertiser {
-    /// `minis-bonjour advertise`, from inside Open Minis.
-    Minis,
-    /// `dns-sd -R`, for running on a Mac on the iPhone's Wi-Fi (testing).
-    DnsSd,
-    /// Print the record and advertise nothing (tests, or advertising by hand).
-    None,
 }
 
 pub struct Args {
@@ -93,12 +73,6 @@ pub struct Args {
     pub apple_id: Option<String>,
     pub ipa: Option<String>,
     pub anisette: Option<String>,
-    pub advertiser: Advertiser,
-    pub keepalive: bool,
-    /// The name Settings shows: "Pair with <name>".
-    pub host_name: String,
-    /// Pair again even when the saved pairing file still works.
-    pub repair: bool,
 }
 
 impl Args {
@@ -130,10 +104,6 @@ fn parse_args(argv: impl IntoIterator<Item = String>) -> std::result::Result<Par
         apple_id: None,
         ipa: None,
         anisette: None,
-        advertiser: Advertiser::Minis,
-        keepalive: true,
-        host_name: "siboot".into(),
-        repair: false,
     };
     let mut argv = argv.into_iter();
     let mut command_seen = false;
@@ -160,30 +130,12 @@ fn parse_args(argv: impl IntoIterator<Item = String>) -> std::result::Result<Par
             "--apple-id" => args.apple_id = Some(value("--apple-id")?),
             "--ipa" => args.ipa = Some(value("--ipa")?),
             "--anisette" => args.anisette = Some(value("--anisette")?),
-            "--name" => args.host_name = value("--name")?,
-            "--advertiser" => {
-                args.advertiser = match value("--advertiser")?.as_str() {
-                    "minis" => Advertiser::Minis,
-                    "dns-sd" => Advertiser::DnsSd,
-                    "none" => Advertiser::None,
-                    other => return Err(format!("unknown advertiser `{other}` (minis, dns-sd, none)")),
-                }
-            }
-            "--no-keepalive" => args.keepalive = false,
-            "--repair" => args.repair = true,
-            "check" | "pair" | "connect" if !command_seen => {
+            "check" | "connect" if !command_seen => {
                 command_seen = true;
-                args.command = match arg.as_str() {
-                    "check" => Command::Check,
-                    "pair" => Command::Pair,
-                    _ => Command::Connect,
-                };
+                args.command = if arg == "check" { Command::Check } else { Command::Connect };
             }
             other => return Err(format!("unrecognised argument `{other}`")),
         }
-    }
-    if args.host_name.trim().is_empty() {
-        return Err("--name can't be empty".into());
     }
     Ok(Parsed::Run(args))
 }
@@ -194,16 +146,16 @@ fn usage() {
 siboot {VERSION} — installs SideInstaller onto this iPhone, from Open Minis.
 
 USAGE
-    siboot [check | pair | connect] [options]
+    siboot [check | connect] [options]
 
-    With no command, every step runs: check, pair this iPhone with itself,
+    First pair in rootshell (App Store) with siboot-pair and leave it running.
+    With no command, every step runs: check, take the pairing from rootshell,
     connect, sign in to your Apple Account, sign SideInstaller, install it,
     and hand it the pairing.
 
 COMMANDS
-    check       Only check that Minis, LocalDevVPN and this iPhone are ready.
-    pair        Check, then pair this iPhone with itself and save the file.
-    connect     Check, then open the tunnel with the saved pairing file.
+    check       Only check that LocalDevVPN, this iPhone and the internet are ready.
+    connect     Check, take the pairing, and only open the tunnel with it.
 
 OPTIONS
     --apple-id EMAIL    Apple Account to sign with (else SIBOOT_APPLE_ID, else
@@ -215,19 +167,12 @@ OPTIONS
     --port N            The iPhone's RPPairing port (default {port}).
     --pairing-file PATH Default ~/.siboot/rp_pairing_file.plist.
     --home DIR          Where siboot keeps its files (default ~/.siboot).
-    --name NAME         The host name Settings shows (default siboot).
-    --repair            Pair again even if the saved pairing file works.
-    --advertiser KIND   minis (default), dns-sd (a Mac on the iPhone's Wi-Fi,
-                        for testing) or none.
-    --no-keepalive      Don't play silence while pairing. Without it iOS may
-                        suspend Minis while you're in Settings.
     -v, --verbose       Show the underlying protocol and library errors.
     -h, --help          Show this message.
 
 NEEDS
-    Open Minis with the minis-bonjour command (its TestFlight build from late
-    October 2026 on), Wi-Fi, Developer Mode on, iOS 27 or later, and
-    LocalDevVPN (App Store) connected.",
+    iOS 27 or later, Developer Mode on, Wi-Fi, LocalDevVPN (App Store)
+    connected, and the pairing from siboot-pair in rootshell.",
         ip = DEFAULT_DEVICE_IP,
         port = DEFAULT_RP_PORT,
     );
@@ -256,7 +201,7 @@ fn main() -> ExitCode {
 
     ui::set_verbose(args.verbose);
     init_logging(args.verbose);
-    ui::banner(VERSION, args.advertiser);
+    ui::banner(VERSION);
 
     // Two workers: the software TCP stack inside the tunnel keeps moving while
     // a foreground task waits on it, and threads are cheap next to emulation.
@@ -278,8 +223,6 @@ fn main() -> ExitCode {
             _ = tokio::signal::ctrl_c() => Err(Fail::new("Stopped with Ctrl-C.", "SIGINT")),
         }
     });
-    // Whatever was advertised or playing is stopped by its guard as the
-    // pipeline's future is dropped, before this point.
     match outcome {
         Ok(()) => ExitCode::SUCCESS,
         Err(f) => {
@@ -312,24 +255,18 @@ fn init_logging(verbose: bool) {
 async fn pipeline(args: &Args) -> Result<()> {
     std::fs::create_dir_all(&args.home)
         .map_err(|e| Fail::new(format!("Couldn't create {}.", args.home.display()), e.to_string()))?;
-    let bridge = bridge::Bridge::from_env();
 
-    ui::stage(1, STAGES, "Checking Minis, LocalDevVPN and this iPhone");
-    let ready = preflight::run(&bridge, args).await?;
+    ui::stage(1, STAGES, "Checking LocalDevVPN, this iPhone and the internet");
+    preflight::run(args).await?;
     if args.command == Command::Check {
         println!();
         ui::ok("ready — run `siboot` to install SideInstaller");
         return Ok(());
     }
 
-    ui::stage(2, STAGES, "Pairing this iPhone with itself");
+    ui::stage(2, STAGES, "Taking the pairing from rootshell");
     let pairing_path = args.pairing_path();
-    pairing::ensure(&bridge, args, &ready, &pairing_path).await?;
-    if args.command == Command::Pair {
-        println!();
-        ui::ok(&format!("pairing file saved at {}", pairing_path.display()));
-        return Ok(());
-    }
+    pairing::ensure(args, &pairing_path).await?;
 
     ui::stage(3, STAGES, "Connecting to this iPhone through LocalDevVPN");
     let device = {
@@ -388,23 +325,21 @@ mod tests {
         let args = parse("");
         assert_eq!(args.command, Command::All);
         assert_eq!(args.device.to_string(), "10.7.0.1:49152");
-        assert_eq!(args.advertiser, Advertiser::Minis);
-        assert!(args.keepalive);
         assert!(args.pairing_path().ends_with(".siboot/rp_pairing_file.plist"));
     }
 
     #[test]
     fn commands_and_options_parse() {
-        let args = parse("pair --advertiser dns-sd --device-ip 192.168.1.20 --port 50000 --no-keepalive -v");
-        assert_eq!(args.command, Command::Pair);
-        assert_eq!(args.advertiser, Advertiser::DnsSd);
+        let args = parse("connect --device-ip 192.168.1.20 --port 50000 -v");
+        assert_eq!(args.command, Command::Connect);
         assert_eq!(args.device.to_string(), "192.168.1.20:50000");
-        assert!(!args.keepalive && args.verbose);
+        assert!(args.verbose);
+        assert_eq!(parse("check").command, Command::Check);
     }
 
     #[test]
     fn bad_input_is_refused() {
-        for line in ["--device-ip", "--device-ip nope", "--advertiser avahi", "pair connect", "--name"] {
+        for line in ["--device-ip", "--device-ip nope", "pair", "check connect", "--repair", "--advertiser minis"] {
             assert!(parse_args(line.split_whitespace().map(String::from)).is_err(), "{line}");
         }
     }

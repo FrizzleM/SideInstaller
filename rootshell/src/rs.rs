@@ -35,31 +35,163 @@ unsafe extern "C" {
     fn rootshell_socket_close(fd: i32) -> i32;
 }
 
-#[cfg(target_arch = "wasm32")]
-#[link(wasm_import_module = "rootshell_terminal")]
-unsafe extern "C" {
-    fn rootshell_terminal_is_tty(fd: i32) -> i32;
-}
-
-/// Whether `fd` (0, 1 or 2) is rootshell's terminal rather than a pipe.
-pub fn is_tty(fd: i32) -> bool {
-    unsafe { rootshell_terminal_is_tty(fd) == 1 }
-}
-
-// Off WASM there is no rootshell: every call fails, so the program still
-// builds and its pure parts test on the host.
+// Off WASM there is no rootshell. For `cargo test` the same calls run on the
+// host's own sockets: TCP on loopback only, and datagrams counted as sent and
+// dropped, so a test never announces "Pair with …" to iPhones on the network.
 #[cfg(not(target_arch = "wasm32"))]
 mod host {
-    const ENOSYS: i32 = 52;
-    pub unsafe fn rootshell_terminal_is_tty(_: i32) -> i32 { 1 }
-    pub unsafe fn rootshell_socket_socket(_: i32, _: i32, _: *mut i32) -> i32 { ENOSYS }
-    pub unsafe fn rootshell_socket_bind(_: i32, _: *const u8, _: i32) -> i32 { ENOSYS }
-    pub unsafe fn rootshell_socket_listen(_: i32, _: i32) -> i32 { ENOSYS }
-    pub unsafe fn rootshell_socket_accept(_: i32, _: *mut i32) -> i32 { ENOSYS }
-    pub unsafe fn rootshell_socket_send(_: i32, _: *const u8, _: i32, _: *mut u32) -> i32 { ENOSYS }
-    pub unsafe fn rootshell_socket_recv(_: i32, _: *mut u8, _: i32, _: *mut u32) -> i32 { ENOSYS }
-    pub unsafe fn rootshell_socket_sendto(_: i32, _: *const u8, _: i32, _: *const u8, _: i32, _: *mut u32) -> i32 { ENOSYS }
-    pub unsafe fn rootshell_socket_close(_: i32) -> i32 { ENOSYS }
+    use std::collections::HashMap;
+    use std::io::{Read, Write};
+    use std::net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream};
+    use std::sync::atomic::{AtomicI32, Ordering};
+    use std::sync::{Mutex, OnceLock};
+
+    const EADDRINUSE: i32 = 1;
+    const EBADF: i32 = 8;
+    const EINVAL: i32 = 28;
+    const EIO: i32 = 29;
+
+    enum Entry {
+        /// A TCP socket and the port it was bound to (0 until then).
+        Unbound(u16),
+        Listener(TcpListener),
+        Stream(TcpStream),
+        Datagram,
+    }
+
+    fn table() -> &'static Mutex<HashMap<i32, Entry>> {
+        static TABLE: OnceLock<Mutex<HashMap<i32, Entry>>> = OnceLock::new();
+        TABLE.get_or_init(Default::default)
+    }
+
+    fn insert(entry: Entry) -> i32 {
+        static NEXT: AtomicI32 = AtomicI32::new(3);
+        let fd = NEXT.fetch_add(1, Ordering::Relaxed);
+        table().lock().unwrap().insert(fd, entry);
+        fd
+    }
+
+    fn errno(e: &std::io::Error) -> i32 {
+        if e.kind() == std::io::ErrorKind::AddrInUse {
+            EADDRINUSE
+        } else {
+            EIO
+        }
+    }
+
+    /// A handle to the connection, so blocking I/O doesn't hold the table.
+    fn stream(fd: i32) -> Result<TcpStream, i32> {
+        match table().lock().unwrap().get(&fd) {
+            Some(Entry::Stream(s)) => s.try_clone().map_err(|e| errno(&e)),
+            _ => Err(EBADF),
+        }
+    }
+
+    /// The port a listener got: tests listen on port 0.
+    #[cfg(test)]
+    pub fn local_port(fd: i32) -> u16 {
+        match table().lock().unwrap().get(&fd) {
+            Some(Entry::Listener(l)) => l.local_addr().map(|a| a.port()).unwrap_or(0),
+            _ => 0,
+        }
+    }
+
+    pub unsafe fn rootshell_socket_socket(_domain: i32, kind: i32, fd_out: *mut i32) -> i32 {
+        let entry = if kind == super::SOCK_STREAM { Entry::Unbound(0) } else { Entry::Datagram };
+        unsafe { *fd_out = insert(entry) };
+        0
+    }
+
+    pub unsafe fn rootshell_socket_bind(fd: i32, addr: *const u8, addrlen: i32) -> i32 {
+        if addrlen < 4 {
+            return EINVAL;
+        }
+        let port = unsafe { u16::from_be_bytes([*addr.add(2), *addr.add(3)]) };
+        match table().lock().unwrap().get_mut(&fd) {
+            Some(Entry::Unbound(bound)) => {
+                *bound = port;
+                0
+            }
+            Some(_) => EINVAL,
+            None => EBADF,
+        }
+    }
+
+    pub unsafe fn rootshell_socket_listen(fd: i32, _backlog: i32) -> i32 {
+        let mut table = table().lock().unwrap();
+        let port = match table.get(&fd) {
+            Some(Entry::Unbound(port)) => *port,
+            Some(_) => return EINVAL,
+            None => return EBADF,
+        };
+        match TcpListener::bind(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port)) {
+            Ok(listener) => {
+                table.insert(fd, Entry::Listener(listener));
+                0
+            }
+            Err(e) => errno(&e),
+        }
+    }
+
+    pub unsafe fn rootshell_socket_accept(fd: i32, fd_out: *mut i32) -> i32 {
+        let listener = match table().lock().unwrap().get(&fd) {
+            Some(Entry::Listener(l)) => l.try_clone(),
+            _ => return EBADF,
+        };
+        match listener.and_then(|l| l.accept()) {
+            Ok((connection, _)) => {
+                unsafe { *fd_out = insert(Entry::Stream(connection)) };
+                0
+            }
+            Err(e) => errno(&e),
+        }
+    }
+
+    pub unsafe fn rootshell_socket_send(fd: i32, buf: *const u8, len: i32, sent_out: *mut u32) -> i32 {
+        let data = unsafe { std::slice::from_raw_parts(buf, len as usize) };
+        match stream(fd).and_then(|mut s| s.write(data).map_err(|e| errno(&e))) {
+            Ok(n) => {
+                unsafe { *sent_out = n as u32 };
+                0
+            }
+            Err(e) => e,
+        }
+    }
+
+    pub unsafe fn rootshell_socket_recv(fd: i32, buf: *mut u8, len: i32, recv_out: *mut u32) -> i32 {
+        let room = unsafe { std::slice::from_raw_parts_mut(buf, len as usize) };
+        match stream(fd).and_then(|mut s| s.read(room).map_err(|e| errno(&e))) {
+            Ok(n) => {
+                unsafe { *recv_out = n as u32 };
+                0
+            }
+            Err(e) => e,
+        }
+    }
+
+    pub unsafe fn rootshell_socket_sendto(
+        fd: i32,
+        _buf: *const u8,
+        len: i32,
+        _addr: *const u8,
+        _addrlen: i32,
+        sent_out: *mut u32,
+    ) -> i32 {
+        match table().lock().unwrap().get(&fd) {
+            Some(Entry::Datagram) => {
+                unsafe { *sent_out = len as u32 };
+                0
+            }
+            _ => EBADF,
+        }
+    }
+
+    pub unsafe fn rootshell_socket_close(fd: i32) -> i32 {
+        match table().lock().unwrap().remove(&fd) {
+            Some(_) => 0,
+            None => EBADF,
+        }
+    }
 }
 #[cfg(not(target_arch = "wasm32"))]
 use host::*;
@@ -143,6 +275,14 @@ impl Socket {
             return Err(io::Error::other(format!("sendto sent {sent} of {} bytes", data.len())));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+impl Socket {
+    /// The port a listener got (tests listen on port 0).
+    pub fn local_port(&self) -> u16 {
+        host::local_port(self.fd)
     }
 }
 

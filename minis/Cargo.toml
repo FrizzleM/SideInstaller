@@ -1,10 +1,8 @@
 [package]
 name = "siboot"
-# Continues the version line of ../ashell/siboot.py (0.10.0, the last a-Shell
-# build). ../ish-bootstrap was an earlier Rust line that stopped at 0.1.0.
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
-description = "PC-free bootstrap that installs SideInstaller onto the iPhone it runs on, from Open Minis's Linux shell"
+description = "PC-free bootstrap that installs SideInstaller onto the iPhone it runs on, from Open Minis's Linux shell, with the pairing made in rootshell"
 license = "MIT"
 publish = false
 
@@ -12,7 +10,7 @@ publish = false
 name = "siboot"
 path = "src/main.rs"
 
-# Its own workspace, like ../ish-bootstrap: this crate builds for
+# Its own workspace: this crate builds for
 # aarch64-unknown-linux-musl (Open Minis runs an ARM64 iSH), so it must not
 # share rust-core's lockfile, which is resolved around the Apple targets.
 [workspace]
@@ -21,14 +19,13 @@ path = "src/main.rs"
 # The same vendored idevice SideInstaller ships (OPACK back-reference fix and
 # logging changes, see ../rust-core/vendor/idevice/README.md), with the features
 # the pipeline needs:
-#   remote_pairing     the pairable-host responder (pairing) and the client (pair-verify)
+#   remote_pairing     pair-verify with the pairing file from rootshell
 #   tunnel_tcp_stack   in-process software TCP stack over the CDTunnel
 #   rsd / xpc / tcp    RemoteServiceDiscovery inside the tunnel
 #   afc                /PublicStaging upload
 #   installation_proxy the install
 #   house_arrest       writing the pairing file into SideInstaller's container
-# `aws-lc`, as rust-core: aarch64 musl is a supported aws-lc target, unlike the
-# i686 one that pushed ../ish-bootstrap onto ring.
+# `aws-lc`, as rust-core: aarch64 musl is a supported aws-lc target.
 idevice = { path = "../rust-core/vendor/idevice", default-features = false, features = [
   "aws-lc",
   "remote_pairing",
@@ -55,14 +52,12 @@ tokio = { version = "1", features = [
   "fs",
   "io-util",
   "time",
-  "process",
   "sync",
   "signal",
 ] }
 plist = "1.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-uuid = { version = "1", features = ["v4"] }
 # Downloading the SideInstaller release. Same line isideload uses, so it adds
 # nothing to the tree.
 reqwest = { version = "0.13", features = ["json", "gzip"] }
@@ -75,17 +70,6 @@ hex = "0.4"
 rpassword = "7"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-
-[dev-dependencies]
-# The fake iPhone in src/fake_iphone.rs drives the controller side of
-# pair-setup, so it needs the crypto idevice's responder uses, at the same
-# versions.
-idevice-srp = "0.6"
-sha2-10 = { package = "sha2", version = "0.10" }
-hkdf = "0.12"
-chacha20poly1305 = "0.10"
-ed25519-dalek = "2"
-base64 = "0.22"
 
 # isideload signs with apple-codesign-quick; SideInstaller's vendored copy also
 # signs ExtensionKit extensions (#110). Patches only apply at a workspace root,

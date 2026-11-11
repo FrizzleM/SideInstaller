@@ -1,13 +1,12 @@
 //! Terminal output: staged status lines, a verbose channel, and prompts.
 //!
-//! Kept from ../ish-bootstrap: every stage prints its line *before* the work
+//! Every stage prints its line *before* the work
 //! starts, so a stall is attributable to a named step, and errors name the
 //! thing the user can change while the raw cause goes to the verbose channel.
 
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::Advertiser;
 
 static VERBOSE: AtomicBool = AtomicBool::new(false);
 
@@ -66,29 +65,6 @@ pub fn detail(msg: &str) {
     }
 }
 
-/// Numbered steps for the user to do on the iPhone.
-pub fn steps(lines: &[String]) {
-    for (i, line) in lines.iter().enumerate() {
-        println!("      {} {line}", paint("1", &format!("{}.", i + 1)));
-    }
-    flush();
-}
-
-/// The pairing code, big enough to read at a glance: "123 456".
-pub fn pin(code: &str) {
-    let spaced = if code.len() == 6 {
-        format!("{} {}", &code[..3], &code[3..])
-    } else {
-        code.into()
-    };
-    println!();
-    println!("      {}", paint("1", "Type this code into Settings:"));
-    println!();
-    println!("            {}", paint("1;7", &format!("  {spaced}  ")));
-    println!();
-    flush();
-}
-
 /// A progress line that rewrites itself on a terminal.
 pub fn progress(label: &str, percent: u64) {
     if styled() {
@@ -128,7 +104,7 @@ pub fn ask(prompt: &str) -> Option<String> {
     }
 }
 
-pub fn banner(version: &str, advertiser: Advertiser) {
+pub fn banner(version: &str) {
     println!();
     println!("{} {}", paint("1;35", "siboot"), paint("2", version));
     println!(
@@ -138,19 +114,11 @@ pub fn banner(version: &str, advertiser: Advertiser) {
             "installs SideInstaller onto this iPhone, with your own Apple Account"
         )
     );
-    if advertiser == Advertiser::Minis {
-        println!();
-        println!(
-            "{}",
-            paint(
-                "1;33",
-                "Keep Minis open: you can switch to Settings when asked, but don't"
-            )
-        );
-        println!(
-            "{}",
-            paint("1;33", "swipe Minis away until siboot says it's done.")
-        );
-    }
+    println!();
+    println!(
+        "{}",
+        paint("1;33", "Keep Minis open until siboot says it's done: iOS pauses it")
+    );
+    println!("{}", paint("1;33", "in the background."));
     flush();
 }

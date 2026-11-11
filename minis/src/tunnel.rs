@@ -188,7 +188,7 @@ async fn read_pairing(path: &Path) -> Result<RpPairingFile> {
     RpPairingFile::read_from_file(path).await.map_err(|e| {
         Fail::new(
             format!(
-                "Couldn't read the pairing file at {}. Run `siboot pair` to make a new one.",
+                "Couldn't read the pairing file at {}. Pair again in rootshell (`./siboot-pair.wasm`), then run siboot again.",
                 path.display()
             ),
             chain(&e),
@@ -224,7 +224,7 @@ async fn pair_verified(
         Ok(Ok(())) => Ok(rpc),
         Ok(Err(e)) => Err(Fail::new(
             "This iPhone doesn't accept the pairing file (it was removed in Settings, or the \
-             iPhone was reset). Run `siboot pair --repair`.",
+             iPhone was reset). Pair again in rootshell (`./siboot-pair.wasm`), then run siboot again.",
             chain(&e),
         )),
         Err(_) => Err(Fail::new(

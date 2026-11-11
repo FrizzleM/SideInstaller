@@ -10,12 +10,15 @@
 //! so this one sends the advertisement as raw mDNS (`mdns.rs`) and answers
 //! with idevice's own `PairableHost`, the responder SideInstaller uses.
 //!
-//! It writes `rp_pairing_file.plist` into rootshell's folder, the same file
-//! `siboot pair` makes. siboot in Open Minis's App Store build (which can't
-//! advertise) takes it from Minis's shared folder for the other six steps.
+//! It writes `rp_pairing_file.plist` into rootshell's folder, then offers it
+//! on this iPhone's loopback, behind a transfer code, to siboot in Open Minis
+//! (../minis), which runs the other six steps.
 
 mod mdns;
 mod rs;
+
+#[cfg(test)]
+mod fake_iphone;
 
 use std::cell::Cell;
 use std::net::Ipv4Addr;
@@ -29,6 +32,9 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const HOST_MODEL: &str = "Mac17,7";
 /// Connections tried before giving up: a stray one, a mistyped code, the one that pairs.
 const MAX_ATTEMPTS: u32 = 3;
+/// Settings shows "Pair with siboot".
+const HOST_NAME: &str = "siboot";
+const PAIRING_FILE: &str = "rp_pairing_file.plist";
 const ALT_IRK_FILE: &str = "host_alt_irk";
 /// Where `ifconfig en0 > ifconfig.txt` leaves the address for us.
 const IFCONFIG_FILE: &str = "ifconfig.txt";
@@ -37,9 +43,7 @@ const INSTALL: &str =
 
 struct Args {
     ip: [u8; 4],
-    name: String,
     port: Option<u16>,
-    out: String,
     service: String,
 }
 
@@ -48,33 +52,23 @@ fn usage() {
         "siboot-pair {VERSION} — pairs this iPhone with itself, from rootshell.
 
 USAGE
-    ifconfig en0 > ifconfig.txt     (then)     ./siboot-pair.wasm [options]
-    ifconfig en0 | ./siboot-pair.wasm [options]
-    ./siboot-pair.wasm <this iPhone's Wi-Fi IP address> [options]
+    ifconfig en0 > ifconfig.txt
+    ./siboot-pair.wasm
 
-    It needs this iPhone's Wi-Fi address: from ifconfig.txt, piped, or as given
-    (Settings › Wi-Fi › ⓘ next to your network › IP Address).
-    Before running it, turn on rootshell's Settings › Location Diary Mode ›
-    Session Only, which keeps rootshell running while you're in Settings.
-    After pairing it hands the pairing file to siboot in Open Minis.
+    One line at a time. It reads this iPhone's Wi-Fi address from ifconfig.txt
+    (a WASM program can't find it itself). Before running it, turn on
+    rootshell's Settings › Location Diary Mode › Session Only, which keeps
+    rootshell running while you're in Settings. After pairing it hands the
+    pairing file to siboot in Open Minis.
 
 OPTIONS
-    --name NAME   What Settings shows: \"Pair with NAME\" (default siboot).
     --port N      The port to listen on (default: a random one).
-    --out FILE    Where to write the pairing file (default rp_pairing_file.plist).
     -h, --help    Show this message."
     );
 }
 
 fn parse_args() -> Result<Option<Args>, String> {
-    let mut ip = None;
-    let mut args = Args {
-        ip: [0; 4],
-        name: "siboot".into(),
-        port: None,
-        out: "rp_pairing_file.plist".into(),
-        service: mdns::PAIRABLE_HOST_TYPE.into(),
-    };
+    let mut args = Args { ip: [0; 4], port: None, service: mdns::PAIRABLE_HOST_TYPE.into() };
     let mut argv = std::env::args().skip(1);
     while let Some(arg) = argv.next() {
         let mut value = |flag: &str| argv.next().ok_or(format!("{flag} needs a value"));
@@ -84,69 +78,38 @@ fn parse_args() -> Result<Option<Args>, String> {
                 println!("siboot-pair {VERSION}");
                 std::process::exit(0);
             }
-            "--name" => args.name = value("--name")?,
-            "--out" => args.out = value("--out")?,
             "--port" => {
                 args.port = Some(value("--port")?.parse().map_err(|_| "--port needs a number".to_string())?)
             }
             // Tests: announce another type, so a test run on a real network
             // doesn't offer itself to iPhones there.
             "--service" => args.service = value("--service")?,
-            other if ip.is_none() && !other.starts_with('-') => {
-                let parsed: Ipv4Addr = other
-                    .parse()
-                    .map_err(|_| format!("`{other}` isn't an IPv4 address like 192.168.1.20"))?;
-                ip = Some(parsed.octets());
-            }
             other => return Err(format!("unrecognised argument `{other}`")),
         }
     }
-    args.ip = match ip {
-        Some(ip) => ip,
-        // `ifconfig en0 | ./siboot-pair.wasm`: rootshell has ifconfig, and a
-        // WASM program can't find the address itself.
-        None if !rs::is_tty(0) => {
-            let mut piped = String::new();
-            std::io::Read::read_to_string(&mut std::io::stdin(), &mut piped)
-                .map_err(|e| format!("couldn't read what was piped in: {e}"))?;
-            wifi_address(&piped).ok_or(
-                "no IPv4 address in what was piped in. Is Wi-Fi on? Or give the address: \
-                 Settings › Wi-Fi › ⓘ › IP Address",
-            )?
-        }
-        // `ifconfig en0 > ifconfig.txt`, for shells that won't pipe into WASM.
-        None if std::path::Path::new(IFCONFIG_FILE).exists() => {
-            let saved = std::fs::read_to_string(IFCONFIG_FILE)
-                .map_err(|e| format!("couldn't read {IFCONFIG_FILE}: {e}"))?;
-            wifi_address(&saved).ok_or(format!(
-                "no IPv4 address in {IFCONFIG_FILE}. Is Wi-Fi on? Run `ifconfig en0 > {IFCONFIG_FILE}` \
-                 again, or give the address: Settings › Wi-Fi › ⓘ › IP Address"
-            ))?
-        }
-        None => {
-            return Err(format!(
-                "give this iPhone's Wi-Fi address: run `ifconfig en0 > {IFCONFIG_FILE}` and then \
-                 `./siboot-pair.wasm`, or `./siboot-pair.wasm <address>` with the one in \
-                 Settings › Wi-Fi › ⓘ"
-            ))
-        }
-    };
+    let saved = std::fs::read_to_string(IFCONFIG_FILE).map_err(|_| {
+        format!("no {IFCONFIG_FILE} here. Run `ifconfig en0 > {IFCONFIG_FILE}` first, then `./siboot-pair.wasm`.")
+    })?;
+    args.ip = wifi_address(&saved).ok_or(format!(
+        "no IPv4 address in {IFCONFIG_FILE}. Turn on Wi-Fi, run `ifconfig en0 > {IFCONFIG_FILE}` again, \
+         then `./siboot-pair.wasm`."
+    ))?;
     Ok(Some(args))
 }
 
-/// The first non-loopback IPv4 address in `ifconfig` output (`inet A.B.C.D`),
-/// or a bare address.
+/// The first non-loopback IPv4 address in `ifconfig` output (`inet A.B.C.D`).
 fn wifi_address(text: &str) -> Option<[u8; 4]> {
     let mut words = text.split_whitespace().peekable();
     while let Some(word) = words.next() {
-        let candidate = if word == "inet" { words.peek().copied() } else { Some(word) };
-        if let Some(ip) = candidate
+        if word != "inet" {
+            continue;
+        }
+        if let Some(ip) = words
+            .peek()
             .and_then(|w| w.trim_start_matches("addr:").parse::<Ipv4Addr>().ok())
             .filter(|ip| !ip.is_loopback() && !ip.is_unspecified() && !ip.is_broadcast())
         {
-            if word == "inet" || text.trim() == word {
-                return Some(ip.octets());
-            }
+            return Some(ip.octets());
         }
     }
     None
@@ -182,8 +145,8 @@ fn run(args: &Args) -> Result<(), String> {
     println!("Session Only): it keeps rootshell running while you're in Settings.");
     println!();
 
-    let (mut file, alt_irk) = identity(args)?;
-    let mut info = PairableHostInfo::generate(args.name.clone(), HOST_MODEL);
+    let (mut file, alt_irk) = identity();
+    let mut info = PairableHostInfo::generate(HOST_NAME, HOST_MODEL);
     if let Some(alt_irk) = alt_irk {
         info.alt_irk = alt_irk;
     }
@@ -211,48 +174,43 @@ fn run(args: &Args) -> Result<(), String> {
                     this again."
             .into());
     }
-    println!("OK announced \"Pair with {}\" on port {port}", args.name);
+    println!("OK announced \"Pair with {HOST_NAME}\" on port {port}");
     println!();
     println!("Now, on this iPhone:");
     println!("  1. Open Settings › Privacy & Security › Developer Mode, and scroll to the bottom.");
-    println!("  2. Tap \"Pair with {}\". It can take a few seconds to appear.", args.name);
+    println!("  2. Tap \"Pair with {HOST_NAME}\". It can take a few seconds to appear.");
     println!("  3. Enter your passcode, then the 6-digit code, which arrives as a rootshell");
     println!("     notification (it's also printed here).");
     println!("Waiting …");
 
-    let peer = pair(&listener, &info, &mut file)?;
+    let peer = pair(&listener, &info, &mut file, show_code)?;
     drop(listener);
 
-    std::fs::write(&args.out, file.to_bytes()).map_err(|e| format!("paired, but couldn't write {}: {e}", args.out))?;
+    std::fs::write(PAIRING_FILE, file.to_bytes()).map_err(|e| format!("paired, but couldn't write {PAIRING_FILE}: {e}"))?;
     let _ = std::fs::write(ALT_IRK_FILE, hex::encode(info.alt_irk));
     // Withdraw the entry: nothing listens behind it now.
     let _ = rs::Socket::send_datagram(&mdns::announcement(&ad, 0), mdns::GROUP, mdns::PORT);
 
     println!();
     println!("OK paired with {} ({})", peer.name, peer.model);
-    println!("OK pairing file saved: Files › rootshell › {}", args.out);
-    hand_off(&file.to_bytes());
-    Ok(())
+    println!("OK pairing file saved: Files › rootshell › {PAIRING_FILE}");
+    hand_off(&file.to_bytes())
 }
 
 /// Where siboot in Minis asks for the pairing file, on this iPhone's loopback.
-/// Also in minis/src/preflight.rs.
+/// Also in minis/src/pairing.rs.
 const HANDOFF_PORT: u16 = 61207;
 const HANDOFF_TRIES: u32 = 5;
 
 /// Offer the pairing file to siboot in Open Minis, over this iPhone's own
-/// loopback, until it has it. The transfer code keeps any other app on the
-/// iPhone from taking it in the meantime: five wrong ones and the offer ends.
-/// The file stays in Files › rootshell either way.
-fn hand_off(pairing: &[u8]) {
-    let listener = match rs::Socket::listen(HANDOFF_PORT) {
-        Ok(l) => l,
-        Err(e) => {
-            println!("(couldn't offer the file to Minis directly: {e})");
-            files_route();
-            return;
-        }
-    };
+/// loopback, until it has it.
+fn hand_off(pairing: &[u8]) -> Result<(), String> {
+    let listener = rs::Socket::listen(HANDOFF_PORT).map_err(|e| {
+        format!(
+            "paired, but couldn't offer the file to Minis ({e}). Close any other rootshell tab \
+             running siboot-pair, then run `./siboot-pair.wasm` again."
+        )
+    })?;
     let code = transfer_code();
     println!();
     println!("Next, install SideInstaller with Open Minis (App Store). In Minis's terminal");
@@ -265,9 +223,21 @@ fn hand_off(pairing: &[u8]) {
     println!("    {} {}", &code[..3], &code[3..]);
     println!();
     println!("Leave rootshell running until siboot has the file (Ctrl-C stops the offer).");
+    if offer(&listener, &code, pairing) {
+        println!("OK siboot has the pairing file. You can close rootshell's tab.");
+        Ok(())
+    } else {
+        Err("stopped offering the file. Run `./siboot-pair.wasm` again for a new transfer code.".into())
+    }
+}
+
+/// Answer siboot's requests on `listener` until one brings `code`, then send
+/// the file. The code keeps any other app on the iPhone from taking it:
+/// `HANDOFF_TRIES` wrong ones end the offer. True once siboot has the file.
+fn offer(listener: &rs::Socket, code: &str, pairing: &[u8]) -> bool {
     let mut wrong = 0;
     while wrong < HANDOFF_TRIES {
-        let Ok(conn) = listener.accept() else { break };
+        let Ok(conn) = listener.accept() else { return false };
         let asked = conn.read_line(64).unwrap_or_default();
         let given: String = asked.trim_start_matches("SIBOOT1").chars().filter(char::is_ascii_digit).collect();
         if asked.starts_with("SIBOOT1") && given == code {
@@ -275,10 +245,7 @@ fn hand_off(pairing: &[u8]) {
                 .write_all(format!("OK {}\n", pairing.len()).as_bytes())
                 .and_then(|()| conn.write_all(pairing));
             match sent {
-                Ok(()) => {
-                    println!("OK siboot has the pairing file. You can close rootshell's tab.");
-                    return;
-                }
+                Ok(()) => return true,
                 Err(e) => println!("  sending the file broke off ({e}); waiting for siboot to ask again"),
             }
         } else {
@@ -287,13 +254,7 @@ fn hand_off(pairing: &[u8]) {
             println!("  a wrong transfer code ({wrong} of {HANDOFF_TRIES})");
         }
     }
-    println!("Stopped offering the file.");
-    files_route();
-}
-
-fn files_route() {
-    println!("Copy rp_pairing_file.plist from Files › rootshell into Files › Minis › shared, then");
-    println!("run in Minis's terminal: {INSTALL}");
+    false
 }
 
 /// Six digits, not starting with 0 so it reads as a number.
@@ -304,8 +265,14 @@ fn transfer_code() -> String {
 }
 
 /// Pair over up to `MAX_ATTEMPTS` connections: a stray one, a mistyped code
-/// or a cancel in Settings leaves the entry up for another tap.
-fn pair(listener: &rs::Socket, info: &PairableHostInfo, file: &mut RpPairingFile) -> Result<PeerDevice, String> {
+/// or a cancel in Settings leaves the entry up for another tap. Each code
+/// goes to `show`.
+fn pair(
+    listener: &rs::Socket,
+    info: &PairableHostInfo,
+    file: &mut RpPairingFile,
+    show: impl Fn(&str),
+) -> Result<PeerDevice, String> {
     for attempt in 1..=MAX_ATTEMPTS {
         let stream = listener.accept().map_err(|e| format!("couldn't accept the connection: {e}"))?;
         println!("Settings connected — waiting for it to ask for a code …");
@@ -313,7 +280,7 @@ fn pair(listener: &rs::Socket, info: &PairableHostInfo, file: &mut RpPairingFile
         let code_shown = Cell::new(false);
         let outcome = futures::executor::block_on(host.accept(file, |pin: String| {
             code_shown.set(true);
-            show_code(&pin);
+            show(&pin);
             async {}
         }));
         let error = match outcome {
@@ -355,23 +322,27 @@ fn show_code(pin: &str) {
 
 /// The host identity from an earlier run, so a new pairing doesn't invalidate
 /// copies of the file handed out before; else a new one.
-fn identity(args: &Args) -> Result<(RpPairingFile, Option<[u8; 16]>), String> {
-    let file = match std::fs::read(&args.out).ok().and_then(|b| RpPairingFile::from_bytes(&b).ok()) {
+fn identity() -> (RpPairingFile, Option<[u8; 16]>) {
+    let file = match std::fs::read(PAIRING_FILE).ok().and_then(|b| RpPairingFile::from_bytes(&b).ok()) {
         Some(mut existing) => {
             existing.alt_irk = None;
             existing
         }
-        None => {
-            let mut fresh = RpPairingFile::generate(&args.name);
-            fresh.identifier = uuid::Uuid::new_v4().to_string().to_uppercase();
-            fresh
-        }
+        None => fresh_identity(),
     };
     let alt_irk = std::fs::read_to_string(ALT_IRK_FILE)
         .ok()
         .and_then(|h| hex::decode(h.trim()).ok())
         .and_then(|b| b.try_into().ok());
-    Ok((file, alt_irk))
+    (file, alt_irk)
+}
+
+/// `generate` derives the identifier from the name, the same for every
+/// siboot; a random one keeps this host's records apart.
+fn fresh_identity() -> RpPairingFile {
+    let mut fresh = RpPairingFile::generate(HOST_NAME);
+    fresh.identifier = uuid::Uuid::new_v4().to_string().to_uppercase();
+    fresh
 }
 
 fn random_port() -> u16 {
@@ -391,7 +362,7 @@ mod tests {
              \tinet 192.168.178.42 netmask 0xffffff00 broadcast 192.168.178.255\n";
         assert_eq!(wifi_address(ifconfig), Some([192, 168, 178, 42]));
         assert_eq!(wifi_address("lo0: inet 127.0.0.1 netmask 0xff000000"), None);
-        assert_eq!(wifi_address("  10.0.0.7\n"), Some([10, 0, 0, 7]));
+        assert_eq!(wifi_address("  10.0.0.7\n"), None, "only ifconfig output, not a bare address");
         assert_eq!(wifi_address("en0: flags=8822<BROADCAST,SMART,SIMPLEX,MULTICAST> mtu 1500"), None);
     }
 
@@ -402,5 +373,124 @@ mod tests {
             assert_eq!(code.len(), 6);
             assert!(code.chars().all(|c| c.is_ascii_digit()) && !code.starts_with('0'));
         }
+    }
+
+    /// A host waiting on a loopback port, as Settings finds it, pairing in a
+    /// thread of its own (the real one blocks in accept). The codes it shows
+    /// come out of the receiver.
+    fn host() -> (
+        u16,
+        std::sync::mpsc::Receiver<String>,
+        std::thread::JoinHandle<(Result<PeerDevice, String>, RpPairingFile)>,
+    ) {
+        let listener = rs::Socket::listen(0).unwrap();
+        let port = listener.local_port();
+        let (codes, shown) = std::sync::mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            let info = PairableHostInfo::generate(HOST_NAME, HOST_MODEL);
+            let mut file = fresh_identity();
+            let paired = pair(&listener, &info, &mut file, |pin| codes.send(pin.to_string()).unwrap());
+            (paired, file)
+        });
+        (port, shown, thread)
+    }
+
+    fn addr(port: u16) -> std::net::SocketAddr {
+        std::net::SocketAddr::from(([127, 0, 0, 1], port))
+    }
+
+    /// The fake iPhone's typing: the next code the host shows.
+    async fn next_code(shown: std::sync::Arc<std::sync::Mutex<std::sync::mpsc::Receiver<String>>>) -> String {
+        tokio::task::spawn_blocking(move || shown.lock().unwrap().recv().unwrap()).await.unwrap()
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_device_pairs_and_the_file_holds_the_host_it_saw() {
+        let (port, shown, host) = host();
+        let shown = std::sync::Arc::new(std::sync::Mutex::new(shown));
+        let phone = fake_iphone::pair(addr(port), next_code(shown)).await.expect("phone paired");
+        let (paired, file) = host.join().unwrap();
+        let peer = paired.expect("host paired");
+        assert_eq!(peer.name, fake_iphone::NAME);
+        assert_eq!(peer.model, fake_iphone::MODEL);
+        // The identity the device was given in M6 is the one written out…
+        assert_eq!(file.identifier, phone.host_identifier);
+        assert_eq!(file.public_key_bytes(), phone.host_public_key);
+        // …with the device's altIRK from M5, and it reads back.
+        assert_eq!(file.alt_irk.as_deref(), Some(&fake_iphone::ALT_IRK[..]));
+        let reread = RpPairingFile::from_bytes(&file.to_bytes()).unwrap();
+        assert_eq!(reread.identifier, file.identifier);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_wrong_code_gets_another_try() {
+        let (port, shown, host) = host();
+        let shown = std::sync::Arc::new(std::sync::Mutex::new(shown));
+        // A typo, then the entry tapped again and the new code typed.
+        let first = fake_iphone::pair(addr(port), async { "000000".to_string() }).await;
+        assert!(first.is_err(), "a wrong code paired");
+        let _typo = next_code(shown.clone()).await;
+        fake_iphone::pair(addr(port), next_code(shown)).await.expect("the second try paired");
+        let (paired, _) = host.join().unwrap();
+        assert_eq!(paired.expect("host paired on the second try").name, fake_iphone::NAME);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn three_wrong_codes_end_the_run_and_say_why() {
+        let (port, _shown, host) = host();
+        for _ in 0..MAX_ATTEMPTS {
+            let paired = fake_iphone::pair(addr(port), async { "000000".to_string() }).await;
+            assert!(paired.is_err(), "a wrong code paired");
+        }
+        let (paired, _) = host.join().unwrap();
+        let problem = paired.err().expect("the host should give up");
+        assert!(problem.contains("code didn't match"), "{problem}");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_connection_that_drops_before_the_code_doesnt_end_pairing() {
+        let (port, shown, host) = host();
+        drop(std::net::TcpStream::connect(addr(port)).unwrap());
+        let shown = std::sync::Arc::new(std::sync::Mutex::new(shown));
+        fake_iphone::pair(addr(port), next_code(shown)).await.expect("phone paired");
+        let (paired, _) = host.join().unwrap();
+        assert_eq!(paired.expect("host paired after the stray connection").name, fake_iphone::NAME);
+    }
+
+    /// siboot's side of the hand-off (minis/src/pairing.rs): one request per
+    /// connection, the answer's first line, then the file.
+    fn ask_for_file(port: u16, code: &str) -> (String, Vec<u8>) {
+        use std::io::{BufRead, Read, Write};
+        let mut conn = std::net::TcpStream::connect(addr(port)).unwrap();
+        conn.write_all(format!("SIBOOT1 {code}\n").as_bytes()).unwrap();
+        let mut reader = std::io::BufReader::new(conn);
+        let mut answer = String::new();
+        reader.read_line(&mut answer).unwrap();
+        let mut rest = Vec::new();
+        reader.read_to_end(&mut rest).unwrap();
+        (answer.trim().to_string(), rest)
+    }
+
+    #[test]
+    fn the_file_goes_to_whoever_has_the_code() {
+        let listener = rs::Socket::listen(0).unwrap();
+        let port = listener.local_port();
+        let offered = std::thread::spawn(move || offer(&listener, "481516", b"pairing file"));
+        assert_eq!(ask_for_file(port, "000000").0, "NO");
+        let (answer, file) = ask_for_file(port, "481516");
+        assert_eq!(answer, "OK 12");
+        assert_eq!(file, b"pairing file");
+        assert!(offered.join().unwrap(), "the offer ends once siboot has the file");
+    }
+
+    #[test]
+    fn five_wrong_codes_end_the_offer() {
+        let listener = rs::Socket::listen(0).unwrap();
+        let port = listener.local_port();
+        let offered = std::thread::spawn(move || offer(&listener, "481516", b"pairing file"));
+        for _ in 0..HANDOFF_TRIES {
+            assert_eq!(ask_for_file(port, "123456").0, "NO");
+        }
+        assert!(!offered.join().unwrap());
     }
 }

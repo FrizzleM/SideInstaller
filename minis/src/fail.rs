@@ -1,5 +1,5 @@
 //! One failure type: what the user can change, and the raw cause for
-//! `--verbose`. Kept from ../ish-bootstrap.
+//! `--verbose`.
 
 use std::fmt;
 

@@ -1,5 +1,5 @@
 //! The pairable host's Bonjour advertisement, as a raw mDNS announcement
-//! (RFC 6762 §8.3): what `NetService.publish` and `minis-bonjour advertise`
+//! (RFC 6762 §8.3): what `NetService.publish`
 //! have the system send, built by hand.
 //!
 //! rootshell's App Store build carries Apple's multicast entitlement

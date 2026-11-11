@@ -5,12 +5,10 @@
 //! sends the handshake, M1, M3 (with the PIN the user typed) and M5 (its own
 //! identity), and checks the accessory's proof (M4) and identity (M6). This is
 //! the mirror of idevice's `PairableHost`, written from the same constants, so a
-//! test can pair all the way to a pairing file with no iPhone. It also writes
-//! stand-ins for Minis's commands (`minis_stub`).
+//! test can pair all the way to a pairing file with no iPhone.
 
 use std::future::Future;
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use chacha20poly1305::aead::{Aead, Payload};
@@ -342,103 +340,9 @@ fn opack_dict(entries: &[(&str, Opack)]) -> Vec<u8> {
     out
 }
 
-/// Stand-ins for Minis's commands, in `<home>/stub-bin`. Each logs its
-/// arguments to `<home>/minis-calls.log` and answers with the envelope
-/// bonjour.md describes. `advertise` reports the guest port as Minis's own:
-/// there is no app in between to forward. `list` reports Minis in the
-/// background while `<home>/minis-background` exists.
-pub fn minis_stub(home: &Path) -> PathBuf {
-    let dir = home.join("stub-bin");
-    std::fs::create_dir_all(&dir).unwrap();
-    let log = home.join("minis-calls.log");
-    let log = log.to_string_lossy();
-    let background = home.join("minis-background");
-    let background = background.to_string_lossy();
-    let scripts = [
-        (
-            "minis-bonjour",
-            r#"case "$1" in
-types) echo '{"ok":true,"tool":"minis-bonjour","action":"types","data":{"types":["_remotepairing-pairable-host._tcp","_http._tcp"],"source":"Info.plist NSBonjourServices","restricted":true}}' ;;
-list) if [ -e "$BACKGROUND" ]; then bg=true; else bg=false; fi
-  echo '{"ok":true,"tool":"minis-bonjour","action":"list","data":{"advertisements":[],"forwards":[],"declared_types":["_remotepairing-pairable-host._tcp"],"app_in_background":'$bg'}}' ;;
-advertise) printf '{"ok":true,"tool":"minis-bonjour","action":"advertise","data":{"id":"adv-1","kind":"advertise","type":"%s","name":"%s","requested_name":"%s","guest_port":%s,"listener_port":%s,"state":"ready"}}\n' "$2" "$3" "$3" "$4" "$4" ;;
-stop) echo '{"ok":true,"tool":"minis-bonjour","action":"stop","data":{"stopped":["adv-1"],"count":1}}' ;;
-*) echo '{"ok":false,"tool":"minis-bonjour","action":"?","error":{"code":"invalid_args","message":"unknown command"}}'; exit 2 ;;
-esac"#,
-        ),
-        (
-            "apple-notification",
-            r#"case "$1" in
-settings) echo '{"ok":true,"tool":"apple-notification","action":"settings","data":{"authorization_status":"authorized"}}' ;;
-*) echo '{"ok":true,"tool":"apple-notification","action":"schedule","data":{"id":"n-1"}}' ;;
-esac"#,
-        ),
-        (
-            "apple-player",
-            r#"case "$1" in
-play) echo '{"ok":true,"tool":"apple-player","action":"play","data":{"session_id":"s-1","media_type":"audio","status":"playing"}}' ;;
-*) echo '{"ok":true,"tool":"apple-player","action":"stop","data":{}}' ;;
-esac"#,
-        ),
-    ];
-    for (name, body) in scripts {
-        let path = dir.join(name);
-        std::fs::write(
-            &path,
-            format!(
-                "#!/bin/sh\nBACKGROUND='{background}'\necho \"{name} $*\" >> '{log}'\n{body}\n"
-            ),
-        )
-        .unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
-        }
-    }
-    dir
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Pairs with a `siboot pair` running elsewhere (under the iSH emulator, say)
-    /// whose Minis commands are `minis_stub`'s, logging to `$SIBOOT_FAKE_LOG`.
-    /// The port comes from its `minis-bonjour advertise` call and the code from
-    /// the notification it posts, as a person would read it:
-    /// `SIBOOT_FAKE_LOG=… cargo test dial_a_running_siboot -- --ignored`.
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    #[ignore = "needs a siboot waiting to pair"]
-    async fn dial_a_running_siboot() {
-        let log = PathBuf::from(std::env::var("SIBOOT_FAKE_LOG").expect("set SIBOOT_FAKE_LOG"));
-        let advertised = wait_for_line(&log, "minis-bonjour advertise").await;
-        let port: u16 = advertised.split(' ').nth(4).unwrap().parse().unwrap();
-        let pin = async {
-            let posted = wait_for_line(&log, "apple-notification schedule").await;
-            let body = posted.split("--body ").nth(1).unwrap();
-            body.chars()
-                .filter(char::is_ascii_digit)
-                .take(6)
-                .collect::<String>()
-        };
-        let outcome = pair(SocketAddr::from(([127, 0, 0, 1], port)), pin)
-            .await
-            .expect("paired");
-        println!("paired with host {}", outcome.host_identifier);
-    }
-
-    async fn wait_for_line(log: &Path, prefix: &str) -> String {
-        for _ in 0..1200 {
-            if let Ok(text) = std::fs::read_to_string(log) {
-                if let Some(line) = text.lines().find(|l| l.starts_with(prefix)) {
-                    return line.to_string();
-                }
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        }
-        panic!("no `{prefix}` line in {} within 2 minutes", log.display());
-    }
 
     #[test]
     fn tlv_round_trips_long_values_in_fragments() {
