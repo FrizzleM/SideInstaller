@@ -903,7 +903,7 @@ struct LocationView: View {
     var body: some View {
         ScrollViewReader { scroller in
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 16) {
                     header.cascadeItem(0)
                     // No note when Set location starts LocalDevVPN itself.
                     if !engine.tunnelAvailable {
@@ -973,33 +973,30 @@ struct LocationView: View {
     // MARK: Header
 
     private var header: some View {
-        BrandHeader(icon: "location.fill", image: "LocationLogo", title: L("Location spoofing"),
-                    animateIcon: manager.isSimulating) {
+        BrandHeader(icon: "location", image: "LocationLogo", title: L("Location spoofing")) {
             statusPill
-                .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
+                .transition(.opacity)
         }
     }
 
     @ViewBuilder
     private var statusPill: some View {
         if let progress = manager.routeProgress {
-            StatusPill(text: L("Playing route · %d%%", Int(progress.fraction * 100)),
-                       systemImage: "point.topleft.down.to.point.bottomright.curvepath.fill",
-                       color: .green)
+            StatusDot(text: L("Playing route · %d%%", Int(progress.fraction * 100)),
+                       color: Theme.positive)
         } else if let simulated = manager.simulated {
-            StatusPill(text: LocationManager.format(simulated),
-                       systemImage: "location.fill", color: .green)
+            StatusDot(text: LocationManager.format(simulated),
+                       color: Theme.positive)
         } else {
-            StatusPill(text: L("Not simulating"), systemImage: "location.slash",
-                       color: .orange, glass: true)
+            StatusDot(text: L("Not simulating"), color: Theme.warning, idle: true)
         }
     }
 
     private var vpnNote: some View {
-        CalloutCard(tint: .red) {
-            HStack(alignment: .top, spacing: 10) {
+        PanelCard {
+            HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "shield.lefthalf.filled")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
                 Text(L("Connect LocalDevVPN. Spoofing runs over its tunnel, like everything else here."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1012,7 +1009,7 @@ struct LocationView: View {
 
     private var mapCard: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 sectionTitle(L("Pick a place"), systemImage: "mappin.and.ellipse")
 
                 searchField
@@ -1031,7 +1028,7 @@ struct LocationView: View {
                             Marker(stop.name ?? LocationManager.format(stop.coordinate),
                                    monogram: Text(verbatim: "\(index + 1)"),
                                    coordinate: stop.coordinate)
-                                .tint(.orange)
+                                .tint(Theme.warning)
                         }
                         if let simulated = manager.simulated {
                             Marker(L("Simulated"), systemImage: "location.fill",
@@ -1049,7 +1046,7 @@ struct LocationView: View {
                         .allowsHitTesting(false)
                 }
                 .frame(height: 280)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
 
                 // Icons only where the coordinate and both labels don't fit.
                 ViewThatFits(in: .horizontal) {
@@ -1059,12 +1056,12 @@ struct LocationView: View {
 
                 // On first use, the spinner also covers disk image setup.
                 Button { manager.simulate(target) } label: {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         if manager.isBusy {
-                            ProgressView().tint(.white)
+                            ProgressView()
                             Text(L("Setting"))
                         } else {
-                            Image(systemName: "location.fill")
+                            Image(systemName: "location")
                             Text(L("Set location"))
                         }
                     }
@@ -1075,12 +1072,11 @@ struct LocationView: View {
                 if manager.isSimulating {
                     Button { manager.stop() } label: {
                         Label(L("Reset to real location"), systemImage: "location.slash")
-                            .font(.subheadline.weight(.semibold))
+                            .font(.subheadline.weight(.medium))
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered, sound: .tap)
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     .controlSize(.regular)
-                    .tint(.orange)
                     .disabled(manager.isBusy)
                 }
             }
@@ -1106,19 +1102,18 @@ struct LocationView: View {
                 pinActionLabel(L("Save"), systemImage: "bookmark", labelled: labelled)
             }
         }
-        .buttonStyle(.bordered, sound: .tap)
+        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
         .controlSize(.small)
-        .tint(Theme.accent)
     }
 
     @ViewBuilder
     private func pinActionLabel(_ title: String, systemImage: String, labelled: Bool) -> some View {
         if labelled {
             Label(title, systemImage: systemImage)
-                .font(.caption.weight(.semibold))
+                .font(.caption.weight(.medium))
         } else {
             Image(systemName: systemImage)
-                .font(.caption.weight(.semibold))
+                .font(.caption.weight(.medium))
                 .accessibilityLabel(title)
         }
     }
@@ -1144,7 +1139,7 @@ struct LocationView: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             TextField(L("Search for a place"), text: $query)
                 .textFieldStyle(.plain)
                 .autocorrectionDisabled()
@@ -1158,8 +1153,7 @@ struct LocationView: View {
                     Image(systemName: "magnifyingglass")
                 }
             }
-            .buttonStyle(.bordered, sound: .tap)
-            .tint(Theme.accent)
+            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
             .disabled(query.trimmingCharacters(in: .whitespaces).isEmpty || isSearching)
         }
     }
@@ -1208,8 +1202,8 @@ struct LocationView: View {
     /// them, played at each road's speed limit when driving.
     private var plannerCard: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 14) {
-                sectionTitle(L("Plan a route"), systemImage: "signpost.right.and.left.fill")
+            VStack(alignment: .leading, spacing: 16) {
+                sectionTitle(L("Plan a route"), systemImage: "signpost.right.and.left")
 
                 Picker(L("Travel by"), selection: $manager.travelMode) {
                     ForEach(TravelMode.allCases) { mode in
@@ -1266,10 +1260,10 @@ struct LocationView: View {
                 if let deviceStart = routeDeviceStart {
                     stopRow(title: L("The device's location"), coordinate: deviceStart) {
                         Image(systemName: "location.fill")
-                            .font(.caption.weight(.bold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.white)
-                            .frame(width: 26, height: 26)
-                            .background(Circle().fill(Color.green))
+                            .frame(width: 24, height: 24)
+                            .background(Circle().fill(Theme.positive))
                     } trailing: {
                         EmptyView()
                     }
@@ -1277,10 +1271,10 @@ struct LocationView: View {
                 ForEach(Array(manager.stops.enumerated()), id: \.element.id) { index, stop in
                     stopRow(title: stop.name ?? L("Stop %d", index + 1), coordinate: stop.coordinate) {
                         Text(verbatim: "\(index + 1)")
-                            .font(.caption.weight(.bold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.white)
-                            .frame(width: 26, height: 26)
-                            .background(Circle().fill(Color.orange))
+                            .frame(width: 24, height: 24)
+                            .background(Circle().fill(Theme.warning))
                     } trailing: {
                         Menu { stopMenu(stop, index: index) } label: {
                             Image(systemName: "ellipsis.circle")
@@ -1297,18 +1291,17 @@ struct LocationView: View {
             HStack {
                 Button { addStopAtPin() } label: {
                     Label(L("Add stop"), systemImage: "plus")
-                        .font(.caption.weight(.semibold))
+                        .font(.caption.weight(.medium))
                 }
                 Spacer()
                 Button(role: .destructive) { manager.removeAllStops() } label: {
                     Label(L("Clear stops"), systemImage: "trash")
-                        .font(.caption.weight(.semibold))
+                        .font(.caption.weight(.medium))
                 }
-                .tint(.red)
+                .tint(Theme.negative)
             }
-            .buttonStyle(.bordered, sound: .tap)
+            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
             .controlSize(.small)
-            .tint(Theme.accent)
             .disabled(manager.isPlayingPlannedRoute)
         }
     }
@@ -1327,7 +1320,7 @@ struct LocationView: View {
             badge()
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.medium))
                     .lineLimit(1)
                 Text(LocationManager.format(coordinate))
                     .font(.caption.monospaced())
@@ -1367,9 +1360,9 @@ struct LocationView: View {
     @ViewBuilder
     private var findRouteButton: some View {
         Button { manager.planRoute() } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 if manager.isPlanningRoute {
-                    ProgressView().tint(.white)
+                    ProgressView()
                     Text(L("Finding route"))
                 } else {
                     Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
@@ -1395,10 +1388,10 @@ struct LocationView: View {
                 .font(.title3)
                 .foregroundStyle(Theme.accent)
                 .frame(width: 28)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("\(Self.formatDistance(planned.distance)) · "
                      + Self.formatDuration(planned.duration))
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.medium))
                 Text(Self.routeDetail(planned))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1432,13 +1425,13 @@ struct LocationView: View {
             } else {
                 Image(systemName: mode.systemImage)
                     .font(.headline)
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(.secondary)
                     .frame(width: 44, height: 44)
-                    .background(Circle().fill(.white.opacity(0.08)))
+                    .background(Circle().fill(Theme.control))
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(stretch.name ?? L("No street name"))
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.medium))
                     .lineLimit(1)
                 Text(Self.roadDetail(stretch))
                     .font(.caption)
@@ -1447,9 +1440,11 @@ struct LocationView: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(.white.opacity(0.06)))
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+            .fill(Theme.control))
+        .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+            .strokeBorder(Theme.hairline, lineWidth: 1))
         .animation(.smooth(duration: 0.3), value: stretch)
     }
 
@@ -1458,7 +1453,7 @@ struct LocationView: View {
     private var savedPlacesCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle(L("Saved places"), systemImage: "bookmark.fill")
+                sectionTitle(L("Saved places"), systemImage: "bookmark")
                 if manager.savedPlaces.isEmpty {
                     Text(L("Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away."))
                         .font(.caption)
@@ -1477,7 +1472,7 @@ struct LocationView: View {
 
     /// Tap to set the place; the menu shows it on the map or deletes it.
     private func savedPlaceRow(_ place: SavedPlace) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Button {
                 moveMap(to: place.coordinate)
                 manager.simulate(place.coordinate, name: place.name)
@@ -1488,7 +1483,7 @@ struct LocationView: View {
                         .foregroundStyle(.white, Theme.accent)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(place.name)
-                            .font(.subheadline.weight(.semibold))
+                            .font(.subheadline.weight(.medium))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
                         Text(LocationManager.format(place.coordinate))
@@ -1498,7 +1493,7 @@ struct LocationView: View {
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 6)
+                .padding(.vertical, 8)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain, sound: .tap)
@@ -1538,9 +1533,9 @@ struct LocationView: View {
 
     private var routeCard: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 sectionTitle(L("Play a GPX route"),
-                             systemImage: "point.topleft.down.to.point.bottomright.curvepath.fill")
+                             systemImage: "point.topleft.down.to.point.bottomright.curvepath")
                 if let route = manager.route {
                     loadedRoute(route)
                 } else {
@@ -1557,12 +1552,11 @@ struct LocationView: View {
                             }
                             Text(L("Import GPX file"))
                         }
-                        .font(.subheadline.weight(.semibold))
+                        .font(.subheadline.weight(.medium))
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered, sound: .tap)
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     .controlSize(.regular)
-                    .tint(Theme.accent)
                     .disabled(manager.isImportingRoute)
                 }
             }
@@ -1571,10 +1565,10 @@ struct LocationView: View {
 
     @ViewBuilder
     private func loadedRoute(_ route: GPXRoute) -> some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(route.name)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.medium))
                     .lineLimit(1)
                 Text("\(Self.formatDistance(route.distance)) · "
                      + Self.formatDuration(route.duration(at: manager.routeSpeed)))
@@ -1612,7 +1606,7 @@ struct LocationView: View {
                     .foregroundStyle(.primary)
                 Spacer()
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.footnote.weight(.semibold))
+                    .font(.footnote.weight(.medium))
                     .foregroundStyle(.secondary)
             }
             .fieldBackground()
@@ -1629,7 +1623,7 @@ struct LocationView: View {
     private func playbackControls<Current: View>(
         @ViewBuilder current: (RouteProgress) -> Current) -> some View {
         if let progress = manager.routeProgress {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 ProgressView(value: progress.fraction)
                     .tint(Theme.accent)
                 Text(L("%@ of %@",
@@ -1644,17 +1638,16 @@ struct LocationView: View {
 
             Button { manager.stopRoute() } label: {
                 Label(L("Stop here"), systemImage: "pause.fill")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.medium))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered, sound: .tap)
+            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
             .controlSize(.regular)
-            .tint(.orange)
         } else {
             Button { manager.playRoute() } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     if manager.isBusy {
-                        ProgressView().tint(.white)
+                        ProgressView()
                         Text(L("Setting"))
                     } else {
                         Image(systemName: "play.fill")
@@ -1778,12 +1771,7 @@ struct LocationView: View {
     // MARK: Helpers
 
     private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        Label {
-            Text(title).font(.headline)
-        } icon: {
-            Image(systemName: systemImage)
-                .foregroundStyle(Theme.brand)
-        }
+        SectionTitle(title: title, systemImage: systemImage)
     }
 }
 
@@ -1809,12 +1797,12 @@ private struct SpeedLimitSign: View {
                     .foregroundStyle(.black)
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
-                    .padding(7)
+                    .padding(8)
             case .unlimited:
                 Stripes()
                     .stroke(.black, lineWidth: 1.6)
                     .clipShape(Circle())
-                    .padding(6)
+                    .padding(8)
                 Circle()
                     .strokeBorder(.black.opacity(0.2), lineWidth: 1)
             }

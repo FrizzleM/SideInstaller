@@ -1284,4 +1284,25 @@ let frenchStrings: [String: String] = [
         "%@ est une adresse que cet iPhone possède déjà. Side by Side installe sur l'iPhone de quelqu'un d'autre : utilisez le sien. Pour installer sur celui-ci, utilisez l'onglet Installer.",
     "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
         "Leur iPhone est sous iOS %@. À partir d'iOS 26.4, %@ ne peut pas utiliser le jumelage que leur iPhone donne via le Wi-Fi. iOS 27 se jumelle plutôt depuis ses propres Réglages, ce qui fonctionne : mettez à jour leur iPhone, puis réessayez en répondant Non quand son IP est demandée.",
+
+    // MARK: - AltStore
+
+    "couldn't reach %@: %@":
+        "impossible de joindre %@ : %@",
+    "%@ answered HTTP %d":
+        "%@ a répondu HTTP %d",
+    "%@'s list of apps couldn't be read (%@). Something on this network may have replaced it.":
+        "impossible de lire la liste d'apps de %@ (%@). Quelque chose sur ce réseau l'a peut-être remplacée.",
+    "the %@ that arrived isn't the file %@ lists, so it isn't installed. Try again later.":
+        "le %@ reçu n'est pas le fichier indiqué par %@, il n'est donc pas installé. Réessayez plus tard.",
+    "%@ lists no version of %@ that runs on iOS %@.":
+        "%@ ne propose aucune version de %@ compatible avec iOS %@.",
+    "Open AltStore from your Home Screen and sign in with your Apple ID.":
+        "Ouvrez AltStore depuis votre écran d'accueil et connectez-vous avec votre Apple ID.",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings. Its pairing file is already in place, so the setup skips pairing.":
+        "Pour installer et renouveler des apps sans ordinateur, touchez « Set up Remote AltServer » dans les réglages d'AltStore. Son fichier de jumelage est déjà en place, la configuration saute donc le jumelage.",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings and follow its steps.":
+        "Pour installer et renouveler des apps sans ordinateur, touchez « Set up Remote AltServer » dans les réglages d'AltStore et suivez les étapes.",
+    "Open AltStore and sign in with the same Apple ID.":
+        "Ouvrez AltStore et connectez-vous avec le même Apple ID.",
 ]

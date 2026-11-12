@@ -1235,4 +1235,25 @@ let chineseStrings: [String: String] = [
         "%@ 是这台 iPhone 自己的地址。Side by Side 用于安装到别人的 iPhone 上，请填对方的地址。要安装到这台设备，请使用“安装”标签页。",
     "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
         "对方的 iPhone 运行 iOS %@。从 iOS 26.4 起，%@ 无法使用对方 iPhone 通过 Wi-Fi 给出的配对。iOS 27 改为在自己的设置中配对，这样可行：请先更新对方的 iPhone，再重试，并在询问 IP 时选择“否”。",
+
+    // MARK: - AltStore
+
+    "couldn't reach %@: %@":
+        "无法连接到 %@：%@",
+    "%@ answered HTTP %d":
+        "%@ 返回了 HTTP %d",
+    "%@'s list of apps couldn't be read (%@). Something on this network may have replaced it.":
+        "无法读取 %@ 的应用列表（%@）。此网络上的某个环节可能替换了它。",
+    "the %@ that arrived isn't the file %@ lists, so it isn't installed. Try again later.":
+        "收到的 %@ 不是 %@ 列出的文件，因此不会安装。请稍后重试。",
+    "%@ lists no version of %@ that runs on iOS %@.":
+        "%@ 没有列出 %@ 可在 iOS %@ 上运行的版本。",
+    "Open AltStore from your Home Screen and sign in with your Apple ID.":
+        "从主屏幕打开 AltStore，并用你的 Apple ID 登录。",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings. Its pairing file is already in place, so the setup skips pairing.":
+        "如需在没有电脑的情况下安装和续签应用，请在 AltStore 的设置中轻点“Set up Remote AltServer”。它的配对文件已经放好了，所以设置时会跳过配对。",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings and follow its steps.":
+        "如需在没有电脑的情况下安装和续签应用，请在 AltStore 的设置中轻点“Set up Remote AltServer”，然后按步骤操作。",
+    "Open AltStore and sign in with the same Apple ID.":
+        "打开 AltStore，用同一个 Apple ID 登录。",
 ]

@@ -1139,4 +1139,25 @@ let turkishStrings: [String: String] = [
         "%@ bu iPhone'un zaten sahip olduğu bir adres. Side by Side başkasının iPhone'una yükler, o yüzden onunkini kullan. Buna yüklemek için Yükle sekmesini kullan.",
     "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
         "Diğer iPhone iOS %@ kullanıyor. iOS 26.4'ten itibaren %@, diğer iPhone'un Wi-Fi üzerinden verdiği eşlemeyi kullanamaz. iOS 27 bunun yerine kendi Ayarlar'ından eşlenir ve bu çalışır: diğer iPhone'u güncelle, sonra yeniden dene ve IP'si sorulduğunda Hayır'ı seç.",
+
+    // MARK: - AltStore
+
+    "couldn't reach %@: %@":
+        "%@ adresine ulaşılamadı: %@",
+    "%@ answered HTTP %d":
+        "%@ HTTP %d yanıtı verdi",
+    "%@'s list of apps couldn't be read (%@). Something on this network may have replaced it.":
+        "%@ uygulama listesi okunamadı (%@). Bu ağdaki bir şey onu değiştirmiş olabilir.",
+    "the %@ that arrived isn't the file %@ lists, so it isn't installed. Try again later.":
+        "Gelen %@, %@ listesindeki dosya değil, bu yüzden yüklenmedi. Daha sonra yeniden dene.",
+    "%@ lists no version of %@ that runs on iOS %@.":
+        "%@ listesinde %@ için iOS %@ ile uyumlu bir sürüm yok.",
+    "Open AltStore from your Home Screen and sign in with your Apple ID.":
+        "AltStore'u Ana Ekran'dan aç ve Apple ID'nle giriş yap.",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings. Its pairing file is already in place, so the setup skips pairing.":
+        "Bilgisayarsız uygulama yüklemek ve yenilemek için AltStore'un Ayarlar'ında “Set up Remote AltServer”a dokun. Eşleme dosyası zaten yerinde, bu yüzden kurulum eşleme adımını atlar.",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings and follow its steps.":
+        "Bilgisayarsız uygulama yüklemek ve yenilemek için AltStore'un Ayarlar'ında “Set up Remote AltServer”a dokun ve adımları izle.",
+    "Open AltStore and sign in with the same Apple ID.":
+        "AltStore'u aç ve aynı Apple ID ile giriş yap.",
 ]

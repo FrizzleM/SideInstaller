@@ -1412,6 +1412,54 @@ Apple granting the capability, Madeira picking up the pairing file and the
 sign-in, and a refresh in Madeira (Apple accepting the handed token, the tunnel,
 misagent accepting the profile).
 
+## AltStore
+
+AltStore Classic is the fifth `InstallSource` (`.altStore`, 2026-11-10, on the
+redesign branch), offered on the Install tab and in Side by Side.
+
+**The download** isn't from GitHub, which only has a "Notarized" 2.3: it comes
+from AltStore's own source, `https://apps.altstore.io` (it redirects to
+`cdn.altstore.io/file/altstore/apps.json`), the list AltServer installs AltStore
+from (`ALTDeviceManager+Installation.swift`, `altstoreSourceURL`). AltServer
+takes the first listed version whose `minOSVersion` the device meets; so does
+`SideStoreDownloader.listedVersions` (`InstallSource.feed`, `AltSourceFeed`),
+with the target's iOS in Side by Side and this iPhone's on the Install tab. Only
+`com.rileytestut.AltStore` is read: the beta is listed under `.Beta`, which the
+vendored isideload doesn't treat as AltStore (no `ALTDeviceID`, certificate or
+app group). Versions before 2.3 (no Remote AltServer, so a computer for
+everything) are left out (`AltSourceFeed.oldestVersion`). Each listed version
+carries a SHA-256, which the download must match (`DownloadError.unverifiedListing`);
+the ledger keeps it as the file's ETag, so an unchanged listing reuses
+`AltStore.ipa`. One channel, Stable; Advanced lists the other versions from the
+same source (`ReleaseCatalog(listed:)`). Errors name AltStore's host, not GitHub
+(`sourceUnreachable`, `sourceStatus`, `badSource`, `noListedVersion`), and the
+"Bring the .ipa yourself" GitHub card isn't shown for it.
+
+**The pairing file.** AltStore 2.3 read it from its bundle, sealed with the
+certificate's machine ID (`ALTPairingFile.dat`, isideload change 9). On
+2026-09-23 AltStore moved it (altstoreio/AltStore 5811912, in 2.3.1 and later):
+AltServer now writes the RPPairing record, plain XML as idevice's
+`rp_pairing_file_to_bytes` writes it, to `Documents/ALTPairingFile.plist` in
+AltStore's container after the install, and AltStore takes it into its Keychain
+when Remote AltServer is set up, which then skips pairing. The 2.3.3 binary has
+`ALTPairingFile.plist` and no `ALTPairingFile.dat`. Step 8 does what AltServer
+does (`AltStorePairingHandoff`: `identifier`, `private_key`, `public_key`,
+`alt_irk`), and so does Side by Side's `setUp`. AltStore's `OnDeviceClient`
+refuses a record without `private_key`, so a lockdown-only pairing file writes
+nothing, and AltStore pairs during its Remote AltServer setup. The file is
+optional, as for Madeira: failing to write it doesn't fail the install. Signing
+still bundles the sealed copy for a 2.3 picked under Advanced. An imported
+AltStore IPA is recognized (`IPALibrary.knownSource`) and set up the same way,
+without the App ID popup a custom IPA gets.
+
+Verified 2026-11-10: a Mac harness compiling `SideStoreDownloader.swift` and
+the pairing types against the live source (list 2.3.3, 2.3.2, 2.3.1, 2.3;
+iOS 17.0 gets `noListedVersion`; a real download matching the listed SHA-256;
+the second run skipped; a wrong SHA-256 refused with nothing kept; the IPA
+recognized as AltStore; the record split), and the simulator (picker, version
+list, Side by Side choice). Not verified, since it needs the iPhone and an Apple
+ID: signing and installing AltStore, and AltStore picking up the file.
+
 ## Running on a device (what you do)
 
 1. Install LocalDevVPN (App Store id 6755608044), connect it, keep Wi-Fi on.

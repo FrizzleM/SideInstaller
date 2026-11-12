@@ -7,13 +7,14 @@ import SideInstallerFFI
 
 /// What Side by Side can put on another iPhone, the choice iLoader offers:
 /// SideInstaller itself, one of the two SideStore builds the Install tab sets
-/// up, or an IPA picked from Files.
+/// up, AltStore, or an IPA picked from Files.
 enum SideBySideApp: String, CaseIterable, Identifiable {
     case sideInstaller
     case sideStore
     case liveContainer
+    case altStore
     /// An IPA picked from Files (`SideBySideManager.customIPA`). One of the
-    /// three above is set up like that build; any other app is signed and
+    /// four above is set up like that build; any other app is signed and
     /// installed as it is, without a pairing file.
     case custom
 
@@ -21,17 +22,18 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
 
     /// The choices with a card of their own; `.custom` is picked from the
     /// text under Continue.
-    static let builtIn: [SideBySideApp] = [.sideInstaller, .sideStore, .liveContainer]
+    static let builtIn: [SideBySideApp] = [.sideInstaller, .sideStore, .liveContainer, .altStore]
 
-    /// The Install tab's build, for the two SideStore builds: downloaded from
-    /// the same place, and handed the pairing file the same way. Nil for
-    /// SideInstaller, which comes from its own latest release and is handed the
-    /// pairing file as an imported one, and for a custom IPA.
+    /// The Install tab's build, for the two SideStore builds and AltStore:
+    /// downloaded from the same place, and handed the pairing file the same
+    /// way. Nil for SideInstaller, which comes from its own latest release and
+    /// is handed the pairing file as an imported one, and for a custom IPA.
     var source: InstallSource? {
         switch self {
         case .sideInstaller: return nil
         case .sideStore:     return .sideStore
         case .liveContainer: return .liveContainer
+        case .altStore:      return .altStore
         case .custom:        return nil
         }
     }
@@ -63,13 +65,15 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
 
     var requirementSymbol: String { "network" }
 
-    /// The app's own icon: SideInstaller's, and the official SideStore and
-    /// LiveContainer icons from their repositories (AGPL-3.0), at 256 px.
+    /// The app's own icon: SideInstaller's, and the official SideStore,
+    /// LiveContainer and AltStore icons from their repositories (AGPL-3.0),
+    /// at 256 px.
     var image: String? {
         switch self {
         case .sideInstaller: return "AppLogo"
         case .sideStore:     return "SideStoreLogo"
         case .liveContainer: return "LiveContainerLogo"
+        case .altStore:      return "AltStoreLogo"
         case .custom:        return nil
         }
     }
@@ -77,19 +81,11 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
     /// SF Symbol drawn on `tint` if the icon art is missing.
     var symbol: String {
         switch self {
-        case .sideInstaller: return "arrow.down.app.fill"
-        case .sideStore:     return "storefront.fill"
-        case .liveContainer: return "shippingbox.fill"
+        case .sideInstaller: return "arrow.down.app"
+        case .sideStore:     return "storefront"
+        case .liveContainer: return "shippingbox"
+        case .altStore:      return "diamond"
         case .custom:        return "app.dashed"
-        }
-    }
-
-    var tint: Color {
-        switch self {
-        case .sideInstaller: return Theme.accent
-        case .sideStore:     return Color(red: 0.56, green: 0.36, blue: 0.96)
-        case .liveContainer: return Color(red: 0.10, green: 0.68, blue: 0.64)
-        case .custom:        return .orange
         }
     }
 }
@@ -294,6 +290,10 @@ final class SideBySideManager: ObservableObject {
     /// use the pairing it gave, so none was handed over: a lockdown record on
     /// iOS 26.4 or later. It then needs a pairing file made on a computer.
     @Published private(set) var pairingLeftOutOn: String?
+    /// True when AltStore went on without the pairing, which it can't connect
+    /// with as a lockdown record only: it pairs as its Remote AltServer is set
+    /// up instead.
+    @Published private(set) var altStorePairsItself = false
     /// Why the run stopped, or couldn't start.
     @Published private(set) var lastError: String?
     /// True while a pair record with someone else's iPhone is saved here.
@@ -507,7 +507,9 @@ final class SideBySideManager: ObservableObject {
         }
 
         let app = self.app
-        let channel = self.channel
+        // AltStore has a stable channel only, whatever was picked for another.
+        let offered = app.source?.channels(stableReleased: true) ?? ReleaseChannel.allCases
+        let channel = offered.contains(self.channel) ? self.channel : offered[0]
         let custom = app == .custom ? customIPA : nil
         let setsUp: SideBySideApp? = custom != nil ? custom?.build : app
         resetRun()
@@ -667,6 +669,7 @@ final class SideBySideManager: ObservableObject {
         pairingPIN = nil
         setTrustWait(false)
         pairingLeftOutOn = nil
+        altStorePairsItself = false
         targetSummary = nil
         targetOSVersion = nil
         installedAppName = nil
@@ -771,12 +774,14 @@ final class SideBySideManager: ObservableObject {
     }
 
     /// The build of SideInstaller's own an IPA is, by its bundle ID: SideInstaller,
-    /// SideStore, or LiveContainer carrying SideStore. Nil for any other app.
+    /// SideStore, LiveContainer carrying SideStore, or AltStore. Nil for any
+    /// other app.
     private static func knownBuild(ofIPAAt url: URL, bundleID id: String) -> SideBySideApp? {
         if id == sideInstallerBundleID || id.hasPrefix(sideInstallerBundleID + ".") { return .sideInstaller }
         switch IPALibrary.knownSource(ofIPAAt: url) {
         case .sideStore?:     return .sideStore
         case .liveContainer?: return .liveContainer
+        case .altStore?:      return .altStore
         default:              return nil
         }
     }
@@ -1082,9 +1087,11 @@ final class SideBySideManager: ObservableObject {
     /// from its Settings, which gives the RPPairing record that works.
     /// SideInstaller is installed all the same, without the record
     /// (`pairingLeftOutOn`): a pairing file made on a computer gets it going.
+    /// So is AltStore, which pairs itself as its Remote AltServer is set up
+    /// when the record is one it can't use (`handOffToAltStore`).
     @MainActor
     private func checkCompatibility(of app: SideBySideApp) throws {
-        guard let version = targetOSVersion, let path = pairRecordPath else { return }
+        guard app != .altStore, let version = targetOSVersion, let path = pairRecordPath else { return }
         let kind = PairingFileKind.of(path: path)
         guard kind.hasLockdown, !kind.hasRemotePairing, Self.version(version, isAtLeast: 26, 4) else { return }
         guard app.source != nil else {
@@ -1355,9 +1362,10 @@ final class SideBySideManager: ObservableObject {
         }
     }
 
-    /// A SideStore build's latest release on `channel`, as the Install tab
-    /// fetches it: into Documents, skipped when the copy there is still the one
-    /// GitHub serves, and an IPA the user put there themselves is used as it is.
+    /// A SideStore build's latest release on `channel`, or AltStore's newest
+    /// version their iOS runs, as the Install tab fetches it: into Documents,
+    /// skipped when the copy there is still the file being served, and an IPA
+    /// the user put there themselves is used as it is.
     @MainActor
     private func downloadBuild(_ source: InstallSource, channel: ReleaseChannel) async throws -> URL {
         let onDisk = IPALibrary.entry(source: source, channel: channel)
@@ -1369,9 +1377,13 @@ final class SideBySideManager: ObservableObject {
         let report: @Sendable (Double) -> Void = { [weak self] fraction in
             Task { @MainActor in self?.downloadProgress = fraction }
         }
+        // Their iOS, not this iPhone's, decides which AltStore version goes on.
+        let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion)
+            ?? ProcessInfo.processInfo.operatingSystemVersion
         do {
             let path = try await SideStoreDownloader.$reportProgress.withValue(report) {
-                try await SideStoreDownloader.downloadLatest(source: source, channel: channel) { [weak self] line in
+                try await SideStoreDownloader.downloadLatest(source: source, channel: channel,
+                                                             runningOn: theirOS) { [weak self] line in
                     self?.engine.log(line)
                 }
             }
@@ -1432,10 +1444,11 @@ final class SideBySideManager: ObservableObject {
         engine.log("Signing \(ipa) for \(udid.isEmpty ? "their iPhone" : udid) …")
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        // No bundled pairing file (only AltStore takes one), and no Increased
+        // No bundled pairing file: only AltStore 2.3 read one, and from 2.3.1
+        // on it takes the file `setUp` writes into its Documents. No Increased
         // Memory Limit: SideInstaller has no use for it, and the SideStore
-        // builds re-register their App IDs without it. Every app gets its app
-        // group, as on the Install tab.
+        // builds and AltStore re-register their App IDs without it. Every app
+        // gets its app group, as on the Install tab.
         let rc = si_sign_ipa(session, ipa, udid, deviceName, nil, 0, 1, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
@@ -1517,9 +1530,10 @@ final class SideBySideManager: ObservableObject {
 
     /// Puts the pair record into the app on their iPhone, so it opens ready to
     /// go without pairing itself: into SideStore as the Install tab hands over
-    /// this iPhone's (`handOffToSideStore`), and into SideInstaller as an
-    /// imported pairing file (`handOffToSideInstaller`), which it connects with
-    /// below iOS 27 too.
+    /// this iPhone's (`handOffToSideStore`), into AltStore where AltServer
+    /// puts it (`handOffToAltStore`), and into SideInstaller as an imported
+    /// pairing file (`handOffToSideInstaller`), which it connects with below
+    /// iOS 27 too.
     @MainActor
     private func setUp(_ app: SideBySideApp, ip: String, appleID: String) async throws {
         try Task.checkCancellation()
@@ -1527,7 +1541,9 @@ final class SideBySideManager: ObservableObject {
         guard let bundleID = signedBundleID else { throw EngineError.message(L("No signed bundle to install.")) }
         setStep(.setUp, .active)
         do {
-            if let source = app.source {
+            if app == .altStore {
+                try await handOffToAltStore(ip: ip, record: record, bundleID: bundleID)
+            } else if let source = app.source {
                 try await handOffToSideStore(source, app: app, appleID: appleID, ip: ip,
                                              record: record, bundleID: bundleID)
             } else {
@@ -1566,6 +1582,36 @@ final class SideBySideManager: ObservableObject {
             if let certificate {
                 self.handOffCertificate(certificate, bundleID: bundleID, appName: appName, home: home)
             }
+        }
+    }
+
+    /// Puts their RPPairing record into AltStore on their iPhone, where
+    /// AltServer puts it (`AltStorePairingHandoff`), so setting up its Remote
+    /// AltServer skips pairing. AltStore pairs during that setup instead
+    /// (`altStorePairsItself`) when the pairing is a lockdown record only,
+    /// which it can't connect with, or the file couldn't be written, which
+    /// doesn't stop the run: as on the Install tab, AltStore works without it.
+    @MainActor
+    private func handOffToAltStore(ip: String, record: String, bundleID: String) async throws {
+        let pairing = try Data(contentsOf: URL(fileURLWithPath: record))
+        guard let rpRecord = AltStorePairingHandoff.record(from: pairing) else {
+            altStorePairsItself = true
+            engine.log("Their pairing is a lockdown record only, which AltStore can't connect with, so none was written. Setting up AltStore's Remote AltServer pairs it instead.")
+            return
+        }
+        do {
+            try await onDeviceQueue {
+                try self.reconnectIfNeeded(ip: ip, record: record)
+                let rel = AltStorePairingHandoff.remoteRelativePath
+                self.engine.log("Writing the RPPairing record into \(bundleID) /Documents/\(rel) …")
+                let written = try self.connection.writeFile(intoBundleID: bundleID,
+                                                            remoteRelativePath: rel, data: rpRecord)
+                self.engine.log("Pairing file written into AltStore on their iPhone and read back VERIFIED (\(written) bytes). Setting up its Remote AltServer skips pairing.")
+            }
+        } catch {
+            if Task.isCancelled { throw CancellationError() }
+            altStorePairsItself = true
+            engine.log("⚠️ Couldn't put the pairing file into AltStore on their iPhone (\(short(error))). It's installed: setting up its Remote AltServer pairs it instead.")
         }
     }
 
@@ -1893,9 +1939,9 @@ struct SideBySideView: View {
                         SoundEffects.play(.tick)
                         manager.goBack()
                     } label: {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 4) {
                             Image(systemName: "chevron.left")
-                                .font(.body.weight(.semibold))
+                                .font(.body.weight(.medium))
                             Text(L("Back"))
                         }
                     }
@@ -1983,12 +2029,12 @@ struct SideBySideView: View {
     // MARK: Welcome
 
     private var welcomePage: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             BrandHeader(icon: "iphone.gen3.radiowaves.left.and.right",
                         image: "SideBySideLogo",
                         title: L("Side by Side"),
                         subtitle: L("Set up someone else's iPhone")) {
-                StatusPill(text: L("Same Wi-Fi network"), systemImage: "wifi", color: .secondary, glass: true)
+                StatusDot(text: L("Same Wi-Fi network"), color: .secondary, idle: true)
             }
             .cascadeItem(0)
 
@@ -2004,18 +2050,18 @@ struct SideBySideView: View {
 
     /// A pairing kept from a run that stopped, which Clear forgets.
     private var rememberedCard: some View {
-        CalloutCard(tint: Theme.accent) {
+        PanelCard {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "link")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.accent2)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.accent)
                 VStack(alignment: .leading, spacing: 8) {
                     Text(L("This iPhone is still paired with theirs. Clearing forgets it."))
                         .font(.footnote)
                         .fixedSize(horizontal: false, vertical: true)
                     Button(L("Clear their details")) { manager.clear() }
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Theme.accent2)
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(Theme.accent)
                         .buttonStyle(.plain, sound: .tap)
                 }
             }
@@ -2025,7 +2071,7 @@ struct SideBySideView: View {
     // MARK: 1. What to install
 
     private var appPage: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             stageHeader(.app,
                         title: L("What should go on their iPhone?"),
                         subtitle: L("Pick one. You can come back for another one later."))
@@ -2039,7 +2085,8 @@ struct SideBySideView: View {
                     .cascadeItem(index + 1)
                 }
             }
-            if manager.app.source != nil {
+            // AltStore has one channel, so nothing to pick.
+            if let source = manager.app.source, source.channels(stableReleased: true).count > 1 {
                 channelCard.transition(.cardAppear)
             } else if manager.app == .custom {
                 customIPACard.transition(.cardAppear)
@@ -2062,9 +2109,9 @@ struct SideBySideView: View {
     /// Small grey text under Continue that picks an IPA from Files instead,
     /// and says why the last pick didn't take.
     private var customIPALink: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             Button { showImporter = true } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     if manager.isImportingIPA { ProgressView().controlSize(.mini) }
                     Text(manager.isImportingIPA ? L("Importing…") : L("Use a custom .ipa instead"))
                 }
@@ -2078,7 +2125,7 @@ struct SideBySideView: View {
             if let error = manager.importError {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -2089,7 +2136,7 @@ struct SideBySideView: View {
     /// The picked IPA, a button to pick another, and what's done with it.
     private var customIPACard: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     AppGlyph(app: .custom, size: 40)
                     VStack(alignment: .leading, spacing: 2) {
@@ -2111,9 +2158,9 @@ struct SideBySideView: View {
                             ProgressView().controlSize(.small)
                         } else {
                             Image(systemName: manager.customIPA == nil
-                                  ? "square.and.arrow.down" : "checkmark.circle.fill")
+                                  ? "square.and.arrow.down" : "checkmark.circle")
                                 .contentTransition(.symbolEffect(.replace))
-                                .foregroundStyle(manager.customIPA == nil ? Color.secondary : Theme.accent2)
+                                .foregroundStyle(manager.customIPA == nil ? Color.secondary : Theme.accent)
                         }
                         Text(manager.isImportingIPA ? L("Importing…")
                              : manager.customIPA?.file.lastPathComponent ?? L("Import .ipa"))
@@ -2123,8 +2170,8 @@ struct SideBySideView: View {
                         Spacer()
                         if manager.customIPA != nil, !manager.isImportingIPA {
                             Text(L("Replace"))
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(Theme.accent2)
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(Theme.accent)
                         }
                     }
                     .fieldBackground()
@@ -2134,9 +2181,9 @@ struct SideBySideView: View {
                 .disabled(manager.isImportingIPA)
 
                 if let error = manager.importError {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                    Label(error, systemImage: "exclamationmark.triangle")
                         .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.warning)
                         .fixedSize(horizontal: false, vertical: true)
                         .transition(.opacity)
                 } else if let picked = manager.customIPA {
@@ -2156,7 +2203,7 @@ struct SideBySideView: View {
     private var channelCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle(L("Release"), systemImage: "tag.fill")
+                sectionTitle(L("Release"), systemImage: "tag")
                 Picker(L("Release"), selection: $manager.channel) {
                     ForEach(ReleaseChannel.allCases) { channel in
                         Text(channel.displayName).tag(channel)
@@ -2170,13 +2217,13 @@ struct SideBySideView: View {
     // MARK: 2. Their address
 
     private var addressPage: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             stageHeader(.address,
                         title: L("Do you have the device's IP?"),
                         subtitle: L("Optional"))
                 .cascadeItem(0)
 
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 OptionRow(symbol: "network",
                           title: L("Yes"),
                           detail: L("SideInstaller asks their iPhone to pair directly. Needed below iOS 27."),
@@ -2184,7 +2231,7 @@ struct SideBySideView: View {
                           wrapsDetail: true) {
                     manager.knowsAddress = true
                 }
-                OptionRow(symbol: "gearshape.fill",
+                OptionRow(symbol: "gearshape",
                           title: L("No"),
                           detail: L("Their iPhone pairs from its own Settings, which needs iOS 27."),
                           selected: !manager.knowsAddress,
@@ -2202,8 +2249,7 @@ struct SideBySideView: View {
             Button(action: continueFromAddress) { continueLabel(L("Continue")) }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(!addressReady)
-                .opacity(addressReady ? 1 : 0.35)
-                .animation(.snappy(duration: 0.25), value: addressReady)
+                .animation(.smooth(duration: 0.2), value: addressReady)
                 .cascadeItem(2)
         }
         .onChange(of: manager.targetIP) { _, _ in showsAddressProblem = false }
@@ -2234,9 +2280,9 @@ struct SideBySideView: View {
                     .onSubmit(continueFromAddress)
                     .fieldBackground()
                 if showsAddressProblem, let problem = manager.addressProblem {
-                    Label(problem, systemImage: "exclamationmark.circle.fill")
+                    Label(problem, systemImage: "exclamationmark.circle")
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                         .fixedSize(horizontal: false, vertical: true)
                         .transition(.opacity)
                 }
@@ -2274,21 +2320,21 @@ struct SideBySideView: View {
     // MARK: 3. The Apple ID
 
     private var accountPage: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             stageHeader(.account,
                         title: L("Which Apple ID signs it?"),
                         subtitle: L("The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's."))
                 .cascadeItem(0)
 
             if let saved = accounts.active {
-                VStack(spacing: 10) {
-                    OptionRow(symbol: "person.2.fill",
+                VStack(spacing: 12) {
+                    OptionRow(symbol: "person.2",
                               title: L("Their Apple ID"),
                               detail: L("Recommended: they keep their apps signed with it."),
                               selected: !manager.usesSavedAccount) {
                         manager.usesSavedAccount = false
                     }
-                    OptionRow(symbol: "person.crop.circle.fill",
+                    OptionRow(symbol: "person.crop.circle",
                               title: L("My Apple ID"),
                               detail: saved.normalized,
                               selected: manager.usesSavedAccount) {
@@ -2300,14 +2346,14 @@ struct SideBySideView: View {
             }
 
             if manager.signsWithSavedAccount {
-                CalloutCard(tint: .orange) {
+                PanelCard {
                     Label {
                         Text(L("Only if you'll keep their apps signed yourself: they won't have this Apple ID's password."))
                             .font(.footnote)
                             .fixedSize(horizontal: false, vertical: true)
                     } icon: {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(Theme.warning)
                     }
                 }
                 .transition(.cardAppear)
@@ -2320,8 +2366,7 @@ struct SideBySideView: View {
             Button(action: continueFromAccount) { continueLabel(L("Continue")) }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(!manager.hasCredentials)
-                .opacity(manager.hasCredentials ? 1 : 0.35)
-                .animation(.snappy(duration: 0.25), value: manager.hasCredentials)
+                .animation(.smooth(duration: 0.2), value: manager.hasCredentials)
                 .cascadeItem(3)
         }
         .animation(.smooth(duration: 0.3), value: manager.signsWithSavedAccount)
@@ -2349,8 +2394,8 @@ struct SideBySideView: View {
                     .onSubmit(continueFromAccount)
                     .fieldBackground()
                 VStack(alignment: .leading, spacing: 8) {
-                    CheckRow(symbol: "lock.fill", text: L("Used for this install only, and never saved."))
-                    CheckRow(symbol: "bell.badge.fill",
+                    CheckRow(symbol: "lock", text: L("Used for this install only, and never saved."))
+                    CheckRow(symbol: "bell.badge",
                              text: L("Apple may send a code to their devices, so keep their iPhone close."))
                 }
                 .padding(.top, 2)
@@ -2367,7 +2412,7 @@ struct SideBySideView: View {
     // MARK: 4. Their iPhone, ready
 
     private var readyPage: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             stageHeader(.ready,
                         title: L("Get their iPhone ready"),
                         subtitle: L("Do this on their iPhone, then start."))
@@ -2383,31 +2428,31 @@ struct SideBySideView: View {
             .cascadeItem(1)
 
             PanelCard {
-                VStack(spacing: 14) {
-                    summaryRow(L("Install"), value: appSummary, symbol: "square.grid.2x2.fill", edit: .app)
+                VStack(spacing: 16) {
+                    summaryRow(L("Install"), value: appSummary, symbol: "square.grid.2x2", edit: .app)
                     hairline
                     summaryRow(L("Their iPhone"), value: addressSummary, symbol: "iphone", edit: .address)
                     hairline
                     summaryRow(L("Apple ID to sign with"), value: manager.credentials?.id ?? L("None"),
-                               symbol: "person.crop.circle.fill", edit: .account)
+                               symbol: "person.crop.circle", edit: .account)
                 }
             }
             .cascadeItem(2)
 
             if !engine.wifiConnected {
-                CalloutCard(tint: .orange) {
+                PanelCard {
                     Label {
                         Text(L("Wi-Fi is off. Both iPhones have to be on the same Wi-Fi network for this to work."))
                             .font(.footnote)
                             .fixedSize(horizontal: false, vertical: true)
                     } icon: {
-                        Image(systemName: "wifi.slash").foregroundStyle(.orange)
+                        Image(systemName: "wifi.slash").foregroundStyle(Theme.warning)
                     }
                 }
                 .transition(.cardAppear)
             }
             if let problem = manager.lastError, !manager.isRunning {
-                CalloutCard(tint: .red) { ErrorMessage(message: problem) }
+                PanelCard { ErrorMessage(message: problem) }
                     .transition(.cardAppear)
             }
 
@@ -2415,7 +2460,7 @@ struct SideBySideView: View {
                 focus = nil
                 manager.start()
             } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Image(systemName: "iphone.and.arrow.forward")
                     Text(L("Start the install"))
                 }
@@ -2429,7 +2474,10 @@ struct SideBySideView: View {
 
     private var appSummary: String {
         if manager.app == .custom { return manager.customIPA?.name ?? manager.app.displayName }
-        guard manager.app.source != nil else { return manager.app.displayName }
+        // A build with one channel (AltStore) has none to name.
+        guard let source = manager.app.source, source.channels(stableReleased: true).count > 1 else {
+            return manager.app.displayName
+        }
         return "\(manager.app.displayName) · \(manager.channel.displayName)"
     }
 
@@ -2442,9 +2490,9 @@ struct SideBySideView: View {
         Button { manager.go(to: stage) } label: {
             HStack(spacing: 12) {
                 Image(systemName: symbol)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.accent2)
-                    .frame(width: 26)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 24)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label)
                         .font(.caption)
@@ -2458,8 +2506,8 @@ struct SideBySideView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Text(L("Edit"))
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Theme.accent2)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(Theme.accent)
             }
             .contentShape(Rectangle())
         }
@@ -2468,14 +2516,14 @@ struct SideBySideView: View {
 
     private var hairline: some View {
         Rectangle()
-            .fill(Color(.separator).opacity(0.6))
+            .fill(Theme.hairline)
             .frame(height: 1)
     }
 
     // MARK: The run
 
     private var runPage: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             runHeader.cascadeItem(0)
             if manager.isRunning {
                 if manager.pairingInSettings || manager.pairingPIN != nil {
@@ -2497,26 +2545,21 @@ struct SideBySideView: View {
     }
 
     private var runHeader: some View {
-        VStack(spacing: 14) {
-            AppGlyph(app: manager.runApp, size: 76)
-                .shadow(color: Theme.glow, radius: 20, x: 0, y: 12)
-                .scaleEffect(manager.isRunning ? 1.04 : 1)
-                .animation(manager.isRunning
-                           ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : .default,
-                           value: manager.isRunning)
+        VStack(spacing: 16) {
+            AppGlyph(app: manager.runApp, size: 72)
             Text(runTitle)
-                .font(.title2.weight(.bold))
+                .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .contentTransition(.opacity)
             Group {
                 if let summary = manager.targetSummary {
-                    StatusPill(text: summary, systemImage: "iphone", color: .green)
+                    StatusDot(text: summary, color: Theme.positive)
                 } else {
-                    StatusPill(text: L("Same Wi-Fi network"), systemImage: "wifi", color: .secondary, glass: true)
+                    StatusDot(text: L("Same Wi-Fi network"), color: .secondary, idle: true)
                 }
             }
-            .transition(.opacity.combined(with: .scale(scale: 0.85)))
+            .transition(.opacity)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
@@ -2531,18 +2574,14 @@ struct SideBySideView: View {
     /// get there, and the code once it wants one. Nothing appears on it by
     /// itself, so without this the run just looks stuck.
     private var pairingCard: some View {
-        CalloutCard(tint: .orange) {
+        PanelCard {
             VStack(alignment: .leading, spacing: 16) {
                 actionHeader(L("Pair their iPhone in Settings"),
                              detail: L("Their iPhone won't ask by itself. Pairing starts from its Settings."),
                              symbol: "lock.iphone")
                 if let pin = manager.pairingPIN {
-                    VStack(spacing: 6) {
-                        Text(pin)
-                            .font(.system(size: 46, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .tracking(8)
-                            .accessibilityLabel(pin.map(String.init).joined(separator: " "))
+                    VStack(spacing: 12) {
+                        PairingCodeDigits(pin: pin)
                         Text(L("Type this into the prompt on their iPhone."))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -2551,10 +2590,8 @@ struct SideBySideView: View {
                             .padding(.horizontal, 12)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(.white.opacity(0.07)))
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    .padding(.vertical, 4)
+                    .transition(.opacity)
                 }
                 NumberedSteps(steps: [
                     L("On their iPhone, open Settings › Privacy & Security › Developer Mode."),
@@ -2563,7 +2600,7 @@ struct SideBySideView: View {
                     L("Type the code that appears here into the prompt on their iPhone."),
                 ])
                 if manager.pairingPIN == nil {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text(L("Waiting for their iPhone…"))
                             .font(.footnote)
@@ -2577,21 +2614,20 @@ struct SideBySideView: View {
 
     /// Their iPhone shows a Trust prompt, on an iOS that still pairs that way.
     private var trustCard: some View {
-        CalloutCard(tint: .orange) {
+        PanelCard {
             actionHeader(L("Tap Trust on their iPhone"),
                          detail: L("Unlock their iPhone, then tap Trust in the prompt that comes up."),
-                         symbol: "hand.tap.fill")
+                         symbol: "hand.tap")
         }
     }
 
     private func actionHeader(_ title: String, detail: String, symbol: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: symbol)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.orange)
-                .frame(width: 40, height: 40)
-                .background(Circle().fill(Color.orange.opacity(0.16)))
-            VStack(alignment: .leading, spacing: 3) {
+                .font(.title3)
+                .foregroundStyle(Theme.warning)
+                .frame(width: 28, height: 28)
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2608,7 +2644,7 @@ struct SideBySideView: View {
         let steps = manager.runSteps
         return PanelCard {
             VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Text(progressTitle)
                         .font(.headline)
                         .contentTransition(.opacity)
@@ -2620,13 +2656,10 @@ struct SideBySideView: View {
                         .animation(.smooth(duration: 0.3), value: manager.overallProgress)
                     if manager.isRunning {
                         cancelButton
-                            .transition(.opacity.combined(with: .scale(scale: 0.6)))
+                            .transition(.opacity)
                     }
                 }
-                InstallProgressBar(progress: manager.overallProgress,
-                                   tint: progressTint,
-                                   gradient: progressGradient,
-                                   animating: manager.isRunning)
+                InstallProgressBar(progress: manager.overallProgress, tint: progressTint)
                 VStack(spacing: 0) {
                     ForEach(Array(steps.enumerated()), id: \.element) { index, step in
                         SideBySideStepRow(title: step.title(for: manager.runApp),
@@ -2653,11 +2686,7 @@ struct SideBySideView: View {
         manager.stepStates.values.contains(.failed)
     }
 
-    private var progressTint: Color { runFailed ? .red : Theme.accent }
-
-    private var progressGradient: LinearGradient {
-        runFailed ? Theme.gradient(.red) : Theme.brand
-    }
+    private var progressTint: Color { runFailed ? Theme.negative : Theme.accent }
 
     /// The X in the card's corner, which stops the run after asking. It dims
     /// once the run is stopping, which waits for the step in flight.
@@ -2666,10 +2695,10 @@ struct SideBySideView: View {
             confirmingCancel = true
         } label: {
             Image(systemName: "xmark")
-                .font(.footnote.weight(.bold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .padding(7)
-                .background(Circle().fill(.white.opacity(0.08)))
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Theme.control))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain, sound: .tap)
@@ -2702,24 +2731,24 @@ struct SideBySideView: View {
     /// Why the run stopped, and the ways on: again as it was, or with
     /// something changed. Untitled: the header above says it stopped.
     private func failureCard(_ message: String) -> some View {
-        CalloutCard(tint: .red) {
-            VStack(alignment: .leading, spacing: 14) {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                    Image(systemName: "exclamationmark.triangle")
                         .font(.title3)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                     Text(message)
                         .font(.subheadline)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) { retryButtons }
-                    VStack(alignment: .leading, spacing: 10) { retryButtons }
+                    HStack(spacing: 12) { retryButtons }
+                    VStack(spacing: 12) { retryButtons }
                 }
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) { reportButtons(message) }
-                    VStack(alignment: .leading, spacing: 10) { reportButtons(message) }
+                    HStack(spacing: 12) { reportButtons(message) }
+                    VStack(alignment: .leading, spacing: 12) { reportButtons(message) }
                 }
             }
         }
@@ -2729,16 +2758,14 @@ struct SideBySideView: View {
     private var retryButtons: some View {
         Button { manager.start() } label: {
             Label(L("Try again"), systemImage: "arrow.clockwise")
-                .font(.subheadline.weight(.semibold))
         }
-        .buttonStyle(.borderedProminent, sound: .press)
-        .tint(Theme.accent)
+        .buttonStyle(PrimaryButtonStyle())
         Button { manager.editDetails() } label: {
             Label(L("Change details"), systemImage: "slider.horizontal.3")
-                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.bordered, sound: .tap)
-        .tint(Theme.accent2)
+        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+        .controlSize(.large)
     }
 
     /// Report this problem, and Copy logs unless the message says how to fix it.
@@ -2746,10 +2773,9 @@ struct SideBySideView: View {
     private func reportButtons(_ message: String) -> some View {
         Button { showReport = true } label: {
             Label(L("Report this problem"), systemImage: "exclamationmark.bubble")
-                .font(.subheadline.weight(.semibold))
+                .font(.subheadline.weight(.medium))
         }
-        .buttonStyle(.bordered, sound: .tap)
-        .tint(.red)
+        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
         if !ErrorHelp.isExplained(message) {
             CopyLogsButton()
         }
@@ -2758,23 +2784,18 @@ struct SideBySideView: View {
     // MARK: Done
 
     private var donePage: some View {
-        VStack(spacing: 18) {
-            VStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(Color.green.opacity(0.16))
-                        .frame(width: 96, height: 96)
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 48, weight: .semibold))
-                        .foregroundStyle(.green)
-                        .symbolEffect(.bounce, options: .nonRepeating, value: manager.finished)
-                }
+        VStack(spacing: 16) {
+            VStack(spacing: 16) {
+                Image(systemName: "checkmark.seal")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Theme.positive)
+                    .frame(height: 72)
                 Text(L("%@ is on their iPhone", manager.installedAppName ?? manager.runName))
-                    .font(.title2.weight(.bold))
+                    .font(.title2.weight(.semibold))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 if let summary = manager.targetSummary {
-                    StatusPill(text: summary, systemImage: "iphone", color: .green)
+                    StatusDot(text: summary, color: Theme.positive)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -2782,22 +2803,22 @@ struct SideBySideView: View {
             .cascadeItem(0)
 
             PanelCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    sectionTitle(L("Finish on their iPhone"), systemImage: "hand.tap.fill")
+                VStack(alignment: .leading, spacing: 16) {
+                    sectionTitle(L("Finish on their iPhone"), systemImage: "hand.tap")
                     NumberedSteps(steps: finishSteps)
                 }
             }
             .cascadeItem(1)
 
             if let version = manager.pairingLeftOutOn {
-                CalloutCard(tint: .orange) {
+                PanelCard {
                     Label {
                         Text(L("Their iPhone runs iOS %@. From iOS 26.4 on, SideInstaller can't use the pairing their iPhone gives over Wi-Fi, so it needs a pairing file made on a computer.",
                                version))
                             .font(.footnote)
                             .fixedSize(horizontal: false, vertical: true)
                     } icon: {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Image(systemName: "exclamationmark.triangle").foregroundStyle(Theme.warning)
                     }
                 }
                 .cascadeItem(2)
@@ -2810,12 +2831,12 @@ struct SideBySideView: View {
                 .multilineTextAlignment(.center)
                 .cascadeItem(3)
 
-            VStack(spacing: 14) {
+            VStack(spacing: 16) {
                 Button { manager.finishAndReset() } label: { Text(L("Done")) }
                     .buttonStyle(PrimaryButtonStyle(sound: .tap))
                 Button(L("Install another app")) { manager.installAnother() }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.accent2)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.accent)
                     .buttonStyle(.plain, sound: .tap)
             }
             .cascadeItem(4)
@@ -2843,6 +2864,11 @@ struct SideBySideView: View {
         case .liveContainer?:
             steps.append(L("Get LocalDevVPN from the App Store and connect it: SideStore works through it."))
             steps.append(L("Open LiveContainer, go to its Settings tab, and tap “Import Certificate From SideStore”."))
+        case .altStore?:
+            steps.append(L("Open AltStore and sign in with the same Apple ID."))
+            steps.append(manager.altStorePairsItself
+                         ? L("To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings and follow its steps.")
+                         : L("To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings. Its pairing file is already in place, so the setup skips pairing."))
         }
         return steps
     }
@@ -2851,18 +2877,18 @@ struct SideBySideView: View {
 
     /// A setup page's heading: where it is in the setup, the question, and why.
     private func stageHeader(_ stage: Stage, title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             if let number = stage.number {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     StageDots(current: number, total: Stage.numberedCount)
                     Text(L("Step %@ of %@", "\(number)", "\(Stage.numberedCount)"))
-                        .font(.caption.weight(.semibold))
+                        .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .combine)
             }
             Text(title)
-                .font(.title2.weight(.bold))
+                .font(.title2.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
             Text(subtitle)
                 .font(.subheadline)
@@ -2877,23 +2903,18 @@ struct SideBySideView: View {
         HStack(spacing: 8) {
             Text(title)
             Image(systemName: "arrow.right")
-                .font(.subheadline.weight(.bold))
+                .font(.subheadline.weight(.semibold))
         }
     }
 
     private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        Label {
-            Text(title).font(.headline)
-        } icon: {
-            Image(systemName: systemImage)
-                .foregroundStyle(Theme.brand)
-        }
+        SectionTitle(title: title, systemImage: systemImage)
     }
 }
 
 // MARK: - Pieces
 
-/// An app's tile: SideInstaller's own icon, or a symbol on the app's tint.
+/// An app's tile: its own icon, or a symbol on a plain tile.
 private struct AppGlyph: View {
     let app: SideBySideApp
     var size: CGFloat = 52
@@ -2901,23 +2922,27 @@ private struct AppGlyph: View {
     var body: some View {
         Group {
             if let image = app.image {
-                Image(image)
-                    .resizable()
-                    .scaledToFill()
+                // SideStore's and LiveContainer's logos keep their own
+                // colors, so each app is easy to tell apart.
+                if app == .sideInstaller {
+                    Image(image).logoArt()
+                } else {
+                    Image(image).resizable().scaledToFill()
+                }
             } else {
                 ZStack {
-                    Rectangle().fill(Theme.gradient(app.tint))
-                    // A lit top edge, as on the app's other glyphs.
-                    LinearGradient(colors: [.white.opacity(0.22), .clear],
-                                   startPoint: .top, endPoint: .center)
+                    Rectangle().fill(Theme.raised)
                     Image(systemName: app.symbol)
-                        .font(.system(size: size * 0.44, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: size * 0.44))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: size * 23 / 86, style: .continuous))
+        // The art's black tile would melt into the page without it.
+        .overlay(RoundedRectangle(cornerRadius: size * 23 / 86, style: .continuous)
+            .strokeBorder(Theme.hairline, lineWidth: 1))
         .accessibilityHidden(true)
     }
 }
@@ -2931,22 +2956,22 @@ private struct AppChoiceCard: View {
     let action: () -> Void
 
     private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
+        RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
     }
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 AppGlyph(app: app, size: 52)
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(app.displayName)
                         .font(.headline)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                     Label(detail, systemImage: app.requirementSymbol)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(selected ? Theme.accent2 : .secondary)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(selected ? Theme.accent : .secondary)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 2)
@@ -2954,14 +2979,14 @@ private struct AppChoiceCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(selected ? Theme.accent2 : Color(.tertiaryLabel))
+                    .foregroundStyle(selected ? Theme.accent : Theme.muted)
                     .contentTransition(.symbolEffect(.replace))
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(shape.fill(Theme.accent.opacity(selected ? 0.14 : 0)))
             .cardSurface(in: shape)
-            .overlay(shape.strokeBorder(Theme.accent2.opacity(selected ? 0.75 : 0), lineWidth: 1.5))
+            .background(shape.fill(Color.white.opacity(selected ? 0.04 : 0)))
+            .overlay(shape.strokeBorder(Theme.accent.opacity(selected ? 0.6 : 0), lineWidth: 1))
             .contentShape(shape)
         }
         .buttonStyle(.plain, sound: .tick)
@@ -2981,20 +3006,20 @@ private struct OptionRow: View {
     let action: () -> Void
 
     private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 20, style: .continuous)
+        RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
     }
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            HStack(spacing: 16) {
                 Image(systemName: symbol)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
-                    .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Theme.brand))
-                VStack(alignment: .leading, spacing: 3) {
+                    .font(.system(size: 17))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, height: 36)
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.control))
+                VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(.primary)
                     Text(detail)
                         .font(.footnote)
@@ -3007,14 +3032,14 @@ private struct OptionRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(selected ? Theme.accent2 : Color(.tertiaryLabel))
+                    .foregroundStyle(selected ? Theme.accent : Theme.muted)
                     .contentTransition(.symbolEffect(.replace))
             }
-            .padding(14)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(shape.fill(Theme.accent.opacity(selected ? 0.14 : 0)))
             .cardSurface(in: shape)
-            .overlay(shape.strokeBorder(Theme.accent2.opacity(selected ? 0.75 : 0), lineWidth: 1.5))
+            .background(shape.fill(Color.white.opacity(selected ? 0.04 : 0)))
+            .overlay(shape.strokeBorder(Theme.accent.opacity(selected ? 0.6 : 0), lineWidth: 1))
             .contentShape(shape)
         }
         .buttonStyle(.plain, sound: .tick)
@@ -3028,11 +3053,11 @@ private struct CheckRow: View {
     let text: String
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
             Image(systemName: symbol)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Theme.accent2)
-                .frame(width: 22)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Theme.muted)
+                .frame(width: 20)
             Text(text.keepingWiFiWhole)
                 .font(.subheadline)
                 .fixedSize(horizontal: false, vertical: true)
@@ -3047,10 +3072,10 @@ private struct StageDots: View {
     let total: Int
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             ForEach(1...total, id: \.self) { index in
                 Capsule()
-                    .fill(index <= current ? AnyShapeStyle(Theme.brand) : AnyShapeStyle(Color.white.opacity(0.14)))
+                    .fill(index <= current ? Theme.accent : Color.white.opacity(0.14))
                     .frame(width: index == current ? 24 : 8, height: 8)
             }
         }
@@ -3067,34 +3092,31 @@ private struct SideBySideStepRow: View {
     let isLast: Bool
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 12) {
             VStack(spacing: 0) {
                 StepNode(state: state)
                 if !isLast {
                     Rectangle()
-                        .fill(state == .done ? Color.green.opacity(0.5) : Color(.tertiarySystemFill))
-                        .frame(width: 2)
+                        .fill(Theme.hairline)
+                        .frame(width: 1)
                         .frame(maxHeight: .infinity)
                 }
             }
-            .frame(width: 28)
+            .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
                     Text(title)
-                        .font(.subheadline.weight(state == .pending ? .regular : .medium))
+                        .font(.subheadline)
                         .foregroundStyle(state == .pending ? .secondary : .primary)
                     Spacer(minLength: 4)
                     if state == .waiting {
                         Text(L("Action needed"))
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(Color.orange.opacity(0.16)))
-                            .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(Theme.warning)
+                            .transition(.opacity)
                     }
                 }
-                .frame(minHeight: 28)
+                .frame(minHeight: 24)
                 if let detail {
                     Text(detail)
                         .font(.caption)
@@ -3102,7 +3124,7 @@ private struct SideBySideStepRow: View {
                         .contentTransition(.numericText())
                         .transition(.opacity)
                 }
-                if !isLast { Spacer(minLength: 14) }
+                if !isLast { Spacer(minLength: 12) }
             }
         }
         .animation(.smooth(duration: 0.3), value: state)

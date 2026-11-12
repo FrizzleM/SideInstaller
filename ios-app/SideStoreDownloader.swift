@@ -60,13 +60,43 @@ struct ActionsBuild {
     }
 }
 
-/// What to install: two SideStore builds and Madeira, fetched from GitHub, or a
-/// user-supplied IPA. Nothing is known about the latter, so its release
-/// properties are nil.
+/// Where AltStore publishes its releases: an AltStore source, the JSON list of
+/// apps and their versions that AltStore itself reads. AltServer installs
+/// AltStore from this one, and only stable AltStore is on GitHub besides.
+struct AltSourceFeed {
+    /// The source's address.
+    let url: URL
+    /// The bundle ID the build is listed under.
+    let bundleID: String
+    /// The oldest version offered: earlier ones are left out.
+    let oldestVersion: [Int]
+
+    /// What messages call the source: its host.
+    var name: String { url.host ?? url.absoluteString }
+
+    /// True for a version from `oldestVersion` on. A version whose numbers
+    /// can't be read ("2.3rc") counts by the numbers it starts with.
+    func offers(_ version: String) -> Bool {
+        let numbers = version.split(separator: ".").map { $0.prefix { $0.isNumber } }
+        let parts = numbers.prefix { !$0.isEmpty }.compactMap { Int($0) }
+        guard !parts.isEmpty else { return false }
+        for i in 0..<max(parts.count, oldestVersion.count) {
+            let have = i < parts.count ? parts[i] : 0
+            let need = i < oldestVersion.count ? oldestVersion[i] : 0
+            if have != need { return have > need }
+        }
+        return true
+    }
+}
+
+/// What to install: two SideStore builds and Madeira, fetched from GitHub,
+/// AltStore, fetched from its own source, or a user-supplied IPA. Nothing is
+/// known about the latter, so its release properties are nil.
 enum InstallSource: String, CaseIterable, Identifiable {
     case sideStore
     case liveContainer
     case madeira
+    case altStore
     case custom
 
     var id: String { rawValue }
@@ -77,6 +107,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "LiveContainer + SideStore"
         case .madeira:       return "Madeira"
+        case .altStore:      return "AltStore"
         case .custom:        return L("Custom .ipa")
         }
     }
@@ -87,18 +118,37 @@ enum InstallSource: String, CaseIterable, Identifiable {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "SS + LiveContainer"
         case .madeira:       return "Madeira"
+        case .altStore:      return "AltStore"
         case .custom:        return L("Custom .ipa")
         }
     }
 
     /// GitHub "owner/repo" the IPA comes from: its releases, and for Madeira's
-    /// nightly its Actions builds (`actionsBuild(_:)`).
+    /// nightly its Actions builds (`actionsBuild(_:)`). Nil for AltStore, which
+    /// comes from its own source (`feed`).
     var repo: String? {
         switch self {
-        case .sideStore:     return "SideStore/SideStore"
-        case .liveContainer: return "LiveContainer/LiveContainer"
-        case .madeira:       return "willfaust/Madeira"
-        case .custom:        return nil
+        case .sideStore:        return "SideStore/SideStore"
+        case .liveContainer:    return "LiveContainer/LiveContainer"
+        case .madeira:          return "willfaust/Madeira"
+        case .altStore, .custom: return nil
+        }
+    }
+
+    /// The AltStore source the build's releases are listed in, for a build
+    /// that isn't fetched from GitHub. AltStore Classic, the version AltServer
+    /// installs: its beta is listed under another bundle ID, which signing
+    /// doesn't set up as AltStore. From 2.3 on, the first with a Remote
+    /// AltServer, which refreshes apps without a computer; earlier versions
+    /// need AltServer on one for everything.
+    var feed: AltSourceFeed? {
+        switch self {
+        case .altStore:
+            return AltSourceFeed(url: URL(string: "https://apps.altstore.io")!,
+                                 bundleID: AltStorePairingHandoff.bundleID,
+                                 oldestVersion: [2, 3])
+        case .sideStore, .liveContainer, .madeira, .custom:
+            return nil
         }
     }
 
@@ -120,13 +170,13 @@ enum InstallSource: String, CaseIterable, Identifiable {
     }
 
     /// The channels the picker offers: both for the SideStore builds, stable
-    /// alone for a custom IPA, and for Madeira its nightly alone until a release
-    /// from `firstStableVersion` on is out (`stableReleased`).
+    /// alone for AltStore and a custom IPA, and for Madeira its nightly alone
+    /// until a release from `firstStableVersion` on is out (`stableReleased`).
     func channels(stableReleased: Bool) -> [ReleaseChannel] {
         switch self {
         case .sideStore, .liveContainer: return [.stable, .nightly]
         case .madeira:                   return stableReleased ? [.stable, .nightly] : [.nightly]
-        case .custom:                    return [.stable]
+        case .altStore, .custom:         return [.stable]
         }
     }
 
@@ -136,8 +186,8 @@ enum InstallSource: String, CaseIterable, Identifiable {
     /// offers only its nightly, the CI build of main.
     var firstStableVersion: [Int]? {
         switch self {
-        case .madeira:                            return [0, 2, 0]
-        case .sideStore, .liveContainer, .custom: return nil
+        case .madeira:                                       return [0, 2, 0]
+        case .sideStore, .liveContainer, .altStore, .custom: return nil
         }
     }
 
@@ -161,10 +211,12 @@ enum InstallSource: String, CaseIterable, Identifiable {
 
     /// The oldest iOS the build runs on, when that is newer than what
     /// SideInstaller itself installs on. Madeira's JIT helper needs iOS 26.
+    /// AltStore's source says which iOS each version needs, and the download
+    /// takes the newest that runs on the iPhone.
     var minimumOSMajorVersion: Int? {
         switch self {
-        case .madeira:                            return 26
-        case .sideStore, .liveContainer, .custom: return nil
+        case .madeira:                                       return 26
+        case .sideStore, .liveContainer, .altStore, .custom: return nil
         }
     }
 
@@ -185,9 +237,9 @@ enum InstallSource: String, CaseIterable, Identifiable {
     /// `assetFileName(forTag:)`.
     var assetFileName: String? {
         switch self {
-        case .sideStore:        return "SideStore.ipa"
-        case .liveContainer:    return "LiveContainer+SideStore.ipa"
-        case .madeira, .custom: return nil
+        case .sideStore:                   return "SideStore.ipa"
+        case .liveContainer:               return "LiveContainer+SideStore.ipa"
+        case .madeira, .altStore, .custom: return nil
         }
     }
 
@@ -198,7 +250,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         case .madeira:
             let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
             return version.isEmpty ? nil : "Madeira-\(version).ipa"
-        case .sideStore, .liveContainer, .custom:
+        case .sideStore, .liveContainer, .altStore, .custom:
             return nil
         }
     }
@@ -242,7 +294,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
                 assetName: "LiveContainer+SideStore.ipa",
                 channel: .nightly,
                 sha256: "bec41bc21d75a0f2e85a0aa589ce5772e24e410deb017486758a3bc0503c8de7")
-        case .sideStore, .madeira, .custom:
+        case .sideStore, .madeira, .altStore, .custom:
             return nil
         }
     }
@@ -273,6 +325,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "LiveContainer+SideStore"
         case .madeira:       return "Madeira"
+        case .altStore:      return "AltStore"
         case .custom:        return nil
         }
     }
@@ -289,6 +342,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         case .sideStore:     return "SideStore"
         case .liveContainer: return "LiveContainer"
         case .madeira:       return MadeiraPairingHandoff.appName
+        case .altStore:      return AltStorePairingHandoff.appName
         case .custom:        return nil
         }
     }
@@ -299,6 +353,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
         case .sideStore:     return "com.SideStore.SideStore"
         case .liveContainer: return "com.kdt.livecontainer"
         case .madeira:       return MadeiraPairingHandoff.bundleID
+        case .altStore:      return AltStorePairingHandoff.bundleID
         case .custom:        return nil
         }
     }
@@ -310,16 +365,18 @@ enum InstallSource: String, CaseIterable, Identifiable {
         case .sideStore, .custom: return "ALTPairingFile.mobiledevicepairing"
         case .liveContainer:      return "SideStore/Documents/ALTPairingFile.mobiledevicepairing"
         case .madeira:            return MadeiraPairingHandoff.remoteRelativePath
+        case .altStore:           return AltStorePairingHandoff.remoteRelativePath
         }
     }
 
     /// True when the app works without the pairing file, so failing to place
     /// it doesn't fail the install: Madeira can pair itself or use StikDebug,
-    /// and nothing is known about a custom IPA.
+    /// AltStore pairs as its Remote AltServer is set up (or refreshes through
+    /// AltServer on a computer), and nothing is known about a custom IPA.
     var pairingIsOptional: Bool {
         switch self {
-        case .sideStore, .liveContainer: return false
-        case .madeira, .custom:          return true
+        case .sideStore, .liveContainer:   return false
+        case .madeira, .altStore, .custom: return true
         }
     }
 
@@ -327,9 +384,9 @@ enum InstallSource: String, CaseIterable, Identifiable {
     /// only the signed bundle id can identify.
     var sideStoreHome: SideStoreHome? {
         switch self {
-        case .sideStore:        return .standalone
-        case .liveContainer:    return .liveContainer
-        case .madeira, .custom: return nil
+        case .sideStore:                   return .standalone
+        case .liveContainer:               return .liveContainer
+        case .madeira, .altStore, .custom: return nil
         }
     }
 
@@ -347,8 +404,8 @@ enum InstallSource: String, CaseIterable, Identifiable {
             // "Madeira-<version>.ipa", beside its checksum file.
             return assets.first { $0.name.lowercased().hasPrefix("madeira") && $0.name.hasSuffix(".ipa") }
                 ?? assets.first { $0.name.hasSuffix(".ipa") }
-        case .custom:
-            // No release to pick from.
+        case .altStore, .custom:
+            // No GitHub release to pick from.
             return nil
         }
     }
@@ -372,6 +429,10 @@ struct ReleaseVersion: Identifiable, Hashable {
     /// lowercase hex. The download must match it, and the IPA is unpacked
     /// from the zip. Nil for a release, whose asset is the IPA itself.
     var artifactSHA256: String? = nil
+    /// For a version listed in an AltStore source: the SHA-256 the listing
+    /// gives for the IPA, in lowercase hex, which the download must match.
+    /// Nil when the listing gives none, and for a GitHub release.
+    var listedSHA256: String? = nil
 
     var id: String { tag }
 
@@ -451,6 +512,15 @@ struct ReleaseCatalog {
         self.fetched = fetched
     }
 
+    /// For a build listed in an AltStore source: its versions there that run
+    /// on the iPhone, newest first, all on the stable channel, the first being
+    /// what "Latest" installs.
+    init(listed versions: [ReleaseVersion], fetched: Date = Date()) {
+        latest = versions.first.map { [.stable: $0] } ?? [:]
+        others = versions.count > 1 ? [.stable: Array(versions.dropFirst())] : [:]
+        self.fetched = fetched
+    }
+
     /// Nightly for a pre-release, whether GitHub flags it or its version says so
     /// ("0.7.0-alpha"); stable for a plain version number. Other tags
     /// ("auto-update-test") belong on neither.
@@ -520,6 +590,19 @@ enum SideStoreDownloader {
         case relayFailed(String, detail: String)
         /// What arrived for an Actions build isn't the zip GitHub recorded.
         case unverifiedBuild(String)
+        /// The request never reached the server an AltStore source, or the
+        /// IPAs it lists, are on (its host).
+        case sourceUnreachable(String, URLError)
+        /// That server answered with a status instead (its host, the status).
+        case sourceStatus(String, Int)
+        /// The source's answer isn't the list of apps this reads (its host,
+        /// why).
+        case badSource(String, String)
+        /// What arrived isn't the file the source lists (the build, its host).
+        case unverifiedListing(String, String)
+        /// The source lists no version of the build that runs on the iPhone's
+        /// iOS (the build, its host, the iOS version).
+        case noListedVersion(String, String, String)
 
         var description: String {
             switch self {
@@ -563,6 +646,18 @@ enum SideStoreDownloader {
             case let .unverifiedBuild(source):
                 return L("the %@ build that arrived isn't the file GitHub recorded, so it isn't installed. Try again later.",
                          source)
+            case let .sourceUnreachable(host, error):
+                return L("couldn't reach %@: %@", host, error.localizedDescription)
+            case let .sourceStatus(host, status):
+                return L("%@ answered HTTP %d", host, status)
+            case let .badSource(host, detail):
+                return L("%@'s list of apps couldn't be read (%@). Something on this network may have replaced it.",
+                         host, detail)
+            case let .unverifiedListing(source, host):
+                return L("the %@ that arrived isn't the file %@ lists, so it isn't installed. Try again later.",
+                         source, host)
+            case let .noListedVersion(source, host, os):
+                return L("%@ lists no version of %@ that runs on iOS %@.", host, source, os)
             }
         }
 
@@ -570,10 +665,11 @@ enum SideStoreDownloader {
         /// interference), not for rate limits or missing releases.
         var manualSideloadHelps: Bool {
             switch self {
-            case .unreachable, .badRelease, .notAnIPA, .relayFailed, .unverifiedBuild:
+            case .unreachable, .badRelease, .notAnIPA, .relayFailed, .unverifiedBuild,
+                 .sourceUnreachable, .badSource, .unverifiedListing:
                 return true
             case .noIPAAsset, .noRelease, .badURL, .notDownloadable, .linkStatus, .repoUnavailable,
-                 .noBuild:
+                 .noBuild, .sourceStatus, .noListedVersion:
                 return false
             case let .badStatus(_, _, retryAfter):
                 return retryAfter == nil
@@ -606,7 +702,8 @@ enum SideStoreDownloader {
             case .noIPAAsset, .noRelease:
                 return true
             case .badURL, .notDownloadable, .badStatus, .repoUnavailable, .unreachable,
-                 .badRelease, .notAnIPA, .linkStatus, .noBuild, .relayFailed, .unverifiedBuild:
+                 .badRelease, .notAnIPA, .linkStatus, .noBuild, .relayFailed, .unverifiedBuild,
+                 .sourceUnreachable, .sourceStatus, .badSource, .unverifiedListing, .noListedVersion:
                 return false
             }
         }
@@ -633,9 +730,22 @@ enum SideStoreDownloader {
     }
 
     /// Returns the local path of the downloaded IPA. `log` receives progress.
+    /// A build listed in an AltStore source comes in the newest version that
+    /// runs on iOS `os`: this iPhone's, or for Side by Side, theirs.
     static func downloadLatest(source: InstallSource,
                                channel: ReleaseChannel,
+                               runningOn os: OperatingSystemVersion = ProcessInfo.processInfo.operatingSystemVersion,
                                log: @escaping (String) -> Void) async throws -> String {
+        if let feed = source.feed {
+            let versions = try await listedVersions(of: source, in: feed, runningOn: os)
+            guard let newest = versions.first else {
+                throw DownloadError.noListedVersion(source.displayName, feed.name, osText(os))
+            }
+            log("Newest \(source.displayName) on \(feed.name) for iOS \(osText(os)): \(newest.tag).")
+            let dest = IPALibrary.documentsDir.appendingPathComponent(source.fileName(channel))
+            try await downloadListed(newest, of: source, from: feed, channel: channel, to: dest, log: log)
+            return dest.path
+        }
         guard source.repo != nil else { throw DownloadError.notDownloadable }
         if let actions = source.actionsBuild(channel) {
             let build = try await latestBuild(actions, of: source)
@@ -804,7 +914,9 @@ enum SideStoreDownloader {
                          log: @escaping (String) -> Void) async throws -> String {
         let dest = IPALibrary.documentsDir
             .appendingPathComponent(source.fileName(channel, version: version.tag))
-        if version.artifactSHA256 != nil {
+        if let feed = source.feed {
+            try await downloadListed(version, of: source, from: feed, channel: channel, to: dest, log: log)
+        } else if version.artifactSHA256 != nil {
             try await downloadArtifact(version, of: source, channel: channel, to: dest, log: log)
         } else {
             if let current = await unchangedDownload(dest, at: version.assetURL, log: log) {
@@ -1005,6 +1117,10 @@ enum SideStoreDownloader {
     /// call; for a build whose nightly comes from GitHub Actions, its recent
     /// builds too, from another.
     static func releaseCatalog(source: InstallSource) async throws -> ReleaseCatalog {
+        if let feed = source.feed {
+            let os = ProcessInfo.processInfo.operatingSystemVersion
+            return ReleaseCatalog(listed: try await listedVersions(of: source, in: feed, runningOn: os))
+        }
         guard let repo = source.repo else { throw DownloadError.notDownloadable }
         if let actions = source.actionsBuild(.nightly) {
             async let releases = recentReleases(of: repo, count: 100)
@@ -1046,6 +1162,127 @@ enum SideStoreDownloader {
         } catch {
             throw DownloadError.badRelease(String(describing: error))
         }
+    }
+
+    // MARK: Builds listed in an AltStore source
+
+    /// As much of an AltStore source as the download reads: each app's
+    /// versions, newest first, with where each downloads from, its SHA-256,
+    /// and the iOS it runs on.
+    private struct AltSourceListing: Decodable {
+        struct App: Decodable {
+            let bundleIdentifier: String
+            let versions: [Version]?
+        }
+        struct Version: Decodable {
+            let version: String
+            let downloadURL: String
+            let sha256: String?
+            let minOSVersion: String?
+            let maxOSVersion: String?
+        }
+        let apps: [App]
+    }
+
+    /// The build's versions in its source that run on iOS `os`, newest first,
+    /// as the version picker offers them. One request to the source; AltServer
+    /// reads the same list to install AltStore, and takes its first version
+    /// the iPhone can run, as the download here does.
+    private static func listedVersions(of source: InstallSource, in feed: AltSourceFeed,
+                                       runningOn os: OperatingSystemVersion) async throws -> [ReleaseVersion] {
+        var req = URLRequest(url: feed.url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        let answer: (Data, URLResponse)
+        do {
+            answer = try await perform { try await URLSession.shared.data(for: req) }
+        } catch DownloadError.unreachable(let error) {
+            throw DownloadError.sourceUnreachable(feed.name, error)
+        }
+        let (data, response) = answer
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw DownloadError.sourceStatus(feed.name, http.statusCode)
+        }
+        let listing: AltSourceListing
+        do {
+            listing = try JSONDecoder().decode(AltSourceListing.self, from: data)
+        } catch {
+            throw DownloadError.badSource(feed.name, String(describing: error))
+        }
+        guard let app = listing.apps.first(where: { $0.bundleIdentifier == feed.bundleID }) else {
+            throw DownloadError.badSource(feed.name, "\(feed.bundleID) isn't listed")
+        }
+        return (app.versions ?? []).compactMap { listed -> ReleaseVersion? in
+            // Only over HTTPS, and only what this iOS can run.
+            guard feed.offers(listed.version),
+                  let url = URL(string: listed.downloadURL), url.scheme == "https",
+                  runs(on: os, from: listed.minOSVersion, to: listed.maxOSVersion) else { return nil }
+            let sha256 = listed.sha256?.lowercased()
+            return ReleaseVersion(tag: listed.version, name: listed.version,
+                                  assetName: url.lastPathComponent, assetURL: url,
+                                  listedSHA256: sha256.flatMap {
+                                      $0.count == 64 && $0.allSatisfy(\.isHexDigit) ? $0 : nil
+                                  })
+        }
+    }
+
+    /// Downloads `version`, listed in `feed`, as `dest`, unless `dest` is that
+    /// version already. When the listing gives a SHA-256, only that file is
+    /// kept; the ledger keeps it, or the link when there's none, as the IPA's
+    /// ETag.
+    private static func downloadListed(_ version: ReleaseVersion, of source: InstallSource,
+                                       from feed: AltSourceFeed, channel: ReleaseChannel, to dest: URL,
+                                       log: @escaping (String) -> Void) async throws {
+        let mark = version.listedSHA256 ?? version.assetURL.absoluteString
+        if DownloadLedger.etag(for: dest) == mark, IPALibrary.looksLikeIPA(dest) {
+            log("\(dest.lastPathComponent) is already \(source.displayName) \(version.tag) — skipping the download.")
+            return
+        }
+        let host = version.assetURL.host ?? feed.name
+        let fetched: Fetched
+        do {
+            fetched = try await fetch(version.assetURL, named: version.assetName, from: channel, log: log)
+        } catch DownloadError.badStatus(let status, _, _) {
+            throw DownloadError.sourceStatus(host, status)
+        } catch DownloadError.unreachable(let error) {
+            throw DownloadError.sourceUnreachable(host, error)
+        }
+        if let expected = version.listedSHA256 {
+            guard IPALibrary.sha256(of: fetched.file) == expected else {
+                try? FileManager.default.removeItem(at: fetched.file)
+                log("⚠️ \(version.assetName) isn't the file \(feed.name) lists for \(source.displayName) \(version.tag) (SHA-256 \(expected)), so it isn't installed.")
+                throw DownloadError.unverifiedListing(source.displayName, feed.name)
+            }
+            log("\(version.assetName) is the file \(feed.name) lists for \(source.displayName) \(version.tag) (SHA-256 \(expected.prefix(12))…).")
+        } else {
+            log("⚠️ \(feed.name) gives no SHA-256 for \(source.displayName) \(version.tag), so the download is only checked to be an IPA.")
+        }
+        try store(Fetched(file: fetched.file, name: fetched.name, channel: channel, etag: mark), as: dest)
+    }
+
+    /// True when iOS `os` is in a listing's range: `min` or later, and `max`
+    /// or earlier when it gives one. A bound that isn't a version is no bound.
+    private static func runs(on os: OperatingSystemVersion, from min: String?, to max: String?) -> Bool {
+        let key = { (v: OperatingSystemVersion) in (v.majorVersion, v.minorVersion, v.patchVersion) }
+        if let min = min.flatMap(osVersion), key(os) < key(min) { return false }
+        if let max = max.flatMap(osVersion), key(os) > key(max) { return false }
+        return true
+    }
+
+    /// "17.4" or "26.0.1" as a version; nil for anything else.
+    static func osVersion(_ text: String) -> OperatingSystemVersion? {
+        let parts = text.trimmingCharacters(in: .whitespaces)
+            .split(separator: ".", omittingEmptySubsequences: false).map { Int($0) }
+        guard (1...3).contains(parts.count), parts.allSatisfy({ $0 != nil }) else { return nil }
+        let numbers = parts.compactMap { $0 }
+        return OperatingSystemVersion(majorVersion: numbers[0],
+                                      minorVersion: numbers.count > 1 ? numbers[1] : 0,
+                                      patchVersion: numbers.count > 2 ? numbers[2] : 0)
+    }
+
+    /// "27.2", or "26.0.1" when there's a patch number.
+    private static func osText(_ os: OperatingSystemVersion) -> String {
+        os.patchVersion == 0 ? "\(os.majorVersion).\(os.minorVersion)"
+                             : "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
     }
 
     // MARK: Builds from GitHub Actions
@@ -1613,6 +1850,7 @@ enum IPALibrary {
         if name.contains("livecontainer")     { source = .liveContainer }
         else if name.contains("sidestore")    { source = .sideStore }
         else if name.contains("madeira")      { source = .madeira }
+        else if name.contains("altstore")     { source = .altStore }
         else { return nil }
         return (source, name.contains("nightly") ? .nightly : .stable)
     }
@@ -1836,9 +2074,10 @@ extension IPALibrary {
 
     /// The build of SideInstaller's own that the IPA at `url` is, told by its
     /// bundle ID rather than its filename: SideStore, LiveContainer carrying
-    /// SideStore, or Madeira. A custom IPA that is one of them is set up just
-    /// like that build's download. Nil for any other app, and for LiveContainer
-    /// without SideStore, which has no SideStore to set up.
+    /// SideStore, Madeira, or AltStore. A custom IPA that is one of them is set
+    /// up just like that build's download. Nil for any other app, for
+    /// LiveContainer without SideStore, which has no SideStore to set up, and
+    /// for AltStore's beta, which signing doesn't set up as AltStore.
     static func knownSource(ofIPAAt url: URL) -> InstallSource? {
         guard let id = appInfo(at: url)?.bundleID else { return nil }
         // As published, or with the team ID an earlier signing appended.
@@ -1846,6 +2085,7 @@ extension IPALibrary {
             source.pairingBundleIDBase.map { id == $0 || id.hasPrefix($0 + ".") } ?? false
         }
         if source == .liveContainer, !carriesSideStore(url) { return nil }
+        if source == .altStore, !AltStorePairingHandoff.isAltStore(bundleID: id) { return nil }
         return source
     }
 
