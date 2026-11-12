@@ -10,18 +10,18 @@
       "iconURL": "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon~ios-marketing.png",
       "subtitle": "An an app that installs Sidestore on iOS 27, fully on-device",
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
-      "version": "1.7.0",
-      "versionDate": "2026-11-09T17:55:39Z",
-      "versionDescription": "### Added\n- **Turkish.** Pick Türkçe in Settings › Language. Thanks to Mr3242-Scripter (#111).\n- **A nudge to update to iOS 27 at setup** on devices that can run it: on iOS 27 the iPhone pairs with itself, no computer needed.\n\n### Changed\n- **Side by Side goes step by step** and can now install SideStore and LiveContainer + SideStore too (Stable or Nightly), each set up with the pairing file on the other iPhone.\n- **Your Apple ID session and pairing stay on this iPhone:** private files are left out of backups, and the saved password is kept in the Keychain for this device only. After restoring a backup, sign in and pair again.\n\n### Fixed\n- Keys and passwords no longer end up in the activity log or problem reports.\n- Side by Side no longer keeps the other person's signing key on your iPhone.\n- A stalled pairing can be cancelled, and gives up by itself.\n- Two sign-ins running at once no longer share one 2FA code; the number pad comes back after a wrong code.\n- Local Network turned off is noticed in about two seconds instead of a minute.\n- Pairing keeps going through a call, Siri, an alarm or AirPods connecting.\n- The app stays smooth while the activity log fills.",
-      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.7.0/SideInstaller.ipa",
-      "size": 10739837,
+      "version": "2.0.0",
+      "versionDate": "2026-11-12T16:22:11Z",
+      "versionDescription": "### Added\n- **AltStore.** AltStore Classic is on the Install tab and in Side by Side, from AltStore's own source, with the download checked against the SHA-256 it lists. Its pairing file goes where AltStore reads it, so setting up Remote AltServer skips pairing.\n\n### Changed\n- **A quieter look.** A still, near-black background with plain cards and an off-white main button. Blue marks only progress, selections and links. The pairing code shows one key per digit, on the Lock Screen too, and nothing pulses, breathes or bounces any more.\n- **Setup takes three pages** (the terms, the sideinstaller.net question and your Apple ID) under a progress bar, and picks up where it stopped.\n- **The app picker shows each app's icon.**\n\n### Fixed\n- **AltStore installed as a custom IPA gets its pairing file again.** AltStore 2.3.1 and later read it from their Documents, and SideInstaller now writes it there.",
+      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v2.0.0/SideInstaller.ipa",
+      "size": 10634541,
       "versions": [
         {
-          "version": "1.7.0",
-          "date": "2026-11-09T17:55:39Z",
-          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v1.7.0/SideInstaller.ipa",
-          "localizedDescription": "### Added\n- **Turkish.** Pick Türkçe in Settings › Language. Thanks to Mr3242-Scripter (#111).\n- **A nudge to update to iOS 27 at setup** on devices that can run it: on iOS 27 the iPhone pairs with itself, no computer needed.\n\n### Changed\n- **Side by Side goes step by step** and can now install SideStore and LiveContainer + SideStore too (Stable or Nightly), each set up with the pairing file on the other iPhone.\n- **Your Apple ID session and pairing stay on this iPhone:** private files are left out of backups, and the saved password is kept in the Keychain for this device only. After restoring a backup, sign in and pair again.\n\n### Fixed\n- Keys and passwords no longer end up in the activity log or problem reports.\n- Side by Side no longer keeps the other person's signing key on your iPhone.\n- A stalled pairing can be cancelled, and gives up by itself.\n- Two sign-ins running at once no longer share one 2FA code; the number pad comes back after a wrong code.\n- Local Network turned off is noticed in about two seconds instead of a minute.\n- Pairing keeps going through a call, Siri, an alarm or AirPods connecting.\n- The app stays smooth while the activity log fills.",
-          "size": 10739837
+          "version": "2.0.0",
+          "date": "2026-11-12T16:22:11Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v2.0.0/SideInstaller.ipa",
+          "localizedDescription": "### Added\n- **AltStore.** AltStore Classic is on the Install tab and in Side by Side, from AltStore's own source, with the download checked against the SHA-256 it lists. Its pairing file goes where AltStore reads it, so setting up Remote AltServer skips pairing.\n\n### Changed\n- **A quieter look.** A still, near-black background with plain cards and an off-white main button. Blue marks only progress, selections and links. The pairing code shows one key per digit, on the Lock Screen too, and nothing pulses, breathes or bounces any more.\n- **Setup takes three pages** (the terms, the sideinstaller.net question and your Apple ID) under a progress bar, and picks up where it stopped.\n- **The app picker shows each app's icon.**\n\n### Fixed\n- **AltStore installed as a custom IPA gets its pairing file again.** AltStore 2.3.1 and later read it from their Documents, and SideInstaller now writes it there.",
+          "size": 10634541
         }
       ]
     },
