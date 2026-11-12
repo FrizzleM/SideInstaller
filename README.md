@@ -72,7 +72,7 @@ Developer Mode on. [sideinstaller.net](https://sideinstaller.net/) shows steps 1
    [Open Minis](https://apps.apple.com/app/id6759188481) and
    [LocalDevVPN](https://apps.apple.com/app/id6755608044), all free on the App Store.
 2. **Pair in rootshell.** Turn on **Settings › Location Diary Mode › Session Only** in rootshell,
-   then run these in its local shell, one line at a time:
+   then tap **Local Shell** and **Open** at the top right, and run these one line at a time:
 
    ```sh
    curl -fsSLO https://raw.githubusercontent.com/FrizzleM/siboot/main/rootshell/bin/siboot-pair.wasm
@@ -82,7 +82,8 @@ Developer Mode on. [sideinstaller.net](https://sideinstaller.net/) shows steps 1
 
    Open **Settings › Privacy & Security › Developer Mode**, scroll to the bottom, tap
    **Pair with siboot**, and enter your passcode and the code rootshell shows. Leave rootshell running.
-3. **Install from Open Minis.** Connect LocalDevVPN, then run this in Open Minis's terminal:
+3. **Install from Open Minis.** Connect LocalDevVPN. In Open Minis, tap the console icon at the
+   top right, then **Shell Terminal**, and run:
 
    ```sh
    wget -qO- https://raw.githubusercontent.com/FrizzleM/siboot/main/minis/install.sh | sh
