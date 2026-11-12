@@ -2922,13 +2922,7 @@ private struct AppGlyph: View {
     var body: some View {
         Group {
             if let image = app.image {
-                // SideStore's and LiveContainer's logos keep their own
-                // colors, so each app is easy to tell apart.
-                if app == .sideInstaller {
-                    Image(image).logoArt()
-                } else {
-                    Image(image).resizable().scaledToFill()
-                }
+                Image(image).logoArt()
             } else {
                 ZStack {
                     Rectangle().fill(Theme.raised)
@@ -2940,7 +2934,7 @@ private struct AppGlyph: View {
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: size * 23 / 86, style: .continuous))
-        // The art's black tile would melt into the page without it.
+        // The art's dark tile would melt into the page without it.
         .overlay(RoundedRectangle(cornerRadius: size * 23 / 86, style: .continuous)
             .strokeBorder(Theme.hairline, lineWidth: 1))
         .accessibilityHidden(true)
@@ -2984,8 +2978,9 @@ private struct AppChoiceCard: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
+            // A picked card takes a tint of the light blue, under its content.
+            .background(shape.fill(Theme.accent.opacity(selected ? 0.08 : 0)))
             .cardSurface(in: shape)
-            .background(shape.fill(Color.white.opacity(selected ? 0.04 : 0)))
             .overlay(shape.strokeBorder(Theme.accent.opacity(selected ? 0.6 : 0), lineWidth: 1))
             .contentShape(shape)
         }
@@ -3037,8 +3032,9 @@ private struct OptionRow: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
+            // A picked card takes a tint of the light blue, under its content.
+            .background(shape.fill(Theme.accent.opacity(selected ? 0.08 : 0)))
             .cardSurface(in: shape)
-            .background(shape.fill(Color.white.opacity(selected ? 0.04 : 0)))
             .overlay(shape.strokeBorder(Theme.accent.opacity(selected ? 0.6 : 0), lineWidth: 1))
             .contentShape(shape)
         }
@@ -3075,7 +3071,7 @@ private struct StageDots: View {
         HStack(spacing: 8) {
             ForEach(1...total, id: \.self) { index in
                 Capsule()
-                    .fill(index <= current ? Theme.accent : Color.white.opacity(0.14))
+                    .fill(index <= current ? Theme.accent : Theme.ice.opacity(0.14))
                     .frame(width: index == current ? 24 : 8, height: 8)
             }
         }

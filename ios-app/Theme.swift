@@ -1,35 +1,46 @@
 import SwiftUI
 
-/// The app's shared visual language: one near-black ramp, one blue, and the
-/// cards, buttons and headers every screen is composed from.
+/// The app's shared visual language: a ramp of night blues, three blues
+/// with a job each, and the cards, buttons and headers every screen is
+/// composed from.
 ///
-/// The surfaces stay quiet so the logo tiles' blue line art, an install's
-/// progress and the pairing code are what the eye lands on. Depth comes from
-/// a step between surfaces and a hairline edge, never a glow.
+/// The surfaces are navy so dark they read as night, and the blues are kept
+/// apart by what they do: `navy` for the logo art and the wash at the top of
+/// a page, `blue` for what's filled behind white (the main button), `accent`
+/// for what's drawn on the dark (progress, links, the selection). Depth comes
+/// from a step between surfaces and a hairline edge.
 enum Theme {
     // MARK: Ramp
 
-    /// The page behind everything: black with the faintest blue in it, so the
-    /// logo tiles' black still reads as a tile.
-    static let page = Color(red: 11 / 255, green: 12 / 255, blue: 15 / 255)
+    /// The page behind everything: a navy so deep it reads as black until a
+    /// card sits on it.
+    static let page = Color(red: 5 / 255, green: 11 / 255, blue: 24 / 255)
     /// A card on the page.
-    static let card = Color(red: 20 / 255, green: 21 / 255, blue: 24 / 255)
+    static let card = Color(red: 13 / 255, green: 21 / 255, blue: 36 / 255)
     /// One step above a card: popups, which float over the dimmed app.
-    static let raised = Color(red: 28 / 255, green: 30 / 255, blue: 34 / 255)
+    static let raised = Color(red: 20 / 255, green: 30 / 255, blue: 49 / 255)
+    /// The pale blue that controls and edges are drawn in, faintly, so they
+    /// stay in the ramp's hue instead of greying it.
+    static let ice = Color(red: 185 / 255, green: 211 / 255, blue: 249 / 255)
     /// A control's fill, a step up from whatever it sits on.
-    static let control = Color.white.opacity(0.06)
+    static let control = ice.opacity(0.07)
     /// The edge of a card or control.
-    static let hairline = Color.white.opacity(0.08)
-    /// The primary button's fill: the one bright thing on a page.
-    static let offWhite = Color(red: 237 / 255, green: 238 / 255, blue: 240 / 255)
-    /// Captions, meta and quiet icons; at least 4.5:1 on a card.
-    static let muted = Color(red: 128 / 255, green: 133 / 255, blue: 141 / 255)
+    static let hairline = ice.opacity(0.1)
+    /// Captions, meta and quiet icons: a slate blue, at least 4.5:1 on a
+    /// popup and more on a card.
+    static let muted = Color(red: 127 / 255, green: 141 / 255, blue: 165 / 255)
 
     // MARK: Colour
 
-    /// SideInstaller's blue, flat: progress, the selection and links. Light
-    /// enough to read as text on every surface above.
-    static let accent = Color(red: 47 / 255, green: 128 / 255, blue: 255 / 255)
+    /// The deep blue of the logo art's patterns, and of the wash at the top
+    /// of every page.
+    static let navy = Color(red: 9 / 255, green: 50 / 255, blue: 143 / 255)
+    /// The filled blue: the main button and a ticked box. White on it reads
+    /// at 4.8:1.
+    static let blue = Color(red: 38 / 255, green: 105 / 255, blue: 237 / 255)
+    /// The light blue drawn on the dark: progress, the selection, links and
+    /// a card's label icon. At least 6:1 on every surface above.
+    static let accent = Color(red: 96 / 255, green: 167 / 255, blue: 253 / 255)
     /// Done, connected, granted.
     static let positive = Color(red: 76 / 255, green: 195 / 255, blue: 138 / 255)
     /// Something needs the user, or will soon.
@@ -67,10 +78,18 @@ extension View {
 
 // MARK: - Background
 
-/// The page every screen sits on: still and near-black.
+/// The page every screen sits on: the night-blue page with a wash of navy at
+/// the top, where each page's logo tile and title sit, gone by the middle of
+/// a phone's screen. Still: nothing in it moves.
 struct AppBackground: View {
     var body: some View {
-        Theme.page.ignoresSafeArea()
+        Theme.page
+            .overlay(alignment: .top) {
+                EllipticalGradient(colors: [Theme.navy.opacity(0.4), Theme.navy.opacity(0)],
+                                   center: .top, startRadiusFraction: 0, endRadiusFraction: 1)
+                    .frame(height: 480)
+            }
+            .ignoresSafeArea()
     }
 }
 
@@ -498,7 +517,7 @@ struct NumberedSteps: View {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text("\(idx + 1)")
                         .font(.subheadline.monospacedDigit().weight(.medium))
-                        .foregroundStyle(Theme.muted)
+                        .foregroundStyle(Theme.accent)
                         .frame(width: 16, alignment: .leading)
                     Text(step)
                         .font(.subheadline)
@@ -558,7 +577,8 @@ struct PairingCodePopup: View {
 
 // MARK: - Small components
 
-/// A card's label: what the card is for, quieter than what it holds.
+/// A card's label: what the card is for, quieter than what it holds, after
+/// an icon in the light blue.
 struct SectionTitle: View {
     var title: String
     var systemImage: String
@@ -571,7 +591,7 @@ struct SectionTitle: View {
         } icon: {
             Image(systemName: systemImage)
                 .font(.subheadline)
-                .foregroundStyle(Theme.muted)
+                .foregroundStyle(Theme.accent)
         }
     }
 }
@@ -605,22 +625,21 @@ struct BetaBadge: View {
     var body: some View {
         Text(L("Beta"))
             .font(.caption)
-            .foregroundStyle(Theme.muted)
+            .foregroundStyle(Theme.accent)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(Theme.hairline, lineWidth: 1))
+                .strokeBorder(Theme.accent.opacity(0.35), lineWidth: 1))
             .fixedSize()
     }
 }
 
 extension Image {
-    /// A SideInstaller logo tile's art, filling its frame in greys: the blue
-    /// patterns would compete with the one accent.
+    /// A logo tile's art, filling its frame: SideInstaller's own are the
+    /// `navy` patterns and a white glyph on a night-blue tile.
     func logoArt() -> some View {
         resizable()
             .scaledToFill()
-            .grayscale(1)
     }
 }
 
@@ -688,15 +707,15 @@ struct BrandHeader<Accessory: View>: View {
             Image(image)
                 .logoArt()
                 .clipShape(tile)
-                // The art's black tile would melt into the page without it.
+                // The art's dark tile would melt into the page without it.
                 .overlay(tile.strokeBorder(Theme.hairline, lineWidth: 1))
         } else {
             ZStack {
-                tile.fill(Theme.card)
+                tile.fill(Theme.navy)
                 tile.strokeBorder(Theme.hairline, lineWidth: 1)
                 Image(systemName: icon)
                     .font(.system(size: glyphSide * 32 / 72))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white)
             }
         }
     }
@@ -724,8 +743,8 @@ extension View {
 
 // MARK: - Buttons
 
-/// The full-width call to action: off-white, the brightest thing on the page.
-/// Plays `sound` as it fires.
+/// The full-width call to action: filled `blue` under a white label, the one
+/// solid colour on a page. Plays `sound` as it fires.
 struct PrimaryButtonStyle: PrimitiveButtonStyle {
     var sound: UISound = .press
 
@@ -750,12 +769,12 @@ private struct PrimaryButtonBody: View {
         let shape = RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
         configuration.label
             .font(.headline)
-            .foregroundStyle(isEnabled ? Theme.page : Theme.muted)
+            .foregroundStyle(isEnabled ? Color.white : Theme.muted)
             // A spinner in the label, while the button's action is under way.
-            .tint(Theme.page)
+            .tint(.white)
             .frame(maxWidth: .infinity, minHeight: 52)
             .padding(.horizontal, 20)
-            .background(shape.fill(isEnabled ? Theme.offWhite : Theme.control))
+            .background(shape.fill(isEnabled ? Theme.blue : Theme.control))
             .contentShape(shape)
             .modifier(PressFeedback(isPressed: configuration.isPressed))
     }

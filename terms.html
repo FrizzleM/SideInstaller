@@ -8,16 +8,16 @@
 <link rel="apple-touch-icon" href="app-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0b0c0f">
+<meta name="theme-color" content="#050b18">
 <style>
   /* The site's palette (assets/site.css in FrizzleM/SideInstaller-Signed, from
      the app's Theme.swift), kept in this file so the page stands on its own.
      Still and plain, as suits a legal document. */
   :root{
-    --page:#0b0c0f; --card:#141518;
-    --control:rgba(255,255,255,.06); --hairline:rgba(255,255,255,.08);
-    --text:#f2f3f5; --text-2:#a4a8b0; --muted:#80858d;
-    --off-white:#edeef0; --accent:#2f80ff;
+    --page:#050b18; --card:#0d1524;
+    --control:rgba(185,211,249,.07); --hairline:rgba(185,211,249,.1);
+    --text:#f1f4f9; --text-2:#aeb8ca; --muted:#7f8da5;
+    --blue:#2669ed; --blue-hover:#3a78f2; --accent:#60a7fd;
     --ease:cubic-bezier(.22,1,.36,1);
     --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif;
     --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
@@ -25,7 +25,8 @@
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%; background:var(--page); scroll-padding-top:76px}
   body{
-    margin:0; min-height:100vh; color:var(--text); background:var(--page);
+    margin:0; min-height:100vh; color:var(--text);
+    background:radial-gradient(ellipse 100% 640px at 50% 0, rgba(9,50,143,.4), rgba(9,50,143,0)) no-repeat, var(--page);
     font:400 17px/1.47 var(--sans); -webkit-font-smoothing:antialiased;
   }
   a{color:inherit}
@@ -38,18 +39,18 @@
   /* ---- top bar ---- */
   .nav{
     position:sticky; top:0; z-index:10; height:52px;
-    background:rgba(11,12,15,.72); border-bottom:1px solid var(--hairline);
+    background:rgba(5,11,24,.72); border-bottom:1px solid var(--hairline);
     -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px);
   }
   .nav .wrap{height:100%; display:flex; align-items:center; justify-content:space-between; gap:24px}
   .brand{display:flex; align-items:center; gap:10px; font-size:17px; font-weight:600; letter-spacing:-.01em; text-decoration:none}
-  .brand img{width:28px; height:28px; border-radius:7px; filter:grayscale(1); box-shadow:0 0 0 1px var(--hairline)}
+  .brand img{width:28px; height:28px; border-radius:7px; box-shadow:0 0 0 1px var(--hairline)}
   .btn{
     display:inline-flex; align-items:center; height:32px; padding:0 16px; border-radius:16px;
-    background:var(--off-white); color:var(--page); font-size:14px; font-weight:500; text-decoration:none;
+    background:var(--blue); color:#fff; font-size:14px; font-weight:500; text-decoration:none;
     transition:background-color .15s var(--ease), transform .15s var(--ease);
   }
-  .btn:hover{background:#fff}
+  .btn:hover{background:var(--blue-hover)}
   .btn:active{transform:scale(.98)}
 
   /* ---- header ---- */

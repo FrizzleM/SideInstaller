@@ -69,14 +69,17 @@ struct PairingActivityWidget: Widget {
 /// The app's colours (`Theme`), repeated here: the extension is its own
 /// binary and takes none of the app's views.
 enum Brand {
-    /// SideInstaller's blue, flat.
-    static let accent = Color(red: 47 / 255, green: 128 / 255, blue: 255 / 255)
+    /// The light blue the app draws on the dark.
+    static let accent = Color(red: 96 / 255, green: 167 / 255, blue: 253 / 255)
+    /// The filled blue, behind a white symbol.
+    static let blue = Color(red: 38 / 255, green: 105 / 255, blue: 237 / 255)
     static let positive = Color(red: 76 / 255, green: 195 / 255, blue: 138 / 255)
     static let warning = Color(red: 229 / 255, green: 161 / 255, blue: 64 / 255)
     static let negative = Color(red: 229 / 255, green: 72 / 255, blue: 77 / 255)
 
-    /// The app's page, behind a Lock Screen card: still and near-black.
-    static let backdrop = Color(red: 11 / 255, green: 12 / 255, blue: 15 / 255)
+    /// The app's page, behind a Lock Screen card: a navy so deep it reads
+    /// as night.
+    static let backdrop = Color(red: 5 / 255, green: 11 / 255, blue: 24 / 255)
 }
 
 private typealias Stage = PairingActivityAttributes.ContentState.Stage
@@ -152,7 +155,7 @@ private struct Glyph: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-            .fill(stage == .paired ? Brand.positive : Brand.accent)
+            .fill(stage == .paired ? Brand.positive : Brand.blue)
             .frame(width: size, height: size)
             .overlay {
                 Image(systemName: stage == .paired ? "checkmark" : "lock.iphone")

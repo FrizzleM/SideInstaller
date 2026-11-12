@@ -213,7 +213,7 @@ private struct TermsPage: View {
             .logoArt()
             .frame(width: 96, height: 96)
             .clipShape(tile)
-            // The art's black tile would melt into the page without it.
+            // The art's dark tile would melt into the page without it.
             .overlay(tile.strokeBorder(Theme.hairline, lineWidth: 1))
             .accessibilityHidden(true)
     }
@@ -227,9 +227,9 @@ private struct TermsPage: View {
                 HStack(spacing: 12) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(accepted ? Theme.accent : Theme.control)
+                            .fill(accepted ? Theme.blue : Theme.control)
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(.white.opacity(accepted ? 0 : 0.3), lineWidth: 1)
+                            .strokeBorder(Theme.ice.opacity(accepted ? 0 : 0.3), lineWidth: 1)
                         Image(systemName: "checkmark")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.white)
@@ -431,7 +431,7 @@ private struct SetupProgressBar: View {
             ForEach(1...total, id: \.self) { index in
                 SegmentFill(fraction: index <= filled ? 1 : 0)
                     .fill(Theme.accent)
-                    .background(Capsule().fill(Color.white.opacity(0.12)))
+                    .background(Capsule().fill(Theme.ice.opacity(0.12)))
                     .frame(height: 4)
             }
         }

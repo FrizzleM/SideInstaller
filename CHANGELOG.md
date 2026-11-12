@@ -2,6 +2,16 @@
 
 All notable changes to SideInstaller are documented here.
 
+## 2.0.1
+
+### Changed
+- **Blue is back.** The greys 2.0.0 brought in are blues again, a shade picked for each job. Pages,
+  cards and popups sit on night blues, with a still wash of navy at the top of every page. The
+  main button is solid blue with white text, and a lighter blue marks progress, links, the
+  selection, switches and each card's label icon. The logo tiles and the app icon have their
+  colour back, their patterns a brighter blue than before 2.0.0 on a night-blue tile. The pairing
+  and install Live Activities and sideinstaller.net use the same blues.
+
 ## 2.0.0
 
 ### Added

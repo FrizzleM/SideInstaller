@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/app-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0b0c0f">
+<meta name="theme-color" content="#050b18">
 <!-- What Discord and other chat apps show under a posted link. -->
 <meta property="og:site_name" content="SideInstaller">
 <meta property="og:title" content="Install with SideInstaller">
@@ -25,10 +25,10 @@
      the app's Theme.swift), kept in this file: its Content-Security-Policy
      lets it load nothing but the icon. */
   :root{
-    --page:#0b0c0f; --card:#141518;
-    --control:rgba(255,255,255,.06); --hairline:rgba(255,255,255,.08);
-    --text:#f2f3f5; --text-2:#a4a8b0; --muted:#80858d;
-    --off-white:#edeef0; --accent:#2f80ff; --warning:#e5a140; --negative:#e5484d;
+    --page:#050b18; --card:#0d1524;
+    --control:rgba(185,211,249,.07); --hairline:rgba(185,211,249,.1);
+    --text:#f1f4f9; --text-2:#aeb8ca; --muted:#7f8da5;
+    --blue:#2669ed; --blue-hover:#3a78f2; --accent:#60a7fd; --warning:#e5a140; --negative:#e5484d;
     --ease:cubic-bezier(.22,1,.36,1);
     --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif;
     --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
@@ -37,7 +37,8 @@
   [hidden]{display:none !important}
   html{-webkit-text-size-adjust:100%; overflow-x:clip; background:var(--page)}
   body{
-    margin:0; min-height:100vh; color:var(--text); background:var(--page); overflow-x:clip;
+    margin:0; min-height:100vh; color:var(--text); overflow-x:clip;
+    background:radial-gradient(ellipse 100% 640px at 50% 0, rgba(9,50,143,.4), rgba(9,50,143,0)) no-repeat, var(--page);
     font:400 17px/1.47 var(--sans); -webkit-font-smoothing:antialiased;
     padding:max(24px,env(safe-area-inset-top)) 24px 64px;
   }
@@ -54,7 +55,7 @@
   .hero{text-align:center; padding:32px 0 8px}
   .logo{
     display:block; width:72px; height:72px; margin:0 auto 24px; border-radius:17px;
-    filter:grayscale(1); box-shadow:0 0 0 1px var(--hairline);
+    box-shadow:0 0 0 1px var(--hairline);
   }
   h1{margin:0; font-size:clamp(28px,7vw,40px); line-height:1.1; font-weight:600; letter-spacing:-.025em}
   .tagline{margin:12px auto 0; max-width:26rem; color:var(--text-2)}
@@ -92,12 +93,12 @@
   .open-btn{
     display:flex; align-items:center; justify-content:center; gap:8px;
     width:100%; height:52px; margin-top:16px; border-radius:26px;
-    background:var(--off-white); color:var(--page);
+    background:var(--blue); color:#fff;
     font-size:17px; font-weight:500; text-decoration:none;
     transition:background-color .15s var(--ease), transform .15s var(--ease);
   }
   .open-btn svg{width:20px; height:20px; flex:none; stroke-width:1.8}
-  .open-btn:hover{background:#fff}
+  .open-btn:hover{background:var(--blue-hover)}
   .open-btn:active{transform:scale(.98)}
   .status{margin:12px 4px 0; text-align:center; color:var(--muted); font-size:14px}
 

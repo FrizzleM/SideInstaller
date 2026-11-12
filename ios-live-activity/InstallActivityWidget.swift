@@ -114,7 +114,9 @@ private extension Stage {
         }
     }
 
-    var fill: AnyShapeStyle { AnyShapeStyle(tint) }
+    /// The badge's fill: the filled blue while running, so its white symbol
+    /// reads, and the stage's colour after.
+    var fill: AnyShapeStyle { AnyShapeStyle(self == .running ? Brand.blue : tint) }
 
     /// The compact island's mark where the percentage was: the user's turn,
     /// or how the install ended.

@@ -480,8 +480,7 @@ struct ContentView: View {
     /// The Install button and the progress card it turns into, as one surface:
     /// starting a run reshapes the button instead of swapping it for a card.
     /// Only the two sets of content cross-fade; the surface itself changes
-    /// size and corners, and the button's off-white gives way to the card's
-    /// fill.
+    /// size and corners, and the button's blue gives way to the card's fill.
     private var installSurface: some View {
         let shape = RoundedRectangle(cornerRadius: showProgress ? Theme.cardRadius : Theme.controlRadius,
                                      style: .continuous)
@@ -495,7 +494,7 @@ struct ContentView: View {
                 Button(action: startInstall) {
                     installLabel
                         .font(.headline)
-                        .foregroundStyle(Theme.page)
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, minHeight: 52)
                         .contentShape(Rectangle())
                 }
@@ -506,10 +505,10 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
         // Clips the incoming content to the surface while it's still growing.
         .clipShape(shape)
-        // The button's off-white, which gives way to the card's fill.
+        // The button's blue, which gives way to the card's fill.
         .background(
             shape
-                .fill(Theme.offWhite)
+                .fill(Theme.blue)
                 .opacity(showProgress ? 0 : 1)
         )
         .cardSurface(in: shape, shown: showProgress)
@@ -1610,7 +1609,7 @@ struct StepNode: View {
 
     private var stroke: Color {
         switch state {
-        case .pending: Color.white.opacity(0.16)
+        case .pending: Theme.ice.opacity(0.18)
         case .active:  Theme.accent
         case .done:    Theme.hairline
         default:       color.opacity(0.4)
