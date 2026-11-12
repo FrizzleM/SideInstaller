@@ -31,8 +31,9 @@ scripts/check-ios.sh            # simulator build + SideInstallerTests (ios-test
 scripts/check_translations.py   # every L("…") string against each *Strings.swift table
 ```
 
-- The vendored crates aren't workspace members (`minis/` and `rootshell/`
-  depend on `vendor/idevice` from outside rust-core), so `test-rust.sh` tests each from
+- The vendored crates aren't workspace members (siboot, in
+  [FrizzleM/siboot](https://github.com/FrizzleM/siboot), builds them from outside
+  rust-core through a submodule of this repository), so `test-rust.sh` tests each from
   its own folder with the features the app's build gives it, rust-core's
   `[patch.crates-io]` entries and a copy of `rust-core/Cargo.lock`, put back
   after. idevice's `test_pairing_file_roundtrip` is skipped: it reads

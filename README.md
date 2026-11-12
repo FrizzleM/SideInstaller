@@ -85,7 +85,7 @@ Wi-Fi, and LocalDevVPN connected.
    local shell, one line at a time:
 
    ```sh
-   curl -fsSLO https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/rootshell/bin/siboot-pair.wasm
+   curl -fsSLO https://raw.githubusercontent.com/FrizzleM/siboot/main/rootshell/bin/siboot-pair.wasm
    ifconfig en0 > ifconfig.txt
    ./siboot-pair.wasm
    ```
@@ -95,7 +95,7 @@ Wi-Fi, and LocalDevVPN connected.
 3. In Open Minis's terminal, run:
 
    ```sh
-   wget -qO- https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/minis/install.sh | sh
+   wget -qO- https://raw.githubusercontent.com/FrizzleM/siboot/main/minis/install.sh | sh
    ```
 
    The first time, type the transfer code rootshell shows (after that, siboot uses the pairing file
@@ -104,11 +104,11 @@ Wi-Fi, and LocalDevVPN connected.
 4. The first time, trust your Apple account in **Settings › General › VPN & Device Management**, then
    open SideInstaller.
 
-How it works: [`rootshell/`](rootshell/) pairs the iPhone with itself, and [`minis/`](minis/) signs
-and installs SideInstaller.
+How it works: this is [siboot](https://github.com/FrizzleM/siboot). Its `rootshell/` pairs the
+iPhone with itself, and its `minis/` signs and installs SideInstaller.
 
 Once paired, `siboot developer-mode` in Open Minis asks the iPhone to show the Developer Mode switch
-in Settings, or with `--turn-on` to turn it on ([details](minis/README.md#developer-mode)).
+in Settings, or with `--turn-on` to turn it on ([details](https://github.com/FrizzleM/siboot/blob/main/minis/README.md#developer-mode)).
 
 ### Links
 
@@ -188,13 +188,16 @@ anyone can inspect exactly what it does.
 | `ios-tests/` | The app's unit tests (`SideInstallerTests`) |
 | `rust-core/` | Rust core compiled into `SideInstallerFFI.xcframework` |
 | `scripts/` | Build, check and release scripts |
-| `rootshell/` | siboot-pair, for rootshell: pairs the iPhone with itself from an App Store app |
-| `minis/` | siboot, for Open Minis: takes that pairing, then signs and installs SideInstaller on the same iPhone |
 | `.github/` | Workflows that check pull requests, build the unsigned IPA, publish it as a release and hand it to the signer |
 
 Signed builds and the install page live in [FrizzleM/SideInstaller-Signed](https://github.com/FrizzleM/SideInstaller-Signed):
 it signs each release's IPA with every certificate, attaches the signed IPAs to a release of its own and
 deploys [sideinstaller.net](https://sideinstaller.net/). No IPA is ever committed to either repository.
+
+siboot, which installs SideInstaller [from the iPhone itself](#without-a-certificate-from-the-iphone-itself),
+lives in [FrizzleM/siboot](https://github.com/FrizzleM/siboot). It builds this repository's vendored crates
+and rust-core's `apple_session.rs` and `error_text.rs` through a submodule pinned to one commit, so a change
+here reaches siboot only when that pin moves.
 
 ## Contributing
 
