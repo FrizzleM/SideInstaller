@@ -40,10 +40,40 @@ repository, checks it against the SHA-256 the script carries, keeps it at
 | 7 | Hand over | house_arrest writes the pairing file to `Library/Application Support/rp_pairing_file.plist` and marks it imported (`importedPairingFileName`), as Side by Side hands one to SideInstaller |
 
 `siboot check` runs step 1 only, and `siboot connect` steps 1–3.
+`siboot developer-mode` runs steps 1–3 and then asks for Developer Mode
+([below](#developer-mode)).
 `SIBOOT_APPLE_ID` and `SIBOOT_PASSWORD` skip the prompts. Everything is kept in
 `~/.siboot`: the pairing file (mode 600), isideload's store (signing key,
 anisette identity, saved token) and the download. The password is never
 written anywhere.
+
+## Developer Mode
+
+```sh
+siboot developer-mode
+```
+
+Before siboot is installed, the same is
+`wget -qO- https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/minis/install.sh | sh -s developer-mode`.
+
+It works as SideInstaller's Settings › Developer Mode does. siboot opens the
+install's tunnel (steps 1–3, without the internet checks), and lockdownd says
+whether Developer Mode is on (`DeveloperModeStatus` in
+`com.apple.security.mac.amfi`). When it's on, nothing is sent. When it's off,
+AMFI's RSD shim (`com.apple.amfi.lockdown.shim.remote`) is asked to show the
+switch under Settings › Privacy & Security, where you turn it on: iOS restarts,
+and once you unlock it, asks you to tap Turn On.
+
+`siboot developer-mode --turn-on` turns it on instead, once you type `yes`: the
+iPhone restarts at once, and Minis stops with it. iOS does that only while the
+iPhone has no passcode. With one, it refuses, and siboot shows the switch
+instead.
+
+It needs what the install needs: a pairing the iPhone accepts, and a tunnel
+that opens. So it can't bring the switch back on an iPhone that has never been
+paired, since pairing happens under that same Developer Mode page. Whether
+iOS 27 still answers on its pairing port with Developer Mode off hasn't been
+tried.
 
 ## Building
 
@@ -68,7 +98,8 @@ binary that doesn't match.
 `cargo test` runs on any host (macOS included): the hand-off from rootshell
 against a stand-in for siboot-pair's side (the right code, a mistyped one, three
 wrong ones, something that isn't a pairing file, nothing offered), argument
-parsing, the bundle walk, 2FA answers, server order, the sign-in errors that
+parsing, `developer-mode` against stand-ins for lockdownd and AMFI (on already,
+off, unreadable, a declined restart, the passcode refusal, a hang-up), the bundle walk, 2FA answers, server order, the sign-in errors that
 stop it, install refusals, and rust-core's own `apple_session.rs` and
 `error_text.rs` tests. A test also stands in for a rootshell that iOS has
 paused: the connection goes through and nothing answers. siboot-pair's own
@@ -92,6 +123,12 @@ tests, with a fake iPhone, are in
   an iPhone. The hand-off itself (two apps on one iPhone's loopback) hasn't
   completed on an iPhone yet: the runs that worked there used a file moved over
   the LAN or saved by an earlier run.
+- **0.14.0** adds `siboot developer-mode`; the install is unchanged. Tested on
+  macOS and Alpine aarch64 (39 tests, the new ones against stand-ins for
+  lockdownd and AMFI; `install.sh | sh -s developer-mode` ran it). Not run on
+  an iPhone yet. SideInstaller's own helper, which sends the same requests, has
+  only read the status and shown the switch on an iPhone where Developer Mode
+  was already on.
 
 Not tested yet: other iPhones and iOS versions, an Apple Account at its
 certificate or App ID limit (siboot then asks which certificate to revoke), and

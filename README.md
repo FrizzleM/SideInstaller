@@ -107,6 +107,9 @@ Wi-Fi, and LocalDevVPN connected.
 How it works: [`rootshell/`](rootshell/) pairs the iPhone with itself, and [`minis/`](minis/) signs
 and installs SideInstaller.
 
+Once paired, `siboot developer-mode` in Open Minis asks the iPhone to show the Developer Mode switch
+in Settings, or with `--turn-on` to turn it on ([details](minis/README.md#developer-mode)).
+
 ### Links
 
 SideInstaller opens three kinds of `sideinstaller://` link, and asks before acting on any of them:

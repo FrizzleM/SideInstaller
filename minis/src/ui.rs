@@ -104,16 +104,10 @@ pub fn ask(prompt: &str) -> Option<String> {
     }
 }
 
-pub fn banner(version: &str) {
+pub fn banner(version: &str, tagline: &str) {
     println!();
     println!("{} {}", paint("1;35", "siboot"), paint("2", version));
-    println!(
-        "{}",
-        paint(
-            "2",
-            "installs SideInstaller onto this iPhone, with your own Apple Account"
-        )
-    );
+    println!("{}", paint("2", tagline));
     println!();
     println!(
         "{}",

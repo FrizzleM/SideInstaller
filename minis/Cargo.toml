@@ -1,6 +1,6 @@
 [package]
 name = "siboot"
-version = "0.13.1"
+version = "0.14.0"
 edition = "2021"
 description = "PC-free bootstrap that installs SideInstaller onto the iPhone it runs on, from Open Minis's Linux shell, with the pairing made in rootshell"
 license = "MIT"
@@ -25,6 +25,7 @@ path = "src/main.rs"
 #   afc                /PublicStaging upload
 #   installation_proxy the install
 #   house_arrest       writing the pairing file into SideInstaller's container
+#   amfi               `siboot developer-mode`
 # `aws-lc`, as rust-core: aarch64 musl is a supported aws-lc target.
 idevice = { path = "../rust-core/vendor/idevice", default-features = false, features = [
   "aws-lc",
@@ -36,6 +37,7 @@ idevice = { path = "../rust-core/vendor/idevice", default-features = false, feat
   "afc",
   "installation_proxy",
   "house_arrest",
+  "amfi",
 ] }
 
 # Apple ID sign-in, developer portal and signing: SideInstaller's vendored copy,

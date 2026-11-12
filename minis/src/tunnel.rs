@@ -235,7 +235,7 @@ async fn pair_verified(
 }
 
 /// Await `future` for up to `secs`, naming `what` if it fails or runs out.
-async fn step<T, E: std::error::Error>(
+pub async fn step<T, E: std::error::Error>(
     what: &str,
     secs: u64,
     future: impl std::future::Future<Output = std::result::Result<T, E>>,

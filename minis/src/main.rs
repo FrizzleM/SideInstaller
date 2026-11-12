@@ -9,6 +9,7 @@
 //!
 //! The steps:
 //! 1 check · 2 pairing · 3 connect · 4 Apple ID · 5 sign · 6 install · 7 hand over.
+//! `siboot developer-mode` runs 1–3, then asks for Developer Mode (devmode.rs).
 //!
 //! The Apple ID password goes only to Apple (as an SRP proof, via isideload) and
 //! is never written to disk or logged. Like SideInstaller, the developer token
@@ -16,6 +17,7 @@
 //! sign in again.
 
 mod account;
+mod devmode;
 mod fail;
 mod install;
 mod pairing;
@@ -43,9 +45,11 @@ use fail::{Fail, Result};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Steps in the full run. Numbering stays fixed whatever the command, so the
-/// output means the same thing in every mode.
+/// Steps in the full run. Numbering stays fixed for `check` and `connect`, so
+/// the output means the same thing in every install mode.
 const STAGES: usize = 7;
+/// `developer-mode`: the install's first three steps, then Developer Mode.
+const DEVMODE_STAGES: usize = 4;
 
 /// LocalDevVPN's address for this iPhone: traffic to it comes back to the
 /// device's own services.
@@ -61,10 +65,14 @@ pub enum Command {
     Check,
     /// Steps 1-3: take the pairing and prove the tunnel works with it.
     Connect,
+    /// Steps 1-3, then show Developer Mode in Settings (or turn it on).
+    DeveloperMode,
 }
 
 pub struct Args {
     pub command: Command,
+    /// With `developer-mode`: turn it on, not only show it.
+    pub turn_on: bool,
     pub verbose: bool,
     pub device: SocketAddr,
     /// ~/.siboot: the pairing file, isideload's store, downloads.
@@ -97,6 +105,7 @@ enum Parsed {
 fn parse_args(argv: impl IntoIterator<Item = String>) -> std::result::Result<Parsed, String> {
     let mut args = Args {
         command: Command::All,
+        turn_on: false,
         verbose: false,
         device: SocketAddr::new(IpAddr::V4(DEFAULT_DEVICE_IP), DEFAULT_RP_PORT),
         home: default_home(),
@@ -130,12 +139,20 @@ fn parse_args(argv: impl IntoIterator<Item = String>) -> std::result::Result<Par
             "--apple-id" => args.apple_id = Some(value("--apple-id")?),
             "--ipa" => args.ipa = Some(value("--ipa")?),
             "--anisette" => args.anisette = Some(value("--anisette")?),
-            "check" | "connect" if !command_seen => {
+            "--turn-on" => args.turn_on = true,
+            "check" | "connect" | "developer-mode" if !command_seen => {
                 command_seen = true;
-                args.command = if arg == "check" { Command::Check } else { Command::Connect };
+                args.command = match arg.as_str() {
+                    "check" => Command::Check,
+                    "connect" => Command::Connect,
+                    _ => Command::DeveloperMode,
+                };
             }
             other => return Err(format!("unrecognised argument `{other}`")),
         }
+    }
+    if args.turn_on && args.command != Command::DeveloperMode {
+        return Err("--turn-on goes with `siboot developer-mode`".into());
     }
     Ok(Parsed::Run(args))
 }
@@ -146,7 +163,7 @@ fn usage() {
 siboot {VERSION} — installs SideInstaller onto this iPhone, from Open Minis.
 
 USAGE
-    siboot [check | connect] [options]
+    siboot [check | connect | developer-mode] [options]
 
     First pair in rootshell (App Store) with siboot-pair and leave it running.
     With no command, every step runs: check, take the pairing from rootshell,
@@ -156,6 +173,12 @@ USAGE
 COMMANDS
     check       Only check that LocalDevVPN, this iPhone and the internet are ready.
     connect     Check, take the pairing, and only open the tunnel with it.
+    developer-mode
+                Connect, and if Developer Mode is off, show its switch under
+                Settings › Privacy & Security. Sends nothing when it's on.
+                With --turn-on, turn it on instead, after asking: the iPhone
+                restarts. iOS allows that only without a passcode; with one,
+                siboot shows the switch instead.
 
 OPTIONS
     --apple-id EMAIL    Apple Account to sign with (else SIBOOT_APPLE_ID, else
@@ -163,6 +186,7 @@ OPTIONS
                         prompt that doesn't echo.
     --ipa PATH|URL      Install this IPA instead of SideInstaller's latest release.
     --anisette URL      Sign in through this anisette server only.
+    --turn-on           With developer-mode: turn it on, not only show it.
     --device-ip IP      LocalDevVPN's address for this iPhone (default {ip}).
     --port N            The iPhone's RPPairing port (default {port}).
     --pairing-file PATH Default ~/.siboot/rp_pairing_file.plist.
@@ -201,7 +225,14 @@ fn main() -> ExitCode {
 
     ui::set_verbose(args.verbose);
     init_logging(args.verbose);
-    ui::banner(VERSION);
+    ui::banner(
+        VERSION,
+        if args.command == Command::DeveloperMode {
+            "shows Developer Mode in Settings, or turns it on"
+        } else {
+            "installs SideInstaller onto this iPhone, with your own Apple Account"
+        },
+    );
 
     // Two workers: the software TCP stack inside the tunnel keeps moving while
     // a foreground task waits on it, and threads are cheap next to emulation.
@@ -256,23 +287,31 @@ async fn pipeline(args: &Args) -> Result<()> {
     std::fs::create_dir_all(&args.home)
         .map_err(|e| Fail::new(format!("Couldn't create {}.", args.home.display()), e.to_string()))?;
 
-    ui::stage(1, STAGES, "Checking LocalDevVPN, this iPhone and the internet");
-    preflight::run(args).await?;
+    let devmode = args.command == Command::DeveloperMode;
+    let stages = if devmode { DEVMODE_STAGES } else { STAGES };
+    // Before the request, a failure also says what siboot can't do without the
+    // tunnel.
+    let note = |f: Fail| if devmode { devmode::unreachable_note(f) } else { f };
+
+    if devmode {
+        ui::stage(1, stages, "Checking LocalDevVPN and this iPhone");
+    } else {
+        ui::stage(1, stages, "Checking LocalDevVPN, this iPhone and the internet");
+    }
+    preflight::run(args).await.map_err(note)?;
     if args.command == Command::Check {
         println!();
         ui::ok("ready — run `siboot` to install SideInstaller");
         return Ok(());
     }
 
-    ui::stage(2, STAGES, "Taking the pairing from rootshell");
+    ui::stage(2, stages, "Taking the pairing from rootshell");
     let pairing_path = args.pairing_path();
-    pairing::ensure(args, &pairing_path).await?;
+    pairing::ensure(args, &pairing_path).await.map_err(note)?;
 
-    ui::stage(3, STAGES, "Connecting to this iPhone through LocalDevVPN");
-    let device = {
-        let mut connection = tunnel::open(args.device, &pairing_path).await?;
-        connection.describe().await?
-    };
+    ui::stage(3, stages, "Connecting to this iPhone through LocalDevVPN");
+    let mut connection = tunnel::open(args.device, &pairing_path).await.map_err(note)?;
+    let device = connection.describe().await.map_err(note)?;
     ui::ok(&format!(
         "{} — {} on iOS {}",
         device.name, device.product_type, device.ios_version
@@ -283,8 +322,13 @@ async fn pipeline(args: &Args) -> Result<()> {
         ui::ok("the tunnel works with this pairing file");
         return Ok(());
     }
+    if devmode {
+        ui::stage(4, stages, "Asking this iPhone for Developer Mode");
+        return developer_mode(args, &mut connection).await;
+    }
     // The connection is closed here: iOS drops an idle tunnel during sign-in and
     // signing anyway, so a fresh one is opened to install (as Side by Side does).
+    drop(connection);
 
     ui::stage(4, STAGES, "Signing in to your Apple Account");
     let mut session = account::sign_in(args).await?;
@@ -306,6 +350,42 @@ async fn pipeline(args: &Args) -> Result<()> {
     ui::info("The first time, iOS asks you to trust your Apple Account: Settings ›");
     ui::info("General › VPN & Device Management. Free accounts' apps last 7 days;");
     ui::info("SideInstaller can renew itself from then on.");
+    Ok(())
+}
+
+/// Step 4 of `siboot developer-mode`, through the open tunnel.
+async fn developer_mode(args: &Args, connection: &mut tunnel::Connection) -> Result<()> {
+    let request = if args.turn_on { devmode::Request::TurnOn } else { devmode::Request::Show };
+    let confirm = || {
+        let answer = ui::ask("Type yes to go ahead: ").unwrap_or_default();
+        matches!(answer.to_lowercase().as_str(), "yes" | "y")
+    };
+    let outcome = devmode::run(connection, request, confirm).await?;
+    println!();
+    match outcome {
+        devmode::Outcome::AlreadyOn => {
+            ui::ok("Developer Mode is already on, so nothing was sent.");
+        }
+        devmode::Outcome::Shown => {
+            ui::ok("Developer Mode now shows under Settings › Privacy & Security, near the");
+            ui::info("bottom. Turn it on there; iOS restarts to finish, and once you unlock it,");
+            ui::info("tap Turn On.");
+        }
+        devmode::Outcome::ShownForPasscode => {
+            ui::ok("iOS turns Developer Mode on from here only while the iPhone has no passcode,");
+            ui::info("so siboot showed it under Settings › Privacy & Security instead. Turn it on");
+            ui::info("there; iOS restarts to finish, and once you unlock it, tap Turn On.");
+        }
+        devmode::Outcome::TurningOn => {
+            ui::ok("Developer Mode is set to turn on, and this iPhone restarts now. Once you");
+            ui::info("unlock it, tap Turn On.");
+        }
+        devmode::Outcome::HungUp => {
+            ui::ok("The iPhone hung up right after the request, as it does when it restarts to");
+            ui::info("turn Developer Mode on. Once you unlock it, tap Turn On. If it doesn't");
+            ui::info("restart, run `siboot developer-mode` again.");
+        }
+    }
     Ok(())
 }
 
@@ -338,8 +418,27 @@ mod tests {
     }
 
     #[test]
+    fn developer_mode_parses_with_or_without_turn_on() {
+        let args = parse("developer-mode");
+        assert_eq!(args.command, Command::DeveloperMode);
+        assert!(!args.turn_on);
+        assert!(parse("developer-mode --turn-on").turn_on);
+        assert!(parse("--turn-on developer-mode -v").turn_on);
+    }
+
+    #[test]
     fn bad_input_is_refused() {
-        for line in ["--device-ip", "--device-ip nope", "pair", "check connect", "--repair", "--advertiser minis"] {
+        for line in [
+            "--device-ip",
+            "--device-ip nope",
+            "pair",
+            "check connect",
+            "developer-mode check",
+            "--turn-on",
+            "connect --turn-on",
+            "--repair",
+            "--advertiser minis",
+        ] {
             assert!(parse_args(line.split_whitespace().map(String::from)).is_err(), "{line}");
         }
     }
