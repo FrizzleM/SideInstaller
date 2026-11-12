@@ -84,10 +84,12 @@ enum LogRedactor {
 
     /// One printed value, in the forms the log uses:
     /// Rust `{:#?}` bytes `Data(\n [\n 225,\n … ],\n )`; idevice's
-    /// `Data(E9 14 … Len: 32)`; wrapped scalars `String("…")`, `UInt64(…)`;
-    /// quoted strings; bare tokens.
+    /// `Data(E9 14 … Len: 32)`; a Rust `Vec<u8>`, `[225, 120]` or
+    /// `Some([225, 120])`; wrapped scalars `String("…")`, `UInt64(…)`; quoted
+    /// strings; bare tokens. A list has to be matched whole: as a bare token
+    /// only its `[225` was taken, and a key's other 31 bytes stayed.
     private static let value = #"""
-    (?:Data\(\s*\[[^\]]*\]\s*,?\s*\)|Data\([^)]*\)|[A-Za-z0-9]+\(\s*"(?:[^"\\]|\\.)*"\s*\)|[A-Za-z0-9]+\([^()\s,]*\)|"(?:[^"\\]|\\.)*"|[^\s,;)}\]]+)
+    (?:Data\(\s*\[[^\]]*\]\s*,?\s*\)|Data\([^)]*\)|Some\(\s*\[[^\]]*\]\s*,?\s*\)|\[[^\]]*\]|[A-Za-z0-9]+\(\s*"(?:[^"\\]|\\.)*"\s*\)|[A-Za-z0-9]+\([^()\s,]*\)|"(?:[^"\\]|\\.)*"|[^\s,;)}\]]+)
     """#
 
     // MARK: Rules
@@ -175,6 +177,11 @@ enum LogRedactor {
                 return bytesMarker(count: Int(value[range].dropFirst(5)) ?? 0)
             }
             return bytesMarker(count: byteCount(value))
+        }
+        // `[225, 120]`, `Some([…])`: a list of numbers keeps its length.
+        let list = value.hasPrefix("Some(") ? value.dropFirst(5) : Substring(value)
+        if list.hasPrefix("["), list.allSatisfy({ $0.isNumber || "[](),- \t\n".contains($0) }) {
+            return numbersMarker(list.split(whereSeparator: { !$0.isNumber && $0 != "-" }))
         }
         return "‹redacted›"
     }

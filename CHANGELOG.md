@@ -5,12 +5,6 @@ All notable changes to SideInstaller are documented here.
 ## 2.0.0
 
 ### Added
-- **SideInstaller is now in Turkish.** Pick Türkçe in Settings › Language, or leave it on Auto
-  with your iPhone set to Turkish. Thanks to [Mr3242-Scripter](https://github.com/Mr3242-Scripter)
-  for the translation (#111), who's now in About › Special thanks.
-- **A nudge to update to iOS 27 at setup.** On an iPhone or iPad below iOS 27 that can run it,
-  the welcome page now suggests updating first: on iOS 27 the iPhone pairs with itself, so
-  SideInstaller works without a computer and there's no pairing file to make.
 - **AltStore on the Install tab and in Side by Side.** AltStore Classic now sits in the list of
   apps next to SideStore, LiveContainer + SideStore and Madeira, and Side by Side can put it on
   someone else's iPhone too. It comes from AltStore's own source (apps.altstore.io), the one
@@ -37,6 +31,26 @@ All notable changes to SideInstaller are documented here.
   device's state show as a small coloured dot. The pairing code takes one key per digit, on the
   Lock Screen too, icons are line drawings in one colour, and nothing pulses, breathes or bounces
   any more.
+
+### Fixed
+- **AltStore installed as a custom IPA gets its pairing file again.** AltStore 2.3.1 and later
+  no longer read the pairing file SideInstaller put inside the app when signing it: they read it
+  from their Documents, where AltServer now writes it after installing (altstoreio/AltStore
+  5811912). SideInstaller writes it there too, so setting up Remote AltServer skips pairing
+  again. An imported AltStore is also recognized and set up just like the download, without the
+  App ID check other custom IPAs get.
+
+## 1.7.0
+
+### Added
+- **SideInstaller is now in Turkish.** Pick Türkçe in Settings › Language, or leave it on Auto
+  with your iPhone set to Turkish. Thanks to [Mr3242-Scripter](https://github.com/Mr3242-Scripter)
+  for the translation (#111), who's now in About › Special thanks.
+- **A nudge to update to iOS 27 at setup.** On an iPhone or iPad below iOS 27 that can run it,
+  the welcome page now suggests updating first: on iOS 27 the iPhone pairs with itself, so
+  SideInstaller works without a computer and there's no pairing file to make.
+
+### Changed
 - **Side by Side goes step by step, and installs SideStore and LiveContainer too.** It was one
   long form that could only put SideInstaller on someone else's iPhone. It now takes one page at
   a time: what to install, whether you have their iPhone's IP address (optional: without it,
@@ -56,12 +70,6 @@ All notable changes to SideInstaller are documented here.
   sign in to Apple and pair again.
 
 ### Fixed
-- **AltStore installed as a custom IPA gets its pairing file again.** AltStore 2.3.1 and later
-  no longer read the pairing file SideInstaller put inside the app when signing it: they read it
-  from their Documents, where AltServer now writes it after installing (altstoreio/AltStore
-  5811912). SideInstaller writes it there too, so setting up Remote AltServer skips pairing
-  again. An imported AltStore is also recognized and set up just like the download, without the
-  App ID check other custom IPAs get.
 - **Keys and passwords stay out of the activity log.** SideInstaller reads back each file it
   hands SideStore, LiveContainer or Madeira, to check it arrived, and the device library logged
   what it read byte by byte: the pairing file with its private keys, SideStore's
@@ -69,7 +77,9 @@ All notable changes to SideInstaller are documented here.
   identity) and Madeira's sign-in. Copying the log and Report a problem took them along, so a
   log posted to a GitHub issue could hold them. The log now says only how many bytes were read,
   the device library's protocol messages are left out unless Settings › Activity Log › Verbose
-  logging is on, and any long run of numbers is taken out of the log, whatever wrote it.
+  logging is on, and any long run of numbers is taken out of the log, whatever wrote it. A key
+  printed as a plain list of numbers (`private_key: [225, 120, …]`) is now taken out whole too:
+  only its first number was, and the rest of the key stayed in the log.
 - **Side by Side no longer keeps the other person's signing key.** It signed their Apple ID in
   with your iPhone's own sign-in files, so the private key for the certificate it made stayed on
   your iPhone after the run. Their Apple ID now signs in from a temporary folder, deleted once

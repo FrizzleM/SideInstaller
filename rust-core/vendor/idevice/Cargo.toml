@@ -111,7 +111,8 @@ wasm-bindgen-futures = { version = "0.4", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.43", features = ["full"] }
-tun-rs = { version = "2.0.8", features = ["async_tokio"] }
+# tun-rs dropped: only upstream's tests/ and examples/ use it, and they aren't
+# vendored (README.md, change 5).
 bytes = "1.10.1"
 
 [features]

@@ -19,6 +19,38 @@ xcodebuild build -project SideInstaller.xcodeproj -scheme SideInstaller \
 Toolchain used here: Xcode 27.0 beta (iOS 27.0 SDK), Rust 1.96 with targets
 `aarch64-apple-ios` + `aarch64-apple-ios-sim`, xcodegen.
 
+### Checks (what every pull request runs)
+
+`.github/workflows/checks.yml` runs three jobs on each pull request and push to
+main, each a script that runs the same on a Mac:
+
+```sh
+scripts/test-rust.sh            # rust-core's tests, then the vendored crates' (idevice, isideload, apple-codesign-quick)
+(cd rust-core && cargo clippy --all-targets -- -D warnings)
+scripts/check-ios.sh            # simulator build + SideInstallerTests (ios-tests/), in a clean clone or worktree
+scripts/check_translations.py   # every L("…") string against each *Strings.swift table
+```
+
+- The vendored crates aren't workspace members (siboot, in
+  [FrizzleM/siboot](https://github.com/FrizzleM/siboot), builds them from outside
+  rust-core through a submodule of this repository), so `test-rust.sh` tests each from
+  its own folder with the features the app's build gives it, rust-core's
+  `[patch.crates-io]` entries and a copy of `rust-core/Cargo.lock`, put back
+  after. idevice's `test_pairing_file_roundtrip` is skipped: it reads
+  `/var/lib/lockdown/test.plist` from the machine running it.
+- `check-ios.sh` builds only the Rust library's simulator slice
+  (`DEVICE=0 ./build-rust.sh`) and runs the tests inside the app on the newest
+  iPhone simulator. With `-quiet`, xcodebuild names a failing test only; the
+  script prints each failure from the result bundle.
+- The translation check fails on a duplicate key (Swift stops the app on the
+  first lookup in that table), a translation whose `%@`/`%d` differ from its
+  key, a key built with `\(…)`, and, given `--base`, a string untranslated now
+  that wasn't at that commit. Gaps a language already had are listed, not
+  failed: as of 2026-11-09, Turkish lacks 32 strings and Spanish, Italian and
+  Vietnamese lack "Beta". Names read the same everywhere (Discord, Wi-Fi,
+  LocalDevVPN…) are in its `SAME_IN_EVERY_LANGUAGE`; labels translated later
+  with `L(value)` are found through `EXTRA_KEY_SOURCES`.
+
 ## Pins
 
 | dependency | pin | features |
