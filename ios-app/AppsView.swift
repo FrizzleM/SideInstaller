@@ -47,6 +47,10 @@ struct ProvisioningProfile: Identifiable, Equatable {
     /// True when the App ID is a wildcard (ends in `*`).
     var isWildcard: Bool { applicationIdentifier.hasSuffix("*") }
 
+    /// True for an App Store distribution profile, the kind TestFlight builds
+    /// carry. Nothing can be sideloaded with one, so the page leaves it out.
+    var isAppStoreDistribution: Bool { entitlements["beta-reports-active"] as? Bool == true }
+
     /// Calendar days until expiry (1 = tomorrow); negative once expired.
     var daysRemaining: Int? {
         guard let expirationDate else { return nil }
@@ -119,17 +123,29 @@ struct SideloadedApp: Identifiable, Equatable {
     var id: String { bundleID }
 
     /// Returns nil unless `ProfileValidated` is set. installd sets it only for
-    /// apps installed with a provisioning profile, not App Store apps.
+    /// apps installed with a provisioning profile, not App Store apps. TestFlight
+    /// apps carry a profile too, so they're left out separately.
     init?(plist: [String: Any]) {
         guard plist["ProfileValidated"] != nil,
               let bundleID = plist["CFBundleIdentifier"] as? String else { return nil }
+        let entitlements = plist["Entitlements"] as? [String: Any]
+        guard !Self.isFromTestFlight(signer: plist["SignerIdentity"] as? String,
+                                     entitlements: entitlements) else { return nil }
         self.bundleID = bundleID
         let display = plist["CFBundleDisplayName"] as? String
         let bundleName = plist["CFBundleName"] as? String
         self.name = display?.isEmpty == false ? display! : (bundleName?.isEmpty == false ? bundleName! : bundleID)
         self.version = plist["CFBundleShortVersionString"] as? String
-        let entitlements = plist["Entitlements"] as? [String: Any]
         self.applicationIdentifier = entitlements?["application-identifier"] as? String
+    }
+
+    /// Whether an app came from TestFlight: Apple signed it (only App Store and
+    /// TestFlight builds carry Apple's own signer) or it has the
+    /// `beta-reports-active` entitlement, which only App Store distribution
+    /// profiles grant. Neither is ever true of a sideloaded app.
+    static func isFromTestFlight(signer: String?, entitlements: [String: Any]?) -> Bool {
+        if let signer, signer.hasPrefix("Apple iPhone OS Application Signing") { return true }
+        return entitlements?["beta-reports-active"] as? Bool == true
     }
 }
 
@@ -401,7 +417,9 @@ final class SideloadedAppsManager: ObservableObject {
             do {
                 let inventory = try await engine.sideloadedAppInventory()
                 let apps = inventory.apps.compactMap(SideloadedApp.init(plist:))
+                // TestFlight apps' profiles would otherwise show as unused.
                 let profiles = inventory.profiles.compactMap(ProvisioningProfile.init(data:))
+                    .filter { !$0.isAppStoreDistribution }
                 let matched = ProfileMatcher.match(apps: apps, profiles: profiles)
                 entries = matched.entries
                 unmatched = matched.unmatched
