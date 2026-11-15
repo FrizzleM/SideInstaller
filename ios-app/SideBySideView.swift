@@ -39,7 +39,8 @@ enum SideBySideApp: String, CaseIterable, Identifiable {
     /// Full name, for titles and the log.
     var displayName: String {
         switch self {
-        case .sideInstaller: return "SideInstaller"
+        case .sideInstaller: return "SideInstaller 🅥"
+        case .liveContainer: return "LiveContainer 🅥 + SideStore"
         case .custom:        return L("Custom .ipa")
         default:             return source?.displayName ?? "SideInstaller"
         }
@@ -164,12 +165,25 @@ enum SideBySideStep: Int, CaseIterable, Identifiable {
 /// the app on their iPhone holds them.
 final class SideBySideManager: ObservableObject {
 
-    /// Unsigned IPA from SideInstaller's latest GitHub release.
+    /// Unsigned IPA from this fork's latest GitHub release
+    /// (wozofa-ship-it/SideInstaller): the SideInstaller 🅥 build, not
+    /// upstream FrizzleM's. A release must exist there; until the first one
+    /// is published this download 404s.
     static let releaseIPA = URL(string:
-        "https://github.com/FrizzleM/SideInstaller/releases/latest/download/SideInstaller.ipa")!
+        "https://github.com/wozofa-ship-it/SideInstaller/releases/latest/download/SideInstaller.ipa")!
 
     /// What the release asset is called, and what the download is saved as.
     static let ipaFileName = "SideInstaller.ipa"
+
+    /// Unsigned IPA of our LiveContainer build: the fork's rolling nightly
+    /// release (wozofa-ship-it/LiveContainer-zh, tag `update`, refreshed by
+    /// CI on every push to main), not upstream LiveContainer's. The tag never
+    /// moves, so this URL always serves the latest push.
+    static let liveContainerIPA = URL(string:
+        "https://github.com/wozofa-ship-it/LiveContainer-zh/releases/download/update/LiveContainer+SideStore.ipa")!
+
+    /// What the LiveContainer asset is called, and what the download is saved as.
+    static let liveContainerFileName = "LiveContainer+SideStore.ipa"
 
     // MARK: Pages
 
@@ -1322,16 +1336,45 @@ final class SideBySideManager: ObservableObject {
         downloadProgress = 0
         let file: URL
         if let source = app.source {
-            file = try await downloadBuild(source, channel: channel)
+            if source == .liveContainer {
+                file = try await downloadLiveContainer()
+            } else {
+                file = try await downloadBuild(source, channel: channel)
+            }
         } else {
             file = try await downloadSideInstaller()
         }
         downloadedIPA = file
         downloadedKey = key
-        ownsDownload = app.source == nil
+        ownsDownload = app.source == nil || app == .liveContainer
         downloadProgress = 1
         engine.log("\(app.displayName) IPA ready at \(file.path) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(file.path)), countStyle: .file))).")
         setStep(.download, .done)
+    }
+
+    /// Our LiveContainer build's latest release, into a staging folder of its
+    /// own — the fork's rolling nightly release, not upstream's. Same shape as
+    /// `downloadSideInstaller`: no channel (the `update` tag always holds the
+    /// latest push), no Documents copy to reuse, so a failed download is an
+    /// error rather than a fall back to a stale copy.
+    @MainActor
+    private func downloadLiveContainer() async throws -> URL {
+        engine.log("Fetching the latest LiveContainer 🅥 release from \(Self.liveContainerIPA.absoluteString) …")
+        do {
+            let file = try await SideStoreDownloader.fetchDirect(
+                Self.liveContainerIPA, named: Self.liveContainerFileName) { fraction in
+                    Task { @MainActor in self.downloadProgress = fraction }
+                }
+            // Validate now, so an error page or truncated download doesn't fail
+            // later during signing.
+            guard IPALibrary.looksLikeIPA(file) else {
+                try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+                throw EngineError.message(L("The release download wasn't an IPA. GitHub may be returning an error page, so try again in a minute."))
+            }
+            return file
+        } catch let error as SideStoreDownloader.DownloadError {
+            throw EngineError.message(L("Couldn't download %@: %@", "LiveContainer 🅥 + SideStore", error.description))
+        }
     }
 
     /// SideInstaller's latest release, into a staging folder of its own.
