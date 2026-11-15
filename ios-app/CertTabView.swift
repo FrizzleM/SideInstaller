@@ -2710,12 +2710,12 @@ struct CertTabView: View {
                                     .textSelection(.enabled)
                             }
                         }
-                        if !engine.lines.isEmpty {
+                        if !LogStore.shared.lines.isEmpty {
                             Divider()
                             Text(L("Engine 步骤日志（最近 40 行）"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            ForEach(Array(engine.lines.suffix(40).enumerated()), id: \.offset) { _, entry in
+                            ForEach(Array(LogStore.shared.lines.suffix(40).enumerated()), id: \.offset) { _, entry in
                                 Text(verbatim: "\(entry.stamp)  \(entry.text)")
                                     .font(.system(.caption, design: .monospaced))
                                     .textSelection(.enabled)
@@ -2729,7 +2729,7 @@ struct CertTabView: View {
                 .cornerRadius(8)
                 Button(L("复制日志")) {
                     var text = localInstall.diagnosticLog.joined(separator: "\n")
-                    let recentEngine = engine.lines.suffix(40)
+                    let recentEngine = LogStore.shared.lines.suffix(40)
                     if !recentEngine.isEmpty {
                         if !text.isEmpty { text += "\n" }
                         text += "--- Engine ---\n" + recentEngine.map { "\($0.stamp)  \($0.text)" }.joined(separator: "\n")
@@ -2737,10 +2737,10 @@ struct CertTabView: View {
                     UIPasteboard.general.string = text
                 }
                 .font(.footnote)
-                .disabled(localInstall.diagnosticLog.isEmpty && engine.lines.isEmpty)
+                .disabled(localInstall.diagnosticLog.isEmpty && LogStore.shared.lines.isEmpty)
                 // 禁用态没有视觉提示时看着能点实际点不了（跟红按钮
                 // 同例）：没日志就半透明，别让人空点。
-                .opacity(localInstall.diagnosticLog.isEmpty && engine.lines.isEmpty ? 0.5 : 1)
+                .opacity(localInstall.diagnosticLog.isEmpty && LogStore.shared.lines.isEmpty ? 0.5 : 1)
             }
         } label: {
             Text(L("安装诊断日志"))

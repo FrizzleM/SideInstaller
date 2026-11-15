@@ -751,34 +751,7 @@ struct FilesTabView: View {
             })
         }
         .sheet(item: $moveItem) { item in
-            NavigationStack {
-                List {
-                    if moveDestinations(for: item).isEmpty {
-                        Text(L("没有可移动到的文件夹，先新建一个。"))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(moveDestinations(for: item), id: \.dir) { dest in
-                        Button {
-                            moveItem = nil
-                            moveItemToFolder(item, dest.dir)
-                        } label: {
-                            HStack {
-                                Image(systemName: dest.dir.isEmpty ? "house" : "folder")
-                                Text(dest.name)
-                                Spacer()
-                            }
-                        }
-                    }
-                }
-                .navigationTitle(L("移动到"))
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(L("取消")) { moveItem = nil }
-                    }
-                }
-            }
+            moveSheetContent(item: item)
         }
         .sheet(isPresented: $showImporter) {
             FileImporterRepresentableView(
@@ -1311,6 +1284,41 @@ struct FilesTabView: View {
         } catch {
             opMessage = error.localizedDescription
             opFailed = true
+        }
+    }
+
+    /// “移动到” sheet 内容：从 body 抽出来——body 的修饰链太大，
+    /// 编译器在 ForEach 那行报 type-check timeout；内容一字未动，
+    /// 只是换了个地方放。
+    @ViewBuilder
+    private func moveSheetContent(item: LocalFileItem) -> some View {
+        NavigationStack {
+            List {
+                if moveDestinations(for: item).isEmpty {
+                    Text(L("没有可移动到的文件夹，先新建一个。"))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(moveDestinations(for: item), id: \.dir) { dest in
+                    Button {
+                        moveItem = nil
+                        moveItemToFolder(item, dest.dir)
+                    } label: {
+                        HStack {
+                            Image(systemName: dest.dir.isEmpty ? "house" : "folder")
+                            Text(dest.name)
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .navigationTitle(L("移动到"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L("取消")) { moveItem = nil }
+                }
+            }
         }
     }
 

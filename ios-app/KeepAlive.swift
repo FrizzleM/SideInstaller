@@ -167,17 +167,12 @@ final class KeepAlive: NSObject {
             default: break
             }
         }
-        if #available(iOS 27.0, *) {
-            // While it plays, this app never deactivates the session itself.
-            observe(AVAudioSession.didBecomeInactiveNotification) { me, note in
-                let context = note.userInfo?[AVAudioSession.deactivationContextKey]
-                    as? AVAudioSession.DeactivationContext
-                if context?.source != .app { me.interruptionBegan() }
-            }
-            observe(AVAudioSession.resumptionRecommendationNotification) { me, _ in
-                me.interruptionEnded()
-            }
-        }
+        // iOS 27 的 AVAudioSession 新通知（didBecomeInactive /
+        // resumptionRecommendation / deactivationContext）暂不接：
+        // 跑道的 Xcode 26.6 自带 iOS 26.5 SDK，符号根本不存在，
+        // #available 是运行时判断、救不了编译期缺符号；等工作流
+        // 升到带 iOS 27 SDK 的 Xcode 再接回来。行为不丢：下面
+        // 的 interruption / routeChange 两路本来就覆盖了这块。
         // AirPods connecting, headphones unplugged, CarPlay.
         observe(AVAudioSession.routeChangeNotification) { me, note in
             let reason = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt

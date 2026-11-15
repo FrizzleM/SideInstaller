@@ -30,6 +30,9 @@ struct SettingsView: View {
     @AppStorage("CZFBuiltinTunnelIfaceIP") private var builtinTunnelIfaceIP = "10.7.1.1/32"
     /// Device IP 填非法时弹一次提示（Tunnel 节和 Advanced 节两处栏共用）。
     @State private var showDeviceIPResetAlert = false
+    /// Set when “Start LocalDevVPN now” opened nothing: how a missing
+    /// LocalDevVPN shows inside LiveContainer, where `canOpenURL` can't tell.
+    @State private var localDevVPNDidntOpen = false
     /// Wi-Fi 下自动启用隧道（v0.9.19）：与安装页预连共用同一键，
     /// 缺省（键不存在）= 开，保住 v70 行为；只管自动行为
     ///（页面预连 + 断线重连），不管操作时 tunnelUp 的内置直起，
@@ -280,7 +283,7 @@ struct SettingsView: View {
             HStack {
                 Text(L("Tunnel peer (device IP)"))
                 Spacer()
-                TextField("10.7.0.1", text: $engine.deviceIP)
+                TextField("10.7.0.1", text: Bindable(engine).deviceIP)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.numbersAndPunctuation)
@@ -293,6 +296,9 @@ struct SettingsView: View {
             Text(L("Tunnel"))
         } footer: {
             // 只留内置隧道：说明地址默认值与生效时机。
+            if localDevVPNDidntOpen {
+                Text(L("LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you."))
+            }
             Text(L("Built-in tunnel: interface 10.7.1.1/32 and peer 10.7.0.1/32 by default. Address changes take effect the next time the tunnel connects."))
             Text(L("When on, the Install tab preconnects the built-in tunnel on Wi-Fi and reconnects it if it drops. Off leaves the tunnel fully manual; a run still starts it when needed."))
         }
