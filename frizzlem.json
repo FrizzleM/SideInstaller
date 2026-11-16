@@ -10,18 +10,18 @@
       "iconURL": "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon~ios-marketing.png",
       "subtitle": "An an app that installs Sidestore on iOS 27, fully on-device",
       "localizedDescription": "Install SideStore and LiveContainer directly on your iPhone. No PC required.",
-      "version": "2.0.1",
-      "versionDate": "2026-11-12T20:00:38Z",
-      "versionDescription": "### Changed\n- **Blue is back.** The greys from 2.0.0 are blues again: night-blue pages, cards and popups under a still navy wash at the top, a solid blue main button, and a lighter blue for progress, links, selections and switches. The app icon and the logo tiles have their colour back, in a brighter blue than before 2.0.0. The Live Activities and sideinstaller.net match.",
-      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v2.0.1/SideInstaller.ipa",
-      "size": 10770716,
+      "version": "2.1.0",
+      "versionDate": "2026-11-16T18:27:35Z",
+      "versionDescription": "### Added\n- **Pick the developer team that signs.** An Apple Account on more than one developer team (a paid Apple Developer Program membership or a company's team, besides the free one every account has) is asked once which team signs, each marked Free or Paid. The question starts on the team that signed SideInstaller itself, so a copy siboot installed with another team now refreshes itself in place. The pick is remembered for the Apple ID and used for installs, refreshes, Certificates and Entitlements; swipe the Apple ID in Settings › Account and tap Team to pick again.",
+      "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v2.1.0/SideInstaller.ipa",
+      "size": 10860622,
       "versions": [
         {
-          "version": "2.0.1",
-          "date": "2026-11-12T20:00:38Z",
-          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v2.0.1/SideInstaller.ipa",
-          "localizedDescription": "### Changed\n- **Blue is back.** The greys from 2.0.0 are blues again: night-blue pages, cards and popups under a still navy wash at the top, a solid blue main button, and a lighter blue for progress, links, selections and switches. The app icon and the logo tiles have their colour back, in a brighter blue than before 2.0.0. The Live Activities and sideinstaller.net match.",
-          "size": 10770716
+          "version": "2.1.0",
+          "date": "2026-11-16T18:27:35Z",
+          "downloadURL": "https://github.com/FrizzleM/SideInstaller/releases/download/v2.1.0/SideInstaller.ipa",
+          "localizedDescription": "### Added\n- **Pick the developer team that signs.** An Apple Account on more than one developer team (a paid Apple Developer Program membership or a company's team, besides the free one every account has) is asked once which team signs, each marked Free or Paid. The question starts on the team that signed SideInstaller itself, so a copy siboot installed with another team now refreshes itself in place. The pick is remembered for the Apple ID and used for installs, refreshes, Certificates and Entitlements; swipe the Apple ID in Settings › Account and tap Team to pick again.",
+          "size": 10860622
         }
       ]
     },
