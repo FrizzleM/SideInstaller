@@ -2,6 +2,18 @@
 
 All notable changes to SideInstaller are documented here.
 
+## 2.1.0
+
+### Added
+- **Pick the developer team that signs.** An Apple Account on more than one developer team, a
+  paid Apple Developer Program membership or a company's team besides the free one every account
+  has, is asked once which team signs, each marked Free or Paid: a free team's apps last 7 days,
+  a paid team's a year. The question starts on the team that signed SideInstaller itself, so a
+  copy siboot installed with another team than Apple's first now refreshes itself in place. The
+  pick is remembered for the Apple ID and used for installs, refreshes, Certificates and
+  Entitlements. Settings › Account shows it under each Apple ID; swipe the Apple ID and tap Team
+  to pick again. Until now the first team Apple lists always signed.
+
 ## 2.0.1
 
 ### Changed
