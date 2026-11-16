@@ -144,21 +144,42 @@ typedef struct SignSession SignSession;
 typedef int32_t (*SITwoFactorCb)(void *ctx, const char *request_json,
                                  char *out_buf, size_t buf_len);
 
+// Invoked when a sign-in has to ask which developer team signs: the account is
+// on more than one (the free team every Apple Account has, and a paid Apple
+// Developer Program membership or a company's team) and the `team_id` passed
+// in isn't one of them. Called on the same thread and with the same `ctx` as
+// the 2FA callback, after any 2FA. `teams_json` lists the teams in Apple's
+// order:
+//   [{"teamId": "ABCDE12345", "name": "…", "kind": "free" | "paid" | "unknown"}]
+// "name" is "" when Apple gave none. "kind" goes by listTeams' membership names
+// as AltSign reads them; "unknown" when they don't tell, or couldn't be read.
+// Write the picked team's ID, NUL-terminated, into `out_buf` (capacity
+// `buf_len`) and return 1, or return 0 to stop the sign-in, which then fails
+// with "No developer team picked.". An ID that isn't listed fails it too.
+typedef int32_t (*SITeamCb)(void *ctx, const char *teams_json,
+                            char *out_buf, size_t buf_len);
+
 // Open a developer session + build the signer. BLOCKS — call off the main
 // thread. With `remember_session` non-zero, the developer session an earlier
 // sign-in of this Apple ID saved in `storage_dir` is reused while Apple still
 // accepts it — no password, no 2FA, no GrandSlam sign-in — and a fresh
 // sign-in's session is saved. Pass 0 for an Apple ID that isn't this iPhone
-// owner's (Side by Side): nothing is read or kept. Returns 0 on success
-// (*out_session + *out_summary set), non-zero on error (*out_error set). Free
-// strings with si_string_free, the session with si_sign_session_free.
+// owner's (Side by Side): nothing is read or kept. `team_id` is the team that
+// signs, as remembered for this Apple ID, or NULL/"" for none: when the account
+// isn't on it, its only team signs, or with more than one, `team_cb` is asked
+// which (a NULL `team_cb` takes Apple's first). Returns 0 on success
+// (*out_session + *out_summary set, the summary naming the team as
+// "team: <name> (<team ID>)"), non-zero on error (*out_error set). Free strings
+// with si_string_free, the session with si_sign_session_free.
 int32_t si_apple_signin(const char *apple_id,
                         const char *password,
                         const char *anisette_url,
                         const char *machine_name,
                         const char *storage_dir,
                         int32_t remember_session,
+                        const char *team_id,
                         SITwoFactorCb twofa_cb,
+                        SITeamCb team_cb,
                         void *ctx,
                         SignSession **out_session,
                         char **out_summary,
@@ -245,17 +266,20 @@ int32_t si_forget_apple_session(const char *storage_dir, const char *apple_id);
 // Opaque certificate-session handle.
 typedef struct CertSession CertSession;
 
-// Log in + open developer session + select the first team, for certificate
-// management. BLOCKS — call off the main thread. Independent of the install
-// pipeline (no device/pairing/VPN needed). Returns 0 on success (*out_session +
-// *out_summary set), non-zero on error (*out_error set). Free strings with
-// si_string_free, the session with si_cert_session_free.
+// Log in + open developer session + select the team that signs, for
+// certificate management: `team_id` and `team_cb` pick it as they do for
+// si_apple_signin. BLOCKS — call off the main thread. Independent of the
+// install pipeline (no device/pairing/VPN needed). Returns 0 on success
+// (*out_session + *out_summary set), non-zero on error (*out_error set). Free
+// strings with si_string_free, the session with si_cert_session_free.
 int32_t si_cert_signin(const char *apple_id,
                        const char *password,
                        const char *anisette_url,
                        const char *machine_name,
                        const char *storage_dir,
+                       const char *team_id,
                        SITwoFactorCb twofa_cb,
+                       SITeamCb team_cb,
                        void *ctx,
                        CertSession **out_session,
                        char **out_summary,

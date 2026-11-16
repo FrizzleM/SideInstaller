@@ -1268,4 +1268,25 @@ let koreanStrings: [String: String] = [
         "컴퓨터 없이 앱을 설치하고 갱신하려면 AltStore 설정에서 “Set up Remote AltServer”를 탭하고 안내를 따르세요.",
     "Open AltStore and sign in with the same Apple ID.":
         "AltStore를 열고 같은 Apple ID로 로그인하세요.",
+
+    // MARK: - Developer team
+
+    "Free · %@": "무료 · %@",
+    "Paid · %@": "유료 · %@",
+    "This Apple Account is on %d developer teams. Pick the one that signs.":
+        "이 Apple 계정은 %d개의 개발자 팀에 속해 있습니다. 서명할 팀을 고르세요.",
+    "Which Team?": "어느 팀?",
+    "Signed this copy of SideInstaller": "이 SideInstaller를 서명한 팀",
+    "A free team's apps last 7 days; a paid team's last a year.":
+        "무료 팀이 서명한 앱은 7일, 유료 팀이 서명한 앱은 1년 동안 쓸 수 있습니다.",
+    "An app installed with another team isn't replaced: signing it with this one installs a second copy.":
+        "다른 팀으로 설치한 앱은 대체되지 않습니다. 이 팀으로 서명하면 사본이 하나 더 설치됩니다.",
+    "SideInstaller remembers the pick for this Apple ID. To pick again, open Settings › Account, swipe the Apple ID left and tap Team.":
+        "SideInstaller가 이 Apple ID에서 고른 팀을 기억합니다. 다시 고르려면 설정 › 계정에서 해당 Apple ID를 왼쪽으로 밀고 팀을 탭하세요.",
+    "No developer team was picked, so the sign-in stopped.": "개발자 팀을 고르지 않아 로그인을 중단했습니다.",
+    "Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs.":
+        "Apple 계정이 여러 개발자 팀에 속해 있습니다. SideInstaller를 열고 서명할 팀을 고르세요.",
+    "Pick the team again?": "팀을 다시 고를까요?",
+    "Pick Again": "다시 고르기",
+    "The next sign-in with “%@” asks which developer team signs.": "다음에 “%@”(으)로 로그인할 때 서명할 개발자 팀을 묻습니다.",
 ]

@@ -1148,6 +1148,9 @@ final class SideBySideManager: ObservableObject {
         // Anyone else's signs in from a temporary folder, deleted with the
         // session, so their key doesn't stay on this iPhone.
         let isSavedHere = AccountStore.shared.isSaved(id)
+        // The team picked for an Apple ID saved here; anyone else's is asked
+        // when they're on more than one, and nothing is kept.
+        let team = isSavedHere ? AccountStore.shared.team(for: id)?.teamId : nil
         let dir: String
         if isSavedHere {
             discardTemporarySignIn()
@@ -1169,7 +1172,8 @@ final class SideBySideManager: ObservableObject {
             }
             do {
                 let summary = try await onSignQueue {
-                    try self.performSignIn(id: id, pw: pw, anisette: anisette, dir: dir, ticket: ticket)
+                    try self.performSignIn(id: id, pw: pw, anisette: anisette, dir: dir,
+                                           team: team, ticket: ticket)
                 }
                 if isSavedHere {
                     engine.anisetteSignedIn(anisette)
@@ -1188,6 +1192,10 @@ final class SideBySideManager: ObservableObject {
                 // A cancelled 2FA prompt isn't the server's fault.
                 if ticket.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
+                }
+                // Nor is a team question closed unanswered.
+                if ticket.teamQuestionWasCancelled {
+                    throw EngineError.message(Engine.noTeamPickedMessage)
                 }
                 // A locked account fails everywhere, and retrying keeps it locked.
                 if Engine.isAccountLocked(failure) {
@@ -1276,16 +1284,17 @@ final class SideBySideManager: ObservableObject {
 
     /// One sign-in attempt against a specific anisette server. Uses the machine
     /// name `SideInstaller`, so an existing certificate is recognized as reusable.
+    /// `team` is the one picked for an Apple ID saved here (`Engine.answerTeam`).
     private func performSignIn(id: String, pw: String, anisette: String, dir: String,
-                               ticket: AppleSignInTicket) throws -> String {
-        defer { engine.endTwoFactor(for: ticket) }
+                               team: String?, ticket: AppleSignInTicket) throws -> String {
+        defer { engine.endSignInQuestions(for: ticket) }
         engine.log("Apple ID sign-in for \(LogRedactor.maskAppleID(id)) via anisette \(Engine.oneLine(anisette)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         // 0 = don't save the session: it may be someone else's Apple ID.
-        let rc = si_apple_signin(id, pw, anisette, "SideInstaller", dir, 0,
-                                 appleSignInTwoFactorCallback, ticket.context,
+        let rc = si_apple_signin(id, pw, anisette, "SideInstaller", dir, 0, team ?? "",
+                                 appleSignInTwoFactorCallback, appleSignInTeamCallback, ticket.context,
                                  &session, &summary, &error)
         if rc == 0 {
             if let old = signSession { si_sign_session_free(old) }

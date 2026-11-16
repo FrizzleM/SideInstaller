@@ -17,6 +17,9 @@ struct SettingsView: View {
     @State private var pendingDelete: DownloadedIPA?
     /// The Apple ID the user swiped to remove, pending confirmation.
     @State private var pendingRemove: SavedAccount?
+    /// The Apple ID whose team the user swiped to pick again, pending
+    /// confirmation.
+    @State private var pendingTeamReset: SavedAccount?
     /// Set while the add/edit sheet is up, and for which account.
     @State private var editorTarget: AccountEditorTarget?
 
@@ -110,8 +113,8 @@ struct SettingsView: View {
 
     // MARK: Account
 
-    /// Saved Apple IDs: tap to make one active, swipe to edit or remove, or add
-    /// a new one.
+    /// Saved Apple IDs: tap to make one active, swipe to edit or remove one or
+    /// pick its team again, or add a new one.
     private var accountSection: some View {
         Section {
             ForEach(accounts.accounts) { account in
@@ -133,6 +136,16 @@ struct SettingsView: View {
                             Label(L("Edit"), systemImage: "pencil")
                         }
                         .tint(Theme.accent)
+                        // Only once a team was picked, which an Apple ID on
+                        // more than one is asked for.
+                        if accounts.team(for: account.normalized) != nil {
+                            Button {
+                                pendingTeamReset = account
+                            } label: {
+                                Label(L("Team"), systemImage: "person.2")
+                            }
+                            .tint(Theme.warning)
+                        }
                     }
             }
             if accounts.accounts.isEmpty {
@@ -151,9 +164,24 @@ struct SettingsView: View {
         } header: {
             Text(L("Account"))
         }
+        // On the section, apart from the Form's alerts, so they don't conflict.
+        .alert(L("Pick the team again?"),
+               isPresented: Binding(get: { pendingTeamReset != nil },
+                                    set: { if !$0 { pendingTeamReset = nil } })) {
+            Button(L("Pick Again")) {
+                if let account = pendingTeamReset { accounts.forgetTeam(for: account.normalized) }
+                pendingTeamReset = nil
+            }
+            Button(L("Cancel"), role: .cancel) { pendingTeamReset = nil }
+        } message: {
+            if let account = pendingTeamReset {
+                Text(L("The next sign-in with “%@” asks which developer team signs.", account.appleID))
+            }
+        }
     }
 
-    /// One saved Apple ID, ticked when it is the one in use.
+    /// One saved Apple ID, ticked when it is the one in use, with the
+    /// developer team it signs with when one was picked.
     private func accountRow(_ account: SavedAccount) -> some View {
         let isActive = accounts.isActive(account)
         return HStack(spacing: 12) {
@@ -169,6 +197,13 @@ struct SettingsView: View {
                     Text(L("In use"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                if let team = accounts.team(for: account.normalized) {
+                    Text(team.label)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
             }
             Spacer(minLength: 8)

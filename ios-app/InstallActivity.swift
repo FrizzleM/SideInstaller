@@ -139,6 +139,7 @@ final class InstallActivity {
             _ = engine.installProgress
             _ = engine.isCancelling
             _ = engine.twoFactor
+            _ = engine.teamQuestion
             _ = engine.appIDCost
             _ = engine.guide
         } onChange: {
@@ -280,6 +281,11 @@ final class InstallActivity {
             }
             return (prompt.expectsCode ? L("Two-Factor Code") : L("Choose How to Get a Code"),
                     detail, "key.fill")
+        }
+        if engine.teamQuestion != nil {
+            return (L("Which Team?"),
+                    L("Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs."),
+                    "person.2.fill")
         }
         if let cost = engine.appIDCost {
             let detail = cost.isAffordable

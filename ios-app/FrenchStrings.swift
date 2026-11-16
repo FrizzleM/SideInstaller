@@ -1305,4 +1305,27 @@ let frenchStrings: [String: String] = [
         "Pour installer et renouveler des apps sans ordinateur, touchez « Set up Remote AltServer » dans les réglages d'AltStore et suivez les étapes.",
     "Open AltStore and sign in with the same Apple ID.":
         "Ouvrez AltStore et connectez-vous avec le même Apple ID.",
+
+    // MARK: - Developer team
+
+    "Free · %@": "Gratuite · %@",
+    "Paid · %@": "Payante · %@",
+    "This Apple Account is on %d developer teams. Pick the one that signs.":
+        "Ce compte Apple fait partie de %d équipes de développement. Choisissez celle qui signe.",
+    "Which Team?": "Quelle équipe ?",
+    "Signed this copy of SideInstaller": "A signé cette copie de SideInstaller",
+    "A free team's apps last 7 days; a paid team's last a year.":
+        "Les apps d'une équipe gratuite durent 7 jours ; celles d'une équipe payante, un an.",
+    "An app installed with another team isn't replaced: signing it with this one installs a second copy.":
+        "Une app installée avec une autre équipe n'est pas remplacée : la signer avec celle-ci en installe une deuxième copie.",
+    "SideInstaller remembers the pick for this Apple ID. To pick again, open Settings › Account, swipe the Apple ID left and tap Team.":
+        "SideInstaller retient ce choix pour cet Apple ID. Pour choisir à nouveau, ouvrez Réglages › Compte, balayez l'Apple ID vers la gauche et touchez Équipe.",
+    "No developer team was picked, so the sign-in stopped.":
+        "Aucune équipe de développement n'a été choisie, la connexion s'est donc arrêtée.",
+    "Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs.":
+        "Votre compte Apple fait partie de plusieurs équipes de développement. Ouvrez SideInstaller et choisissez celle qui signe.",
+    "Pick the team again?": "Choisir l'équipe à nouveau ?",
+    "Pick Again": "Choisir à nouveau",
+    "The next sign-in with “%@” asks which developer team signs.":
+        "La prochaine connexion avec « %@ » demandera quelle équipe de développement signe.",
 ]

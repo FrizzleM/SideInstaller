@@ -1290,4 +1290,27 @@ let portugueseStrings: [String: String] = [
         "Para instalar e renovar apps sem computador, toque em “Set up Remote AltServer” nos ajustes do AltStore e siga os passos.",
     "Open AltStore and sign in with the same Apple ID.":
         "Abra o AltStore e entre com o mesmo Apple ID.",
+
+    // MARK: - Developer team
+
+    "Free · %@": "Gratuita · %@",
+    "Paid · %@": "Paga · %@",
+    "This Apple Account is on %d developer teams. Pick the one that signs.":
+        "Esta conta Apple está em %d equipes de desenvolvimento. Escolha a que assina.",
+    "Which Team?": "Qual equipe?",
+    "Signed this copy of SideInstaller": "Assinou esta cópia do SideInstaller",
+    "A free team's apps last 7 days; a paid team's last a year.":
+        "Os apps de uma equipe gratuita duram 7 dias; os de uma equipe paga, um ano.",
+    "An app installed with another team isn't replaced: signing it with this one installs a second copy.":
+        "Um app instalado com outra equipe não é substituído: assiná-lo com esta instala uma segunda cópia.",
+    "SideInstaller remembers the pick for this Apple ID. To pick again, open Settings › Account, swipe the Apple ID left and tap Team.":
+        "O SideInstaller lembra a escolha para este Apple ID. Para escolher de novo, abra Ajustes › Conta, deslize o Apple ID para a esquerda e toque em Equipe.",
+    "No developer team was picked, so the sign-in stopped.":
+        "Nenhuma equipe de desenvolvimento foi escolhida, então o login parou.",
+    "Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs.":
+        "Sua conta Apple está em mais de uma equipe de desenvolvimento. Abra o SideInstaller e escolha a que assina.",
+    "Pick the team again?": "Escolher a equipe de novo?",
+    "Pick Again": "Escolher de novo",
+    "The next sign-in with “%@” asks which developer team signs.":
+        "O próximo login com “%@” vai perguntar qual equipe de desenvolvimento assina.",
 ]

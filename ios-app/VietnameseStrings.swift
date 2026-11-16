@@ -1296,4 +1296,27 @@ let vietnameseStrings: [String: String] = [
         "Để cài đặt và gia hạn ứng dụng mà không cần máy tính, chạm vào “Set up Remote AltServer” trong phần Cài đặt của AltStore và làm theo các bước.",
     "Open AltStore and sign in with the same Apple ID.":
         "Mở AltStore và đăng nhập bằng cùng Apple ID đó.",
+
+    // MARK: - Developer team
+
+    "Free · %@": "Miễn phí · %@",
+    "Paid · %@": "Trả phí · %@",
+    "This Apple Account is on %d developer teams. Pick the one that signs.":
+        "Apple Account này thuộc %d nhóm nhà phát triển. Hãy chọn nhóm dùng để ký.",
+    "Which Team?": "Nhóm nào?",
+    "Signed this copy of SideInstaller": "Đã ký bản SideInstaller này",
+    "A free team's apps last 7 days; a paid team's last a year.":
+        "Ứng dụng do nhóm miễn phí ký dùng được 7 ngày; do nhóm trả phí ký dùng được một năm.",
+    "An app installed with another team isn't replaced: signing it with this one installs a second copy.":
+        "Ứng dụng đã cài bằng nhóm khác sẽ không bị thay thế: ký bằng nhóm này sẽ cài thêm một bản thứ hai.",
+    "SideInstaller remembers the pick for this Apple ID. To pick again, open Settings › Account, swipe the Apple ID left and tap Team.":
+        "SideInstaller sẽ nhớ lựa chọn này cho Apple ID. Để chọn lại, mở Cài đặt › Tài khoản, vuốt sang trái trên Apple ID đó rồi chạm vào Nhóm.",
+    "No developer team was picked, so the sign-in stopped.":
+        "Chưa chọn nhóm nhà phát triển nào nên đã dừng đăng nhập.",
+    "Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs.":
+        "Apple Account của bạn thuộc nhiều nhóm nhà phát triển. Hãy mở SideInstaller và chọn nhóm dùng để ký.",
+    "Pick the team again?": "Chọn lại nhóm?",
+    "Pick Again": "Chọn lại",
+    "The next sign-in with “%@” asks which developer team signs.":
+        "Lần đăng nhập tiếp theo bằng “%@” sẽ hỏi ký bằng nhóm nhà phát triển nào.",
 ]

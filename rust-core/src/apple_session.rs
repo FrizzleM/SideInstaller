@@ -171,7 +171,7 @@ fn is_account_refusal(error: &str) -> bool {
     e.contains("developer error 1102") || e.contains("developer error 2160")
 }
 
-fn first_line(text: &str) -> &str {
+pub(crate) fn first_line(text: &str) -> &str {
     text.lines()
         .map(|line| line.trim_start_matches([' ', '●']).trim())
         .find(|line| !line.is_empty())

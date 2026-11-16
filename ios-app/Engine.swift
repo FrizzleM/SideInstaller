@@ -543,7 +543,12 @@ final class Engine {
     // request.
     /// What the two-factor sheet shows; nil while no sign-in is asking.
     private(set) var twoFactor: TwoFactorPhase?
-    private let twoFactorRequests = TwoFactorRequests()
+    private let twoFactorRequests = TwoFactorRequests(markingCancelled: { $0.markTwoFactorCancelled() })
+    // Team bridge: likewise for which developer team signs, when the Apple ID
+    // is on more than one and none of them was picked yet.
+    /// What the team sheet shows; nil while no sign-in is asking.
+    private(set) var teamQuestion: TeamQuestion?
+    private let teamRequests = TeamRequests(markingCancelled: { $0.markTeamQuestionCancelled() })
 
     private init() {
         installLogging()
@@ -1112,7 +1117,7 @@ final class Engine {
                 self.signInStatus = "signed out"
                 self.signingTeamID = nil
             }
-            self.log("Apple ID changed — signed out of the previous account.")
+            self.log("Apple ID or its team changed — signed out of the previous sign-in.")
         }
     }
 
@@ -1185,6 +1190,8 @@ final class Engine {
             if updatingChecklist { setStep(.signIn, .done) }
             return
         }
+        // Read once its turn has come, since the one ahead may have picked it.
+        let team = AccountStore.shared.team(for: id)?.teamId
 
         // Anisette servers go down often, so with Auto on try each one before
         // giving up. A server picked in Settings is the only one tried.
@@ -1209,9 +1216,10 @@ final class Engine {
             }
             do {
                 let summary = try await onSignQueue {
-                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, ticket: ticket)
+                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, team: team, ticket: ticket)
                 }
                 anisetteSignedIn(ani)
+                AccountStore.shared.signedIn(id, withTeam: Self.teamID(inSummary: summary))
                 signInStatus = "signed in (\(summary))"
                 if updatingChecklist { setStep(.signIn, .done) }
                 return
@@ -1223,6 +1231,12 @@ final class Engine {
                     log("Two-factor verification cancelled — stopping.")
                     signInStatus = "signed out"
                     throw EngineError.message(L("Two-factor verification was cancelled."))
+                }
+                // Nor is a team question closed unanswered.
+                if ticket.teamQuestionWasCancelled {
+                    log("No developer team picked — stopping.")
+                    signInStatus = "signed out"
+                    throw EngineError.message(Self.noTeamPickedMessage)
                 }
                 // A locked account fails everywhere, and retrying keeps it locked.
                 if Self.isAccountLocked(failure) {
@@ -1316,18 +1330,21 @@ final class Engine {
         throw EngineError.message(anisetteSignInFailure(failures))
     }
 
-    /// One sign-in attempt against a specific anisette server.
+    /// One sign-in attempt against a specific anisette server. `team` is the
+    /// team picked for this Apple ID, if one was; without it, or when the
+    /// account is no longer on it, Rust asks (`answerTeam`) when there's more
+    /// than one.
     private func performSignIn(id: String, pw: String, ani: String, dir: String,
-                               ticket: AppleSignInTicket) throws -> String {
-        defer { endTwoFactor(for: ticket) }
+                               team: String?, ticket: AppleSignInTicket) throws -> String {
+        defer { endSignInQuestions(for: ticket) }
         log("Apple ID sign-in for \(LogRedactor.maskAppleID(id)) via anisette \(Self.oneLine(ani)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         // 1 = save and reuse the developer session, so repeat sign-ins skip
         // Apple authentication until the token expires.
-        let rc = si_apple_signin(id, pw, ani, "SideInstaller", dir, 1,
-                                 appleSignInTwoFactorCallback, ticket.context,
+        let rc = si_apple_signin(id, pw, ani, "SideInstaller", dir, 1, team ?? "",
+                                 appleSignInTwoFactorCallback, appleSignInTeamCallback, ticket.context,
                                  &session, &summary, &error)
         if rc == 0 {
             if let old = self.signSession { si_sign_session_free(old) }
@@ -3907,11 +3924,95 @@ final class Engine {
     }
 
     /// Close the sheet once a sign-in attempt returns, however it went, if it
-    /// shows that sign-in's request. Safe from any thread.
-    func endTwoFactor(for ticket: AppleSignInTicket) {
+    /// shows that sign-in's 2FA request or team question. Safe from any thread.
+    func endSignInQuestions(for ticket: AppleSignInTicket) {
         setMain {
             if self.twoFactor?.signIn == ticket.id { self.twoFactor = nil }
+            if self.teamQuestion?.signIn == ticket.id { self.teamQuestion = nil }
         }
+    }
+
+    // MARK: Team bridge
+
+    /// What a sign-in stopped with when its team question was closed unanswered.
+    static var noTeamPickedMessage: String {
+        L("No developer team was picked, so the sign-in stopped.")
+    }
+
+    /// Called from a Rust worker thread with the Apple Account's teams as JSON,
+    /// when it's on more than one and none was picked for it; blocks until the
+    /// sheet answers. Writes the picked team's ID into `outBuf` and returns 1,
+    /// or returns 0 to stop the sign-in.
+    ///
+    /// Like a 2FA request, it waits while a Trust prompt has the user's
+    /// attention, and a question from an install's background sign-in whose
+    /// run has ended is declined.
+    func answerTeam(request json: UnsafePointer<CChar>?, outBuf: UnsafeMutablePointer<CChar>?, len: Int,
+                    for ticket: AppleSignInTicket) -> Int32 {
+        guard let outBuf, len > 1 else { return 0 }
+        guard let teams = json.flatMap({ DeveloperTeam.list(json: String(cString: $0)) }),
+              let suggested = DeveloperTeam.suggested(in: teams) else {
+            ticket.markTeamQuestionCancelled()
+            log("⚠️ \(ticket.purpose.name): couldn't read the developer teams Apple listed — stopping.")
+            return 0
+        }
+        // Don't cover a Trust prompt; the wait blocks, so never on main.
+        if !Thread.isMainThread { attention.waitUntilFree() }
+        guard let request = teamRequests.open(for: ticket) else {
+            // The queue lets one sign-in ask at a time, so this shouldn't happen.
+            ticket.markTeamQuestionCancelled()
+            log("⚠️ \(ticket.purpose.name): asked which team signs while another sign-in waits for an answer — declined.")
+            return 0
+        }
+        setMain {
+            // A cancel can land between opening the request and this block running.
+            guard self.teamRequests.isWaiting(request.id) else { return }
+            // Checked here, on main, where a stopping run has already counted
+            // itself finished by the time this block runs.
+            if let run = ticket.run, run < self.finishedRuns {
+                self.log("The sign-in of an install that already stopped asked which team signs — declined.")
+                self.teamRequests.cancel(request.id)   // no answer, so the sign-in stops
+                return
+            }
+            // The account got past two-factor, so the question takes the
+            // sheet over from it.
+            if self.twoFactor?.signIn == ticket.id { self.twoFactor = nil }
+            self.teamQuestion = TeamQuestion(request: request.id, signIn: ticket.id,
+                                             appleID: ticket.appleID, teams: teams,
+                                             suggested: suggested,
+                                             remembers: AccountStore.shared.isSaved(ticket.appleID))
+            let kinds = teams.map(\.kind.rawValue).joined(separator: ", ")
+            self.log("\(ticket.purpose.name): this Apple Account is on \(teams.count) developer teams (\(kinds)) — asking which signs.")
+        }
+        guard let answer = teamRequests.wait(request) else { return 0 }
+        let bytes = Array(answer.utf8)
+        guard bytes.count < len else { return 0 }
+        outBuf.withMemoryRebound(to: UInt8.self, capacity: len) { dst in
+            for (i, b) in bytes.enumerated() { dst[i] = b }
+            dst[bytes.count] = 0
+        }
+        return 1
+    }
+
+    /// Hand the sheet's pick to the question it shows, and remember it for the
+    /// Apple ID when the question says to.
+    func answerTeamQuestion(_ team: DeveloperTeam, to question: TeamQuestion) {
+        // Not waiting anymore: answered already, or cancelled.
+        guard teamRequests.answer(question.request, with: team.teamId) else { return }
+        if teamQuestion?.request == question.request { teamQuestion = nil }
+        if question.remembers {
+            AccountStore.shared.remember(team, for: question.appleID)
+        }
+        let kind = team.kind == .unknown ? "" : "\(team.kind.rawValue) "
+        log("Signing with the \(kind)team \(team.named)\(question.remembers ? ", from now on for this Apple ID" : "").")
+    }
+
+    /// Close the team sheet showing `question`, which stops its sign-in.
+    func cancelTeamQuestion(_ question: TeamQuestion) {
+        // Already closed because the sign-in returned: nothing to cancel.
+        guard teamQuestion?.request == question.request else { return }
+        teamQuestion = nil
+        teamRequests.cancel(question.request)
     }
     // MARK: - Storage
 

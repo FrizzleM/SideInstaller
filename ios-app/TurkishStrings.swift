@@ -1160,4 +1160,27 @@ let turkishStrings: [String: String] = [
         "Bilgisayarsız uygulama yüklemek ve yenilemek için AltStore'un Ayarlar'ında “Set up Remote AltServer”a dokun ve adımları izle.",
     "Open AltStore and sign in with the same Apple ID.":
         "AltStore'u aç ve aynı Apple ID ile giriş yap.",
+
+    // MARK: - Developer team
+
+    "Free · %@": "Ücretsiz · %@",
+    "Paid · %@": "Ücretli · %@",
+    "This Apple Account is on %d developer teams. Pick the one that signs.":
+        "Bu Apple Hesabı %d geliştirici ekibinde. İmzalayacak ekibi seç.",
+    "Which Team?": "Hangi ekip?",
+    "Signed this copy of SideInstaller": "Bu SideInstaller kopyasını imzaladı",
+    "A free team's apps last 7 days; a paid team's last a year.":
+        "Ücretsiz bir ekibin uygulamaları 7 gün, ücretli bir ekibinkiler bir yıl geçerlidir.",
+    "An app installed with another team isn't replaced: signing it with this one installs a second copy.":
+        "Başka bir ekiple yüklenen uygulama değiştirilmez: onu bu ekiple imzalamak ikinci bir kopya yükler.",
+    "SideInstaller remembers the pick for this Apple ID. To pick again, open Settings › Account, swipe the Apple ID left and tap Team.":
+        "SideInstaller bu Apple kimliği için seçimi hatırlar. Yeniden seçmek için Ayarlar › Hesap'ı aç, Apple kimliğinde sola kaydır ve Ekip'e dokun.",
+    "No developer team was picked, so the sign-in stopped.":
+        "Hiçbir geliştirici ekibi seçilmedi, bu yüzden oturum açma durduruldu.",
+    "Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs.":
+        "Apple Hesabın birden fazla geliştirici ekibinde. SideInstaller'ı aç ve imzalayacak ekibi seç.",
+    "Pick the team again?": "Ekip yeniden seçilsin mi?",
+    "Pick Again": "Yeniden seç",
+    "The next sign-in with “%@” asks which developer team signs.":
+        "“%@” ile bir sonraki oturum açmada hangi geliştirici ekibinin imzalayacağı sorulur.",
 ]

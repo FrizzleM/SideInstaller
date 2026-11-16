@@ -1256,4 +1256,24 @@ let chineseStrings: [String: String] = [
         "如需在没有电脑的情况下安装和续签应用，请在 AltStore 的设置中轻点“Set up Remote AltServer”，然后按步骤操作。",
     "Open AltStore and sign in with the same Apple ID.":
         "打开 AltStore，用同一个 Apple ID 登录。",
+
+    // MARK: - Developer team
+
+    "Free · %@": "免费 · %@",
+    "Paid · %@": "付费 · %@",
+    "This Apple Account is on %d developer teams. Pick the one that signs.":
+        "此 Apple 账户属于 %d 个开发团队。请选择用来签名的团队。",
+    "Which Team?": "哪个团队？",
+    "Signed this copy of SideInstaller": "签名了这份 SideInstaller",
+    "A free team's apps last 7 days; a paid team's last a year.": "免费团队签名的应用可用 7 天；付费团队签名的可用一年。",
+    "An app installed with another team isn't replaced: signing it with this one installs a second copy.":
+        "用其他团队安装的应用不会被替换：用此团队签名会另外安装一个副本。",
+    "SideInstaller remembers the pick for this Apple ID. To pick again, open Settings › Account, swipe the Apple ID left and tap Team.":
+        "SideInstaller 会为此 Apple ID 记住这个选择。如需重新选择，请打开“设置 › 账户”，在该 Apple ID 上向左轻扫，然后轻点“团队”。",
+    "No developer team was picked, so the sign-in stopped.": "未选择开发团队，因此登录已停止。",
+    "Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs.":
+        "你的 Apple 账户属于多个开发团队。请打开 SideInstaller，选择用来签名的团队。",
+    "Pick the team again?": "重新选择团队？",
+    "Pick Again": "重新选择",
+    "The next sign-in with “%@” asks which developer team signs.": "下次用“%@”登录时，会询问用哪个开发团队签名。",
 ]

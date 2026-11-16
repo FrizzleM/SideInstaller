@@ -769,6 +769,35 @@ SideStore registers each week doesn't get the capability on a free team
 signed with. Madeira passes 1 (required), Side by Side 0. See the vendored
 isideload README, change 13.
 
+**Which developer team signs:** an Apple Account is on the free team every
+account has, and on a paid Apple Developer Program membership too when there is
+one, its own or a company's. Until this change the first team Apple lists
+signed. Now `si_apple_signin` and `si_cert_signin` take the team ID remembered
+for the Apple ID (`AccountStore.team(for:)`, by email in lower case) and a
+`SITeamCb`: the remembered team signs when the account is still on it, its only
+team when it has one, and otherwise Rust asks the callback, which shows the team
+sheet (`SigningTeams.swift`) in the sheet the 2FA prompt uses, takes it over once
+the code has gone through, and blocks like a 2FA request. The pick is remembered
+for an Apple ID saved in Settings › Account (swiping one there and tapping Team
+forgets it, so the next sign-in asks again); Side by Side with someone else's
+Apple ID keeps nothing. Closing the sheet stops the sign-in without trying other
+anisette servers (`AppleSignInTicket.teamQuestionWasCancelled`).
+- Free or paid is siboot's rule (`minis/src/team.rs` in FrizzleM/siboot), which
+  is AltSign's, so AltStore and SideStore read teams the same way: a
+  "Company/Organization" team is paid; an "Individual" one is free when its only
+  membership's name contains "free", and paid with any other memberships;
+  anything else is unknown and listed without a mark (`rust-core/src/team.rs`).
+  isideload's `DeveloperTeam` drops `memberships`, so listTeams is asked once
+  more for them, only when there's a question to ask. No two-team account has
+  been seen yet, so the real membership names are unconfirmed.
+- The sheet starts on the team that signed this SideInstaller, read from its own
+  `embedded.mobileprovision` (`InstalledSigner`), when it's one of the account's
+  teams, and otherwise on Apple's first. siboot asks the same question since
+  0.19.0, and SideInstaller's bundle ID ends in the signing team's ID, so a copy
+  siboot installed with another team keeps refreshing itself in place.
+- Certificates and Entitlements sign in on the same team, so they show the
+  certificates and App IDs of the team that signs.
+
 **idevice version coexistence:** isideload pulls idevice **0.1.61** (crates.io,
 behind its `install` feature, which is required because its feature-gating is
 incomplete) while the rest of the app uses idevice **0.1.63** (git). The two

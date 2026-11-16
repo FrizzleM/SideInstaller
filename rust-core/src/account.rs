@@ -1,9 +1,10 @@
 //! Apple ID sign-in and IPA signing via `isideload`. Only its signing path is
 //! used; installing happens over the app's own RSD tunnel.
 //!
-//! `si_apple_signin` logs in, opens a developer session on the first team, and
-//! returns an opaque `SignSession`. `si_sign_ipa` then signs an IPA with it,
-//! registering the App ID, profile and certificate along the way.
+//! `si_apple_signin` logs in, opens a developer session on the team the caller
+//! names or picks (`team.rs`), and returns an opaque `SignSession`.
+//! `si_sign_ipa` then signs an IPA with it, registering the App ID, profile and
+//! certificate along the way.
 
 use std::ffi::{c_char, c_void, CStr, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -32,6 +33,22 @@ use tracing::subscriber::NoSubscriber;
 use crate::apple_session;
 use crate::error_text::report_text;
 use crate::ffi_util::cstr;
+use crate::team;
+
+/// `int (*)(void *ctx, const char *teams_json, char *out_buf, size_t buf_len)`.
+///
+/// Asked when the account is on more than one developer team and the caller
+/// named none of them. `teams_json` lists them in Apple's order, each a
+/// [`team::Choice`]. Swift writes the picked team's ID, NUL-terminated, into
+/// `out_buf` and returns 1, or returns 0 to stop the sign-in.
+pub type TeamCb = Option<
+    extern "C" fn(
+        ctx: *mut c_void,
+        teams_json: *const c_char,
+        out_buf: *mut c_char,
+        buf_len: usize,
+    ) -> i32,
+>;
 
 /// `int (*)(void *ctx, const char *request_json, char *out_buf, size_t buf_len)`.
 ///
@@ -213,8 +230,38 @@ fn parse_answer(bytes: &[u8]) -> TwoFactorCallbackResponse {
     }
 }
 
+/// Asks Swift which of `choices` signs, through `cb`, shared with `certs.rs`.
+/// The callback blocks until the user answers. Returns the picked team's ID,
+/// or None when they picked none. Without a callback, the first team signs,
+/// as before teams could be picked.
+pub(crate) fn ask_team(cb: TeamCb, ctx: &TwoFaCtx, choices: &[team::Choice]) -> Option<String> {
+    let Some(cb) = cb else {
+        return choices.first().map(|c| c.team_id.clone());
+    };
+    let request = serde_json::to_string(choices)
+        .ok()
+        .and_then(|json| CString::new(json).ok());
+    let Some(request) = request else {
+        tracing::error!("Teams: couldn't encode the question for Swift; stopping");
+        return None;
+    };
+    let mut buf = vec![0u8; 64];
+    let rc = cb(ctx.0, request.as_ptr(), buf.as_mut_ptr() as *mut c_char, buf.len());
+    if rc == 0 {
+        return None;
+    }
+    // Read the NUL-terminated team ID Swift wrote into the buffer.
+    let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+    let answer = String::from_utf8_lossy(&buf[..end]).trim().to_string();
+    (!answer.is_empty()).then_some(answer)
+}
+
 /// Log in, open a developer session, and build a Sideloader. Returns 0 on
 /// success; free the session with `si_sign_session_free`.
+///
+/// `team_id` is the team to sign with, the one the caller remembers for this
+/// Apple ID; NULL or empty for none. When the account isn't on it and is on
+/// more than one team, `team_cb` is asked which (see [`team::pick`]).
 ///
 /// # Safety
 /// All `*const c_char` args must be null or valid C strings; the out pointers
@@ -227,7 +274,9 @@ pub unsafe fn apple_signin(
     machine_name: *const c_char,
     storage_dir: *const c_char,
     remember_session: i32,
+    team_id: *const c_char,
     twofa_cb: TwoFactorCb,
+    team_cb: TeamCb,
     ctx: *mut c_void,
     out_session: *mut *mut SignSession,
     out_summary: *mut *mut c_char,
@@ -238,7 +287,9 @@ pub unsafe fn apple_signin(
     let anisette_url = opt(anisette_url, "https://ani.sidestore.io");
     let machine_name = opt(machine_name, "SideInstaller");
     let storage_dir = opt(storage_dir, ".");
+    let wanted = opt(team_id, "").trim().to_string();
     let twofa = make_2fa(twofa_cb, TwoFaCtx(ctx));
+    let team_ctx = TwoFaCtx(ctx);
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         let rt = tokio::runtime::Builder::new_multi_thread()
@@ -247,7 +298,7 @@ pub unsafe fn apple_signin(
             .map_err(|e| format!("failed to start runtime: {e}"))?;
 
         let sideloader = rt.block_on(async {
-            let (dev_session, teams) = apple_session::open(
+            let (mut dev_session, teams) = apple_session::open(
                 &apple_id,
                 &password,
                 &anisette_url,
@@ -257,7 +308,18 @@ pub unsafe fn apple_signin(
                 "Apple ID",
             )
             .await?;
-            tracing::info!("Developer session OK; building sideloader (first team)");
+            // `open` has just listed the teams, so the one that signs is
+            // handed over rather than listed again.
+            let team = team::pick(
+                &mut dev_session,
+                teams,
+                Some(wanted.as_str()).filter(|id| !id.is_empty()),
+                |choices| ask_team(team_cb, &team_ctx, choices),
+                "Apple ID",
+            )
+            .await?;
+            let summary = team::summary(&team);
+            tracing::info!("Developer session OK; building sideloader ({summary})");
 
             let mut sideloader = SideloaderBuilder::new(dev_session, apple_id.clone())
                 .team_selection(TeamSelection::First)
@@ -265,22 +327,7 @@ pub unsafe fn apple_signin(
                 .storage(Box::new(FsStorage::new(PathBuf::from(&storage_dir))))
                 .machine_name(machine_name.clone())
                 .build();
-            // `open` has just listed the teams, and TeamSelection::First takes
-            // the first of them, so it's handed over rather than listed again.
-            if let Some(first) = teams.into_iter().next() {
-                sideloader.set_team(first);
-            }
-
-            // Surface the selected team for the summary.
-            let team = sideloader
-                .get_team()
-                .await
-                .map_err(|e| format!("get_team: {}", report_text(&e)))?;
-            let summary = format!(
-                "team: {} ({})",
-                team.name.as_deref().unwrap_or("<unnamed>"),
-                team.team_id
-            );
+            sideloader.set_team(team);
             Ok::<_, String>((sideloader, summary))
         })?;
 
@@ -844,6 +891,84 @@ mod two_factor_bridge_tests {
         assert!(matches!(ask_swift(Some(texting_callback), &ctx, &p), R::SendSms(1)));
         assert!(matches!(ask_swift(Some(cancelling_callback), &ctx, &p), R::Abort));
         assert!(matches!(ask_swift(None, &ctx, &p), R::Abort));
+    }
+}
+
+#[cfg(test)]
+mod team_question_tests {
+    use super::*;
+    use isideload::dev::teams::DeveloperTeam;
+    use std::collections::HashMap;
+
+    fn choices() -> Vec<team::Choice> {
+        let team = |id: &str| DeveloperTeam {
+            name: Some("Frizzle".into()),
+            team_id: id.into(),
+            r#type: Some("Individual".into()),
+            status: None,
+        };
+        let kinds = HashMap::from([
+            ("ABCDE12345".to_string(), team::Kind::Free),
+            ("FGHIJ67890".to_string(), team::Kind::Paid),
+        ]);
+        team::choices(&[team("ABCDE12345"), team("FGHIJ67890")], &kinds)
+    }
+
+    fn answer(out_buf: *mut c_char, buf_len: usize, answer: &[u8]) {
+        assert!(answer.len() <= buf_len);
+        unsafe { std::ptr::copy_nonoverlapping(answer.as_ptr(), out_buf as *mut u8, answer.len()) };
+    }
+
+    extern "C" fn picking_the_paid_team(
+        _ctx: *mut c_void,
+        teams_json: *const c_char,
+        out_buf: *mut c_char,
+        buf_len: usize,
+    ) -> i32 {
+        let request = unsafe { CStr::from_ptr(teams_json) }.to_str().unwrap();
+        let json: serde_json::Value = serde_json::from_str(request).unwrap();
+        assert_eq!(json[0]["kind"], "free");
+        assert_eq!(json[1]["kind"], "paid");
+        let paid = json[1]["teamId"].as_str().unwrap();
+        answer(out_buf, buf_len, format!("{paid}\0").as_bytes());
+        1
+    }
+
+    extern "C" fn declining(
+        _ctx: *mut c_void,
+        _teams_json: *const c_char,
+        _out_buf: *mut c_char,
+        _buf_len: usize,
+    ) -> i32 {
+        0
+    }
+
+    extern "C" fn answering_nothing(
+        _ctx: *mut c_void,
+        _teams_json: *const c_char,
+        out_buf: *mut c_char,
+        buf_len: usize,
+    ) -> i32 {
+        answer(out_buf, buf_len, b"\0");
+        1
+    }
+
+    #[test]
+    fn the_question_round_trips_through_a_c_callback() {
+        let ctx = TwoFaCtx(std::ptr::null_mut());
+        assert_eq!(
+            ask_team(Some(picking_the_paid_team), &ctx, &choices()).as_deref(),
+            Some("FGHIJ67890")
+        );
+        assert_eq!(ask_team(Some(declining), &ctx, &choices()), None);
+        assert_eq!(ask_team(Some(answering_nothing), &ctx, &choices()), None);
+    }
+
+    #[test]
+    fn without_a_callback_the_first_team_signs_as_before() {
+        let ctx = TwoFaCtx(std::ptr::null_mut());
+        assert_eq!(ask_team(None, &ctx, &choices()).as_deref(), Some("ABCDE12345"));
+        assert_eq!(ask_team(None, &ctx, &[]), None);
     }
 }
 

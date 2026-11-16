@@ -2,12 +2,19 @@ import SwiftUI
 
 /// Tab container (Install, Tools, About). Each page draws its own
 /// `AppBackground`, since `TabView` would hide a shared one. Also hosts the
-/// 2FA sheet and the pages' popups, so they show over any tab.
+/// sign-in sheet (2FA, and which team signs) and the pages' popups, so they
+/// show over any tab.
 struct RootView: View {
     /// The tabs. The selection is tracked so a tab switch can tick, and a
     /// link can bring the Install tab forward.
     private enum Page: Hashable {
         case install, tools, about
+    }
+
+    /// What the sign-in sheet shows: a 2FA prompt, or which team signs.
+    private enum SignInSheet: Equatable {
+        case twoFactor(TwoFactorPhase)
+        case team(TeamQuestion)
     }
 
     /// One popup, tagged with the page that raised it.
@@ -56,9 +63,9 @@ struct RootView: View {
     @StateObject private var entitlementsManager = EntitlementsManager()
     @StateObject private var appsManager = SideloadedAppsManager()
     @StateObject private var sideBySideManager = SideBySideManager()
-    /// The last two-factor prompt shown, so the sheet keeps its content while it
+    /// What the sign-in sheet showed last, so it keeps its content while it
     /// slides away after the sign-in clears it.
-    @State private var shownTwoFactor: TwoFactorPhase?
+    @State private var shownSignInSheet: SignInSheet?
     @State private var page: Page = .install
 
     var body: some View {
@@ -113,15 +120,25 @@ struct RootView: View {
         .preferredColorScheme(.dark)
         // A swipe down is a cancel; the sign-in closing it is not.
         .sheet(isPresented: Binding(
-            get: { engine.twoFactor != nil },
-            set: { if !$0, let phase = engine.twoFactor { engine.cancelTwoFactor(phase) } }
+            get: { signInSheet != nil },
+            set: { if !$0 { cancel(signInSheet) } }
         )) {
-            if let phase = engine.twoFactor ?? shownTwoFactor {
-                TwoFactorSheet(phase: phase)
+            switch signInSheet ?? shownSignInSheet {
+            case .twoFactor(let phase): TwoFactorSheet(phase: phase)
+            case .team(let question):   TeamSheet(question: question)
+            case nil:                   EmptyView()
+            }
+        }
+        .onChange(of: signInSheet) { _, sheet in
+            if let sheet { shownSignInSheet = sheet }
+        }
+        // Which team signs is asked once per Apple ID.
+        .onChange(of: engine.teamQuestion) { old, question in
+            if let question, old?.request != question.request {
+                SoundEffects.play(.attention)
             }
         }
         .onChange(of: engine.twoFactor) { old, phase in
-            if let phase { shownTwoFactor = phase }
             // A code is wanted, or the one entered was turned down.
             if let phase, phase.isAsking {
                 if old?.signIn != phase.signIn {
@@ -130,6 +147,22 @@ struct RootView: View {
                     SoundEffects.play(.error)
                 }
             }
+        }
+    }
+
+    /// The sign-in sheet's content now. The team question comes once the code
+    /// has gone through, so it takes the sheet over.
+    private var signInSheet: SignInSheet? {
+        if let question = engine.teamQuestion { return .team(question) }
+        return engine.twoFactor.map(SignInSheet.twoFactor)
+    }
+
+    /// Stops the sign-in the sheet asks for, as a swipe down does.
+    private func cancel(_ sheet: SignInSheet?) {
+        switch sheet {
+        case .twoFactor(let phase): engine.cancelTwoFactor(phase)
+        case .team(let question):   engine.cancelTeamQuestion(question)
+        case nil:                   break
         }
     }
 

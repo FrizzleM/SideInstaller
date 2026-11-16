@@ -16,6 +16,7 @@ mod ffi_util;
 mod logging;
 mod p12;
 mod pairing;
+mod team;
 
 use std::ffi::{c_char, c_void};
 
@@ -24,7 +25,7 @@ use isideload::sideload::sideloader::MemoryLimit;
 use ffi_util::cstr;
 
 // Re-export FFI types so the generated header / Swift see them.
-pub use account::{SignSession, TwoFactorCb};
+pub use account::{SignSession, TeamCb, TwoFactorCb};
 pub use certs::CertSession;
 pub use pairing::{PairCancel, PairResult, PinCb, ReadyCb};
 
@@ -163,7 +164,8 @@ pub unsafe extern "C" fn si_pairing_result_free(r: *mut PairResult) {
 /// Sign in, open a developer session and build a signer. Blocks; `twofa_cb` is
 /// called when a 2FA code is needed. If `remember_session` is non-zero, a saved
 /// developer session is reused while valid and new ones are saved (see
-/// `apple_session`).
+/// `apple_session`). `team_id` names the team that signs; `team_cb` is asked
+/// which when the account isn't on it and is on more than one (see `team`).
 ///
 /// # Safety
 /// See `account::apple_signin`.
@@ -176,15 +178,17 @@ pub unsafe extern "C" fn si_apple_signin(
     machine_name: *const c_char,
     storage_dir: *const c_char,
     remember_session: i32,
+    team_id: *const c_char,
     twofa_cb: TwoFactorCb,
+    team_cb: TeamCb,
     ctx: *mut c_void,
     out_session: *mut *mut SignSession,
     out_summary: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
     account::apple_signin(
-        apple_id, password, anisette_url, machine_name, storage_dir, remember_session, twofa_cb,
-        ctx, out_session, out_summary, out_error,
+        apple_id, password, anisette_url, machine_name, storage_dir, remember_session, team_id,
+        twofa_cb, team_cb, ctx, out_session, out_summary, out_error,
     )
 }
 
@@ -303,8 +307,9 @@ pub unsafe extern "C" fn si_forget_apple_session(
 // Certificates — list, revoke, import and export
 // ---------------------------------------------------------------------------
 
-/// Open a developer session on the first team for certificate management.
-/// Blocks, and needs no device.
+/// Open a developer session on the team that signs, for certificate
+/// management: `team_id`, or the one `team_cb` picks, as `si_apple_signin`
+/// does. Blocks, and needs no device.
 ///
 /// # Safety
 /// See `certs::cert_signin`.
@@ -316,15 +321,17 @@ pub unsafe extern "C" fn si_cert_signin(
     anisette_url: *const c_char,
     machine_name: *const c_char,
     storage_dir: *const c_char,
+    team_id: *const c_char,
     twofa_cb: TwoFactorCb,
+    team_cb: TeamCb,
     ctx: *mut c_void,
     out_session: *mut *mut CertSession,
     out_summary: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
     certs::cert_signin(
-        apple_id, password, anisette_url, machine_name, storage_dir, twofa_cb, ctx,
-        out_session, out_summary, out_error,
+        apple_id, password, anisette_url, machine_name, storage_dir, team_id, twofa_cb, team_cb,
+        ctx, out_session, out_summary, out_error,
     )
 }
 
