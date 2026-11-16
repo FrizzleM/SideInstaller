@@ -342,6 +342,43 @@ struct MadeiraHandoff: Equatable {
     var signIn = false
 }
 
+/// The pairing hand-off AltStore Classic reads from 2.3.1 on: the RPPairing
+/// record on its own, as an XML plist, at `Documents/ALTPairingFile.plist`,
+/// where AltServer writes it after installing AltStore (altstoreio/AltStore
+/// 5811912, 23 September 2026). AltStore takes it into its Keychain as its
+/// Remote AltServer is set up, which then skips pairing.
+///
+/// Only an RPPairing record connects: AltStore's `OnDeviceClient` refuses one
+/// without `private_key`. A lockdown record would be taken all the same and
+/// then fail, so none is written without an RPPairing one, and AltStore pairs
+/// during that setup instead. AltStore 2.3 read the record from its own bundle,
+/// sealed with the signing certificate's machine ID (`ALTPairingFile.dat`),
+/// which signing still adds for it (vendored isideload, change 9).
+enum AltStorePairingHandoff {
+
+    /// AltStore's home-screen name, as installation_proxy reports it.
+    static let appName = "AltStore"
+    /// AltStore Classic's bundle ID as published, before signing appends the
+    /// team ID. Signing sets up only this one as AltStore, not the beta's
+    /// ("com.rileytestut.AltStore.Beta").
+    static let bundleID = "com.rileytestut.AltStore"
+    /// Where the record goes, relative to AltStore's Documents.
+    static let remoteRelativePath = "ALTPairingFile.plist"
+
+    /// True for AltStore Classic's bundle ID, as published or with the team ID
+    /// an earlier signing appended; false for the beta's.
+    static func isAltStore(bundleID id: String) -> Bool {
+        id == bundleID || (id.hasPrefix(bundleID + ".") && !id.hasPrefix(bundleID + ".Beta"))
+    }
+
+    /// The RPPairing record in `pairingFile` on its own, as idevice writes it
+    /// for AltServer, or nil if it holds none AltStore could connect with.
+    static func record(from pairingFile: Data) -> Data? {
+        guard PairingFileKind.of(data: pairingFile).hasRemotePairing else { return nil }
+        return (try? SideStorePairingHandoff.split(pairingFile, udid: nil))?.remote
+    }
+}
+
 /// The sign-in Madeira renews its own signing with.
 ///
 /// Madeira refreshes itself the way SideStore does: it asks Apple for a new

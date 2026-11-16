@@ -64,14 +64,9 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 
 ## How to use it
 
-1. Open [the official install page](https://sideinstaller.net/) and install the app using any
-   of the certificates.
-2. Once it's installed, open it.
-3. Connect the device to LocalDevVPN (or any alternative)
-4. Log in with your Apple account credentials.
-5. Tap **Install SideStore** or **Install SideStore + LiveContainer**.
-6. Wait while your selection installs.
-7. That's it. No PC and no extra steps required.
+[siboot](https://github.com/FrizzleM/siboot) installs SideInstaller from the iPhone itself, signed
+with your own Apple account: no computer and no certificate. You need iOS 27 or later, Wi-Fi and
+Developer Mode on. [sideinstaller.net](https://sideinstaller.net/) shows steps 1 to 3.
 
 ### Links
 
@@ -149,12 +144,17 @@ anyone can inspect exactly what it does.
 | `ios-app/` | The SwiftUI app — UI, install engine, certificate handling, translations |
 | `ios-live-activity/` | The widget extension that draws the pairing code in the Dynamic Island and on the Lock Screen |
 | `rust-core/` | Rust core compiled into `SideInstallerFFI.xcframework` |
-| `scripts/` | Build and release scripts |
-| `.github/` | Workflows that build the unsigned IPA, publish it as a release and hand it to the signer |
+| `scripts/` | Build, check and release scripts |
+| `.github/` | Workflows that check pull requests, build the unsigned IPA, publish it as a release and hand it to the signer |
 
 Signed builds and the install page live in [FrizzleM/SideInstaller-Signed](https://github.com/FrizzleM/SideInstaller-Signed):
 it signs each release's IPA with every certificate, attaches the signed IPAs to a release of its own and
 deploys [sideinstaller.net](https://sideinstaller.net/). No IPA is ever committed to either repository.
+
+siboot, which installs SideInstaller [from the iPhone itself](#how-to-use-it),
+lives in [FrizzleM/siboot](https://github.com/FrizzleM/siboot). It builds this repository's vendored crates
+and rust-core's `apple_session.rs` and `error_text.rs` through a submodule pinned to one commit, so a change
+here reaches siboot only when that pin moves.
 
 ## Contributing
 

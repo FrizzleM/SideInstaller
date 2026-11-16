@@ -6,8 +6,8 @@ import UIKit
 /// because the background animates off the clock. Also hosts the 2FA sheet and
 /// the pages' popups, so they show over any tab.
 struct RootView: View {
-    /// The tabs and their backdrop level. The selection is tracked so a tab
-    /// switch can animate `Backdrop` to the new level.
+    /// The tabs. The selection is tracked so a tab switch can tick, and a
+    /// link can bring the Install tab forward.
     private enum Page: Hashable {
         case cert, files, install, tools, about
 
@@ -305,9 +305,9 @@ struct RootView: View {
                 if case .install(.error(_, let stoppedRun)) = item { stoppedRun } else { nil }
             }.first
             return (InstallPopup.errorTitle(stoppedRun: stoppedRun ?? true),
-                    "exclamationmark.triangle.fill", .red)
+                    "exclamationmark.triangle", Theme.negative)
         case .installFinished:
-            return (L("Success: last steps"), "checkmark.seal.fill", .green)
+            return (L("Success: last steps"), "checkmark.seal", Theme.positive)
         case .pairingPage:
             return (PairingPopup.pairInSettingsTitle, "lock.iphone", Theme.accent)
         }
@@ -402,8 +402,8 @@ struct TwoFactorSheet: View {
             Form {
                 if let error = prompt.shownError {
                     Section {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(Theme.warning)
                     }
                 }
                 Section {
@@ -423,7 +423,7 @@ struct TwoFactorSheet: View {
                             }
                     }
                     if let pending {
-                        HStack(spacing: 10) {
+                        HStack(spacing: 8) {
                             ProgressView()
                             Text(status(for: pending))
                                 .foregroundStyle(.secondary)
@@ -557,7 +557,7 @@ struct ToolsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 16) {
                     header.cascadeItem(0)
                     NavigationLink {
                         SideBySideView(manager: sideBySideManager)
@@ -644,8 +644,6 @@ struct ToolsView: View {
             }
             // Still unless the rows don't all fit on the screen.
             .scrollBounceBehavior(.basedOnSize)
-            // The darker backdrop is set by the tab switch, not by this page
-            // appearing, so pushed pages keep the same level.
             .background(AppBackground())
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
             .sheet(isPresented: $showSettings) { SettingsView() }
@@ -660,7 +658,7 @@ struct ToolsView: View {
     /// Just the title: the rows below carry the iconography on this page.
     private var header: some View {
         Text(L("Tools"))
-            .font(.largeTitle.weight(.bold))
+            .font(.largeTitle.weight(.medium))
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
     }

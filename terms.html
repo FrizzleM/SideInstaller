@@ -2,120 +2,139 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>SideInstaller — Terms of Service</title>
+<title>SideInstaller Terms of Service</title>
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
 <link rel="apple-touch-icon" href="app-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#050b18">
 <style>
-  /* Same brand palette as the install page (Theme.swift blues), but restrained:
-     static backdrop, no motion — appropriate for a legal document. */
+  /* The site's palette (assets/site.css in FrizzleM/SideInstaller-Signed, from
+     the app's Theme.swift), kept in this file so the page stands on its own.
+     Still and plain, as suits a legal document. */
   :root{
-    --card:rgba(23,28,42,.62);
-    --stroke:rgba(255,255,255,.07); --stroke-strong:rgba(255,255,255,.14);
-    --text:#f4f6fb; --muted:#9ba3b8; --faint:#6c7386;
-    --accent:#2170f5; --accent2:#4dadff; --glow:#011a5c;
-    --radius:22px; --radius-sm:14px;
+    --page:#050b18; --card:#0d1524;
+    --control:rgba(185,211,249,.07); --hairline:rgba(185,211,249,.1);
+    --text:#f1f4f9; --text-2:#aeb8ca; --muted:#7f8da5;
+    --blue:#2669ed; --blue-hover:#3a78f2; --accent:#60a7fd;
+    --ease:cubic-bezier(.22,1,.36,1);
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%; scroll-behavior:smooth}
+  html{-webkit-text-size-adjust:100%; background:var(--page); scroll-padding-top:76px}
   body{
     margin:0; min-height:100vh; color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
-    line-height:1.7; background:#000;
-    padding:max(20px,env(safe-area-inset-top)) 18px 64px;
+    background:radial-gradient(ellipse 100% 640px at 50% 0, rgba(9,50,143,.4), rgba(9,50,143,0)) no-repeat, var(--page);
+    font:400 17px/1.47 var(--sans); -webkit-font-smoothing:antialiased;
   }
-  .bg{
-    position:fixed; inset:0; z-index:-1; pointer-events:none;
-    background:
-      radial-gradient(70% 42% at 50% -6%, rgba(1,26,92,.5), transparent 74%),
-      radial-gradient(46% 30% at 32% 2%, rgba(33,112,245,.10), transparent 70%),
-      radial-gradient(40% 26% at 72% 0%, rgba(77,173,255,.07), transparent 72%),
-      #000;
+  a{color:inherit}
+  :focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+  .wrap{
+    max-width:808px; margin:0 auto;
+    padding:0 max(24px,env(safe-area-inset-right)) 0 max(24px,env(safe-area-inset-left));
   }
-  .wrap{max-width:760px; margin:0 auto}
+
+  /* ---- top bar ---- */
+  .nav{
+    position:sticky; top:0; z-index:10; height:52px;
+    background:rgba(5,11,24,.72); border-bottom:1px solid var(--hairline);
+    -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px);
+  }
+  .nav .wrap{height:100%; display:flex; align-items:center; justify-content:space-between; gap:24px}
+  .brand{display:flex; align-items:center; gap:10px; font-size:17px; font-weight:600; letter-spacing:-.01em; text-decoration:none}
+  .brand img{width:28px; height:28px; border-radius:7px; box-shadow:0 0 0 1px var(--hairline)}
+  .btn{
+    display:inline-flex; align-items:center; height:32px; padding:0 16px; border-radius:16px;
+    background:var(--blue); color:#fff; font-size:14px; font-weight:500; text-decoration:none;
+    transition:background-color .15s var(--ease), transform .15s var(--ease);
+  }
+  .btn:hover{background:var(--blue-hover)}
+  .btn:active{transform:scale(.98)}
 
   /* ---- header ---- */
-  .head{text-align:center; padding:14px 8px 6px}
-  .logo{
-    width:72px; height:72px; margin:0 auto 16px; display:block;
-    border-radius:18px; border:1px solid var(--stroke-strong);
-    box-shadow:0 10px 34px rgba(33,112,245,.28), 0 16px 50px rgba(1,26,92,.8);
-  }
-  .head .app{margin:0; font-size:15px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent2)}
-  h1{margin:6px 0 0; color:#fff; font-size:clamp(26px,5.4vw,36px); font-weight:800; letter-spacing:-.02em}
-  .updated{
-    display:inline-block; margin-top:14px; font-size:13px; font-weight:600; color:var(--muted);
-    padding:6px 14px; border-radius:999px; background:var(--card); border:1px solid var(--stroke);
-  }
-  .intro{margin:22px auto 0; color:var(--muted); font-size:15.5px}
-  .intro b{color:var(--text)}
+  .head{padding:72px 0 8px}
+  h1{margin:0; font-size:clamp(40px,7vw,64px); line-height:1.04; font-weight:600; letter-spacing:-.03em}
+  .updated{margin:20px 0 0; font:400 13px/1.4 var(--mono); color:var(--muted)}
+  .intro{margin:24px 0 0; font-size:19px; line-height:1.42; color:var(--text-2)}
+  .intro b{color:var(--text); font-weight:500}
 
   /* ---- table of contents ---- */
   .toc{
-    margin:28px 0 8px; padding:18px 22px;
-    background:var(--card); border:1px solid var(--stroke); border-radius:var(--radius);
-    -webkit-backdrop-filter:blur(20px) saturate(140%); backdrop-filter:blur(20px) saturate(140%);
+    margin:48px 0 8px; padding:24px;
+    background:var(--card); border:1px solid var(--hairline); border-radius:20px;
   }
-  .toc h2{margin:0 0 10px; font-size:13px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--faint)}
-  .toc ol{margin:0; padding-left:22px; columns:2; column-gap:28px; font-size:14.5px}
-  .toc li{margin:5px 0; break-inside:avoid}
-  .toc a{color:var(--muted); text-decoration:none}
-  .toc a:hover{color:var(--accent2)}
+  .toc h2{margin:0 0 12px; font-size:14px; line-height:1.43; font-weight:500; color:var(--text-2)}
+  .toc ol{margin:0; padding-left:24px; columns:2; column-gap:32px; font-size:15px}
+  .toc li{margin:0 0 8px; break-inside:avoid; color:var(--muted)}
+  .toc a{color:var(--text); text-decoration:none}
+  .toc a:hover{color:var(--accent)}
 
   /* ---- sections ---- */
-  section{margin-top:34px; scroll-margin-top:24px}
+  section{margin-top:48px}
   h2.sec{
     display:flex; align-items:baseline; gap:12px;
-    margin:0 0 12px; font-size:19px; font-weight:800; letter-spacing:-.01em; color:#fff;
+    margin:0 0 12px; font-size:21px; line-height:1.2; font-weight:600; letter-spacing:-.01em;
   }
-  h2.sec .num{flex:none; font-size:14px; font-weight:800; color:var(--accent2)}
-  section p, section li{color:var(--muted); font-size:15px}
+  h2.sec .num{flex:none; min-width:20px; font:400 14px/1 var(--mono); color:var(--muted)}
+  section p, section li{color:var(--text-2); font-size:16px; line-height:1.6}
   section p{margin:0 0 12px}
-  section b{color:var(--text)}
-  section ul, section ol{margin:0 0 12px; padding-left:22px}
-  section li{margin:7px 0}
-  section a{color:var(--accent2); text-decoration:none}
-  section a:hover{text-decoration:underline}
+  section b{color:var(--text); font-weight:500}
+  section ul, section ol{margin:0 0 12px; padding-left:24px}
+  section li{margin:8px 0}
+  section a{color:var(--accent); text-decoration:none}
+  section a:hover{text-decoration:underline; text-underline-offset:3px}
 
   /* Emphasis block for the standalone risk statement. */
-  .notice{
-    margin:14px 0 12px; padding:13px 16px; border-radius:var(--radius-sm);
-    background:rgba(33,112,245,.08); border:1px solid rgba(33,112,245,.3);
-    color:var(--text); font-weight:600; font-size:15px;
+  section p.notice{
+    margin:16px 0 12px; padding:16px 20px; border-radius:12px;
+    background:var(--control); color:var(--text); font-weight:500;
   }
 
-  /* Capitalised warranty/liability language: set slightly tighter so the long
-     caps runs stay readable without altering the wording. */
-  .caps p, .caps li{font-size:13.5px; letter-spacing:.01em; line-height:1.75}
+  /* Capitalised warranty/liability language: set slightly smaller and looser
+     so the long caps runs stay readable without altering the wording. */
+  .caps p, .caps li{font-size:14px; letter-spacing:.01em; line-height:1.7}
 
-  hr.rule{margin:36px 0 0; border:0; border-top:1px solid var(--stroke)}
-  .footer{margin-top:22px; text-align:center; color:var(--faint); font-size:13px}
-  .footer a{color:var(--muted); text-decoration:none}
+  .footer{
+    margin-top:72px; padding:24px 0 max(48px,env(safe-area-inset-bottom));
+    border-top:1px solid var(--hairline); font-size:14px; color:var(--muted);
+    display:flex; flex-wrap:wrap; gap:8px 24px; justify-content:space-between;
+  }
+  .footer a{color:var(--text-2); text-decoration:none}
   .footer a:hover{color:var(--text)}
 
-  @media (max-width:560px){ .toc ol{columns:1} }
+  @media (max-width:560px){
+    .toc ol{columns:1}
+    .head{padding-top:48px}
+  }
   @media print{
     body{background:#fff; color:#111}
-    .bg,.toc{display:none}
-    .head .app, h2.sec .num{color:#1d4ed8}
+    .nav,.toc{display:none}
+    h2.sec .num{color:#444}
     h1, h2.sec{color:#000}
-    section p, section li, .intro{color:#222}
-    .notice{border-color:#1d4ed8; background:none; color:#000}
+    section p, section li, .intro, .updated{color:#222}
+    section b, .intro b{color:#000}
+    section p.notice{border:1px solid #444; background:none; color:#000}
+    section a{color:#1d4ed8}
   }
 </style>
 </head>
 <body>
-<div class="bg" aria-hidden="true"></div>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="index.html"><img src="favicon-192.png" width="28" height="28" alt="">SideInstaller</a>
+    <!-- The install steps, wherever the site keeps them. -->
+    <a class="btn" href="index.html#setup">Install</a>
+  </div>
+</header>
+
 <div class="wrap">
 
   <header class="head">
-    <img class="logo" src="https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/app-icon.png" alt="SideInstaller">
-    <p class="app">SideInstaller</p>
     <h1>Terms of Service</h1>
-    <span class="updated">Last updated: July 2026</span>
+    <p class="updated">Last updated: July 2026</p>
     <p class="intro">By downloading, installing, or using SideInstaller (the "App"), or by using its source code, you agree to these Terms of Service ("Terms"). <b>If you do not agree, do not use the App.</b></p>
   </header>
 
@@ -208,10 +227,9 @@
     <p>Questions about these Terms may be directed via the official repository: <a href="https://github.com/FrizzleM" target="_blank" rel="noopener">github.com/FrizzleM</a></p>
   </section>
 
-  <hr class="rule">
   <footer class="footer">
-    SideInstaller — Terms of Service
-    <br><a href="index.html">← Back to the install page</a>
+    <span>SideInstaller Terms of Service</span>
+    <a href="index.html">Back to SideInstaller</a>
   </footer>
 
 </div>

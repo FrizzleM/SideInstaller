@@ -121,7 +121,7 @@ struct ReportProblemView: View {
                             detail: crash.date.map(Self.dateText) ?? crash.name)
             }
             if lookingForCrashes {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     ProgressView()
                     Text(L("Looking for crash logs …"))
                         .foregroundStyle(.secondary)
@@ -138,7 +138,7 @@ struct ReportProblemView: View {
             if let crashLookError {
                 Text(crashLookError)
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
             } else if deviceCrashes?.isEmpty == true {
                 Text(L("No crash logs from SideStore, LiveContainer or Madeira in the last %d days.",
                        DeviceCrashLog.maxAgeDays))
@@ -198,7 +198,7 @@ struct ReportProblemView: View {
                 openIssue(report)
             } label: {
                 Label(L("Open a GitHub issue"), systemImage: "arrow.up.right.square")
-                    .font(.body.weight(.semibold))
+                    .font(.body.weight(.medium))
             }
             .disabled(!canSend)
             Button {
@@ -222,7 +222,7 @@ struct ReportProblemView: View {
             if let saveError {
                 Text(saveError)
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
             }
         } footer: {
             Text(canSend

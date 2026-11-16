@@ -1,5 +1,14 @@
 import SwiftUI
 
+// MARK: - Official download check
+
+/// Asked once, before an Apple ID is first typed in: was this copy downloaded
+/// from sideinstaller.net? The app is open source, so anyone can publish a
+/// copy that sends the Apple ID somewhere else. "No" says why that's a risk
+/// and where the official app is, with only Back to answer again.
+///
+/// The first-run setup lays the same pieces out as a page of its own
+/// (`SetupView`), with the buttons at its foot.
 // MARK: - First-run setup
 
 /// First-run Apple ID setup, shown once after the TOS screen. The saved account
@@ -114,12 +123,7 @@ struct AccountSetupView: View {
     }
 }
 
-// MARK: - Official download check
 
-/// Asked once, before an Apple ID is first typed in: was this copy downloaded
-/// from sideinstaller.net? The app is open source, so anyone can publish a
-/// copy that sends the Apple ID somewhere else. "No" says why that's a risk
-/// and where the official app is, with only Back to answer again.
 struct OfficialSourceCheck: View {
     /// Set once the user says the app came from sideinstaller.net.
     static let defaultsKey = "confirmedOfficialSource"
@@ -127,85 +131,118 @@ struct OfficialSourceCheck: View {
 
     @EnvironmentObject private var loc: Localizer
     @State private var unofficial = false
-    @State private var confirmRisk = false
     let onConfirm: () -> Void
 
     var body: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: 24) {
             if unofficial {
-                warning.transition(.cardAppear)
+                VStack(spacing: 24) {
+                    OfficialSourceWarning()
+                    OfficialSourceWarningActions(onBack: { unofficial = false }, onConfirm: onConfirm)
+                }
+                .transition(.cardAppear)
             } else {
-                question.transition(.cardAppear)
+                VStack(spacing: 24) {
+                    OfficialSourceQuestion()
+                    OfficialSourceAnswers(onYes: onConfirm) { unofficial = true }
+                }
+                .transition(.cardAppear)
             }
         }
         .animation(.smooth(duration: 0.35), value: unofficial)
     }
+}
 
-    private var question: some View {
-        VStack(spacing: 22) {
-            VStack(spacing: 10) {
-                Image(systemName: "checkmark.shield.fill")
-                    .font(.system(size: 52, weight: .semibold))
-                    .foregroundStyle(Theme.brand)
-                    .shadow(color: Theme.glow, radius: 20, x: 0, y: 12)
-                    .padding(.bottom, 4)
-                Text(L("Did you download SideInstaller from sideinstaller.net?"))
-                    .font(.title2.weight(.bold))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(L("SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official."))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            VStack(spacing: 14) {
-                Button(L("Yes, from sideinstaller.net"), action: onConfirm)
-                    .buttonStyle(PrimaryButtonStyle())
-                Button(L("No, or I'm not sure")) { unofficial = true }
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(.white.opacity(0.08)))
-                    .buttonStyle(.plain, sound: .press)
-            }
+/// The question, and why it's asked.
+struct OfficialSourceQuestion: View {
+    @EnvironmentObject private var loc: Localizer
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "checkmark.shield")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 4)
+                .setupObject(0)
+            Text(L("Did you download SideInstaller from sideinstaller.net?"))
+                .font(.title2.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .setupObject(1)
+            Text(L("SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official."))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .setupObject(2)
         }
     }
+}
 
-    private var warning: some View {
-        VStack(spacing: 22) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(L("Don't sign in with this copy"))
-                        .font(.headline)
-                    Text(L("Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there."))
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.75))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.orange.opacity(0.12)))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1))
+/// Its two answers.
+struct OfficialSourceAnswers: View {
+    let onYes: () -> Void
+    let onNo: () -> Void
+    @EnvironmentObject private var loc: Localizer
 
-            VStack(spacing: 14) {
-                Link(destination: Self.websiteURL) {
-                    Text(L("Open sideinstaller.net"))
-                }
+    var body: some View {
+        VStack(spacing: 12) {
+            Button(L("Yes, from sideinstaller.net"), action: onYes)
                 .buttonStyle(PrimaryButtonStyle())
-                Button(L("Back")) { unofficial = false }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .buttonStyle(.plain, sound: .tap)
+                .setupObject(3)
+            Button(action: onNo) {
+                Text(L("No, or I'm not sure"))
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(SecondaryButtonStyle(), sound: .press)
+            .controlSize(.large)
+            .setupObject(4)
+        }
+    }
+}
+
+/// What "No" says: don't sign in with this copy.
+struct OfficialSourceWarning: View {
+    @EnvironmentObject private var loc: Localizer
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.title3)
+                .foregroundStyle(Theme.warning)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("Don't sign in with this copy"))
+                    .font(.headline)
+                Text(L("Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface(in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+    }
+}
+
+/// Under the warning: the way to the official app, Back to answer again, and
+/// a dim way past it for those who know the risk.
+struct OfficialSourceWarningActions: View {
+    let onBack: () -> Void
+    let onConfirm: () -> Void
+    @EnvironmentObject private var loc: Localizer
+    @State private var confirmRisk = false
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Link(destination: OfficialSourceCheck.websiteURL) {
+                Text(L("Open sideinstaller.net"))
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            Button(L("Back"), action: onBack)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .buttonStyle(.plain, sound: .tap)
 
             // Kept small and dim on purpose, and behind a confirmation, so
             // it's there for people who know what they're doing without
@@ -214,7 +251,7 @@ struct OfficialSourceCheck: View {
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.3))
                 .buttonStyle(.plain, sound: .tap)
-                .padding(.top, 24)
+                .padding(.top, 8)
         }
         .alert(L("Use an unofficial copy?"), isPresented: $confirmRisk) {
             Button(L("Cancel"), role: .cancel) {}

@@ -1247,4 +1247,25 @@ let koreanStrings: [String: String] = [
         "%@ 주소는 이 iPhone이 이미 가지고 있는 주소입니다. Side by Side는 다른 사람의 iPhone에 설치하는 기능이니 상대방 주소를 입력하세요. 이 iPhone에 설치하려면 설치 탭을 사용하세요.",
     "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
         "상대방 iPhone은 iOS %@입니다. iOS 26.4부터는 상대방 iPhone이 Wi-Fi로 주는 페어링을 %@에서 쓸 수 없습니다. iOS 27은 대신 자체 설정에서 페어링하며, 이 방법은 작동합니다. 상대방 iPhone을 업데이트한 뒤 다시 시도하고, IP를 물으면 아니요를 선택하세요.",
+
+    // MARK: - AltStore
+
+    "couldn't reach %@: %@":
+        "%@에 연결할 수 없습니다: %@",
+    "%@ answered HTTP %d":
+        "%@ 서버가 HTTP %d로 응답했습니다",
+    "%@'s list of apps couldn't be read (%@). Something on this network may have replaced it.":
+        "%@의 앱 목록을 읽을 수 없습니다(%@). 이 네트워크의 무언가가 목록을 바꿨을 수 있습니다.",
+    "the %@ that arrived isn't the file %@ lists, so it isn't installed. Try again later.":
+        "받은 %@ 파일이 %@ 목록의 파일과 달라 설치하지 않습니다. 나중에 다시 시도하세요.",
+    "%@ lists no version of %@ that runs on iOS %@.":
+        "%@에는 %@의 iOS %@ 지원 버전이 없습니다.",
+    "Open AltStore from your Home Screen and sign in with your Apple ID.":
+        "홈 화면에서 AltStore를 열고 Apple ID로 로그인하세요.",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings. Its pairing file is already in place, so the setup skips pairing.":
+        "컴퓨터 없이 앱을 설치하고 갱신하려면 AltStore 설정에서 “Set up Remote AltServer”를 탭하세요. 페어링 파일이 이미 들어 있어 설정 과정에서 페어링을 건너뜁니다.",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings and follow its steps.":
+        "컴퓨터 없이 앱을 설치하고 갱신하려면 AltStore 설정에서 “Set up Remote AltServer”를 탭하고 안내를 따르세요.",
+    "Open AltStore and sign in with the same Apple ID.":
+        "AltStore를 열고 같은 Apple ID로 로그인하세요.",
 ]

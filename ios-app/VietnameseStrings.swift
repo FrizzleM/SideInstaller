@@ -1275,4 +1275,25 @@ let vietnameseStrings: [String: String] = [
         "%@ là địa chỉ mà chính chiếc iPhone này đang dùng. Side by Side cài lên iPhone của người khác, nên hãy dùng địa chỉ của họ. Để cài lên máy này, hãy dùng tab Cài ứng dụng.",
     "Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.":
         "iPhone của họ đang chạy iOS %@. Từ iOS 26.4 trở đi, %@ không dùng được kiểu ghép nối mà iPhone của họ cấp qua Wi-Fi. iOS 27 thì ghép nối từ Cài đặt của chính nó, cách này hoạt động: hãy cập nhật iPhone của họ, rồi thử lại và chọn Không khi được hỏi địa chỉ IP.",
+
+    // MARK: - AltStore
+
+    "couldn't reach %@: %@":
+        "không kết nối được tới %@: %@",
+    "%@ answered HTTP %d":
+        "%@ phản hồi HTTP %d",
+    "%@'s list of apps couldn't be read (%@). Something on this network may have replaced it.":
+        "không đọc được danh sách ứng dụng của %@ (%@). Có thể thứ gì đó trên mạng này đã thay thế nó.",
+    "the %@ that arrived isn't the file %@ lists, so it isn't installed. Try again later.":
+        "%@ nhận được không phải là tệp mà %@ liệt kê, nên sẽ không được cài đặt. Hãy thử lại sau.",
+    "%@ lists no version of %@ that runs on iOS %@.":
+        "%@ không có phiên bản %@ nào chạy được trên iOS %@.",
+    "Open AltStore from your Home Screen and sign in with your Apple ID.":
+        "Mở AltStore từ Màn hình chính và đăng nhập bằng Apple ID của bạn.",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings. Its pairing file is already in place, so the setup skips pairing.":
+        "Để cài đặt và gia hạn ứng dụng mà không cần máy tính, chạm vào “Set up Remote AltServer” trong phần Cài đặt của AltStore. Tệp ghép nối đã có sẵn, nên quá trình thiết lập sẽ bỏ qua bước ghép nối.",
+    "To install and refresh apps without a computer, tap “Set up Remote AltServer” in AltStore's Settings and follow its steps.":
+        "Để cài đặt và gia hạn ứng dụng mà không cần máy tính, chạm vào “Set up Remote AltServer” trong phần Cài đặt của AltStore và làm theo các bước.",
+    "Open AltStore and sign in with the same Apple ID.":
+        "Mở AltStore và đăng nhập bằng cùng Apple ID đó.",
 ]

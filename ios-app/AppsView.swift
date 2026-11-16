@@ -49,6 +49,10 @@ struct ProvisioningProfile: Identifiable, Equatable {
     /// True when the App ID is a wildcard (ends in `*`).
     var isWildcard: Bool { applicationIdentifier.hasSuffix("*") }
 
+    /// True for an App Store distribution profile, the kind TestFlight builds
+    /// carry. Nothing can be sideloaded with one, so the page leaves it out.
+    var isAppStoreDistribution: Bool { entitlements["beta-reports-active"] as? Bool == true }
+
     /// Calendar days until expiry (1 = tomorrow); negative once expired.
     var daysRemaining: Int? {
         guard let expirationDate else { return nil }
@@ -121,17 +125,29 @@ struct SideloadedApp: Identifiable, Equatable {
     var id: String { bundleID }
 
     /// Returns nil unless `ProfileValidated` is set. installd sets it only for
-    /// apps installed with a provisioning profile, not App Store apps.
+    /// apps installed with a provisioning profile, not App Store apps. TestFlight
+    /// apps carry a profile too, so they're left out separately.
     init?(plist: [String: Any]) {
         guard plist["ProfileValidated"] != nil,
               let bundleID = plist["CFBundleIdentifier"] as? String else { return nil }
+        let entitlements = plist["Entitlements"] as? [String: Any]
+        guard !Self.isFromTestFlight(signer: plist["SignerIdentity"] as? String,
+                                     entitlements: entitlements) else { return nil }
         self.bundleID = bundleID
         let display = plist["CFBundleDisplayName"] as? String
         let bundleName = plist["CFBundleName"] as? String
         self.name = display?.isEmpty == false ? display! : (bundleName?.isEmpty == false ? bundleName! : bundleID)
         self.version = plist["CFBundleShortVersionString"] as? String
-        let entitlements = plist["Entitlements"] as? [String: Any]
         self.applicationIdentifier = entitlements?["application-identifier"] as? String
+    }
+
+    /// Whether an app came from TestFlight: Apple signed it (only App Store and
+    /// TestFlight builds carry Apple's own signer) or it has the
+    /// `beta-reports-active` entitlement, which only App Store distribution
+    /// profiles grant. Neither is ever true of a sideloaded app.
+    static func isFromTestFlight(signer: String?, entitlements: [String: Any]?) -> Bool {
+        if let signer, signer.hasPrefix("Apple iPhone OS Application Signing") { return true }
+        return entitlements?["beta-reports-active"] as? Bool == true
     }
 }
 
@@ -172,20 +188,21 @@ enum ExpiryUrgency {
 
     var color: Color {
         switch self {
-        case .expired, .critical: return .red
-        case .soon:               return .orange
-        case .later:              return .yellow
-        case .comfortable:        return .green
+        case .expired, .critical: return Theme.negative
+        case .soon:               return Theme.warning
+        // Between the warning and the positive, toned like them.
+        case .later:              return Color(red: 214 / 255, green: 194 / 255, blue: 86 / 255)
+        case .comfortable:        return Theme.positive
         case .unknown:            return .secondary
         }
     }
 
     var symbol: String {
         switch self {
-        case .expired:  return "exclamationmark.triangle.fill"
-        case .critical: return "clock.badge.exclamationmark.fill"
+        case .expired:  return "exclamationmark.triangle"
+        case .critical: return "clock.badge.exclamationmark"
         case .unknown:  return "questionmark.circle"
-        default:        return "clock.fill"
+        default:        return "clock"
         }
     }
 
@@ -418,7 +435,9 @@ final class SideloadedAppsManager: ObservableObject {
             do {
                 let inventory = try await engine.sideloadedAppInventory()
                 let apps = inventory.apps.compactMap(SideloadedApp.init(plist:))
+                // TestFlight apps' profiles would otherwise show as unused.
                 let profiles = inventory.profiles.compactMap(ProvisioningProfile.init(data:))
+                    .filter { !$0.isAppStoreDistribution }
                 let matched = ProfileMatcher.match(apps: apps, profiles: profiles)
                 entries = matched.entries
                 unmatched = matched.unmatched
@@ -846,7 +865,7 @@ struct AppsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 16) {
                 header.cascadeItem(0)
                 refreshAllButton
                 refreshNote
@@ -916,14 +935,13 @@ struct AppsView: View {
         BrandHeader(icon: "app.badge.clock", image: "AppsLogo", title: L("Sideloaded apps")) {
             if manager.hasLoaded {
                 let expiring = manager.expiringSoon
-                StatusPill(text: expiring > 0
+                StatusDot(text: expiring > 0
                              ? (expiring == 1 ? L("%d app needs refreshing", expiring)
                                               : L("%d apps need refreshing", expiring))
                              : (manager.entries.count == 1 ? L("%d app", manager.entries.count)
                                                            : L("%d apps", manager.entries.count)),
-                           systemImage: expiring > 0 ? "exclamationmark.triangle.fill" : "checkmark.circle.fill",
-                           color: expiring > 0 ? .orange : .green)
-                    .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
+                          color: expiring > 0 ? Theme.warning : Theme.positive)
+                    .transition(.opacity)
             }
         }
     }
@@ -936,9 +954,9 @@ struct AppsView: View {
         if manager.hasLoaded && !manager.refreshable.isEmpty {
             VStack(spacing: 8) {
                 Button { confirmRefresh = true } label: {
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         if manager.isRefreshing {
-                            ProgressView().tint(.white)
+                            ProgressView()
                             Text(manager.refreshStatus ?? L("Getting ready"))
                                 .lineLimit(1)
                         } else {
@@ -952,7 +970,7 @@ struct AppsView: View {
                 // Only the install step reports progress.
                 if manager.isRefreshing, engine.installProgress > 0, engine.installProgress < 1 {
                     ProgressView(value: engine.installProgress)
-                        .tint(Theme.accent2)
+                        .tint(Theme.accent)
                 }
                 Text(manager.refreshable.count == 1
                      ? L("%d app can be signed again from an IPA already on this iPhone.",
@@ -960,7 +978,7 @@ struct AppsView: View {
                      : L("%d apps can be signed again from IPAs already on this iPhone.",
                          manager.refreshable.count))
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
             }
             .transition(.cardAppear)
@@ -976,17 +994,15 @@ struct AppsView: View {
             Button(role: .cancel) { manager.cancelRefresh() } label: {
                 Text(L("Cancel")).frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered, sound: .tap)
+            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
             .controlSize(.large)
-            .tint(Theme.accent)
             .cascadeItem(2)
         } else if manager.hasLoaded && !manager.refreshable.isEmpty {
             Button { manager.load() } label: {
                 loadLabel(spinner: Theme.accent).frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered, sound: .tap)
+            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
             .controlSize(.large)
-            .tint(Theme.accent)
             .disabled(manager.isWorking || manager.isRefreshing)
             .cascadeItem(2)
         } else {
@@ -998,7 +1014,7 @@ struct AppsView: View {
     }
 
     private func loadLabel(spinner: Color) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             if manager.isWorking {
                 ProgressView().tint(spinner)
                 Text(L("Reading the device"))
@@ -1020,7 +1036,7 @@ struct AppsView: View {
             PanelCard {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(L("Refresh all"))
-                        .font(.subheadline.weight(.semibold))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
                     // Enumerated so rows redraw on a language change.
                     ForEach(Array(manager.jobs.enumerated()), id: \.element.id) { _, job in
@@ -1040,14 +1056,14 @@ struct AppsView: View {
     }
 
     private func jobRow(_ job: RefreshJob) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 jobIcon(job.state)
                 Text(job.name)
-                    .font(.caption.weight(.semibold))
+                    .font(.caption.weight(.medium))
                 Spacer(minLength: 6)
                 Text(Self.stateText(job.state))
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption2.weight(.medium))
                     .foregroundStyle(Self.stateColor(job.state))
             }
             if case let .failed(message) = job.state {
@@ -1062,10 +1078,10 @@ struct AppsView: View {
     @ViewBuilder
     private func jobIcon(_ state: RefreshJob.State) -> some View {
         switch state {
-        case .pending:  Image(systemName: "clock").foregroundStyle(.tertiary)
+        case .pending:  Image(systemName: "clock").foregroundStyle(Theme.muted)
         case .working:  ProgressView().controlSize(.small)
-        case .done:     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-        case .failed:   Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+        case .done:     Image(systemName: "checkmark.circle").foregroundStyle(Theme.positive)
+        case .failed:   Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.negative)
         }
     }
 
@@ -1081,8 +1097,8 @@ struct AppsView: View {
     private static func stateColor(_ state: RefreshJob.State) -> Color {
         switch state {
         case .pending, .working: return .secondary
-        case .done:              return .green
-        case .failed:            return .red
+        case .done:              return Theme.positive
+        case .failed:            return Theme.negative
         }
     }
 
@@ -1108,7 +1124,7 @@ struct AppsView: View {
                  : L("%d apps here have no IPA in SideInstaller, so they can't be refreshed from this page. Refresh them in whatever installed them, or import their .ipa first.",
                      manager.unrefreshable))
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .cascadeItem(2)
@@ -1122,19 +1138,19 @@ struct AppsView: View {
         if manager.hasLoaded && manager.entries.isEmpty && !manager.isWorking {
             emptyState.transition(.cardAppear)
         } else if !manager.entries.isEmpty {
-            VStack(spacing: 14) {
+            VStack(spacing: 16) {
                 HStack {
                     Text(manager.entries.count == 1
                          ? L("%d app", manager.entries.count)
                          : L("%d apps", manager.entries.count))
-                        .font(.subheadline.weight(.semibold))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
                     Spacer()
                     if let refreshed = manager.lastRefreshed {
                         Text(refreshed.formatted(Date.FormatStyle(date: .omitted, time: .shortened)
                                                      .locale(Localizer.locale)))
                             .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Theme.muted)
                     }
                 }
                 .cascadeItem(4)
@@ -1200,7 +1216,7 @@ struct AppsView: View {
                 rowIcon(for: status)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(status.app.name)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.subheadline.weight(.medium))
                     // The App ID, which is what a profile is issued against —
                     // the bundle id alone doesn't say which team signed it.
                     Text(profile?.applicationIdentifier ?? status.app.applicationIdentifier ?? status.app.bundleID)
@@ -1212,8 +1228,8 @@ struct AppsView: View {
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.muted)
             }
         }
     }
@@ -1221,11 +1237,11 @@ struct AppsView: View {
     /// The one line that matters: how long is left, and the date it runs out.
     @ViewBuilder
     private func expiryLabel(_ profile: ProvisioningProfile?, urgency: ExpiryUrgency) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: urgency.symbol)
             Text(ExpiryUrgency.text(for: profile))
         }
-        .font(.caption.weight(.semibold))
+        .font(.caption.weight(.medium))
         .foregroundStyle(urgency.color)
         .padding(.top, 1)
     }
@@ -1235,7 +1251,7 @@ struct AppsView: View {
             VStack(spacing: 8) {
                 Image(systemName: "questionmark.app.dashed")
                     .font(.largeTitle)
-                    .foregroundStyle(Theme.brand)
+                    .foregroundStyle(Theme.muted)
                 Text(L("No sideloaded apps"))
                     .font(.headline)
                 Text(L("Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here."))
@@ -1255,14 +1271,14 @@ struct AppsView: View {
     @ViewBuilder
     private var unmatchedSection: some View {
         if !manager.unmatched.isEmpty {
-            VStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 3) {
+            VStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(L("Unused profiles"))
-                        .font(.subheadline.weight(.semibold))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
                     Text(L("Issued to App IDs no installed app is running on."))
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Theme.muted)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 // Enumerated so rows redraw on a language change (a plain
@@ -1271,14 +1287,14 @@ struct AppsView: View {
                     PanelCard {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(profile.appIDName.isEmpty ? profile.bundleIdentifier : profile.appIDName)
-                                .font(.subheadline.weight(.semibold))
+                                .font(.subheadline.weight(.medium))
                             Text(profile.applicationIdentifier)
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                             Text(ExpiryUrgency.text(for: profile))
-                                .font(.caption.weight(.semibold))
+                                .font(.caption.weight(.medium))
                                 .foregroundStyle(ExpiryUrgency.of(profile).color)
                         }
                     }
@@ -1308,7 +1324,7 @@ private struct AppProfileDetail: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 16) {
                 appCard.cascadeItem(0)
                 exportCertCard.cascadeItem(1)
                 if let current = status.current {
@@ -1319,7 +1335,7 @@ private struct AppProfileDetail: View {
                 if !status.superseded.isEmpty {
                     HStack {
                         Text(L("Older profiles"))
-                            .font(.subheadline.weight(.semibold))
+                            .font(.subheadline.weight(.medium))
                             .foregroundStyle(.secondary)
                         Spacer()
                     }
@@ -1338,9 +1354,9 @@ private struct AppProfileDetail: View {
 
     private var appCard: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text(status.app.name)
-                    .font(.title3.weight(.bold))
+                    .font(.title3.weight(.semibold))
                 field(L("Bundle identifier"), status.app.bundleID)
                 if let identifier = status.app.applicationIdentifier ?? status.current?.applicationIdentifier {
                     field(L("App ID"), identifier)
@@ -1459,21 +1475,18 @@ private struct AppProfileDetail: View {
     private func profileCard(_ profile: ProvisioningProfile, isCurrent: Bool) -> some View {
         let urgency = ExpiryUrgency.of(profile)
         return PanelCard {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: urgency.symbol)
                         .foregroundStyle(urgency.color)
                     Text(ExpiryUrgency.text(for: profile))
-                        .font(.subheadline.weight(.semibold))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(urgency.color)
                     Spacer(minLength: 6)
                     if isCurrent {
                         Text(L("In use"))
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(Theme.accent2)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(Theme.accent.opacity(0.18)))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(Theme.accent)
                     }
                 }
                 if !profile.appIDName.isEmpty {
@@ -1509,7 +1522,7 @@ private struct AppProfileDetail: View {
         if !keys.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 Text(L("Capabilities"))
-                    .font(.caption.weight(.semibold))
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
                 ForEach(keys, id: \.self) { key in
                     Text(key)
@@ -1524,10 +1537,10 @@ private struct AppProfileDetail: View {
     }
 
     private var noProfileCard: some View {
-        CalloutCard(tint: .orange) {
-            VStack(alignment: .leading, spacing: 6) {
-                Label(L("No matching profile"), systemImage: "exclamationmark.triangle.fill")
-                    .font(.subheadline.weight(.semibold))
+        PanelCard {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(L("No matching profile"), systemImage: "exclamationmark.triangle")
+                    .font(.subheadline.weight(.medium))
                 Text(L("The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -1540,7 +1553,7 @@ private struct AppProfileDetail: View {
     private func field(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.caption.weight(.semibold))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.caption.monospaced())

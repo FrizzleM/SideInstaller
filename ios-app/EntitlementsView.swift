@@ -429,7 +429,7 @@ struct EntitlementsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 16) {
                 header.cascadeItem(0)
                 loadButton.cascadeItem(1)
                 // Errors and results show as popups, which `RootView` lays
@@ -453,17 +453,17 @@ struct EntitlementsView: View {
     private var header: some View {
         BrandHeader(icon: "checklist", image: "EntitlementsLogo", title: L("Entitlements")) {
             if let team = manager.teamSummary {
-                StatusPill(text: team, systemImage: "person.2.fill", color: .green)
-                    .transition(.opacity.combined(with: .scale(scale: 0.85, anchor: .top)))
+                StatusDot(text: team, color: Theme.positive)
+                    .transition(.opacity)
             }
         }
     }
 
     private var loadButton: some View {
         Button { manager.loadApps() } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 if manager.isWorking {
-                    ProgressView().tint(.white)
+                    ProgressView()
                     Text(manager.teamSummary == nil ? L("Signing in") : L("Refreshing"))
                 } else {
                     Image(systemName: manager.hasLoaded ? "arrow.clockwise" : "list.bullet.rectangle")
@@ -483,12 +483,12 @@ struct EntitlementsView: View {
         if manager.hasLoaded && manager.apps.isEmpty && !manager.isWorking {
             emptyApps.transition(.cardAppear)
         } else if !manager.apps.isEmpty {
-            VStack(spacing: 14) {
+            VStack(spacing: 16) {
                 HStack {
                     Text(manager.apps.count == 1
                          ? L("%d App ID", manager.apps.count)
                          : L("%d App IDs", manager.apps.count))
-                        .font(.subheadline.weight(.semibold))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
@@ -511,10 +511,10 @@ struct EntitlementsView: View {
             HStack(spacing: 12) {
                 Image(systemName: "app.badge.checkmark")
                     .font(.title3)
-                    .foregroundStyle(Theme.brand)
-                VStack(alignment: .leading, spacing: 3) {
+                    .foregroundStyle(Theme.muted)
+                VStack(alignment: .leading, spacing: 4) {
                     Text(app.displayName)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.subheadline.weight(.medium))
                     Text(app.identifier)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -522,14 +522,14 @@ struct EntitlementsView: View {
                         .truncationMode(.middle)
                     if let results = manager.outcomes[app.id] {
                         Text(L("%d of %d enabled", results.filter(\.ok).count, results.count))
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(results.contains(where: \.ok) ? .green : .orange)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(results.contains(where: \.ok) ? Theme.positive : Theme.warning)
                     }
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.muted)
             }
         }
     }
@@ -539,7 +539,7 @@ struct EntitlementsView: View {
             VStack(spacing: 8) {
                 Image(systemName: "questionmark.app.dashed")
                     .font(.largeTitle)
-                    .foregroundStyle(Theme.brand)
+                    .foregroundStyle(Theme.muted)
                 Text(L("No App IDs"))
                     .font(.headline)
                 Text(L("This Apple ID hasn't registered any apps yet. Install something with SideInstaller first, then come back."))
@@ -569,7 +569,7 @@ private struct EntitlementPicker: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 16) {
                 appCard.cascadeItem(0)
                 // What Apple said shows as a popup; the rows keep its marks.
                 ForEach(Array(Entitlement.Group.allCases.enumerated()), id: \.element.id) { idx, group in
@@ -587,25 +587,22 @@ private struct EntitlementPicker: View {
 
     private var appCard: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(app.displayName)
-                    .font(.title3.weight(.bold))
+                    .font(.title3.weight(.semibold))
                 Text(app.identifier)
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Button(L("Recommended")) { selected = Entitlement.recommendedIDs }
-                        .buttonStyle(.bordered, sound: .tap)
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                         .controlSize(.small)
-                        .tint(Theme.accent)
                     Button(L("Select all")) { selected = Set(Entitlement.all.map(\.id)) }
-                        .buttonStyle(.bordered, sound: .tap)
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                         .controlSize(.small)
-                        .tint(Theme.accent)
                     Button(L("None")) { selected = [] }
-                        .buttonStyle(.bordered, sound: .tap)
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                         .controlSize(.small)
-                        .tint(.secondary)
                 }
                 .padding(.top, 4)
             }
@@ -622,8 +619,8 @@ private struct EntitlementPicker: View {
                     // accounts, so the rest are marked Beta.
                     if group == .other {
                         Text(L("Beta"))
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(Theme.accent2)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.accent)
                     }
                     Spacer(minLength: 0)
                 }
@@ -658,8 +655,8 @@ private struct EntitlementPicker: View {
                 }
                 Spacer(minLength: 6)
                 if let outcome = results?.first(where: { $0.capability == entitlement.id }) {
-                    Image(systemName: outcome.ok ? "checkmark.seal.fill" : "xmark.circle.fill")
-                        .foregroundStyle(outcome.ok ? .green : .orange)
+                    Image(systemName: outcome.ok ? "checkmark.seal" : "xmark.circle.fill")
+                        .foregroundStyle(outcome.ok ? Theme.positive : Theme.warning)
                 }
             }
         }
@@ -668,9 +665,9 @@ private struct EntitlementPicker: View {
 
     private var applyBar: some View {
         Button { manager.enable(Array(selected), on: app) } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 if isApplying {
-                    ProgressView().tint(.white)
+                    ProgressView()
                     Text(L("Asking Apple"))
                 } else {
                     Image(systemName: "checkmark.seal")
@@ -717,12 +714,12 @@ struct EntitlementsPopup: View {
         let granted = results.filter(\.ok)
         let refused = results.filter { !$0.ok }
         return PopupCard(title: L("%d of %d enabled", granted.count, results.count),
-                         systemImage: granted.isEmpty ? "exclamationmark.triangle.fill" : "checkmark.seal.fill",
-                         tint: granted.isEmpty ? .orange : .green,
+                         systemImage: granted.isEmpty ? "exclamationmark.triangle" : "checkmark.seal",
+                         tint: granted.isEmpty ? Theme.warning : Theme.positive,
                          onClose: close) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text(appName)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.medium))
                 if !granted.isEmpty {
                     Text(L("Install the app again for these to take effect."))
                         .font(.footnote)
@@ -732,7 +729,7 @@ struct EntitlementsPopup: View {
                 ForEach(refused) { outcome in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(outcome.name)
-                            .font(.caption.weight(.semibold))
+                            .font(.caption.weight(.medium))
                         Text(outcome.error)
                             .font(.caption2)
                             .foregroundStyle(.secondary)

@@ -23,17 +23,6 @@ struct SideInstallerApp: App {
     @StateObject private var localizer = Localizer.shared
     // The saved Apple IDs, shared by every screen that signs in.
     @StateObject private var accounts = AccountStore.shared
-    // Keeps the app alive in background for Shortcuts-triggered resign.
-    private let keepAlive = KeepAlive()
-    // Shows notifications even when the app is in foreground.
-    private let notificationDelegate = NotificationDelegate()
-    /// Watched so a pending shortcut resign resumes when LocalDevVPN
-    /// bounces back or the app returns to the foreground.
-    @Environment(\.scenePhase) private var scenePhase
-    /// False until the TOS is accepted, after which the welcome page is gone.
-    @AppStorage("hasAcceptedTOS") private var hasAcceptedTOS = false
-    /// 界面外观（跟随系统/浅色/深色），设置页里改，整个窗口统一生效。
-    @AppStorage("SIDAppearance") private var appearance: AppAppearance = .system
     /// False until account setup is completed or skipped. Never reset, even if
     /// all accounts are removed later.
     @AppStorage("hasCompletedAccountSetup") private var hasCompletedAccountSetup = false
@@ -103,6 +92,7 @@ struct SideInstallerApp: App {
                         .zIndex(1)
                 }
             }
+
             .animation(.smooth(duration: 0.5), value: hasAcceptedTOS)
             .animation(.smooth(duration: 0.5), value: hasCompletedAccountSetup)
             // 外观统一在窗口根上应用，三个页面（欢迎/账户/主界面）都跟着走。

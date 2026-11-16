@@ -59,7 +59,7 @@ struct PairingActivityWidget: Widget {
             } minimal: {
                 StageSymbol(stage: state.stage, codeReady: "ellipsis.rectangle.fill")
             }
-            .keylineTint(Brand.accent2)
+            .keylineTint(Brand.accent)
         }
     }
 }
@@ -69,25 +69,17 @@ struct PairingActivityWidget: Widget {
 /// The app's colours (`Theme`), repeated here: the extension is its own
 /// binary and takes none of the app's views.
 enum Brand {
-    static let accent = Color(red: 0.13, green: 0.44, blue: 0.96)
-    static let accent2 = Color(red: 0.30, green: 0.68, blue: 1.0)
-    static let glow = Color(red: 1 / 255, green: 26 / 255, blue: 92 / 255)
+    /// The light blue the app draws on the dark.
+    static let accent = Color(red: 96 / 255, green: 167 / 255, blue: 253 / 255)
+    /// The filled blue, behind a white symbol.
+    static let blue = Color(red: 38 / 255, green: 105 / 255, blue: 237 / 255)
+    static let positive = Color(red: 76 / 255, green: 195 / 255, blue: 138 / 255)
+    static let warning = Color(red: 229 / 255, green: 161 / 255, blue: 64 / 255)
+    static let negative = Color(red: 229 / 255, green: 72 / 255, blue: 77 / 255)
 
-    static var gradient: LinearGradient {
-        LinearGradient(colors: [accent, accent2],
-                       startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
-
-    /// The app's backdrop in small, behind a Lock Screen card: black, with the
-    /// blue, or `tint`, blooming from a corner.
-    static func backdrop(glow tint: Color = accent) -> some View {
-        ZStack {
-            LinearGradient(colors: [tint == accent ? glow : tint.opacity(0.3), .black],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-            RadialGradient(colors: [tint.opacity(0.35), .clear],
-                           center: .topLeading, startRadius: 0, endRadius: 240)
-        }
-    }
+    /// The app's page, behind a Lock Screen card: a navy so deep it reads
+    /// as night.
+    static let backdrop = Color(red: 5 / 255, green: 11 / 255, blue: 24 / 255)
 }
 
 private typealias Stage = PairingActivityAttributes.ContentState.Stage
@@ -118,7 +110,7 @@ private struct LockScreenCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity)
-        .background(Brand.backdrop())
+        .background(Brand.backdrop)
         .activityBackgroundTint(.black)
         .activitySystemActionForegroundColor(.white)
     }
@@ -134,16 +126,15 @@ private struct CodeDigits: View {
 
     var body: some View {
         let digits = Array(code)
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             ForEach(Array(digits.enumerated()), id: \.offset) { index, digit in
                 Text(String(digit))
-                    .font(.system(size: cell.height * 0.6, weight: .bold, design: .rounded))
-                    .monospacedDigit()
+                    .font(.system(size: cell.height * 0.56, weight: .medium, design: .monospaced))
                     .foregroundStyle(.white)
                     .frame(width: cell.width, height: cell.height)
-                    .background(cellShape.fill(.white.opacity(0.1)))
-                    .overlay(cellShape.strokeBorder(Brand.gradient.opacity(0.6), lineWidth: 1))
-                    .padding(.leading, digits.count == 6 && index == 3 ? 10 : 0)
+                    .background(cellShape.fill(.white.opacity(0.06)))
+                    .overlay(cellShape.strokeBorder(.white.opacity(0.12), lineWidth: 1))
+                    .padding(.leading, digits.count == 6 && index == 3 ? 8 : 0)
             }
         }
         // Read out as one code, digit by digit, rather than as six numbers.
@@ -152,20 +143,19 @@ private struct CodeDigits: View {
     }
 
     private var cellShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 11, style: .continuous)
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
     }
 }
 
-/// The activity's badge: the pairing lock on the brand gradient, or a tick
-/// once paired.
+/// The activity's badge: the pairing lock on the blue, or a tick once
+/// paired.
 private struct Glyph: View {
     var stage: Stage
     var size: CGFloat
 
     var body: some View {
         RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-            .fill(stage == .paired ? AnyShapeStyle(Color.green.gradient)
-                                   : AnyShapeStyle(Brand.gradient))
+            .fill(stage == .paired ? Brand.positive : Brand.blue)
             .frame(width: size, height: size)
             .overlay {
                 Image(systemName: stage == .paired ? "checkmark" : "lock.iphone")
@@ -183,7 +173,7 @@ private struct Destination: View {
     var body: some View {
         Image(systemName: stage == .paired ? "arrow.up.forward.app.fill" : "gearshape.fill")
             .font(.system(size: 20, weight: .semibold))
-            .foregroundStyle(stage == .paired ? AnyShapeStyle(Brand.gradient)
+            .foregroundStyle(stage == .paired ? AnyShapeStyle(Brand.accent)
                                               : AnyShapeStyle(.secondary))
             .frame(width: 36, height: 36)
     }
@@ -200,13 +190,13 @@ private struct StageSymbol: View {
         switch stage {
         case .paired:
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
+                .foregroundStyle(Brand.positive)
         case .code:
             Image(systemName: codeReady ?? "lock.iphone")
-                .foregroundStyle(Brand.gradient)
+                .foregroundStyle(Brand.accent)
         case .waiting:
             Image(systemName: "lock.iphone")
-                .foregroundStyle(Brand.gradient)
+                .foregroundStyle(Brand.accent)
         }
     }
 }
@@ -221,13 +211,12 @@ private struct CompactTrailing: View {
                 .foregroundStyle(.secondary)
         case .code(let code):
             Text(code)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .monospacedDigit()
+                .font(.system(size: 15, weight: .semibold, design: .monospaced))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         case .paired:
             Image(systemName: "arrow.up.forward.app.fill")
-                .foregroundStyle(Brand.gradient)
+                .foregroundStyle(Brand.accent)
         }
     }
 }

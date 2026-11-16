@@ -32,7 +32,13 @@ struct SettingsView: View {
     @State private var showDeviceIPResetAlert = false
     /// Set when “Start LocalDevVPN now” opened nothing: how a missing
     /// LocalDevVPN shows inside LiveContainer, where `canOpenURL` can't tell.
+    /// Set while a Developer Mode request runs.
+    @State private var developerModeBusy = false
+    /// How the last Developer Mode request went.
+    @State private var developerModeNote: DeveloperModeNote?
     @State private var localDevVPNDidntOpen = false
+    /// Set while the restart warning is up, before Developer Mode is turned on.
+    @State private var confirmEnableDeveloperMode = false
     /// Wi-Fi 下自动启用隧道（v0.9.19）：与安装页预连共用同一键，
     /// 缺省（键不存在）= 开，保住 v70 行为；只管自动行为
     ///（页面预连 + 断线重连），不管操作时 tunnelUp 的内置直起，
@@ -44,6 +50,11 @@ struct SettingsView: View {
     /// 界面外观，与 App 入口共用同一 UserDefaults 键，改完立即生效。
     @AppStorage("SIDAppearance") private var appearance: AppAppearance = .system
 
+    private struct DeveloperModeNote {
+        let text: String
+        let failed: Bool
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -52,6 +63,7 @@ struct SettingsView: View {
                 appearanceSection
                 soundsSection
                 tunnelSection
+                developerModeSection
                 autoRefreshSection
                 downloadsSection
                 anisetteSection
@@ -128,7 +140,7 @@ struct SettingsView: View {
                         }
                         // Set explicitly: the row's `.plain` style removes the
                         // destructive red.
-                        .tint(.red)
+                        .tint(Theme.negative)
                         Button {
                             editorTarget = .existing(account)
                         } label: {
@@ -143,12 +155,12 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Button { editorTarget = .new } label: {
-                Label(L("Add Apple ID"), systemImage: "plus.circle.fill")
+                Label(L("Add Apple ID"), systemImage: "plus.circle")
             }
             if let warning = accounts.keychainWarning {
-                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                Label(warning, systemImage: "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
             }
         } header: {
             Text(L("Account"))
@@ -159,12 +171,12 @@ struct SettingsView: View {
     private func accountRow(_ account: SavedAccount) -> some View {
         let isActive = accounts.isActive(account)
         return HStack(spacing: 12) {
-            Image(systemName: "person.crop.circle.fill")
+            Image(systemName: "person.crop.circle")
                 .font(.title3)
-                .foregroundStyle(isActive ? AnyShapeStyle(Theme.brand) : AnyShapeStyle(.secondary))
+                .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.appleID)
-                    .font(.subheadline.weight(isActive ? .semibold : .regular))
+                    .font(.subheadline.weight(isActive ? .medium : .regular))
                     .lineLimit(1)
                     .truncationMode(.middle)
                 if isActive {
@@ -176,8 +188,8 @@ struct SettingsView: View {
             Spacer(minLength: 8)
             if isActive {
                 Image(systemName: "checkmark")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Theme.accent2)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
             }
         }
         .foregroundStyle(.primary)
@@ -308,6 +320,78 @@ struct SettingsView: View {
 
     /// 常驻后台自动续签：开了之后 AutoRefreshService 双保活巡检，
     /// 描述文件 3 天内到期的 App 自动续签，不用再靠手动或快捷指令触发。
+    // MARK: Developer Mode
+
+    /// Asks this iPhone to show Developer Mode in Settings, or to turn it on.
+    /// Both need a link that already works, so they can't help where the link
+    /// itself needs Developer Mode (iOS 27).
+    private var developerModeSection: some View {
+        Section {
+            Button {
+                runDeveloperMode(.reveal)
+            } label: {
+                Label(L("Show Developer Mode in Settings"), systemImage: "eye")
+            }
+            .disabled(developerModeBusy || engine.isRunning)
+            Button {
+                confirmEnableDeveloperMode = true
+            } label: {
+                Label(L("Turn on Developer Mode"), systemImage: "hammer")
+            }
+            .disabled(developerModeBusy || engine.isRunning)
+            if developerModeBusy {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(L("Asking this iPhone…"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if let note = developerModeNote {
+                Label(note.text, systemImage: note.failed ? "exclamationmark.triangle"
+                                                          : "checkmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(note.failed ? AnyShapeStyle(Theme.negative) : AnyShapeStyle(.secondary))
+            }
+        } header: {
+            Text(L("Developer Mode"))
+        }
+        // On the section, apart from the Form's alerts, so they don't conflict.
+        .alert(L("Turn on Developer Mode?"), isPresented: $confirmEnableDeveloperMode) {
+            Button(L("Turn On and Restart"), role: .destructive) { runDeveloperMode(.enable) }
+            Button(L("Cancel"), role: .cancel) {}
+        } message: {
+            Text(L("This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode."))
+        }
+    }
+
+    private func runDeveloperMode(_ request: DeviceConnection.DeveloperModeRequest) {
+        guard !developerModeBusy else { return }
+        developerModeBusy = true
+        developerModeNote = nil
+        Task {
+            do {
+                let text: String
+                switch try await engine.requestDeveloperMode(request) {
+                case .alreadyOn:
+                    text = L("Developer Mode is already on.")
+                case .revealed:
+                    text = L("Developer Mode now shows under Settings › Privacy & Security, near the bottom. Turn it on there, and iOS restarts to finish.")
+                case .enabling:
+                    text = L("Developer Mode is set to turn on, and this iPhone restarts now. Once you unlock it, tap Turn On.")
+                }
+                developerModeNote = DeveloperModeNote(text: text, failed: false)
+                SoundEffects.play(.success)
+            } catch {
+                developerModeNote = DeveloperModeNote(
+                    text: (error as? LocalizedError)?.errorDescription ?? String(describing: error),
+                    failed: true)
+                SoundEffects.play(.error)
+            }
+            developerModeBusy = false
+        }
+    }
+
+
     private var autoRefreshSection: some View {
         Section {
             Toggle(L("Refresh apps automatically in background"), isOn: $autoRefreshEnabled)
@@ -344,9 +428,9 @@ struct SettingsView: View {
     private var downloadsSection: some View {
         Section {
             if let error = downloadsManager.lastError {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
+                Label(error, systemImage: "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
             }
             if downloadsManager.hasLoaded && downloadsManager.downloads.isEmpty {
                 Text(L("No downloaded IPAs. Ones you install from the Install tab are cached here."))
@@ -376,9 +460,9 @@ struct SettingsView: View {
 
     private func downloadRow(_ item: DownloadedIPA) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "shippingbox.fill")
+            Image(systemName: "shippingbox")
                 .font(.title3)
-                .foregroundStyle(Theme.brand)
+                .foregroundStyle(Theme.muted)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.displayName)
                     .font(.subheadline.weight(.medium))
@@ -394,11 +478,8 @@ struct SettingsView: View {
             }
             Spacer()
             Text(item.sizeText)
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(Theme.accent2)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(Theme.accent.opacity(0.16)))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(Theme.muted)
         }
     }
 
