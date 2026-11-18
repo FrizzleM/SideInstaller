@@ -144,6 +144,21 @@ int32_t si_find_pairing_port(const char *device_ip,
                              uint16_t *out_port,
                              char **out_summary);
 
+// Ask device_ip:port for the RPPairing handshake (attemptPairVerify), as
+// tunnel_create_rppairing_multihost does first, but with 8 s to connect and
+// 10 s to answer: the dial has no time limit, so a port that takes the
+// connection and never answers would hold it for ever. BLOCKS for up to 18 s —
+// run it off the main thread. Returns 0 when the port answered as the pairing
+// service, 1 when it refused the connection, 2 when something took the
+// connection and didn't answer as the service (nothing within 10 s, or
+// something else), 3 when nothing took or refused it within 8 s, 4 when the
+// connection failed some other way, and -1 when `device_ip` isn't an IP
+// address. `*out_summary` (NULL to skip) says what the port did, for the log
+// after "Port N"; free it with si_string_free().
+int32_t si_probe_pairing_port(const char *device_ip,
+                              uint16_t port,
+                              char **out_summary);
+
 // ---------------------------------------------------------------------------
 // Account — Apple ID sign-in + on-device signing (STEP 3)
 // ---------------------------------------------------------------------------

@@ -187,6 +187,30 @@ pub unsafe extern "C" fn si_find_pairing_port(
     pairing_port::find_ffi(device_ip, tried, tried_count, out_port, out_summary)
 }
 
+/// Ask `device_ip:port` for the RPPairing handshake (`attemptPairVerify`), as
+/// `tunnel_create_rppairing_multihost` does first, but with 8 s to connect and
+/// 10 s to answer. The dial has no time limit, so a port that takes the
+/// connection and never answers would hold it for ever. Blocks for up to 18 s,
+/// so run it off the main thread.
+///
+/// Returns 0 when the port answered as the pairing service, 1 when it refused
+/// the connection, 2 when something took the connection and didn't answer as
+/// the service (nothing within 10 s, or something else), 3 when nothing took or
+/// refused it within 8 s, 4 when the connection failed some other way, and -1
+/// for an address that isn't one. `*out_summary` says what the port did, for
+/// the log after "Port N"; free it with `si_string_free`.
+///
+/// # Safety
+/// See `pairing_port::probe_ffi`.
+#[no_mangle]
+pub unsafe extern "C" fn si_probe_pairing_port(
+    device_ip: *const c_char,
+    port: u16,
+    out_summary: *mut *mut c_char,
+) -> i32 {
+    pairing_port::probe_ffi(device_ip, port, out_summary)
+}
+
 
 // ---------------------------------------------------------------------------
 // Account — Apple ID sign-in and signing

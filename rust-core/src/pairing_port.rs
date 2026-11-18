@@ -16,11 +16,20 @@
 //! handshake. iOS refuses a closed port at once and doesn't rate-limit the
 //! refusals, so that takes seconds: all 16,382 in 24 s, from a Mac over Wi-Fi.
 //!
-//! The search is siboot 0.19.1's (`minis/src/preflight.rs` in FrizzleM/siboot),
-//! with its width, timeouts and limits.
+//! Before `DeviceConnection` dials a port for the tunnel, [`probe`] asks it for
+//! that handshake, with 8 s to connect and 10 s to answer, as siboot's first
+//! dial does. The tunnel's dial has no time limit, so a port something else
+//! holds would hold the dial: for ever when it takes the connection and never
+//! answers, as the iPhone's other listeners do, and until it fails as a
+//! pairing file the iPhone rejected when it answers something else. Such a
+//! port is passed over instead, like a refused one.
+//!
+//! The search and the probe are siboot 0.19.1's (`minis/src/preflight.rs` in
+//! FrizzleM/siboot), with its widths, timeouts and limits.
 
 use std::collections::{HashSet, VecDeque};
 use std::ffi::c_char;
+use std::fmt::Write;
 use std::future::Future;
 use std::io::ErrorKind;
 use std::net::{IpAddr, SocketAddr};
@@ -42,6 +51,17 @@ pub const FOUND: i32 = 0;
 pub const NOT_FOUND: i32 = 1;
 pub const STOPPED: i32 = 2;
 pub const INVALID: i32 = -1;
+
+/// `si_probe_pairing_port`'s results: the port answered as the pairing
+/// service, refused the connection, took it without answering as the service
+/// (nothing in time, or something else), neither took nor refused it in time,
+/// or the connection failed some other way. A tunnel dial gets a refusal or a
+/// failure at once too, and says why.
+pub const PROBE_ANSWERED: i32 = 0;
+pub const PROBE_REFUSED: i32 = 1;
+pub const PROBE_TOOK: i32 = 2;
+pub const PROBE_SILENT: i32 = 3;
+pub const PROBE_FAILED: i32 = 4;
 
 /// The ports iOS hands a listener that asks for any free one
 /// (`net.inet.ip.portrange.first` to `.last`).
@@ -66,6 +86,15 @@ const KNOCKS: Knocks = Knocks {
     answer: Duration::from_secs(3),
 };
 
+/// How long a probe waits: siboot's, longer than a knock. A port that misses
+/// the probe isn't dialled, and the search passes over it, so one that's only
+/// slow to answer mustn't miss. (One port, so the width isn't used.)
+const PROBE: Knocks = Knocks {
+    width: 1,
+    connect: Duration::from_secs(8),
+    answer: Duration::from_secs(10),
+};
+
 /// This many connections in a row that neither refuse nor connect: the route
 /// has gone (LocalDevVPN disconnected), and knocking on would take minutes.
 const SILENT_IN_A_ROW: usize = 64;
@@ -77,8 +106,9 @@ const MOST_OPEN: usize = 48;
 /// Times the app ran out of descriptors or buffers before the search gives up.
 const MOST_BUSY: usize = 256;
 
-/// What a search came to, for `DeviceConnection`: one of the results above,
-/// the port when one answered, and a line for the log.
+/// What a search or a probe came to, for `DeviceConnection`: one of the
+/// results above, the port found (0 when none was) or probed, and a line for
+/// the log.
 #[derive(Debug)]
 pub struct Report {
     pub code: i32,
@@ -235,6 +265,95 @@ fn report(search: &Search, ip: IpAddr, count: usize, took: Duration, knocks: &Kn
     }
 }
 
+/// `si_probe_pairing_port`: ask `device_ip:port` for the RPPairing handshake,
+/// as a tunnel dial does first, within `PROBE`'s limits. Blocks for up to
+/// 18 s. Never panics across the boundary.
+///
+/// # Safety
+/// `device_ip` must be null or a valid C string, and `out_summary` null or
+/// writable. `*out_summary` is freed with `si_string_free`.
+pub unsafe fn probe_ffi(device_ip: *const c_char, port: u16, out_summary: *mut *mut c_char) -> i32 {
+    let ip = req_str(device_ip).and_then(|s| s.trim().parse::<IpAddr>().ok());
+    let report = match ip {
+        None => Report {
+            code: INVALID,
+            port,
+            summary: "wasn't probed: there's no IP address to probe".into(),
+        },
+        Some(ip) => catch_unwind(AssertUnwindSafe(|| probe(SocketAddr::new(ip, port))))
+            .unwrap_or_else(|_| Report {
+                code: PROBE_FAILED,
+                port,
+                summary: "wasn't probed: the probe stopped on an internal error".into(),
+            }),
+    };
+    if !out_summary.is_null() {
+        *out_summary = cstr(report.summary);
+    }
+    report.code
+}
+
+/// Ask `addr` for the RPPairing handshake, as a tunnel dial does first, within
+/// `PROBE`'s limits, and say what it did. Blocks.
+pub fn probe(addr: SocketAddr) -> Report {
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            return Report {
+                code: PROBE_FAILED,
+                port: addr.port(),
+                summary: format!("wasn't probed: couldn't start the runtime to probe with: {e}"),
+            }
+        }
+    };
+    let knocked = runtime.block_on(knock(addr, PROBE.connect, PROBE.answer));
+    probed(knocked, addr.port(), &PROBE)
+}
+
+/// What a probe's knock on `port` found, said for the log after "Port N".
+fn probed(knock: Knock, port: u16, limits: &Knocks) -> Report {
+    let (code, summary) = match knock {
+        Knock::Answered(found) => (
+            PROBE_ANSWERED,
+            format!(
+                "answered the RPPairing handshake (wire protocol {})",
+                found.wire_version
+            ),
+        ),
+        Knock::Closed => (PROBE_REFUSED, "refused the connection".to_string()),
+        Knock::Open(None) => (
+            PROBE_TOOK,
+            format!(
+                "took the connection but didn't answer the RPPairing handshake within {} s",
+                limits.answer.as_secs_f32()
+            ),
+        ),
+        Knock::Open(Some(said)) => (
+            PROBE_TOOK,
+            format!("took the connection but didn't answer as RPPairing ({said})"),
+        ),
+        Knock::Silent => (
+            PROBE_SILENT,
+            format!(
+                "neither took nor refused the connection within {} s",
+                limits.connect.as_secs_f32()
+            ),
+        ),
+        Knock::Busy(e) | Knock::Failed(e) => (
+            PROBE_FAILED,
+            format!("couldn't be connected to: {e} ({:?})", e.kind()),
+        ),
+    };
+    Report {
+        code,
+        port,
+        summary,
+    }
+}
+
 /// What the pairing service said to the handshake.
 #[derive(Debug, PartialEq, Eq)]
 struct Found {
@@ -326,7 +445,7 @@ where
                 }
             }
             Knock::Closed => silent = 0,
-            Knock::Open => {
+            Knock::Open(_) => {
                 silent = 0;
                 open.push(port);
                 if open.len() > MOST_OPEN {
@@ -390,8 +509,10 @@ enum Knock {
     Answered(Found),
     /// Nothing listens there.
     Closed,
-    /// Something took the connection, but didn't answer as the service.
-    Open,
+    /// Something took the connection, but didn't answer as the service: what
+    /// went wrong when it answered something else or hung up, `None` when it
+    /// said nothing in time.
+    Open(Option<String>),
     /// Neither refused nor connected in time.
     Silent,
     /// Out of descriptors, buffers or local ports for now.
@@ -417,9 +538,22 @@ async fn knock(addr: SocketAddr, connect: Duration, answer: Duration) -> Knock {
         },
         Ok(Ok(stream)) => match timeout(answer, handshake(stream)).await {
             Ok(Ok(found)) => Knock::Answered(found),
-            _ => Knock::Open,
+            Ok(Err(e)) => Knock::Open(Some(chain(&e))),
+            Err(_) => Knock::Open(None),
         },
     }
+}
+
+/// `e` and what caused it: idevice's socket error alone reads "device socket
+/// io failed".
+fn chain(e: &dyn std::error::Error) -> String {
+    let mut out = e.to_string();
+    let mut source = e.source();
+    while let Some(s) = source {
+        let _ = write!(out, ": {s}");
+        source = s.source();
+    }
+    out
 }
 
 /// The handshake the pairing service answers first, as
@@ -543,9 +677,116 @@ mod tests {
             matches!(answered, Knock::Answered(Found { wire_version: 26 })),
             "{answered:?}"
         );
-        assert!(matches!(knock_quick(silent).await, Knock::Open));
-        assert!(matches!(knock_quick(other).await, Knock::Open));
+        assert!(matches!(knock_quick(silent).await, Knock::Open(None)));
+        let answered = knock_quick(other).await;
+        assert!(matches!(&answered, Knock::Open(Some(_))), "{answered:?}");
         assert!(matches!(knock_quick(closed).await, Knock::Closed));
+    }
+
+    #[tokio::test]
+    async fn a_probe_says_what_the_port_did() {
+        let (service, silent) = (pairing_service().await, silent_service().await);
+        let (other, closed) = (other_service().await, closed_port().await);
+        let probe = |port| async move { probed(knock_quick(port).await, port, &QUICK) };
+
+        let answered = probe(service).await;
+        assert_eq!((answered.code, answered.port), (PROBE_ANSWERED, service));
+        assert_eq!(
+            answered.summary,
+            "answered the RPPairing handshake (wire protocol 26)"
+        );
+        let refused = probe(closed).await;
+        assert_eq!(
+            (refused.code, refused.summary.as_str()),
+            (PROBE_REFUSED, "refused the connection")
+        );
+        // Taken and never answered: the tunnel's dial would wait for ever.
+        let quiet = probe(silent).await;
+        assert_eq!(
+            (quiet.code, quiet.summary.as_str()),
+            (
+                PROBE_TOOK,
+                "took the connection but didn't answer the RPPairing handshake within 0.3 s"
+            )
+        );
+        // Taken and answered otherwise: the dial would fail it as a pairing
+        // file the iPhone rejected.
+        let wrong = probe(other).await;
+        assert_eq!(wrong.code, PROBE_TOOK);
+        assert!(
+            wrong.summary.starts_with(
+                "took the connection but didn't answer as RPPairing (device socket io failed: "
+            ),
+            "{}",
+            wrong.summary
+        );
+    }
+
+    #[test]
+    fn a_probe_that_gets_nowhere_says_so() {
+        let silent = probed(Knock::Silent, 49152, &PROBE);
+        assert_eq!(
+            (silent.code, silent.summary.as_str()),
+            (
+                PROBE_SILENT,
+                "neither took nor refused the connection within 8 s"
+            )
+        );
+        let quiet = probed(Knock::Open(None), 49152, &PROBE);
+        assert_eq!(
+            quiet.summary,
+            "took the connection but didn't answer the RPPairing handshake within 10 s"
+        );
+        let unreachable = std::io::Error::from_raw_os_error(libc::ENETUNREACH);
+        let failed = probed(Knock::Failed(unreachable), 49152, &PROBE);
+        assert_eq!(failed.code, PROBE_FAILED);
+        assert!(
+            failed.summary.starts_with("couldn't be connected to: ")
+                && failed.summary.ends_with(" (NetworkUnreachable)"),
+            "{}",
+            failed.summary
+        );
+        let busy = std::io::Error::from_raw_os_error(libc::EMFILE);
+        assert_eq!(probed(Knock::Busy(busy), 49152, &PROBE).code, PROBE_FAILED);
+    }
+
+    #[test]
+    fn the_probe_answers_through_the_c_call() {
+        // The stand-ins run on a runtime of their own, as the iPhone's
+        // listeners do, and the probe starts its own, as when Swift calls it.
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let (service, closed) =
+            runtime.block_on(async { (pairing_service().await, closed_port().await) });
+        let ask = |ip: &std::ffi::CStr, port: u16| {
+            let mut text = std::ptr::null_mut();
+            let code = unsafe { probe_ffi(ip.as_ptr(), port, &mut text) };
+            let said = unsafe { std::ffi::CStr::from_ptr(text) }
+                .to_str()
+                .unwrap()
+                .to_string();
+            unsafe { crate::ffi_util::string_free(text) };
+            (code, said)
+        };
+        assert_eq!(
+            ask(c"127.0.0.1", service),
+            (
+                PROBE_ANSWERED,
+                "answered the RPPairing handshake (wire protocol 26)".to_string()
+            )
+        );
+        assert_eq!(
+            ask(c"127.0.0.1", closed),
+            (PROBE_REFUSED, "refused the connection".to_string())
+        );
+        assert_eq!(
+            ask(c"not an address", 49152),
+            (
+                INVALID,
+                "wasn't probed: there's no IP address to probe".to_string()
+            )
+        );
+        let code = unsafe { probe_ffi(std::ptr::null(), 49152, std::ptr::null_mut()) };
+        assert_eq!(code, INVALID);
     }
 
     #[tokio::test]

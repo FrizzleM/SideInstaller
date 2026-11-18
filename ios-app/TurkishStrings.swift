@@ -563,6 +563,8 @@ let turkishStrings: [String: String] = [
         "%@:%d adresindeki bir şey bağlantıyı reddetti; yani tünel trafik taşıyor, ama bu iPhone eşleme bağlantı noktasını dinlemiyor: Geliştirici Modu kapalı. Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'ndan aç (iPhone yeniden başlar), sonra yeniden dene.",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
         "%@:%d adresindeki bir şey bağlantıyı reddetti; yani tünel trafik taşıyor, ama Geliştirici Modu açık olduğu hâlde bu iPhone eşleme bağlantı noktasını dinlemiyor. “Eşleme dosyası” altında bu iPhone'u yeniden eşle, sonra yeniden dene. Yine olmazsa iPhone'u yeniden başlat.",
+    "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
+        "%@:%d adresindeki bir şey bağlantıyı kabul etti ama bu iPhone'un eşleme bağlantı noktası gibi yanıt vermedi, başka hiçbir bağlantı noktası da öyle yanıt vermedi. Açık olan VPN'in LocalDevVPN olduğunu ve Geliştirici Modu'nun açık olduğunu (Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu) denetle, sonra yeniden dene. Yine olmazsa iPhone'u yeniden başlat.",
     "Start LocalDevVPN when needed": "Gerektiğinde LocalDevVPN'i başlat",
     "Start LocalDevVPN now": "LocalDevVPN'i şimdi başlat",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":

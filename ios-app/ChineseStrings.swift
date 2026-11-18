@@ -630,6 +630,8 @@ let chineseStrings: [String: String] = [
         "%@:%d 上有东西拒绝了连接，说明隧道是通的，但这台 iPhone 没有在配对端口上监听：开发者模式已关闭。请在 设置 › 隐私与安全性 › 开发者模式 中打开它（iPhone 会重启），然后重试。",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
         "%@:%d 上有东西拒绝了连接，说明隧道是通的，但尽管开发者模式已打开，这台 iPhone 仍没有在配对端口上监听。请在“配对文件”中重新配对这台 iPhone，然后重试。如果仍然失败，请重启 iPhone。",
+    "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
+        "%@:%d 上有东西接受了连接，但没有像这台 iPhone 的配对端口那样应答，其他端口也没有。请确认当前打开的 VPN 是 LocalDevVPN，并且开发者模式已打开（设置 › 隐私与安全性 › 开发者模式），然后重试。如果仍然失败，请重启 iPhone。",
     "Start LocalDevVPN when needed": "需要时打开 LocalDevVPN",
     "Start LocalDevVPN now": "立即启动 LocalDevVPN",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":

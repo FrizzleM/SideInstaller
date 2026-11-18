@@ -1310,12 +1310,51 @@ simulator build compiles the Swift side. Never run on an iPhone: how fast
 LocalDevVPN carries 32 knocks at once, and whether the app's descriptor limit is
 ever reached, are unmeasured.
 
-Not covered: something else holding 49152. If it takes the connection and says
-nothing, as the iPhone's other listeners do, `tunnel_create_rppairing_multihost`
-waits for its handshake answer with no time limit; if it answers something
-else, the dial fails as `TunnelFailurePairVerify`. Only a refusal starts the
-search, so neither gets past 49152. siboot's first dial does have that time
-limit, and searches after either.
+**Probing before the dial (2026-11-18).** Only a refusal started the search,
+and `tunnel_create_rppairing_multihost` has no time limit. So when something
+else held 49152 and took the connection without a word, as the iPhone's other
+listeners do, the dial waited for its handshake answer for ever; when it
+answered something else, the dial failed as `TunnelFailurePairVerify`, whose
+advice is to pair again, and Engine paired again once for nothing when the
+pairing file was a reused one. Now, on this
+iPhone (`findsMovedPort`), `connectRemotePairing` probes each port before it
+dials it: `probeListener` calls `si_probe_pairing_port`, the knock with siboot's
+first-dial limits, 8 s to connect and 10 s for the answer to `attemptPairVerify`
+(the message the dial sends first: `RemotePairingClient::connect` starts with
+it).
+
+- Answered: dialled. Refused, or failed at once some other way (no route,
+  EPERM, out of descriptors): dialled too, since the dial gets the same answer
+  at once and its error says why, so the refusal handling and its advice stay
+  as they were.
+- Took the connection without answering as the listener, by saying nothing
+  within 10 s or something else: not dialled, and passed over like a refused
+  port. The remembered port falls back to 49152, 49152 goes on to the advert
+  and the knock, and the knock skips it. When the listener is on no port, the
+  error is `RsdUnreachable`, so nothing pairs again, with advice of its own:
+  something at the address took the connection but didn't answer as the
+  pairing port; check that LocalDevVPN is the VPN that's on and that Developer
+  Mode is on, then restart the iPhone. A new string, in all nine tables.
+- Neither took nor refused the connection within 8 s: not dialled, and nothing
+  else is tried. The error is the unreachable one (“Couldn't reach the device
+  at … at all”), after 8 s where the dial waited for the OS to give up on the
+  connect (`net.inet.tcp.keepinit`, 75 s on a Mac).
+- A probe is logged only when the port doesn't answer, as in
+
+      Port 49152 took the connection but didn't answer the RPPairing handshake within 10 s. This iPhone's remote pairing advertisement: …
+
+  On the usual path it costs one more connection and round trip through
+  LocalDevVPN before the dial: milliseconds.
+- Side by Side isn't probed (`findsMovedPort` is false), so its dial still has
+  no time limit.
+
+Tested in rust-core with the same stand-ins: the probe's result and log line
+for the RPPairing one, a closed port, the silent one and the HTTP one, the first
+and second through the C call too, and the silence and failures from scripted
+knocks. Never run on an iPhone. The dial comes milliseconds after the probe's
+connection closes; siboot has probed before pairing since its first Open Minis
+version (2026-11-10), and its 0.18.0 paired an iPhone, but its next connection
+comes later.
 
 ## Resuming downloads
 
