@@ -77,6 +77,11 @@ isideload = { git = "https://github.com/nab138/isideload.git", package = "isidel
 
 tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "fs", "sync", "time"] }
 
+# The errno values that mean "out of descriptors or buffers" when knocking on
+# the iPhone's ports for its pairing listener (`pairing_port.rs`). Already in
+# the tree via tokio.
+libc = "0.2"
+
 # Serialize the certificate list across the FFI boundary as JSON (decoded by
 # Swift). Both are already in the tree via isideload, so this adds no new deps.
 serde = { version = "1", features = ["derive"] }

@@ -3106,6 +3106,7 @@ dependencies = [
  "idevice-ffi",
  "isideload",
  "isideload-p12-keystore",
+ "libc",
  "pkcs12",
  "plist",
  "rootcause",

@@ -1262,6 +1262,61 @@ Mode text (the simulator reads the Mac's sysctl, 1) all behaved. Never run on an
 iPhone: whether its own advert is seen from inside the app, whether the sysctl
 can be read there, and whether either report's iPhone had moved its port.
 
+**Knocking for the listener (2026-11-18).** That day siboot users with Developer
+Mode on and LocalDevVPN connected were refused at 10.7.0.1:49152, while another
+iPhone on the same Wi-Fi advertised `_remotepairing._tcp` on 55021. iOS hands
+TCP ports out in order from 49152, not at random (`net.inet.tcp.randomize_ports`
+is 0, as on a Mac), so remotepairingd's listener gets 49152 only when it binds
+first; started later, it gets the next free one. siboot 0.19.1 knocks on the
+other dynamic ports for it, and SideInstaller now does the same when 49152
+refuses and the advert gives no port, or its port refuses too:
+`DeviceConnection.knockForListener` calls `si_find_pairing_port`
+(`rust-core/src/pairing_port.rs`, siboot's `reach`/`search`/`knock` from
+`minis/src/preflight.rs`). In Rust rather than Swift because the answer that
+counts is RPPairing's handshake, which idevice already speaks, and because the
+search can be tested against loopback stand-ins there.
+
+- It knocks on 49152–65535 except lockdownd's 62078 and the ports already
+  refused, in order, 32 connections at a time: 2 s to connect, then 3 s for the
+  answer to RPPairing's first message (`attemptPairVerify`, which only the
+  listener answers). The first port that answers is dialled with
+  `tunnel_create_rppairing_multihost`, as before.
+- It stops after 64 connections in a row that neither refuse nor connect
+  (LocalDevVPN went), once more than 48 ports take the connection without
+  answering (another VPN or a proxy answers for the address), and after running
+  out of descriptors or buffers 256 times. Each of those (EMFILE, ENFILE,
+  ENOBUFS, EADDRNOTAVAIL, EAGAIN) halves the width, down to 4, and the port is
+  knocked on again later.
+- From a Mac over Wi-Fi, iOS refused all 16,382 closed ports in 24 s at 32
+  wide, with no rate limiting (siboot's measurement).
+- The port found, by the advert or the knock, is remembered
+  (`movedListenerPort`) for the next connect in the same run of the app, which
+  dials it first and falls back to 49152 when it refuses; an install connects at
+  least twice. A restart, which moves the listener, ends the run too.
+- Side by Side never knocks (`findsMovedPort` is false there): its listener is
+  another iPhone's.
+- The log gets a line when the knock starts, one at each quarter of the ports,
+  and the result, like the advert lookup's:
+
+      Knocking on this iPhone's other ports: found on port 55021 (RPPairing, wire protocol 26) after 5869 of 16381 ports, in 9.2 s.
+
+  A search that finds nothing ends on the same refusal advice as before, for
+  49152 or the advertised port.
+
+Tested in rust-core: a fake listener that answers the handshake as the iPhone
+does, one that takes the connection and says nothing, one that answers HTTP, and
+closed ports, plus scripted knocks for each stop and the narrower retry. The
+simulator build compiles the Swift side. Never run on an iPhone: how fast
+LocalDevVPN carries 32 knocks at once, and whether the app's descriptor limit is
+ever reached, are unmeasured.
+
+Not covered: something else holding 49152. If it takes the connection and says
+nothing, as the iPhone's other listeners do, `tunnel_create_rppairing_multihost`
+waits for its handshake answer with no time limit; if it answers something
+else, the dial fails as `TunnelFailurePairVerify`. Only a refusal starts the
+search, so neither gets past 49152. siboot's first dial does have that time
+limit, and searches after either.
+
 ## Resuming downloads
 
 Every IPA download from GitHub — SideStore, LiveContainer + SideStore, the

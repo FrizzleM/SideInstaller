@@ -16,6 +16,13 @@ final class DeviceConnection {
     /// which iOS closes without it (`LockdownHeartbeat`). Nil on the RPPairing
     /// route, which doesn't go through lockdownd.
     private var heartbeat: LockdownHeartbeat?
+    /// The port this iPhone's remote-pairing listener was found on when it
+    /// wasn't `rsdPort`: the one it advertised, or the one that answered a
+    /// knock. The next connect dials it first, so the search runs once in a
+    /// run of the app, as siboot's later steps dial the port its first one
+    /// found. The listener only moves when it starts again, as it does when
+    /// the iPhone restarts, which ends the run anyway.
+    private var movedListenerPort: UInt16?
 
     /// RemoteServiceDiscovery port reached over the VPN loopback.
     static let rsdPort: UInt16 = 49152
@@ -295,7 +302,8 @@ final class DeviceConnection {
             do {
                 if useRemotePairing {
                     // Another iPhone's listener (Side by Side, the one caller
-                    // that can't mint) isn't the one this iPhone advertises.
+                    // that can't mint) isn't this iPhone's, so it isn't looked
+                    // for on other ports.
                     try connectRemotePairing(deviceIP: deviceIP,
                                              pairingFilePath: pairingFilePath,
                                              hostname: hostname,
@@ -341,10 +349,13 @@ final class DeviceConnection {
     /// The RPPairing route: straight to the device's remote-pairing listener.
     ///
     /// The listener is dialled on `rsdPort`, the port it nearly always has.
-    /// When that's refused and `findsMovedPort` is set (the listener is this
-    /// iPhone's own), the port this iPhone advertises over Bonjour is looked
-    /// up and dialled too: the listener takes whatever port is free when it
-    /// starts (`NetworkStatus.ownRemotePairingAdvert`).
+    /// It takes whatever port is free when it starts, so when that's refused
+    /// and `findsMovedPort` is set (the listener is this iPhone's own), it's
+    /// looked for: on the port this iPhone advertises over Bonjour
+    /// (`NetworkStatus.ownRemotePairingAdvert`), then, when there's none or it
+    /// refuses too, by knocking on this iPhone's other ports
+    /// (`knockForListener`). The next connect dials the port it was found on
+    /// first (`movedListenerPort`).
     private func connectRemotePairing(deviceIP: String, pairingFilePath: String,
                                       hostname: String, findsMovedPort: Bool) throws {
         var pf: OpaquePointer?
@@ -358,21 +369,63 @@ final class DeviceConnection {
         // RSD address, loopback, then these local interface addresses, all
         // within one shared timeout.
         let candidates = NetworkStatus.tunnelHostCandidates()
-        guard var failure = try dialRemotePairing(pairingFile, deviceIP: deviceIP, port: Self.rsdPort,
-                                                  hostname: hostname, candidates: candidates) else { return }
+        func dial(_ port: UInt16) throws -> DialFailure? {
+            try dialRemotePairing(pairingFile, deviceIP: deviceIP, port: port,
+                                  hostname: hostname, candidates: candidates)
+        }
         var port = Self.rsdPort
-        if findsMovedPort, failure.kind == TunnelFailureRsdUnreachable, Self.wasRefused(failure.raw) {
+        if findsMovedPort, let moved = movedListenerPort {
+            Engine.shared.log("Dialling port \(moved), where this iPhone's remote pairing listener was found before …")
+            port = moved
+        }
+        guard var failure = try dial(port) else { return }
+        // The ports that refused, which knocking skips.
+        var refused: [UInt16] = []
+        if port != Self.rsdPort, Self.refusedOutright(failure) {
+            Engine.shared.log("Port \(port) refused. Dialling \(Self.rsdPort) …")
+            movedListenerPort = nil
+            refused.append(port)
+            port = Self.rsdPort
+            guard let retried = try dial(port) else { return }
+            failure = retried
+        }
+        if findsMovedPort, Self.refusedOutright(failure) {
+            refused.append(port)
             let advert = NetworkStatus.ownRemotePairingAdvert()
             Engine.shared.log("Port \(port) refused. This iPhone's remote pairing advertisement: \(advert.summary).")
-            if let moved = advert.port, moved != port {
+            if let moved = advert.port, !refused.contains(moved) {
                 Engine.shared.log("Dialling the advertised port \(moved) instead …")
                 port = moved
-                guard let retried = try dialRemotePairing(pairingFile, deviceIP: deviceIP, port: moved,
-                                                          hostname: hostname, candidates: candidates) else {
+                guard let retried = try dial(moved) else {
                     Engine.shared.log("The tunnel opened on port \(moved).")
+                    movedListenerPort = moved
                     return
                 }
                 failure = retried
+                if Self.refusedOutright(failure) {
+                    refused.append(moved)
+                } else {
+                    // The listener answered there; what failed comes after it.
+                    movedListenerPort = moved
+                }
+            }
+            // No advert, or its port refused too: if the listener is up, it's
+            // on another port.
+            if Self.refusedOutright(failure) {
+                Engine.shared.log("Knocking on this iPhone's other ports for its remote pairing listener …")
+                let knock = Self.knockForListener(deviceIP: deviceIP, skipping: refused)
+                Engine.shared.log("Knocking on this iPhone's other ports: \(knock.summary).")
+                if let found = knock.port {
+                    Engine.shared.log("Dialling port \(found) instead …")
+                    port = found
+                    guard let retried = try dial(found) else {
+                        Engine.shared.log("The tunnel opened on port \(found).")
+                        movedListenerPort = found
+                        return
+                    }
+                    failure = retried
+                    if !Self.refusedOutright(failure) { movedListenerPort = found }
+                }
             }
         }
         throw TunnelError(kind: failure.kind,
@@ -388,6 +441,38 @@ final class DeviceConnection {
     private struct DialFailure {
         let raw: FFIError
         let kind: TunnelFailureKind
+    }
+
+    /// True when `failure` got no further than a refused connection: nothing
+    /// listens on that port.
+    private static func refusedOutright(_ failure: DialFailure) -> Bool {
+        failure.kind == TunnelFailureRsdUnreachable && wasRefused(failure.raw)
+    }
+
+    /// What knocking on this iPhone's other ports found.
+    private struct ListenerKnock {
+        /// The port that answered as the remote-pairing listener, nil when
+        /// none did.
+        let port: UInt16?
+        /// What happened, for the log.
+        let summary: String
+    }
+
+    /// Knocks on `deviceIP`'s dynamic ports (49152–65535), other than
+    /// lockdownd's and `tried`, 32 at a time, until one answers the RPPairing
+    /// handshake (`si_find_pairing_port`, siboot 0.19.1's search). Through
+    /// LocalDevVPN a closed port refuses at once, so it blocks for seconds.
+    private static func knockForListener(deviceIP: String, skipping tried: [UInt16]) -> ListenerKnock {
+        var port: UInt16 = 0
+        var summary: UnsafeMutablePointer<CChar>?
+        let result = tried.withUnsafeBufferPointer { ports in
+            deviceIP.withCString { ip in
+                si_find_pairing_port(ip, ports.baseAddress, ports.count, &port, &summary)
+            }
+        }
+        defer { si_string_free(summary) }
+        let said = summary.map { String(cString: $0) } ?? "no answer (result \(result))"
+        return ListenerKnock(port: result == 0 && port != 0 ? port : nil, summary: said)
     }
 
     /// One tunnel attempt to the remote-pairing listener at `deviceIP:port`.

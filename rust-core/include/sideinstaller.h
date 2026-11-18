@@ -123,6 +123,28 @@ void si_pairing_cancel(const SIPairCancel *cancel);
 void si_pairing_cancel_free(SIPairCancel *cancel);
 
 // ---------------------------------------------------------------------------
+// Pairing port — this iPhone's RPPairing listener when it isn't on 49152
+// ---------------------------------------------------------------------------
+
+// Knock on `device_ip`'s dynamic ports (49152–65535), except lockdownd's 62078
+// and the `tried_count` ports in `tried`, 32 at a time, in order, until one
+// answers the RPPairing handshake: the listener tunnel_create_rppairing_multihost
+// dials, which takes whatever port is free when it starts. BLOCKS for seconds
+// (a closed port refuses at once) — run it off the main thread. Stops early
+// after 64 connections in a row that neither refuse nor connect (the VPN went),
+// once more than 48 ports take the connection without answering (another VPN
+// or a proxy answers there), and after running out of descriptors 256 times.
+// Returns 0 with the port in `*out_port` when one answered, 1 when none did,
+// 2 when knocking had to stop, and -1 when `device_ip` isn't an IP address.
+// `*out_summary` (NULL to skip) says what happened, for the log; free it with
+// si_string_free(). `tried` may be NULL.
+int32_t si_find_pairing_port(const char *device_ip,
+                             const uint16_t *tried,
+                             size_t tried_count,
+                             uint16_t *out_port,
+                             char **out_summary);
+
+// ---------------------------------------------------------------------------
 // Account — Apple ID sign-in + on-device signing (STEP 3)
 // ---------------------------------------------------------------------------
 
