@@ -502,13 +502,27 @@ final class SideloadedAppsManager: ObservableObject {
             // 是同步的，放 defer 里保证任何出口都执行；defer 不能
             // await，所以内存 session 的重登放在正文末尾尽力做。
             let originalAccount = AccountStore.shared.active
+            var tunnelAcquired = false
             defer {
                 isRefreshing = false
                 refreshStatus = nil
                 refreshTask = nil
                 self.keepAlive.stopAudio()
                 if let originalAccount { AccountStore.shared.activate(originalAccount) }
+                if tunnelAcquired { engine.releaseTunnel() }
             }
+            // SIDE-2：隧道按需开——续签全程拿租约；拿不到就地报错、不跑，
+            // defer 照常复位 isRefreshing（不走这句会卡死在“续签中”）。
+            guard await engine.acquireTunnel() else {
+                let message = BuiltinTunnel.useBuiltinDirectly
+                    ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                    : L("LocalDevVPN isn't connected. Connect it, then try again.")
+                lastError = message
+                engine.log("⛔️ Refresh all: \(message)")
+                jobs = []
+                return
+            }
+            tunnelAcquired = true
             do {
                 try await engine.prepareRefresh()
             } catch {
@@ -711,6 +725,10 @@ final class SideloadedAppsManager: ObservableObject {
     func refreshAllFromShortcut() async {
         guard !isRefreshing else { return }
         engine.refreshNetworkStatus()
+        // SIDE-2：隧道按需开——这里的直起改成拿租约（C2 顺带修：两处入口
+        // 的双触发已删，见 SideInstallerApp / RefreshAllAppsIntent），
+        // loadThenRefreshAll 之后还掉；refreshAll 自己还会再拿一次。
+        var tunnelAcquired = false
         if !engine.vpnConnected {
             // 快捷指令/后台续签同样不再查 WiFi（2026-10-29）：
             // 下面本来就有一套隧道拉起流程（内置隧道直起，
@@ -718,10 +736,11 @@ final class SideloadedAppsManager: ObservableObject {
             // 在隧道明明能起时提前判死刑，删掉它。
             if BuiltinTunnel.useBuiltinDirectly {
                 // 签名带隧道权限：内置隧道不依赖任何外部 App，拉不起来才报失败
-                guard await BuiltinTunnel.startAndWait() else {
+                guard await engine.acquireTunnel() else {
                     await postResignNotification(title: L("续签失败"), body: L("内置隧道没能启动，打开 SideInstaller 重试一次。"))
                     return
                 }
+                tunnelAcquired = true
                 engine.refreshNetworkStatus()
             } else {
                 if !engine.localDevVPNInstalled {
@@ -735,6 +754,7 @@ final class SideloadedAppsManager: ObservableObject {
             }
         }
         await loadThenRefreshAll()
+        if tunnelAcquired { engine.releaseTunnel() }
     }
 
     /// App 回到前台时调用：有待续签标记且隧道已通就清掉标记接着跑。
@@ -885,10 +905,6 @@ struct AppsView: View {
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .onAppear { manager.autoLoad() }
-        .onReceive(NotificationCenter.default.publisher(for: .refreshAllApps)) { _ in
-            // From Shortcuts App Intent: skip confirmation, refresh directly.
-            manager.refreshAll()
-        }
         .alert(L("Refresh all apps?"), isPresented: $confirmRefresh) {
             Button(L("Refresh all")) {
                 // 点续签先做一轮检查：隧道已通直接签；没通也不再

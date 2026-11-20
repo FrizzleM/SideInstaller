@@ -104,9 +104,15 @@ struct SideInstallerApp: App {
                     SideloadedAppsManager.shared.consumePendingRefresh()
                     // 回前台时确保自动续签巡检在跑（开关内部自查）。
                     SIDAutoRefresh.consider()
+                    // SIDE-2 S1：回前台重起状态轮询（进后台时已停）。
+                    engine.startStatusMonitor()
                 } else if phase == .background {
                     // 进后台时把下一次系统唤醒交上去（开关开着才提交）。
                     SIDAutoRefresh.scheduleBackgroundWake()
+                    // SIDE-2 S1：进后台停掉隧道状态轮询——自动续签保活常驻
+                    // 后台时它每 5 秒醒 CPU 空转系统调用；唤醒续签入口自己
+                    // 会调 refreshNetworkStatus，不依赖轮询。
+                    engine.stopStatusMonitor()
                 }
             }
             // Every switch in the app clicks on and off.
@@ -121,8 +127,9 @@ struct SideInstallerApp: App {
                 // parses as ignored and is safely dropped.
                 if url.scheme == "sideinstaller" {
                     if url.host == "refresh-all" {
-                        NotificationCenter.default.post(name: .refreshAllApps, object: nil)
-                        // 界面不在应用页时通知没人接，共享 manager 自己在后台跑
+                        // SIDE-2 C2：以前这里先 post 通知、再直调 refreshAllFromShortcut，
+                        // 应用页在前台时通知同步跑 refreshAll() 抢掉 isRefreshing，直调的
+                        // LocalDevVPN 交接分支永远走不到。只留直调一个入口。
                         Task { await SideloadedAppsManager.shared.refreshAllFromShortcut() }
                     } else {
                         Task { @MainActor in engine.receiveLink(url) }

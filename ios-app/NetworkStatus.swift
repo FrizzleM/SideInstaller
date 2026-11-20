@@ -365,13 +365,23 @@ enum NetworkStatus {
 // fork's summary below; restored verbatim from the fork @ 3e560dd.
 
 extension NetworkStatus {
+    /// 1 秒内的同 IP 摘要缓存（SIDE-2 S1）：tunnelUp 的 15 秒等待循环每 0.5 秒
+    /// 调一次 refreshNetworkStatus，同一秒内两次调用只算一次。所有调用方都
+    /// 在主线程（MainActor 或主 RunLoop 定时器），缓存无锁。
+    private static var lastSummary: (at: Date, deviceIP: String, result: (vpn: Bool, wifi: Bool, detail: String))?
+
     /// (vpnUp, wifiUp, detail) for the current interfaces.
     static func summarize(deviceIP: String) -> (vpn: Bool, wifi: Bool, detail: String) {
+        if let last = lastSummary, last.deviceIP == deviceIP, Date().timeIntervalSince(last.at) < 1 {
+            return last.result
+        }
         let ifs = interfaces()
         let vpn = isLoopbackTunnelUp(in: ifs, deviceIP: deviceIP)
         let wifi = ifs.contains { $0.name == "en0" }
         let detail = ifs.map { "\($0.name)=\($0.ipv4)" }.joined(separator: ", ")
-        return (vpn, wifi, detail)
+        let result = (vpn, wifi, detail)
+        lastSummary = (at: Date(), deviceIP: deviceIP, result: result)
+        return result
     }
 
     private static func isLoopbackTunnelUp(in ifs: [Interface], deviceIP: String) -> Bool {

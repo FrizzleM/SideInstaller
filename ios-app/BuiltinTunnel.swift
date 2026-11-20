@@ -148,12 +148,12 @@ enum BuiltinTunnel {
         return false
     }
 
-    /// 停掉内置隧道（企业本地安装前调用）：企业安装走 localhost HTTP，
-    /// 不需要隧道；隧道是各步骤自动拉起后从不停（此前全仓无 stop
-    /// 调用点），若在跑可能干扰 installd 的回环连接（v65 前台仍弹
-    /// localhost 的头号嫌疑）。尽力而为：没配置、未连接、停失败
-    /// 都不阻断安装（只写日志）。ID 操作需要时 tunnelUp/startAndWait
-    /// 会自动再拉起来，这里不用重起。
+    /// 停掉内置隧道。调用方：企业回环安装前（隧道会干扰 installd 的
+    /// localhost 连接，v65 实证）、pill 手动关、租约闲置停（SIDE-2）。
+    /// 注意“企业安装不需要隧道”只对回环路成立——Engine 配对路的企业
+    /// 安装仍要隧道（见 Engine.runEnterpriseCertInstall）。尽力而为：
+    /// 没配置、未连接、停失败都不阻断调用方（只写日志）。ID 操作需要时
+    /// tunnelUp/startAndWait 会自动再拉起来，这里不用重起。
     static func stop() async {
         do {
             let managers = try await NETunnelProviderManager.loadAllFromPreferences()

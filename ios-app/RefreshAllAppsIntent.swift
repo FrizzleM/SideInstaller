@@ -16,10 +16,10 @@ struct RefreshAllAppsIntent: AppIntent {
     
     @MainActor
     func perform() async throws -> some IntentResult {
-        // App 正开着且界面在：走原有通知路径，界面上的 manager 立即接手。
-        NotificationCenter.default.post(name: .refreshAllApps, object: nil)
-        // App 没开着/已被杀时通知没人接，这里自己在后台把续签跑起来
-        // （与界面共用同一个 manager，靠 isRefreshing 互斥不会重复跑）。
+        // SIDE-2 C2：以前先 post 通知、再直调 refreshAllFromShortcut，应用页
+        // 在前台时通知同步跑 refreshAll() 抢掉 isRefreshing，直调的 LocalDevVPN
+        // 交接分支永远走不到。只留直调一个入口（与界面共用同一个 manager，
+        // 靠 isRefreshing 互斥不会重复跑）。
         await SideloadedAppsManager.shared.refreshAllFromShortcut()
         return .result()
     }

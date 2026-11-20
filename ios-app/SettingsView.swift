@@ -39,11 +39,6 @@ struct SettingsView: View {
     @State private var localDevVPNDidntOpen = false
     /// Set while the restart warning is up, before Developer Mode is turned on.
     @State private var confirmEnableDeveloperMode = false
-    /// Wi-Fi 下自动启用隧道（v0.9.19）：与安装页预连共用同一键，
-    /// 缺省（键不存在）= 开，保住 v70 行为；只管自动行为
-    ///（页面预连 + 断线重连），不管操作时 tunnelUp 的内置直起，
-    /// 也不管 pill 手动点按。
-    @AppStorage("CZFAutoTunnelPreconnect") private var autoTunnelPreconnect = true
     /// Buttons, switches and messages make sounds; see `SoundEffects`.
     @AppStorage(SoundEffects.enabledKey) private var soundEffects = true
 
@@ -303,7 +298,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .onSubmit { validateDeviceIP() }
             }
-            Toggle(L("Auto-enable tunnel on Wi-Fi"), isOn: $autoTunnelPreconnect)
         } header: {
             Text(L("Tunnel"))
         } footer: {

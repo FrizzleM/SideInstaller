@@ -599,6 +599,9 @@ final class LocationManager: ObservableObject {
         keepAlive.stopAll()
         lastSuccess = nil
         lastError = ErrorHelp.explained(L("Location session closed — set it up again."))
+        // SIDE-2：会话在底下断掉时也释放 prepare 拿的那一次隧道持有
+        // （没持有时空操作；与 stopSimulatingLocation 的释放互斥）。
+        Task { @MainActor in engine.releaseLocationTunnelHold() }
     }
 
     private func stopResending() {

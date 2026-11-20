@@ -36,9 +36,6 @@ struct ContentView: View {
     @State private var tunnelManualOff = false
     /// Last auto-reconnect attempt, so a flapping tunnel doesn't hammer start.
     @State private var lastTunnelReconnect = Date.distantPast
-    /// Same key the Settings toggle writes; a missing key reads as on, so the
-    /// v70 preconnect behaviour is kept unless the user turns it off.
-    @AppStorage("CZFAutoTunnelPreconnect") private var autoTunnel = true
     /// Text in the IPA download-link field.
     @State private var ipaLink = ""
     @FocusState private var linkFieldFocused: Bool
@@ -139,21 +136,15 @@ struct ContentView: View {
                 Text(L("LocalDevVPN 的隧道只能在 LocalDevVPN 里关。过去关掉后，回到这里 pill 会自动变回关闭态。"))
             }
             .scrollDismissesKeyboard(.interactively)
-            // WiFi 下安装页出现即预连隧道（见 preconnectTunnelIfNeeded）：
-            // v67 删预连是怕纯企业会话带着隧道跑（v65 localhost 嫌疑）；
-            // v68 企业安装已回退到 Engine 配对路（本来就要隧道），
-            // 预连不再有害，只是让隧道提前就绪、pill 直接变绿。
-            // WiFi 后开上来也补一次（下面 onChange），隧道已起、
-            // 运行中、非 WiFi 时一律不拉。
-            .task { await preconnectTunnelIfNeeded() }
-            .onChange(of: engine.wifiConnected) { _, isOn in
-                if isOn { Task { await preconnectTunnelIfNeeded() } }
-            }
+            // SIDE-2：安装页不再预连隧道（2026-11-21 用户亲令按需开）：
+            // 以前打开安装页即拉、WiFi 后连上再补一次，什么都没点隧道
+            // 已经起了。隧道只在需要它的操作开始时起（见 Engine 租约）。
+            // 断线重连只留给“有操作正在用隧道”的情况：空闲掉线不再拉回。
             .onChange(of: engine.vpnConnected) { _, isUp in
                 if isUp {
-                    // 回升即清手动关闭：下次预连/重连恢复正常。
+                    // 回升即清手动关闭：下次重连恢复正常。
                     tunnelManualOff = false
-                } else if autoTunnel, !tunnelManualOff, !engine.isRunning,
+                } else if !tunnelManualOff, !engine.isRunning, engine.tunnelHolders > 0,
                           engine.wifiConnected, BuiltinTunnel.useBuiltinDirectly,
                           Date().timeIntervalSince(lastTunnelReconnect) > 30 {
                     // 隧道中途掉了：只走内置直连（绝不无操作跳去
@@ -170,22 +161,6 @@ struct ContentView: View {
 
     private var showProgress: Bool {
         engine.isRunning || engine.overallProgress > 0 || engine.finished
-    }
-
-    /// WiFi 下安装页预连隧道：空闲 + WiFi 连着 + 隧道还没起 +
-    /// 内置隧道可用时拉一次。只走内置隧道（不跳去 LocalDevVPN，
-    /// 预连绝不能把用户拽到别的 App；LOC 交接仍留在点安装时
-    /// 的已有流程里）。tunnelUp 自带幂等（已起直接返回），
-    /// Engine 的 ensureNetwork 在操作开始时也会拉，不会双重
-    /// 启动；Engine 从不停隧道，预连上的不会被自家流程掐掉。
-    /// 首次会弹一次系统 VPN 许可，之后静默自动连；pill 读的
-    /// vpnConnected 由状态监控刷新，隧道一起 pill 自动变绿。
-    /// 受“Wi-Fi 下自动启用隧道”开关与 pill 手动关闭约束
-    ///（v0.9.19）：开关关了、或刚手动关掉，都不预连。
-    private func preconnectTunnelIfNeeded() async {
-        guard autoTunnel, !tunnelManualOff, !engine.isRunning, engine.wifiConnected,
-              !engine.vpnConnected, BuiltinTunnel.useBuiltinDirectly else { return }
-        _ = await engine.tunnelUp()
     }
 
     /// True on an iPhone new enough to install but too old to pair itself.
@@ -274,7 +249,16 @@ struct ContentView: View {
             return
         }
         tunnelManualOff = true
-        Task { await BuiltinTunnel.stop() }
+        Task { @MainActor in
+            // SIDE-2：手动关顺带释放 pill 开的那一次持有（有才放，没有空操作，
+            // 不碰操作方持有的计数），再取消闲置停计时、立刻停隧道。
+            if engine.tunnelManualHold {
+                engine.tunnelManualHold = false
+                engine.releaseTunnel()
+            }
+            engine.cancelTunnelIdleStop()
+            await BuiltinTunnel.stop()
+        }
     }
 
     /// Pill 点按：未连时开。内置直接拉；LOC 装了就交接过去；
@@ -283,7 +267,13 @@ struct ContentView: View {
         CZFHaptics.impact()
         tunnelManualOff = false
         if BuiltinTunnel.useBuiltinDirectly {
-            Task { _ = await engine.tunnelUp() }
+            // SIDE-2：pill 手动开拿一次手动持有——用户亲手开的隧道不参与
+            // 闲置停，只由 pill 关释放；拿不到就不置持有。
+            Task { @MainActor in
+                if await engine.acquireTunnel() {
+                    engine.tunnelManualHold = true
+                }
+            }
         } else if engine.localDevVPNInstalled {
             engine.startLocalDevVPN()
         } else {

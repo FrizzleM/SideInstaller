@@ -713,7 +713,17 @@ final class Engine {
 
         pipelineTask = Task { @MainActor in
             var outcome: InstallActivity.Outcome = .stopped
+            var tunnelAcquired = false
             do {
+                // SIDE-2：隧道按需开——管线开始拿租约，收尾统一还；拿不到按
+                // ensurePairingConnection 同款文案报错（入口 tunnelAvailable
+                // 守卫已先拦过一轮，这里是竞态兜底）。
+                guard await acquireTunnel() else {
+                    throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                        ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                        : L("LocalDevVPN isn't connected. Connect it, then try again."))
+                }
+                tunnelAcquired = true
                 try await ensureNetwork()
                 // The download needs neither the device nor the Apple ID, so it
                 // starts now and runs while those steps do.
@@ -760,6 +770,7 @@ final class Engine {
                 failActiveStep(to: .failed)
             }
             InstallActivity.shared.runEnded(outcome)
+            if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
             isRunning = false
             isCancelling = false
@@ -2132,7 +2143,15 @@ final class Engine {
         log("=== Starting enterprise-cert install ===")
 
         pipelineTask = Task { @MainActor in
+            var tunnelAcquired = false
             do {
+                // SIDE-2：隧道按需开——同 runOneClick，管线开始拿租约、收尾统一还。
+                guard await acquireTunnel() else {
+                    throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                        ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                        : L("LocalDevVPN isn't connected. Connect it, then try again."))
+                }
+                tunnelAcquired = true
                 try await ensureNetwork()
                 try await pairAndConnect()
                 downloadedIPAPath = ipaURL.path
@@ -2151,6 +2170,7 @@ final class Engine {
                 log("⛔️ Stopped: \(msg)")
                 failActiveStep(to: .failed)
             }
+            if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
             isRunning = false
             isCancelling = false
@@ -2237,7 +2257,15 @@ final class Engine {
         log("=== Installing already-signed IPA ===")
 
         pipelineTask = Task { @MainActor in
+            var tunnelAcquired = false
             do {
+                // SIDE-2：隧道按需开——同 runOneClick，管线开始拿租约、收尾统一还。
+                guard await acquireTunnel() else {
+                    throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                        ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                        : L("LocalDevVPN isn't connected. Connect it, then try again."))
+                }
+                tunnelAcquired = true
                 try await ensureNetwork()
                 try await pairAndConnect()
                 downloadedIPAPath = ipaURL.path
@@ -2260,6 +2288,7 @@ final class Engine {
                 log("⛔️ Stopped: \(msg)")
                 failActiveStep(to: .failed)
             }
+            if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
             isRunning = false
             isCancelling = false
@@ -2837,13 +2866,23 @@ final class Engine {
 
     /// Poll the interface list so the readouts track the tunnel while the app is
     /// open. Runs in `.common` mode so it keeps firing during scrolling.
-    private func startStatusMonitor() {
+    /// SIDE-2 S1：以前 2 秒一次、从启动跑到进程死、进后台也不停；自动续签保活
+    /// 常驻后台时等于拿着保活换来的后台时间空转系统调用。现在前台 5 秒一次，
+    /// 进后台由 SideInstallerApp 停掉、回前台重起（见 stopStatusMonitor）。
+    func startStatusMonitor() {
         statusTimer?.invalidate()
-        let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 5.0, repeats: true) { [weak self] _ in
             self?.refreshNetworkStatus()
         }
         RunLoop.main.add(timer, forMode: .common)
         statusTimer = timer
+        refreshNetworkStatus()
+    }
+
+    /// 停掉状态轮询（进后台时调用；回前台由 startStatusMonitor 重起）。
+    func stopStatusMonitor() {
+        statusTimer?.invalidate()
+        statusTimer = nil
     }
 
     /// One quiet re-scan of the tunnel and Wi-Fi state.
@@ -2910,6 +2949,69 @@ final class Engine {
     /// over to the separate LocalDevVPN app.
     var tunnelAvailable: Bool { vpnConnected || startsVPNWhenNeeded || BuiltinTunnel.useBuiltinDirectly }
 
+    /// 隧道租约（SIDE-2，2026-11-21 用户亲令“隧道别一直打开了，需要时候才打开”）：
+    /// 以前隧道只进不出——安装页预连、断线重连、操作入口都拉，收尾/后台/闲置从不
+    /// 停。现在需要设备链路的操作开始时 acquire、结束时 release；持有归零后闲置
+    /// 60 秒只停内置隧道。LocalDevVPN 的隧道是另一个 App 的，本 App 停不掉，
+    /// 只能做到“不主动拉起”。定位模拟是长时持有者，另有 tunnelLocationHold
+    /// 单独记一次（setup 与 stop/sessionClosed 两路结束，防重复释放）。
+    /// 持有计数与闲置计时只在主线程碰（acquire/release 都是 @MainActor）。
+    @ObservationIgnored var tunnelHolders = 0
+    @ObservationIgnored private var tunnelIdleTimer: Timer?
+    /// Pill 手动开的持有：用户亲手开的隧道不参与闲置停，只由 pill 关释放。
+    @ObservationIgnored var tunnelManualHold = false
+    /// 定位模拟会话的持有：prepare 成功置真，stop / sessionClosed 任一结束路清掉。
+    @ObservationIgnored private var tunnelLocationHold = false
+
+    /// 操作开始前调用：先记一次持有，再拉隧道（tunnelUp 幂等）。隧道起不来时
+    /// 把持有还回去，返回 false，调用方按现有失败路径处理。
+    @MainActor func acquireTunnel() async -> Bool {
+        tunnelIdleTimer?.invalidate(); tunnelIdleTimer = nil
+        tunnelHolders += 1
+        guard await tunnelUp() else {
+            tunnelHolders = max(0, tunnelHolders - 1)
+            return false
+        }
+        return true
+    }
+
+    /// 操作结束后调用：持有归零时启动闲置计时，到时只停内置隧道。
+    @MainActor func releaseTunnel() {
+        tunnelHolders = max(0, tunnelHolders - 1)
+        guard tunnelHolders == 0 else { return }
+        scheduleTunnelIdleStop()
+    }
+
+    /// 闲置停计时：持有为零且内置隧道可用时才设 60 秒定时；到时二次核对三路
+    /// 长时持有（在跑安装 / 在跑续签 / 定位模拟中），任一成立就不停。
+    @MainActor private func scheduleTunnelIdleStop() {
+        tunnelIdleTimer?.invalidate(); tunnelIdleTimer = nil
+        guard tunnelHolders == 0, BuiltinTunnel.useBuiltinDirectly else { return }
+        tunnelIdleTimer = Timer(timeInterval: 60, repeats: false) { _ in
+            Task { @MainActor in
+                guard Engine.shared.tunnelHolders == 0,
+                      !Engine.shared.isRunning,
+                      !SideloadedAppsManager.shared.isRefreshing,
+                      !Engine.shared.connection.isSimulatingLocation else { return }
+                await BuiltinTunnel.stop()
+                Engine.shared.refreshNetworkStatus()
+            }
+        }
+        RunLoop.main.add(tunnelIdleTimer!, forMode: .common)
+    }
+
+    /// 取消闲置停计时（pill 手动关时用；停隧道本身由调用方做）。
+    @MainActor func cancelTunnelIdleStop() {
+        tunnelIdleTimer?.invalidate(); tunnelIdleTimer = nil
+    }
+
+    /// 定位模拟会话结束时释放它那一次持有；没持有时空操作，防两路结束重复放。
+    @MainActor func releaseLocationTunnelHold() {
+        guard tunnelLocationHold else { return }
+        tunnelLocationHold = false
+        releaseTunnel()
+    }
+
     /// Makes sure the tunnel is up for something about to use it. Starts
     /// Side+'s built-in tunnel first — that part is not gated by the
     /// “Start LocalDevVPN when needed” setting; only if the built-in fails
@@ -2920,13 +3022,19 @@ final class Engine {
         refreshNetworkStatus()
         // 内置隧道不受自动启动开关限制：它是 App 自带的一部分。
         // 那个开关只管内置起不来时要不要自动跳去打开独立装的 LOC。
-        guard !vpnConnected, startsVPNWhenNeeded || BuiltinTunnel.useBuiltinDirectly else { return vpnConnected }
+        guard !vpnConnected, startsVPNWhenNeeded || BuiltinTunnel.useBuiltinDirectly else {
+            // 隧道已经通着、又没人持有：补一次闲置停计时（不走租约的裸 tunnelUp
+            // 调用方，如安装页“修复隧道”按钮，靠这句兜底，不会一直开着）。
+            if vpnConnected { scheduleTunnelIdleStop() }
+            return vpnConnected
+        }
         // Built-in tunnel first: no app switch, no dependency on a
         // separately installed LocalDevVPN.
         if await BuiltinTunnel.startAndWait() {
             refreshNetworkStatus()
             if vpnConnected {
                 log("Tunnel up (built-in).")
+                scheduleTunnelIdleStop()
                 return true
             }
         }
@@ -2947,6 +3055,7 @@ final class Engine {
             refreshNetworkStatus()
             if vpnConnected {
                 log("Tunnel up.")
+                scheduleTunnelIdleStop()
                 return true
             }
             if UIApplication.shared.applicationState == .active { waited += 0.5 }
@@ -2962,7 +3071,18 @@ final class Engine {
 
     func connectAndReadDeviceInfo() {
         Task { @MainActor in
-            do { try await connect() } catch { log("Connect FAILED: \(short(error))") }
+            // SIDE-2：隧道按需开——单步连接自己拿租约；connect() 本身不拉隧道。
+            var tunnelAcquired = false
+            defer { if tunnelAcquired { releaseTunnel() } }
+            do {
+                guard await acquireTunnel() else {
+                    throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                        ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                        : L("LocalDevVPN isn't connected. Connect it, then try again."))
+                }
+                tunnelAcquired = true
+                try await connect()
+            } catch { log("Connect FAILED: \(short(error))") }
         }
     }
 
@@ -3305,6 +3425,15 @@ final class Engine {
     /// List the supported pairing-target apps installed on the device.
     @MainActor
     func installedPairingTargets() async throws -> [InstalledPairingTarget] {
+        // SIDE-2：隧道按需开——单次配对操作自己拿租约、defer 还。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
         try await ensurePairingConnection()
         let apps = try await onDeviceQueue { try self.connection.installedApps() }
         let targets = PairingTargets.match(installed: apps)
@@ -3315,6 +3444,15 @@ final class Engine {
     /// Write the current pairing file into one installed target app's container.
     @MainActor
     func installPairing(into target: InstalledPairingTarget) async throws {
+        // SIDE-2：隧道按需开——同 installedPairingTargets。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
         try await ensurePairingConnection()
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         let udid = deviceUDID
@@ -3328,6 +3466,15 @@ final class Engine {
     /// "Place In All Apps" does. Connects once, then writes each in turn.
     @MainActor
     func installPairing(intoAll targets: [InstalledPairingTarget]) async throws {
+        // SIDE-2：隧道按需开——同 installedPairingTargets（整批写完才还）。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
         try await ensurePairingConnection()
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         let udid = deviceUDID
@@ -3455,6 +3602,15 @@ final class Engine {
     /// together so the caller can match each app to its profile.
     @MainActor
     func sideloadedAppInventory() async throws -> (apps: [[String: Any]], profiles: [Data]) {
+        // SIDE-2：隧道按需开——同 installedPairingTargets。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
         try await ensurePairingConnection()
         let apps = try await onDeviceQueue { try self.connection.installedAppPlists() }
         let profiles = try await onDeviceQueue { try self.connection.provisioningProfiles() }
@@ -3547,23 +3703,37 @@ final class Engine {
                                    trustcachePath: String,
                                    manifestPath: String,
                                    progress: @escaping (Double) -> Void) async throws -> Bool {
-        try await ensurePairingConnection()
-        let mounted = try await onDeviceQueue { try self.connection.mountedDeveloperImageCount() }
-        if mounted > 0 {
-            log("Developer disk image already mounted (\(mounted) image(s)).")
+        // SIDE-2：隧道按需开——会话开始拿租约，整个模拟期间持有；中途失败在
+        // catch 里还掉，成功则由 stop / sessionClosed 释放（见 tunnelLocationHold）。
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelLocationHold = true
+        do {
+            try await ensurePairingConnection()
+            let mounted = try await onDeviceQueue { try self.connection.mountedDeveloperImageCount() }
+            if mounted > 0 {
+                log("Developer disk image already mounted (\(mounted) image(s)).")
+                try await onDeviceQueue { try self.connection.beginLocationSimulation() }
+                return false
+            }
+            log("No developer disk image mounted — mounting the personalized one…")
+            try await onDeviceQueue {
+                try self.connection.mountPersonalizedDeveloperImage(imagePath: imagePath,
+                                                                   trustcachePath: trustcachePath,
+                                                                   manifestPath: manifestPath,
+                                                                   progress: progress)
+            }
+            log("Developer disk image mounted.")
             try await onDeviceQueue { try self.connection.beginLocationSimulation() }
-            return false
+            return true
+        } catch {
+            tunnelLocationHold = false
+            releaseTunnel()
+            throw error
         }
-        log("No developer disk image mounted — mounting the personalized one…")
-        try await onDeviceQueue {
-            try self.connection.mountPersonalizedDeveloperImage(imagePath: imagePath,
-                                                               trustcachePath: trustcachePath,
-                                                               manifestPath: manifestPath,
-                                                               progress: progress)
-        }
-        log("Developer disk image mounted.")
-        try await onDeviceQueue { try self.connection.beginLocationSimulation() }
-        return true
     }
 
     /// Push a coordinate to the device. The caller repeats this on a timer —
@@ -3581,12 +3751,17 @@ final class Engine {
     /// Give the device its real location back and close the session.
     @MainActor
     func stopSimulatingLocation() async throws {
-        guard connection.isSimulatingLocation else { return }
+        guard connection.isSimulatingLocation else {
+            // 会话已在别处断掉：顺手回收可能残留的持有（没持有时空操作）。
+            releaseLocationTunnelHold()
+            return
+        }
         try await onDeviceQueue {
             try self.connection.clearSimulatedLocation()
             self.connection.endLocationSimulation()
         }
         log("Simulated location cleared.")
+        releaseLocationTunnelHold()
     }
 
     // MARK: - Developer Mode (Settings)
@@ -3615,6 +3790,16 @@ final class Engine {
         }
         let outcome: DeveloperModeOutcome = request == .reveal ? .revealed : .enabling
         log("Developer Mode: \(request == .reveal ? "showing it in Settings" : "turning it on") …")
+        // SIDE-2：隧道按需开——单次操作自己拿租约；回落到 lockdownd 直连那路
+        // 也在租约内跑完，无非多持有一会儿，无害。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
         do {
             try await ensurePairingConnection()
         } catch {
@@ -4438,8 +4623,11 @@ enum SIDAutoRefresh {
         }
         Task {
             if isEnabled {
-                _ = await Engine.shared.tunnelUp()
+                // SIDE-2：隧道按需开——唤醒续签拿租约，跑完还掉；拿不到也照常
+                // 跑巡检（tick 自己会判隧道未通而跳过），不白白记一次成功。
+                let tunnelAcquired = await Engine.shared.acquireTunnel()
                 await AutoRefreshService.shared.runCheck()
+                if tunnelAcquired { await Engine.shared.releaseTunnel() }
             }
             completion.finish(true)
         }
@@ -4575,6 +4763,15 @@ extension Engine {
         guard !isRunning else {
             throw EngineError.message(L("An install is already running. Wait for it to finish, then try again."))
         }
+        // SIDE-2：隧道按需开——同上；本函数非 @MainActor，defer 里经 Task 回主线程还。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { Task { @MainActor in Engine.shared.releaseTunnel() } } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
         try await ensurePairingConnection()
         log("Crash logs: looking for SideStore's, LiveContainer's and Madeira's …")
         let logs = try await onDeviceQueue {
