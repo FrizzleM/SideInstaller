@@ -163,18 +163,18 @@ struct OfficialSourceQuestion: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 4)
-                .setupObject(0)
+                .cascadeItem(0)
             Text(L("Did you download SideInstaller from sideinstaller.net?"))
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .setupObject(1)
+                .cascadeItem(1)
             Text(L("SideInstaller is open source, so anyone can publish a modified copy that steals the Apple ID typed into it. Only sideinstaller.net is official."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-                .setupObject(2)
+                .cascadeItem(2)
         }
     }
 }
@@ -189,14 +189,14 @@ struct OfficialSourceAnswers: View {
         VStack(spacing: 12) {
             Button(L("Yes, from sideinstaller.net"), action: onYes)
                 .buttonStyle(PrimaryButtonStyle())
-                .setupObject(3)
+                .cascadeItem(3)
             Button(action: onNo) {
                 Text(L("No, or I'm not sure"))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle(), sound: .press)
             .controlSize(.large)
-            .setupObject(4)
+            .cascadeItem(4)
         }
     }
 }

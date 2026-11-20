@@ -857,6 +857,8 @@ struct BrandHeader<Accessory: View>: View {
     var beta: Bool = false
     /// A line tucked under the title, close enough to read as one block.
     var subtitle: String? = nil
+    /// Breathe/pulse the icon while a run is in flight.
+    var animateIcon: Bool = false
     @ViewBuilder var accessory: () -> Accessory
 
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -907,6 +909,11 @@ struct BrandHeader<Accessory: View>: View {
             Image(image)
                 .logoArt()
                 .clipShape(tile)
+                // A breathe while a run is in flight, mirroring `.pulse`.
+                .scaleEffect(animateIcon ? 1.04 : 1)
+                .animation(animateIcon ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
+                                       : .default,
+                           value: animateIcon)
                 // The art's dark tile would melt into the page without it.
                 .overlay(tile.strokeBorder(Theme.hairline, lineWidth: 1))
         } else {
@@ -916,6 +923,7 @@ struct BrandHeader<Accessory: View>: View {
                 Image(systemName: icon)
                     .font(.system(size: glyphSide * 32 / 72))
                     .foregroundStyle(.white)
+                    .symbolEffect(.pulse, isActive: animateIcon)
             }
         }
     }
