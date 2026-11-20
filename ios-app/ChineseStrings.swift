@@ -1241,7 +1241,6 @@ let chineseStrings: [String: String] = [
     "Source URL": "应用源地址",
     "Add": "添加",
     "That isn't a usable source link.": "这不是可用的应用源链接。",
-    "OK": "好",
     "Loading…": "正在加载…",
     "Import failed": "导入失败",
     "Export certificate (p12)": "导出证书（p12）",

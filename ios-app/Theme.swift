@@ -175,6 +175,7 @@ struct AppBackground: View {
             .ignoresSafeArea()
     }
 }
+}
 
 // MARK: - Cards
 
