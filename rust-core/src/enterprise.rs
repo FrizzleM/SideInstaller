@@ -310,7 +310,7 @@ fn sign_with_cert_mods(
         return Err("描述文件里没有 TeamIdentifier".into());
     }
     let date_expire = match dict.get("ExpirationDate") {
-        Some(plist::Value::Date(d)) => d.clone(),
+        Some(plist::Value::Date(d)) => *d,
         _ => return Err("描述文件里没有 ExpirationDate".into()),
     };
 
@@ -492,7 +492,7 @@ fn u64be(b: &[u8], off: usize) -> u64 {
 /// between the load commands and the first section/segment data
 /// (the same trick insert_dylib uses; the file size never changes).
 /// Already-present loads are left alone.
-fn macho_add_load(data: &mut Vec<u8>, base: usize, load_path: &str) -> Result<(), String> {
+fn macho_add_load(data: &mut [u8], base: usize, load_path: &str) -> Result<(), String> {
     if data.len() < base + 32 {
         return Err("主程序文件太小".into());
     }
@@ -718,7 +718,7 @@ fn deb_dylibs(bytes: &[u8]) -> Result<Vec<(String, Vec<u8>)>, String> {
             let base = full.rsplit('/').next().unwrap_or(&full).to_string();
             out.push((base, tar_bytes[data_start..data_start + size].to_vec()));
         }
-        p = data_start + ((size + 511) / 512) * 512;
+        p = data_start + size.div_ceil(512) * 512;
     }
     if out.is_empty() {
         return Err("deb 里没找到 .dylib".into());

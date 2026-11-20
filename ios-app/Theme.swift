@@ -175,6 +175,47 @@ struct AppBackground: View {
             .ignoresSafeArea()
     }
 }
+
+    /// The blue layer: the swaying mesh, or on iOS 17 (no `MeshGradient`) a
+    /// radial bloom that follows the mesh's centre point.
+    @ViewBuilder
+    private func mesh(at t: TimeInterval) -> some View {
+        let points = meshPoints(at: t)
+        if #available(iOS 18.0, *) {
+            MeshGradient(width: 3, height: 3, points: points, colors: meshColors)
+        } else {
+            let centre = points[4]
+            RadialGradient(colors: [Theme.accent2, Theme.accent, Theme.glow],
+                           center: UnitPoint(x: CGFloat(centre.x), y: CGFloat(centre.y)),
+                           startRadius: 0, endRadius: 600)
+        }
+    }
+
+    /// Deep-navy corners with brighter blue blooms through the middle.
+    private let meshColors: [Color] = [
+        Theme.glow,    Theme.accent,   Theme.glow,
+        Theme.accent2, Theme.accent,   Theme.accent2,
+        Theme.glow,    Theme.accent2,  Theme.glow,
+    ]
+
+    /// A 3×3 grid of control points: corners pinned so the gradient fills the
+    /// screen, the rest swaying on out-of-phase sine waves.
+    private func meshPoints(at t: TimeInterval) -> [SIMD2<Float>] {
+        func osc(_ base: Double, _ amp: Double, _ speed: Double, _ phase: Double) -> Float {
+            Float(base + amp * sin(t * speed + phase))
+        }
+        return [
+            SIMD2<Float>(0, 0),
+            SIMD2<Float>(osc(0.5, 0.18, 0.625, 0.0), 0),
+            SIMD2<Float>(1, 0),
+            SIMD2<Float>(0, osc(0.5, 0.18, 0.55, 1.0)),
+            SIMD2<Float>(osc(0.5, 0.12, 0.75, 2.0), osc(0.5, 0.12, 0.675, 3.0)),
+            SIMD2<Float>(1, osc(0.5, 0.18, 0.60, 4.0)),
+            SIMD2<Float>(0, 1),
+            SIMD2<Float>(osc(0.5, 0.18, 0.65, 5.0), 1),
+            SIMD2<Float>(1, 1),
+        ]
+    }
 }
 
 // MARK: - Cards

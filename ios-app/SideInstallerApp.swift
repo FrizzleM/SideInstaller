@@ -26,6 +26,14 @@ struct SideInstallerApp: App {
     /// False until account setup is completed or skipped. Never reset, even if
     /// all accounts are removed later.
     @AppStorage("hasCompletedAccountSetup") private var hasCompletedAccountSetup = false
+    // 0.9.89（SIDE-2 修复）：下面 5 个声明是合并时丢的，从提交历史原样恢复——
+    // hasAcceptedTOS（@AppStorage，WelcomeView 写同一键）、appearance（SIDAppearance，
+    // 与设置页同一键）、scenePhase、notificationDelegate、keepAlive。
+    @AppStorage("hasAcceptedTOS") private var hasAcceptedTOS = false
+    @AppStorage("SIDAppearance") private var appearance: AppAppearance = .system
+    @Environment(\.scenePhase) private var scenePhase
+    private let notificationDelegate = NotificationDelegate()
+    private let keepAlive = KeepAlive()
 
     init() {
         // A pairing code still up from a run that was killed means nothing now.

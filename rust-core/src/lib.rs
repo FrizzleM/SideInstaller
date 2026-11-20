@@ -481,6 +481,7 @@ pub unsafe extern "C" fn si_cert_revoke(
     certs::cert_revoke(session, serial_number, out_error)
 }
 
+/// # Safety
 /// See `certs::cert_import`.
 #[no_mangle]
 pub unsafe extern "C" fn si_cert_import(
