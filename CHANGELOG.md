@@ -4,7 +4,22 @@ All notable changes to SideInstaller are documented here.
 
 ## Unreleased
 
+### Changed
+- **lillq is the first anisette server.** anisette.lillq.me, a pool of anisette servers that checks
+  every hour which clients Apple lets through and hands out one that passes, is now on the list in
+  Settings › Anisette Server, and a first sign-in starts there. With Auto on, it comes right after
+  the server that signed in last and the others that share its anisette identity, since those keep
+  the saved sign-in: lillq's identities work on no other server, and theirs not on lillq. A sign-in
+  that moves between lillq and another server makes that server an identity of its own instead of
+  stopping at the one it can't use.
+
 ### Fixed
+- **Signing in to Apple works again.** Since 20 November Apple has answered sign-ins through every
+  Mac anisette server with HTTP 503, “Service Temporarily Unavailable” (#146–#161): it now turns
+  away any client that calls its system “macOS”, and SideInstaller signed in as a Mac on macOS 26.6.
+  It now signs in as a Mac on macOS 10.15.7, the newest that still calls its system “Mac OS X”,
+  which Apple lets through and which is new enough for the accounts Apple asks for macOS 10.13 or
+  later (#89). The anisette identities made since 1.6.1 work with it as they are.
 - **The device link finds the pairing port when it isn't 49152.** iOS gives this iPhone's remote
   pairing listener whatever port is free when it starts, so it isn't always on 49152, and the
   device link was refused there with Developer Mode and LocalDevVPN both on. When 49152 refuses

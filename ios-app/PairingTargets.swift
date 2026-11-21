@@ -767,8 +767,9 @@ enum SideStoreAnisetteHandoff {
     static let userAgent = "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)"
 
     /// Sets SideStore's settings (`prefs`, its preferences plist) to sign in
-    /// that way, and returns what changed, for the log. A macOS-ADI server
-    /// already picked is kept, and so is client info saved for a Mac; client
+    /// that way, and returns what changed, for the log. A macOS-ADI server or
+    /// lillq (which tells SideStore's users how to add it) already picked is
+    /// kept, and so is client info saved for a Mac; client
     /// info saved for a Windows PC or an Android phone (as guides for -80045
     /// had people do) goes back to SideStore's default Mac.
     static func applySettings(to prefs: inout [String: Any]) -> [String] {
@@ -783,7 +784,8 @@ enum SideStoreAnisetteHandoff {
         }
         let picked = (prefs["menuAnisetteURL"] as? String) ?? ""
         let pickedHost = URL(string: picked)?.host?.lowercased() ?? ""
-        if !AnisetteServer.macADIHosts.contains(pickedHost) {
+        if !AnisetteServer.macADIHosts.contains(pickedHost),
+           !AnisetteServer.poolHosts.contains(pickedHost) {
             prefs["menuAnisetteURL"] = server
             changes.append("server “SideStore (New)”")
         }
