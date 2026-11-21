@@ -2180,9 +2180,12 @@ final class Engine {
         resetRun()
         isRunning = true
         log("=== Starting enterprise-cert install ===")
-        InstallActivity.shared.runStarted()
 
         pipelineTask = Task { @MainActor in
+            // 修法：runStarted() 是 @MainActor（InstallActivity 类级隔离），
+            // 而本入口是非隔离同步函数——runOneClick 能直接调是因为它自己
+            // 带 @MainActor。放进 Task 头一句，仍在任何管线工作之前。
+            InstallActivity.shared.runStarted()
             var outcome: InstallActivity.Outcome = .stopped
             var tunnelAcquired = false
             do {
@@ -2304,9 +2307,11 @@ final class Engine {
         isRunning = true
         installSessionID = UUID()
         log("=== Installing already-signed IPA ===")
-        InstallActivity.shared.runStarted()
 
         pipelineTask = Task { @MainActor in
+            // 修法：同企业路——runStarted() 是 @MainActor，本入口非隔离，
+            // 放进 Task 头一句，仍在任何管线工作之前。
+            InstallActivity.shared.runStarted()
             var outcome: InstallActivity.Outcome = .stopped
             var tunnelAcquired = false
             do {
