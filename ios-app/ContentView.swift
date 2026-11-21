@@ -1042,6 +1042,14 @@ struct ContentView: View {
             InstallProgressBar(progress: engine.overallProgress, tint: progressTint)
 
             stepSection
+
+            // C7: a download that fell back to an older local copy says so
+            // here, under the card, until the next run clears it.
+            if let notice = engine.downloadFallbackNotice {
+                Text(notice)
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+            }
         }
     }
 
@@ -2024,6 +2032,13 @@ private struct StepBadge: View {
                 .foregroundStyle(Theme.accent)
                 .contentTransition(.numericText(value: installProgress))
                 .animation(.smooth(duration: 0.3), value: installProgress)
+                .transition(.opacity)
+        } else if step == .sign, state == .active {
+            // C6: signing takes a while with no percentage to show — say so
+            // in the badge, where the install step shows its own percent.
+            Text(L("正在签名，请稍候…"))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Theme.accent)
                 .transition(.opacity)
         } else if state == .waiting {
             Text(L("Action needed"))

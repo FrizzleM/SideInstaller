@@ -369,6 +369,10 @@ final class Engine {
     /// Install percentage (0…1) streamed from installation_proxy.
     var installProgress: Double = 0
 
+    /// Download percentage (0…1) streamed from the downloader while that
+    /// step is running; mirrors SideBySideView's own downloadProgress.
+    var downloadProgress: Double = 0
+
     /// The pairing PIN to display prominently, when one has been issued.
     var pairingPIN: String?
 
@@ -403,6 +407,10 @@ final class Engine {
 
     /// Set when the pipeline stops on an error; cleared on a new run.
     var lastError: String?
+
+    /// Set when a download falls back to a copy already in Documents; shown
+    /// as a caption under the progress card, never a blocking error.
+    var downloadFallbackNotice: String?
 
     /// Set once the whole pipeline has completed successfully.
     var finished: Bool = false
@@ -483,8 +491,13 @@ final class Engine {
     var overallProgress: Double {
         let total = Double(Step.allCases.count)
         let done = Double(Step.allCases.filter { stepStates[$0] == .done }.count)
-        let frac = (stepStates[.install] == .active || stepStates[.install] == .waiting)
-            ? installProgress : 0
+        // The download step fills its own share as bytes arrive (SideBySideView
+        // does the same); the install step keeps its own fraction after it.
+        var frac = 0.0
+        if stepStates[.download] == .active { frac = downloadProgress }
+        if stepStates[.install] == .active || stepStates[.install] == .waiting {
+            frac = installProgress
+        }
         return min(1, (done + frac) / total)
     }
 
@@ -614,6 +627,8 @@ final class Engine {
         setMain {
             for s in Step.allCases { self.stepStates[s] = .pending }
             self.installProgress = 0
+            self.downloadProgress = 0
+            self.downloadFallbackNotice = nil
             self.pairingPIN = nil
             self.guide = nil
             self.deviceSummary = nil
@@ -762,6 +777,7 @@ final class Engine {
                 // tab goes back to its button.
                 for s in Step.allCases { stepStates[s] = .pending }
                 installProgress = 0
+                downloadProgress = 0
                 setGuide(nil)
             } catch {
                 let msg = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
@@ -1592,6 +1608,14 @@ final class Engine {
                 cached = onDisk?.url
             }
             if let cached {
+                // C7: the install goes on with the older local copy — say so
+                // under the progress card instead of silently succeeding.
+                let when = (try? FileManager.default.attributesOfItem(atPath: cached.path))?[.modificationDate] as? Date
+                let dateText = when?.formatted(
+                    Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localizer.locale)) ?? ""
+                downloadFallbackNotice = L("Couldn't download %@: %@", src.displayName, short(error))
+                    + " — " + cached.lastPathComponent
+                    + (dateText.isEmpty ? "" : " (" + L("Downloaded %@", dateText) + ")")
                 log("⚠️ Download failed (\(short(error))) — using \(cached.lastPathComponent) already in Documents instead.")
                 adopt(cached, source: src, channel: channel, version: version?.tag)
                 setStep(.download, .done)
@@ -1662,10 +1686,19 @@ final class Engine {
     private func downloadBuild(source: InstallSource, channel: ReleaseChannel,
                                version: ReleaseVersion?) async throws -> String {
         let log: (String) -> Void = { line in self.log(line) }
-        guard let version else {
-            return try await SideStoreDownloader.downloadLatest(source: source, channel: channel, log: log)
+        // C6: stream the transfer into downloadProgress, exactly as
+        // SideBySideView does for its own downloads.
+        let report: @Sendable (Double) -> Void = { [weak self] fraction in
+            Task { @MainActor in self?.downloadProgress = fraction }
         }
-        return try await SideStoreDownloader.download(version, source: source, channel: channel, log: log)
+        guard let version else {
+            return try await SideStoreDownloader.$reportProgress.withValue(report) {
+                try await SideStoreDownloader.downloadLatest(source: source, channel: channel, log: log)
+            }
+        }
+        return try await SideStoreDownloader.$reportProgress.withValue(report) {
+            try await SideStoreDownloader.download(version, source: source, channel: channel, log: log)
+        }
     }
 
     /// A build as the log names it: "Nightly SideStore", or "SideStore 0.6.3".
@@ -2109,8 +2142,13 @@ final class Engine {
 
     /// 证书页入口：对指定 IPA 用企业证书签名（可带修改项）并安装。
     func runEnterpriseCertInstall(ipaURL: URL, mods: CertSignMods) {
-        guard !isRunning else { return }
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then refresh.")
+            return
+        }
         guard osSupported else {
+            lastError = L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
+                          osVersionText, Engine.minimumTunnelOSText)
             log("⛔️ iOS \(osVersionText) isn't supported — SideInstaller needs iOS \(Engine.minimumTunnelOSText) or later.")
             return
         }
@@ -2120,6 +2158,7 @@ final class Engine {
             return
         }
         guard EnterpriseCertStore.ready else {
+            lastError = L("企业证书材料不齐：需要 .p12、描述文件和证书密码。")
             log("⛔️ 企业证书材料不齐：需要 .p12、描述文件和证书密码。")
             return
         }
@@ -2141,8 +2180,10 @@ final class Engine {
         resetRun()
         isRunning = true
         log("=== Starting enterprise-cert install ===")
+        InstallActivity.shared.runStarted()
 
         pipelineTask = Task { @MainActor in
+            var outcome: InstallActivity.Outcome = .stopped
             var tunnelAcquired = false
             do {
                 // SIDE-2：隧道按需开——同 runOneClick，管线开始拿租约、收尾统一还。
@@ -2159,7 +2200,9 @@ final class Engine {
                 try await signAppWithCert(mods: mods)
                 try await install(prestaged: nil)
                 finishSuccess()
+                outcome = .installed
             } catch is CancellationError {
+                outcome = .cancelled
                 log("Install cancelled.")
                 for s in Step.allCases { stepStates[s] = .pending }
                 installProgress = 0
@@ -2170,6 +2213,7 @@ final class Engine {
                 log("⛔️ Stopped: \(msg)")
                 failActiveStep(to: .failed)
             }
+            InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
             isRunning = false
@@ -2226,8 +2270,13 @@ final class Engine {
 
     /// 已签名页入口：解包一个已签好的 IPA 直接安装（不再签一次）。
     func runInstallSignedIPA(ipaURL: URL) {
-        guard !isRunning else { return }
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then refresh.")
+            return
+        }
         guard osSupported else {
+            lastError = L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
+                          osVersionText, Engine.minimumTunnelOSText)
             log("⛔️ iOS \(osVersionText) isn't supported — SideInstaller needs iOS \(Engine.minimumTunnelOSText) or later.")
             return
         }
@@ -2255,8 +2304,10 @@ final class Engine {
         isRunning = true
         installSessionID = UUID()
         log("=== Installing already-signed IPA ===")
+        InstallActivity.shared.runStarted()
 
         pipelineTask = Task { @MainActor in
+            var outcome: InstallActivity.Outcome = .stopped
             var tunnelAcquired = false
             do {
                 // SIDE-2：隧道按需开——同 runOneClick，管线开始拿租约、收尾统一还。
@@ -2277,7 +2328,9 @@ final class Engine {
                 setStep(.sign, .done)
                 try await install(prestaged: nil)
                 finishSuccess()
+                outcome = .installed
             } catch is CancellationError {
+                outcome = .cancelled
                 log("Install cancelled.")
                 for s in Step.allCases { stepStates[s] = .pending }
                 installProgress = 0
@@ -2288,6 +2341,7 @@ final class Engine {
                 log("⛔️ Stopped: \(msg)")
                 failActiveStep(to: .failed)
             }
+            InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
             isRunning = false
