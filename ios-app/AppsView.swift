@@ -399,6 +399,26 @@ final class SideloadedAppsManager: ObservableObject {
     @Published private(set) var refreshStatus: String?
     /// How the last finished run went, e.g. "Refreshed 2 of 3 apps."
     @Published private(set) var refreshSummary: String?
+    /// UserDefaults key for `lastBackgroundRefreshResult`.
+    private static let backgroundRefreshResultKey = "SIDLastBackgroundRefreshResult"
+    /// The last refresh run that finished with failures while its completion
+    /// notification couldn't be delivered (C11). Persisted — a background run
+    /// has no other way to report — and shown on the apps page next open.
+    /// Cleared by the next fully successful refresh. The stored text is the
+    /// run's refreshSummary, already localized when it was saved.
+    @Published private(set) var lastBackgroundRefreshResult: String? =
+        UserDefaults.standard.string(forKey: Self.backgroundRefreshResultKey)
+
+    /// Writes (or clears) `lastBackgroundRefreshResult`, keeping UserDefaults
+    /// in step so the note survives an app restart (C11).
+    private func setBackgroundRefreshResult(_ value: String?) {
+        lastBackgroundRefreshResult = value
+        if let value {
+            UserDefaults.standard.set(value, forKey: Self.backgroundRefreshResultKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.backgroundRefreshResultKey)
+        }
+    }
 
     private var engine: Engine { Engine.shared }
 
@@ -579,9 +599,33 @@ final class SideloadedAppsManager: ObservableObject {
             } ?? refreshable
             if rebuiltCandidates.count != jobs.count {
                 engine.log("Refresh all: list rebuilt after sign-in (\(jobs.count) → \(rebuiltCandidates.count)).")
-                jobs = rebuiltCandidates
+                // C4：重建把有的 App 悄悄丢了时，别直接换掉 jobs——
+                // 被丢的以 .failed 留在原位（分母不变、有一行交代），
+                // 新进来的（刚记下团队映射的）接在末尾。
+                var byID: [String: RefreshJob] = [:]
+                for job in rebuiltCandidates { byID[job.bundleID] = job }
+                let oldIDs = Set(jobs.map { $0.bundleID })
+                var merged: [RefreshJob] = []
+                merged.reserveCapacity(max(jobs.count, rebuiltCandidates.count))
+                for var job in jobs {
+                    if let rebuilt = byID[job.bundleID] {
+                        merged.append(rebuilt)
+                    } else {
+                        job.state = .failed(L("Skipped: this app stopped being refreshable after the run started. Its IPA may have been deleted."))
+                        merged.append(job)
+                    }
+                }
+                merged.append(contentsOf: rebuiltCandidates.filter { !oldIDs.contains($0.bundleID) })
+                jobs = merged
             }
 
+            // C4：没团队号的 job 不进任何组——以前 groupedByTeam 里
+            // 静默跳过，现在先标 .failed，免得它从总数里无声消失。
+            // 正常不会走到这里（rebuildRefreshable 已滤掉没团队号的），
+            // 只是防线。
+            for index in jobs.indices where jobs[index].teamID == nil {
+                jobs[index].state = .failed(L("Skipped: this app has no team on its signing profile, so it can't be refreshed."))
+            }
             // 按团队分组跑：每组先切到该团队的账号、登完核对团队号再
             // 签。组内保持页面顺序，组按首次出现顺序。取消只在组间
             // 和 App 间检查，正在签装的单个 App 不中断。
@@ -680,13 +724,27 @@ final class SideloadedAppsManager: ObservableObject {
                                   : L("Nothing was refreshed."))
                 : L("Refreshed %d of %d apps.", refreshed, jobs.count)
             engine.log("Refresh all finished: \(refreshed)/\(jobs.count) refreshed.")
+            // C11：全续完就清掉上次后台失败的留底；没全续完时，
+            // 通知发不出去才留底（发出去就不用留，用户已收到）。
+            if refreshed == jobs.count {
+                setBackgroundRefreshResult(nil)
+            }
             // Post local notification for background resign
             let content = UNMutableNotificationContent()
             content.title = refreshed > 0 ? L("续签成功") : L("续签完成")
             content.body = refreshSummary ?? L("Refreshed %d of %d apps.", refreshed, jobs.count)
             content.sound = .default
             let request = UNNotificationRequest(identifier: "resign-done", content: content, trigger: nil)
-            try? await UNUserNotificationCenter.current().add(request)
+            do {
+                try await UNUserNotificationCenter.current().add(request)
+            } catch {
+                engine.log("Refresh all: completion notification failed to send (\(error.localizedDescription)).")
+                // C11：通知是后台续签唯一的出口——发不出去又有失败，
+                // 把结果存下来，下次打开应用页时在列表上方显示。
+                if refreshed < jobs.count {
+                    setBackgroundRefreshResult(refreshSummary ?? L("Refreshed %d of %d apps.", refreshed, jobs.count))
+                }
+            }
             // Read the device again, so the days on screen are the new ones.
             if refreshed > 0 {
                 isRefreshing = false        // `load` won't run while a refresh holds the link
@@ -843,7 +901,13 @@ final class SideloadedAppsManager: ObservableObject {
         let request = UNNotificationRequest(
             identifier: "resign-shortcut-\(Int(Date().timeIntervalSince1970))",
             content: content, trigger: nil)
-        try? await UNUserNotificationCenter.current().add(request)
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+        } catch {
+            // C11：快捷指令失败通知本身也可能发不出去（没给通知权限
+            // 最常见）——记一行日志，别用 try? 静默吞掉。
+            engine.log("Refresh (shortcut): notification failed to send (\(error.localizedDescription)).")
+        }
     }
 
     /// A thrown error as the page should print it.
@@ -1233,6 +1297,16 @@ struct AppsView: View {
                     Text(L("Load failed. Showing the last loaded list."))
                         .font(.caption)
                         .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                // C11：上次后台续签没全续完、通知又没发出去时，留底在
+                // 这里显示——前台刚跑完的 summary 优先（refreshSummary
+                // 非空时不显示，避免新旧两条结果并列）。
+                if manager.refreshSummary == nil, !manager.isRefreshing,
+                   let background = manager.lastBackgroundRefreshResult {
+                    Text(L("Last refresh (its notification couldn't be delivered): %@", background))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 ForEach(Array(manager.entries.enumerated()), id: \.element.id) { idx, status in

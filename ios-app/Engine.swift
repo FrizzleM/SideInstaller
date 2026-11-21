@@ -4681,14 +4681,18 @@ enum SIDAutoRefresh {
             completion.finish(false)
         }
         Task {
-            if isEnabled {
-                // SIDE-2：隧道按需开——唤醒续签拿租约，跑完还掉；拿不到也照常
-                // 跑巡检（tick 自己会判隧道未通而跳过），不白白记一次成功。
-                let tunnelAcquired = await Engine.shared.acquireTunnel()
-                await AutoRefreshService.shared.runCheck()
-                if tunnelAcquired { await Engine.shared.releaseTunnel() }
+            guard isEnabled else {
+                completion.finish(true)
+                return
             }
-            completion.finish(true)
+            // SIDE-2：隧道按需开——唤醒续签拿租约，跑完还掉；拿不到也照常
+            // 跑巡检（tick 自己会判隧道未通而跳过）。
+            let tunnelAcquired = await Engine.shared.acquireTunnel()
+            // C11：只有巡检真跑了一轮才记成功——隧道不通、清单没读到、
+            // 正在跑别的安装时，finish(false)，让系统知道这轮没干活。
+            let ran = await AutoRefreshService.shared.runCheck()
+            if tunnelAcquired { await Engine.shared.releaseTunnel() }
+            completion.finish(ran)
         }
     }
 }

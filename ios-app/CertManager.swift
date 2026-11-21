@@ -144,6 +144,13 @@ final class CertManager: ObservableObject {
                 return
             } catch is CancellationError {
                 // Not currently cancellable; handled for consistency with Engine.
+                // C10：取消也跑 then——等回调的是用户已点过的动作
+                // （吊销 chooser），不跑界面就永远没反应；先把
+                // isWorking 复位，再跑 then，顺序与成功路一致。
+                engine.log("Certificates: load cancelled.")
+                isWorking = false
+                then?()
+                return
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Certificates: \(lastError ?? "failed")")
@@ -171,8 +178,17 @@ final class CertManager: ObservableObject {
                 try await onQueue { try self.performRevoke(serial: serial) }
                 revoked = true
                 engine.log("Certificates: revoked \(cert.displayName).")
-                let list = try await onQueue { try self.performList() }
-                certs = list
+                do {
+                    let list = try await onQueue { try self.performList() }
+                    certs = list
+                } catch {
+                    // C9：吊销成功了，只是列表没刷出来——先把这张从
+                    // 列表里拿掉，别让用户再点一次吊销；再告诉他
+                    // 列表可能还是旧的，重新加载会刷新。
+                    certs.removeAll { $0.id == cert.id }
+                    lastError = L("Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.")
+                    engine.log("⛔️ Certificates: revoked \(cert.displayName), but the list refresh failed: \(short(error))")
+                }
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Revoke failed: \(lastError ?? "")")

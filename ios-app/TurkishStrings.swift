@@ -431,6 +431,14 @@ let turkishStrings: [String: String] = [
         "Cihaz hâlâ okunuyor. Birazdan yeniden deneyin.",
     "Load failed. Showing the last loaded list.":
         "Liste yüklenemedi. Son yüklenen liste gösteriliyor.",
+    "Skipped: this app stopped being refreshable after the run started. Its IPA may have been deleted.":
+        "Atlandı: bu uygulama çalıştırma başladıktan sonra yenilenemez hale geldi. IPA'si silinmiş olabilir.",
+    "Skipped: this app has no team on its signing profile, so it can't be refreshed.":
+        "Atlandı: bu uygulamanın imza profilinde ekip yok, bu yüzden yenilenemez.",
+    "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "İptal edildi, ancak sertifika listesi yenilenemedi. Yeniden yükleyene kadar güncel olmayabilir.",
+    "Last refresh (its notification couldn't be delivered): %@":
+        "Son yenileme (bildirim iletilemedi): %@",
     "Getting ready": "Hazırlanıyor",
     "Stopping after this app": "Bu uygulamadan sonra duruluyor",
     "Refreshing %@": "%@ yenileniyor",

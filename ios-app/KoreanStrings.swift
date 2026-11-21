@@ -457,6 +457,14 @@ let koreanStrings: [String: String] = [
         "기기를 아직 읽는 중입니다. 잠시 후 다시 시도하세요.",
     "Load failed. Showing the last loaded list.":
         "목록을 불러오지 못했습니다. 마지막으로 불러온 목록을 표시합니다.",
+    "Skipped: this app stopped being refreshable after the run started. Its IPA may have been deleted.":
+        "건너뜀: 실행 시작 후 이 앱을 새로 고칠 수 없게 되었습니다. IPA가 삭제되었을 수 있습니다.",
+    "Skipped: this app has no team on its signing profile, so it can't be refreshed.":
+        "건너뜀: 이 앱의 서명 프로파일에 팀이 없어 새로 고칠 수 없습니다.",
+    "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "해지했지만 인증서 목록을 새로 고칠 수 없습니다. 다시 불러오기 전까지 오래된 내용일 수 있습니다.",
+    "Last refresh (its notification couldn't be delivered): %@":
+        "마지막 새로 고침(알림을 전달할 수 없음): %@",
     "Getting ready": "준비 중",
     "Stopping after this app": "이 앱까지 진행하고 중단하는 중",
     "Refreshing %@": "%@ 갱신 중",

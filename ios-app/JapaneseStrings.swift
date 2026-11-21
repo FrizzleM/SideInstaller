@@ -456,6 +456,14 @@ let japaneseStrings: [String: String] = [
         "デバイスを読み取り中です。しばらくしてからもう一度お試しください。",
     "Load failed. Showing the last loaded list.":
         "読み込みに失敗しました。前回読み込んだ一覧を表示しています。",
+    "Skipped: this app stopped being refreshable after the run started. Its IPA may have been deleted.":
+        "スキップ：実行開始後に更新できなくなりました。IPA が削除された可能性があります。",
+    "Skipped: this app has no team on its signing profile, so it can't be refreshed.":
+        "スキップ：この App の署名プロファイルにチームがなく、更新できません。",
+    "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "取り消しましたが、証明書一覧を更新できませんでした。再読み込みするまで古い内容の可能性があります。",
+    "Last refresh (its notification couldn't be delivered): %@":
+        "前回の更新（通知を配信できませんでした）：%@",
     "Getting ready": "準備中",
     "Stopping after this app": "このアプリの後で停止します",
     "Refreshing %@": "%@ を更新中",

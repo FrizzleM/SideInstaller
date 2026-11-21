@@ -469,6 +469,14 @@ let vietnameseStrings: [String: String] = [
         "Vẫn đang đọc thiết bị. Hãy thử lại sau giây lát.",
     "Load failed. Showing the last loaded list.":
         "Tải danh sách thất bại. Đang hiển thị danh sách đã tải lần trước.",
+    "Skipped: this app stopped being refreshable after the run started. Its IPA may have been deleted.":
+        "Đã bỏ qua: ứng dụng này không còn làm mới được sau khi bắt đầu. IPA có thể đã bị xóa.",
+    "Skipped: this app has no team on its signing profile, so it can't be refreshed.":
+        "Đã bỏ qua: hồ sơ ký của ứng dụng này không có nhóm nên không thể làm mới.",
+    "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "Đã thu hồi, nhưng không thể làm mới danh sách chứng chỉ. Danh sách có thể lỗi thời cho đến khi tải lại.",
+    "Last refresh (its notification couldn't be delivered): %@":
+        "Lần làm mới trước (không gửi được thông báo): %@",
     "Getting ready": "Đang chuẩn bị",
     "Stopping after this app": "Sẽ dừng sau ứng dụng này",
     "Refreshing %@": "Đang gia hạn %@",

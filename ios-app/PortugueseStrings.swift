@@ -470,6 +470,14 @@ let portugueseStrings: [String: String] = [
         "Ainda lendo o dispositivo. Tente novamente em instantes.",
     "Load failed. Showing the last loaded list.":
         "Falha ao carregar. Exibindo a última lista carregada.",
+    "Skipped: this app stopped being refreshable after the run started. Its IPA may have been deleted.":
+        "Ignorado: este app deixou de poder ser atualizado após o início. O IPA pode ter sido excluído.",
+    "Skipped: this app has no team on its signing profile, so it can't be refreshed.":
+        "Ignorado: o perfil de assinatura deste app não tem equipa, por isso não pode ser atualizado.",
+    "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "Revogado, mas a lista de certificados não pôde ser atualizada. Pode estar desatualizada até recarregar.",
+    "Last refresh (its notification couldn't be delivered): %@":
+        "Última atualização (a notificação não pôde ser entregue): %@",
     "Getting ready": "Preparando",
     "Stopping after this app": "Parando depois deste app",
     "Refreshing %@": "Renovando %@",

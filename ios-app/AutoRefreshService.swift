@@ -54,7 +54,7 @@ final class AutoRefreshService {
         loopTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                await self.tick()
+                _ = await self.tick()
                 try? await Task.sleep(nanoseconds: Self.checkInterval)
             }
         }
@@ -81,28 +81,37 @@ final class AutoRefreshService {
 
     /// 立刻单跑一轮巡检（BGAppRefreshTask 把进程唤醒时用：
     /// 那时没有常驻循环可借，直接调巡检本体）。
-    func runCheck() async {
+    /// 返回值见 `tick`：后台唤醒凭它决定 `finish(true/false)`（C11）。
+    func runCheck() async -> Bool {
         await tick()
     }
 
     // MARK: - 巡检
 
-    private func tick() async {
+    /// One patrol round. Returns whether the round reached a decision:
+    /// `true` when it checked the list and decided (nothing due, throttled,
+    /// a refresh started — and also "feature off" / "checked recently",
+    /// which are decisions, not failures); `false` only when a transient
+    /// blocker kept it from checking at all (tunnel down, list failed or
+    /// still loading, another refresh/install running). The background wake
+    /// uses this to decide `finish(true/false)` (C11).
+    private func tick() async -> Bool {
         let manager = SideloadedAppsManager.shared
         let engine = Engine.shared
-        guard isEnabled, !manager.isRefreshing, !engine.isRunning else { return }
+        guard isEnabled else { return true }
+        guard !manager.isRefreshing, !engine.isRunning else { return false }
 
         // 来源去重：上一轮巡检 10 分钟内跑过就静默跳过。BG 唤醒、
         // 30 分钟循环、回前台三路撞在一起时，只留一轮干活。
         let tickNow = Date().timeIntervalSince1970
         let lastTick = UserDefaults.standard.double(forKey: Self.lastTickKey)
-        guard tickNow - lastTick >= Self.minTickInterval else { return }
+        guard tickNow - lastTick >= Self.minTickInterval else { return true }
         UserDefaults.standard.set(tickNow, forKey: Self.lastTickKey)
 
         engine.refreshNetworkStatus()
         guard engine.vpnConnected else {
             await alertIfCritical(manager: manager)
-            return
+            return false
         }
 
         // 读一次设备清单（安静模式，失败就等下一轮）。
@@ -112,19 +121,19 @@ final class AutoRefreshService {
             if !manager.isWorking { break }
             try? await Task.sleep(nanoseconds: 500_000_000)
         }
-        guard !manager.isRefreshing else { return }
+        guard !manager.isRefreshing else { return false }
         if manager.isWorking {
             engine.log("Auto refresh: device list still loading after 20s, skipping this round.")
-            return
+            return false
         }
         // C5：本轮读设备失败时不用旧清单做决策——旧的到期天数可能已变，
         // 对已删 App 发起续签只会白跑一趟。成功加载会清掉失败标记，
         // 标记与调用前不同，就是本轮刚失败；旧标记原样不动不算。
         if let failed = manager.lastLoadFailed, failed != failedBefore {
             engine.log("Auto refresh: device list failed to load (\(manager.lastLoadError ?? "unknown")), skipping this round.")
-            return
+            return false
         }
-        guard manager.hasLoaded else { return }
+        guard manager.hasLoaded else { return false }
 
         // 到期通知排期：每轮巡检拿到新清单就重排一次（本地通知，
         // 不用服务器）；旧的先清掉，新的按到期日排。
@@ -139,12 +148,12 @@ final class AutoRefreshService {
             default: return false
             }
         }.map(\.bundleID))
-        guard !dueIDs.isEmpty else { return }
+        guard !dueIDs.isEmpty else { return true }
 
         // 最短间隔：上一轮自动续签在 6 小时内就不重复跑。
         let now = Date().timeIntervalSince1970
         let last = UserDefaults.standard.double(forKey: Self.lastRoundKey)
-        guard now - last >= Self.minRoundInterval else { return }
+        guard now - last >= Self.minRoundInterval else { return true }
 
         engine.log("Auto refresh: \(dueIDs.count) app(s) due within 3 days; refreshing.")
         manager.refreshAll(onlyBundleIDs: dueIDs)
@@ -153,6 +162,7 @@ final class AutoRefreshService {
         if manager.isRefreshing {
             UserDefaults.standard.set(now, forKey: Self.lastRoundKey)
         }
+        return true
     }
 
     /// 隧道没通时没法续签；若已加载的清单显示有 App 今天/明天就过期，
@@ -183,7 +193,13 @@ final class AutoRefreshService {
         let request = UNNotificationRequest(
             identifier: "resign-auto-\(Int(Date().timeIntervalSince1970))",
             content: content, trigger: nil)
-        try? await UNUserNotificationCenter.current().add(request)
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+        } catch {
+            // C11：到期提醒本身也可能发不出去——记一行日志，
+            // 别用 try? 静默吞掉。
+            Engine.shared.log("Auto refresh: notification failed to send (\(error.localizedDescription)).")
+        }
     }
 }
 
