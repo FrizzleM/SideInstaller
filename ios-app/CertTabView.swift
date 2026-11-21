@@ -228,8 +228,7 @@ struct CertTabView: View {
                 let changed = await Task.detached { SignedIPAStore.fillMissingCertInfo() }.value
                 if changed { signedRecords = SignedIPAStore.load() }
             }
-            unsignedIPAs = unsignedItems()
-            ensureUnsignedInfo()
+            refreshUnsignedIPAs()
             presets = CertSignPresetStore.load()
             logEntries = CertSignLogStore.load()
             if let shared = workspace.selectedIPA {
@@ -245,8 +244,7 @@ struct CertTabView: View {
         }
         .onChange(of: libraryTab) { _, tab in
             if tab == .unsigned {
-                unsignedIPAs = unsignedItems()
-                ensureUnsignedInfo()
+                refreshUnsignedIPAs()
             }
         }
         .onChange(of: engine.isRunning) { old, new in
@@ -1859,8 +1857,7 @@ struct CertTabView: View {
                             _ = try await CertSigner.signToFile(ipa: url, mods: copy)
                         }
                         signedRecords = SignedIPAStore.load()
-                        unsignedIPAs = unsignedItems()
-                        ensureUnsignedInfo()
+                        refreshUnsignedIPAs()
                         CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
                             appName: baseName, kind: .signOnly, success: true,
                             detail: L("已签出 %d 个副本，存到「已签名」。", multiCount)))
@@ -1871,8 +1868,7 @@ struct CertTabView: View {
                     } else {
                         let record = try await CertSigner.signToFile(ipa: url, mods: mods)
                         signedRecords = SignedIPAStore.load()
-                        unsignedIPAs = unsignedItems()
-                        ensureUnsignedInfo()
+                        refreshUnsignedIPAs()
                         CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
                             appName: record.appName, kind: .signOnly, success: true,
                             detail: L("已存到「已签名」")))
@@ -1906,8 +1902,7 @@ struct CertTabView: View {
                     // onChange 按 finished/lastError 记完成日志。
                     let record = try await CertSigner.signToFile(ipa: url, mods: mods)
                     signedRecords = SignedIPAStore.load()
-                    unsignedIPAs = unsignedItems()
-                    ensureUnsignedInfo()
+                    refreshUnsignedIPAs()
                     await MainActor.run {
                         self.localInstall.appendStepLog(L("签名成功：%@", record.appName))
                         self.engineInstallLogAppName = record.appName
@@ -2420,10 +2415,10 @@ struct CertTabView: View {
             }
             await MainActor.run {
                 self.signedRecords = SignedIPAStore.load()
-                self.unsignedIPAs = self.unsignedItems()
-                self.ensureUnsignedInfo()
+                self.refreshUnsignedIPAs {
+                    self.selectedUnsignedIDs = self.selectedUnsignedIDs.intersection(self.unsignedIPAs.map { $0.id })
+                }
                 self.logEntries = CertSignLogStore.load()
-                self.selectedUnsignedIDs = self.selectedUnsignedIDs.intersection(self.unsignedIPAs.map { $0.id })
                 self.batchBusy = false
                 if fail == 0 {
                     self.batchMessage = L("批量签完：%d 个已存到「已签名」。", ok)
@@ -2549,8 +2544,20 @@ struct CertTabView: View {
         return parts.joined(separator: " | ")
     }
 
-    private func unsignedItems() -> [LocalFileItem] {
-        AppFileLibrary.scan().filter { $0.isIPA && !$0.isInSignedDir }
+    /// 未签名列表重扫：递归扫盘放 Task.detached，扫完回主线程写
+    /// unsignedIPAs 再跑 ensureUnsignedInfo（它按新列表筛缓存、给
+    /// 新出现的 IPA 排队解析；先写列表再跑它，顺序与同步扫盘时一致）。
+    /// onRefreshed 在列表写完后、同一主线程块里跑：批量签完那处靠它
+    /// 按新列表裁掉已签走的选中项（同步扫盘时 intersection 读的就是新列表）。
+    private func refreshUnsignedIPAs(onRefreshed: (() -> Void)? = nil) {
+        Task.detached {
+            let items = AppFileLibrary.scan().filter { $0.isIPA && !$0.isInSignedDir }
+            await MainActor.run {
+                unsignedIPAs = items
+                ensureUnsignedInfo()
+                onRefreshed?()
+            }
+        }
     }
 
     /// 未签名栏的 IPA 信息只解析一次：切到未签名栏/进页/签完刷新时，
@@ -3048,10 +3055,10 @@ private struct LibraryIPAPicker: View {
     @State private var iconsTried: Set<String> = []
     @State private var infos: [String: IPALibrary.AppInfo] = [:]
     @State private var infosTried: Set<String> = []
-
-    private var ipas: [LocalFileItem] {
-        AppFileLibrary.scan().filter { $0.isIPA }
-    }
+    // 3.8.900（SIDE-4/S2）：文件列表只扫一次——原来 ipas 是计算属性，
+    // query 每敲一字 → body 重算 → 全量递归扫一遍 Documents。
+    // 改 @State + 下方 .task 扫一次；picker 关闭即丢弃，不跨页缓存。
+    @State private var ipas: [LocalFileItem] = []
 
     private var filtered: [LocalFileItem] {
         let q = query.trimmingCharacters(in: .whitespaces)
@@ -3095,6 +3102,14 @@ private struct LibraryIPAPicker: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(L("取消")) { dismiss() }
                 }
+            }
+            .task {
+                // 3.8.900（SIDE-4/S2）：进 picker 只扫一次；扫盘放
+                // Task.detached，扫完回主线程写 ipas（照抄 loadFileIcon 写法）。
+                let scanned = await Task.detached {
+                    AppFileLibrary.scan().filter { $0.isIPA }
+                }.value
+                await MainActor.run { ipas = scanned }
             }
         }
     }

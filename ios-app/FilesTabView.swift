@@ -628,7 +628,7 @@ struct FilesTabView: View {
             .background(AppBackground())
         }
         .onAppear {
-            files = AppFileLibrary.scan()
+            refreshFiles()
             renewalSources = RenewalSourceStore.load()
         }
         // 配对安装跑完：finished 置位才算成功（取消不算）。只认
@@ -766,7 +766,7 @@ struct FilesTabView: View {
                         importError = L("导入失败：%@", error.localizedDescription)
                     }
                 }
-                files = AppFileLibrary.scan()
+                refreshFiles()
             }
         }
     }
@@ -789,8 +789,7 @@ struct FilesTabView: View {
                     Label(L("新建文件夹"), systemImage: "folder.badge.plus")
                 }
                 Button {
-                    files = AppFileLibrary.scan()
-                    resetCurrentDirIfNeeded()
+                    refreshFiles(resetDir: true)
                 } label: {
                     Label(L("刷新"), systemImage: "arrow.clockwise")
                 }
@@ -1208,6 +1207,21 @@ struct FilesTabView: View {
         }
     }
 
+    /// 文件列表重扫：递归扫盘放 Task.detached，扫完回主线程写 files
+    /// （照抄 loadFileIcon 写法）；onAppear 与各操作后刷新都走这里，
+    /// 不在主线程同步扫盘。resetDir 为 true 时，写完列表后立即按新
+    /// 列表复核 currentDir——删/移/改名后原地复核用的就是新列表，
+    /// 语义与同步扫盘时一致（只换线程，不换顺序）。
+    private func refreshFiles(resetDir: Bool = false) {
+        Task.detached {
+            let items = AppFileLibrary.scan()
+            await MainActor.run {
+                files = items
+                if resetDir { resetCurrentDirIfNeeded() }
+            }
+        }
+    }
+
     /// 从磁盘删掉一项，返回磁盘上是不是真没了（已签名行同时清 Signed 清单记录，
     /// SignedIPAStore.remove 里本来就连文件一起删）。删不掉返回 false，
     /// 调用方写提示，别静默重扫了事。
@@ -1256,8 +1270,7 @@ struct FilesTabView: View {
             }
             resetCurrentDirIfNeeded()
         } else {
-            files = AppFileLibrary.scan()
-            resetCurrentDirIfNeeded()
+            refreshFiles(resetDir: true)
             opMessage = L("删除失败，文件仍在")
             opFailed = true
         }
@@ -1278,7 +1291,7 @@ struct FilesTabView: View {
         }
         do {
             try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: false)
-            files = AppFileLibrary.scan()
+            refreshFiles()
             opMessage = L("已创建文件夹 %@", name)
             opFailed = false
         } catch {
@@ -1353,8 +1366,7 @@ struct FilesTabView: View {
         }
         do {
             try FileManager.default.moveItem(at: item.url, to: dest)
-            files = AppFileLibrary.scan()
-            resetCurrentDirIfNeeded()
+            refreshFiles(resetDir: true)
             opMessage = L("已移动到 %@", destDir.isEmpty ? L("根目录") : destDir)
             opFailed = false
         } catch {
@@ -1371,7 +1383,7 @@ struct FilesTabView: View {
         let dest = uniqueSibling(of: item, stem: stem, ext: item.url.pathExtension)
         do {
             try FileManager.default.copyItem(at: item.url, to: dest)
-            files = AppFileLibrary.scan()
+            refreshFiles()
             opMessage = L("已复制为 %@", dest.lastPathComponent)
             opFailed = false
         } catch {
@@ -1389,8 +1401,7 @@ struct FilesTabView: View {
         }
         selection = []
         selecting = false
-        files = AppFileLibrary.scan()
-        resetCurrentDirIfNeeded()
+        refreshFiles(resetDir: true)
         if failed > 0 {
             opMessage = L("有 %d 个文件删除失败", failed)
             opFailed = true
@@ -1444,7 +1455,7 @@ struct FilesTabView: View {
                                            size: old.size, modified: old.modified,
                                            isDirectory: old.isDirectory, childCount: old.childCount)
             } else {
-                files = AppFileLibrary.scan()
+                refreshFiles(resetDir: true)
             }
             resetCurrentDirIfNeeded()
             opMessage = L("已改名")
@@ -1492,7 +1503,7 @@ struct FilesTabView: View {
                 FileZipTool.zip(paths: paths, to: out)
             }.value
             opBusy = false
-            files = AppFileLibrary.scan()
+            refreshFiles()
             if let error {
                 opMessage = error
                 opFailed = true
@@ -1513,7 +1524,7 @@ struct FilesTabView: View {
                 FileZipTool.unzip(archive: item.url, to: dest)
             }.value
             opBusy = false
-            files = AppFileLibrary.scan()
+            refreshFiles()
             if let error {
                 opMessage = error
                 opFailed = true

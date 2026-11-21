@@ -75,6 +75,9 @@ struct LoadedSource: Identifiable {
     var model: AltSource?
     var isLoading = false
     var errorMessage: String?
+    /// When `model` was last fetched (network or disk cache); nil if never.
+    /// Drives the 15-minute TTL in `fetch(_:force:)`.
+    var fetchedAt: Date?
 
     var id: String { url.absoluteString }
 
@@ -86,6 +89,13 @@ struct LoadedSource: Identifiable {
 
     /// The installable apps in the loaded document.
     var apps: [AltApp] { model?.validApps ?? [] }
+}
+
+/// One source document as kept on disk: the decoded model plus when it was
+/// fetched. Mirrors Engine's `ReleaseCatalog` (`fetched`) shape.
+private struct CachedSource: Codable {
+    let model: AltSource
+    let fetched: Date
 }
 
 // MARK: - Store
@@ -133,19 +143,68 @@ final class SourceStore: ObservableObject {
         persist()
     }
 
-    /// Fetch every source, in parallel.
-    func fetchAll() async {
+    /// Disk cache for source documents, in Engine's `releaseCatalogs.json`
+    /// shape: a missing or unreadable file just means "fetch fresh". Lets a
+    /// document survive an app restart, so reopening the sources page
+    /// within 15 minutes doesn't cost another download.
+    private static var sourceCacheURL: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        return base.appendingPathComponent("sourceDocuments.json")
+    }
+
+    private static func loadSourceCache() -> [String: CachedSource] {
+        guard let data = try? Data(contentsOf: sourceCacheURL),
+              let cached = try? JSONDecoder().decode([String: CachedSource].self, from: data)
+        else { return [:] }
+        return cached
+    }
+
+    private static func saveSourceCache(url: URL, model: AltSource, fetched: Date = Date()) {
+        var cached = loadSourceCache()
+        cached[url.absoluteString] = CachedSource(model: model, fetched: fetched)
+        if let data = try? JSONEncoder().encode(cached) {
+            try? data.write(to: sourceCacheURL, options: .atomic)
+        }
+    }
+
+    /// Fetch every source, in parallel. `force` (pull-to-refresh) skips the
+    /// 15-minute cache; entry and detail `.task` calls use the cache.
+    func fetchAll(force: Bool = false) async {
         await withTaskGroup(of: Void.self) { group in
             for source in sources {
-                group.addTask { await self.fetch(source.url) }
+                group.addTask { await self.fetch(source.url, force: force) }
             }
         }
     }
 
-    /// Fetch (or refetch) one source document. Decoding is tolerant: a body
-    /// that isn't a source document is reported as the row's error.
-    func fetch(_ url: URL) async {
+    /// Fetch (or refetch) one source document. Within 15 minutes of the last
+    /// successful fetch, a cached document (memory, then disk) is used
+    /// instead of the network, mirroring `loadReleaseCatalog`'s TTL; `force`
+    /// skips the cache. Decoding is tolerant: a body that isn't a source
+    /// document is reported as the row's error.
+    func fetch(_ url: URL, force: Bool = false) async {
         guard let index = sources.firstIndex(where: { $0.url == url }) else { return }
+        // Memory cache, same 15-minute rule as loadReleaseCatalog.
+        if !force, let fetchedAt = sources[index].fetchedAt,
+           sources[index].model != nil,
+           Date().timeIntervalSince(fetchedAt) < 15 * 60 {
+            // 3.8.900（SIDE-4/S4）：缓存命中也要清掉旧的 errorMessage——
+            // 上次下拉失败留下的错不能继续盖在有效的缓存模型上（列表
+            // 行有 model 时也优先显示 errorMessage；磁盘命中那路已清）。
+            sources[index].errorMessage = nil
+            return
+        }
+        // Disk cache, same 15-minute rule: a document saved by an earlier
+        // launch still counts, so reopening the sources page doesn't refetch.
+        // isLoading is left alone here — a fetch may already be in flight.
+        if !force, let cached = Self.loadSourceCache()[url.absoluteString],
+           Date().timeIntervalSince(cached.fetched) < 15 * 60 {
+            sources[index].model = cached.model
+            sources[index].fetchedAt = cached.fetched
+            sources[index].errorMessage = nil
+            return
+        }
         sources[index].isLoading = true
         sources[index].errorMessage = nil
         do {
@@ -159,7 +218,9 @@ final class SourceStore: ObservableObject {
             let model = try JSONDecoder().decode(AltSource.self, from: data)
             guard let index = sources.firstIndex(where: { $0.url == url }) else { return }
             sources[index].model = model
+            sources[index].fetchedAt = Date()
             sources[index].isLoading = false
+            Self.saveSourceCache(url: url, model: model)
         } catch {
             guard let index = sources.firstIndex(where: { $0.url == url }) else { return }
             sources[index].errorMessage = error.localizedDescription

@@ -54,7 +54,7 @@ struct SourcesView: View {
         .alert(L("That isn't a usable source link."), isPresented: $addFailed) {
             Button(L("OK"), role: .cancel) { }
         }
-        .refreshable { await store.fetchAll() }
+        .refreshable { await store.fetchAll(force: true) }
         .task { await store.fetchAll() }
     }
 
@@ -163,10 +163,8 @@ struct SourceAppsView: View {
             }
         }
         .navigationTitle(source?.displayName ?? L("App Sources"))
-        .refreshable { await store.fetch(sourceURL) }
-        .task {
-            if source?.model == nil { await store.fetch(sourceURL) }
-        }
+        .refreshable { await store.fetch(sourceURL, force: true) }
+        .task { await store.fetch(sourceURL) }
         .onDisappear {
             downloadTask?.cancel()
             downloader.cancel()
