@@ -106,12 +106,25 @@ final class AutoRefreshService {
         }
 
         // 读一次设备清单（安静模式，失败就等下一轮）。
+        let failedBefore = manager.lastLoadFailed
         manager.load(quiet: true)
         for _ in 0..<40 {
             if !manager.isWorking { break }
             try? await Task.sleep(nanoseconds: 500_000_000)
         }
-        guard manager.hasLoaded, !manager.isRefreshing else { return }
+        guard !manager.isRefreshing else { return }
+        if manager.isWorking {
+            engine.log("Auto refresh: device list still loading after 20s, skipping this round.")
+            return
+        }
+        // C5：本轮读设备失败时不用旧清单做决策——旧的到期天数可能已变，
+        // 对已删 App 发起续签只会白跑一趟。成功加载会清掉失败标记，
+        // 标记与调用前不同，就是本轮刚失败；旧标记原样不动不算。
+        if let failed = manager.lastLoadFailed, failed != failedBefore {
+            engine.log("Auto refresh: device list failed to load (\(manager.lastLoadError ?? "unknown")), skipping this round.")
+            return
+        }
+        guard manager.hasLoaded else { return }
 
         // 到期通知排期：每轮巡检拿到新清单就重排一次（本地通知，
         // 不用服务器）；旧的先清掉，新的按到期日排。

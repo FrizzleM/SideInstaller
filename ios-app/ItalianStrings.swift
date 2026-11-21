@@ -462,6 +462,12 @@ let italianStrings: [String: String] = [
         "Apple non rilascia un certificato di firma per questo Apple ID: segnala che ne esiste già uno (errore 7460). In Strumenti › Certificati usa il certificato di SideStore o revoca quello, poi rinnova di nuovo.",
     "An install is already running. Wait for it to finish, then refresh.":
         "C'è già un'installazione in corso. Aspetta che finisca, poi rinnova.",
+    "A refresh is already running. Wait for it to finish, then try again.":
+        "Un rinnovo è già in corso. Attendi che finisca, poi riprova.",
+    "Still reading the device. Try again in a moment.":
+        "Lettura del dispositivo ancora in corso. Riprova tra un momento.",
+    "Load failed. Showing the last loaded list.":
+        "Caricamento non riuscito. Viene mostrato l'ultimo elenco caricato.",
     "Getting ready": "Preparazione",
     "Stopping after this app": "In arresto dopo questa app",
     "Refreshing %@": "Rinnovo di %@",

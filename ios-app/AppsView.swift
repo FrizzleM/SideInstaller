@@ -372,6 +372,14 @@ final class SideloadedAppsManager: ObservableObject {
     @Published private(set) var isWorking = false
     @Published private(set) var hasLoaded = false
     @Published private(set) var lastRefreshed: Date?
+    /// The last device-list load failed: when set, `entries` / `refreshable`
+    /// are the previous successful load's, not fresh. Cleared by the next
+    /// successful load. Callers that waited on a load check this instead of
+    /// trusting `hasLoaded` alone (C5).
+    @Published private(set) var lastLoadFailed: Date?
+    /// What the last failed load reported, for the log. `lastError` stays
+    /// untouched in quiet mode so no popup appears (C5).
+    @Published private(set) var lastLoadError: String?
     @Published var lastError: String?
 
     /// The apps a refresh can act on: an installed app whose IPA is still in
@@ -444,9 +452,13 @@ final class SideloadedAppsManager: ObservableObject {
                 await rebuildRefreshable()
                 hasLoaded = true
                 lastRefreshed = Date()
+                lastLoadFailed = nil
+                lastLoadError = nil
                 engine.log("Sideloaded apps: \(apps.count) sideloaded, \(profiles.count) profile(s) decoded.")
             } catch {
                 let message = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                lastLoadFailed = Date()
+                lastLoadError = message
                 if quiet {
                     engine.log("Sideloaded apps: not ready yet (\(message))")
                 } else {
@@ -468,7 +480,30 @@ final class SideloadedAppsManager: ObservableObject {
         let candidates = onlyBundleIDs.map { ids in
             refreshable.filter { ids.contains($0.bundleID) }
         } ?? refreshable
-        guard !isRefreshing, !isWorking, !candidates.isEmpty else { return }
+        // C3：三个守卫别再静默 return——调用方要知道本轮为什么没跑。
+        // 只有自动巡检入口（onlyBundleIDs != nil）只写日志、不置
+        // lastError：它没有界面可弹，后台一轮也不该弹前台弹窗。
+        if isRefreshing {
+            if onlyBundleIDs == nil {
+                lastError = L("A refresh is already running. Wait for it to finish, then try again.")
+            }
+            engine.log("Refresh all: already refreshing.")
+            return
+        }
+        if isWorking {
+            if onlyBundleIDs == nil {
+                lastError = L("Still reading the device. Try again in a moment.")
+            }
+            engine.log("Refresh all: device inventory in progress.")
+            return
+        }
+        if candidates.isEmpty {
+            if onlyBundleIDs == nil {
+                lastError = L("没有需要续签的应用。")
+            }
+            engine.log("Refresh all: nothing to refresh.")
+            return
+        }
         guard !engine.isRunning else {
             lastError = L("An install is already running. Wait for it to finish, then refresh.")
             return
@@ -770,12 +805,24 @@ final class SideloadedAppsManager: ObservableObject {
     /// 先（必要时）加载设备上的可续签列表，再开续签。
     @MainActor
     private func loadThenRefreshAll() async {
-        if !hasLoaded {
-            load(quiet: true)
-            for _ in 0..<40 {
-                if hasLoaded || !isWorking { break }
-                try? await Task.sleep(nanoseconds: 500_000_000)
-            }
+        // C5：快捷指令每次都重读一次设备再续签——只在 hasLoaded 时跳过，
+        // 用的是上次的清单，设备上 App 变了（新装/已删/到期日变了）
+        // 续签集就是错的。等这一轮 load 跑完（最多 20 秒）再决定。
+        let failedBefore = lastLoadFailed
+        load(quiet: true)
+        for _ in 0..<40 {
+            if !isWorking { break }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        if isWorking {
+            await postResignNotification(title: L("续签失败"), body: L("读取设备失败，请打开 SideInstaller 查看。"))
+            return
+        }
+        // 成功加载会清掉失败标记；标记与调用前不同，就是本轮刚失败。
+        // 旧标记原样不动时不算失败——那是更早一轮留下的。
+        if let failed = lastLoadFailed, failed != failedBefore {
+            await postResignNotification(title: L("续签失败"), body: L("读取设备失败，请打开 SideInstaller 查看。"))
+            return
         }
         guard hasLoaded else {
             await postResignNotification(title: L("续签失败"), body: L("读取设备失败，请打开 SideInstaller 查看。"))
@@ -833,6 +880,15 @@ final class SideloadedAppsManager: ObservableObject {
         teamExcluded = excluded
         unrefreshable = max(0, entries.count - paired.count)
         engine.log("Sideloaded apps: \(kept.count) of \(entries.count) can be refreshed from an IPA on disk.\(excluded > 0 ? " \(excluded) left out (signed by another team)." : "")")
+    }
+
+    /// Recompute only which listed apps still have an IPA on disk, after a
+    /// file was deleted from the Files/Downloads page. No device read and
+    /// `entries` untouched — just re-pairs the current entries against the
+    /// IPA library on disk, so the "N apps can be signed again" count and
+    /// the refresh set stop including the deleted IPA (C8).
+    func refreshRefreshableOnly() {
+        Task { await rebuildRefreshable() }
     }
 
     /// A page entry cut down to what the matching needs, so that work can be
@@ -1170,6 +1226,15 @@ struct AppsView: View {
                     }
                 }
                 .cascadeItem(4)
+                // C5：上次读设备失败时，列表是上一次成功加载的旧清单——
+                // 到期天数可能已经变了，标出来，别让用户当成新的看。
+                // 成功加载会清掉 lastLoadFailed，小字随之消失。
+                if manager.lastLoadFailed != nil {
+                    Text(L("Load failed. Showing the last loaded list."))
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 ForEach(Array(manager.entries.enumerated()), id: \.element.id) { idx, status in
                     NavigationLink {
                         AppProfileDetail(status: status)

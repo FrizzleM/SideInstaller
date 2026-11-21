@@ -87,6 +87,10 @@ final class DownloadsManager: ObservableObject {
             // Update the Install tab's custom IPA button.
             if item.source == .custom { engine.refreshCustomIPA() }
             engine.log("Downloads: deleted \(item.fileName) (\(item.sizeText)).")
+            // C8：删掉的 IPA 可能是某 App 的续签源——应用页的“可续签”
+            // 数字只在 load/续签时重算，不联动这里就会一直显示旧数。
+            // 只重算配对，不重读设备。
+            SideloadedAppsManager.shared.refreshRefreshableOnly()
         } catch {
             lastError = L("Couldn't delete %@: %@", item.fileName, error.localizedDescription)
             engine.log("⛔️ Downloads: \(lastError ?? "delete failed")")

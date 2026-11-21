@@ -449,6 +449,12 @@ let chineseStrings: [String: String] = [
         "Apple 不会为此 Apple ID 签发签名证书：它报告已经存在一个（错误 7460）。请在“工具 › 证书”中使用 SideStore 的证书或吊销该证书，然后重新续签。",
     "An install is already running. Wait for it to finish, then refresh.":
         "已有安装正在进行。请等它完成后再续签。",
+    "A refresh is already running. Wait for it to finish, then try again.":
+        "续签正在进行，等它跑完再试。",
+    "Still reading the device. Try again in a moment.":
+        "正在读取设备，稍后再试。",
+    "Load failed. Showing the last loaded list.":
+        "加载失败，显示的是上次的结果。",
     "Getting ready": "正在准备",
     "Stopping after this app": "将在这个应用之后停止",
     "Refreshing %@": "正在续签 %@",

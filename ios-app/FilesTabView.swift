@@ -1269,6 +1269,10 @@ struct FilesTabView: View {
                 $0.url.path == item.url.path || $0.url.path.hasPrefix(item.url.path + "/")
             }
             resetCurrentDirIfNeeded()
+            // C8：删掉的 IPA 可能是某 App 的续签源，应用页的可续签数
+            // 只在 load/续签时重算——这里只重算配对，不重读设备。
+            // 文件页本身不隔离在 @MainActor 上，包进 Task 回主线程调。
+            Task { @MainActor in SideloadedAppsManager.shared.refreshRefreshableOnly() }
         } else {
             refreshFiles(resetDir: true)
             opMessage = L("删除失败，文件仍在")
@@ -1402,6 +1406,8 @@ struct FilesTabView: View {
         selection = []
         selecting = false
         refreshFiles(resetDir: true)
+        // C8：批量删完只重算一次配对（同上；每项各算一次是白扫盘）。
+        Task { @MainActor in SideloadedAppsManager.shared.refreshRefreshableOnly() }
         if failed > 0 {
             opMessage = L("有 %d 个文件删除失败", failed)
             opFailed = true

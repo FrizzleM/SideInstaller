@@ -451,6 +451,12 @@ let koreanStrings: [String: String] = [
         "Apple이 이 Apple ID에 서명 인증서를 발급하지 않습니다. 이미 인증서가 있다고 응답했습니다(오류 7460). 도구 › 인증서에서 SideStore의 인증서를 사용하거나 기존 인증서를 폐기한 뒤 다시 갱신하세요.",
     "An install is already running. Wait for it to finish, then refresh.":
         "이미 설치가 진행 중입니다. 끝날 때까지 기다린 뒤 다시 갱신하세요.",
+    "A refresh is already running. Wait for it to finish, then try again.":
+        "갱신이 이미 진행 중입니다. 완료될 때까지 기다렸다가 다시 시도하세요.",
+    "Still reading the device. Try again in a moment.":
+        "기기를 아직 읽는 중입니다. 잠시 후 다시 시도하세요.",
+    "Load failed. Showing the last loaded list.":
+        "목록을 불러오지 못했습니다. 마지막으로 불러온 목록을 표시합니다.",
     "Getting ready": "준비 중",
     "Stopping after this app": "이 앱까지 진행하고 중단하는 중",
     "Refreshing %@": "%@ 갱신 중",

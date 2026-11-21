@@ -425,6 +425,12 @@ let turkishStrings: [String: String] = [
         "Apple bu Apple kimliği için imzalama sertifikası vermiyor: zaten bir tane olduğunu bildiriyor (hata 7460). Araçlar › Sertifikalar altında SideStore'un sertifikasını kullan veya onu iptal et, sonra yeniden yenile.",
     "An install is already running. Wait for it to finish, then refresh.":
         "Bir yükleme zaten sürüyor. Bitmesini bekle, sonra yenile.",
+    "A refresh is already running. Wait for it to finish, then try again.":
+        "Bir yenileme zaten çalışıyor. Bitmesini bekleyip yeniden deneyin.",
+    "Still reading the device. Try again in a moment.":
+        "Cihaz hâlâ okunuyor. Birazdan yeniden deneyin.",
+    "Load failed. Showing the last loaded list.":
+        "Liste yüklenemedi. Son yüklenen liste gösteriliyor.",
     "Getting ready": "Hazırlanıyor",
     "Stopping after this app": "Bu uygulamadan sonra duruluyor",
     "Refreshing %@": "%@ yenileniyor",

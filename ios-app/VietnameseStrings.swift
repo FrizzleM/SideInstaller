@@ -463,6 +463,12 @@ let vietnameseStrings: [String: String] = [
         "Apple không cấp chứng chỉ ký cho Apple ID này: nó báo rằng đã có một chứng chỉ (lỗi 7460). Trong Công cụ › Chứng chỉ, hãy dùng chứng chỉ của SideStore hoặc thu hồi chứng chỉ đó, rồi gia hạn lại.",
     "An install is already running. Wait for it to finish, then refresh.":
         "Đang có một lượt cài đặt chạy. Hãy đợi xong rồi gia hạn.",
+    "A refresh is already running. Wait for it to finish, then try again.":
+        "Đã có một lần gia hạn đang chạy. Hãy đợi nó hoàn tất rồi thử lại.",
+    "Still reading the device. Try again in a moment.":
+        "Vẫn đang đọc thiết bị. Hãy thử lại sau giây lát.",
+    "Load failed. Showing the last loaded list.":
+        "Tải danh sách thất bại. Đang hiển thị danh sách đã tải lần trước.",
     "Getting ready": "Đang chuẩn bị",
     "Stopping after this app": "Sẽ dừng sau ứng dụng này",
     "Refreshing %@": "Đang gia hạn %@",

@@ -450,6 +450,12 @@ let japaneseStrings: [String: String] = [
         "Apple はこの Apple ID に署名証明書を発行しません。すでに存在すると報告されています（エラー 7460）。「ツール › 証明書」で SideStore の証明書を使うか、その証明書を失効させてから、もう一度更新してください。",
     "An install is already running. Wait for it to finish, then refresh.":
         "インストールがすでに実行中です。終わるまで待ってから更新してください。",
+    "A refresh is already running. Wait for it to finish, then try again.":
+        "更新がすでに実行中です。完了するまで待ってから、もう一度お試しください。",
+    "Still reading the device. Try again in a moment.":
+        "デバイスを読み取り中です。しばらくしてからもう一度お試しください。",
+    "Load failed. Showing the last loaded list.":
+        "読み込みに失敗しました。前回読み込んだ一覧を表示しています。",
     "Getting ready": "準備中",
     "Stopping after this app": "このアプリの後で停止します",
     "Refreshing %@": "%@ を更新中",
