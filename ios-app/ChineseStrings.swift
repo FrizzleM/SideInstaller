@@ -1278,4 +1278,73 @@ let chineseStrings: [String: String] = [
     "Pick the team again?": "重新选择团队？",
     "Pick Again": "重新选择",
     "The next sign-in with “%@” asks which developer team signs.": "下次用“%@”登录时，会询问用哪个开发团队签名。",
+
+    // MARK: - Sources
+
+    "Suggested":
+        "推荐",
+
+    "Paste the link of a SideStore or AltStore source, or of a .json source file. Its apps, their updates and release notes show here.":
+        "粘贴 SideStore 或 AltStore 源的链接，或 .json 源文件的链接。它的应用、更新和发布说明会显示在这里。",
+
+    "Sources":
+        "源",
+    "Add a source":
+        "添加源",
+    "Add":
+        "添加",
+    "Apps":
+        "应用",
+    "Updates":
+        "更新",
+    "Update":
+        "更新",
+    "Your sources":
+        "你的源",
+    "Check for updates":
+        "检查更新",
+    "Copy link":
+        "拷贝链接",
+    "Source options":
+        "源选项",
+    "Loading…":
+        "正在载入…",
+    "What's new":
+        "新功能",
+    "Version history":
+        "版本历史",
+    "This version has no release notes.":
+        "此版本没有发布说明。",
+    "%d update":
+        "%d 个更新",
+    "%d updates":
+        "%d 个更新",
+    "%d source":
+        "%d 个源",
+    "%d sources":
+        "%d 个源",
+    "Update to %@":
+        "更新到 %@",
+    "Install %@ %@?":
+        "安装 %@ %@？",
+    "Version %@ · from %@":
+        "版本 %@ · 来自 %@",
+    "%@ installed · %@ available":
+        "已安装 %@ · 可用 %@",
+    "%@ installed · up to date":
+        "已安装 %@ · 已是最新",
+    "That source is already added.":
+        "该源已添加。",
+    "The source answered with HTTP %d.":
+        "源返回了 HTTP %d。",
+    "Couldn't reach the source: %@":
+        "无法访问该源：%@",
+    "That isn't a source link. Paste the whole https:// address of the source.":
+        "这不是源链接。请粘贴源的完整 https:// 地址。",
+    "That link didn't return a source. It has to be the source's JSON file itself.":
+        "该链接未返回源。它必须是源的 JSON 文件本身。",
+    "Downloads the IPA from the source, then signs it with your Apple ID and installs it, as a custom .ipa would be.":
+        "从源下载 IPA，然后用你的 Apple 账户签名并安装，与自定义 .ipa 相同。",
+    "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
+        "此版本比最新版本旧。它会覆盖安装在此 iPhone 上的副本，可能无法打开较新版本保存的数据。",
 ]

@@ -59,7 +59,7 @@ final class UpdateChecker: ObservableObject {
 
     /// Compare dotted versions numerically, so "0.10.0" > "0.9.0". Anything
     /// after a "-" (e.g. "-beta.1") is ignored.
-    static func isNewer(_ lhs: String, than rhs: String) -> Bool {
+    nonisolated static func isNewer(_ lhs: String, than rhs: String) -> Bool {
         func parts(_ v: String) -> [Int] {
             let core = v.split(separator: "-", maxSplits: 1).first ?? ""
             return core.split(separator: ".").map { Int($0) ?? 0 }

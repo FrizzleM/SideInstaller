@@ -1326,4 +1326,73 @@ let spanishStrings: [String: String] = [
     "Pick Again": "Elegir de nuevo",
     "The next sign-in with “%@” asks which developer team signs.":
         "El próximo inicio de sesión con “%@” preguntará qué equipo de desarrollo firma.",
+
+    // MARK: - Sources
+
+    "Suggested":
+        "Sugeridas",
+
+    "Paste the link of a SideStore or AltStore source, or of a .json source file. Its apps, their updates and release notes show here.":
+        "Pega el enlace de una fuente de SideStore o AltStore, o de un archivo de fuente .json. Sus apps, actualizaciones y notas aparecerán aquí.",
+
+    "Sources":
+        "Fuentes",
+    "Add a source":
+        "Añadir una fuente",
+    "Add":
+        "Añadir",
+    "Apps":
+        "Apps",
+    "Updates":
+        "Actualizaciones",
+    "Update":
+        "Actualizar",
+    "Your sources":
+        "Tus fuentes",
+    "Check for updates":
+        "Buscar actualizaciones",
+    "Copy link":
+        "Copiar enlace",
+    "Source options":
+        "Opciones de la fuente",
+    "Loading…":
+        "Cargando…",
+    "What's new":
+        "Novedades",
+    "Version history":
+        "Historial de versiones",
+    "This version has no release notes.":
+        "Esta versión no tiene notas.",
+    "%d update":
+        "%d actualización",
+    "%d updates":
+        "%d actualizaciones",
+    "%d source":
+        "%d fuente",
+    "%d sources":
+        "%d fuentes",
+    "Update to %@":
+        "Actualizar a %@",
+    "Install %@ %@?":
+        "¿Instalar %@ %@?",
+    "Version %@ · from %@":
+        "Versión %@ · de %@",
+    "%@ installed · %@ available":
+        "%@ instalada · %@ disponible",
+    "%@ installed · up to date":
+        "%@ instalada · al día",
+    "That source is already added.":
+        "Esa fuente ya está añadida.",
+    "The source answered with HTTP %d.":
+        "La fuente respondió con HTTP %d.",
+    "Couldn't reach the source: %@":
+        "No se pudo acceder a la fuente: %@",
+    "That isn't a source link. Paste the whole https:// address of the source.":
+        "Eso no es un enlace de fuente. Pega la dirección https:// completa de la fuente.",
+    "That link didn't return a source. It has to be the source's JSON file itself.":
+        "Ese enlace no devolvió una fuente. Tiene que ser el archivo JSON de la fuente.",
+    "Downloads the IPA from the source, then signs it with your Apple ID and installs it, as a custom .ipa would be.":
+        "Descarga el IPA de la fuente y luego lo firma con tu Apple ID y lo instala, como un .ipa personalizado.",
+    "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
+        "Esta versión es más antigua que la más reciente. Se instala sobre la copia de este iPhone, que quizá no abra datos guardados por una versión más nueva.",
 ]
