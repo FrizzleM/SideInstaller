@@ -407,7 +407,9 @@ final class SideloadedAppsManager: ObservableObject {
     /// Cleared by the next fully successful refresh. The stored text is the
     /// run's refreshSummary, already localized when it was saved.
     @Published private(set) var lastBackgroundRefreshResult: String? =
-        UserDefaults.standard.string(forKey: Self.backgroundRefreshResultKey)
+        // 键与 backgroundRefreshResultKey 相同：属性初始化器里不能
+        // 用 Self.xxx（协变 Self），写字面量。
+        UserDefaults.standard.string(forKey: "SIDLastBackgroundRefreshResult")
 
     /// Writes (or clears) `lastBackgroundRefreshResult`, keeping UserDefaults
     /// in step so the note survives an app restart (C11).
