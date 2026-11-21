@@ -2,7 +2,7 @@
 
 All notable changes to SideInstaller are documented here.
 
-## Unreleased
+## 2.1.1
 
 ### Changed
 - **lillq is the first anisette server.** anisette.lillq.me, a pool of anisette servers that checks
