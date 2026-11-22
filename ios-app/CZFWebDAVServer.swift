@@ -211,7 +211,7 @@ final class CZFWebDAVServer: ObservableObject {
         let tmpURL = URL(fileURLWithPath: tmpPath)
         do {
             if existed {
-                _ = try FileManager.default.replaceItem(at: url, withItemAt: tmpURL)
+                _ = try FileManager.default.replaceItem(at: url, withItemAt: tmpURL, backupItemName: nil, resultingItemURL: nil)
             } else {
                 try FileManager.default.moveItem(at: tmpURL, to: url)
             }
