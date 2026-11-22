@@ -172,11 +172,15 @@ struct ReportProblemView: View {
     @MainActor
     private func lookForCrashes() async {
         guard !lookingForCrashes else { return }
+        // C-5（防御）：将来内层加取消检查时，取消的 lookup 不渲染错误。
+        guard !Task.isCancelled else { return }
         lookingForCrashes = true
         crashLookError = nil
         defer { lookingForCrashes = false }
         do {
             deviceCrashes = try await engine.deviceCrashLogs()
+        } catch is CancellationError {
+            return
         } catch {
             crashLookError = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
         }

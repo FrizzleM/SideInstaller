@@ -518,6 +518,10 @@ final class Engine {
     // Apple ID sign-in and signing (isideload), serialized on signQueue.
     private let signQueue = DispatchQueue(label: "sideinstaller.sign")
     @ObservationIgnored private var signSession: OpaquePointer?          // SignSession*
+    /// Sign-in generation stamp (A21-1, mirrors CertManager.signInGeneration):
+    /// bumped on every account switch, so a sign-in that waited through a
+    /// switch is discarded instead of signing back into the old account.
+    private var signInGeneration = 0
     /// Team ID of the signed-in account, parsed from the sign-in summary. Only
     /// apps signed by this team can be refreshed in place.
     private(set) var signingTeamID: String?
@@ -1206,6 +1210,8 @@ final class Engine {
     /// fresh Apple authentication (2FA stays possible as a safety valve).
     @MainActor
     func dropSignSession() async {
+        // A21-1：切账号时世代递增——等位中的登录靠它作废（同 forgetAppleSession）。
+        signInGeneration += 1
         try? await onSignQueue {
             if let session = self.signSession { si_sign_session_free(session) }
             self.signSession = nil
@@ -1230,6 +1236,9 @@ final class Engine {
     /// account. Called when credentials change. Runs on `signQueue`, which owns
     /// `signSession`.
     func forgetAppleSession() {
+        // A21-1：世代递增放同步处——等位中的登录靠它作废；调用方是主线程的
+        // onChange（RootView），与 dropSignSession 同款。
+        signInGeneration += 1
         // C19：抓调用时那一个指针——释放块排在登录块后面时，块内重读
         // 当前 session 会把切账号后才登好的新 session 也释放掉（登录块
         // 换 session 时已把旧的释放了，见 performSignIn）。
@@ -1309,8 +1318,14 @@ final class Engine {
         if updatingChecklist { setStep(.signIn, .active) }
 
         let id = normalizedAppleID, pw = applePassword, dir = storageDir
+        // A21-1：世代在等位前抓（同 CertManager.signIn 的 A2）。
+        let generation = signInGeneration
         let ticket = try await appleSignIns.waitForTurn(purpose, appleID: id, run: run)
         defer { appleSignIns.finished(ticket) }
+        // A21-1：等位期间切账号，作废本次尝试——不在旧会话上继续。
+        // 放 signSession 检查之前：切账号后旧会话可能还没被释放块清掉，
+        // 先看世代，不看会话在不在。
+        guard generation == signInGeneration else { throw CancellationError() }
         // A sign-in that went first may have signed this session in.
         if signSession != nil {
             log("Already signed in this session — skipping.")
@@ -1327,6 +1342,8 @@ final class Engine {
 
         for (idx, ani) in servers.enumerated() {
             try Task.checkCancellation()
+            // A21-1（A3 同款）：循环头查世代——切账号后不再拿旧 id/pw 试下一台服务器。
+            guard generation == signInGeneration else { throw CancellationError() }
             let name = anisetteName(for: ani)
             if appleRefusals.rulesOut(ani) {
                 log("Skipping anisette \(name): Apple has refused the device sign-in reports through it.")
@@ -1342,12 +1359,27 @@ final class Engine {
                 let summary = try await onSignQueue {
                     try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, ticket: ticket)
                 }
+                // A21-1：切账号后完成的旧登录作废——刚登好的会话放掉、清掉
+                // performSignIn 已写回的旧团队，再报取消。
+                guard generation == signInGeneration else {
+                    if let stale = self.signSession {
+                        self.signSession = nil
+                        signQueue.async { si_sign_session_free(stale) }
+                    }
+                    signingTeamID = nil
+                    UserDefaults.standard.removeObject(forKey: Self.savedTeamKey)
+                    signInStatus = "signed out"
+                    log("Apple ID changed — signed out of the previous account.")
+                    throw CancellationError()
+                }
                 // Stick with the server that worked.
                 anisetteURL = ani
                 signInStatus = "signed in (\(summary))"
                 if updatingChecklist { setStep(.signIn, .done) }
                 return
             } catch let error as EngineError {
+                // A21-1（A3 同款）：旧登录在 2FA 取消等失败时也不写新账号的 lastError。
+                if generation != signInGeneration { throw CancellationError() }
                 lastError = error.errorDescription ?? "sign-in failed"
 
                 // A cancelled 2FA prompt isn't the server's fault.
@@ -2121,6 +2153,8 @@ final class Engine {
             signedDisplayName = signedAppName()
             setStep(.sign, .done)
         } catch {
+            // A21-2：签名失败也留 `_extracted`——清掉再往上抛。
+            Self.discardExtraction(forIPA: ipa)
             // User-fixable failures get an explanatory card. A certificate that
             // already exists offers revoke-and-retry, never revoked automatically.
             if case EngineError.certExists = error {
@@ -2295,7 +2329,14 @@ final class Engine {
     private func signAppWithCert(mods: CertSignMods = CertSignMods()) async throws {
         guard let ipa = downloadedIPAPath else { throw EngineError.message(L("No IPA imported.")) }
         setStep(.sign, .active)
-        let path = try await onSignQueue { try self.performCertSign(ipa: ipa, mods: mods) }
+        let path: String
+        do {
+            path = try await onSignQueue { try self.performCertSign(ipa: ipa, mods: mods) }
+        } catch {
+            // A21-2：企业签名失败也留 `_extracted`——清掉再往上抛。
+            Self.discardExtraction(forIPA: ipa)
+            throw error
+        }
         signedAppPath = path
         signedDisplayName = signedAppName()
         setStep(.sign, .done)
@@ -2395,7 +2436,14 @@ final class Engine {
                 downloadedIPAPath = ipaURL.path
                 downloadedSource = .custom
                 setStep(.sign, .active)
-                let bundle = try await onSignQueue { try self.performExtract(ipa: ipaURL.path) }
+                let bundle: String
+                do {
+                    bundle = try await onSignQueue { try self.performExtract(ipa: ipaURL.path) }
+                } catch {
+                    // A21-2：解包失败也留 `_extracted`——清掉再往上抛。
+                    Self.discardExtraction(forIPA: ipaURL.path)
+                    throw error
+                }
                 signedAppPath = bundle
                 signedDisplayName = signedAppName()
                 setStep(.sign, .done)
@@ -3881,6 +3929,11 @@ final class Engine {
         let device = deviceName ?? ""
         log("=== Refreshing \(name) from \((ipaPath as NSString).lastPathComponent) ===")
         let path = pairingFilePath ?? PairingController.pairingFilePath()
+        // A21-2：defer 登记在 performSign 之前——签名失败时 defer 已登记、
+        // signedPath 仍是 nil 不删；成功时才删。失败的解包目录另由 catch
+        // 里的 discardExtraction(forIPA:) 清（此时还没有 bundle 路径）。
+        var signedPath: String?
+        defer { if let signedPath { Self.discardSignedBundle(at: signedPath) } }
         let signed: String
         do {
             signed = try await onSignQueue {
@@ -3888,12 +3941,16 @@ final class Engine {
                                      pairingFilePath: path,
                                      forMadeira: Self.isMadeira(ipaPath: ipaPath))
             }
-        } catch EngineError.certExists {
+            signedPath = signed
+        } catch {
+            Self.discardExtraction(forIPA: ipaPath)
             // Don't set `certConflict`: its retry button starts a full install
             // from the Install tab. Point to the Certificates page instead.
-            throw EngineError.message(L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again."))
+            if case EngineError.certExists = error {
+                throw EngineError.message(L("Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again."))
+            }
+            throw error
         }
-        defer { Self.discardSignedBundle(at: signed) }
         installProgress = 0
         let ip = deviceHost
         try await onDeviceQueue {
@@ -3919,6 +3976,20 @@ final class Engine {
         let extraction = URL(fileURLWithPath: path).standardizedFileURL
             .deletingLastPathComponent()        // Payload
             .deletingLastPathComponent()        // <ipa file name>_extracted
+        guard extraction.deletingLastPathComponent().path == temp.path,
+              extraction.lastPathComponent.hasSuffix("_extracted") else { return }
+        try? FileManager.default.removeItem(at: extraction)
+    }
+
+    /// Deletes the `_extracted` directory a signing attempt would have left
+    /// for `ipaPath`, even when signing failed before returning a bundle
+    /// path. Same naming as Rust `Application::new`: tmp/<ipa file name>_extracted.
+    /// No-op when nothing was extracted (or the path escapes tmp).
+    static func discardExtraction(forIPA ipaPath: String) {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).standardizedFileURL
+        let name = URL(fileURLWithPath: ipaPath).lastPathComponent
+        guard !name.isEmpty else { return }
+        let extraction = temp.appendingPathComponent(name + "_extracted").standardizedFileURL
         guard extraction.deletingLastPathComponent().path == temp.path,
               extraction.lastPathComponent.hasSuffix("_extracted") else { return }
         try? FileManager.default.removeItem(at: extraction)

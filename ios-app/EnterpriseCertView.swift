@@ -288,7 +288,7 @@ struct EnterpriseCertView: View {
                                     if let expiration = EnterpriseCertStore.provisionInfo(for: profile)?.expiration {
                                         Text(expiration.formatted(date: .abbreviated, time: .omitted) + remainingText(expiration))
                                             .font(.caption)
-                                            .foregroundStyle(expirySoon(expiration) ? Color.red : Color.secondary)
+                                            .foregroundStyle(expirySoon(expiration) ? Theme.negative : Color.secondary)
                                     }
                                     Spacer()
                                 }
@@ -368,7 +368,7 @@ struct EnterpriseCertView: View {
                                     .foregroundStyle(.secondary)
                                 Spacer()
                                 Text(expiration.formatted(date: .abbreviated, time: .omitted) + remainingText(expiration))
-                                    .foregroundStyle(expirySoon(expiration) ? .red : .primary)
+                                    .foregroundStyle(expirySoon(expiration) ? Theme.negative : .primary)
                             }
                             .font(.footnote)
                         }
@@ -934,7 +934,7 @@ struct EnterpriseCertView: View {
                             if let expiration = certInfo?.expiration ?? provisionInfo?.expiration {
                                 Text(expiration.formatted(date: .abbreviated, time: .omitted) + remainingText(expiration))
                                     .font(.footnote)
-                                    .foregroundStyle(expirySoon(expiration) ? .red : .secondary)
+                                    .foregroundStyle(expirySoon(expiration) ? Theme.negative : .secondary)
                             }
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
@@ -1093,7 +1093,7 @@ struct EnterpriseCertView: View {
                 } else if let signOnlyMessage {
                     Text(signOnlyMessage)
                         .font(.footnote)
-                        .foregroundStyle(signOnlyFailed ? .red : .green)
+                        .foregroundStyle(signOnlyFailed ? Theme.negative : Theme.positive)
                 }
                 // 多开与立即安装静默冲突提示：多开只对“仅签名”生效，
                 // 开着“签名后立即安装”时红按钮只签装 1 个——这句以前

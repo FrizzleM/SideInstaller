@@ -47,7 +47,7 @@ final class CZFWebDAVServer: ObservableObject {
         server.addDefaultHandler(forMethod: "GET", request: GCDWebServerRequest.self) { [weak self] request in
             self?.handleGet(request, root: root)
         }
-        server.addDefaultHandler(forMethod: "PUT", request: GCDWebServerDataRequest.self) { [weak self] request in
+        server.addDefaultHandler(forMethod: "PUT", request: GCDWebServerFileRequest.self) { [weak self] request in
             self?.handlePut(request, root: root)
         }
         server.addDefaultHandler(forMethod: "DELETE", request: GCDWebServerRequest.self) { [weak self] request in
@@ -202,9 +202,19 @@ final class CZFWebDAVServer: ObservableObject {
             return GCDWebServerResponse(statusCode: 409)
         }
         let existed = FileManager.default.fileExists(atPath: url.path)
-        let data = (request as? GCDWebServerDataRequest)?.data as Data? ?? Data()
+        // C21-1：PUT 走流式 FileRequest，body 落临时文件不进内存；
+        // 临时文件在 request 释放时自动删，移走后 unlink 空操作。
+        // 覆盖用 replaceItemAt（失败保旧文件），新建用 moveItem。
+        guard let tmpPath = (request as? GCDWebServerFileRequest)?.temporaryPath else {
+            return GCDWebServerResponse(statusCode: 500)
+        }
+        let tmpURL = URL(fileURLWithPath: tmpPath)
         do {
-            try data.write(to: url, options: .atomic)
+            if existed {
+                _ = try FileManager.default.replaceItem(at: url, withItemAt: tmpURL)
+            } else {
+                try FileManager.default.moveItem(at: tmpURL, to: url)
+            }
         } catch {
             return GCDWebServerResponse(statusCode: 500)
         }

@@ -1501,8 +1501,15 @@ final class SideBySideManager: ObservableObject {
             engine.log("⚠️ No UDID captured from their iPhone, so signing may fail with error 8220.")
         }
         setStep(.sign, .active)
-        let path = try await onSignQueue {
-            try self.performSign(session: session, ipa: ipa.path, udid: udid, deviceName: name)
+        let path: String
+        do {
+            path = try await onSignQueue {
+                try self.performSign(session: session, ipa: ipa.path, udid: udid, deviceName: name)
+            }
+        } catch {
+            // A21-2：签名失败也留 `_extracted`——清掉再往上抛。
+            Engine.discardExtraction(forIPA: ipa.path)
+            throw error
         }
         signedAppPath = path
         let info = Self.bundleInfo(at: path)

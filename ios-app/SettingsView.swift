@@ -185,7 +185,7 @@ struct SettingsView: View {
                     if let exp = enterpriseCertExpiration {
                         Text(exp.formatted(Date.FormatStyle(date: .abbreviated).locale(Localizer.locale)))
                             .font(.footnote)
-                            .foregroundStyle(enterpriseCertExpirationSoon ? .red : .secondary)
+                            .foregroundStyle(enterpriseCertExpirationSoon ? Theme.negative : .secondary)
                     }
                 }
             }

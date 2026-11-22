@@ -1111,7 +1111,7 @@ struct FilesTabView: View {
                 } else if let opMessage {
                     Text(opMessage)
                         .font(.footnote)
-                        .foregroundStyle(opFailed ? .red : .green)
+                        .foregroundStyle(opFailed ? Theme.negative : Theme.positive)
                 }
                 Divider()
                 lanSection
@@ -1516,7 +1516,7 @@ struct FilesTabView: View {
     /// 新建文件夹同款）：重名就拒，不覆盖。
     private func createFolder() {
         let name = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, !name.contains("/") else { return }
+        guard !name.isEmpty, !name.contains("/"), !name.hasPrefix(".") else { return }
         let root = IPALibrary.documentsDir
         let parent = currentDir.isEmpty ? root : root.appendingPathComponent(currentDir)
         let dest = parent.appendingPathComponent(name)
@@ -1664,7 +1664,7 @@ struct FilesTabView: View {
         renameItem = nil
         var newName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !newName.isEmpty, newName != item.name,
-              !newName.contains("/") else { return }
+              !newName.contains("/"), !newName.hasPrefix(".") else { return }
         // 已签 IPA 改名去后缀后，证书页清单仍留一条幽灵记录
         // （点安装必失败）：IPA 文件改名没写 .ipa 就补上。
         if !item.isDirectory, item.url.pathExtension.lowercased() == "ipa",
@@ -1942,7 +1942,7 @@ struct FilesTabView: View {
                     if let batchMessage {
                         Text(batchMessage)
                             .font(.footnote)
-                            .foregroundStyle(batchFailed ? .red : .green)
+                            .foregroundStyle(batchFailed ? Theme.negative : Theme.positive)
                     }
                 }
                 ForEach(filteredUnsigned) { item in
@@ -2211,7 +2211,7 @@ struct FilesTabView: View {
                     Spacer()
                     Text(entry.success ? L("成功") : L("失败"))
                         .font(.caption)
-                        .foregroundStyle(entry.success ? .green : .red)
+                        .foregroundStyle(entry.success ? Theme.positive : Theme.negative)
                 }
                 Text("\(logKindText(entry.kind)) · \(Self.logDateFormatter.string(from: entry.date))")
                     .font(.caption)
