@@ -2195,7 +2195,7 @@ final class Engine {
         guard let entry = IPALibrary.customImport() else {
             guard !isRunning else { return }
             setGuide(Guides.customIPA)
-            log("⛔️ 还没导入 IPA。先在上面导入一个 .ipa，再用企业证书签名。")
+            log("⛔️ No IPA imported yet. Import an .ipa above first, then sign it with the enterprise certificate.")
             return
         }
         runEnterpriseCertInstall(ipaURL: entry.url, mods: CertSignMods())
@@ -2215,12 +2215,12 @@ final class Engine {
         }
         guard canSelfPair || hasPairingFile else {
             setGuide(Guides.importPairing)
-            log("⛔️ 需要配对文件：先导入配对文件，再用企业证书签名。")
+            log("⛔️ A pairing file is needed: import a pairing file first, then sign with the enterprise certificate.")
             return
         }
         guard EnterpriseCertStore.ready else {
             lastError = L("企业证书材料不齐：需要 .p12、描述文件和证书密码。")
-            log("⛔️ 企业证书材料不齐：需要 .p12、描述文件和证书密码。")
+            log("⛔️ Enterprise certificate materials are incomplete: a .p12, a provisioning profile and the certificate password are needed.")
             return
         }
         refreshNetworkStatus()
@@ -2350,7 +2350,7 @@ final class Engine {
         }
         guard canSelfPair || hasPairingFile else {
             setGuide(Guides.importPairing)
-            log("⛔️ 需要配对文件：先导入配对文件，再安装。")
+            log("⛔️ A pairing file is needed: import a pairing file first, then install.")
             return
         }
         refreshNetworkStatus()

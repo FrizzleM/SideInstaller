@@ -65,9 +65,19 @@ enum Theme {
     /// at 4.8:1.
     static let blue = Color(red: 38 / 255, green: 105 / 255, blue: 237 / 255)
     /// The light blue drawn on the dark: progress, the selection, links and
-    /// a card's label icon. At least 6:1 on every surface above.
-    static let accent = Color(red: 96 / 255, green: 167 / 255, blue: 253 / 255)
-    static let accent2 = Color(red: 0.30, green: 0.68, blue: 1.0)
+    /// a card's label icon. Dark keeps the old value (at least 6:1 on a card);
+    /// light uses a deeper blue (#1F5BD0, 6.06:1 on white, 5.43:1 on a card) —
+    /// the old value was only 2.49:1 on white in light mode.
+    static let accent = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 96 / 255, green: 167 / 255, blue: 253 / 255, alpha: 1)
+            : UIColor(red: 31 / 255, green: 91 / 255, blue: 208 / 255, alpha: 1)
+    })
+    static let accent2 = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.30, green: 0.68, blue: 1.0, alpha: 1)
+            : UIColor(red: 31 / 255, green: 91 / 255, blue: 208 / 255, alpha: 1)
+    })
     /// Deep-navy halo behind each header icon, matching the icon art (#011A5C).
     static let glow = Color(red: 1/255, green: 26/255, blue: 92/255)
 
