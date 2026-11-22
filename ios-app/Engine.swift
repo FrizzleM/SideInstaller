@@ -3212,16 +3212,9 @@ final class Engine {
     @MainActor func acquireTunnel() async -> Bool {
         tunnelIdleTimer?.invalidate(); tunnelIdleTimer = nil
         tunnelHolders += 1
-        do {
-            guard await tunnelUp() else {
-                tunnelHolders = max(0, tunnelHolders - 1)
-                return false
-            }
-        } catch {
-            // tunnelUp 只在 settleNetworkStatus 等全隧道探针时可抛（取消）；
-            // 抛错也要把刚记的持有还回去，否则闲置停永不触发。
+        guard await tunnelUp() else {
             tunnelHolders = max(0, tunnelHolders - 1)
-            throw error
+            return false
         }
         return true
     }
