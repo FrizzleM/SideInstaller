@@ -1197,7 +1197,6 @@ struct FilesTabView: View {
             TextField(L("搜索"), text: $fileSearchText)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-                .multilineTextAlignment(.center)
         }
         .padding(8)
         .background(Color.secondary.opacity(0.12))
@@ -1356,10 +1355,10 @@ struct FilesTabView: View {
                             .lineLimit(1)
                         Text(ipaSecondLine(item))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                         Text(item.name)
-                            .font(.caption)
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -1370,7 +1369,7 @@ struct FilesTabView: View {
                             .lineLimit(2)
                         Text(fileSecondLine(item))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                     }
                 }

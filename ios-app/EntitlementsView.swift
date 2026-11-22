@@ -477,7 +477,7 @@ struct EntitlementsView: View {
     private var header: some View {
         BrandHeader(icon: "checklist", image: "EntitlementsLogo", title: L("Entitlements")) {
             if let team = manager.teamSummary {
-                StatusDot(text: team, color: Theme.positive)
+                StatusDot(text: team, color: Theme.positive, textColor: Theme.muted)
                     .transition(.opacity)
             }
         }
@@ -535,7 +535,9 @@ struct EntitlementsView: View {
             HStack(spacing: 12) {
                 Image(systemName: "app.badge.checkmark")
                     .font(.title3)
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(app.displayName)
                         .font(.subheadline.weight(.medium))

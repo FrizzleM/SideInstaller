@@ -1795,10 +1795,10 @@ extension View {
             Button { isPresented.wrappedValue = true } label: {
                 Image(systemName: "gearshape")
             }
-            // 与工具页设置行同色（indigo）：.primary 在浅色下是黑，
-            // 齿轮就跟黑图标行一水黑；齿轮就是设置入口，全页统一
-            // 这个色（本 helper 全 App 共用，改色即全页同色）。
-            .tint(.indigo)
+            // 全站蓝（Theme.accent）：indigo 是旧工具页设置行的颜色，
+            // 工具页已删（0.9.102），全仓只剩这一处 indigo，与顶栏/
+            // 按钮/链接的蓝色不合；本 helper 全 App 共用，改色即全页同色。
+            .tint(Theme.accent)
         }
     }
 }

@@ -59,7 +59,7 @@ struct CertsView: View {
     private var header: some View {
         BrandHeader(icon: "checkmark.seal", image: "CertsLogo", title: L("Certificates")) {
             if let team = manager.teamSummary {
-                StatusDot(text: team, color: Theme.positive)
+                StatusDot(text: team, color: Theme.positive, textColor: Theme.muted)
                     .transition(.opacity)
             }
         }
