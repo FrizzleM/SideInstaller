@@ -522,7 +522,10 @@ final class LANTransferServer: ObservableObject {
             let chunk = try handle.read(upToCount: 1 << 20) ?? Data()
             if chunk.isEmpty {
                 let expected = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? Int ?? -1
-                LogStore.shared.append("⚠️ Download truncated: \(file.lastPathComponent) stopped at \(offset)/\(expected) bytes.")
+                // 正常到 EOF 时 offset == expected，不记；只有真短（删/换文件）才记。
+                if expected < 0 || offset != expected {
+                    LogStore.shared.append("⚠️ Download truncated: \(file.lastPathComponent) stopped at \(offset)/\(expected) bytes.")
+                }
                 connection.cancel()
                 return
             }

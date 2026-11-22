@@ -93,7 +93,9 @@ enum Theme {
                        startPoint: .topLeading, endPoint: .bottomTrailing)
     }
     /// Done, connected, granted.
-    static let positive = Color(red: 76 / 255, green: 195 / 255, blue: 138 / 255)
+    static let positive = Color(UIColor { t in t.userInterfaceStyle == .dark
+        ? UIColor(red: 76/255, green: 195/255, blue: 138/255, alpha: 1)   // 深色保持 #4CC38A，深卡 8.24:1
+        : UIColor(red: 30/255, green: 125/255, blue: 50/255, alpha: 1) }) // 浅色 #1E7D32，白底 5.20:1 / 浅卡 4.66:1
     /// Something needs the user, or will soon.
     static let warning = Color(UIColor { t in t.userInterfaceStyle == .dark
         ? UIColor(red: 229/255, green: 161/255, blue: 64/255, alpha: 1)   // 深色保持 #E5A140

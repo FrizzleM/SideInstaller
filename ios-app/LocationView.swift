@@ -880,6 +880,7 @@ struct LocationView: View {
     @ObservedObject var manager: LocationManager
 
     @State private var showSettings = false
+    @State private var showingClearStopsConfirm = false
     /// Where the map is looking, and the point under the crosshair.
     @State private var camera: MapCameraPosition = .region(
         MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 37.3349, longitude: -122.0090),
@@ -1297,9 +1298,15 @@ struct LocationView: View {
                         .font(.caption.weight(.medium))
                 }
                 Spacer()
-                Button(role: .destructive) { manager.removeAllStops() } label: {
+                Button(role: .destructive) { showingClearStopsConfirm = true } label: {
                     Label(L("Clear stops"), systemImage: "trash")
                         .font(.caption.weight(.medium))
+                }
+                .alert(L("Clear stops"), isPresented: $showingClearStopsConfirm) {
+                    Button(L("删除"), role: .destructive) { manager.removeAllStops() }
+                    Button(L("取消"), role: .cancel) {}
+                } message: {
+                    Text(L("删除后无法恢复"))
                 }
                 .tint(Theme.negative)
             }

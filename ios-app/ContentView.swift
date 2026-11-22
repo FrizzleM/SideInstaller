@@ -224,17 +224,17 @@ struct ContentView: View {
             StatusDot(text: summary, color: Theme.positive)
         } else if engine.vpnConnected {
             Button(action: stopTunnelFromTap) {
-                StatusPill(text: L("Tunnel connected"), systemImage: "checkmark.shield.fill", color: .green)
+                StatusPill(text: L("Tunnel connected"), systemImage: "checkmark.shield.fill", color: Theme.positive)
             }
             .buttonStyle(.plain)
         } else if engine.startsVPNWhenNeeded || BuiltinTunnel.useBuiltinDirectly {
             Button(action: startTunnelFromTap) {
-                StatusPill(text: L("Tunnel standby"), systemImage: "shield.slash.fill", color: .orange, glass: true)
+                StatusPill(text: L("Tunnel standby"), systemImage: "shield.slash.fill", color: Theme.warning, glass: true)
             }
             .buttonStyle(.plain)
         } else {
             Button(action: startTunnelFromTap) {
-                StatusPill(text: L("Tunnel off"), systemImage: "shield.slash.fill", color: .red)
+                StatusPill(text: L("Tunnel off"), systemImage: "shield.slash.fill", color: Theme.negative)
             }
             .buttonStyle(.plain)
         }

@@ -283,7 +283,7 @@ struct EnterpriseCertView: View {
                                     if profile.id == activeProfileID {
                                         Text(L("激活"))
                                             .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.green)
+                                            .foregroundStyle(Theme.positive)
                                     }
                                     if let expiration = EnterpriseCertStore.provisionInfo(for: profile)?.expiration {
                                         Text(expiration.formatted(date: .abbreviated, time: .omitted) + remainingText(expiration))
@@ -381,7 +381,7 @@ struct EnterpriseCertView: View {
                                 if info.provisionedDevices.contains(udid) {
                                     Text(L("本机在描述文件设备列表里，签名后能装。"))
                                         .font(.footnote)
-                                        .foregroundStyle(.green)
+                                        .foregroundStyle(Theme.positive)
                                 } else {
                                     Text(L("此签名证书不包含当前设备，签名后无法在当前设备安装！！！"))
                                         .font(.footnote)
@@ -394,7 +394,7 @@ struct EnterpriseCertView: View {
                             } else {
                                 Text(L("描述文件限定了设备（共 %d 台）：如果是开发证书且本机不在列表里，签名后装不上；企业证书通常不限设备。", info.provisionedDeviceCount))
                                     .font(.footnote)
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(Theme.warning)
                             }
                         }
                     }
@@ -943,7 +943,7 @@ struct EnterpriseCertView: View {
                             // 让用户自己展开去猜（轻松签式一眼看全）。
                             Text(certStatusText)
                                 .font(.footnote)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Theme.warning)
                         }
                         Image(systemName: (certGroupExpanded ?? !certReady) ? "chevron.up" : "chevron.down")
                             .foregroundStyle(.secondary)
@@ -1043,7 +1043,7 @@ struct EnterpriseCertView: View {
                          ? L("程序未脱壳，签名后可能无法安装，建议重新脱壳签名。")
                          : L("以下程序未脱壳，签名后可能无法安装，建议重新脱壳签名：%@", selectedUndumpedApps.joined(separator: "、")))
                         .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.warning)
                 }
                 // 底部两个通栏大按钮（轻松签签名页同款层级）：主按钮
                 // 大红实心（走开关：开 = 签名并安装，关 = 仅签名），
@@ -1102,7 +1102,7 @@ struct EnterpriseCertView: View {
                 if installWhenSign && multiCount > 1 {
                     Text(L("已开“签名后立即安装”，这次只签装 1 个，多开数量不生效；要签多个请关掉安装开关或用“仅签名”。"))
                         .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.warning)
                 }
                 Button {
                     CZFHaptics.impact(.light)
@@ -1116,8 +1116,8 @@ struct EnterpriseCertView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(Color.blue.opacity(0.12))
-                    .foregroundStyle(.blue)
+                    .background(Theme.accent.opacity(0.12))
+                    .foregroundStyle(Theme.accent)
                     .cornerRadius(16)
                 }
                 .buttonStyle(CZFPressButtonStyle())
@@ -1263,7 +1263,7 @@ struct EnterpriseCertView: View {
             if multiCountTextInvalid {
                 Text(L("数量填 1–20 的数字，超出按边界算。"))
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
             }
         }
     }
@@ -1509,7 +1509,7 @@ struct EnterpriseCertView: View {
                 } else {
                     Text(L("证书未就绪，签不了"))
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.warning)
                         .lineLimit(1)
                 }
             }

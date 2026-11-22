@@ -1149,7 +1149,7 @@ struct FilesTabView: View {
                         if lanCopied {
                             Text(L("已复制"))
                                 .font(.footnote)
-                                .foregroundStyle(.green)
+                                .foregroundStyle(Theme.positive)
                         }
                     }
                     .contentShape(Rectangle())

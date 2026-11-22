@@ -328,7 +328,7 @@ struct SettingsView: View {
                     }
                     Text(L("Anyone on your LAN can access it without a password. Turn it off when done."))
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.warning)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let error = webdav.errorMessage {
@@ -591,7 +591,7 @@ struct SettingsView: View {
             Text(L("SideInstaller stays alive in the background (silent audio + location) and checks every 30 minutes. Apps whose signing expires within 3 days are re-signed automatically. Location access must be set to “Always” and the tunnel must stay connected (the built-in tunnel is enough). The system also wakes the app in the background from time to time to run a check — don't swipe it away from the app switcher."))
             if autoRefreshEnabled && AutoRefreshService.shared.locationDegraded {
                 Text(L("Location is not set to “Always”, so only silent audio is keeping the app alive — renewal from the lock screen may be suspended. Set Location to “Always” in Settings."))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.warning)
             }
         }
     }

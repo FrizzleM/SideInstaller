@@ -260,6 +260,8 @@ final class EntitlementsManager: ObservableObject {
         var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
+            // A3：循环头查世代——切账号后不再拿旧 id/pw 试下一台服务器。
+            guard generation == signInGeneration else { throw CancellationError() }
             if appleRefusals.rulesOut(ani) {
                 engine.log("Entitlements: skipping anisette \(idx + 1)/\(servers.count): Apple has refused the device sign-in reports through it.")
                 failures.skip()
@@ -282,6 +284,8 @@ final class EntitlementsManager: ObservableObject {
                 engine.log("Entitlements: signed in (\(summary)).")
                 return
             } catch let error as EngineError {
+                // A3：同 CertManager——旧登录的失败不写新账号的 lastError。
+                if generation != signInGeneration { throw CancellationError() }
                 let failure = error.errorDescription ?? "sign-in failed"
                 if ticket.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))

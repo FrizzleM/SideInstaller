@@ -144,7 +144,12 @@ struct RootView: View {
             engine.certificateToImport = nil
             certManager.importCertificate(request)
         }
-        .fullScreenCover(isPresented: $showInstallSheet) { ContentView() }
+        .fullScreenCover(isPresented: $showInstallSheet) {
+            ContentView()
+                .popupStack(installEntries, onBackdropTap: installBackdropTap) { entry in
+                    card(for: entry)
+                }
+        }
         // U-UI：安装进行中/刚跑完时各 tab 底部浮一颗 pill，点开就是
         // 原来的安装页（ContentView 原样搬进 sheet，逻辑不动）；
         // 没跑过时不显示，不占地方。文案复用 L("Install")，0 新 key。
@@ -173,7 +178,8 @@ struct RootView: View {
             }
         }
         // Over the tab bar too, so the whole app dims behind the popups.
-        .popupStack(entries, onBackdropTap: backdropTap) { entry in
+        .popupStack(showInstallSheet ? otherEntries : entries,
+                    onBackdropTap: showInstallSheet ? otherBackdropTap : backdropTap) { entry in
             card(for: entry)
         }
         .onChange(of: popups) { old, new in
@@ -213,6 +219,7 @@ struct RootView: View {
             // C31：2FA 来了先落安装页（全屏 sheet 盖住 TabView 时 2FA sheet
             // 会被 UIKit 静默丢弃）；2FA 清掉后把暂缓的安装页补开。
             if phase != nil {
+                if showInstallSheet { showInstallSheetPending = true }
                 showInstallSheet = false
             } else if showInstallSheetPending {
                 showInstallSheetPending = false
@@ -276,6 +283,19 @@ struct RootView: View {
         }
     }
 
+    /// cover 里 backdrop 点按：只关 install 组里不阻塞的项。
+    private var installBackdropTap: (() -> Void)? {
+        let closable = installEntries.flatMap(\.items).filter { !blocks($0) }
+        guard !closable.isEmpty else { return nil }
+        return { SoundEffects.play(.dismiss); closable.forEach(close) }
+    }
+    /// TabView 层 backdrop 点按：只关非 install 组里不阻塞的项。
+    private var otherBackdropTap: (() -> Void)? {
+        let closable = otherEntries.flatMap(\.items).filter { !blocks($0) }
+        guard !closable.isEmpty else { return nil }
+        return { SoundEffects.play(.dismiss); closable.forEach(close) }
+    }
+
     /// Plays the sound for popups that just came up: an error over a success
     /// over a request for the user, when several come up at once.
     private func playSound(forShown items: [PopupItem]) {
@@ -331,6 +351,19 @@ struct RootView: View {
             }
         }
         return entries
+    }
+
+    /// Install 组进全屏 cover 里渲染（TabView 层的 overlay 被 cover 盖住）；
+    /// 其余组留在 TabView 层。组要么全是 install、要么全不是，不会拆散一组。
+    private var installEntries: [PopupEntry] {
+        entries.filter { $0.items.allSatisfy(isInstall) }
+    }
+    private var otherEntries: [PopupEntry] {
+        entries.filter { !$0.items.allSatisfy(isInstall) }
+    }
+    private func isInstall(_ item: PopupItem) -> Bool {
+        if case .install = item { return true }
+        return false
     }
 
     /// The group a popup comes up in, if it's ever up with others.

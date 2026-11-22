@@ -388,6 +388,8 @@ final class CertManager: ObservableObject {
         var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
+            // A3：循环头查世代——切账号后不再拿旧 id/pw 试下一台服务器。
+            guard generation == signInGeneration else { throw CancellationError() }
             if appleRefusals.rulesOut(ani) {
                 engine.log("Certificates: skipping anisette \(idx + 1)/\(servers.count): Apple has refused the device sign-in reports through it.")
                 continue
@@ -410,6 +412,8 @@ final class CertManager: ObservableObject {
                 engine.log("Certificates: signed in (\(summary)).")
                 return
             } catch let error as EngineError {
+                // A3：旧登录在 2FA 取消等失败时也不写新账号的 lastError。
+                if generation != signInGeneration { throw CancellationError() }
                 lastError = error.errorDescription ?? "sign-in failed"
                 if ticket.twoFactorWasCancelled {
                     engine.log("Two-factor verification cancelled — stopping.")
