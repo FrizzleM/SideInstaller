@@ -477,6 +477,9 @@ let portugueseStrings: [String: String] = [
         "Ignorado: o perfil de assinatura deste app não tem equipa, por isso não pode ser atualizado.",
     "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "Revogado, mas a lista de certificados não pôde ser atualizada. Pode estar desatualizada até recarregar.",
+
+    "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "Importado, mas a lista de certificados não pôde ser atualizada. Pode estar desatualizada até recarregar.",
     "Last refresh (its notification couldn't be delivered): %@":
         "Última atualização (a notificação não pôde ser entregue): %@",
     "Getting ready": "Preparando",

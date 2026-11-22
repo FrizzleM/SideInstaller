@@ -438,6 +438,9 @@ let turkishStrings: [String: String] = [
         "Atlandı: bu uygulamanın imza profilinde ekip yok, bu yüzden yenilenemez.",
     "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "İptal edildi, ancak sertifika listesi yenilenemedi. Yeniden yükleyene kadar güncel olmayabilir.",
+
+    "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "İçe aktarıldı, ancak sertifika listesi yenilenemedi. Yeniden yükleyene kadar güncel olmayabilir.",
     "Last refresh (its notification couldn't be delivered): %@":
         "Son yenileme (bildirim iletilemedi): %@",
     "Getting ready": "Hazırlanıyor",

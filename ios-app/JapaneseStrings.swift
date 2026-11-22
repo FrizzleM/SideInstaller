@@ -463,6 +463,9 @@ let japaneseStrings: [String: String] = [
         "スキップ：この App の署名プロファイルにチームがなく、更新できません。",
     "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "取り消しましたが、証明書一覧を更新できませんでした。再読み込みするまで古い内容の可能性があります。",
+
+    "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "インポートしましたが、証明書一覧を更新できませんでした。再読み込みするまで古い内容の可能性があります。",
     "Last refresh (its notification couldn't be delivered): %@":
         "前回の更新（通知を配信できませんでした）：%@",
     "Getting ready": "準備中",

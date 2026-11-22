@@ -478,6 +478,9 @@ let spanishStrings: [String: String] = [
         "Omitido: el perfil de firma de esta app no tiene equipo, por lo que no se puede actualizar.",
     "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "Revocado, pero no se pudo actualizar la lista de certificados. Puede estar desactualizada hasta recargarla.",
+
+    "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "Importado, pero no se pudo actualizar la lista de certificados. Puede estar desactualizada hasta recargarla.",
     "Last refresh (its notification couldn't be delivered): %@":
         "Última actualización (no se pudo entregar la notificación): %@",
     "Getting ready": "Preparando",

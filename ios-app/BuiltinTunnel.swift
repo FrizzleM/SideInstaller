@@ -110,6 +110,10 @@ enum BuiltinTunnel {
         private var result: TunnelWaitResult?
         private var observer: NSObjectProtocol?
         private var continuation: CheckedContinuation<TunnelWaitResult, Never>?
+        /// Whether a `.connecting` status has been seen in this wait.
+        /// A `.disconnected` that arrives before any `.connecting` is
+        /// just the pre-start state, not a fast failure (S13).
+        private var seenConnecting = false
 
         func set(continuation: CheckedContinuation<TunnelWaitResult, Never>,
                  observer: NSObjectProtocol?) {
@@ -120,6 +124,18 @@ enum BuiltinTunnel {
             let result = self.result
             lock.unlock()
             if already, let result { continuation.resume(returning: result) }
+        }
+
+        func noteConnecting() {
+            lock.lock()
+            seenConnecting = true
+            lock.unlock()
+        }
+
+        func hasSeenConnecting() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return seenConnecting
         }
 
         func resume(_ result: TunnelWaitResult) {
@@ -140,7 +156,9 @@ enum BuiltinTunnel {
     /// Waits for the tunnel to connect, go invalid, or time out — one
     /// status notification instead of polling every 300ms (S7). The timeout
     /// still bounds the wait when the notification never comes, and
-    /// cancellation answers at once instead of waiting it out.
+    /// cancellation answers at once instead of waiting it out. A
+    /// `.disconnected` after `.connecting` ends the round as `.invalid` at
+    /// once (S13); before any `.connecting` it is ignored.
     @MainActor
     private static func waitForStatus(manager: NETunnelProviderManager,
                                      timeout: TimeInterval) async -> TunnelWaitResult {
@@ -162,6 +180,13 @@ enum BuiltinTunnel {
                     switch manager.connection.status {
                     case .connected: state.resume(.connected)
                     case .invalid: state.resume(.invalid)
+                    // S13: a fast failure shows up as `.connecting` then
+                    // `.disconnected`; end the round at once instead of
+                    // waiting out the full timeout. `.disconnected` before
+                    // any `.connecting` is the pre-start state, not a failure.
+                    case .connecting: state.noteConnecting()
+                    case .disconnected:
+                        if state.hasSeenConnecting() { state.resume(.invalid) }
                     default: break
                     }
                 }

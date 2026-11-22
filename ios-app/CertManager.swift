@@ -285,9 +285,15 @@ final class CertManager: ObservableObject {
                 engine.log(result.replacedKey
                     ? "Certificates: signing with \(name) (\(result.certificate.serialNumber)) from now on; nothing was revoked."
                     : "Certificates: \(name) is the certificate SideInstaller signs with already.")
-                if let list = try? await onQueue({ try self.performList() }) {
+                do {
+                    let list = try await onQueue { try self.performList() }
                     certs = list
                     hasLoaded = true
+                } catch {
+                    // C17：导入成功了，只是列表没刷出来——告诉他
+                    // 列表可能还是旧的，重新加载会刷新。
+                    lastError = L("Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.")
+                    engine.log("⛔️ Certificates: imported \(name), but the list refresh failed: \(short(error))")
                 }
                 if retryInstall {
                     engine.log("Retrying the install with \(name).")

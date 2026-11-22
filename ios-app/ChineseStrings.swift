@@ -462,6 +462,9 @@ let chineseStrings: [String: String] = [
         "已跳过：这个 App 的签名描述文件里没有团队号，无法续签。",
     "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "已吊销，但证书列表刷新失败，重新加载前可能显示旧的。",
+
+    "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "已导入，但证书列表刷新失败，重新加载前可能显示旧的。",
     "Last refresh (its notification couldn't be delivered): %@":
         "上次续签（通知没发出去）：%@",
     "Getting ready": "正在准备",

@@ -476,6 +476,9 @@ let vietnameseStrings: [String: String] = [
         "Đã bỏ qua: hồ sơ ký của ứng dụng này không có nhóm nên không thể làm mới.",
     "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "Đã thu hồi, nhưng không thể làm mới danh sách chứng chỉ. Danh sách có thể lỗi thời cho đến khi tải lại.",
+
+    "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "Đã nhập, nhưng không thể làm mới danh sách chứng chỉ. Danh sách có thể lỗi thời cho đến khi tải lại.",
     "Last refresh (its notification couldn't be delivered): %@":
         "Lần làm mới trước (không gửi được thông báo): %@",
     "Getting ready": "Đang chuẩn bị",

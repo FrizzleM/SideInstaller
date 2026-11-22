@@ -158,6 +158,10 @@ struct FilesTabView: View {
     /// 文件地址（装时记下）；失败原因快照（证书页同款，不直接
     /// 读 engine 的全局 lastError，免得别的页的失败串到这里）。
     @State private var fileInstallInFlight = false
+    /// 文件页这次安装的归属凭证（证书页 enterpriseInstallRunID 同款）：
+    /// 起跑时快照 engine.installSessionID，结束时只认同一会话；对不上
+    /// 说明这段“进行中”是别的安装的，不记日志、不弹框。
+    @State private var fileInstallRunID: UUID?
     @State private var showingFileInstallSuccessAlert = false
     @State private var fileInstallRecord: SignedIPARecord?
     @State private var fileInstallURL: URL?
@@ -474,11 +478,10 @@ struct FilesTabView: View {
             return
         }
         let guideBefore = engine.guide
-        fileInstallInFlight = true
+        let sessionBefore = engine.installSessionID
         localInstall.appendStepLog(L("配对安装开始：%@", appName))
         engine.runInstallSignedIPA(ipaURL: ipaURL)
         if !engine.isRunning {
-            fileInstallInFlight = false
             if let guide = engine.guide,
                guide != guideBefore
                || guide == Guides.importPairing || guide == Guides.vpn
@@ -488,7 +491,19 @@ struct FilesTabView: View {
                 fileInstallErrorText = L("配对安装没能启动：请检查配对文件与隧道是否就绪，或去「安装」页看日志。")
             }
             localInstall.appendStepLog(L("配对安装失败：%@", fileInstallErrorText ?? ""))
+            return
         }
+        // 真正起跑了才立进行中标志 + 归属凭证：会话没变说明这
+        // 次调用根本没起跑（起跑瞬间输了竞态），按“已有安装在
+        // 进行”处理，绝不把别人的结束认成自己的；onChange 只
+        // 认同一会话的结束（见 body 层）。证书页同款。
+        guard engine.installSessionID != sessionBefore, let session = engine.installSessionID else {
+            fileInstallErrorText = L("已有安装在进行，先等当前安装完成再试。")
+            localInstall.appendStepLog(L("配对安装失败：%@", fileInstallErrorText ?? ""))
+            return
+        }
+        fileInstallInFlight = true
+        fileInstallRunID = session
     }
 
     /// 文件页配对安装状态：只在文件页内显示，不碰共享「安装」页。
@@ -637,7 +652,17 @@ struct FilesTabView: View {
         // 全局量。文件页安装跑完写一条「仅安装」日志（见 startEnterpriseInstall）。
         .onChange(of: engine.isRunning) { old, new in
             if old && !new && fileInstallInFlight {
+                // 当前又有安装在跑（isRunning 已翻回 true）：这次
+                // 投递是上一次安装的滞后投递，不是当前这跑的结束
+                // ——不认、不清，新跑的结束投递随后会来；不清的
+                // 话新跑结束时 inFlight 还在，不会丢完成。
+                guard !engine.isRunning else { return }
                 fileInstallInFlight = false
+                // 归属凭证：只认自己那次安装的结束。凭证对不上
+                // （别的安装在标志立着时结束）时不记日志、不弹框。
+                let runID = fileInstallRunID
+                fileInstallRunID = nil
+                guard runID != nil, runID == engine.installSessionID else { return }
                 if engine.finished {
                     showingFileInstallSuccessAlert = true
                     localInstall.appendStepLog(L("配对安装完成"))

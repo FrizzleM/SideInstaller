@@ -291,6 +291,11 @@ final class SideBySideManager: ObservableObject {
     @Published private(set) var targetOSVersion: String?
     /// How much of the download has arrived (0…1), while that step is running.
     @Published private(set) var downloadProgress: Double = 0
+    /// What a download that fell back to an older local copy should say:
+    /// set in `downloadBuild` when the fetch fails and a copy an earlier
+    /// run left behind stands in (C14, C7's pattern on the Install tab).
+    /// Shown under the progress card until the next run clears it.
+    @Published private(set) var downloadFallbackNotice: String?
     /// Home-screen name of what landed on their iPhone.
     @Published private(set) var installedAppName: String?
     /// True while their iPhone has to pair from its own Settings, which it
@@ -677,6 +682,7 @@ final class SideBySideManager: ObservableObject {
     private func resetRun() {
         for step in SideBySideStep.allCases { stepStates[step] = .pending }
         downloadProgress = 0
+        downloadFallbackNotice = nil
         lastError = nil
         finished = false
         pairingInSettings = false
@@ -1435,6 +1441,14 @@ final class SideBySideManager: ObservableObject {
             if Task.isCancelled { throw CancellationError() }
             // Offline or blocked: a copy an earlier run left behind will do.
             if let onDisk {
+                // C14: the run goes on with the older local copy — say so
+                // under the progress card instead of silently succeeding.
+                let when = (try? FileManager.default.attributesOfItem(atPath: onDisk.url.path))?[.modificationDate] as? Date
+                let dateText = when?.formatted(
+                    Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localizer.locale)) ?? ""
+                downloadFallbackNotice = L("Couldn't download %@: %@", source.displayName, short(error))
+                    + " — " + onDisk.url.lastPathComponent
+                    + (dateText.isEmpty ? "" : " (" + L("Downloaded %@", dateText) + ")")
                 engine.log("⚠️ Download failed (\(short(error))), using \(onDisk.url.lastPathComponent) already in Documents instead.")
                 return onDisk.url
             }
@@ -2579,6 +2593,13 @@ struct SideBySideView: View {
                 failureCard(message).transition(.cardAppear)
             }
             progressCard.cascadeItem(1)
+            // C14: a download that fell back to an older local copy says so
+            // here, under the card, until the next run clears it.
+            if let notice = manager.downloadFallbackNotice {
+                Text(notice)
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+            }
         }
         .animation(.smooth(duration: 0.35), value: manager.pairingInSettings)
         .animation(.smooth(duration: 0.35), value: manager.pairingPIN)

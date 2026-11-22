@@ -464,6 +464,9 @@ let koreanStrings: [String: String] = [
         "건너뜀: 이 앱의 서명 프로파일에 팀이 없어 새로 고칠 수 없습니다.",
     "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "해지했지만 인증서 목록을 새로 고칠 수 없습니다. 다시 불러오기 전까지 오래된 내용일 수 있습니다.",
+
+    "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
+        "가져왔지만 인증서 목록을 새로 고칠 수 없습니다. 다시 불러오기 전까지 오래된 내용일 수 있습니다.",
     "Last refresh (its notification couldn't be delivered): %@":
         "마지막 새로 고침(알림을 전달할 수 없음): %@",
     "Getting ready": "준비 중",
