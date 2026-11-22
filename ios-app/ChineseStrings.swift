@@ -156,7 +156,6 @@ let chineseStrings: [String: String] = [
     "From the website": "从网站安装",
     "Sign it with your Apple ID": "用你的 Apple ID 签名",
     "Install it in LiveContainer": "安装到 LiveContainer",
-    "LiveContainer isn't installed on this iPhone.": "这台 iPhone 上没有安装 LiveContainer。",
     "Release": "渠道",
     "Reinstall": "重新安装",
     "Install %@": "安装 %@",

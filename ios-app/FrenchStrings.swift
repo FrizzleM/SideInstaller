@@ -157,7 +157,6 @@ let frenchStrings: [String: String] = [
     "From the website": "Depuis le site web",
     "Sign it with your Apple ID": "La signer avec votre Apple ID",
     "Install it in LiveContainer": "L'installer dans LiveContainer",
-    "LiveContainer isn't installed on this iPhone.": "LiveContainer n'est pas installé sur cet iPhone.",
     "Release": "Canal",
     "Reinstall": "Réinstaller",
     "Install %@": "Installer %@",

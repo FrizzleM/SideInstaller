@@ -156,7 +156,6 @@ let koreanStrings: [String: String] = [
     "From the website": "웹사이트에서 받기",
     "Sign it with your Apple ID": "내 Apple ID로 서명",
     "Install it in LiveContainer": "LiveContainer에 설치",
-    "LiveContainer isn't installed on this iPhone.": "이 iPhone에 LiveContainer가 설치되어 있지 않습니다.",
     "Release": "릴리즈 채널",
     "Reinstall": "다시 설치",
     "Install %@": "%@ 설치",

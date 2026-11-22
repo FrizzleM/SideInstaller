@@ -132,7 +132,6 @@ let turkishStrings: [String: String] = [
     "From the website": "Web sitesinden",
     "Sign it with your Apple ID": "Apple kimliğinle imzala",
     "Install it in LiveContainer": "LiveContainer'a yükle",
-    "LiveContainer isn't installed on this iPhone.": "Bu iPhone'da LiveContainer yüklü değil.",
     "Release": "Sürüm",
     "Reinstall": "Yeniden yükle",
     "Install %@": "%@ yükle",

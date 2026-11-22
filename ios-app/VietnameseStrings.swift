@@ -157,7 +157,6 @@ let vietnameseStrings: [String: String] = [
     "From the website": "Từ trang web",
     "Sign it with your Apple ID": "Ký bằng Apple ID của bạn",
     "Install it in LiveContainer": "Cài vào LiveContainer",
-    "LiveContainer isn't installed on this iPhone.": "LiveContainer chưa được cài trên iPhone này.",
     "Release": "Kênh",
     "Reinstall": "Cài đặt lại",
     "Install %@": "Cài đặt %@",

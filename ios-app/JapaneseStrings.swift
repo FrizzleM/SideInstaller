@@ -155,7 +155,6 @@ let japaneseStrings: [String: String] = [
     "From the website": "Web サイトから",
     "Sign it with your Apple ID": "Apple ID で署名",
     "Install it in LiveContainer": "LiveContainer にインストール",
-    "LiveContainer isn't installed on this iPhone.": "この iPhone には LiveContainer がインストールされていません。",
     "Release": "チャンネル",
     "Reinstall": "再インストール",
     "Install %@": "%@ をインストール",

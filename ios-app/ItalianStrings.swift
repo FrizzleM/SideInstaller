@@ -156,7 +156,6 @@ let italianStrings: [String: String] = [
     "From the website": "Dal sito web",
     "Sign it with your Apple ID": "Firmala con il tuo Apple ID",
     "Install it in LiveContainer": "Installala in LiveContainer",
-    "LiveContainer isn't installed on this iPhone.": "LiveContainer non è installato su questo iPhone.",
     "Release": "Canale",
     "Reinstall": "Reinstalla",
     "Install %@": "Installa %@",
