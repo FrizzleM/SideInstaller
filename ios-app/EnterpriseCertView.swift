@@ -1424,6 +1424,9 @@ struct EnterpriseCertView: View {
         }
     }
 
+    /// 应用库行图标：IPA 里取的真实图标（大圆角 52pt）；还没取到或
+    /// 取不到时显示中性灰圆角方块（不是假 App 图，只占位）。
+    @ViewBuilder
     private func libraryIcon(for path: String, signed: Bool) -> some View {
         if let image = signed ? signedIcons[path] : unsignedIcons[path] {
             Image(uiImage: image)
