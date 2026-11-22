@@ -164,6 +164,14 @@ struct FilesTabView: View {
     @State private var fileInstallRecord: SignedIPARecord?
     @State private var fileInstallURL: URL?
     @State private var fileInstallErrorText: String?
+    /// 已签名行安装方式选择（OTA 0.9.104）：点行先选“配对安装”还是
+    /// “流量安装（OTA）”，再走对应入口；选择记录只当对话框锚点。
+    @State private var installChoiceRecord: SignedIPARecord?
+    /// 流量安装（OTA）表单：记录 + 已生成的 manifest 地址；置位即弹 sheet。
+    @State private var otaRecord: SignedIPARecord?
+    @State private var otaManifestURL: URL?
+    /// itms 链接已拉起：表单内改显示信任引导，不再显示上传步骤。
+    @State private var otaLaunched = false
     /// 局域网地址点按复制后的短暂「已复制」提示。
     @State private var lanCopied = false
 
@@ -549,6 +557,89 @@ struct FilesTabView: View {
         fileInstallRunID = session
     }
 
+    /// 流量安装（OTA，企业证书 + R2 公网 manifest，0.9.104）：只生成 manifest，
+    /// 不起本地服务、不走配对、不走隧道。v1 手动上传：App 生成 manifest 写到
+    /// 已签名 IPA 旁边，用户经 WebDAV 桥或 R2 控制台把 manifest + IPA 传到 R2，
+    /// 再点“已上传，开始安装”拉起系统安装。生成失败时页内留错，不静默。
+    private func startOTAInstall(record: SignedIPARecord) {
+        otaLaunched = false
+        guard let manifestURL = OTAInstallServer.writePublicManifest(for: record) else {
+            fileInstallErrorText = L("安装清单生成失败，改用配对安装。")
+            return
+        }
+        otaManifestURL = manifestURL
+        otaRecord = record
+    }
+
+    /// 流量安装表单：上传步骤 + 两个 R2 直链 + 分享/开始安装/改用配对安装。
+    /// 拉起系统安装后改显示信任引导（App 内收不到 installd 回调，只知已拉起）。
+    @ViewBuilder
+    private func otaSheet(record: SignedIPARecord) -> some View {
+        NavigationStack {
+            List {
+                Section {
+                    if otaLaunched {
+                        Text(L("After installing, the first launch will say “Untrusted Enterprise Developer”: go to Settings → General → VPN & Device Management to trust the certificate, tap “Allow and Restart”, then open the app again."))
+                    } else {
+                        Text(L("Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.", OTAInstallServer.publicManifestFileName(for: record.fileName), record.fileName))
+                        Text(OTAInstallServer.publicManifestR2URL(for: record.fileName))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                        Text(OTAInstallServer.publicIPAR2URL(for: record.fileName))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                }
+                Section {
+                    if !otaLaunched {
+                        Button(L("分享")) {
+                            if let manifestURL = otaManifestURL {
+                                shareOTAFiles(record: record, manifestURL: manifestURL)
+                            }
+                        }
+                        Button(L("Uploaded, Start Install")) {
+                            let manifestR2 = OTAInstallServer.publicManifestR2URL(for: record.fileName)
+                            if let link = OTAInstallServer.publicInstallURL(manifestR2URL: manifestR2),
+                               UIApplication.shared.open(link) {
+                                otaLaunched = true
+                            } else {
+                                fileInstallErrorText = L("Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.")
+                                otaRecord = nil
+                            }
+                        }
+                    }
+                    Button(L("改用配对安装")) {
+                        otaRecord = nil
+                        installSignedFile(LocalFileItem(url: SignedIPAStore.url(for: record),
+                            name: record.appName, relativeDir: "Signed",
+                            size: record.size, modified: record.date,
+                            isDirectory: false, childCount: 0))
+                    }
+                }
+            }
+            .navigationTitle(L("Cellular Install (OTA)"))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L("取消")) { otaRecord = nil }
+                }
+            }
+        }
+    }
+
+    /// 分享 manifest + 已签名 IPA（shareFile 同款 present 写法，双文件版）。
+    private func shareOTAFiles(record: SignedIPARecord, manifestURL: URL) {
+        DispatchQueue.main.async {
+            let sheet = UIActivityViewController(activityItems: [manifestURL, SignedIPAStore.url(for: record)], applicationActivities: nil)
+            guard let top = UIApplication.shared.topViewController else { return }
+            sheet.popoverPresentationController?.sourceView = top.view
+            sheet.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY,
+                                                                     width: 0, height: 0)
+            top.present(sheet, animated: true)
+        }
+    }
+
     /// 文件页配对安装状态：只在文件页内显示，不碰共享「安装」页。
     /// 进行中显示 Engine 进度 +“取消安装”（调 Engine 的
     /// cancelOneClick，中止 pipelineTask；取消后 isRunning 落下触发
@@ -890,6 +981,25 @@ struct FilesTabView: View {
         }
         .sheet(item: $moveItem) { item in
             moveSheetContent(item: item)
+        }
+        .confirmationDialog(installChoiceRecord?.appName ?? "", isPresented: Binding(
+            get: { installChoiceRecord != nil },
+            set: { if !$0 { installChoiceRecord = nil } }
+        )) {
+            Button(L("Pairing Install")) {
+                if let record = installChoiceRecord {
+                    installSignedFile(LocalFileItem(url: SignedIPAStore.url(for: record),
+                        name: record.appName, relativeDir: "Signed",
+                        size: record.size, modified: record.date,
+                        isDirectory: false, childCount: 0))
+                }
+            }
+            Button(L("Cellular Install (OTA)")) {
+                if let record = installChoiceRecord { startOTAInstall(record: record) }
+            }
+        }
+        .sheet(item: $otaRecord) { record in
+            otaSheet(record: record)
         }
         .sheet(isPresented: $showImporter) {
             FileImporterRepresentableView(
@@ -2298,7 +2408,7 @@ struct FilesTabView: View {
     private func signedRow(_ record: SignedIPARecord) -> some View {
         let iconPath = SignedIPAStore.url(for: record).path
         return VStack(alignment: .leading, spacing: 6) {
-            // 点行直装（轻松签已签名行同款）；选择模式下点行改选。
+            // 点行先选安装方式（配对安装 / 流量安装 OTA）；选择模式下点行改选。
             Button {
                 if selectingSigned {
                     if selectedSignedIDs.contains(record.id) {
@@ -2308,10 +2418,9 @@ struct FilesTabView: View {
                     }
                 } else {
                     CZFHaptics.impact(.light)
-                    installSignedFile(LocalFileItem(url: SignedIPAStore.url(for: record),
-                        name: record.appName, relativeDir: "Signed",
-                        size: record.size, modified: record.date,
-                        isDirectory: false, childCount: 0))
+                    // OTA 0.9.104：点行先选安装方式（配对安装 / 流量安装），
+                    // 不再一点就直装配对——流量安装是不用 WiFi 的主路。
+                    installChoiceRecord = record
                 }
             } label: {
                 HStack(spacing: 10) {
@@ -2339,7 +2448,7 @@ struct FilesTabView: View {
             }
             .buttonStyle(.plain)
             .task(id: "\(iconPath)#\(record.size)-\(record.date.timeIntervalSince1970)") { loadLibraryIcon(for: iconPath, signed: true) }
-            // 行下按钮排已删：安装走点行直装，分享/删除进长按菜单。
+            // 行下按钮排已删：安装走点行选方式，分享/删除进长按菜单。
             .contextMenu {
                 ShareLink(item: SignedIPAStore.url(for: record)) {
                     Label(L("分享"), systemImage: "square.and.arrow.up")

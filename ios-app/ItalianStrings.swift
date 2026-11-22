@@ -504,6 +504,18 @@ let italianStrings: [String: String] = [
         "L'abbinamento non è stato trasferito nel nuovo formato. SideStore potrebbe richiedere il file di abbinamento.",
     "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
         "Il certificato di firma non è stato trasferito. SideStore potrebbe richiedere una nuova firma al primo accesso.",
+    "Cellular Install (OTA)":
+        "Installazione via dati (OTA)",
+    "Pairing Install":
+        "Installazione con abbinamento",
+    "Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.":
+        "Carica questi due file su R2, poi installa: %@ e %@. Caricali tramite il ponte WebDAV https://r2-webdav.wozofa.workers.dev o la console R2; .plist come text/xml, .ipa come application/octet-stream. Dopo il caricamento, tocca “Già caricato, installa”.",
+    "Uploaded, Start Install":
+        "Già caricato, installa",
+    "After installing, the first launch will say “Untrusted Enterprise Developer”: go to Settings → General → VPN & Device Management to trust the certificate, tap “Allow and Restart”, then open the app again.":
+        "Dopo l’installazione, al primo avvio comparirà “Sviluppatore aziendale non attendibile”: vai in Impostazioni → Generali → VPN e gestione dispositivi per autorizzare il certificato, tocca “Consenti e riavvia”, poi riapri l’app.",
+    "Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.":
+        "L’installazione via dati non è riuscita ad aprire l’installatore di sistema: controlla i link R2 oppure usa l’installazione con abbinamento.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "Le impostazioni anisette di SideStore non sono state applicate. Se l'accesso non riesce con -80046, disattiva Anisette sul dispositivo e la rotazione automatica, e scegli “SideStore (New)”。",
     "Last refresh (its notification couldn't be delivered): %@":

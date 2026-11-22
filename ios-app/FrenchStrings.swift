@@ -509,6 +509,18 @@ let frenchStrings: [String: String] = [
         "Le jumelage n'a pas été transmis dans le nouveau format. SideStore pourrait demander le fichier de jumelage.",
     "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
         "Le certificat de signature n'a pas été transmis. SideStore pourrait demander une nouvelle signature à la première connexion.",
+    "Cellular Install (OTA)":
+        "Installation cellulaire (OTA)",
+    "Pairing Install":
+        "Installation par jumelage",
+    "Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.":
+        "Envoyez ces deux fichiers sur R2, puis installez : %@ et %@. Envoyez-les via le pont WebDAV https://r2-webdav.wozofa.workers.dev ou la console R2 ; .plist en text/xml, .ipa en application/octet-stream. Après l’envoi, touchez « Déjà envoyé, installer ».",
+    "Uploaded, Start Install":
+        "Déjà envoyé, installer",
+    "After installing, the first launch will say “Untrusted Enterprise Developer”: go to Settings → General → VPN & Device Management to trust the certificate, tap “Allow and Restart”, then open the app again.":
+        "Après l’installation, le premier lancement affichera « Développeur d’entreprise non approuvé » : allez dans Réglages → Général → VPN et gestion des appareils pour approuver le certificat, touchez « Autoriser et redémarrer », puis rouvrez l’app.",
+    "Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.":
+        "L’installation cellulaire n’a pas pu ouvrir l’installateur système : vérifiez les liens R2 ou utilisez l’installation par jumelage.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "Les réglages anisette de SideStore n'ont pas pu être définis. Si sa connexion échoue avec -80046, désactivez Anisette sur l'appareil et la rotation automatique, et choisissez « SideStore (New) ».",
     "Last refresh (its notification couldn't be delivered): %@":

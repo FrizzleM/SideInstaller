@@ -492,6 +492,18 @@ let japaneseStrings: [String: String] = [
         "ペアリングを新しい形式で渡せませんでした。SideStore が初回起動時にペアリングファイルを求める場合があります。",
     "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
         "署名証明書を渡せませんでした。SideStore が初回サインイン時に再署名を求める場合があります。",
+    "Cellular Install (OTA)":
+        "モバイル通信でインストール（OTA）",
+    "Pairing Install":
+        "ペアリングでインストール",
+    "Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.":
+        "この 2 つのファイルを R2 にアップロードしてからインストールします：%@ と %@。WebDAV ブリッジ https://r2-webdav.wozofa.workers.dev または R2 コンソールからアップロードしてください。.plist は text/xml、.ipa は application/octet-stream です。アップロード後、「アップロード済み、インストール開始」をタップしてください。",
+    "Uploaded, Start Install":
+        "アップロード済み、インストール開始",
+    "After installing, the first launch will say “Untrusted Enterprise Developer”: go to Settings → General → VPN & Device Management to trust the certificate, tap “Allow and Restart”, then open the app again.":
+        "インストール後、初回起動時に「信頼されていないエンタープライズデベロッパ」と表示されます。「設定 → 一般 → VPN とデバイス管理」で証明書を信頼し、「許可して再起動」をタップしてから、もう一度アプリを開いてください。",
+    "Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.":
+        "モバイル通信インストールでシステムインストーラーを開けませんでした。R2 のリンクを確認するか、ペアリングでインストールしてください。",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "SideStore の anisette 設定を書き込めませんでした。サインインが -80046 で失敗する場合は、デバイス上の Anisette と自動ローテーションをオフにして「SideStore (New)」を選んでください。",
     "Last refresh (its notification couldn't be delivered): %@":

@@ -506,6 +506,18 @@ let portugueseStrings: [String: String] = [
         "O emparelhamento não foi entregue no novo formato. O SideStore pode pedir o arquivo de emparelhamento.",
     "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
         "O certificado de assinatura não foi entregue. O SideStore pode pedir uma nova assinatura no primeiro login.",
+    "Cellular Install (OTA)":
+        "Instalação por dados (OTA)",
+    "Pairing Install":
+        "Instalação por emparelhamento",
+    "Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.":
+        "Envie estes dois arquivos para o R2 e instale: %@ e %@. Envie pelo ponte WebDAV https://r2-webdav.wozofa.workers.dev ou pelo console R2; .plist como text/xml, .ipa como application/octet-stream. Depois de enviar, toque em “Já enviado, instalar”.",
+    "Uploaded, Start Install":
+        "Já enviado, instalar",
+    "After installing, the first launch will say “Untrusted Enterprise Developer”: go to Settings → General → VPN & Device Management to trust the certificate, tap “Allow and Restart”, then open the app again.":
+        "Depois de instalar, a primeira abertura dirá “Desenvolvedor empresarial não confiável”: vá em Ajustes → Geral → VPN e Gerenciamento de Dispositivos para confiar no certificado, toque em “Permitir e reiniciar” e abra o app novamente.",
+    "Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.":
+        "A instalação por dados não conseguiu abrir o instalador do sistema: verifique os links R2 ou use a instalação por emparelhamento.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "Não foi possível aplicar as configurações de anisette do SideStore. Se o login falhar com -80046, desative o Anisette no dispositivo e a rotação automática, e escolha “SideStore (New)”。",
     "Last refresh (its notification couldn't be delivered): %@":

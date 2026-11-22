@@ -491,6 +491,18 @@ let chineseStrings: [String: String] = [
         "配对文件没能以新格式交过去，SideStore 首次打开时可能会索要配对文件。",
     "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
         "签名证书没交过去，SideStore 首次登录时可能要求重新签名。",
+    "Cellular Install (OTA)":
+        "流量安装（OTA）",
+    "Pairing Install":
+        "配对安装",
+    "Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.":
+        "把这两个文件传到 R2 再安装：%@ 和 %@。经 WebDAV 桥 https://r2-webdav.wozofa.workers.dev 或 R2 控制台上传；.plist 用 text/xml，.ipa 用 application/octet-stream。传完点“已上传，开始安装”。",
+    "Uploaded, Start Install":
+        "已上传，开始安装",
+    "After installing, the first launch will say “Untrusted Enterprise Developer”: go to Settings → General → VPN & Device Management to trust the certificate, tap “Allow and Restart”, then open the app again.":
+        "装完首次打开会提示“不受信任的企业级开发者”：去“设置 → 通用 → VPN 与设备管理”信任证书，点“允许并重新启动”后再打开。",
+    "Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.":
+        "流量安装没能拉起系统安装：请检查 R2 链接，或改用配对安装。",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "SideStore 的 anisette 设置没能写进去。如果它登录时报 -80046，请关掉本机 Anisette 与自动轮换，并选择“SideStore (New)”。",
     "Last refresh (its notification couldn't be delivered): %@":

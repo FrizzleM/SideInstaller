@@ -493,6 +493,18 @@ let koreanStrings: [String: String] = [
         "페어링을 새 형식으로 전달하지 못했습니다. SideStore가 처음 실행될 때 페어링 파일을 요청할 수 있습니다.",
     "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
         "서명 인증서를 전달하지 못했습니다. SideStore가 처음 로그인할 때 다시 서명을 요청할 수 있습니다.",
+    "Cellular Install (OTA)":
+        "데이터 설치(OTA)",
+    "Pairing Install":
+        "페어링 설치",
+    "Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.":
+        "이 두 파일을 R2에 업로드한 뒤 설치하세요: %@ 및 %@. WebDAV 브리지 https://r2-webdav.wozofa.workers.dev 또는 R2 콘솔로 업로드하세요. .plist는 text/xml, .ipa는 application/octet-stream입니다. 업로드 후 “업로드 완료, 설치 시작”을 누르세요.",
+    "Uploaded, Start Install":
+        "업로드 완료, 설치 시작",
+    "After installing, the first launch will say “Untrusted Enterprise Developer”: go to Settings → General → VPN & Device Management to trust the certificate, tap “Allow and Restart”, then open the app again.":
+        "설치 후 처음 실행하면 “신뢰할 수 없는 엔터프라이즈 개발자”라는 메시지가 표시됩니다. 설정 → 일반 → VPN 및 기기 관리에서 인증서를 신뢰하고 “허용 및 재시작”을 누른 뒤 앱을 다시 여세요.",
+    "Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.":
+        "데이터 설치가 시스템 설치 프로그램을 열지 못했습니다. R2 링크를 확인하거나 페어링 설치를 사용하세요.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "SideStore의 anisette 설정을 적용하지 못했습니다. 로그인 시 -80046 오류가 발생하면 기기 내 Anisette와 자동 순환을 끄고 “SideStore (New)”를 선택하세요.",
     "Last refresh (its notification couldn't be delivered): %@":

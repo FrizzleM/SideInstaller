@@ -505,6 +505,18 @@ let vietnameseStrings: [String: String] = [
         "Không thể chuyển tệp ghép nối ở định dạng mới. SideStore có thể yêu cầu tệp ghép nối khi mở lần đầu.",
     "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
         "Không thể chuyển chứng chỉ ký. SideStore có thể yêu cầu ký lại khi đăng nhập lần đầu.",
+    "Cellular Install (OTA)":
+        "Cài đặt qua dữ liệu (OTA)",
+    "Pairing Install":
+        "Cài đặt qua ghép nối",
+    "Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.":
+        "Tải hai tệp này lên R2 rồi cài đặt: %@ và %@. Tải lên qua cầu WebDAV https://r2-webdav.wozofa.workers.dev hoặc bảng điều khiển R2; .plist dạng text/xml, .ipa dạng application/octet-stream. Sau khi tải lên, chạm vào “Đã tải lên, bắt đầu cài đặt”.",
+    "Uploaded, Start Install":
+        "Đã tải lên, bắt đầu cài đặt",
+    "After installing, the first launch will say “Untrusted Enterprise Developer”: go to Settings → General → VPN & Device Management to trust the certificate, tap “Allow and Restart”, then open the app again.":
+        "Sau khi cài đặt, lần mở đầu tiên sẽ báo “Nhà phát triển doanh nghiệp không đáng tin cậy”: vào Cài đặt → Cài đặt chung → VPN & Quản lý thiết bị để tin cậy chứng chỉ, chạm “Cho phép và khởi động lại”, rồi mở lại ứng dụng.",
+    "Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.":
+        "Cài đặt qua dữ liệu không mở được trình cài đặt hệ thống: hãy kiểm tra các liên kết R2 hoặc dùng cài đặt qua ghép nối.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "Không thể đặt cài đặt anisette của SideStore. Nếu đăng nhập lỗi -80046, hãy tắt Anisette trên thiết bị và tính năng tự động xoay, và chọn “SideStore (New)”。",
     "Last refresh (its notification couldn't be delivered): %@":

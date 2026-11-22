@@ -76,6 +76,69 @@ final class OTAInstallServer: ObservableObject {
         tryPort(18080)
     }
 
+    // MARK: - 公网 OTA（企业证书 + R2 托管，0.9.104，v1 手动上传）
+
+    /// R2 公开直链前缀（用户自己的桶 xiaofang-ipa；manifest 与 IPA 都放这里）。
+    static let r2BaseURL = "https://pub-c948069b1c9743189b263b39ecce2ca7.r2.dev/"
+
+    /// manifest 文件名：同名 .ipa 换 .plist 后缀。
+    static func publicManifestFileName(for ipaFileName: String) -> String {
+        (ipaFileName as NSString).deletingPathExtension + ".plist"
+    }
+
+    /// R2 上的 manifest 直链（文件名按路径段编码）。
+    static func publicManifestR2URL(for ipaFileName: String) -> String {
+        let name = publicManifestFileName(for: ipaFileName)
+        return r2BaseURL + (name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name)
+    }
+
+    /// R2 上的 IPA 直链。
+    static func publicIPAR2URL(for ipaFileName: String) -> String {
+        r2BaseURL + (ipaFileName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ipaFileName)
+    }
+
+    /// 按标准 itms-services 格式生成 manifest（与回环 onReady 同款 items 结构，
+    /// 基址换 R2 https 地址；补 subtitle；不起本地服务、不走回环）。
+    static func publicManifestData(ipaFileName: String, appName: String, bundleID: String, version: String) -> Data? {
+        let item: [String: Any] = [
+            "assets": [
+                ["kind": "software-package", "url": publicIPAR2URL(for: ipaFileName)],
+            ],
+            "metadata": [
+                "bundle-identifier": bundleID,
+                "bundle-version": version,
+                "kind": "software",
+                "subtitle": appName,
+                "title": appName,
+            ],
+        ]
+        return try? PropertyListSerialization.data(
+            fromPropertyList: ["items": [item]], format: .xml, options: 0)
+    }
+
+    /// 把 manifest 写到已签名 IPA 旁边（SignedIPAStore.dir），返回文件地址；
+    /// 生成或写盘失败返回 nil（调用方显示“安装清单生成失败”并留配对入口）。
+    static func writePublicManifest(for record: SignedIPARecord) -> URL? {
+        guard !record.bundleID.isEmpty,
+              let data = publicManifestData(ipaFileName: record.fileName, appName: record.appName,
+                                            bundleID: record.bundleID, version: record.version ?? "1.0") else {
+            return nil
+        }
+        let url = SignedIPAStore.dir.appendingPathComponent(publicManifestFileName(for: record.fileName))
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            return nil
+        }
+        return url
+    }
+
+    /// itms-services 安装链接（manifest 直链按 query 编码，onReady 同款写法）。
+    static func publicInstallURL(manifestR2URL: String) -> URL? {
+        let encoded = manifestR2URL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? manifestR2URL
+        return URL(string: "itms-services://?action=download-manifest&url=\(encoded)")
+    }
+
     func stop() {
         stopWork?.cancel()
         stopWork = nil

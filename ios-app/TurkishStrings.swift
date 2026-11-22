@@ -531,6 +531,18 @@ let turkishStrings: [String: String] = [
         "Eşleştirme yeni biçimde aktarılamadı. SideStore ilk açılışta eşleştirme dosyasını isteyebilir.",
     "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
         "İmzalama sertifikası aktarılamadı. SideStore ilk oturum açışta yeniden imzalamayı isteyebilir.",
+    "Cellular Install (OTA)":
+        "Mobil veriyle yükleme (OTA)",
+    "Pairing Install":
+        "Eşleştirme ile yükleme",
+    "Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.":
+        "Bu iki dosyayı R2’ye yükleyip sonra kurun: %@ ve %@. WebDAV köprüsü https://r2-webdav.wozofa.workers.dev veya R2 konsoluyla yükleyin; .plist text/xml, .ipa application/octet-stream olarak. Yükledikten sonra “Yüklendi, yüklemeyi başlat” düğmesine dokunun.",
+    "Uploaded, Start Install":
+        "Yüklendi, yüklemeyi başlat",
+    "After installing, the first launch will say “Untrusted Enterprise Developer”: go to Settings → General → VPN & Device Management to trust the certificate, tap “Allow and Restart”, then open the app again.":
+        "Kurulumdan sonra ilk açılışta “Güvenilmeyen Kurumsal Geliştirici” uyarısı çıkar: Ayarlar → Genel → VPN ve Aygıt Yönetimi’ne gidip sertifikaya güvenin, “İzin Ver ve Yeniden Başlat”a dokunun, ardından uygulamayı yeniden açın.",
+    "Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.":
+        "Mobil veriyle yükleme sistem yükleyicisini açamadı: R2 bağlantılarını kontrol edin veya eşleştirme ile yüklemeyi kullanın.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "SideStore'un anisette ayarları uygulanamadı. Girişi -80046 hatasıyla başarısız olursa cihaz içi Anisette'i ve otomatik döndürmeyi kapatıp “SideStore (New)” öğesini seçin.",
     "Last refresh (its notification couldn't be delivered): %@":

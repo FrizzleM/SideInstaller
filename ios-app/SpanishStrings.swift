@@ -507,6 +507,18 @@ let spanishStrings: [String: String] = [
         "El emparejamiento no se entregó en el nuevo formato. SideStore podría pedir el archivo de emparejamiento.",
     "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
         "El certificado de firma no se entregó. SideStore podría pedir una nueva firma en el primer inicio de sesión.",
+    "Cellular Install (OTA)":
+        "Instalación por datos (OTA)",
+    "Pairing Install":
+        "Instalación por emparejamiento",
+    "Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.":
+        "Sube estos dos archivos a R2 y luego instala: %@ y %@. Súbelos por el puente WebDAV https://r2-webdav.wozofa.workers.dev o la consola R2; .plist como text/xml, .ipa como application/octet-stream. Después de subirlos, toca «Ya subido, instalar».",
+    "Uploaded, Start Install":
+        "Ya subido, instalar",
+    "After installing, the first launch will say “Untrusted Enterprise Developer”: go to Settings → General → VPN & Device Management to trust the certificate, tap “Allow and Restart”, then open the app again.":
+        "Tras instalar, el primer inicio dirá «Desarrollador empresarial no confiable»: ve a Ajustes → General → VPN y gestión de dispositivos para confiar en el certificado, toca «Permitir y reiniciar» y vuelve a abrir la app.",
+    "Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.":
+        "La instalación por datos no pudo abrir el instalador del sistema: revisa los enlaces R2 o usa la instalación por emparejamiento.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "No se pudieron aplicar los ajustes de anisette de SideStore. Si el inicio de sesión falla con -80046, desactiva Anisette en el dispositivo y la rotación automática, y elige “SideStore (New)”。",
     "Last refresh (its notification couldn't be delivered): %@":
