@@ -235,7 +235,7 @@ final class LANTransferServer: ObservableObject {
 
     /// 上传第一阶段：攒 body 直到 part 头齐（`\r\n\r\n`），取文件名、建临时
     /// 文件，进内容流。part 头本身很小，超 64KB 就是非法请求。
-    private func receiveUploadHead(connection: NWConnection, head: RequestHead,
+    private func receiveUploadHead(_ connection: NWConnection, head: RequestHead,
                                    boundary: String, body: Data, received: Int) {
         let headEnd = Data("\r\n\r\n".utf8)
         if let range = body.range(of: headEnd) {
@@ -287,7 +287,7 @@ final class LANTransferServer: ObservableObject {
     /// 上传第二阶段：内容边收边写临时文件。收尾 marker（`\r\n--boundary`）
     /// 可能跨块，先扫整段待写窗口再落盘，留尾部（marker 长 − 1）字节不写，
     /// 见到 marker 才算收完——与 saveUpload“截在第一个 marker 处”同款。
-    private func receiveUploadBody(connection: NWConnection, sink: UploadSink, chunk: Data) {
+    private func receiveUploadBody(_ connection: NWConnection, sink: UploadSink, chunk: Data) {
         if !sink.markerFound, !chunk.isEmpty {
             sink.pending.append(chunk)
             if let at = sink.pending.range(of: sink.tailMarker) {
@@ -340,7 +340,7 @@ final class LANTransferServer: ObservableObject {
 
     /// 收满：没见到收尾 marker 就是非法 body，删临时文件回 400；见到了就
     /// 按重名规则把临时文件挪到 Documents，回 303。
-    private func finishUpload(connection: NWConnection, sink: UploadSink) {
+    private func finishUpload(_ connection: NWConnection, sink: UploadSink) {
         try? sink.handle.close()
         guard sink.markerFound else {
             try? FileManager.default.removeItem(at: sink.tempURL)
@@ -359,7 +359,7 @@ final class LANTransferServer: ObservableObject {
     }
 
     /// 上传失败/取消/断开：关句柄、删临时文件、断连接，Documents 里不留半截文件。
-    private func failUpload(connection: NWConnection, sink: UploadSink) {
+    private func failUpload(_ connection: NWConnection, sink: UploadSink) {
         try? sink.handle.close()
         try? FileManager.default.removeItem(at: sink.tempURL)
         connection.cancel()
