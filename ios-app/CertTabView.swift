@@ -81,6 +81,12 @@ struct CertTabView: View {
     @State private var showPluginPicker = false
     @State private var pluginError: String?
     @State private var iconItem: PhotosPickerItem?
+    /// B12-6：新图标的解码缓存——`mods.icon` 是相册原图 Data（数 MB），
+    /// `iconRow` 每遍 body 都 `UIImage(data:)` 重解；这里只解一次，
+    /// body 只读缓存。`decodedIconData` 记缓存对应哪份 Data，视图
+    /// 重建导致任务重跑时不再重复解码。
+    @State private var decodedIcon: UIImage?
+    @State private var decodedIconData: Data?
     @State private var signBusy = false
     @State private var signOnlyMessage: String?
     @State private var signOnlyFailed = false
@@ -1587,7 +1593,7 @@ struct CertTabView: View {
     /// 无图标或白图标时补一张默认图标（App 内已有的 AppLogo 资源）。
     private var iconRow: some View {
         HStack(spacing: 10) {
-            if let icon = mods.icon, let image = UIImage(data: icon) {
+            if let image = decodedIcon {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -1596,6 +1602,8 @@ struct CertTabView: View {
                 Button {
                     mods.icon = nil
                     iconItem = nil
+                    decodedIcon = nil
+                    decodedIconData = nil
                 } label: {
                     Text(L("清除"))
                         .font(.footnote)
@@ -1606,7 +1614,7 @@ struct CertTabView: View {
                     Text(L("修复图标"))
                         .font(.footnote)
                 }
-            } else {
+            } else if mods.icon == nil {
                 PhotosPicker(selection: $iconItem, matching: .images) {
                     Text(L("从相册选择"))
                         .font(.footnote)
@@ -1617,8 +1625,37 @@ struct CertTabView: View {
                     Text(L("修复图标"))
                         .font(.footnote)
                 }
+            } else {
+                // B12-6：解码中——占位，不闪回“从相册选择”。
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(Color.secondary.opacity(0.15))
+                    .frame(width: 40, height: 40)
+                Button {
+                    repairIcon()
+                } label: {
+                    Text(L("修复图标"))
+                        .font(.footnote)
+                }
             }
             Spacer()
+        }
+        .task(id: mods.icon) {
+            // B12-6：照抄同文件 S15（loadLibraryIcon :2609）：mods.icon
+            // 变时 detached 解一次、写回前核对仍是同一份 Data，旧解码
+            // 不覆盖新图；.task 跑在主线程上（Swift 5 靶里 .task 继承
+            // MainActor，见核验技能），读写 @State 不用再跳。
+            guard let data = mods.icon else {
+                decodedIcon = nil
+                decodedIconData = nil
+                return
+            }
+            guard decodedIconData != data else { return }
+            let decoded = await Task.detached(priority: .userInitiated) {
+                UIImage(data: data)
+            }.value
+            guard mods.icon == data else { return }
+            decodedIcon = decoded
+            decodedIconData = data
         }
     }
 

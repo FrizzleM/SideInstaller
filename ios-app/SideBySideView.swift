@@ -588,6 +588,10 @@ final class SideBySideManager: ObservableObject {
             pairingPIN = nil
             setTrustWait(false)
             remembersTheirIPhone = PrivateStore.hasPeerPairings
+            // C20：同 Engine 三路——签好的包解在 tmp/<名>_extracted，
+            // 收尾删掉它再置 nil（helper 在 Engine.swift，internal）。
+            if let signed = signedAppPath { Engine.discardSignedBundle(at: signed) }
+            signedAppPath = nil
             isRunning = false
             isCancelling = false
             UIApplication.shared.isIdleTimerDisabled = false

@@ -141,14 +141,6 @@ enum NetworkStatus {
         }
     }
 
-    /// True when a tunnel carries traffic to `deviceIP`, without probing: a
-    /// full-tunnel VPN counts only when its subnet holds `deviceIP`. Never
-    /// equality: `deviceIP` is the peer, which no interface holds.
-    static func loopbackTunnelUp(deviceIP: String) -> Bool {
-        let (route, fallbackMatch) = tunnelRoute(in: interfaces(), deviceIP: deviceIP)
-        return tunnelIsUp(route: route, fallbackMatch: fallbackMatch, probe: nil)
-    }
-
     private static func tunnelRoute(in ifs: [Interface],
                                     deviceIP: String) -> (route: TunnelRoute, fallbackMatch: Bool) {
         guard let target = ipv4Value(deviceIP) else {

@@ -16,9 +16,6 @@ import UIKit
 enum Theme {
     // MARK: Ramp
 
-    /// The page behind everything: a navy so deep it reads as black until a
-    /// card sits on it.
-    static let page = Color(red: 5 / 255, green: 11 / 255, blue: 24 / 255)
     /// A card on the page. Dark keeps the night navy; light uses the
     /// system's secondary background, so the black text on it stays
     /// readable — a fixed navy under black text was unreadable in
@@ -49,9 +46,15 @@ enum Theme {
     static let control = ice.opacity(0.07)
     /// The edge of a card or control.
     static let hairline = ice.opacity(0.1)
-    /// Captions, meta and quiet icons: a slate blue, at least 4.5:1 on a
-    /// popup and more on a card.
-    static let muted = Color(red: 127 / 255, green: 141 / 255, blue: 165 / 255)
+    /// Captions, meta and quiet icons: a slate blue. Dark keeps the old
+    /// value (at least 4.5:1 on a popup, more on a card); light uses a
+    /// deeper slate (#5A6678, 5.82:1 on white, 5.22:1 on a card) — the
+    /// old value was only 3.36:1 on white in light mode.
+    static let muted = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 127 / 255, green: 141 / 255, blue: 165 / 255, alpha: 1)
+            : UIColor(red: 90 / 255, green: 102 / 255, blue: 120 / 255, alpha: 1)
+    })
 
     // MARK: Colour
 

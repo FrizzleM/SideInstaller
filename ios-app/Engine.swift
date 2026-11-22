@@ -805,6 +805,10 @@ final class Engine {
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
+            // C20：签好的包解在 tmp/<名>_extracted，收尾删掉它再置 nil；
+            // 删失败静默（helper 内 try?），下次重装同名目录会先清旧的。
+            if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
+            signedAppPath = nil
             isRunning = false
             isCancelling = false
             pairingPIN = nil
@@ -2270,6 +2274,10 @@ final class Engine {
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
+            // C20：签好的包解在 tmp/<名>_extracted，收尾删掉它再置 nil；
+            // 删失败静默（helper 内 try?），下次重装同名目录会先清旧的。
+            if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
+            signedAppPath = nil
             isRunning = false
             isCancelling = false
             pairingPIN = nil
@@ -2299,7 +2307,7 @@ final class Engine {
         try certDER.write(to: certPath)
         try keyDER.write(to: keyPath)
         var iconPath: String? = nil
-        if let icon = mods.icon {
+        if let icon = mods.pngIconData() {
             let path = tmp.appendingPathComponent("icon.png")
             try icon.write(to: path)
             iconPath = path.path
@@ -2400,6 +2408,10 @@ final class Engine {
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
+            // C20：签好的包解在 tmp/<名>_extracted，收尾删掉它再置 nil；
+            // 删失败静默（helper 内 try?），下次重装同名目录会先清旧的。
+            if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
+            signedAppPath = nil
             isRunning = false
             isCancelling = false
             pairingPIN = nil
@@ -3452,7 +3464,7 @@ final class Engine {
         }
     }
 
-    // MARK: - Upstream helpers (from the Links section; receiveLink/answerLink/installLinkedIPA kept as fork versions, so those duplicates are not taken)
+    // MARK: - App presence & SideStore pairing helpers
 
     /// True unless SideStore is known to be missing (see `appPresence`).
     /// Opening it reports when it isn't there.
@@ -3465,12 +3477,6 @@ final class Engine {
     /// keeps SideStore's certificate itself (`LiveContainerCertificate`).
     var canUseSideStoreCertificate: Bool {
         Self.runsInLiveContainer || sideStoreInstalled
-    }
-
-    /// True unless LiveContainer is known to be missing (see `appPresence`).
-    /// Opening it reports when it isn't there.
-    var liveContainerInstalled: Bool {
-        mayBeInstalled(scheme: "livecontainer")
     }
 
     /// Bumped each time SideInstaller comes back to the front. Apps installed
@@ -3535,25 +3541,6 @@ final class Engine {
         let defaults = UserDefaults.self as AnyObject
         guard defaults.responds(to: selector) else { return nil }
         return defaults.perform(selector)?.takeUnretainedValue() as? Bundle
-    }
-
-    /// Opens `livecontainer://install?url=`, which has LiveContainer download
-    /// the IPA and install it inside itself. LiveContainer asks before
-    /// replacing an app with the same bundle ID.
-    @MainActor
-    func installInLiveContainer(_ ipa: URL) {
-        // LiveContainer takes the link percent-decoded, so all of it is encoded.
-        let link = ipa.absoluteString.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
-        guard let url = URL(string: "livecontainer://install?url=\(link)") else { return }
-        lastError = nil
-        log("Asking LiveContainer to install \(ipa.lastPathComponent) …")
-        UIApplication.shared.open(url) { opened in
-            Task { @MainActor in
-                guard !opened else { return }
-                self.lastError = ErrorHelp.explained(L("LiveContainer isn't installed on this iPhone."))
-                self.log("⛔️ LiveContainer: \(self.lastError ?? "")")
-            }
-        }
     }
 
     /// True when “Get it from SideStore” has somewhere to get the pairing file:
@@ -3902,8 +3889,11 @@ final class Engine {
     }
 
     /// Deletes a signed bundle after it's installed. A refresh extracts one
-    /// bundle per app, so each is removed right away to save space.
-    private static func discardSignedBundle(at path: String) {
+    /// bundle per app, so each is removed right away to save space; the
+    /// install pipelines call it from their shared tail for the same
+    /// reason, and Side by Side calls it as `Engine.discardSignedBundle`
+    /// (C20 — internal, not private, so the other file can reach it).
+    static func discardSignedBundle(at path: String) {
         // isideload extracts to <temp>/<ipa file name>_extracted/Payload/X.app.
         // Remove that `_extracted` directory; leave any other path alone.
         let temp = URL(fileURLWithPath: NSTemporaryDirectory()).standardizedFileURL

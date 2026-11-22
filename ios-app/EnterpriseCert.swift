@@ -2,6 +2,7 @@ import Foundation
 import Security
 import SideInstallerFFI
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 /// 企业证书签名的材料存储：.p12 与 .mobileprovision 复制进
@@ -885,8 +886,18 @@ struct CertSignMods {
     /// 自定义输出主名（表单“打包文件名”可编辑项，空着回落源文件名；
     /// 不进预设，换 IPA 时随 mods 一起清空）。
     var outputName = ""
-    /// 新图标的 PNG 数据（选了才有）。
+    /// 新图标的数据（选了才有）。挑图处存的是相册原图字节，不保证
+    /// 是 PNG；签名写盘前由 `pngIconData()` 转真 PNG（C24）。
     var icon: Data? = nil
+
+    /// 签名用的图标字节：真 PNG。Rust `apply_icon` 把给定字节原样
+    /// 覆盖到各 `*.png` 图标文件上，不解码不校验，所以 JPEG/HEIC
+    /// 原字节会装出坏图标；这里先解码再 `pngData()` 转码，解码失败
+    /// 回落原字节——行为不比现况差（C24）。
+    func pngIconData() -> Data? {
+        guard let icon else { return nil }
+        return UIImage(data: icon)?.pngData() ?? icon
+    }
     /// 要注入的插件文件（已复制到暂存目录的 .dylib/.deb/.zip）。
     var plugins: [URL] = []
     /// 瘦身与兼容（签名段“更多设置”里的三个开关，默认全关）：
@@ -1441,7 +1452,7 @@ enum CertSigner {
             try certDER.write(to: certPath)
             try keyDER.write(to: keyPath)
             var iconPath: String? = nil
-            if let icon = mods.icon {
+            if let icon = mods.pngIconData() {
                 let path = tmp.appendingPathComponent("icon.png")
                 try icon.write(to: path)
                 iconPath = path.path

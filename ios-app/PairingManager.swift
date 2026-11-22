@@ -198,11 +198,6 @@ final class PairingManager: ObservableObject {
 
     // MARK: - Helpers
 
-    /// Human-readable pairing-file size, e.g. "2 KB".
-    var pairingFileSizeText: String {
-        ByteCountFormatter.string(fromByteCount: Int64(pairingFileSize), countStyle: .file)
-    }
-
     private func message(_ error: Error) -> String {
         (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     }

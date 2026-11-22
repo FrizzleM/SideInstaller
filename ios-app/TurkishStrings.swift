@@ -441,6 +441,70 @@ let turkishStrings: [String: String] = [
 
     "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "İçe aktarıldı, ancak sertifika listesi yenilenemedi. Yeniden yükleyene kadar güncel olmayabilir.",
+    "%@ is on their iPhone":
+        "%@ onların iPhone'unda",
+    "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
+        "%@ onların iPhone'unda ama eşleştirme dosyası eklenemedi (%@). Side by Side'ı yeniden çalıştır ya da %@ içinde bir eşleştirme dosyası içe aktar.",
+    "Apple may send a code to their devices, so keep their iPhone close.":
+        "Apple onların cihazlarına bir kod gönderebilir, o yüzden onların iPhone'unu yakınında tut.",
+    "Change details":
+        "Ayrıntıları değiştir",
+    "Connect their iPhone to the same Wi-Fi network as this one.":
+        "Onların iPhone'unu bu iPhone ile aynı Wi-Fi ağına bağla.",
+    "Couldn't download %@: %@":
+        "%@ indirilemedi: %@",
+    "Do this on their iPhone, then start.":
+        "Bunu onların iPhone'unda yap, sonra başlat.",
+    "Finish on their iPhone":
+        "Onların iPhone'unda bitir",
+    "Get LocalDevVPN from the App Store and connect it: SideStore works through it.":
+        "LocalDevVPN'i App Store'dan alıp bağlan: SideStore onun üzerinden çalışır.",
+    "Get started":
+        "Başla",
+    "Get their iPhone ready":
+        "Onların iPhone'unu hazırla",
+    "Handing over the pairing file…":
+        "Eşleştirme dosyası aktarılıyor…",
+    "Install another app":
+        "Başka bir uygulama yükle",
+    "Installing %@ on their iPhone":
+        "%@ onların iPhone'una yükleniyor",
+    "Looking for their iPhone…":
+        "Onların iPhone'u aranıyor…",
+    "My Apple ID":
+        "Apple kimliğim",
+    "Needs LocalDevVPN on their iPhone":
+        "Onların iPhone'unda LocalDevVPN gerekiyor",
+    "Only if you'll keep their apps signed yourself: they won't have this Apple ID's password.":
+        "Yalnızca onların uygulamalarını kendin imzalı tutacaksan seç: bu Apple kimliğinin parolası onlarda olmayacak.",
+    "Open LiveContainer, go to its Settings tab, and tap “Import Certificate From SideStore”.":
+        "LiveContainer'ı aç, Settings sekmesine git ve “Import Certificate From SideStore” öğesine dokun.",
+    "Open SideStore and sign in with the same Apple ID. Its pairing file is already in place.":
+        "SideStore'u aç ve aynı Apple kimliğiyle oturum aç. Eşleştirme dosyası zaten yerinde.",
+    "Pick one. You can come back for another one later.":
+        "Birini seç. Başka biri için daha sonra dönebilirsin.",
+    "Recommended: they keep their apps signed with it.":
+        "Önerilir: uygulamalarını bununla imzalı tutarlar.",
+    "The app is signed with it, and needs it again every 7 days to keep opening. Use the iPhone owner's.":
+        "Uygulama bununla imzalanıyor ve açılmaya devam etmesi için her 7 günde bir yine buna ihtiyaç duyuyor. iPhone sahibinin kimliğini kullan.",
+    "Their Apple ID":
+        "Onların Apple kimliği",
+    "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
+        "Onların iPhone'unda ücretsiz bir Apple kimliğiyle imzalanmış üç uygulama zaten var; süresi dolanlar da dahil iOS'un izin verdiği en fazla bu kadar. Birini silmeleri gerekiyor, sonra yeniden deneyebilirsin.",
+    "This iPhone no longer keeps a pairing with theirs.":
+        "Bu iPhone artık onların iPhone'uyla eşleştirmeyi tutmuyor.",
+    "Turn on Developer Mode under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu altından Geliştirici Modu'nu aç ve yeniden başlatmanın ardından onayla.",
+    "Unlock their iPhone and keep it next to this one.":
+        "Onların iPhone'unun kilidini aç ve bunu yanında tut.",
+    "Used for this install only, and never saved.":
+        "Yalnızca bu yükleme için kullanılır, asla kaydedilmez.",
+    "Waiting for their iPhone…":
+        "Onların iPhone'u bekleniyor…",
+    "What should go on their iPhone?":
+        "Onların iPhone'una ne yüklensin?",
+    "Which Apple ID signs it?":
+        "Hangi Apple kimliği imzalıyor?",
     "Skipped: refresh stopped.":
         "Atlandı: yenileme durduruldu.",
     "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
