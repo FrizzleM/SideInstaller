@@ -115,7 +115,7 @@ struct DownloadsListView: View {
                     .foregroundStyle(.red)
             }
             if manager.hasLoaded && manager.downloads.isEmpty {
-                Text(L("No downloaded IPAs. Ones you install from the Install tab are cached here."))
+                Text(L("No downloaded IPAs. Ones you install from a source or a file are cached here."))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
@@ -154,6 +154,7 @@ struct DownloadsListView: View {
                 }
             }
         }
+        .listStyle(.plain)
         .navigationTitle(L("下载"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { manager.refresh() }

@@ -1145,3 +1145,13 @@ enum AppAppearance: String, CaseIterable {
         }
     }
 }
+
+/// U-UI：截图式蓝顶栏（复用 Theme.accent2 #4DAEFF，不发明新色）。
+extension View {
+    func blueTopBar() -> some View {
+        self
+            .toolbarBackground(Theme.accent2, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+    }
+}

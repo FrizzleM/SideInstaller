@@ -54,7 +54,7 @@ struct ContentView: View {
                     if showsPairingCard {
                         pairingFileCard.cascadeItem(2)
                     }
-                    // 企业证书签名已挪到「证书」页（功能更全），安装页不再放卡片。
+                    // 企业证书签名在设置页的企业证书区（功能更全），安装页不再放卡片。
                     // Most-blocking requirement first: an unsupported iOS, then
                     // Wi-Fi if this run must pair, then the missing tunnel.
                     if !engine.isRunning {
@@ -385,25 +385,6 @@ struct ContentView: View {
                 // A value, not a link: the menu's label keeps the text colour.
                 .tint(.primary)
 
-                // App sources: AltStore-format feeds whose apps install
-                // through the custom-IPA channel.
-                NavigationLink {
-                    SourcesView()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "shippingbox")
-                            .foregroundStyle(.secondary)
-                        Text(L("App Sources"))
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .fieldBackground()
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
 
                 // A custom IPA has no release, so the importer takes that slot;
                 // a build with one channel has nothing to pick and no slot.

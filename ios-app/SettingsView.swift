@@ -4,17 +4,30 @@ import UIKit
 /// The settings sheet: occasional configuration and the activity log, kept out
 /// of the main flow.
 struct SettingsView: View {
+    /// U-UI：当设置页本身就是一个 tab 时 true（标题 L("设置")、无 Done 钮）。
+    var isTab: Bool = false
+    /// U-UI：文件页/源页要求打开企业证书区时置位；企业区 NavigationLink
+    /// 认它，打开后自己清掉。
+    var enterpriseRequest: Binding<Bool> = .constant(false)
     @Environment(Engine.self) private var engine
     /// Observed for the language picker, and to redraw on language change.
     @EnvironmentObject private var loc: Localizer
     /// The saved Apple IDs the Account section manages.
     @EnvironmentObject private var accounts: AccountStore
+    // U-UI：工具区 5 行要的目的地（RootView 注入，见 U2）。
+    @EnvironmentObject private var pairingManager: PairingManager
+    @EnvironmentObject private var certManager: CertManager
+    @EnvironmentObject private var locationManager: LocationManager
+    @EnvironmentObject private var entitlementsManager: EntitlementsManager
+    @EnvironmentObject private var sideBySideManager: SideBySideManager
     @Environment(\.dismiss) private var dismiss
 
     /// Owned here; a new instance just rescans the disk.
-    @StateObject private var downloadsManager = DownloadsManager()
+    // U-UI：webdavCard 从 ToolsView 搬来（共享开关的唯一 Owner）。
+    @StateObject private var webdav = CZFWebDAVServer.shared
+    /// U-UI：关于区“关于”行打开 AboutView 的开关。
+    @State private var showingAbout = false
     /// The IPA the user swiped to delete, pending confirmation.
-    @State private var pendingDelete: DownloadedIPA?
     /// The Apple ID the user swiped to remove, pending confirmation.
     @State private var pendingRemove: SavedAccount?
     /// Set while the add/edit sheet is up, and for which account.
@@ -54,16 +67,18 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 accountSection
+                enterpriseSection
+                toolsSection
                 languageSection
                 appearanceSection
                 soundsSection
                 tunnelSection
                 developerModeSection
                 autoRefreshSection
-                downloadsSection
                 anisetteSection
                 advancedSection
                 logSection
+                aboutSection
             }
             .sheet(item: $editorTarget) { AccountEditor(target: $0) }
             // Attached to the Form, apart from the download alert below, so the
@@ -82,34 +97,22 @@ struct SettingsView: View {
                            account.appleID))
                 }
             }
-            .navigationTitle(L("Settings"))
+            .navigationTitle(isTab ? L("设置") : L("Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(L("Done")) { dismiss() }
-                }
+                    if !isTab {
+                        Button(L("Done")) { dismiss() }
+                    }
+            }
             }
         }
         .onAppear {
             anisetteIsCustom = !engine.anisetteServers.contains { $0.address == engine.anisetteURL }
-            downloadsManager.refresh()
-        }
-        .alert(L("Delete this download?"),
-               isPresented: Binding(get: { pendingDelete != nil },
-                                    set: { if !$0 { pendingDelete = nil } })) {
-            Button(L("Delete"), role: .destructive) {
-                if let item = pendingDelete { downloadsManager.delete(item) }
-                pendingDelete = nil
-            }
-            Button(L("Cancel"), role: .cancel) { pendingDelete = nil }
-        } message: {
-            if let item = pendingDelete {
-                Text(L("“%@” (%@) will be removed. You can download it again any time from the Install tab.",
-                       item.fileName, item.sizeText))
-            }
         }
         // Device IP 非法重置的提示：挂在 Form 链上，与上面两个 alert
         // 分开，避免同时弹出冲突。
+        .blueTopBar()
         .alert(L("Invalid device IP"), isPresented: $showDeviceIPResetAlert) {
             Button(L("OK"), role: .cancel) { }
         } message: {
@@ -161,6 +164,182 @@ struct SettingsView: View {
             Text(L("Account"))
         }
     }
+    /// U-UI：企业证书区（签名段从原证书页搬到 EnterpriseCertView 后，
+    /// 设置页只留这一行摘要 + 推入链接；证书本身的表单全在那一页）。
+    private var enterpriseSection: some View {
+        Section {
+            NavigationLink(destination: EnterpriseCertView(), isActive: enterpriseRequest) {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.seal")
+                        .foregroundStyle(Theme.accent2)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("企业证书"))
+                            .font(.body)
+                        Text(enterpriseCertName)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let exp = enterpriseCertExpiration {
+                        Text(exp.formatted(Date.FormatStyle(date: .abbreviated).locale(Localizer.locale)))
+                            .font(.footnote)
+                            .foregroundStyle(enterpriseCertExpirationSoon ? .red : .secondary)
+                    }
+                }
+            }
+        } header: {
+            Text(L("企业证书"))
+        }
+    }
+
+    /// 企业证书是否就绪（表单里的 P12 + 描述文件 + 密码都在）。
+    private var enterpriseCertReady: Bool { EnterpriseCertStore.ready }
+
+    /// 企业证书摘要行第二行：证书名 / 描述文件名，哪个有写哪个，都没有写“未导入证书”。
+    private var enterpriseCertName: String {
+        if let name = EnterpriseCertStore.certInfo?.name, !name.isEmpty { return name }
+        if let name = EnterpriseCertStore.provisionInfo?.name, !name.isEmpty { return name }
+        return L("未导入证书")
+    }
+
+    /// 企业证书到期日（证书优先，空了退回描述文件）。
+    private var enterpriseCertExpiration: Date? {
+        EnterpriseCertStore.certInfo?.expiration ?? EnterpriseCertStore.provisionInfo?.expiration
+    }
+
+    /// 企业证书 30 天内到期就红字提醒。
+    private var enterpriseCertExpirationSoon: Bool {
+        guard let exp = enterpriseCertExpiration else { return false }
+        return exp.timeIntervalSinceNow < 30 * 24 * 3600
+    }
+
+    /// U-UI：工具区（ToolsView 的 9 行里剩下的 5 行；Sideloaded apps →
+    /// 应用 tab，下载 → 下载 tab，设置 → 本页，3 行去掉）。
+    private var toolsSection: some View {
+        Group {
+            Section {
+                NavigationLink { SideBySideView(manager: sideBySideManager) } label: {
+                    ToolRow(icon: "square.on.square", color: .purple, title: L("Side by Side"), beta: true)
+                }
+                if Engine.deviceCanSelfPair {
+                    NavigationLink { PairingView(manager: pairingManager) } label: {
+                        ToolRow(icon: "link", color: .teal, title: L("Pairing"))
+                    }
+                }
+                NavigationLink { CertsView(manager: certManager) } label: {
+                    ToolRow(icon: "checkmark.seal", color: .blue, title: L("Apple ID 证书"))
+                }
+                NavigationLink { EntitlementsView(manager: entitlementsManager) } label: {
+                    ToolRow(icon: "checklist", color: .orange, title: L("Entitlements"))
+                }
+                NavigationLink { LocationView(manager: locationManager) } label: {
+                    ToolRow(icon: "location.fill", color: .green, title: L("Location spoofing"))
+                }
+            } header: {
+                Text(L("Tools"))
+            }
+            webdavCard
+        }
+    }
+
+    /// U-UI：关于区（AboutView 本体不动；点行弹 sheet）。
+    private var aboutSection: some View {
+        Section {
+            HStack {
+                Text(L("Version"))
+                Spacer()
+                Text(aboutVersionText)
+                    .foregroundStyle(.secondary)
+            }
+            Button(L("About")) { showingAbout = true }
+                .foregroundStyle(Theme.accent2)
+        } header: {
+            Text(L("About"))
+        }
+        .sheet(isPresented: $showingAbout) {
+            AboutView()
+        }
+    }
+
+    /// 关于区版本号：纯 "短版 (build)"，不套 L()（AboutView:44-49 的
+    /// fallbacks "0"/"1" 照抄）。
+    private var aboutVersionText: String {
+        let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(short) (\(build))"
+    }
+
+    /// WebDAV 文件服务卡片（0.9.88）：开关 + 开启后的局域网地址、
+    /// 复制按钮与安全提示。样式跟 ToolRow 同款（PanelCard + 46×46
+    /// 渐变图标），不另起视觉语言。开关不持久化，默认关闭；开关
+    /// 绑服务的 isRunning，启动失败时开关自动弹回关闭并显示原因。
+    @ViewBuilder
+    private var webdavCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(isOn: Binding(
+                    get: { webdav.isRunning },
+                    set: { on in
+                        CZFHaptics.impact()
+                        if on { webdav.start() } else { webdav.stop() }
+                    }
+                )) {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Rectangle().fill(Theme.gradient(.cyan))
+                            Image(systemName: "server.rack")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                        .frame(width: 46, height: 46)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L("WebDAV file service"))
+                                .font(.headline)
+                            Text(L("Transfer files to Documents over LAN"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                if webdav.isRunning {
+                    if let address = webdav.address {
+                        HStack(spacing: 8) {
+                            Text(address)
+                                .font(.subheadline.monospaced())
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer(minLength: 8)
+                            Button {
+                                CZFHaptics.impact()
+                                UIPasteboard.general.string = address
+                            } label: {
+                                Text(L("Copy"))
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .buttonStyle(.bordered, sound: .tap)
+                        }
+                    } else {
+                        Text(L("Wi-Fi not connected"))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(L("Anyone on your LAN can access it without a password. Turn it off when done."))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let error = webdav.errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+    }
+
+
 
     /// One saved Apple ID, ticked when it is the one in use.
     private func accountRow(_ account: SavedAccount) -> some View {
@@ -418,64 +597,7 @@ struct SettingsView: View {
 
     // MARK: Downloaded IPAs
 
-    /// The cached IPAs with their size and age, and swipe-to-delete.
-    private var downloadsSection: some View {
-        Section {
-            if let error = downloadsManager.lastError {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .font(.caption)
-                    .foregroundStyle(Theme.negative)
-            }
-            if downloadsManager.hasLoaded && downloadsManager.downloads.isEmpty {
-                Text(L("No downloaded IPAs. Ones you install from the Install tab are cached here."))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(downloadsManager.downloads) { item in
-                    downloadRow(item)
-                }
-                .onDelete { offsets in
-                    if let idx = offsets.first {
-                        pendingDelete = downloadsManager.downloads[idx]
-                    }
-                }
-            }
-        } header: {
-            HStack {
-                Text(L("Downloaded IPAs"))
-                Spacer()
-                if !downloadsManager.downloads.isEmpty {
-                    Text(L("%@ used", downloadsManager.totalSizeText))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
 
-    private func downloadRow(_ item: DownloadedIPA) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: "shippingbox")
-                .font(.title3)
-                .foregroundStyle(Theme.muted)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.displayName)
-                    .font(.subheadline.weight(.medium))
-                if let modified = item.modified {
-                    let when = modified.formatted(
-                        Date.FormatStyle(date: .abbreviated, time: .shortened)
-                            .locale(Localizer.locale))
-                    // An imported file's timestamp is when it arrived.
-                    Text(item.isImported ? L("Added %@", when) : L("Downloaded %@", when))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            Text(item.sizeText)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(Theme.muted)
-        }
-    }
 
     // MARK: Anisette server
 
@@ -617,5 +739,47 @@ private struct LogHeader: View {
 
     var body: some View {
         Text(L("Activity Log (%d)", LogStore.shared.lines.count))
+    }
+}
+
+/// One Tools menu row: coloured glyph, name and chevron. Each row gets its
+/// own gradient colour (no uniform black: the dark logo art rendered every
+/// row black); the glyph is a white SF Symbol on that row's gradient.
+/// The logo assets stay in the catalog (each pushed page's BrandHeader
+/// still uses its own), only the Tools rows stop using them.
+private struct ToolRow: View {
+    var icon: String
+    var color: Color
+    var title: String
+    /// Shows a Beta badge.
+    var beta: Bool = false
+
+    var body: some View {
+        PanelCard {
+            HStack(spacing: 14) {
+                glyph
+                    .frame(width: 46, height: 46)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                Text(title)
+                    .font(.headline)
+                if beta { BetaBadge() }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    /// Single branch now (no if/switch over View types), so no
+    /// @ViewBuilder needed here; the 46×46 frame + cornerRadius 12
+    /// in body are untouched.
+    private var glyph: some View {
+        ZStack {
+            Rectangle().fill(Theme.gradient(color))
+            Image(systemName: icon)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.white)
+        }
     }
 }

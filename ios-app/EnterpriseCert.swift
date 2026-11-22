@@ -1512,6 +1512,14 @@ enum CertSigner {
 /// 文件页点「去签名」时把 IPA 交给证书页。
 final class CertWorkspace: ObservableObject {
     @Published var selectedIPA: URL?
+    /// U-UI：文件页/源页把 IPA 交给企业证书页时举手——RootView 认到后
+    /// 切到设置 tab 并打开企业证书页；RootView 触发后自己清掉。
+    @Published var openEnterpriseSign = false
+    /// U-UI：单签进行中（原证书页的 @State signBusy；签名段与
+    /// 应用库段拆到两个 View 后，互斥标志放共享工作区）。
+    @Published var signBusy = false
+    /// U-UI：批量签名进行中（原证书页的 @State batchBusy；同上）。
+    @Published var batchBusy = false
 }
 
 

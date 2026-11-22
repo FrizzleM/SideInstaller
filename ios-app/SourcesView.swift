@@ -1,7 +1,22 @@
 import SwiftUI
 
+/// U-UI：源/应用列表排序（照抄 FilesTabView 的 FileSort 形状；源列表只用
+/// 默认/名称/最新，应用列表四项全用）。
+private enum SourceSort: String, CaseIterable {
+    case `default`, name, size, newest
+
+    var label: String {
+        switch self {
+        case .default: return L("默认")
+        case .name: return L("名称")
+        case .size: return L("大小")
+        case .newest: return L("最新")
+        }
+    }
+}
+
 /// The App Sources list: every source the user added, each leading to its
-/// apps. Reached from the Install card on the main screen.
+/// apps. Reached from the Sources tab.
 struct SourcesView: View {
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
@@ -10,29 +25,74 @@ struct SourcesView: View {
     @State private var showAddAlert = false
     @State private var newSourceURL = ""
     @State private var addFailed = false
+    /// U-UI：源列表排序（默认/名称/最新；大小只用于应用列表）。
+    @State private var sourceSort = SourceSort.default
+    /// U-UI：源列表搜索（名字含查询串，不区分大小写）。
+    @State private var sourceSearchText = ""
 
     var body: some View {
         List {
+            if store.sources.contains(where: \.isLoading) {
+                Text(L("正在刷新数据中…"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else if let last = store.sources.compactMap(\.fetchedAt).max() {
+                Text(L("最后更新：%@", last.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localizer.locale))))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+            searchBar
             if store.sources.isEmpty {
                 Text(L("No sources yet. Tap + to add one."))
                     .foregroundStyle(.secondary)
             }
-            ForEach(store.sources) { source in
+            ForEach(displayedSources) { source in
                 NavigationLink {
                     SourceAppsView(store: store, sourceURL: source.url)
                 } label: {
                     sourceRow(source)
                 }
             }
-            .onDelete { store.removeSource(at: $0) }
+            .onDelete { offsets in
+                for offset in offsets {
+                    let item = displayedSources[offset]
+                    if let idx = store.sources.firstIndex(where: { $0.url == item.url }) {
+                        store.removeSource(at: IndexSet(integer: idx))
+                    }
+                }
+            }
         }
-        .navigationTitle(L("App Sources"))
+        .listStyle(.plain)
+        .blueTopBar()
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(L("AppStore"))
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { showAddAlert = true } label: {
+                    Image(systemName: "plus").foregroundStyle(.white)
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showAddAlert = true
+                Menu {
+                    ForEach([SourceSort.default, .name, .newest], id: \.self) { option in
+                        Button {
+                            sourceSort = option
+                        } label: {
+                            if sourceSort == option {
+                                Label(option.label, systemImage: "checkmark")
+                            } else {
+                                Text(option.label)
+                            }
+                        }
+                    }
                 } label: {
-                    Image(systemName: "plus")
+                    Text(L("筛选")).foregroundStyle(.white)
                 }
             }
         }
@@ -56,6 +116,41 @@ struct SourcesView: View {
         }
         .refreshable { await store.fetchAll(force: true) }
         .task { await store.fetchAll() }
+    }
+
+    /// U-UI：搜索过滤 + 排序后的源（onDelete 按 url 回映射到 store.sources，
+    /// 不能直接用 displayedSources 的下标删 store.sources）。
+    private var displayedSources: [LoadedSource] {
+        let q = sourceSearchText.trimmingCharacters(in: .whitespaces).lowercased()
+        var list = store.sources
+        if !q.isEmpty {
+            list = list.filter { $0.displayName.lowercased().contains(q) }
+        }
+        switch sourceSort {
+        case .default:
+            return list
+        case .name:
+            return list.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        case .size:
+            return list
+        case .newest:
+            return list.sorted { ($0.fetchedAt ?? .distantPast) > ($1.fetchedAt ?? .distantPast) }
+        }
+    }
+
+    /// U-UI：搜索框（照抄 FilesTabView 的 fileSearchBar 灰底样式）。
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField(L("搜索"), text: $sourceSearchText)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .multilineTextAlignment(.center)
+        }
+        .padding(8)
+        .background(Color.secondary.opacity(0.12))
+        .cornerRadius(8)
     }
 
     /// One source: its icon and name, with the app count, a spinner while it
@@ -132,6 +227,10 @@ struct SourceAppsView: View {
     /// row can show the downloader's progress and the others stay disabled.
     @State private var activeID: String?
     @State private var downloadTask: Task<Void, Never>?
+    /// U-UI：应用列表排序。
+    @State private var appSort = SourceSort.default
+    /// U-UI：应用列表搜索（名字含查询串，不区分大小写）。
+    @State private var appSearchText = ""
 
     /// What one app's row is doing.
     private enum RowState: Equatable {
@@ -157,12 +256,46 @@ struct SourceAppsView: View {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.red)
                 }
-                ForEach(source.apps, id: \.id) { app in
+                searchBar
+                ForEach(displayedApps, id: \.id) { app in
                     appRow(app)
                 }
             }
         }
-        .navigationTitle(source?.displayName ?? L("App Sources"))
+        .listStyle(.plain)
+        .blueTopBar()
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(L("AppStore"))
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { dismiss() } label: {
+                    Text("‹ " + L("软件源"))
+                        .foregroundStyle(.white)
+                }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    ForEach(SourceSort.allCases, id: \.self) { option in
+                        Button {
+                            appSort = option
+                        } label: {
+                            if appSort == option {
+                                Label(option.label, systemImage: "checkmark")
+                            } else {
+                                Text(option.label)
+                            }
+                        }
+                    }
+                } label: {
+                    Text(L("筛选")).foregroundStyle(.white)
+                }
+            }
+        }
         .refreshable { await store.fetch(sourceURL, force: true) }
         .task { await store.fetch(sourceURL) }
         .onDisappear {
@@ -171,34 +304,94 @@ struct SourceAppsView: View {
         }
     }
 
-    /// One app: icon, name, version and size, its subtitle, and the Install
-    /// button (or the download's progress / failure in its place).
+    /// U-UI：截图式应用行——60pt 图标 / 名字 / “应用 - 源名（副标题）” /
+    /// V版本 | 大小 | 日期 / 多行描述 / 右侧蓝色下载 pill。
     private func appRow(_ app: AltApp) -> some View {
-        HStack(spacing: 12) {
-            appIcon(app.iconLink)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(app.name ?? "")
-                    .lineLimit(1)
-                HStack(spacing: 6) {
-                    if let version = app.version, !version.isEmpty {
-                        Text("v\(version)")
-                    }
-                    if let size = app.sizeText {
-                        Text(size)
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                if let subtitle = app.subtitle, !subtitle.isEmpty {
-                    Text(subtitle)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 12) {
+                appIcon(app.iconLink)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(app.name ?? "")
+                        .font(.headline)
+                        .lineLimit(1)
+                    Text(sourceLine(for: app))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
+                    Text(metaLine(for: app))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
+                Spacer()
+                installControl(app)
             }
-            Spacer()
-            installControl(app)
+            if let description = appDescription(app), !description.isEmpty {
+                Text(description)
+                    .font(.subheadline)
+                    .lineLimit(4)
+            }
         }
+        .padding(.vertical, 4)
+    }
+
+    /// 第二行：“应用 - 源名”，副标题有就跟在括号里（截图同款）。
+    private func sourceLine(for app: AltApp) -> String {
+        let base = L("应用 - %@", source?.displayName ?? "")
+        if let subtitle = source?.model?.subtitle, !subtitle.isEmpty {
+            return base + " (\(subtitle))"
+        }
+        return base
+    }
+
+    /// 第三行：“V版本 | 大小 | 日期”，缺的段直接省掉（不留空竖线）。
+    private func metaLine(for app: AltApp) -> String {
+        var parts: [String] = []
+        if let version = app.version, !version.isEmpty { parts.append("V\(version)") }
+        if let size = app.sizeText { parts.append(size) }
+        if let date = app.versionDate, !date.isEmpty { parts.append(date) }
+        return parts.joined(separator: " | ")
+    }
+
+    /// 描述行：localizedDescription 优先，空了退回 subtitle。
+    private func appDescription(_ app: AltApp) -> String? {
+        if let desc = app.localizedDescription, !desc.isEmpty { return desc }
+        return app.subtitle
+    }
+
+    /// U-UI：搜索过滤 + 排序后的应用（最新按 versionDate 字符串倒序，不解析日期）。
+    private var displayedApps: [AltApp] {
+        guard let source else { return [] }
+        let q = appSearchText.trimmingCharacters(in: .whitespaces).lowercased()
+        var list = source.apps
+        if !q.isEmpty {
+            list = list.filter { ($0.name ?? "").lowercased().contains(q) }
+        }
+        switch appSort {
+        case .default:
+            return list
+        case .name:
+            return list.sorted { ($0.name ?? "").localizedCaseInsensitiveCompare($1.name ?? "") == .orderedAscending }
+        case .size:
+            return list.sorted { ($0.size ?? 0) > ($1.size ?? 0) }
+        case .newest:
+            return list.sorted { ($0.versionDate ?? "") > ($1.versionDate ?? "") }
+        }
+    }
+
+    /// U-UI：搜索框（照抄 FilesTabView 的 fileSearchBar 灰底样式）。
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField(L("搜索"), text: $appSearchText)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .multilineTextAlignment(.center)
+        }
+        .padding(8)
+        .background(Color.secondary.opacity(0.12))
+        .cornerRadius(8)
     }
 
     /// The row's trailing control: Install, the download progress with its
@@ -247,20 +440,29 @@ struct SourceAppsView: View {
                         Label(L("企业证书签名安装"), systemImage: "checkmark.seal")
                     }
                 } label: {
-                    HStack(spacing: 3) {
-                        Text(L("Install"))
-                        Image(systemName: "chevron.down")
-                            .font(.caption2.weight(.bold))
+                    HStack {
+                        Text(L("下载"))
+                            .font(.subheadline.weight(.semibold))
                     }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Theme.accent2))
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
                 .disabled(activeID != nil || engine.isRunning)
             } else {
-                Button(L("Install")) { startInstall(app) }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .disabled(activeID != nil || engine.isRunning)
+                Button { startInstall(app) } label: {
+                    HStack {
+                        Text(L("下载"))
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Theme.accent2))
+                }
+                .buttonStyle(.plain)
+                .disabled(activeID != nil || engine.isRunning)
             }
         }
     }
@@ -272,9 +474,9 @@ struct SourceAppsView: View {
             Image(systemName: "app")
                 .foregroundStyle(.secondary)
         }
-        .frame(width: 52, height: 52)
+        .frame(width: 60, height: 60)
         .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     /// Download the app's IPA, import it as the custom IPA, then start the
@@ -355,6 +557,9 @@ struct SourceAppsView: View {
                     return
                 }
                 certWorkspace.selectedIPA = entry.url
+                // U-UI：企业页已搬进设置——交完 IPA 还要举手让 RootView
+                // 切到设置 tab 并打开企业证书页，否则用户留在源页看不到表单。
+                await MainActor.run { certWorkspace.openEnterpriseSign = true }
                 activeID = nil
                 states[app.id] = nil
                 dismiss()

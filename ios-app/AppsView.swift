@@ -1051,7 +1051,7 @@ struct AppsView: View {
             .animation(.smooth(duration: 0.35), value: manager.jobs)
             .animation(.smooth(duration: 0.35), value: manager.refreshable)
         }
-        .background(AppBackground())
+        .background(Color(.systemBackground))
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .onAppear { manager.autoLoad() }

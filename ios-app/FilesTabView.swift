@@ -101,8 +101,6 @@ struct FilesTabView: View {
     /// Declared so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @EnvironmentObject private var workspace: CertWorkspace
-    /// 切到证书页（RootView 给的）。
-    var onGoCert: () -> Void
 
     /// First scan happens in onAppear; starting empty so the list isn't
     /// scanned twice on first appearance.
@@ -168,6 +166,51 @@ struct FilesTabView: View {
     @State private var fileInstallErrorText: String?
     /// 局域网地址点按复制后的短暂「已复制」提示。
     @State private var lanCopied = false
+
+    /// U-UI：应用库段（原证书页的应用库，0.9.102 搬入文件页）。
+    @State private var libraryTab = CertLibraryTab.unsigned
+    @State private var librarySearchText = ""
+    @State private var unsignedIPAs: [LocalFileItem] = []
+    /// 未签名栏的 IPA 信息缓存（路径 → Info.plist 解析结果），只解析一次。
+    @State private var unsignedInfo: [String: IPALibrary.AppInfo] = [:]
+    /// 已经试过的路径（含解析失败），避免重复读盘。
+    @State private var unsignedInfoTried: Set<String> = []
+    /// 应用库图标缓存（路径 → IPA 里取的真实图标，大圆角显示）。
+    /// 已尝试集合存“路径#指纹”（大小 + 修改时间），文件变了
+    /// （重签覆盖、删了重导同名）就换 key 重取，不沿用旧图。
+    /// 加载是行内 .task 触发（只取可见行），不在列表刷新时批量跑。
+    @State private var unsignedIcons: [String: UIImage] = [:]
+    @State private var unsignedIconsTried: Set<String> = []
+    @State private var signedIcons: [String: UIImage] = [:]
+    @State private var signedIconsTried: Set<String> = []
+    @State private var signedRecords = SignedIPAStore.load()
+    @State private var selectingSigned = false
+    @State private var selectedSignedIDs: Set<String> = []
+    @State private var recordPendingDelete: SignedIPARecord?
+    @State private var showingDeleteConfirm = false
+    @State private var showingBatchDeleteConfirm = false
+    // 批量签名（未签名栏）：只签名不安装，跟多开同理。
+    @State private var batchingUnsigned = false
+    @State private var selectedUnsignedIDs: Set<String> = []
+    @State private var batchMessage: String?
+    @State private var batchFailed = false
+    // 批量签名警告确认：掉签/未脱壳先汇总弹一次，点继续才签。
+    @State private var pendingBatchWarnings: [String] = []
+    @State private var pendingBatchTargets: [LocalFileItem] = []
+    @State private var pendingBatchMods = CertSignMods()
+    @State private var showingBatchWarningAlert = false
+    // 签名日志（应用库「记录」栏）。
+    @State private var logEntries: [CertSignLogEntry] = []
+    @State private var showingLogClearConfirm = false
+    /// U-UI：应用库段自己的导入 picker（与 EnterpriseCertView 的同名 @State 各管各的）。
+    @State private var showIPAPicker = false
+    /// U-UI：批量签名前的吊销状态缓存（签名段那份在 EnterpriseCertView）。
+    @State private var revocationStatus: CertRevocationStatus = .unknown
+    @State private var revocationChecking = false
+    @State private var revocationCheckedAt: Date?
+    /// U-UI：文件页顶部分段——文件列表 / 应用文件夹库。
+    private enum FileViewTab { case files, library }
+    @State private var fileView = FileViewTab.files
 
     private var ipas: [LocalFileItem] { files.filter { $0.isIPA } }
     private var others: [LocalFileItem] { files.filter { !$0.isIPA && !$0.isSystem } }
@@ -316,7 +359,7 @@ struct FilesTabView: View {
             Button {
                 CZFHaptics.impact(.light)
                 workspace.selectedIPA = item.url
-                onGoCert()
+                workspace.openEnterpriseSign = true
                 actionItem = nil
             } label: {
                 if useIcons { Label(L("签名"), systemImage: "checkmark.seal") } else { Text(L("签名")) }
@@ -554,65 +597,71 @@ struct FilesTabView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
-                    header.cascadeItem(0)
-                    if selecting {
-                        selectionBar.cascadeItem(2)
-                    }
-                    // 轻松签文件列表式切栏（只过滤 IPA 行）：放搜索框上面，
-                    // 跟证书页应用库切栏同例，segmented 样式。
-                    Picker("", selection: $fileTab) {
-                        Text(L("未签名 (%d)", unsignedCount)).tag(FileListTab.unsigned)
-                        Text(L("已签名 (%d)", signedCount)).tag(FileListTab.signed)
+                    // U-UI：文件页顶部分段——文件列表 / 应用文件夹库（证书页搬来的库）。
+                    Picker("", selection: $fileView) {
+                        Text(L("文件")).tag(FileViewTab.files)
+                        Text(L("应用文件夹库")).tag(FileViewTab.library)
                     }
                     .pickerStyle(.segmented)
-                    // 切栏触感：点切栏、或菜单“查看文件位置”切栏变化时
-                    // 各震一次 .light；后者菜单按钮本身不另震，免得一次点按震两次。
-                    .onChange(of: fileTab) { _, _ in CZFHaptics.impact(.light) }
-                    fileSearchBar
-                    // 排序：只改显示顺序（IPA 列表、文件夹内列表、其他文件
-                    // 组都按同一规则排）；默认保持扫描顺序，不动老习惯。
-                    HStack {
-                        Menu {
-                            ForEach(FileSort.allCases, id: \.self) { option in
-                                Button {
-                                    fileSortRaw = option.rawValue
-                                } label: {
-                                    if fileSort == option {
-                                        Label(option.label, systemImage: "checkmark")
-                                    } else {
-                                        Text(option.label)
+                    .cascadeItem(0)
+                    if fileView == .files {
+                        if selecting {
+                            selectionBar.cascadeItem(2)
+                        }
+                        // 轻松签文件列表式切栏（只过滤 IPA 行）：放搜索框上面，
+                        // 跟证书页应用库切栏同例，segmented 样式。
+                        Picker("", selection: $fileTab) {
+                            Text(L("未签名 (%d)", unsignedCount)).tag(FileListTab.unsigned)
+                            Text(L("已签名 (%d)", signedCount)).tag(FileListTab.signed)
+                        }
+                        .pickerStyle(.segmented)
+                        // 切栏触感：点切栏、或菜单“查看文件位置”切栏变化时
+                        // 各震一次 .light；后者菜单按钮本身不另震，免得一次点按震两次。
+                        .onChange(of: fileTab) { _, _ in CZFHaptics.impact(.light) }
+                        fileSearchBar
+                        // 排序：只改显示顺序（IPA 列表、文件夹内列表、其他文件
+                        // 组都按同一规则排）；默认保持扫描顺序，不动老习惯。
+                        HStack {
+                            Menu {
+                                ForEach(FileSort.allCases, id: \.self) { option in
+                                    Button {
+                                        fileSortRaw = option.rawValue
+                                    } label: {
+                                        if fileSort == option {
+                                            Label(option.label, systemImage: "checkmark")
+                                        } else {
+                                            Text(option.label)
+                                        }
                                     }
                                 }
+                            } label: {
+                                Label(L("排序：%@", fileSort.label), systemImage: "arrow.up.arrow.down")
+                                    .font(.footnote.weight(.semibold))
                             }
-                        } label: {
-                            Label(L("排序：%@", fileSort.label), systemImage: "arrow.up.arrow.down")
-                                .font(.footnote.weight(.semibold))
+                            Spacer()
                         }
-                        Spacer()
-                    }
-                    if !currentDir.isEmpty {
-                        currentDirBar
-                        if currentDirItems.isEmpty {
+                        if !currentDir.isEmpty {
+                            currentDirBar
+                            if currentDirItems.isEmpty {
+                                emptyCard.cascadeItem(2)
+                            } else if visibleDirItems.isEmpty {
+                                Text(L("没有匹配的 IPA。"))
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                folderSection(items: visibleDirItems).cascadeItem(2)
+                            }
+                        } else if files.isEmpty {
                             emptyCard.cascadeItem(2)
-                        } else if visibleDirItems.isEmpty {
-                            Text(L("没有匹配的 IPA。"))
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
                         } else {
-                            folderSection(items: visibleDirItems).cascadeItem(2)
-                        }
-                    } else if files.isEmpty {
-                        emptyCard.cascadeItem(2)
-                    } else {
-                        // IPA 行不再单开「IPA 文件」组：切栏 + 搜索过滤
-                        // 后的 ipaList 就是全部 IPA（轻松签文件列表式，
-                        // 无卡片头）；其他文件、系统文件不再分组头，合并为
-                        // 扁平列表（过滤逻辑不动）。
-                        ipaList.cascadeItem(2)
-                        if fileTab == .unsigned {
-                            let flatFiles = sortedFiles(matching(others) + matching(systemFiles))
-                            if !flatFiles.isEmpty {
-                                PanelCard {
+                            // IPA 行不再单开「IPA 文件」组：切栏 + 搜索过滤
+                            // 后的 ipaList 就是全部 IPA（轻松签文件列表式，
+                            // 无卡片头）；其他文件、系统文件不再分组头，合并为
+                            // 扁平列表（过滤逻辑不动）。
+                            ipaList.cascadeItem(2)
+                            if fileTab == .unsigned {
+                                let flatFiles = sortedFiles(matching(others) + matching(systemFiles))
+                                if !flatFiles.isEmpty {
                                     VStack(alignment: .leading, spacing: 12) {
                                         ForEach(flatFiles) { item in
                                             fileRow(item)
@@ -621,10 +670,25 @@ struct FilesTabView: View {
                                             }
                                         }
                                     }
+                                    .cascadeItem(3)
                                 }
-                                .cascadeItem(3)
                             }
                         }
+                    } else {
+                        libraryContentView
+                            .task {
+                                signedRecords = SignedIPAStore.load()
+                                let changed = await Task.detached { SignedIPAStore.fillMissingCertInfo() }.value
+                                if changed { signedRecords = SignedIPAStore.load() }
+                                refreshUnsignedIPAs()
+                                logEntries = CertSignLogStore.load()
+                                checkRevocation()
+                            }
+                            .onChange(of: libraryTab) { _, tab in
+                                if tab == .unsigned {
+                                    refreshUnsignedIPAs()
+                                }
+                            }
                     }
                     // 页尾（原来顶栏区的安装状态、导入卡、计数都到这里）：
                     // 安装状态平时不显示，安装进行中/失败时才出现。
@@ -640,11 +704,60 @@ struct FilesTabView: View {
                 .padding(.bottom, 20)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .background(AppBackground())
+            .blueTopBar()
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(L("文件列表"))
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button { showImporter = true } label: {
+                            Label(L("导入文件"), systemImage: "square.and.arrow.down")
+                        }
+                        Button {
+                            newFolderName = ""
+                            showNewFolderAlert = true
+                        } label: {
+                            Label(L("新建文件夹"), systemImage: "folder.badge.plus")
+                        }
+                        Button {
+                            refreshFiles(resetDir: true)
+                        } label: {
+                            Label(L("刷新"), systemImage: "arrow.clockwise")
+                        }
+                        if fileView == .files && !files.isEmpty {
+                            Button {
+                                selecting.toggle()
+                                selection = []
+                            } label: {
+                                Label(selecting ? L("完成") : L("选择"), systemImage: "checkmark.circle")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+            .background(Color(.systemBackground))
         }
         .onAppear {
             refreshFiles()
             renewalSources = RenewalSourceStore.load()
+        }
+        .sheet(isPresented: $showIPAPicker) {
+            FileImporterRepresentableView(
+                allowedContentTypes: [UTType(filenameExtension: "ipa") ?? .data]
+            ) { urls in
+                if let url = urls.first {
+                    workspace.selectedIPA = url
+                    workspace.openEnterpriseSign = true
+                }
+            }
         }
         // 配对安装跑完：finished 置位才算成功（取消不算）。只认
         // fileInstallInFlight 期间的变化，ID 线的安装跑完不会误弹
@@ -798,46 +911,6 @@ struct FilesTabView: View {
 
     /// 文件页顶栏：只留标题 + 切栏 + 搜索（轻松签文件列表式紧凑顶栏）；
     /// 原来的大标题计数、导入卡、安装状态、操作行都移到页尾或 ••• 菜单里。
-    private var header: some View {
-        HStack(alignment: .top) {
-            Text(L("文件"))
-                .font(.largeTitle.weight(.bold))
-            Spacer()
-            Menu {
-                Button { showImporter = true } label: {
-                    Label(L("导入文件"), systemImage: "square.and.arrow.down")
-                }
-                Button {
-                    newFolderName = ""
-                    showNewFolderAlert = true
-                } label: {
-                    Label(L("新建文件夹"), systemImage: "folder.badge.plus")
-                }
-                Button {
-                    refreshFiles(resetDir: true)
-                } label: {
-                    Label(L("刷新"), systemImage: "arrow.clockwise")
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
-            if !files.isEmpty {
-                Button {
-                    selecting.toggle()
-                    selection = []
-                } label: {
-                    Text(selecting ? L("完成") : L("选择"))
-                        .font(.footnote.weight(.semibold))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 8)
-    }
 
     /// 多选时的操作条：压缩成一个 zip / 批量删除。
     private var selectionBar: some View {
@@ -973,7 +1046,7 @@ struct FilesTabView: View {
 
     private var emptyCard: some View {
         PanelCard {
-            Text(L("还没有文件。点上面「导入文件」放 IPA 进来，或在安装页下载/导入后这里会出现。"))
+            Text(L("还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -1023,13 +1096,11 @@ struct FilesTabView: View {
     /// 当前文件夹内的直接子项（文件夹 + 文件同一列表，轻松签式）：
     /// 行格式跟根目录 fileRow 一模一样，不另起一套。
     private func folderSection(items: [LocalFileItem]) -> some View {
-        PanelCard {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(items) { item in
-                    fileRow(item)
-                    if item.id != items.last?.id {
-                        Divider()
-                    }
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(items) { item in
+                fileRow(item)
+                if item.id != items.last?.id {
+                    Divider()
                 }
             }
         }
@@ -1085,21 +1156,21 @@ struct FilesTabView: View {
             Image(systemName: "folder.fill")
                 .foregroundStyle(.blue)
                 .font(.title3)
-                .frame(width: 52, height: 52)
+                .frame(width: 60, height: 60)
         } else if item.isIPA,
                   let uiImage = fileIcons[item.id] {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFill()
-                .frame(width: 52, height: 52)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .frame(width: 60, height: 60)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
         } else {
             // IPA 还没取到图、取图失败、非 IPA 文件：一律中性占位，
             // 不造假图、不空框（IPA 占位与应用库同款灰色文档标）。
             Image(systemName: "doc")
                 .foregroundStyle(.secondary)
                 .font(.title3)
-                .frame(width: 52, height: 52)
+                .frame(width: 60, height: 60)
         }
     }
 
@@ -1185,6 +1256,7 @@ struct FilesTabView: View {
                 } label: {
                     Image(systemName: "info.circle")
                         .foregroundStyle(.blue)
+                    .font(.title3)
                 }
                 .buttonStyle(.plain)
             }
@@ -1565,12 +1637,808 @@ struct FilesTabView: View {
             }
         }
     }
+
+    /// 文件页（Documents 管理）原样保留；这里只是证书页里的
+    /// 一个应用库切栏：未签名栏复用文件库数据（只读展示 +
+    /// 点进签名），已签名栏就是原来的已签名列表。
+    private var libraryContentView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "square.stack")
+                    .foregroundStyle(.secondary)
+                Text(L("应用库"))
+                    .font(.headline)
+                Spacer()
+                // 选择改顶栏右上按钮（原来在“共 N 个”计数行里，计数行已删）：
+                // 未签名栏切批量签名、已签名栏切批量删除，记录段没有选择。
+                if libraryTab != .log {
+                    Button {
+                        if libraryTab == .unsigned {
+                            batchingUnsigned.toggle()
+                            if !batchingUnsigned { selectedUnsignedIDs.removeAll() }
+                        } else {
+                            selectingSigned.toggle()
+                            if !selectingSigned { selectedSignedIDs.removeAll() }
+                        }
+                    } label: {
+                        Text((libraryTab == .unsigned ? batchingUnsigned : selectingSigned) ? L("完成") : L("选择"))
+                            .font(.footnote)
+                    }
+                    .disabled(libraryTab == .unsigned ? workspace.batchBusy : false)
+                }
+                // 应用库页内直接导入（轻松签应用页同款入口）：
+                // 复用签名段的文件导入 picker，选完走 workspace 交接
+                // 进设置·企业证书页；“从文件库选择”不在这里重复——
+                // 未签名栏本身就是文件库，点行就进签名。
+                Button {
+                    showIPAPicker = true
+                } label: {
+                    Text(L("导入"))
+                        .font(.footnote)
+                }
+            }
+            Picker("", selection: $libraryTab) {
+                Text(L("未签名")).tag(CertLibraryTab.unsigned)
+                Text(L("已签名")).tag(CertLibraryTab.signed)
+            }
+            .pickerStyle(.segmented)
+            // 轻松签应用页同款浅灰搜索框，两个切栏都按名字过滤。
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField(L("搜索"), text: $librarySearchText)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+            }
+            .padding(8)
+            .background(Color.secondary.opacity(0.12))
+            .cornerRadius(8)
+            libraryContent
+            // 记录段不在切栏里了，页尾留一行入口（切到记录段后本行隐藏，点切栏回未签名/已签名）。
+            if libraryTab != .log {
+                Button {
+                    libraryTab = .log
+                } label: {
+                    HStack {
+                        Text(L("记录"))
+                            .font(.footnote)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.secondary)
+                            .font(.footnote)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .alert(L("删除这个已签名 IPA？"), isPresented: $showingDeleteConfirm) {
+            Button(L("删除"), role: .destructive) {
+                if let record = recordPendingDelete {
+                    SignedIPAStore.remove(record)
+                    signedRecords = SignedIPAStore.load()
+                }
+                recordPendingDelete = nil
+            }
+            Button(L("取消"), role: .cancel) {
+                recordPendingDelete = nil
+            }
+        } message: {
+            Text(L("会删掉文件和这条记录，之后要重签才能再装。"))
+        }
+        .alert(L("删除选中的已签名 IPA？"), isPresented: $showingBatchDeleteConfirm) {
+            Button(L("删除"), role: .destructive) {
+                let targets = signedRecords.filter { selectedSignedIDs.contains($0.id) }
+                SignedIPAStore.remove(targets)
+                signedRecords = SignedIPAStore.load()
+                selectedSignedIDs.removeAll()
+                selectingSigned = false
+            }
+            Button(L("取消"), role: .cancel) {}
+        } message: {
+            Text(L("一次删掉选中的 %d 个，文件和记录一起删。", selectedSignedIDs.count))
+        }
+    }
+
+    /// switch 返回两种不同 View，普通函数必须加 @ViewBuilder
+    /// 才能编（body 自带，普通函数没有）。
+    @ViewBuilder
+    private var libraryContent: some View {
+        switch libraryTab {
+        case .unsigned:
+            unsignedList
+        case .signed:
+            signedList
+        case .log:
+            logList
+        }
+    }
+
+    /// 未签名栏：文件库里还没签过的 IPA（Signed 目录里的已签
+    /// 成品不算未签名）。只读展示名字、目录、大小，不逐行解
+    /// Info.plist（证书页每敲一键都重读是已知性能坑）；点
+    /// 「去签名」就进签名段表单。扁平列表，不按目录分组。
+    private var unsignedList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if filteredUnsigned.isEmpty {
+                Text(librarySearchText.isEmpty
+                     ? L("文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。")
+                     : L("没有匹配的 IPA。"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                if batchingUnsigned {
+                    HStack(spacing: 12) {
+                        Button {
+                            CZFHaptics.impact()
+                            selectedUnsignedIDs = Set(filteredUnsigned.map { $0.id })
+                        } label: {
+                            Text(L("全选")).font(.footnote)
+                        }
+                        Button {
+                            CZFHaptics.impact()
+                            selectedUnsignedIDs.removeAll()
+                        } label: {
+                            Text(L("取消全选")).font(.footnote)
+                        }
+                        Spacer()
+                        Button {
+                            CZFHaptics.impact()
+                            batchSign()
+                        } label: {
+                            Text(L("签名选中（%d）", selectedUnsignedIDs.count)).font(.footnote)
+                        }
+                        .disabled(selectedUnsignedIDs.isEmpty || workspace.batchBusy)
+                        .alert(L("签名提醒"), isPresented: $showingBatchWarningAlert) {
+                            Button(L("继续签名")) {
+                                runBatchSign(targets: pendingBatchTargets, mods: pendingBatchMods)
+                                clearPendingBatch()
+                            }
+                            Button(L("取消"), role: .cancel) {
+                                clearPendingBatch()
+                                // 批量忙标志在 batchSign 入口就立起来了，取消
+                                // 时这里放掉；确认那路 runBatchSign 自己接管，
+                                // 跑完才放，不在这里清。
+                                workspace.batchBusy = false
+                            }
+                        } message: {
+                            Text(pendingBatchWarnings.joined(separator: "\n"))
+                        }
+                    }
+                    if let batchMessage {
+                        Text(batchMessage)
+                            .font(.footnote)
+                            .foregroundStyle(batchFailed ? .red : .green)
+                    }
+                }
+                ForEach(filteredUnsigned) { item in
+                    unsignedRow(item)
+                    if item.id != filteredUnsigned.last?.id {
+                        Divider()
+                    }
+                }
+            }
+        }
+    }
+
+    /// 搜索过滤只读缓存：名字命中文件名或解析出的 App 名都算，
+    /// 敲键绝不触发解析（解析只在切栏/进页/签完刷新时跑一次）。
+    private var filteredUnsigned: [LocalFileItem] {
+        guard !librarySearchText.isEmpty else { return unsignedIPAs }
+        let query = librarySearchText.lowercased()
+        return unsignedIPAs.filter { item in
+            item.name.lowercased().contains(query)
+                || (unsignedInfo[item.url.path]?.name.lowercased().contains(query) == true)
+                || (unsignedInfo[item.url.path]?.bundleID.lowercased().contains(query) == true)
+        }
+    }
+
+    /// 轻松签应用页未签名行：名字 / V版本 | 大小 | Bundle ID / 文件名，
+    /// 整行可点进签名段表单（不要行内按钮）。
+    private func unsignedRowTexts(_ item: LocalFileItem) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(unsignedDisplayName(item))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+            Text(unsignedSecondLine(item))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text(item.name)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// if 两分支是两种不同 View，普通函数必须加 @ViewBuilder
+    ///（跟 libraryContent 的 switch 同例，不加编不过）。
+    @ViewBuilder
+    private func unsignedRow(_ item: LocalFileItem) -> some View {
+        if batchingUnsigned {
+            Button {
+                if selectedUnsignedIDs.contains(item.id) {
+                    selectedUnsignedIDs.remove(item.id)
+                } else {
+                    selectedUnsignedIDs.insert(item.id)
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: selectedUnsignedIDs.contains(item.id) ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(selectedUnsignedIDs.contains(item.id) ? Color.accentColor : Color.secondary)
+                    libraryIcon(for: item.url.path, signed: false)
+                    unsignedRowTexts(item)
+                }
+            }
+            .buttonStyle(.plain)
+            .task(id: "\(item.url.path)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)") { loadLibraryIcon(for: item.url.path, signed: false) }
+        } else {
+            Button {
+                workspace.selectedIPA = item.url
+                workspace.openEnterpriseSign = true
+            } label: {
+                HStack(spacing: 10) {
+                    libraryIcon(for: item.url.path, signed: false)
+                    unsignedRowTexts(item)
+                }
+            }
+            .buttonStyle(.plain)
+            .task(id: "\(item.url.path)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)") { loadLibraryIcon(for: item.url.path, signed: false) }
+        }
+    }
+
+    /// 批量签名：只签名不安装（一次装多个做不出来，跟多开同理），
+    /// 逐个签进「已签名」；签名段表单的改动批量同样带上（见 batchSign）。
+    /// 批量签名：先在后台跑单签同一组签前检查（掉签、未脱壳），
+    /// 有警告先弹一次汇总确认，点继续才签；没警告直接签。
+    /// 吊销状态读上次手动检查的结果——没查过就不警告，不猜。
+    private func batchSign() {
+        guard !workspace.batchBusy, !selectedUnsignedIDs.isEmpty else { return }
+        guard EnterpriseCertStore.ready else {
+            // 应用库页没有“上方证书组”（证书组在签名页顶部），
+            // 原文案会把用户指到不存在的地方：改指签名页。
+            batchMessage = L("先去设置里的企业证书页，把证书、描述文件和密码备齐。")
+            batchFailed = true
+            return
+        }
+        // 与单签互斥（见 S2）：单签跑着、或 Engine 安装跑着时
+        // 不进批量，否则两路撞同一个输出文件。忙标志在入口就
+        // 立起来（不只在 runBatchSign 里），否则脱壳预检那几秒
+        // 窗口里单签还能进来，两路照样撞上。
+        if workspace.signBusy {
+            batchMessage = L("正在签名，等它跑完再批量签名。")
+            batchFailed = true
+            return
+        }
+        if engine.isRunning {
+            batchMessage = L("已有安装在进行，先等当前安装完成再批量签名。")
+            batchFailed = true
+            return
+        }
+        let targets = unsignedIPAs.filter { selectedUnsignedIDs.contains($0.id) }
+        guard !targets.isEmpty else { return }
+        workspace.batchBusy = true
+        batchMessage = nil
+        // 签名段表单的改动（插件、最低系统版本、图标等）批量同样带上，
+        // 与单签 startSign 一致；但名字/Bundle ID/版本是单 App 身份，
+        // 批量目标各有自己的值，表单里手填的自定义值不能盖到全部目标上，
+        // 这里清掉只留跨 App 通用项；打包名同理（不然全部产物共用
+        // 同一主名、只靠 2、3… 序号区分，文件名跟 App 对不上）；
+        // 包成 let，避免 var 被 Task.detached 捕获。
+        let mods: CertSignMods = {
+            var m = CertSignMods()
+            m.name = ""
+            m.bundleID = ""
+            m.version = ""
+            m.outputName = ""
+            return m
+        }()
+        let urls = targets.map { $0.url }
+        Task.detached(priority: .userInitiated) {
+            var undumpedURLs: [URL] = []
+            for url in urls {
+                // 按 IPA 粒度判定：包里任一 .app 未脱壳即该 IPA
+                // 未脱壳（见 SS2），不再只看第一个 .app。
+                if let undumped = IPADecryptionCheck.undumpedApps(of: url), !undumped.isEmpty {
+                    undumpedURLs.append(url)
+                }
+            }
+            await MainActor.run {
+                var warnings: [String] = []
+                if self.revocationStatus == .revoked {
+                    warnings.append(L("证书已经掉签，签名后可能无法安装。"))
+                }
+                if !undumpedURLs.isEmpty {
+                    let names = undumpedURLs.compactMap { url in
+                        targets.first(where: { $0.url == url }).map { self.unsignedDisplayName($0) }
+                    }
+                    if !names.isEmpty {
+                        warnings.append(L("以下程序未脱壳，签名后可能无法安装，建议重新脱壳签名：%@", names.joined(separator: "、")))
+                    }
+                }
+                if let expiry = self.expiryWarningText() {
+                    warnings.append(expiry)
+                }
+                if warnings.isEmpty {
+                    self.runBatchSign(targets: targets, mods: mods)
+                } else {
+                    self.pendingBatchWarnings = warnings
+                    self.pendingBatchTargets = targets
+                    self.pendingBatchMods = mods
+                    self.showingBatchWarningAlert = true
+                }
+            }
+        }
+    }
+
+    private func clearPendingBatch() {
+        pendingBatchWarnings = []
+        pendingBatchTargets = []
+        pendingBatchMods = CertSignMods()
+    }
+
+    /// 批量签名执行：只签名不安装；每项各签一次，多开不展开
+    ///（多开只对单签的「仅签名」生效，见 multiOpenSection 注释，
+    /// batchSign 本来就不走 multiCount，这里也不新开行为）。
+    private func runBatchSign(targets: [LocalFileItem], mods: CertSignMods) {
+        workspace.batchBusy = true
+        batchMessage = nil
+        Task {
+            var ok = 0
+            var fail = 0
+            var firstError: String?
+            for item in targets {
+                do {
+                    _ = try await CertSigner.signToFile(ipa: item.url, mods: mods)
+                    CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
+                        appName: unsignedDisplayName(item), kind: .batch, success: true,
+                        detail: L("已存到「已签名」")))
+                    ok += 1
+                } catch {
+                    fail += 1
+                    let message = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                    if firstError == nil { firstError = message }
+                    CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
+                        appName: unsignedDisplayName(item), kind: .batch, success: false,
+                        detail: message))
+                }
+            }
+            await MainActor.run {
+                self.signedRecords = SignedIPAStore.load()
+                self.refreshUnsignedIPAs {
+                    self.selectedUnsignedIDs = self.selectedUnsignedIDs.intersection(self.unsignedIPAs.map { $0.id })
+                }
+                self.logEntries = CertSignLogStore.load()
+                self.workspace.batchBusy = false
+                if fail == 0 {
+                    self.batchMessage = L("批量签完：%d 个已存到「已签名」。", ok)
+                    self.batchFailed = false
+                } else {
+                    var message = L("批量签完：成功 %d 个，失败 %d 个。", ok, fail)
+                    if let firstError { message += " " + friendlySignError(firstError) }
+                    self.batchMessage = message
+                    self.batchFailed = true
+                }
+            }
+        }
+    }
+
+    private var logList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if logEntries.isEmpty {
+                Text(L("还没有签名记录。签一次就会记一条，成功失败都有。"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                HStack(spacing: 12) {
+                    Text(L("共 %d 条", logEntries.count))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button { showingLogClearConfirm = true } label: {
+                        Text(L("清空")).font(.footnote)
+                    }
+                }
+                ForEach(logEntries) { entry in
+                    logRow(entry)
+                    if entry.id != logEntries.last?.id { Divider() }
+                }
+            }
+        }
+        .alert(L("清空签名记录？"), isPresented: $showingLogClearConfirm) {
+            Button(L("清空"), role: .destructive) {
+                CertSignLogStore.clear()
+                logEntries = []
+            }
+            Button(L("取消"), role: .cancel) {}
+        } message: {
+            Text(L("只删记录，不动已签名的 IPA 文件。"))
+        }
+    }
+
+    /// 签名日志行：跟已签名行同款格式（真实图标 + 名 + 成功/失败、
+    /// 种类·日期、detail 最多两行）。记录本身只存名字（不改
+    /// CertSignLogEntry 结构、不迁移旧日志）：图标按 appName 匹
+    /// 配首个同名已签名记录取已签名行那套解析（SignedIPAStore
+    /// 路径 + loadLibraryIcon，.task 触发）；匹配不上就走中性
+    /// 占位——宁可占位，不造假图、不空行。
+    private func logRow(_ entry: CertSignLogEntry) -> some View {
+        let iconPath = signedRecords.first(where: { $0.appName == entry.appName })
+            .map { SignedIPAStore.url(for: $0).path } ?? ""
+        return HStack(alignment: .top, spacing: 10) {
+            libraryIcon(for: iconPath, signed: true)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text(entry.appName)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer()
+                    Text(entry.success ? L("成功") : L("失败"))
+                        .font(.caption)
+                        .foregroundStyle(entry.success ? .green : .red)
+                }
+                Text("\(logKindText(entry.kind)) · \(Self.logDateFormatter.string(from: entry.date))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                if !entry.detail.isEmpty {
+                    Text(entry.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .task(id: iconPath) {
+            guard !iconPath.isEmpty else { return }
+            loadLibraryIcon(for: iconPath, signed: true)
+        }
+    }
+
+    private func logKindText(_ kind: CertSignLogKind) -> String {
+        switch kind {
+        case .signOnly: return L("仅签名")
+        case .signAndInstall: return L("签名并安装")
+        case .batch: return L("批量签名")
+        case .installOnly: return L("仅安装")
+        }
+    }
+
+    private static let logDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }()
+
+    private func unsignedDisplayName(_ item: LocalFileItem) -> String {
+        if let name = unsignedInfo[item.url.path]?.name, !name.isEmpty {
+            return name
+        }
+        return (item.name as NSString).deletingPathExtension
+    }
+
+    /// 第二行：V版本 | 大小 | Bundle ID；版本缺了就省掉 V 那段，
+    /// 解析失败只显示大小，不造假。
+    private func unsignedSecondLine(_ item: LocalFileItem) -> String {
+        let size = ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file)
+        guard let info = unsignedInfo[item.url.path] else { return size }
+        var parts: [String] = []
+        if let version = info.version, !version.isEmpty {
+            parts.append("V\(version)")
+        }
+        parts.append(size)
+        if !info.bundleID.isEmpty {
+            parts.append(info.bundleID)
+        }
+        return parts.joined(separator: " | ")
+    }
+
+    /// 未签名列表重扫：递归扫盘放 Task.detached，扫完回主线程写
+    /// unsignedIPAs 再跑 ensureUnsignedInfo（它按新列表筛缓存、给
+    /// 新出现的 IPA 排队解析；先写列表再跑它，顺序与同步扫盘时一致）。
+    /// onRefreshed 在列表写完后、同一主线程块里跑：批量签完那处靠它
+    /// 按新列表裁掉已签走的选中项（同步扫盘时 intersection 读的就是新列表）。
+    private func refreshUnsignedIPAs(onRefreshed: (() -> Void)? = nil) {
+        Task.detached {
+            let items = AppFileLibrary.scan().filter { $0.isIPA && !$0.isInSignedDir }
+            await MainActor.run {
+                unsignedIPAs = items
+                ensureUnsignedInfo()
+                onRefreshed?()
+            }
+        }
+    }
+
+    /// 未签名栏的 IPA 信息只解析一次：切到未签名栏/进页/签完刷新时，
+    /// 把还没试过的路径在后台统一解析，结果按路径缓存；解析失败也记
+    /// 已尝试，不重复读盘。删掉的路径清掉缓存，免得同名新文件沿用旧信息。
+    private func ensureUnsignedInfo() {
+        let current = Set(unsignedIPAs.map { $0.url.path })
+        unsignedInfo = unsignedInfo.filter { current.contains($0.key) }
+        unsignedInfoTried = unsignedInfoTried.intersection(current)
+        let pending = unsignedIPAs.filter { !unsignedInfoTried.contains($0.url.path) }
+        guard !pending.isEmpty else { return }
+        for item in pending { unsignedInfoTried.insert(item.url.path) }
+        let urls = pending.map { $0.url }
+        Task.detached(priority: .userInitiated) {
+            var found: [String: IPALibrary.AppInfo] = [:]
+            for url in urls {
+                if let info = IPALibrary.appInfo(at: url) {
+                    found[url.path] = info
+                }
+            }
+            await MainActor.run {
+                for (path, info) in found {
+                    self.unsignedInfo[path] = info
+                }
+            }
+        }
+    }
+
+    /// 应用库行图标：IPA 里取的真实图标（大圆角 52pt）；还没取到或
+    /// 取不到时显示中性灰圆角方块（不是假 App 图，只占位）。
+    @ViewBuilder
+    private func libraryIcon(for path: String, signed: Bool) -> some View {
+        if let image = signed ? signedIcons[path] : unsignedIcons[path] {
+            Image(uiImage: image)
+                .resizable()
+                .frame(width: 60, height: 60)
+                .cornerRadius(13)
+        } else {
+            RoundedRectangle(cornerRadius: 13)
+                .fill(Color.secondary.opacity(0.15))
+                .frame(width: 60, height: 60)
+        }
+    }
+
+    /// 行内图标加载（只取可见行，行 .task 触发）：key 已尝试直接跳过
+    /// （含取失败，不重复解包）；文件变了 key 就变，先清旧图再取，
+    /// 不让旧图标冒充新文件。解包只取图标文件，不整包解压。
+    private func loadLibraryIcon(for path: String, signed: Bool) {
+        let key = "\(path)#\(iconFingerprint(for: path))"
+        if signed {
+            guard !signedIconsTried.contains(key) else { return }
+            signedIconsTried.insert(key)
+            signedIcons[path] = nil
+        } else {
+            guard !unsignedIconsTried.contains(key) else { return }
+            unsignedIconsTried.insert(key)
+            unsignedIcons[path] = nil
+        }
+        let url = URL(fileURLWithPath: path)
+        Task.detached(priority: .userInitiated) {
+            guard let data = IPALibrary.iconData(at: url),
+                  let image = UIImage(data: data) else { return }
+            await MainActor.run {
+                if signed { self.signedIcons[path] = image }
+                else { self.unsignedIcons[path] = image }
+            }
+        }
+    }
+
+    /// 图标指纹：文件大小 + 修改时间（重签覆盖同路径时变）。
+    /// 文件没了就返回空串，key 照样唯一，不会死循环重取。
+    private func iconFingerprint(for path: String) -> String {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let size = attrs[.size] as? Int,
+              let modified = attrs[.modificationDate] as? Date else { return "" }
+        return "\(size)-\(modified.timeIntervalSince1970)"
+    }
+
+    private var signedList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if signedRecords.isEmpty {
+                Text(L("还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if filteredSigned.isEmpty {
+                Text(L("没有匹配的已签名 IPA。"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                if selectingSigned {
+                    HStack(spacing: 12) {
+                        Button {
+                            CZFHaptics.impact()
+                            // 全选只选当前可见的（搜了就只选搜到的）。
+                            selectedSignedIDs = Set(filteredSigned.map { $0.id })
+                        } label: {
+                            Text(L("全选"))
+                                .font(.footnote)
+                        }
+                        Button {
+                            CZFHaptics.impact()
+                            selectedSignedIDs.removeAll()
+                        } label: {
+                            Text(L("取消全选"))
+                                .font(.footnote)
+                        }
+                        Spacer()
+                        Button {
+                            CZFHaptics.impact()
+                            showingBatchDeleteConfirm = true
+                        } label: {
+                            Text(L("删除选中（%d）", selectedSignedIDs.count))
+                                .font(.footnote)
+                        }
+                        .disabled(selectedSignedIDs.isEmpty)
+                    }
+                }
+                ForEach(filteredSigned) { record in
+                    signedRow(record)
+                    if record.id != filteredSigned.last?.id {
+                        Divider()
+                    }
+                }
+            }
+        }
+    }
+
+    private func signedRow(_ record: SignedIPARecord) -> some View {
+        let iconPath = SignedIPAStore.url(for: record).path
+        return VStack(alignment: .leading, spacing: 6) {
+            // 点行直装（轻松签已签名行同款）；选择模式下点行改选。
+            Button {
+                if selectingSigned {
+                    if selectedSignedIDs.contains(record.id) {
+                        selectedSignedIDs.remove(record.id)
+                    } else {
+                        selectedSignedIDs.insert(record.id)
+                    }
+                } else {
+                    CZFHaptics.impact(.light)
+                    installSignedFile(LocalFileItem(url: SignedIPAStore.url(for: record),
+                        name: record.appName, relativeDir: "Signed",
+                        size: record.size, modified: record.date,
+                        isDirectory: false, childCount: 0))
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    if selectingSigned {
+                        Image(systemName: selectedSignedIDs.contains(record.id)
+                              ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(selectedSignedIDs.contains(record.id) ? Color.accentColor : Color.secondary)
+                    }
+                    libraryIcon(for: iconPath, signed: true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(record.appName)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        Text(signedSecondLine(record))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Text(record.fileName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                }
+            }
+            .buttonStyle(.plain)
+            .task(id: "\(iconPath)#\(record.size)-\(record.date.timeIntervalSince1970)") { loadLibraryIcon(for: iconPath, signed: true) }
+            // 行下按钮排已删：安装走点行直装，分享/删除进长按菜单。
+            .contextMenu {
+                ShareLink(item: SignedIPAStore.url(for: record)) {
+                    Label(L("分享"), systemImage: "square.and.arrow.up")
+                }
+                Button(role: .destructive) {
+                    recordPendingDelete = record
+                    showingDeleteConfirm = true
+                } label: {
+                    Label(L("删除"), systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    /// 搜索过滤：名字命中 App 名或文件名都算。
+    private var filteredSigned: [SignedIPARecord] {
+        guard !librarySearchText.isEmpty else { return signedRecords }
+        let query = librarySearchText.lowercased()
+        return signedRecords.filter { record in
+            record.appName.lowercased().contains(query)
+                || record.fileName.lowercased().contains(query)
+                || record.bundleID.lowercased().contains(query)
+        }
+    }
+
+    /// 已签名行第二行（轻松签应用库同款）：V版本 | 大小 | Bundle ID；
+    /// 版本缺了就省掉 V 那段（跟未签名行同例）。
+    private func signedSecondLine(_ record: SignedIPARecord) -> String {
+        let size = ByteCountFormatter.string(fromByteCount: Int64(record.size), countStyle: .file)
+        var parts: [String] = []
+        if let version = record.version, !version.isEmpty {
+            parts.append("V\(version)")
+        }
+        parts.append(size)
+        if !record.bundleID.isEmpty {
+            parts.append(record.bundleID)
+        }
+        return parts.joined(separator: " | ")
+    }
+
+    /// 剩余天数：按自然日对齐（与已装 App 页 AppsView.daysRemaining
+    /// 同一套算法，见 S7）。旧算法 dateComponents(from: Date(),
+    /// to: expiry) 按不足 24 小时截断，同一到期日在企业页算 0
+    /// 天、在 App 页算 1 天，两边说法打架；自然日对齐后“1 =
+    /// tomorrow”，到期当天算 0 天（显示“今天到期”）。
+    private func remainingDays(to expiration: Date) -> Int {
+        let calendar = Calendar.current
+        return calendar.dateComponents([.day],
+            from: calendar.startOfDay(for: Date()),
+            to: calendar.startOfDay(for: expiration)).day ?? 0
+    }
+
+    /// 签前到期警告（7 天内到期，只警告不拦截；已过期走 S4
+    /// 拦截，不在这里重复报）：复用 S7 的 remainingDays（startOfDay
+    /// 自然日）。单签与批量共用同一句，批量一次运行只拼一次。
+    private func expiryWarningText() -> String? {
+        var parts: [String] = []
+        let now = Date()
+        if let expiration = EnterpriseCertStore.certInfo?.expiration, expiration >= now {
+            let days = remainingDays(to: expiration)
+            if days <= 7 {
+                parts.append(days == 0 ? L("证书今天到期") : L("证书 %d 天后到期", days))
+            }
+        }
+        if let expiration = EnterpriseCertStore.provisionInfo?.expiration, expiration >= now {
+            let days = remainingDays(to: expiration)
+            if days <= 7 {
+                parts.append(days == 0 ? L("描述文件今天到期") : L("描述文件 %d 天后到期", days))
+            }
+        }
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: "，") + L("，仍要签名吗？")
+    }
+
+    /// 签名失败文案：p12 打不开基本就是密码不对（Rust 侧原话就是
+    /// “a wrong password reads the same”），按轻松签原文给中文提示，
+    /// 其他错误原样透传；日志和界面用同一句，不两张皮。
+    private func friendlySignError(_ message: String) -> String {
+        if message.contains("PKCS#12") {
+            return L("密码错误，请重新输入")
+        }
+        return message
+    }
+
+    /// 吊销检查放后台线程跑（信任评估可能联网 OCSP）。
+    private func checkRevocation() {
+        guard !revocationChecking, EnterpriseCertStore.hasP12 else { return }
+        revocationChecking = true
+        Task.detached(priority: .userInitiated) {
+            let status = CertRevocationChecker.check()
+            await MainActor.run {
+                self.revocationStatus = status
+                self.revocationCheckedAt = Date()
+                self.revocationChecking = false
+            }
+        }
+    }
 }
 
 /// 文件页 IPA 切栏：未签名 / 已签名（轻松签文件列表同款）。
 private enum FileListTab: Hashable {
     case unsigned
     case signed
+}
+
+/// 应用库切栏。
+private enum CertLibraryTab: Identifiable, Hashable {
+    case unsigned
+    case signed
+    case log
+
+    var id: String {
+        switch self {
+        case .unsigned: return "unsigned"
+        case .signed: return "signed"
+        case .log: return "log"
+        }
+    }
 }
 
 /// 文件详情（轻松签文件列表右边的 ⓘ）：名字、大小、修改时间、路径，
