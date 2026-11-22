@@ -1316,4 +1316,19 @@ let vietnameseStrings: [String: String] = [
         "Để cài đặt và gia hạn ứng dụng mà không cần máy tính, chạm vào “Set up Remote AltServer” trong phần Cài đặt của AltStore và làm theo các bước.",
     "Open AltStore and sign in with the same Apple ID.":
         "Mở AltStore và đăng nhập bằng cùng Apple ID đó.",
+
+    // MARK: - LAN transfer (browser page)
+
+    "File not found": "Không tìm thấy tệp",
+    "Invalid path": "Đường dẫn không hợp lệ",
+    "Couldn't parse the upload": "Không thể xử lý tệp tải lên",
+    "No such page": "Không có trang này",
+    "Download": "Tải xuống",
+    "Delete this file?": "Xóa tệp này?",
+    "This directory is empty": "(Thư mục này trống)",
+    "SideInstaller LAN Transfer": "Truyền tệp LAN SideInstaller",
+    "SideInstaller File Transfer": "Truyền tệp SideInstaller",
+    "Upload": "Tải lên",
+    "File": "Tệp",
+    "Size": "Kích thước",
 ]

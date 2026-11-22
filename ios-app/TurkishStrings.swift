@@ -1180,4 +1180,19 @@ let turkishStrings: [String: String] = [
         "Bilgisayarsız uygulama yüklemek ve yenilemek için AltStore'un Ayarlar'ında “Set up Remote AltServer”a dokun ve adımları izle.",
     "Open AltStore and sign in with the same Apple ID.":
         "AltStore'u aç ve aynı Apple ID ile giriş yap.",
+
+    // MARK: - LAN transfer (browser page)
+
+    "File not found": "Dosya bulunamadı",
+    "Invalid path": "Geçersiz yol",
+    "Couldn't parse the upload": "Yükleme işlenemedi",
+    "No such page": "Böyle bir sayfa yok",
+    "Download": "İndir",
+    "Delete this file?": "Bu dosya silinsin mi?",
+    "This directory is empty": "(Bu dizin boş)",
+    "SideInstaller LAN Transfer": "SideInstaller LAN Aktarımı",
+    "SideInstaller File Transfer": "SideInstaller Dosya Aktarımı",
+    "Upload": "Yükle",
+    "File": "Dosya",
+    "Size": "Boyut",
 ]

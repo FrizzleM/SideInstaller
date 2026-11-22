@@ -1288,4 +1288,19 @@ let koreanStrings: [String: String] = [
         "컴퓨터 없이 앱을 설치하고 갱신하려면 AltStore 설정에서 “Set up Remote AltServer”를 탭하고 안내를 따르세요.",
     "Open AltStore and sign in with the same Apple ID.":
         "AltStore를 열고 같은 Apple ID로 로그인하세요.",
+
+    // MARK: - LAN transfer (browser page)
+
+    "File not found": "파일을 찾을 수 없습니다",
+    "Invalid path": "경로가 올바르지 않습니다",
+    "Couldn't parse the upload": "업로드를 분석할 수 없습니다",
+    "No such page": "해당 페이지가 없습니다",
+    "Download": "다운로드",
+    "Delete this file?": "이 파일을 삭제할까요?",
+    "This directory is empty": "(디렉터리가 비어 있습니다)",
+    "SideInstaller LAN Transfer": "SideInstaller LAN 전송",
+    "SideInstaller File Transfer": "SideInstaller 파일 전송",
+    "Upload": "업로드",
+    "File": "파일",
+    "Size": "크기",
 ]

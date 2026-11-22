@@ -1287,4 +1287,19 @@ let japaneseStrings: [String: String] = [
         "パソコンなしでアプリをインストール・更新するには、AltStore の設定で「Set up Remote AltServer」をタップし、表示される手順に従ってください。",
     "Open AltStore and sign in with the same Apple ID.":
         "AltStore を開き、同じ Apple ID でサインインします。",
+
+    // MARK: - LAN transfer (browser page)
+
+    "File not found": "ファイルが見つかりません",
+    "Invalid path": "パスが正しくありません",
+    "Couldn't parse the upload": "アップロードを解析できませんでした",
+    "No such page": "そのページはありません",
+    "Download": "ダウンロード",
+    "Delete this file?": "このファイルを削除しますか？",
+    "This directory is empty": "（ディレクトリは空です）",
+    "SideInstaller LAN Transfer": "SideInstaller ローカル転送",
+    "SideInstaller File Transfer": "SideInstaller ファイル転送",
+    "Upload": "アップロード",
+    "File": "ファイル",
+    "Size": "サイズ",
 ]

@@ -1339,4 +1339,19 @@ let chineseStrings: [String: String] = [
         "如需在没有电脑的情况下安装和续签应用，请在 AltStore 的设置中轻点“Set up Remote AltServer”，然后按步骤操作。",
     "Open AltStore and sign in with the same Apple ID.":
         "打开 AltStore，用同一个 Apple ID 登录。",
+
+    // MARK: - LAN transfer (browser page)
+
+    "File not found": "文件不存在",
+    "Invalid path": "路径不对",
+    "Couldn't parse the upload": "上传解析失败",
+    "No such page": "没有这个页面",
+    "Download": "下载",
+    "Delete this file?": "删掉这个文件？",
+    "This directory is empty": "（目录是空的）",
+    "SideInstaller LAN Transfer": "SideInstaller 局域网传输",
+    "SideInstaller File Transfer": "SideInstaller 文件传输",
+    "Upload": "上传",
+    "File": "文件",
+    "Size": "大小",
 ]

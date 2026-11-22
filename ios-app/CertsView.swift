@@ -232,8 +232,11 @@ struct CertsView: View {
         isExporting = true
         exportError = nil
         exportURL = nil
-        DispatchQueue.global(qos: .userInitiated).async {
+        Task {
             do {
+                // 证书页导出同款：先自动登录再导出，否则刚启动没开过证书页
+                // 之外的入口点进来也会报 Not signed in.（App 详情页同款已修）。
+                try await manager.ensureSignedIn()
                 let (p12Data, password) = try manager.exportP12()
                 // Write to temp file
                 let tempURL = FileManager.default.temporaryDirectory
@@ -243,13 +246,13 @@ struct CertsView: View {
                 let pwdURL = FileManager.default.temporaryDirectory
                     .appendingPathComponent("certificate-password.txt")
                 try password.write(to: pwdURL, atomically: true, encoding: .utf8)
-                DispatchQueue.main.async {
+                await MainActor.run {
                     isExporting = false
                     exportURL = tempURL
                     exportPassword = password
                 }
             } catch {
-                DispatchQueue.main.async {
+                await MainActor.run {
                     isExporting = false
                     exportError = error.localizedDescription
                 }

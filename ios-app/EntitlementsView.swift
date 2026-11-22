@@ -222,7 +222,10 @@ final class EntitlementsManager: ObservableObject {
     @MainActor
     func signOut() {
         guard let session else { return }
-        si_cert_session_free(session)
+        // C18：释放排进权限队列（与在途的 FFI 调用串行），不在主线程直接
+        // 释放；抓调用时那一个指针，块内不再重读当前 session（C19 的教训）。
+        let freed = session
+        queue.async { si_cert_session_free(freed) }
         self.session = nil
         teamSummary = nil
         apps = []

@@ -257,6 +257,12 @@ struct ContentView: View {
                 engine.releaseTunnel()
             }
             engine.cancelTunnelIdleStop()
+            // S21：还有操作方持有时不调停——在途的安装/续签正用着隧道，
+            // 只记日志；持有归零时照旧停。
+            guard engine.tunnelHolders == 0 else {
+                engine.log("Tunnel: pill tap ignored — an operation still holds the tunnel (\(engine.tunnelHolders) holder(s)).")
+                return
+            }
             await BuiltinTunnel.stop()
         }
     }

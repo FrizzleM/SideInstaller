@@ -1310,4 +1310,19 @@ let portugueseStrings: [String: String] = [
         "Para instalar e renovar apps sem computador, toque em “Set up Remote AltServer” nos ajustes do AltStore e siga os passos.",
     "Open AltStore and sign in with the same Apple ID.":
         "Abra o AltStore e entre com o mesmo Apple ID.",
+
+    // MARK: - LAN transfer (browser page)
+
+    "File not found": "Arquivo não encontrado",
+    "Invalid path": "Caminho inválido",
+    "Couldn't parse the upload": "Não foi possível processar o envio",
+    "No such page": "Não existe essa página",
+    "Download": "Baixar",
+    "Delete this file?": "Excluir este arquivo?",
+    "This directory is empty": "(Este diretório está vazio)",
+    "SideInstaller LAN Transfer": "Transferência LAN do SideInstaller",
+    "SideInstaller File Transfer": "Transferência de arquivos do SideInstaller",
+    "Upload": "Enviar",
+    "File": "Arquivo",
+    "Size": "Tamanho",
 ]
