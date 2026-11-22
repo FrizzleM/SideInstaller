@@ -142,13 +142,6 @@ struct EnterpriseCertView: View {
         if !hasProvision { return L("未导入描述文件") }
         return L("缺密码")
     }
-    /// 证书组收起行缺件状态：三件（p12、描述文件、密码）缺哪件说哪件，
-    /// 别笼统报“未就绪”；全齐不会走到这里（certReady 分支已处理）。
-    private var certStatusText: String {
-        if !hasP12 { return L("未导入证书") }
-        if !hasProvision { return L("未导入描述文件") }
-        return L("缺密码")
-    }
 
     var body: some View {
         ScrollViewReader { proxy in
