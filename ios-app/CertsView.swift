@@ -251,6 +251,9 @@ struct CertsView: View {
                     exportURL = tempURL
                     exportPassword = password
                 }
+            } catch is CancellationError {
+                // A2：切账号后本次导出作废，不记错。
+                await MainActor.run { isExporting = false }
             } catch {
                 await MainActor.run {
                     isExporting = false

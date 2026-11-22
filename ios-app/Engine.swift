@@ -757,6 +757,7 @@ final class Engine {
                 // ensurePairingConnection 同款文案报错（入口 tunnelAvailable
                 // 守卫已先拦过一轮，这里是竞态兜底）。
                 guard await acquireTunnel() else {
+                    if Task.isCancelled { throw CancellationError() }
                     throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
                         ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
                         : L("LocalDevVPN isn't connected. Connect it, then try again."))
@@ -2252,6 +2253,7 @@ final class Engine {
             do {
                 // SIDE-2：隧道按需开——同 runOneClick，管线开始拿租约、收尾统一还。
                 guard await acquireTunnel() else {
+                    if Task.isCancelled { throw CancellationError() }
                     throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
                         ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
                         : L("LocalDevVPN isn't connected. Connect it, then try again."))
@@ -2382,6 +2384,7 @@ final class Engine {
             do {
                 // SIDE-2：隧道按需开——同 runOneClick，管线开始拿租约、收尾统一还。
                 guard await acquireTunnel() else {
+                    if Task.isCancelled { throw CancellationError() }
                     throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
                         ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
                         : L("LocalDevVPN isn't connected. Connect it, then try again."))

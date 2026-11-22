@@ -536,7 +536,7 @@ final class LANTransferServer: ObservableObject {
         var rows = ""
         for item in items {
             let rel = item.relativeDir.isEmpty ? item.name : "\(item.relativeDir)/\(item.name)"
-            let enc = rel.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? rel
+            let enc = rel.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&"))) ?? rel
             let size = ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file)
             rows += "<tr><td>\(Self.htmlEscape(rel))</td><td>\(size)</td>" +
                 "<td><a href=\"/dl?path=\(enc)\">\(L("Download"))</a></td>" +

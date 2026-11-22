@@ -563,6 +563,9 @@ struct FilesTabView: View {
     /// 再点“已上传，开始安装”拉起系统安装。生成失败时页内留错，不静默。
     private func startOTAInstall(record: SignedIPARecord) {
         otaLaunched = false
+        // C33：入口就留重试凭证——两条失败路只置错 + 关 sheet，重试按钮
+        // 以 record 非空为条件，入口不置就永远没有重试。
+        fileInstallRecord = record
         guard let manifestURL = OTAInstallServer.writePublicManifest(for: record) else {
             fileInstallErrorText = L("安装清单生成失败，改用配对安装。")
             return
@@ -685,7 +688,17 @@ struct FilesTabView: View {
                         .foregroundStyle(.red)
                     Spacer()
                     if let record = fileInstallRecord {
-                        Button(L("重试安装")) { CZFHaptics.impact(.light); startEnterpriseInstall(ipaURL: SignedIPAStore.url(for: record), record: record) }
+                        Button(L("重试安装")) {
+                            CZFHaptics.impact(.light)
+                            let url = SignedIPAStore.url(for: record)
+                            if FileManager.default.fileExists(atPath: url.path) {
+                                startEnterpriseInstall(ipaURL: url, record: record)
+                            } else {
+                                // C33 遗留：文件已被外部删掉，重试无意义，清掉凭证并留错。
+                                fileInstallRecord = nil
+                                fileInstallErrorText = L("File not found")
+                            }
+                        }
                             .font(.footnote)
                     } else if let url = fileInstallURL {
                         Button(L("重试安装")) { CZFHaptics.impact(.light); startEnterpriseInstall(ipaURL: url, record: nil) }
@@ -1009,6 +1022,7 @@ struct FilesTabView: View {
             Button(L("Cellular Install (OTA)")) {
                 if let record = installChoiceRecord { startOTAInstall(record: record) }
             }
+            Button(L("取消"), role: .cancel) { installChoiceRecord = nil }
         }
         .sheet(item: $otaRecord) { record in
             otaSheet(record: record)

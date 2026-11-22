@@ -218,6 +218,12 @@ final class CZFWebDAVServer: ObservableObject {
         guard let url = resolve(request.path, under: root) else {
             return GCDWebServerResponse(statusCode: 403)
         }
+        // C32：C28 同款——目录（含 Documents 根本身）不删，回 400；
+        // 不存在的文件仍回 404（不改原有语义）。
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+            return GCDWebServerResponse(statusCode: 400)
+        }
         guard FileManager.default.fileExists(atPath: url.path) else {
             return GCDWebServerResponse(statusCode: 404)
         }

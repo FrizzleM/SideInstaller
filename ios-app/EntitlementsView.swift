@@ -112,6 +112,8 @@ final class EntitlementsManager: ObservableObject {
     @Published private(set) var hasLoaded = false
 
     private var session: OpaquePointer?            // CertSession*
+    /// A2：登录代际号——signOut 递增；signIn 完成后核对，未变才写会话。
+    private var signInGeneration = 0
     private let queue = DispatchQueue(label: "sideinstaller.entitlements")
 
     private var engine: Engine { Engine.shared }
@@ -184,6 +186,9 @@ final class EntitlementsManager: ObservableObject {
                 apps = list.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
                 hasLoaded = true
                 engine.log("Entitlements: \(list.count) App ID(s).")
+            } catch is CancellationError {
+                // A2：切账号后本次加载作废，不记错（isWorking 在分支后统一复位）。
+                engine.log("Entitlements: load cancelled.")
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Entitlements: \(lastError ?? "failed")")
@@ -221,6 +226,8 @@ final class EntitlementsManager: ObservableObject {
     /// No-op if not signed in.
     @MainActor
     func signOut() {
+        // A2：世代递增放 guard 之前——登录在途时 session 还是 nil，早退会漏递增。
+        signInGeneration += 1
         guard let session else { return }
         // C18：释放排进权限队列（与在途的 FFI 调用串行），不在主线程直接
         // 释放；抓调用时那一个指针，块内不再重读当前 session（C19 的教训）。
@@ -241,6 +248,8 @@ final class EntitlementsManager: ObservableObject {
     @MainActor
     private func signIn(id: String, pw: String) async throws {
         // One Apple ID sign-in at a time (`AppleSignInQueue`).
+        // A2：排队等待期间切账号同样作废本次尝试，世代在等位前抓。
+        let generation = signInGeneration
         let ticket = try await engine.appleSignIns.waitForTurn(.entitlements, appleID: id)
         defer { engine.appleSignIns.finished(ticket) }
 
@@ -259,6 +268,14 @@ final class EntitlementsManager: ObservableObject {
             do {
                 let summary = try await onQueue {
                     try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, ticket: ticket)
+                }
+                // A2：切账号后完成的旧登录作废——刚登好的会话在队列上放掉再报取消。
+                guard generation == signInGeneration else {
+                    if let stale = self.session {
+                        self.session = nil
+                        queue.async { si_cert_session_free(stale) }
+                    }
+                    throw CancellationError()
                 }
                 engine.anisetteSignedIn(ani)
                 teamSummary = summary

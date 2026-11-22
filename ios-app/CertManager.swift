@@ -89,6 +89,8 @@ final class CertManager: ObservableObject {
     var isBusy: Bool { isWorking || isImporting || revokingID != nil }
 
     private var session: OpaquePointer?            // CertSession*
+    /// A2：登录代际号——signOut 递增；signIn 完成后核对，未变才写会话。
+    private var signInGeneration = 0
     private let queue = DispatchQueue(label: "sideinstaller.certs")
 
     private var engine: Engine { Engine.shared }
@@ -303,6 +305,9 @@ final class CertManager: ObservableObject {
                         ? L("SideInstaller signs with “%@” from now on. Nothing was revoked, so the apps already signed with it keep working.", name)
                         : L("SideInstaller already signs with “%@”.", name)
                 }
+            } catch is CancellationError {
+                // A2：切账号后本次导入作废，不记错（isImporting 由外层 defer 复位）。
+                engine.log("Certificates: import cancelled (account changed).")
             } catch {
                 lastError = error is ImportNotOnTeam ? notOnTeam : short(error)
                 engine.log("⛔️ Certificates: \(lastError ?? "import failed")")
@@ -345,6 +350,8 @@ final class CertManager: ObservableObject {
     /// No-op if not signed in.
     @MainActor
     func signOut() {
+        // A2：世代递增放 guard 之前——登录在途时 session 还是 nil，早退会漏递增。
+        signInGeneration += 1
         guard let session else { return }
         // C18：释放排进证书队列（与在途的 FFI 调用串行），不在主线程直接
         // 释放；抓调用时那一个指针，块内不再重读当前 session（C19 的教训）。
@@ -365,6 +372,8 @@ final class CertManager: ObservableObject {
     @MainActor
     private func signIn(id: String, pw: String) async throws {
         // One Apple ID sign-in at a time (`AppleSignInQueue`).
+        // A2：排队等待期间切账号同样作废本次尝试，世代在等位前抓。
+        let generation = signInGeneration
         let ticket = try await engine.appleSignIns.waitForTurn(.certificates, appleID: id)
         defer { engine.appleSignIns.finished(ticket) }
         // A load and an import can both have been waiting; the first signed in.
@@ -386,6 +395,14 @@ final class CertManager: ObservableObject {
             do {
                 let summary = try await onQueue {
                     try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, ticket: ticket)
+                }
+                // A2：切账号后完成的旧登录作废——刚登好的会话在队列上放掉再报取消。
+                guard generation == signInGeneration else {
+                    if let stale = self.session {
+                        self.session = nil
+                        queue.async { si_cert_session_free(stale) }
+                    }
+                    throw CancellationError()
                 }
                 engine.anisetteURL = ani               // stick with what worked
                 teamSummary = summary

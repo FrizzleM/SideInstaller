@@ -135,7 +135,7 @@ final class OTAInstallServer: ObservableObject {
 
     /// itms-services 安装链接（manifest 直链按 query 编码，onReady 同款写法）。
     static func publicInstallURL(manifestR2URL: String) -> URL? {
-        let encoded = manifestR2URL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? manifestR2URL
+        let encoded = manifestR2URL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&"))) ?? manifestR2URL
         return URL(string: "itms-services://?action=download-manifest&url=\(encoded)")
     }
 

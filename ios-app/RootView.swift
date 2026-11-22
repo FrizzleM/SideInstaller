@@ -79,6 +79,8 @@ struct RootView: View {
     @State private var page: Page = .sources
     /// U-UI：安装页改全屏 sheet 后的开关（浮动 pill 与链接/分享入口共用）。
     @State private var showInstallSheet = false
+    /// C31：2FA 弹着时安装页暂缓打开的待处理标志（反方向）。
+    @State private var showInstallSheetPending = false
     /// U-UI：文件页/源页“签名”动作要求打开设置里的企业证书页时置位；
     /// SettingsView 的企业区 NavigationLink 认它，打开后自己清掉。
     @State private var settingsEnterpriseRequest = false
@@ -122,13 +124,13 @@ struct RootView: View {
         // A link's install or pairing file ends up on the install sheet, so its
         // popup comes up over that.
         .onChange(of: engine.pendingLink) { _, link in
-            if link != nil { showInstallSheet = true }
+            if link != nil { openInstallSheet() }
         }
         // A share / “Open with” IPA import lands here too: the run it started
         // (or the guide it stopped on) lives on the install sheet, so jump
         // there instead of leaving the user to go find it by hand.
         .onChange(of: engine.sharedIPAReady) { _, ready in
-            if ready { showInstallSheet = true; engine.sharedIPAReady = false }
+            if ready { openInstallSheet(); engine.sharedIPAReady = false }
         }
         // A certificate a link brought is checked and imported by the same
         // manager as the Certificates page.
@@ -148,7 +150,7 @@ struct RootView: View {
         // 没跑过时不显示，不占地方。文案复用 L("Install")，0 新 key。
         .overlay(alignment: .bottom) {
             if engine.isRunning || engine.overallProgress > 0 || engine.finished {
-                Button { showInstallSheet = true } label: {
+                Button { openInstallSheet() } label: {
                     HStack(spacing: 6) {
                         if engine.isRunning {
                             ProgressView().tint(.white)
@@ -208,6 +210,14 @@ struct RootView: View {
         }
         .onChange(of: engine.twoFactor) { old, phase in
             if let phase { shownTwoFactor = phase }
+            // C31：2FA 来了先落安装页（全屏 sheet 盖住 TabView 时 2FA sheet
+            // 会被 UIKit 静默丢弃）；2FA 清掉后把暂缓的安装页补开。
+            if phase != nil {
+                showInstallSheet = false
+            } else if showInstallSheetPending {
+                showInstallSheetPending = false
+                showInstallSheet = true
+            }
             // A code is wanted, or the one entered was turned down.
             if let phase, phase.isAsking {
                 if old?.signIn != phase.signIn {
@@ -216,6 +226,16 @@ struct RootView: View {
                     SoundEffects.play(.error)
                 }
             }
+        }
+    }
+
+    /// C31：安装页与 2FA sheet 不能同时 present——2FA 弹着时只记 pending，
+    /// 等 2FA 清掉再补开安装页（否则 UIKit 静默丢弃 present）。
+    private func openInstallSheet() {
+        if engine.twoFactor != nil {
+            showInstallSheetPending = true
+        } else {
+            showInstallSheet = true
         }
     }
 
