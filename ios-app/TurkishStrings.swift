@@ -264,6 +264,7 @@ let turkishStrings: [String: String] = [
         "Yalnızca SideInstaller'ın imzaladığı sertifika dışa aktarılabilir: diğerlerinin özel anahtarı, Apple'dan onu isteyen cihazda kalır.",
     "Couldn't export the certificate: %@": "Sertifika dışa aktarılamadı: %@",
     "Export certificate": "Sertifikayı dışa aktar",
+    "Import to %@": "%@'e aktar",
     "Password (optional)": "Parola (isteğe bağlı)",
     "Export": "Dışa aktar",
     "Exporting": "Dışa aktarılıyor",
@@ -581,6 +582,8 @@ let turkishStrings: [String: String] = [
     "Start LocalDevVPN now": "LocalDevVPN'i şimdi başlat",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "LocalDevVPN yüklü değil. App Store'dan al; bu senin için başlatabilir.",
+    "When on, operations that need the tunnel try the built-in tunnel first and start LocalDevVPN when needed. When off, LocalDevVPN is never started automatically; the built-in tunnel still starts on demand, and the manual pill switch is unaffected.":
+        "Açıkken, tünel gerektiren işlemler önce yerleşik tüneli dener ve gerektiğinde LocalDevVPN'i başlatır. Kapalıyken LocalDevVPN hiçbir zaman otomatik başlatılmaz; yerleşik tünel yine de gerektiğinde başlar ve manuel pill anahtarı etkilenmez.",
     "Downloaded IPAs": "İndirilen IPA'lar",
     "%@ used": "%@ kullanıldı",
     "imported": "içe aktarıldı",

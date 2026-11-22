@@ -292,6 +292,7 @@ let koreanStrings: [String: String] = [
         "SideInstaller가 서명에 사용하는 인증서만 내보낼 수 있습니다. 다른 인증서의 개인 키는 Apple에 인증서를 요청한 기기에만 남아 있습니다.",
     "Couldn't export the certificate: %@": "인증서를 내보내지 못했습니다: %@",
     "Export certificate": "인증서 내보내기",
+    "Import to %@": "%@로 가져오기",
     "Password (optional)": "암호(선택)",
     "Export": "내보내기",
     "Exporting": "내보내는 중",
@@ -588,6 +589,8 @@ let koreanStrings: [String: String] = [
     "Start LocalDevVPN now": "지금 LocalDevVPN 시작",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "LocalDevVPN이 설치되어 있지 않습니다. App Store에서 받으면 여기서 실행할 수 있습니다.",
+    "When on, operations that need the tunnel try the built-in tunnel first and start LocalDevVPN when needed. When off, LocalDevVPN is never started automatically; the built-in tunnel still starts on demand, and the manual pill switch is unaffected.":
+        "켜져 있으면 터널이 필요한 작업은 내장 터널을 먼저 시도하고 필요할 때 LocalDevVPN을 시작합니다. 꺼져 있으면 LocalDevVPN이 자동으로 시작되지 않습니다. 내장 터널은 여전히 필요할 때 시작되며, 수동 pill 스위치에는 영향이 없습니다.",
 
     "Downloaded IPAs": "다운로드한 IPA",
     "%@ used": "%@ 사용 중",

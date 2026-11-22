@@ -306,7 +306,7 @@ struct SettingsView: View {
                 Text(L("LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you."))
             }
             Text(L("Built-in tunnel: interface 10.7.1.1/32 and peer 10.7.0.1/32 by default. Address changes take effect the next time the tunnel connects."))
-            Text(L("When on, the Install tab preconnects the built-in tunnel on Wi-Fi and reconnects it if it drops. Off leaves the tunnel fully manual; a run still starts it when needed."))
+            Text(L("When on, operations that need the tunnel try the built-in tunnel first and start LocalDevVPN when needed. When off, LocalDevVPN is never started automatically; the built-in tunnel still starts on demand, and the manual pill switch is unaffected."))
         }
     }
 

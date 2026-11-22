@@ -295,6 +295,7 @@ let portugueseStrings: [String: String] = [
         "Só o certificado com que o SideInstaller assina pode ser exportado: a chave privada de qualquer outro fica no dispositivo que o pediu à Apple.",
     "Couldn't export the certificate: %@": "Não foi possível exportar o certificado: %@",
     "Export certificate": "Exportar certificado",
+    "Import to %@": "Importar para %@",
     "Password (optional)": "Senha (opcional)",
     "Export": "Exportar",
     "Exporting": "Exportando",
@@ -670,6 +671,8 @@ let portugueseStrings: [String: String] = [
     "Start LocalDevVPN now": "Iniciar o LocalDevVPN agora",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "O LocalDevVPN não está instalado. Baixe-o na App Store e o SideInstaller poderá iniciá-lo para você.",
+    "When on, operations that need the tunnel try the built-in tunnel first and start LocalDevVPN when needed. When off, LocalDevVPN is never started automatically; the built-in tunnel still starts on demand, and the manual pill switch is unaffected.":
+        "Quando ativado, as operações que precisam do túnel tentam primeiro o túnel integrado e iniciam o LocalDevVPN quando necessário. Quando desativado, o LocalDevVPN nunca é iniciado automaticamente; o túnel integrado continua iniciando sob demanda, e o interruptor manual (pill) não é afetado.",
 
     "Downloaded IPAs": "IPAs baixados",
     "%@ used": "%@ em uso",

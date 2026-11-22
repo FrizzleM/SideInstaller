@@ -31,7 +31,7 @@ struct ContentView: View {
     /// Shows the "LocalDevVPN's tunnel can only be closed from LocalDevVPN"
     /// note when the pill is tapped with a LOC tunnel up.
     @State private var showLOCStopNote = false
-    /// The tunnel was closed by hand from the pill: preconnect and
+    /// The tunnel was closed by hand from the pill: the holder-only
     /// auto-reconnect must not pull it back up until it comes up again.
     @State private var tunnelManualOff = false
     /// Last auto-reconnect attempt, so a flapping tunnel doesn't hammer start.

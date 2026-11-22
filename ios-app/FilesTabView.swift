@@ -94,9 +94,9 @@ struct FilesTabView: View {
     /// 文件页安装的传输不再走它的 install()，只用 appendStepLog
     /// 记配对安装开始/完成/失败，证书页的诊断日志里能看到。
     @ObservedObject private var localInstall = LocalHTTPInstallServer.shared
-    /// IPA 文件行图标缓存（路径 → 图标数据）与已试集合（键 =
+    /// IPA 文件行图标缓存（路径 → 解码后的图标）与已试集合（键 =
     /// 路径#大小#修改时间，文件换了就重取，不死循环重试）。
-    @State private var fileIcons: [String: Data] = [:]
+    @State private var fileIcons: [String: UIImage] = [:]
     @State private var fileIconsTried: Set<String> = []
     /// Declared so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
@@ -1062,8 +1062,7 @@ struct FilesTabView: View {
                 .font(.title3)
                 .frame(width: 52, height: 52)
         } else if item.isIPA,
-                  let data = fileIcons[item.id],
-                  let uiImage = UIImage(data: data) {
+                  let uiImage = fileIcons[item.id] {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFill()
@@ -1094,8 +1093,9 @@ struct FilesTabView: View {
         guard !fileIconsTried.contains(key) else { return }
         fileIconsTried.insert(key)
         Task.detached { [url = item.url, id = item.id] in
-            guard let data = IPALibrary.iconData(at: url) else { return }
-            await MainActor.run { fileIcons[id] = data }
+            guard let data = IPALibrary.iconData(at: url),
+                  let image = UIImage(data: data) else { return }
+            await MainActor.run { fileIcons[id] = image }
         }
     }
 

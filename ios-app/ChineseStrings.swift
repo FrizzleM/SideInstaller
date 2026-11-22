@@ -291,6 +291,7 @@ let chineseStrings: [String: String] = [
         "只能导出 SideInstaller 用来签名的证书：其他证书的私钥只保存在向 Apple 申请它的设备上。",
     "Couldn't export the certificate: %@": "无法导出证书：%@",
     "Export certificate": "导出证书",
+    "Import to %@": "导入到 %@",
     "Password (optional)": "密码（可选）",
     "Export": "导出",
     "Exporting": "正在导出",
@@ -1236,6 +1237,8 @@ let chineseStrings: [String: String] = [
     "Auto-enable tunnel on Wi-Fi": "Wi-Fi 下自动启用隧道",
     "When on, the Install tab preconnects the built-in tunnel on Wi-Fi and reconnects it if it drops. Off leaves the tunnel fully manual; a run still starts it when needed.":
         "打开后，安装页在 Wi-Fi 下自动预连内置隧道，隧道中途掉了也会自动重连。关掉则全手动——安装需要时仍会自动启动。",
+    "When on, operations that need the tunnel try the built-in tunnel first and start LocalDevVPN when needed. When off, LocalDevVPN is never started automatically; the built-in tunnel still starts on demand, and the manual pill switch is unaffected.":
+        "开启时，需要隧道的操作先试内置隧道，再按需启动 LocalDevVPN。关闭时，LocalDevVPN 不会自动启动；内置隧道仍按需启动，手动 pill 开关不受影响。",
     "Refresh apps automatically in background": "后台自动续签应用",
     "Auto Refresh": "自动续签",
     "SideInstaller stays alive in the background (silent audio + location) and checks every 30 minutes. Apps whose signing expires within 3 days are re-signed automatically. Location access must be set to “Always” and the tunnel must stay connected (the built-in tunnel is enough). The system also wakes the app in the background from time to time to run a check — don't swipe it away from the app switcher.":

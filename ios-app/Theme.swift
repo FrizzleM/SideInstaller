@@ -5,21 +5,43 @@ import UIKit
 /// with a job each, and the cards, buttons and headers every screen is
 /// composed from.
 ///
-/// The surfaces are navy so dark they read as night, and the blues are kept
-/// apart by what they do: `navy` for the logo art and the wash at the top of
-/// a page, `blue` for what's filled behind white (the main button), `accent`
-/// for what's drawn on the dark (progress, links, the selection). Depth comes
-/// from a step between surfaces and a hairline edge.
+/// In dark mode the surfaces are navy so dark they read as night, and the
+/// blues are kept apart by what they do: `navy` for the logo art and the
+/// wash at the top of a page, `blue` for what's filled behind white (the
+/// main button), `accent` for what's drawn on the dark (progress, links,
+/// the selection). Depth comes from a step between surfaces and a hairline
+/// edge. In light mode `card` and `raised` step down to the system
+/// backgrounds instead, so the dark text on them stays readable — a fixed
+/// navy under black text was unreadable (Files page, 2026-11-22).
 enum Theme {
     // MARK: Ramp
 
     /// The page behind everything: a navy so deep it reads as black until a
     /// card sits on it.
     static let page = Color(red: 5 / 255, green: 11 / 255, blue: 24 / 255)
-    /// A card on the page.
-    static let card = Color(red: 13 / 255, green: 21 / 255, blue: 36 / 255)
+    /// A card on the page. Dark keeps the night navy; light uses the
+    /// system's secondary background, so the black text on it stays
+    /// readable — a fixed navy under black text was unreadable in
+    /// light mode (Files page screenshot, 2026-11-22: the file-row
+    /// card and the file-management card were dark navy with near-
+    /// black text, while the rest of the page was light).
+    static let card = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 13 / 255, green: 21 / 255, blue: 36 / 255, alpha: 1)
+            : UIColor.secondarySystemBackground
+    })
     /// One step above a card: popups, which float over the dimmed app.
-    static let raised = Color(red: 20 / 255, green: 30 / 255, blue: 49 / 255)
+    /// Dark keeps the night navy; light is the system background, so
+    /// popup text (.primary, black in light mode) stays readable —
+    /// the same fixed-navy disease as `card`, confirmed by reading
+    /// the code (no screenshot, but the surface and the text colour
+    /// are the same pair). The two plain icon tiles that use this as
+    /// a glyph backdrop go light with it, which stays legible.
+    static let raised = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 20 / 255, green: 30 / 255, blue: 49 / 255, alpha: 1)
+            : UIColor.systemBackground
+    })
     /// The pale blue that controls and edges are drawn in, faintly, so they
     /// stay in the ramp's hue instead of greying it.
     static let ice = Color(red: 185 / 255, green: 211 / 255, blue: 249 / 255)

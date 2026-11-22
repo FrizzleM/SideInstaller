@@ -1019,10 +1019,10 @@ struct AppsView: View {
     @State private var confirmRefresh = false
     /// Shows the "LocalDevVPN isn't installed" prompt with a link to get it.
     @State private var showInstallLOCPrompt = false
-    /// 行图标缓存（已装包名 → 配对 IPA 的图标数据）与已试过的键：
+    /// 行图标缓存（已装包名 → 配对 IPA 的解码后图标）与已试过的键：
     /// 文件页同款取法（IPALibrary.iconData 只读 central directory +
     /// 单个图标条目），没配对 IPA 的行继续用虚线占位。
-    @State private var rowIcons: [String: Data] = [:]
+    @State private var rowIcons: [String: UIImage] = [:]
     @State private var rowIconsTried: Set<String> = []
     @Environment(\.openURL) private var openURL
 
@@ -1362,8 +1362,9 @@ struct AppsView: View {
         guard let ipa = manager.refreshable.first(where: { $0.bundleID == status.app.bundleID })?.ipa else { return }
         let bundleID = status.app.bundleID
         Task.detached { [ipa, bundleID] in
-            guard let data = IPALibrary.iconData(at: ipa) else { return }
-            await MainActor.run { rowIcons[bundleID] = data }
+            guard let data = IPALibrary.iconData(at: ipa),
+                  let image = UIImage(data: data) else { return }
+            await MainActor.run { rowIcons[bundleID] = image }
         }
     }
 
@@ -1371,8 +1372,7 @@ struct AppsView: View {
     /// 两路不同 View 类型，函数前必须加 @ViewBuilder（AGENTS.md 血泪）。
     @ViewBuilder
     private func rowIcon(for status: SideloadedAppStatus) -> some View {
-        if let data = rowIcons[status.app.bundleID],
-           let uiImage = UIImage(data: data) {
+        if let uiImage = rowIcons[status.app.bundleID] {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFill()
@@ -1570,12 +1570,16 @@ private struct AppProfileDetail: View {
                                 .cornerRadius(8)
                         }
                     }
-                    // Direct import to LiveContainer (no password input needed)
+                    // Direct import into the app on this page (no password input needed):
+                    // the certificate travels by URL scheme, so the button goes to
+                    // whichever container app this page is for. Apps with no such
+                    // receiver keep the old LiveContainer button.
                     if exportP12Data != nil, exportPassword != nil {
+                        let target = certificateImportTarget
                         Button {
-                            importToLiveContainer()
+                            importCertificate(to: target.scheme)
                         } label: {
-                            Label(L("导入到 LiveContainer"), systemImage: "arrow.right.circle")
+                            Label(L("Import to %@", target.name), systemImage: "arrow.right.circle")
                                 .font(.subheadline.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                         }
@@ -1638,13 +1642,31 @@ private struct AppProfileDetail: View {
         }
     }
 
-    /// Open LiveContainer with the certificate via URL scheme (no password input needed).
-    private func importToLiveContainer() {
+    /// Which app the exported certificate can be handed to, from this page.
+    /// LiveContainer and zContainer both take a certificate by URL scheme
+    /// (`<scheme>://certificate?cert=…&password=…` — the receiver only looks
+    /// at the URL host, so the scheme is the target's own). The installed
+    /// bundle ID carries a team suffix (e.g. `.9C27AADJ2K`), so match by
+    /// prefix. Any other app has no receiver: fall back to LiveContainer,
+    /// as before.
+    private var certificateImportTarget: (scheme: String, name: String) {
+        let id = status.app.bundleID
+        if id == "com.kdt.livecontainer" || id.hasPrefix("com.kdt.livecontainer.") {
+            return ("livecontainer", status.app.name)
+        }
+        if id == "app.reiko.zcontainer" || id.hasPrefix("app.reiko.zcontainer.") {
+            return ("zcontainer", status.app.name)
+        }
+        return ("livecontainer", "LiveContainer")
+    }
+
+    /// Open the target container app with the certificate via URL scheme (no password input needed).
+    private func importCertificate(to scheme: String) {
         guard let p12Data = exportP12Data, let password = exportPassword else { return }
         let b64 = p12Data.base64EncodedString()
         guard let b64Enc = b64.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let pwdEnc = password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "livecontainer://certificate?cert=\(b64Enc)&password=\(pwdEnc)") else {
+              let url = URL(string: "\(scheme)://certificate?cert=\(b64Enc)&password=\(pwdEnc)") else {
             return
         }
         UIApplication.shared.open(url)

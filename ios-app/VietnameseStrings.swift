@@ -296,6 +296,7 @@ let vietnameseStrings: [String: String] = [
         "Chỉ có thể xuất chứng chỉ mà SideInstaller dùng để ký: khóa riêng của mọi chứng chỉ khác nằm trên thiết bị đã yêu cầu nó từ Apple.",
     "Couldn't export the certificate: %@": "Không thể xuất chứng chỉ: %@",
     "Export certificate": "Xuất chứng chỉ",
+    "Import to %@": "Nhập vào %@",
     "Password (optional)": "Mật khẩu (không bắt buộc)",
     "Export": "Xuất",
     "Exporting": "Đang xuất",
@@ -671,6 +672,8 @@ let vietnameseStrings: [String: String] = [
     "Start LocalDevVPN now": "Khởi động LocalDevVPN ngay",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "Chưa cài LocalDevVPN. Hãy tải từ App Store, rồi SideInstaller có thể khởi động giúp bạn.",
+    "When on, operations that need the tunnel try the built-in tunnel first and start LocalDevVPN when needed. When off, LocalDevVPN is never started automatically; the built-in tunnel still starts on demand, and the manual pill switch is unaffected.":
+        "Khi bật, các thao tác cần đường hầm sẽ thử đường hầm tích hợp trước rồi khởi động LocalDevVPN khi cần. Khi tắt, LocalDevVPN không bao giờ tự khởi động; đường hầm tích hợp vẫn khởi động khi cần, và công tắc pill thủ công không bị ảnh hưởng.",
 
     "Downloaded IPAs": "Tệp IPA đã tải",
     "%@ used": "Đã dùng %@",

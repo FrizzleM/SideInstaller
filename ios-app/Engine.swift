@@ -228,6 +228,11 @@ final class Engine {
         Set((UserDefaults.standard.stringArray(forKey: Engine.stableReleasedKey) ?? [])
             .compactMap(InstallSource.init(rawValue:)))
     private static let stableReleasedKey = "stableReleased"
+    /// Last time each build's stable channel was checked on GitHub
+    /// (`checkStableRelease`); 15-minute TTL, same as `loadReleaseCatalog`,
+    /// so switching builds doesn't HEAD the same release page every time.
+    /// A failed check leaves the timestamp alone, so the next pick retries.
+    private var lastStableCheck: [InstallSource: Date] = [:]
     /// Versions picked under Advanced, per build and channel; a missing entry
     /// installs the latest release. Not persisted, like the channel.
     private var pickedVersions: [InstallSource: [ReleaseChannel: ReleaseVersion]] = [:]
@@ -1767,9 +1772,14 @@ final class Engine {
     /// known. Not applied during a run, which has already picked its channel.
     @MainActor
     func checkStableRelease(for source: InstallSource) async {
-        guard source.firstStableVersion != nil,
-              let released = await SideStoreDownloader.hasStableRelease(source),
-              released != stableReleased.contains(source), !isRunning else { return }
+        guard source.firstStableVersion != nil else { return }
+        // 15-minute TTL, same as loadReleaseCatalog: switching to Madeira
+        // and back must not HEAD GitHub every time.
+        if let last = lastStableCheck[source], Date().timeIntervalSince(last) < 15 * 60 { return }
+        guard let released = await SideStoreDownloader.hasStableRelease(source) else { return }
+        // A failed check leaves the timestamp alone, so the next pick retries.
+        lastStableCheck[source] = Date()
+        guard released != stableReleased.contains(source), !isRunning else { return }
         if released { stableReleased.insert(source) } else { stableReleased.remove(source) }
         UserDefaults.standard.set(stableReleased.map(\.rawValue).sorted(), forKey: Self.stableReleasedKey)
         log(released

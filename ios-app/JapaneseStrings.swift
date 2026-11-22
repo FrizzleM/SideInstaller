@@ -291,6 +291,7 @@ let japaneseStrings: [String: String] = [
         "書き出せるのは SideInstaller が署名に使っている証明書だけです。ほかの証明書の秘密鍵は、それを Apple に要求したデバイスにしかありません。",
     "Couldn't export the certificate: %@": "証明書を書き出せませんでした: %@",
     "Export certificate": "証明書を書き出す",
+    "Import to %@": "%@ にインポート",
     "Password (optional)": "パスワード（任意）",
     "Export": "書き出す",
     "Exporting": "書き出し中",
@@ -587,6 +588,8 @@ let japaneseStrings: [String: String] = [
     "Start LocalDevVPN now": "今すぐ LocalDevVPN を開始",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "LocalDevVPN がインストールされていません。App Store から入手すると、SideInstaller が起動できるようになります。",
+    "When on, operations that need the tunnel try the built-in tunnel first and start LocalDevVPN when needed. When off, LocalDevVPN is never started automatically; the built-in tunnel still starts on demand, and the manual pill switch is unaffected.":
+        "オンの場合、トンネルが必要な操作はまず内蔵トンネルを試し、必要に応じて LocalDevVPN を起動します。オフの場合、LocalDevVPN は自動起動しません。内蔵トンネルは引き続き必要時に起動し、手動の pill スイッチには影響しません。",
 
     "Downloaded IPAs": "ダウンロード済みの IPA",
     "%@ used": "%@ を使用中",

@@ -2282,7 +2282,7 @@ struct CertTabView: View {
                 }
             }
             .buttonStyle(.plain)
-            .task(id: "\(item.url.path)#\(iconFingerprint(for: item.url.path))") { loadLibraryIcon(for: item.url.path, signed: false) }
+            .task(id: "\(item.url.path)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)") { loadLibraryIcon(for: item.url.path, signed: false) }
         } else {
             Button {
                 select(item.url)
@@ -2293,7 +2293,7 @@ struct CertTabView: View {
                 }
             }
             .buttonStyle(.plain)
-            .task(id: "\(item.url.path)#\(iconFingerprint(for: item.url.path))") { loadLibraryIcon(for: item.url.path, signed: false) }
+            .task(id: "\(item.url.path)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)") { loadLibraryIcon(for: item.url.path, signed: false) }
         }
     }
 
@@ -2964,7 +2964,7 @@ struct CertTabView: View {
                 }
             }
             .buttonStyle(.plain)
-            .task(id: "\(iconPath)#\(iconFingerprint(for: iconPath))") { loadLibraryIcon(for: iconPath, signed: true) }
+            .task(id: "\(iconPath)#\(record.size)-\(record.date.timeIntervalSince1970)") { loadLibraryIcon(for: iconPath, signed: true) }
             // 行下按钮排已删：安装走点行直装，分享/删除进长按菜单。
             .contextMenu {
                 ShareLink(item: SignedIPAStore.url(for: record)) {
@@ -3051,7 +3051,7 @@ private struct LibraryIPAPicker: View {
     var onPick: (URL) -> Void
 
     @State private var query = ""
-    @State private var icons: [String: Data] = [:]
+    @State private var icons: [String: UIImage] = [:]
     @State private var iconsTried: Set<String> = []
     @State private var infos: [String: IPALibrary.AppInfo] = [:]
     @State private var infosTried: Set<String> = []
@@ -3141,7 +3141,7 @@ private struct LibraryIPAPicker: View {
 
     private func pickerRow(_ item: LocalFileItem) -> some View {
         HStack(spacing: 8) {
-            if let data = icons[item.url.path], let uiImage = UIImage(data: data) {
+            if let uiImage = icons[item.url.path] {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
@@ -3181,8 +3181,9 @@ private struct LibraryIPAPicker: View {
         guard !iconsTried.contains(key) else { return }
         iconsTried.insert(key)
         Task.detached { [url = item.url, path = item.url.path] in
-            guard let data = IPALibrary.iconData(at: url) else { return }
-            await MainActor.run { icons[path] = data }
+            guard let data = IPALibrary.iconData(at: url),
+                  let image = UIImage(data: data) else { return }
+            await MainActor.run { icons[path] = image }
         }
     }
 
