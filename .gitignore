@@ -25,3 +25,6 @@ DerivedData/
 
 # Claude Code per-machine settings
 /.claude/settings.local.json
+
+__pycache__/
+*.orig

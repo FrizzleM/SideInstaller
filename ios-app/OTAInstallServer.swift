@@ -340,6 +340,7 @@ final class OTAInstallServer: ObservableObject {
         }
         let chunk = handle.readData(ofLength: min(remaining, 64 * 1024))
         guard !chunk.isEmpty else {
+            LogStore.shared.append("⚠️ Install truncated: \(ipaURL?.lastPathComponent ?? "?") stopped with \(remaining) bytes left.")
             try? handle.close()
             connection.cancel()
             return

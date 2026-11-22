@@ -112,7 +112,7 @@ struct DownloadsListView: View {
             if let error = manager.lastError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
             }
             if manager.hasLoaded && manager.downloads.isEmpty {
                 Text(L("No downloaded IPAs. Ones you install from a source or a file are cached here."))

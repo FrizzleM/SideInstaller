@@ -165,7 +165,7 @@ struct RootView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .background(Capsule().fill(Theme.accent2))
+                    .background(Capsule().fill(Theme.topBarFill))
                     .shadow(radius: 4)
                 }
                 .buttonStyle(.plain)

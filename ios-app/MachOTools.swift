@@ -74,7 +74,7 @@ struct MachOView: View {
                         if let opError {
                             Text(opError)
                                 .font(.footnote)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(Theme.negative)
                         }
                         ForEach(info.slices) { slice in
                             Section {

@@ -95,9 +95,21 @@ enum Theme {
     /// Done, connected, granted.
     static let positive = Color(red: 76 / 255, green: 195 / 255, blue: 138 / 255)
     /// Something needs the user, or will soon.
-    static let warning = Color(red: 229 / 255, green: 161 / 255, blue: 64 / 255)
+    static let warning = Color(UIColor { t in t.userInterfaceStyle == .dark
+        ? UIColor(red: 229/255, green: 161/255, blue: 64/255, alpha: 1)   // 深色保持 #E5A140
+        : UIColor(red: 140/255, green: 94/255,  blue: 0,     alpha: 1) }) // 浅色 #8C5E00，白底 5.65:1 / 浅卡 5.06:1
     /// Failed, missing, can't be undone.
-    static let negative = Color(red: 229 / 255, green: 72 / 255, blue: 77 / 255)
+    static let negative = Color(UIColor { t in t.userInterfaceStyle == .dark
+        ? UIColor(red: 229/255, green: 72/255,  blue: 77/255, alpha: 1)   // 深色保持 #E5484D
+        : UIColor(red: 200/255, green: 30/255,  blue: 30/255, alpha: 1) }) // 浅色 #C81E1E，白底 5.74:1 / 浅卡 5.14:1
+    /// 顶栏/药丸/安装 pill 的填充：浅色沿用现浅 accent2，深色用 Theme.blue。
+    /// 不能直接改 accent2 深色分支——accent2 同时是深色正文色（深卡 7.67:1）。
+    static let topBarFill = Color(UIColor { t in t.userInterfaceStyle == .dark
+        ? UIColor(red: 38/255, green: 105/255, blue: 237/255, alpha: 1)   // 深色 #2669ED，白字 4.85:1
+        : UIColor(red: 31/255, green: 91/255,  blue: 208/255, alpha: 1) }) // 浅色 #1F5BD0，白字 6.06:1
+    /// 徽章类深填充（圆点/绿 pill 用，白字均过 5:1，双模式通用固定值）。
+    static let badgePositive = Color(red: 30/255,  green: 125/255, blue: 50/255)  // #1E7D32，白字 5.20:1
+    static let badgeWarning  = Color(red: 140/255, green: 94/255,  blue: 0)       // #8C5E00，白字 5.65:1
 
     // MARK: Shape
 
@@ -1160,7 +1172,7 @@ enum AppAppearance: String, CaseIterable {
 extension View {
     func blueTopBar() -> some View {
         self
-            .toolbarBackground(Theme.accent2, for: .navigationBar)
+            .toolbarBackground(Theme.topBarFill, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
     }

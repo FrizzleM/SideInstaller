@@ -1266,7 +1266,7 @@ struct LocationView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white)
                             .frame(width: 24, height: 24)
-                            .background(Circle().fill(Theme.positive))
+                            .background(Circle().fill(Theme.badgePositive))
                     } trailing: {
                         EmptyView()
                     }
@@ -1277,7 +1277,7 @@ struct LocationView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white)
                             .frame(width: 24, height: 24)
-                            .background(Circle().fill(Theme.warning))
+                            .background(Circle().fill(Theme.badgeWarning))
                     } trailing: {
                         Menu { stopMenu(stop, index: index) } label: {
                             Image(systemName: "ellipsis.circle")

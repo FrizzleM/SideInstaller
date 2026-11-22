@@ -685,7 +685,7 @@ struct FilesTabView: View {
                 HStack(spacing: 8) {
                     Text(error)
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                     Spacer()
                     if let record = fileInstallRecord {
                         Button(L("重试安装")) {
@@ -1099,7 +1099,7 @@ struct FilesTabView: View {
                 if let importError {
                     Text(importError)
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                 }
                 if opBusy {
                     HStack(spacing: 6) {
@@ -1174,7 +1174,7 @@ struct FilesTabView: View {
                 if let error = lanServer.lastError {
                     Text(error)
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                 }
             }
         }
@@ -1382,7 +1382,7 @@ struct FilesTabView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.green, in: Capsule())
+                        .background(Theme.badgePositive, in: Capsule())
                         .accessibilityLabel(L("续签用的文件：%@", source.appName))
                 }
                 // ⓘ 详情：所有行都有（IPA 行也补上，与非 IPA 行一致）；

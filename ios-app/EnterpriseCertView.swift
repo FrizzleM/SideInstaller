@@ -385,7 +385,7 @@ struct EnterpriseCertView: View {
                                 } else {
                                     Text(L("此签名证书不包含当前设备，签名后无法在当前设备安装！！！"))
                                         .font(.footnote)
-                                        .foregroundStyle(.red)
+                                        .foregroundStyle(Theme.negative)
                                 }
                                 Text(udid)
                                     .font(.system(.footnote, design: .monospaced))
@@ -434,7 +434,7 @@ struct EnterpriseCertView: View {
                     if revocationStatus == .revoked {
                         Text(L("证书已经掉签，签名后可能无法安装。"))
                             .font(.footnote)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Theme.negative)
                     }
                     if let checked = revocationCheckedAt {
                         Text(L("上次检查：%@", checked.formatted(date: .abbreviated, time: .shortened)))
@@ -519,12 +519,12 @@ struct EnterpriseCertView: View {
             if let certPasswordError {
                 Text(certPasswordError)
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
             }
             if let importError {
                 Text(importError)
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
             }
             if hasP12 || hasProvision {
                 Button(role: .destructive) {
@@ -964,7 +964,7 @@ struct EnterpriseCertView: View {
             if let signError {
                 Text(signError)
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
             }
             if let url = selectedIPA {
                 PanelCard {
@@ -1063,10 +1063,10 @@ struct EnterpriseCertView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(Color.red)
+                    .background(Theme.negative)
                     .foregroundStyle(.white)
                     .cornerRadius(16)
-                    .shadow(color: Color.red.opacity(0.25), radius: 8, y: 4)
+                    .shadow(color: Theme.negative.opacity(0.25), radius: 8, y: 4)
                 }
                 .buttonStyle(CZFPressButtonStyle())
                 .opacity(workspace.signBusy || engine.isRunning || !certReady ? 0.5 : 1)
@@ -1077,7 +1077,7 @@ struct EnterpriseCertView: View {
                 if let signBlockedMessage {
                     Text(signBlockedMessage)
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                 } else if workspace.signBusy {
                     Text(L("正在签名，请稍候…"))
                         .font(.footnote)
@@ -1089,7 +1089,7 @@ struct EnterpriseCertView: View {
                 } else if let error = enterpriseInstallErrorText {
                     Text(error)
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                 } else if let signOnlyMessage {
                     Text(signOnlyMessage)
                         .font(.footnote)
@@ -1147,7 +1147,7 @@ struct EnterpriseCertView: View {
                             if let signBlockedMessage {
                                 Text(signBlockedMessage)
                                     .font(.footnote)
-                                    .foregroundStyle(.red)
+                                    .foregroundStyle(Theme.negative)
                             }
                         }
                     }
@@ -1419,7 +1419,7 @@ struct EnterpriseCertView: View {
             if let pluginError {
                 Text(pluginError)
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
             }
         }
     }
@@ -2046,7 +2046,7 @@ struct EnterpriseCertView: View {
             HStack(spacing: 8) {
                 Text(error)
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
                 Spacer()
                 if let record = enterpriseInstallRecord {
                     Button(L("重试配对安装")) { CZFHaptics.impact(.light); startEngineInstall(record: record) }
@@ -2219,7 +2219,7 @@ struct EnterpriseCertView: View {
                             .foregroundStyle(.red)
                         Text(error)
                             .font(.footnote)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Theme.negative)
                     } else {
                         Image(systemName: "circle")
                             .foregroundStyle(.secondary)

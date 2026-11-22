@@ -191,7 +191,9 @@ enum ExpiryUrgency {
         case .expired, .critical: return Theme.negative
         case .soon:               return Theme.warning
         // Between the warning and the positive, toned like them.
-        case .later:              return Color(red: 214 / 255, green: 194 / 255, blue: 86 / 255)
+        case .later:              return Color(UIColor { t in t.userInterfaceStyle == .dark
+            ? UIColor(red: 214/255, green: 194/255, blue: 86/255, alpha: 1)   // 深色保持 #D6C256
+            : UIColor(red: 122/255, green: 106/255, blue: 0, alpha: 1) })     // 浅色 #7A6A00，白底 5.40:1 / 浅卡 4.84:1
         case .comfortable:        return Theme.positive
         case .unknown:            return .secondary
         }
@@ -1339,7 +1341,7 @@ struct AppsView: View {
                 if manager.lastLoadFailed != nil {
                     Text(L("Load failed. Showing the last loaded list."))
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 // C11：上次后台续签没全续完、通知又没发出去时，留底在
@@ -1628,7 +1630,7 @@ private struct AppProfileDetail: View {
                     if let err = exportError {
                         Text(err)
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundColor(Theme.negative)
                     }
                 }
             }

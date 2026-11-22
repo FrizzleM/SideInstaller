@@ -52,6 +52,7 @@ struct SettingsView: View {
     @State private var localDevVPNDidntOpen = false
     /// Set while the restart warning is up, before Developer Mode is turned on.
     @State private var confirmEnableDeveloperMode = false
+    @State private var showingClearLogConfirm = false
     /// Buttons, switches and messages make sounds; see `SoundEffects`.
     @AppStorage(SoundEffects.enabledKey) private var soundEffects = true
 
@@ -333,7 +334,7 @@ struct SettingsView: View {
                 if let error = webdav.errorMessage {
                     Text(error)
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                 }
             }
         }
@@ -688,9 +689,15 @@ struct SettingsView: View {
                 }
                 Spacer()
                 Button(role: .destructive) {
-                    LogStore.shared.clear()
+                    showingClearLogConfirm = true
                 } label: {
                     Label(L("Clear"), systemImage: "trash")
+                }
+                .alert(L("Clear"), isPresented: $showingClearLogConfirm) {
+                    Button(L("删除"), role: .destructive) { LogStore.shared.clear() }
+                    Button(L("取消"), role: .cancel) {}
+                } message: {
+                    Text(L("删除后无法恢复"))
                 }
             }
             .font(.subheadline)

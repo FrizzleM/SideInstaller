@@ -188,7 +188,7 @@ struct CertsView: View {
                 .disabled(manager.isWorking || isExporting || !manager.isSignedIn)
             }
             if let err = exportError {
-                Text(err).font(.caption).foregroundColor(.red)
+                Text(err).font(.caption).foregroundColor(Theme.negative)
             }
         }
     }

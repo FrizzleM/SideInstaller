@@ -174,7 +174,7 @@ struct SourcesView: View {
             } else if let error = source.errorMessage {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
                     .lineLimit(2)
             } else if source.model != nil {
                 Text(L("%d apps", source.apps.count))
@@ -254,7 +254,7 @@ struct SourceAppsView: View {
                     }
                 } else if let error = source.errorMessage, source.model == nil {
                     Label(error, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                 }
                 searchBar
                 ForEach(displayedApps, id: \.id) { app in
@@ -421,7 +421,7 @@ struct SourceAppsView: View {
                 .disabled(activeID != nil)
                 Text(message)
                     .font(.caption2)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.negative)
                     .lineLimit(2)
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 140)
@@ -447,7 +447,7 @@ struct SourceAppsView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
-                    .background(Capsule().fill(Theme.accent2))
+                    .background(Capsule().fill(Theme.topBarFill))
                 }
                 .disabled(activeID != nil || engine.isRunning)
             } else {
@@ -459,7 +459,7 @@ struct SourceAppsView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
-                    .background(Capsule().fill(Theme.accent2))
+                    .background(Capsule().fill(Theme.topBarFill))
                 }
                 .buttonStyle(.plain)
                 .disabled(activeID != nil || engine.isRunning)

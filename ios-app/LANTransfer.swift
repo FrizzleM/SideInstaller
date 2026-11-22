@@ -400,6 +400,12 @@ final class LANTransferServer: ObservableObject {
                 sendText(connection, status: "404 Not Found", text: L("File not found"))
                 return
             }
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: file.path, isDirectory: &isDir),
+               isDir.boolValue {
+                sendText(connection, status: "400 Bad Request", text: L("Invalid path"))
+                return
+            }
             sendFile(connection, file: file)
         case ("GET", "/del"):
             guard let rel = request.query["path"], let file = resolve(rel),
@@ -515,6 +521,8 @@ final class LANTransferServer: ObservableObject {
             try handle.seek(toOffset: UInt64(offset))
             let chunk = try handle.read(upToCount: 1 << 20) ?? Data()
             if chunk.isEmpty {
+                let expected = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? Int ?? -1
+                LogStore.shared.append("⚠️ Download truncated: \(file.lastPathComponent) stopped at \(offset)/\(expected) bytes.")
                 connection.cancel()
                 return
             }
