@@ -601,12 +601,24 @@ struct FilesTabView: View {
                         }
                         Button(L("Uploaded, Start Install")) {
                             let manifestR2 = OTAInstallServer.publicManifestR2URL(for: record.fileName)
-                            if let link = OTAInstallServer.publicInstallURL(manifestR2URL: manifestR2),
-                               UIApplication.shared.open(link) {
-                                otaLaunched = true
-                            } else {
+                            // open 的返回值不能当条件用：裸 open(link) 在条件位置会
+                            // 解析成 iOS 18+ 的 async 重载，Button 闭包里编不过
+                            // （0.9.104 首查唯一红字）。Engine 同款：带 completionHandler
+                            // 的同步重载 + Task { @MainActor in } 写状态。
+                            guard let link = OTAInstallServer.publicInstallURL(manifestR2URL: manifestR2) else {
                                 fileInstallErrorText = L("Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.")
                                 otaRecord = nil
+                                return
+                            }
+                            UIApplication.shared.open(link) { opened in
+                                Task { @MainActor in
+                                    if opened {
+                                        otaLaunched = true
+                                    } else {
+                                        fileInstallErrorText = L("Cellular install couldn't open the system installer: check the R2 links, or use pairing install instead.")
+                                        otaRecord = nil
+                                    }
+                                }
                             }
                         }
                     }
