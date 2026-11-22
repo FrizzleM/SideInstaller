@@ -1219,9 +1219,14 @@ final class Engine {
     /// account. Called when credentials change. Runs on `signQueue`, which owns
     /// `signSession`.
     func forgetAppleSession() {
+        // C19：抓调用时那一个指针——释放块排在登录块后面时，块内重读
+        // 当前 session 会把切账号后才登好的新 session 也释放掉（登录块
+        // 换 session 时已把旧的释放了，见 performSignIn）。
+        let freed = signSession
         signQueue.async { [weak self] in
-            guard let self, let session = self.signSession else { return }
-            si_sign_session_free(session)
+            guard let self, let freed = freed else { return }
+            guard self.signSession == freed else { return }
+            si_sign_session_free(freed)
             self.signSession = nil
             self.setMain {
                 self.signInStatus = "signed out"

@@ -296,6 +296,13 @@ final class SideBySideManager: ObservableObject {
     /// run left behind stands in (C14, C7's pattern on the Install tab).
     /// Shown under the progress card until the next run clears it.
     @Published private(set) var downloadFallbackNotice: String?
+    /// What a hand-off step that failed quietly should say: set in
+    /// `handOffSplitPairing` / `handOffAnisette` when the newer-format
+    /// pairing or the anisette settings couldn't be written (C23, C14's
+    /// pattern on the same page). Shown under the progress card until
+    /// the next run clears it. The run still succeeds — these steps are
+    /// best-effort.
+    @Published private(set) var handOffNotice: String?
     /// Home-screen name of what landed on their iPhone.
     @Published private(set) var installedAppName: String?
     /// True while their iPhone has to pair from its own Settings, which it
@@ -607,11 +614,14 @@ final class SideBySideManager: ObservableObject {
     /// pointer isn't `Sendable`.
     func signOut() {
         signedInAs = nil
-        // Freed on `signQueue`, which owns `signSession`. It's serial, so this
-        // can't race the next sign-in.
+        // C19：抓调用时那一个指针。`signQueue` 是串行的，释放块一定排
+        // 在已入队的登录块后面——块内重读当前 session 会把切账号后才
+        // 登好的新 session 也释放掉；只释放抓到的那一个。
+        let freed = signSession
         signQueue.async { [weak self] in
-            guard let self, let session = self.signSession else { return }
-            si_sign_session_free(session)
+            guard let self, let freed = freed else { return }
+            guard self.signSession == freed else { return }
+            si_sign_session_free(freed)
             self.signSession = nil
         }
         // The key was made for this session, and a later one would make
@@ -683,6 +693,7 @@ final class SideBySideManager: ObservableObject {
         for step in SideBySideStep.allCases { stepStates[step] = .pending }
         downloadProgress = 0
         downloadFallbackNotice = nil
+        handOffNotice = nil
         lastError = nil
         finished = false
         pairingInSettings = false
@@ -1776,6 +1787,11 @@ final class SideBySideManager: ObservableObject {
             }
             engine.log("Set \(appName) to load its \(active) pairing file (/\(prefsPath)), as its own import does.")
         } catch {
+            // C23：只记日志不够——对方日后遇到要配对文件时，这边没有
+            // 任何提示能把两件事连起来；run 页留一句（run 照常成功）。
+            Task { @MainActor in
+                self.handOffNotice = [self.handOffNotice, L("The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.")].compactMap { $0 }.joined(separator: "\n")
+            }
             engine.log("⚠️ Couldn't hand \(appName) its pairing in the newer format (\(short(error))). SideStore nightlies from 20 September 2026 on may ask for the pairing file; older builds are set.")
         }
     }
@@ -1793,6 +1809,11 @@ final class SideBySideManager: ObservableObject {
             guard !changes.isEmpty else { return }
             engine.log("Set \(appName)'s anisette the way SideStore's users get past Apple's -80046: \(changes.joined(separator: ", ")) (/\(prefsPath)).")
         } catch {
+            // C23：只记日志不够——对方日后遇到登录失败时，这边没有
+            // 任何提示能把两件事连起来；run 页留一句（run 照常成功）。
+            Task { @MainActor in
+                self.handOffNotice = [self.handOffNotice, L("SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.")].compactMap { $0 }.joined(separator: "\n")
+            }
             engine.log("⚠️ Couldn't set \(appName)'s anisette settings (\(short(error))). If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation in its settings and pick “SideStore (New)”.")
         }
     }
@@ -1809,12 +1830,19 @@ final class SideBySideManager: ObservableObject {
             engine.log("Not handing \(app.displayName) the signing certificate: it belongs to an Apple ID saved on this iPhone, and its private key shouldn't stay on theirs. \(app.displayName) asks to resign itself the first time it signs in.")
             return nil
         }
-        guard Self.importsAccountConfigSilently(signedApp: signed) else {
-            engine.log("This SideStore build asks for a file password before importing Account.sideconf, so nothing is handed over, the same as iLoader. It offers to resign itself on first sign-in instead.")
-            return nil
-        }
         do {
-            return try await onSignQueue { try Self.accountConfig(session: session) }
+            // S18：这步检查 mmap + 全文扫描已签二进制，放主线程上会冻
+            // 界面一次；挪进 onSignQueue，与下一句 accountConfig 同队列。
+            // 闭包只回 nil（检查不过）或抛错，日志仍在主线程上记。
+            let config: String? = try await onSignQueue { () -> String? in
+                guard Self.importsAccountConfigSilently(signedApp: signed) else { return nil }
+                return try Self.accountConfig(session: session)
+            }
+            guard let config = config else {
+                engine.log("This SideStore build asks for a file password before importing Account.sideconf, so nothing is handed over, the same as iLoader. It offers to resign itself on first sign-in instead.")
+                return nil
+            }
+            return config
         } catch {
             engine.log("⚠️ Couldn't build the certificate hand-off (\(short(error))). SideStore will ask to resign itself on first sign-in.")
             return nil
@@ -2596,6 +2624,12 @@ struct SideBySideView: View {
             // C14: a download that fell back to an older local copy says so
             // here, under the card, until the next run clears it.
             if let notice = manager.downloadFallbackNotice {
+                Text(notice)
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+            }
+            // C23: a hand-off step that failed quietly says so here too.
+            if let notice = manager.handOffNotice {
                 Text(notice)
                     .font(.caption)
                     .foregroundStyle(Theme.muted)

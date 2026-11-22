@@ -441,6 +441,12 @@ let turkishStrings: [String: String] = [
 
     "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "İçe aktarıldı, ancak sertifika listesi yenilenemedi. Yeniden yükleyene kadar güncel olmayabilir.",
+    "Skipped: refresh stopped.":
+        "Atlandı: yenileme durduruldu.",
+    "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
+        "Eşleştirme yeni biçimde aktarılamadı. SideStore ilk açılışta eşleştirme dosyasını isteyebilir.",
+    "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
+        "SideStore'un anisette ayarları uygulanamadı. Girişi -80046 hatasıyla başarısız olursa cihaz içi Anisette'i ve otomatik döndürmeyi kapatıp “SideStore (New)” öğesini seçin.",
     "Last refresh (its notification couldn't be delivered): %@":
         "Son yenileme (bildirim iletilemedi): %@",
     "Getting ready": "Hazırlanıyor",

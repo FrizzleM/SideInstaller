@@ -465,6 +465,12 @@ let chineseStrings: [String: String] = [
 
     "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "已导入，但证书列表刷新失败，重新加载前可能显示旧的。",
+    "Skipped: refresh stopped.":
+        "已跳过：续签已停止。",
+    "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
+        "配对文件没能以新格式交过去，SideStore 首次打开时可能会索要配对文件。",
+    "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
+        "SideStore 的 anisette 设置没能写进去。如果它登录时报 -80046，请关掉本机 Anisette 与自动轮换，并选择“SideStore (New)”。",
     "Last refresh (its notification couldn't be delivered): %@":
         "上次续签（通知没发出去）：%@",
     "Getting ready": "正在准备",

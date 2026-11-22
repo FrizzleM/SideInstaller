@@ -297,6 +297,11 @@ struct SourceAppsView: View {
                                   userInfo: [NSLocalizedDescriptionKey:
                                                 engine.lastError ?? L("Import failed")])
                 }
+                guard !Task.isCancelled else {
+                    activeID = nil
+                    states[app.id] = nil
+                    return
+                }
                 engine.installSource = .custom
                 // Drop any earlier run's cached path, so the pipeline reads
                 // the import from disk (its own check would skip it anyway:

@@ -726,6 +726,12 @@ final class SideloadedAppsManager: ObservableObject {
                 await self.restoreOriginalSession(original: originalAccount)
             }
 
+            // C22：取消只停 Task、不扫尾 jobs——没轮到的 job 仍是 .pending，
+            // 卡片常驻显示 "Waiting"，与“本轮已结束”不符；收尾扫一遍改
+            // .failed。正常跑完时没有 .pending 残留，扫尾是空操作。
+            for index in jobs.indices where jobs[index].state == .pending {
+                jobs[index].state = .failed(L("Skipped: refresh stopped."))
+            }
             refreshSummary = jobs.count == 1
                 ? (refreshed == 1 ? L("Refreshed. Its seven days start again now.")
                                   : L("Nothing was refreshed."))
@@ -812,8 +818,9 @@ final class SideloadedAppsManager: ObservableObject {
         }
     }
 
-    /// Stops the run after the current app finishes. Remaining apps are left
-    /// unchanged.
+    /// Stops the run after the current app finishes. Remaining apps aren't
+    /// refreshed; their rows are marked failed on the run card (C22) instead
+    /// of staying "Waiting".
     func cancelRefresh() {
         guard isRefreshing, refreshTask != nil else { return }
         refreshTask?.cancel()

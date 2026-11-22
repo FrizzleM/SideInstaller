@@ -467,6 +467,12 @@ let koreanStrings: [String: String] = [
 
     "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "가져왔지만 인증서 목록을 새로 고칠 수 없습니다. 다시 불러오기 전까지 오래된 내용일 수 있습니다.",
+    "Skipped: refresh stopped.":
+        "건너뜀: 갱신이 중단되었습니다.",
+    "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
+        "페어링을 새 형식으로 전달하지 못했습니다. SideStore가 처음 실행될 때 페어링 파일을 요청할 수 있습니다.",
+    "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
+        "SideStore의 anisette 설정을 적용하지 못했습니다. 로그인 시 -80046 오류가 발생하면 기기 내 Anisette와 자동 순환을 끄고 “SideStore (New)”를 선택하세요.",
     "Last refresh (its notification couldn't be delivered): %@":
         "마지막 새로 고침(알림을 전달할 수 없음): %@",
     "Getting ready": "준비 중",

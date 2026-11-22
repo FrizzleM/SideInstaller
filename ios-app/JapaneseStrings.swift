@@ -466,6 +466,12 @@ let japaneseStrings: [String: String] = [
 
     "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "インポートしましたが、証明書一覧を更新できませんでした。再読み込みするまで古い内容の可能性があります。",
+    "Skipped: refresh stopped.":
+        "スキップ：更新を停止しました。",
+    "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
+        "ペアリングを新しい形式で渡せませんでした。SideStore が初回起動時にペアリングファイルを求める場合があります。",
+    "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
+        "SideStore の anisette 設定を書き込めませんでした。サインインが -80046 で失敗する場合は、デバイス上の Anisette と自動ローテーションをオフにして「SideStore (New)」を選んでください。",
     "Last refresh (its notification couldn't be delivered): %@":
         "前回の更新（通知を配信できませんでした）：%@",
     "Getting ready": "準備中",

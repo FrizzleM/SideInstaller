@@ -15,6 +15,23 @@ final class LANTransferServer: ObservableObject {
     private var activeCandidate = 0
     private let queue = DispatchQueue(label: "czf.lan.transfer")
 
+    /// S19：列表扫盘的短 TTL 缓存——GET / 每次都全量递归扫盘，上传/
+    /// 删除后 303 再扫一次；电脑端列表最多滞后 TTL。只在 lan 串行
+    /// 队列上读写（respond 全走这条队列），不用加锁；上传/删除后
+    /// 的 redirect 会清掉缓存，所以刚传完的文件立刻能看到。
+    private var lanListCache: (items: [LocalFileItem], at: Date)?
+    private static let lanListCacheTTL: TimeInterval = 5
+
+    /// 5 秒内的重复列表请求直接用缓存；过期重扫。
+    private func cachedLANListItems() -> [LocalFileItem] {
+        if let cache = lanListCache, Date().timeIntervalSince(cache.at) < Self.lanListCacheTTL {
+            return cache.items
+        }
+        let items = AppFileLibrary.scan().filter { !$0.isDirectory }
+        lanListCache = (items, Date())
+        return items
+    }
+
     private var root: URL { IPALibrary.documentsDir }
 
     var addressText: String {
@@ -453,6 +470,7 @@ final class LANTransferServer: ObservableObject {
     }
 
     private func redirect(_ connection: NWConnection) {
+        lanListCache = nil
         send(connection, status: "303 See Other", contentType: "text/plain",
              body: Data(), extraHeaders: ["Location: /"])
     }
@@ -501,7 +519,7 @@ final class LANTransferServer: ObservableObject {
         // 文件页改成连文件夹一起列之后，这里仍只列文件：
         // 局域网传输的下载链接对文件夹没有意义，别让它出现在列表里。
         let lang = Localizer.locale.language.languageCode?.identifier ?? "en"
-        let items = AppFileLibrary.scan().filter { !$0.isDirectory }
+        let items = cachedLANListItems()
         var rows = ""
         for item in items {
             let rel = item.relativeDir.isEmpty ? item.name : "\(item.relativeDir)/\(item.name)"

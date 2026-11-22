@@ -481,6 +481,12 @@ let spanishStrings: [String: String] = [
 
     "Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "Importado, pero no se pudo actualizar la lista de certificados. Puede estar desactualizada hasta recargarla.",
+    "Skipped: refresh stopped.":
+        "Omitido: actualización detenida.",
+    "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
+        "El emparejamiento no se entregó en el nuevo formato. SideStore podría pedir el archivo de emparejamiento.",
+    "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
+        "No se pudieron aplicar los ajustes de anisette de SideStore. Si el inicio de sesión falla con -80046, desactiva Anisette en el dispositivo y la rotación automática, y elige “SideStore (New)”。",
     "Last refresh (its notification couldn't be delivered): %@":
         "Última actualización (no se pudo entregar la notificación): %@",
     "Getting ready": "Preparando",
