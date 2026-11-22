@@ -147,7 +147,9 @@ final class LANTransferServer: ObservableObject {
                 headers[key] = value
             }
         }
-        let contentLength = Int(headers["content-length"] ?? "") ?? 0
+        // S22：负 Content-Length 会让 parse 切出倒置 range、Data 下标 trap
+        // 撞崩整个 App，夹到 0（畸形请求随后走老路回 400）。
+        let contentLength = max(0, Int(headers["content-length"] ?? "") ?? 0)
         let rawPath = String(parts[1])
         let pathPart = rawPath.split(separator: "?", maxSplits: 1).first.map(String.init) ?? "/"
         var query: [String: String] = [:]
@@ -253,7 +255,10 @@ final class LANTransferServer: ObservableObject {
             }
             let sink = UploadSink(boundary: boundary, tempURL: tempURL, handle: handle,
                                   fileName: fileName, contentLength: head.contentLength,
-                                  received: received)
+                                  // R-1：received 初值只算 part 头那段——首块内容马上要当
+                                  // chunk 传给 receiveUploadBody 再加一次，初值里不能再算它，
+                                  // 否则 received 虚高、收尾 marker 没到就提前 finishUpload 回 400。
+                                  received: received - body[range.upperBound...].count)
             receiveUploadBody(connection, sink: sink,
                               chunk: Data(body[range.upperBound...]))
             return
