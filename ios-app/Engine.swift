@@ -578,10 +578,11 @@ final class Engine {
     // MARK: - Anisette servers
 
     /// Swap the bundled anisette list for the live one, keeping it on failure.
+    /// The live list is cached for 24h (S5), so most launches don't re-fetch.
     func loadAnisetteServers() {
         Task { @MainActor in
             do {
-                let servers = try await AnisetteServer.fetchList()
+                let servers = try await AnisetteServer.fetchListCached()
                 guard !servers.isEmpty else { return }
                 self.anisetteServers = servers
                 log("Loaded \(servers.count) anisette servers.")

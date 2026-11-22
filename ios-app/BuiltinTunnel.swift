@@ -92,6 +92,97 @@ enum BuiltinTunnel {
         NetworkStatus.host(Engine.shared.deviceIP) + "/32"
     }
 
+    /// What one wait for the tunnel ended with.
+    private enum TunnelWaitResult {
+        case connected
+        case invalid
+        case timedOut
+        case cancelled
+    }
+
+    /// One wait's shared state: the status notification, the timeout, and
+    /// cancellation all settle through here, exactly once. A resume that
+    /// lands before the continuation is stored is replayed to it, so no
+    /// path can strand the wait and none can resume it twice.
+    private final class TunnelWaitState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var resumed = false
+        private var result: TunnelWaitResult?
+        private var observer: NSObjectProtocol?
+        private var continuation: CheckedContinuation<TunnelWaitResult, Never>?
+
+        func set(continuation: CheckedContinuation<TunnelWaitResult, Never>,
+                 observer: NSObjectProtocol?) {
+            lock.lock()
+            self.continuation = continuation
+            self.observer = observer
+            let already = resumed
+            let result = self.result
+            lock.unlock()
+            if already, let result { continuation.resume(returning: result) }
+        }
+
+        func resume(_ result: TunnelWaitResult) {
+            lock.lock()
+            guard !resumed else { lock.unlock(); return }
+            resumed = true
+            self.result = result
+            let observer = self.observer
+            let continuation = self.continuation
+            self.observer = nil
+            self.continuation = nil
+            lock.unlock()
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            continuation?.resume(returning: result)
+        }
+    }
+
+    /// Waits for the tunnel to connect, go invalid, or time out — one
+    /// status notification instead of polling every 300ms (S7). The timeout
+    /// still bounds the wait when the notification never comes, and
+    /// cancellation answers at once instead of waiting it out.
+    @MainActor
+    private static func waitForStatus(manager: NETunnelProviderManager,
+                                     timeout: TimeInterval) async -> TunnelWaitResult {
+        switch manager.connection.status {
+        case .connected: return .connected
+        case .invalid: return .invalid
+        default: break
+        }
+        let state = TunnelWaitState()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<TunnelWaitResult, Never>) in
+                // Subscribe first, then re-check: a change between the fast
+                // path above and the subscription can't strand us. The
+                // callback runs on the main queue, so the state is only ever
+                // touched from the main actor and the lock-guarded paths.
+                let observer = NotificationCenter.default.addObserver(
+                    forName: .NEVPNStatusDidChange, object: manager.connection, queue: .main
+                ) { _ in
+                    switch manager.connection.status {
+                    case .connected: state.resume(.connected)
+                    case .invalid: state.resume(.invalid)
+                    default: break
+                    }
+                }
+                state.set(continuation: continuation, observer: observer)
+                switch manager.connection.status {
+                case .connected: state.resume(.connected)
+                case .invalid: state.resume(.invalid)
+                default: break
+                }
+                // Timeout fallback: the extension may die silently without
+                // ever posting, so the wait is still bounded.
+                Task {
+                    try? await Task.sleep(nanoseconds: UInt64(max(timeout, 0) * 1_000_000_000))
+                    state.resume(.timedOut)
+                }
+            }
+        } onCancel: {
+            state.resume(.cancelled)
+        }
+    }
+
     /// 确保内置隧道已连接：没有配置就建（首次会弹系统的 VPN 许可
     /// 提示），已在连/已连上直接等结果。给两次机会：第一次若是刚
     /// 保存完配置、系统还没就绪而失败，重新读一遍配置再启一次。
@@ -124,24 +215,16 @@ enum BuiltinTunnel {
                 Engine.shared.log("Built-in tunnel: startVPNTunnel failed on attempt \(attempt): \(error.localizedDescription) (enabled=\(manager.isEnabled))")
                 continue
             }
-            let deadline = Date().addingTimeInterval(timeout)
-            var invalid = false
-            while Date() < deadline, !invalid {
-                switch manager.connection.status {
-                case .connected:
-                    return true
-                case .invalid:
-                    invalid = true
-                default:
-                    break
-                }
-                if !invalid {
-                    try? await Task.sleep(nanoseconds: 300_000_000)
-                }
-                if Task.isCancelled { return false }
-            }
-            if invalid {
+            // S7：等一次状态通知，不再 300ms 轮询；超时与取消仍有交代。
+            switch await waitForStatus(manager: manager, timeout: timeout) {
+            case .connected:
+                return true
+            case .invalid:
                 Engine.shared.log("Built-in tunnel: connection went invalid on attempt \(attempt).")
+            case .timedOut:
+                break
+            case .cancelled:
+                return false
             }
         }
         Engine.shared.log("Built-in tunnel: not connected after 2 attempts.")

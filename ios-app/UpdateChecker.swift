@@ -25,8 +25,18 @@ final class UpdateChecker: ObservableObject {
     let currentVersion =
         (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
 
+    /// UserDefaults key for the last check date: the version file changes
+    /// every few days at most, so one check a day is enough (S6).
+    private static let lastCheckKey = "SIDUpdateCheckerLastCheck"
+
     /// Fetch the remote version and reveal the banner if it's newer.
     func check() async {
+        // One check a day: skip when the last check was recent, even if it
+        // failed — failures are silent and the banner can wait a day.
+        let now = Date()
+        if let last = UserDefaults.standard.object(forKey: Self.lastCheckKey) as? Date,
+           now.timeIntervalSince(last) < 24 * 3600 { return }
+        UserDefaults.standard.set(now, forKey: Self.lastCheckKey)
         guard let url = URL(string: Self.versionFileURL) else { return }
         var req = URLRequest(url: url)
         req.cachePolicy = .reloadIgnoringLocalCacheData

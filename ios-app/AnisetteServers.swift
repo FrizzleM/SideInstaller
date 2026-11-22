@@ -2,7 +2,7 @@ import Foundation
 
 /// One server from the community list, serving the device-attestation data
 /// Apple's auth endpoints require.
-struct AnisetteServer: Identifiable, Hashable, Decodable {
+struct AnisetteServer: Identifiable, Hashable, Decodable, Encodable {
     let name: String
     let address: String
 
@@ -78,6 +78,38 @@ extension AnisetteServer {
         return servers + extras.filter { extra in
             !servers.contains { normalized($0.address) == normalized(extra.address) }
         }
+    }
+
+    /// How long a fetched list stays usable without re-fetching.
+    private static let listCacheTTL: TimeInterval = 24 * 3600
+    private static let cachedListKey = "SIDAnisetteServersCache"
+    private static let cachedListDateKey = "SIDAnisetteServersCacheDate"
+
+    /// The live list, cached for 24h in UserDefaults (S5): within TTL the
+    /// stored list is returned without touching the network; past TTL it
+    /// re-fetches and stores the new list. Throws on a stale cache +
+    /// failed fetch, so the caller keeps its bundled list.
+    static func fetchListCached() async throws -> [AnisetteServer] {
+        if let cached = cachedList() { return cached }
+        let servers = try await fetchList()
+        if !servers.isEmpty { storeCachedList(servers) }
+        return servers
+    }
+
+    /// The stored list, only when it was fetched within TTL.
+    private static func cachedList() -> [AnisetteServer]? {
+        guard let date = UserDefaults.standard.object(forKey: cachedListDateKey) as? Date,
+              Date().timeIntervalSince(date) < listCacheTTL,
+              let data = UserDefaults.standard.data(forKey: cachedListKey),
+              let servers = try? JSONDecoder().decode([AnisetteServer].self, from: data),
+              !servers.isEmpty else { return nil }
+        return servers
+    }
+
+    private static func storeCachedList(_ servers: [AnisetteServer]) {
+        guard let data = try? JSONEncoder().encode(servers) else { return }
+        UserDefaults.standard.set(data, forKey: cachedListKey)
+        UserDefaults.standard.set(Date(), forKey: cachedListDateKey)
     }
 
     /// `server` named for the library it runs now: the community list still

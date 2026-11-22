@@ -153,15 +153,18 @@ final class CZFWebDAVServer: ObservableObject {
             xml += "    <D:href>\(xmlEscape(href(for: item, root: root)))</D:href>\n"
             xml += "    <D:propstat>\n      <D:prop>\n"
             xml += "        <D:displayname>\(xmlEscape(name))</D:displayname>\n"
+            // S8：size 与 mdate 一次取字典两项同读——原来每个条目调两次
+            // attributesOfItem（stat 两次）。
+            let attrs = try? fm.attributesOfItem(atPath: item.path)
             if itemIsDir.boolValue {
                 xml += "        <D:resourcetype><D:collection/></D:resourcetype>\n"
             } else {
                 xml += "        <D:resourcetype/>\n"
-                if let size = (try? fm.attributesOfItem(atPath: item.path))?[.size] as? NSNumber {
+                if let size = attrs?[.size] as? NSNumber {
                     xml += "        <D:getcontentlength>\(size.intValue)</D:getcontentlength>\n"
                 }
             }
-            if let mdate = (try? fm.attributesOfItem(atPath: item.path))?[.modificationDate] as? Date {
+            if let mdate = attrs?[.modificationDate] as? Date {
                 xml += "        <D:getlastmodified>\(Self.rfc1123.string(from: mdate))</D:getlastmodified>\n"
             }
             xml += "      </D:prop>\n      <D:status>HTTP/1.1 200 OK</D:status>\n    </D:propstat>\n  </D:response>\n"
