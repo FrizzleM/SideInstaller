@@ -35,12 +35,12 @@ struct SourcesView: View {
             if store.sources.contains(where: \.isLoading) {
                 Text(L("正在刷新数据中…"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .center)
             } else if let last = store.sources.compactMap(\.fetchedAt).max() {
                 Text(L("最后更新：%@", last.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localizer.locale))))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
             searchBar

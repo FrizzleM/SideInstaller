@@ -1348,6 +1348,7 @@ enum CertSigner {
         var raw = mods.outputName.trimmingCharacters(in: .whitespaces)
         if raw.lowercased().hasSuffix(".ipa") { raw = String(raw.dropLast(4)) }
         raw = raw.replacingOccurrences(of: "/", with: "")
+        raw = raw.replacingOccurrences(of: "?", with: "")
         if raw.isEmpty { raw = ipa.deletingPathExtension().lastPathComponent }
         // 手填名已带“-已签”也先去掉，uniqueOutputURL 只加一次。
         return SignedIPAStore.stripSignedSuffix(raw)
@@ -1484,6 +1485,9 @@ enum CertSigner {
                 if !outExistedBefore {
                     try? fm.removeItem(at: outURL)
                 }
+                // C22-3：签名失败也留 `_extracted`——清掉再往上抛。
+                // 用 signIPA.path：瘦身开关开着时解的是 slimmed.ipa。
+                Engine.discardExtraction(forIPA: signIPA.path)
                 throw EngineError.message(L("企业证书签名失败：%@", msg))
             }
             signed.map { si_string_free($0) }

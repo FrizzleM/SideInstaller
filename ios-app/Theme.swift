@@ -827,9 +827,9 @@ struct SectionTitle: View {
 struct StatusDot: View {
     var text: String
     var color: Color
-    /// The text colour. Defaults to the system secondary label; a page
-    /// whose backdrop is tinted can pass Theme.muted instead.
-    var textColor: Color = .secondary
+    /// The text colour. Defaults to Theme.muted; a page that needs the
+    /// system secondary label can pass .secondary instead.
+    var textColor: Color = Theme.muted
     /// A state that needs nothing from the user, shown with a muted dot.
     var idle = false
 

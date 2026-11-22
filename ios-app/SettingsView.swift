@@ -357,7 +357,7 @@ struct SettingsView: View {
                 if isActive {
                     Text(L("In use"))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
             }
             Spacer(minLength: 8)
@@ -518,7 +518,7 @@ struct SettingsView: View {
                     ProgressView().controlSize(.small)
                     Text(L("Asking this iPhone…"))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
             } else if let note = developerModeNote {
                 Label(note.text, systemImage: note.failed ? "exclamationmark.triangle"
@@ -614,7 +614,7 @@ struct SettingsView: View {
             if engine.anisetteAuto {
                 Text(L("Starts with %@", anisetteName))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(1)
                     .truncationMode(.middle)
             } else if anisetteIsCustom {
@@ -625,7 +625,7 @@ struct SettingsView: View {
             } else {
                 Text(engine.anisetteURL)
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -774,7 +774,7 @@ private struct ToolRow: View {
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
         }
     }

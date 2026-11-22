@@ -83,7 +83,7 @@ struct CertsView: View {
     @ViewBuilder
     private var expiryBanner: some View {
         if !expiringCerts.isEmpty {
-            CalloutCard(tint: .red) {
+            CalloutCard(tint: Theme.negative) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(L("证书到期提醒"))
                         .font(.subheadline.weight(.semibold))
@@ -95,13 +95,13 @@ struct CertsView: View {
                             if let expiry = cert.expiresAt {
                                 Text(expiryLabel(expiry))
                                     .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Theme.muted)
                             }
                         }
                     }
                     Text(L("证书到期后请重新登录 Apple ID 获取新证书，再用全部续签重签 App。"))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
             }
             .transition(.opacity)
@@ -205,7 +205,7 @@ struct CertsView: View {
                      ? L("SideInstaller takes SideStore's certificate from LiveContainer and signs with it too, so on a free Apple ID neither app has to revoke the other's.")
                      : L("SideStore opens and sends back its certificate. SideInstaller then signs with it too, so on a free Apple ID neither app has to revoke the other's."))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Button {
                     manager.requestSideStoreCertificate(retryInstall: false)
@@ -318,7 +318,7 @@ struct CertsView: View {
                         if let machine = cert.machineLabel {
                             Label(machine, systemImage: "desktopcomputer")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                         }
                     }
                     Spacer()
@@ -344,7 +344,7 @@ struct CertsView: View {
                         }
                     }
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 }
 
                 Button(role: .destructive) {

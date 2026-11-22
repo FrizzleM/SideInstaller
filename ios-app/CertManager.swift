@@ -106,9 +106,14 @@ final class CertManager: ObservableObject {
     // MARK: - Popups
 
     /// What went wrong last, as a popup `RootView` stacks over the app.
-    var popups: [ToolPopup] { lastError.map { [.error($0)] } ?? [] }
+    var popups: [ToolPopup] { [lastError.map(ToolPopup.error), lastSuccess.map(ToolPopup.success)].compactMap { $0 } }
 
-    func closePopup(_ popup: ToolPopup) { lastError = nil }
+    func closePopup(_ popup: ToolPopup) {
+        switch popup {
+        case .error:   lastError = nil
+        case .success: lastSuccess = nil
+        }
+    }
 
     // MARK: - Public actions
 
@@ -300,7 +305,7 @@ final class CertManager: ObservableObject {
                 if retryInstall {
                     engine.log("Retrying the install with \(name).")
                     engine.runOneClick()
-                } else {
+                } else if lastError == nil {
                     lastSuccess = result.replacedKey
                         ? L("SideInstaller signs with “%@” from now on. Nothing was revoked, so the apps already signed with it keep working.", name)
                         : L("SideInstaller already signs with “%@”.", name)
@@ -352,6 +357,8 @@ final class CertManager: ObservableObject {
     func signOut() {
         // A2：世代递增放 guard 之前——登录在途时 session 还是 nil，早退会漏递增。
         signInGeneration += 1
+        // A3：成功文案也放 guard 之前，session 已是 nil 时早退会漏清。
+        lastSuccess = nil
         guard let session else { return }
         // C18：释放排进证书队列（与在途的 FFI 调用串行），不在主线程直接
         // 释放；抓调用时那一个指针，块内不再重读当前 session（C19 的教训）。

@@ -67,6 +67,9 @@ enum AppFileLibrary {
 
     /// 把外部文件拷进 Documents 根目录，重名自动改名，返回落点。
     static func importIntoDocuments(_ source: URL) throws -> URL {
+        guard !source.lastPathComponent.hasPrefix(".") else {
+            throw EngineError.message(L("名字不能以. 开头"))
+        }
         let fm = FileManager.default
         let stem = source.deletingPathExtension().lastPathComponent
         let ext = source.pathExtension
@@ -587,11 +590,11 @@ struct FilesTabView: View {
                         Text(L("Upload these two files to R2, then install: %@ and %@. Upload via the WebDAV bridge https://r2-webdav.wozofa.workers.dev or the R2 console; .plist as text/xml, .ipa as application/octet-stream. After uploading, tap “Uploaded, Start Install”.", OTAInstallServer.publicManifestFileName(for: record.fileName), record.fileName))
                         Text(OTAInstallServer.publicManifestR2URL(for: record.fileName))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .textSelection(.enabled)
                         Text(OTAInstallServer.publicIPAR2URL(for: record.fileName))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .textSelection(.enabled)
                     }
                 }
@@ -671,11 +674,11 @@ struct FilesTabView: View {
                     if engine.installProgress > 0 {
                         Text(L("配对安装进行中（%d%%）", Int(engine.installProgress * 100)))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     } else {
                         Text(L("配对安装进行中"))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                     Spacer()
                     Button(L("取消安装")) { CZFHaptics.impact(.light); engine.cancelOneClick() }
@@ -1289,7 +1292,7 @@ struct FilesTabView: View {
     private func fileIcon(for item: LocalFileItem) -> some View {
         if item.isDirectory {
             Image(systemName: "folder.fill")
-                .foregroundStyle(.blue)
+                .foregroundStyle(Theme.accent)
                 .font(.title3)
                 .frame(width: 60, height: 60)
         } else if item.isIPA,
@@ -1336,7 +1339,7 @@ struct FilesTabView: View {
                 if selecting {
                     Image(systemName: selection.contains(item.id)
                           ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(selection.contains(item.id) ? Color.accentColor : .secondary)
+                        .foregroundStyle(selection.contains(item.id) ? Theme.accent : .secondary)
                 }
                 // 轻松签文件列表式：IPA 有真实图标就显示真图（应用库
                 // 同款解析，见 loadFileIcon），没取到就中性占位；
@@ -1390,7 +1393,7 @@ struct FilesTabView: View {
                     detailItem = item
                 } label: {
                     Image(systemName: "info.circle")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Theme.accent)
                     .font(.title3)
                 }
                 .buttonStyle(.plain)
@@ -2001,7 +2004,7 @@ struct FilesTabView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: selectedUnsignedIDs.contains(item.id) ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(selectedUnsignedIDs.contains(item.id) ? Color.accentColor : Color.secondary)
+                        .foregroundStyle(selectedUnsignedIDs.contains(item.id) ? Theme.accent : Color.secondary)
                     libraryIcon(for: item.url.path, signed: false)
                     unsignedRowTexts(item)
                 }
@@ -2452,7 +2455,7 @@ struct FilesTabView: View {
                     if selectingSigned {
                         Image(systemName: selectedSignedIDs.contains(record.id)
                               ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(selectedSignedIDs.contains(record.id) ? Color.accentColor : Color.secondary)
+                            .foregroundStyle(selectedSignedIDs.contains(record.id) ? Theme.accent : Color.secondary)
                     }
                     libraryIcon(for: iconPath, signed: true)
                     VStack(alignment: .leading, spacing: 2) {

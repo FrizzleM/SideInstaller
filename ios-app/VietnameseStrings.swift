@@ -1407,4 +1407,5 @@ let vietnameseStrings: [String: String] = [
     "导出描述文件": "Xuất hồ sơ cấp phép",
     "导出后可在 LiveContainer 里导入同一张证书，不用再找原文件；密码不一起导出，导入时再填一次。": "Sau khi xuất, bạn có thể nhập cùng một chứng chỉ vào LiveContainer mà không cần tìm lại tệp gốc; mật khẩu không được xuất kèm, bạn sẽ nhập lại khi nhập.",
     "Beta": "Beta",
+    "名字不能以. 开头": "Tên không được bắt đầu bằng dấu chấm",
 ]

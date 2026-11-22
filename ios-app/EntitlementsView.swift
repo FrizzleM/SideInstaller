@@ -675,7 +675,7 @@ private struct EntitlementPicker: View {
                         .foregroundStyle(.primary)
                     Text(entitlement.id)
                         .font(.caption2.monospaced())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -749,7 +749,7 @@ struct EntitlementsPopup: View {
                 if !granted.isEmpty {
                     Text(L("Install the app again for these to take effect."))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(refused) { outcome in

@@ -762,11 +762,11 @@ struct EnterpriseCertView: View {
     @ViewBuilder
     private var expiryWarning: some View {
         if let expiration = provisionInfo?.expiration, expirySoon(expiration) {
-            CalloutCard(tint: .red) {
+            CalloutCard(tint: Theme.negative) {
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.title2)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(expiration < Date() ? L("描述文件已过期") : L("描述文件快到期了"))
                             .font(.subheadline.weight(.semibold))
@@ -781,11 +781,11 @@ struct EnterpriseCertView: View {
             }
         }
         if let expiration = certInfo?.expiration, expirySoon(expiration) {
-            CalloutCard(tint: .red) {
+            CalloutCard(tint: Theme.negative) {
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.title2)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.negative)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(expiration < Date() ? L("证书已过期") : L("证书快到期了"))
                             .font(.subheadline.weight(.semibold))
@@ -831,9 +831,9 @@ struct EnterpriseCertView: View {
 
     private var revocationColor: Color {
         switch revocationStatus {
-        case .revoked: return .red
-        case .ok: return .green
-        case .unknown: return .secondary
+        case .revoked: return Theme.negative
+        case .ok: return Theme.positive
+        case .unknown: return Theme.muted
         }
     }
 
@@ -920,7 +920,7 @@ struct EnterpriseCertView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.seal.fill")
-                            .foregroundStyle(certReady ? Color.secondary : Color.orange)
+                            .foregroundStyle(certReady ? Color.secondary : Theme.warning)
                         Text(L("证书"))
                             .font(.headline)
                         Spacer()
@@ -937,7 +937,7 @@ struct EnterpriseCertView: View {
                                     .foregroundStyle(expirySoon(expiration) ? Theme.negative : .secondary)
                             }
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
+                                .foregroundStyle(Theme.positive)
                         } else {
                             // 收起时也明说到底缺哪一件，别只给一句“未就绪”
                             // 让用户自己展开去猜（轻松签式一眼看全）。
@@ -2180,28 +2180,28 @@ struct EnterpriseCertView: View {
                         ProgressView()
                     } else if signOnlyFailed {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Theme.negative)
                     } else {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Theme.positive)
                     }
                     Text(workspace.signBusy ? L("签名中…") : (signOnlyFailed ? L("签名失败") : L("签名已完成")))
                         .font(.footnote)
-                        .foregroundStyle(workspace.signBusy ? Color.primary : (signOnlyFailed ? Color.red : Color.primary))
+                        .foregroundStyle(workspace.signBusy ? Color.primary : (signOnlyFailed ? Theme.negative : Color.primary))
                 }
                 HStack(spacing: 6) {
                     if workspace.signBusy {
                         ProgressView()
                     } else if signOnlyFailed {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Theme.negative)
                     } else {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Theme.positive)
                     }
                     Text(workspace.signBusy ? L("打包中…") : (signOnlyFailed ? L("打包未完成") : L("打包已完成")))
                         .font(.footnote)
-                        .foregroundStyle(workspace.signBusy ? Color.primary : (signOnlyFailed ? Color.red : Color.primary))
+                        .foregroundStyle(workspace.signBusy ? Color.primary : (signOnlyFailed ? Theme.negative : Color.primary))
                 }
                 HStack(spacing: 6) {
                     if enterpriseInstallInFlight {
@@ -2211,12 +2211,12 @@ struct EnterpriseCertView: View {
                             .foregroundStyle(.secondary)
                     } else if showingEnterpriseInstallSuccessAlert {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Theme.positive)
                         Text(L("配对安装完成，进度回桌面看"))
                             .font(.footnote)
                     } else if let error = enterpriseInstallErrorText {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Theme.negative)
                         Text(error)
                             .font(.footnote)
                             .foregroundStyle(Theme.negative)

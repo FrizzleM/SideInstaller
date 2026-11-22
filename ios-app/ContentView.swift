@@ -314,7 +314,7 @@ struct ContentView: View {
                         Text(L("SideInstaller %@ is available — you're on %@.",
                                updateChecker.latestVersion ?? "", updateChecker.currentVersion))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 4)
@@ -434,7 +434,7 @@ struct ContentView: View {
         Text(L("SideInstaller recognizes this as %@ and sets it up just like its own download.",
                build.displayName))
             .font(.footnote)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.muted)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .transition(.opacity)
@@ -519,7 +519,7 @@ struct ContentView: View {
                 if !ipaLink.isEmpty {
                     Button { ipaLink = "" } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain, sound: .tick)
                 }
@@ -700,7 +700,7 @@ struct ContentView: View {
                     Text(L("This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.",
                            engine.osVersionText, Engine.minimumTunnelOSText))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -766,7 +766,7 @@ struct ContentView: View {
                  ? L("SideInstaller takes the pairing file LiveContainer's built-in SideStore has.")
                  : L("SideStore opens and sends back the pairing file it has."))
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -895,14 +895,14 @@ struct ContentView: View {
             if let shown, shown.hasRemark {
                 Label(shown.menuTitle, systemImage: "info.circle")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let error = engine.catalogErrors[source] {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(L("Couldn't load the other versions: %@", error))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     Button(L("Try again")) {
                         Task { await engine.loadReleaseCatalog(for: source, force: true) }
@@ -1362,9 +1362,9 @@ private enum PrecheckState {
 
     var color: Color {
         switch self {
-        case .ok: return .green
-        case .warn: return .orange
-        case .blocked: return .red
+        case .ok: return Theme.positive
+        case .warn: return Theme.warning
+        case .blocked: return Theme.negative
         case .na: return .secondary
         }
     }

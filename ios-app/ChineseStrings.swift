@@ -1393,4 +1393,5 @@ let chineseStrings: [String: String] = [
     "Upload": "上传",
     "File": "文件",
     "Size": "大小",
+    "名字不能以. 开头": "名字不能以. 开头",
 ]

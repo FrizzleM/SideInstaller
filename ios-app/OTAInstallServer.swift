@@ -302,6 +302,9 @@ final class OTAInstallServer: ObservableObject {
                   let handle = try? FileHandle(forReadingFrom: ipaURL) else {
                 send(connection, status: "404 Not Found", contentType: "text/plain",
                      length: 0, body: Data()) { connection.cancel() }
+                // A4：文件没了，安装器拿 404 也装不成——别空转到 600 秒硬停。
+                setStatus(L("签好的文件找不到了，先重签一次。"))
+                stop()
                 return
             }
             // 安装器下载包时 App 已退到后台，分片发、发完再停，
@@ -343,6 +346,9 @@ final class OTAInstallServer: ObservableObject {
             LogStore.shared.append("⚠️ Install truncated: \(ipaURL?.lastPathComponent ?? "?") stopped with \(remaining) bytes left.")
             try? handle.close()
             connection.cancel()
+            // A4：包发一半文件没了——别静默空转，停服务并告诉用户重签。
+            setStatus(L("签好的文件找不到了，先重签一次。"))
+            stop()
             return
         }
         connection.send(content: chunk, completion: .contentProcessed { [weak self] _ in

@@ -466,7 +466,7 @@ final class SideloadedAppsManager: ObservableObject {
     func load(quiet: Bool = false) {
         guard !isWorking, !isRefreshing else { return }
         isWorking = true
-        lastError = nil
+        if !quiet { lastError = nil }
         if !quiet { engine.log("=== Sideloaded apps: reading the device ===") }
         Task {
             do {
@@ -1293,7 +1293,7 @@ struct AppsView: View {
                  ? L("%d app here is signed under a team that matches no saved Apple ID, so it is left out. Switch to the Apple ID that signed it and sign in once, then reload, and it will join the list. Enterprise-signed apps stay excluded.", manager.teamExcluded)
                  : L("%d apps here are signed under teams that match no saved Apple ID, so they are left out. Switch to the Apple ID that signed them and sign in once, then reload, and they will join the list. Enterprise-signed apps stay excluded.", manager.teamExcluded))
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .cascadeItem(2)

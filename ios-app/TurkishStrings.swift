@@ -1334,4 +1334,5 @@ let turkishStrings: [String: String] = [
     "Wi-Fi not connected": "Wi-Fi bağlı değil",
     "导出描述文件": "Sağlama profilini dışa aktar",
     "导出后可在 LiveContainer 里导入同一张证书，不用再找原文件；密码不一起导出，导入时再填一次。": "Dışa aktardıktan sonra orijinal dosyayı aramadan aynı sertifikayı LiveContainer’a aktarabilirsiniz; şifre birlikte dışa aktarılmaz, içe aktarırken yeniden girersiniz.",
+    "名字不能以. 开头": "Ad '.' ile başlayamaz",
 ]

@@ -932,11 +932,28 @@ fn zip_create(paths_json: &str, out_zip: &str) -> Result<(), String> {
 /// and restoring unix permissions (executable bits matter for
 /// IPAs and dylibs).
 fn unzip_archive(archive_path: &str, dest_dir: &str) -> Result<(), String> {
-    let bytes = std::fs::read(archive_path).map_err(|e| format!("读压缩包失败：{e}"))?;
-    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes))
-        .map_err(|e| format!("压缩包打不开：{e}"))?;
+    // C-3：失败清掉本次新建的 dest（已存在的目录不动——调用方传的
+    // uniqueSibling 恒为新名，实操中总是不存在，但守卫要写）。
     let dest = PathBuf::from(dest_dir);
-    std::fs::create_dir_all(&dest).map_err(|e| format!("建解压目录失败：{e}"))?;
+    let dest_existed = dest.exists();
+    let result = unzip_archive_inner(archive_path, &dest);
+    if result.is_err() && !dest_existed {
+        let _ = std::fs::remove_dir_all(&dest);
+    }
+    result
+}
+
+fn unzip_archive_inner(archive_path: &str, dest: &std::path::Path) -> Result<(), String> {
+    // C-3：流式开包，整包不再读进内存（File 满足 Read + Seek，
+    // 与 vendored isideload 的 Application::new 同款写法）。
+    let file = std::fs::File::open(archive_path).map_err(|e| format!("读压缩包失败：{e}"))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| format!("压缩包打不开：{e}"))?;
+    std::fs::create_dir_all(dest).map_err(|e| format!("建解压目录失败：{e}"))?;
+    // 总量上限 8GB：zip bomb / 损坏包的刹车。Cargo.toml 里没有可用
+    // 空间依赖，不为这一个上限引新 crate。
+    const TOTAL_LIMIT: u64 = 8 * 1024 * 1024 * 1024;
+    let mut total: u64 = 0;
     for i in 0..archive.len() {
         let mut entry = archive
             .by_index(i)
@@ -953,7 +970,11 @@ fn unzip_archive(archive_path: &str, dest_dir: &str) -> Result<(), String> {
             std::fs::create_dir_all(parent).map_err(|e| format!("解压失败：{e}"))?;
         }
         let mut target = std::fs::File::create(&out).map_err(|e| format!("解压失败：{e}"))?;
-        std::io::copy(&mut entry, &mut target).map_err(|e| format!("解压失败：{e}"))?;
+        let written = std::io::copy(&mut entry, &mut target).map_err(|e| format!("解压失败：{e}"))?;
+        total = total.saturating_add(written);
+        if total > TOTAL_LIMIT {
+            return Err("解压失败：展开总量超过 8GB 上限".to_string());
+        }
         #[cfg(unix)]
         if let Some(mode) = entry.unix_mode() {
             use std::os::unix::fs::PermissionsExt;
