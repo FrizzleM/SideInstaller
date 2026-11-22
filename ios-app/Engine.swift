@@ -657,8 +657,10 @@ final class Engine {
     // MARK: - One-click pipeline (the default flow)
 
     /// Run every install step in order, stopping at the first failure.
+    /// `afterProbe` is set on the second pass, once a full-tunnel VPN's probe
+    /// has answered.
     @MainActor
-    func runOneClick() {
+    func runOneClick(afterProbe: Bool = false) {
         guard !isRunning else { return }
         // Nothing downstream works on an older iOS.
         guard osSupported else {
@@ -701,6 +703,15 @@ final class Engine {
             return
         }
         guard tunnelAvailable else {
+            // A full-tunnel VPN counts as down until its probe answers, which
+            // takes half a second at most: wait for it, then decide.
+            if !afterProbe, awaitsFullTunnelProbe() {
+                Task { @MainActor in
+                    await self.settleNetworkStatus()
+                    self.runOneClick(afterProbe: true)
+                }
+                return
+            }
             if BuiltinTunnel.useBuiltinDirectly {
                 // 内置隧道在包里就不再弹 LocalDevVPN 指引卡：
                 // 自动启动关着时，装不成的原因是那个开关。
@@ -931,8 +942,11 @@ final class Engine {
         case .install(let url):
             installSource = .custom
             Task {
-                await importCustomIPA(fromLink: url.absoluteString)
-                if lastError == nil, IPALibrary.customImport() != nil {
+                // C12：只凭这次导入的返回值起管线——进行中被跳过时
+                // importCustomIPA 已置 lastError，旧 IPA 不会再被
+                // 当成新导入的装掉。
+                if await importCustomIPA(fromLink: url.absoluteString),
+                   IPALibrary.customImport() != nil {
                     runOneClick()
                 }
             }
@@ -982,7 +996,8 @@ final class Engine {
         var announced: String?
         while true {
             try Task.checkCancellation()
-            let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceHost)
+            // Waits for a full-tunnel VPN's probe when there's no fresh answer.
+            let (vpn, wifi, detail) = await readNetworkSettled()
             publishNetwork(vpn: vpn, wifi: wifi, vpnText: vpn ? "tunnel up" : "no tunnel")
             // Only a run that pairs needs Wi-Fi; the tunnel is always required.
             let wifiSatisfied = wifi || !needsFreshPairing
@@ -1815,9 +1830,16 @@ final class Engine {
     }
 
     /// Copy a picked IPA in as the custom import, replacing any previous one.
+    /// Returns true only when this call really imported (C12): a call that
+    /// finds an import already running returns false, so a chained caller
+    /// can't mistake the previous import for this one.
     @MainActor
-    func importCustomIPA(from url: URL) async {
-        guard !isImportingIPA else { return }
+    func importCustomIPA(from url: URL) async -> Bool {
+        guard !isImportingIPA else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            return false
+        }
         isImportingIPA = true
         // Delete the picker's temporary copy once the import is done.
         defer { isImportingIPA = false; Self.discardInboxCopy(url) }
@@ -1830,6 +1852,7 @@ final class Engine {
             if downloadedSource == .custom { downloadedIPAPath = nil }
             setGuide(nil)
             log("Imported \(dest.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(dest.path)), countStyle: .file))).")
+            return true
         } catch IPALibrary.ImportError.notAnIPA {
             // The picker accepts any file. Validation runs on a staged copy, so
             // the previous import is kept.
@@ -1837,22 +1860,30 @@ final class Engine {
             lastError = L("%@ isn't an IPA. Pick the .ipa file itself — if it looks right, the download may have saved an error page instead, or stopped partway.",
                           url.lastPathComponent)
             log("⛔️ Import: \(lastError ?? "")")
+            return false
         } catch {
             // Re-read the import from disk to update the button label.
             refreshCustomIPA()
             lastError = L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
             log("⛔️ Import: \(lastError ?? "")")
+            return false
         }
     }
 
     /// Downloads an IPA from a pasted link and stores it as the custom import.
+    /// Returns true only when this call really imported (C12); see the `from:`
+    /// overload.
     @MainActor
-    func importCustomIPA(fromLink text: String) async {
-        guard !isImportingIPA else { return }
+    func importCustomIPA(fromLink text: String) async -> Bool {
+        guard !isImportingIPA else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            return false
+        }
         guard let url = Self.downloadLink(text) else {
             lastError = L("That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.")
             log("⛔️ Import: \(lastError ?? "")")
-            return
+            return false
         }
         isImportingIPA = true
         importProgress = 0
@@ -1872,17 +1903,21 @@ final class Engine {
             if downloadedSource == .custom { downloadedIPAPath = nil }
             setGuide(nil)
             log("Imported \(dest.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(dest.path)), countStyle: .file))).")
+            return true
         } catch IPALibrary.ImportError.notAnIPA {
             refreshCustomIPA()
             lastError = L("That link didn't return an IPA. It has to download the file itself — a page that only links to the .ipa, or one that asks you to sign in first, arrives here as a web page.")
             log("⛔️ Import: \(lastError ?? "")")
+            return false
         } catch is CancellationError {
             refreshCustomIPA()
             log("Import cancelled.")
+            return false
         } catch {
             refreshCustomIPA()
             lastError = L("Couldn't download that link: %@", short(error))
             log("⛔️ Import: \(lastError ?? "")")
+            return false
         }
     }
 
@@ -2916,7 +2951,7 @@ final class Engine {
     // a run or showing a guide.
 
     func checkVPNAndWifi() {
-        let (vpn, wifi, detail) = NetworkStatus.summarize(deviceIP: deviceHost)
+        let (vpn, wifi, detail) = readNetwork()
         publishNetwork(vpn: vpn, wifi: wifi,
                        vpnText: vpn ? "tunnel up" : "no tunnel (start a loopback VPN)")
         log("Network: \(detail)")
@@ -2945,11 +2980,120 @@ final class Engine {
         statusTimer = nil
     }
 
-    /// One quiet re-scan of the tunnel and Wi-Fi state.
+    /// One quiet re-scan of the tunnel and Wi-Fi state. A full-tunnel VPN gets
+    /// its cached probe answer, and a probe is started when that's stale.
     func refreshNetworkStatus() {
-        let (vpn, wifi, _) = NetworkStatus.summarize(deviceIP: deviceHost)
+        let (vpn, wifi, _) = readNetwork()
         publishNetwork(vpn: vpn, wifi: wifi,
                        vpnText: vpn ? "tunnel up" : "no tunnel (start a loopback VPN)")
+    }
+
+    /// `refreshNetworkStatus`, but waiting for a full-tunnel VPN's probe when
+    /// there's no fresh answer, so what's decided next sees it. Returns at once
+    /// for any other route.
+    @MainActor
+    func settleNetworkStatus() async {
+        let (vpn, wifi, _) = await readNetworkSettled()
+        publishNetwork(vpn: vpn, wifi: wifi,
+                       vpnText: vpn ? "tunnel up" : "no tunnel (start a loopback VPN)")
+    }
+
+    // MARK: Full-tunnel probe
+    //
+    // A full-tunnel VPN (case (c) in `NetworkStatus`) is judged by a TCP probe
+    // of Device IP. It runs off the main thread, one at a time, and its answer
+    // is kept for `fullTunnelProbeLifetime` per Device IP and tunnel address.
+    // LocalDevVPN, and no VPN at all, never get here.
+    // Restored from 2df7e76 ("Tunnel: accept full-tunnel proxy VPNs that loop
+    // Device IP back"); the scan family it reuses was never dropped.
+
+    private static let fullTunnelProbeLifetime: TimeInterval = 5
+
+    private typealias NetworkReading = (vpn: Bool, wifi: Bool, detail: String)
+
+    /// The tunnel and Wi-Fi state now. A full-tunnel VPN counts as up by its
+    /// last probe, and as down until one has answered.
+    private func readNetwork() -> NetworkReading {
+        reading(of: NetworkStatus.scan(deviceIP: deviceHost))
+    }
+
+    private func reading(of scan: NetworkStatus.Scan) -> NetworkReading {
+        let probe = scan.probeTarget.flatMap { fullTunnelAnswer(for: $0) }
+        let vpn = NetworkStatus.tunnelIsUp(route: scan.route,
+                                           fallbackMatch: scan.fallbackMatch,
+                                           probe: probe)
+        return (vpn, scan.wifi, scan.detail)
+    }
+
+    /// `readNetwork`, after waiting for a full-tunnel VPN's probe that has no
+    /// fresh answer (half a second at most).
+    @MainActor
+    private func readNetworkSettled() async -> NetworkReading {
+        let scan = NetworkStatus.scan(deviceIP: deviceHost)
+        guard let target = scan.probeTarget, freshFullTunnelAnswer(for: target) == nil
+        else { return reading(of: scan) }
+        // One probe at a time: one for an earlier VPN or Device IP finishes first.
+        while let running = fullTunnelProbe, running.key != target.key {
+            _ = await running.task.value
+        }
+        if let task = startFullTunnelProbe(target) { _ = await task.value }
+        return readNetwork()
+    }
+
+    /// True when the tunnel is a full-tunnel VPN whose probe has no fresh
+    /// answer, so it may still turn out to be up.
+    private func awaitsFullTunnelProbe() -> Bool {
+        guard let target = NetworkStatus.scan(deviceIP: deviceHost).probeTarget else { return false }
+        return freshFullTunnelAnswer(for: target) == nil
+    }
+
+    /// The last answer for `target`, if it's recent.
+    private func freshFullTunnelAnswer(for target: NetworkStatus.ProbeTarget) -> NetworkStatus.ProbeResult? {
+        guard let last = lastFullTunnelProbe, last.key == target.key,
+              Date().timeIntervalSince(last.date) < Self.fullTunnelProbeLifetime
+        else { return nil }
+        return last.result
+    }
+
+    /// The probe answer to judge `target` by: the cached one, possibly stale,
+    /// or nil when there's none. Starts a probe when it's stale, and drops it
+    /// once Device IP or the VPN has changed.
+    private func fullTunnelAnswer(for target: NetworkStatus.ProbeTarget) -> NetworkStatus.ProbeResult? {
+        if let last = lastFullTunnelProbe, last.key != target.key { lastFullTunnelProbe = nil }
+        if let fresh = freshFullTunnelAnswer(for: target) { return fresh }
+        startFullTunnelProbe(target)
+        return lastFullTunnelProbe?.result
+    }
+
+    /// Starts a probe of `target`, or returns the one already running for it.
+    /// Nil while one for another target runs; the next look starts this one.
+    @discardableResult
+    private func startFullTunnelProbe(_ target: NetworkStatus.ProbeTarget) -> Task<NetworkStatus.ProbeResult, Never>? {
+        if let running = fullTunnelProbe {
+            return running.key == target.key ? running.task : nil
+        }
+        let task = Task { @MainActor [weak self] () -> NetworkStatus.ProbeResult in
+            let result = await NetworkStatus.probe(host: target.deviceIP, port: DeviceConnection.rsdPort)
+            self?.finishFullTunnelProbe(target, result: result)
+            return result
+        }
+        fullTunnelProbe = (target.key, task)
+        return task
+    }
+
+    /// Keeps the answer, and publishes it when it turns the tunnel up or down.
+    @MainActor
+    private func finishFullTunnelProbe(_ target: NetworkStatus.ProbeTarget,
+                                       result: NetworkStatus.ProbeResult) {
+        fullTunnelProbe = nil
+        let previous = lastFullTunnelProbe.flatMap { $0.key == target.key ? $0.result : nil }
+        lastFullTunnelProbe = (target.key, result, Date())
+        let wasUp = previous?.answered ?? false
+        guard result.answered != wasUp else { return }
+        if result.answered {
+            log("Tunnel: the full-tunnel VPN on \(target.interface) loops \(target.deviceIP) back (probe \(result)).")
+        }
+        refreshNetworkStatus()
     }
 
     /// Publish only what changed, so the poll doesn't redraw every view.
@@ -3079,7 +3223,9 @@ final class Engine {
     /// for the tunnel once SideInstaller is back. Returns whether it's up.
     @MainActor
     func tunnelUp() async -> Bool {
-        refreshNetworkStatus()
+        // A full-tunnel VPN that loops Device IP back is already the tunnel, so
+        // its probe answers before LocalDevVPN is opened over it.
+        await settleNetworkStatus()
         // 内置隧道不受自动启动开关限制：它是 App 自带的一部分。
         // 那个开关只管内置起不来时要不要自动跳去打开独立装的 LOC。
         guard !vpnConnected, startsVPNWhenNeeded || BuiltinTunnel.useBuiltinDirectly else {
@@ -3108,10 +3254,15 @@ final class Engine {
         guard handingOver || startLocalDevVPN() else { return false }
         // Only time back in SideInstaller counts, so a while spent in
         // LocalDevVPN (its VPN permission prompt, say) doesn't use up the wait.
+        // S10：绝对上限——后台时 waited 永不涨，循环不能只靠它退出；
+        // 墙钟 30 秒或 60 次迭代先到为准，到时返回 false。
+        let waitStartedAt = Date()
         var waited = 0.0
-        while waited < 15 {
+        var waitIterations = 0
+        while waited < 15 && waitIterations < 60 && Date().timeIntervalSince(waitStartedAt) < 30 {
             try? await Task.sleep(nanoseconds: 500_000_000)
             if Task.isCancelled { return false }
+            waitIterations += 1
             refreshNetworkStatus()
             if vpnConnected {
                 log("Tunnel up.")
@@ -4678,10 +4829,14 @@ enum SIDAutoRefresh {
     static func handleBackgroundWake(_ task: BGAppRefreshTask) {
         scheduleBackgroundWake()
         let completion = BGTaskCompletion(task)
+        // S10：过期回调取消工作 Task——它可能正卡在 tunnelUp 的 LOC
+        // 等待循环里（后台 waited 不涨），只 finish 不取消等于空转到过期。
+        var work: Task<Void, Never>?
         task.expirationHandler = {
+            work?.cancel()
             completion.finish(false)
         }
-        Task {
+        work = Task {
             guard isEnabled else {
                 completion.finish(true)
                 return

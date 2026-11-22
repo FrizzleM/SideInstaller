@@ -289,7 +289,7 @@ struct SourceAppsView: View {
                 let file = try await downloader.download(from: url)
                 // The staged file already carries `expectedName`: the import
                 // names the custom slot after it.
-                await engine.importCustomIPA(from: file)
+                _ = await engine.importCustomIPA(from: file)
                 guard engine.lastError == nil,
                       IPALibrary.customImport()?.url.lastPathComponent == expectedName
                 else {
@@ -335,7 +335,7 @@ struct SourceAppsView: View {
         downloadTask = Task {
             do {
                 let file = try await downloader.download(from: url)
-                await engine.importCustomIPA(from: file)
+                _ = await engine.importCustomIPA(from: file)
                 guard engine.lastError == nil,
                       let entry = IPALibrary.customImport(),
                       entry.url.lastPathComponent == expectedName

@@ -115,7 +115,7 @@ struct ContentView: View {
             .sheet(isPresented: $showImporter) {
                 FileImporterRepresentableView(allowedContentTypes: [.ipa]) { urls in
                     guard let url = urls.first else { return }   // empty means cancelled
-                    Task { await engine.importCustomIPA(from: url) }
+                    Task { _ = await engine.importCustomIPA(from: url) }
                 }
                 .ignoresSafeArea()
             }
@@ -563,7 +563,7 @@ struct ContentView: View {
         guard linkIsUsable else { return }
         linkFieldFocused = false
         let link = ipaLink
-        Task { await engine.importCustomIPA(fromLink: link) }
+        Task { _ = await engine.importCustomIPA(fromLink: link) }
     }
 
     // MARK: Primary action
@@ -1261,7 +1261,7 @@ private struct PrecheckSheet: View {
             .sheet(isPresented: $showIPAPicker) {
                 FileImporterRepresentableView(allowedContentTypes: [.ipa]) { urls in
                     guard let url = urls.first else { return }   // empty means cancelled
-                    Task { await engine.importCustomIPA(from: url) }
+                    Task { _ = await engine.importCustomIPA(from: url) }
                 }
                 .ignoresSafeArea()
             }

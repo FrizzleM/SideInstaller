@@ -360,53 +360,6 @@ enum NetworkStatus {
     }
 }
 
-// MARK: - Restored from the fork (2026-10-25 merge recovery)
-// 290310a took NetworkStatus.swift from the upstream side, dropping the
-// fork's summary below; restored verbatim from the fork @ 3e560dd.
-
-extension NetworkStatus {
-    /// 1 秒内的同 IP 摘要缓存（SIDE-2 S1）：tunnelUp 的 15 秒等待循环每 0.5 秒
-    /// 调一次 refreshNetworkStatus，同一秒内两次调用只算一次。所有调用方都
-    /// 在主线程（MainActor 或主 RunLoop 定时器），缓存无锁。
-    private static var lastSummary: (at: Date, deviceIP: String, result: (vpn: Bool, wifi: Bool, detail: String))?
-
-    /// (vpnUp, wifiUp, detail) for the current interfaces.
-    static func summarize(deviceIP: String) -> (vpn: Bool, wifi: Bool, detail: String) {
-        if let last = lastSummary, last.deviceIP == deviceIP, Date().timeIntervalSince(last.at) < 1 {
-            return last.result
-        }
-        let ifs = interfaces()
-        let vpn = isLoopbackTunnelUp(in: ifs, deviceIP: deviceIP)
-        let wifi = ifs.contains { $0.name == "en0" }
-        let detail = ifs.map { "\($0.name)=\($0.ipv4)" }.joined(separator: ", ")
-        let result = (vpn, wifi, detail)
-        lastSummary = (at: Date(), deviceIP: deviceIP, result: result)
-        return result
-    }
-
-    private static func isLoopbackTunnelUp(in ifs: [Interface], deviceIP: String) -> Bool {
-        guard let target = ipv4Value(deviceIP) else {
-            // Unparseable target IP — fall back to the broad tunnel-name check.
-            return ifs.contains { isTunnelInterface($0.name) }
-        }
-        // The routing table is the authority; ask it first.
-        if tunnelCarriesRoute(to: deviceIP, in: ifs) == true { return true }
-        // Fall back to a subnet check on tunnel interfaces only: iOS keeps system
-        // `utun`s up without a VPN, and a home LAN can overlap the tunnel's range.
-        return ifs.contains { isTunnelInterface($0.name) && subnet($0, contains: target) }
-    }
-
-    private static func tunnelCarriesRoute(to deviceIP: String, in ifs: [Interface]) -> Bool? {
-        guard let source = routeSource(to: deviceIP),
-              let iface = ifs.first(where: { $0.ipv4 == source })
-        else { return nil }
-        guard isTunnelInterface(iface.name) else { return false }
-        // A full-tunnel VPN routes every address, so only count it when
-        // `deviceIP` uses a different route than the default.
-        return routeSource(to: defaultRouteProbe) != source
-    }
-}
-
 // MARK: - This iPhone's remote pairing listener
 
 extension NetworkStatus {

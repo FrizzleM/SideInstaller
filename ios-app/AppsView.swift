@@ -365,6 +365,11 @@ final class SideloadedAppsManager: ObservableObject {
 
     /// LocalDevVPN 跳回后待续签的标记（UserDefaults 键）。
     static let pendingRefreshKey = "SIDPendingRefreshAll"
+    /// 待续签标记的落点时间（UserDefaults 键，C13）：标记过期 24 小时
+    /// 只清不跑，免得数日后回前台又自动跑一轮。
+    static let pendingRefreshAtKey = "SIDPendingRefreshAllAt"
+    /// 待续签标记的有效期。
+    private static let pendingRefreshTTL: TimeInterval = 24 * 3600
 
     @Published private(set) var entries: [SideloadedAppStatus] = []
     /// Profiles belonging to no installed app — deleted apps' leftovers.
@@ -752,6 +757,12 @@ final class SideloadedAppsManager: ObservableObject {
                 isRefreshing = false        // `load` won't run while a refresh holds the link
                 load(quiet: true)
             }
+            // C13：手动续签正常跑完，快捷指令留下的待续签意图已满足——
+            // 清掉标记，免得下次回前台又自动跑一轮。
+            if onlyBundleIDs == nil {
+                UserDefaults.standard.removeObject(forKey: Self.pendingRefreshKey)
+                UserDefaults.standard.removeObject(forKey: Self.pendingRefreshAtKey)
+            }
         }
     }
 
@@ -843,6 +854,7 @@ final class SideloadedAppsManager: ObservableObject {
                     return
                 }
                 UserDefaults.standard.set(true, forKey: Self.pendingRefreshKey)
+                UserDefaults.standard.set(Date(), forKey: Self.pendingRefreshAtKey)
                 engine.log("Refresh all (shortcut): tunnel down, opening LocalDevVPN; will resume on return.")
                 _ = engine.startLocalDevVPN()
                 return
@@ -856,9 +868,18 @@ final class SideloadedAppsManager: ObservableObject {
     @MainActor
     func consumePendingRefresh() {
         guard UserDefaults.standard.bool(forKey: Self.pendingRefreshKey), !isRefreshing else { return }
+        // C13：标记过期 24 小时只清不跑——数日后回前台不该再自动整轮重签。
+        // 没时间戳的是旧版留下的标记，同样只清不跑。
+        let markedAt = UserDefaults.standard.object(forKey: Self.pendingRefreshAtKey) as? Date
+        guard let markedAt, Date().timeIntervalSince(markedAt) < Self.pendingRefreshTTL else {
+            UserDefaults.standard.removeObject(forKey: Self.pendingRefreshKey)
+            UserDefaults.standard.removeObject(forKey: Self.pendingRefreshAtKey)
+            return
+        }
         engine.refreshNetworkStatus()
         guard engine.vpnConnected else { return }
-        UserDefaults.standard.set(false, forKey: Self.pendingRefreshKey)
+        UserDefaults.standard.removeObject(forKey: Self.pendingRefreshKey)
+        UserDefaults.standard.removeObject(forKey: Self.pendingRefreshAtKey)
         Task { await loadThenRefreshAll() }
     }
 
