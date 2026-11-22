@@ -504,6 +504,8 @@ let portugueseStrings: [String: String] = [
         "Ignorado: atualização interrompida.",
     "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
         "O emparelhamento não foi entregue no novo formato. O SideStore pode pedir o arquivo de emparelhamento.",
+    "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
+        "O certificado de assinatura não foi entregue. O SideStore pode pedir uma nova assinatura no primeiro login.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "Não foi possível aplicar as configurações de anisette do SideStore. Se o login falhar com -80046, desative o Anisette no dispositivo e a rotação automática, e escolha “SideStore (New)”。",
     "Last refresh (its notification couldn't be delivered): %@":

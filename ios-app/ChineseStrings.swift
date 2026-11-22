@@ -489,6 +489,8 @@ let chineseStrings: [String: String] = [
         "已跳过：续签已停止。",
     "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
         "配对文件没能以新格式交过去，SideStore 首次打开时可能会索要配对文件。",
+    "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
+        "签名证书没交过去，SideStore 首次登录时可能要求重新签名。",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "SideStore 的 anisette 设置没能写进去。如果它登录时报 -80046，请关掉本机 Anisette 与自动轮换，并选择“SideStore (New)”。",
     "Last refresh (its notification couldn't be delivered): %@":

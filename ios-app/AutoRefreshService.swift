@@ -106,7 +106,6 @@ final class AutoRefreshService {
         let tickNow = Date().timeIntervalSince1970
         let lastTick = UserDefaults.standard.double(forKey: Self.lastTickKey)
         guard tickNow - lastTick >= Self.minTickInterval else { return true }
-        UserDefaults.standard.set(tickNow, forKey: Self.lastTickKey)
 
         engine.refreshNetworkStatus()
         guard engine.vpnConnected else {
@@ -134,6 +133,11 @@ final class AutoRefreshService {
             return false
         }
         guard manager.hasLoaded else { return false }
+
+        // C26：去重戳只在检查真正跑起来后才盖——盖在入口处会让隧道不通/
+        // 清单失败的一轮也吃掉 10 分钟窗口（对照：lastRoundKey 在 :163
+        // 确认真开跑才记）。hasLoaded 通过之后才算“这一轮真的查了”。
+        UserDefaults.standard.set(tickNow, forKey: Self.lastTickKey)
 
         // 到期通知排期：每轮巡检拿到新清单就重排一次（本地通知，
         // 不用服务器）；旧的先清掉，新的按到期日排。

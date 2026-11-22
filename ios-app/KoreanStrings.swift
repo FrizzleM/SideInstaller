@@ -491,6 +491,8 @@ let koreanStrings: [String: String] = [
         "건너뜀: 갱신이 중단되었습니다.",
     "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
         "페어링을 새 형식으로 전달하지 못했습니다. SideStore가 처음 실행될 때 페어링 파일을 요청할 수 있습니다.",
+    "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
+        "서명 인증서를 전달하지 못했습니다. SideStore가 처음 로그인할 때 다시 서명을 요청할 수 있습니다.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "SideStore의 anisette 설정을 적용하지 못했습니다. 로그인 시 -80046 오류가 발생하면 기기 내 Anisette와 자동 순환을 끄고 “SideStore (New)”를 선택하세요.",
     "Last refresh (its notification couldn't be delivered): %@":

@@ -1037,6 +1037,13 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
             }
+            // C25：配对/证书交接失败的提示（Engine.handOffNotice），与 C7
+            // 的 downloadFallbackNotice 并列显示在进度卡下方。
+            if let notice = engine.handOffNotice {
+                Text(notice)
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+            }
         }
     }
 

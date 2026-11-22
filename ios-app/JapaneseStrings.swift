@@ -490,6 +490,8 @@ let japaneseStrings: [String: String] = [
         "スキップ：更新を停止しました。",
     "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
         "ペアリングを新しい形式で渡せませんでした。SideStore が初回起動時にペアリングファイルを求める場合があります。",
+    "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
+        "署名証明書を渡せませんでした。SideStore が初回サインイン時に再署名を求める場合があります。",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "SideStore の anisette 設定を書き込めませんでした。サインインが -80046 で失敗する場合は、デバイス上の Anisette と自動ローテーションをオフにして「SideStore (New)」を選んでください。",
     "Last refresh (its notification couldn't be delivered): %@":

@@ -417,6 +417,11 @@ final class Engine {
     /// as a caption under the progress card, never a blocking error.
     var downloadFallbackNotice: String?
 
+    /// C25：安装时配对/证书交接失败只记日志时留的提示（照抄 C23 的
+    /// SideBySide 手法）：run 照常成功，但这句留在进度卡下方，几天后
+    /// SideStore 索要配对文件/要求重签时能把因果连起来。resetRun 清掉。
+    var handOffNotice: String?
+
     /// Set once the whole pipeline has completed successfully.
     var finished: Bool = false
 
@@ -635,6 +640,7 @@ final class Engine {
             self.installProgress = 0
             self.downloadProgress = 0
             self.downloadFallbackNotice = nil
+            self.handOffNotice = nil
             self.pairingPIN = nil
             self.guide = nil
             self.deviceSummary = nil
@@ -2730,7 +2736,7 @@ final class Engine {
         }
 
         // Give SideStore the signing certificate so its first sign-in reuses it
-        // instead of creating a new one and asking to resign. Failures only log.
+        // instead of creating a new one and asking to resign. Failures log and leave a notice under the progress card (C25).
         if let accountConfig, let remoteRel = accountConfigRemoteRelativePath(source: source) {
             do {
                 let handed = try connection.writeFile(intoBundleID: bundleID,
@@ -2738,6 +2744,10 @@ final class Engine {
                                                       data: Data(accountConfig.utf8))
                 log("Certificate handed to \(appName): /Documents/\(remoteRel) written and read-back VERIFIED (\(handed) bytes). SideStore imports and deletes it on first launch.")
             } catch {
+                // C25：同上，证书交接失败也在进度卡下方留一句（新 key 1 个）。
+                Task { @MainActor in
+                    self.handOffNotice = [self.handOffNotice, L("The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.")].compactMap { $0 }.joined(separator: "\n")
+                }
                 log("⚠️ Couldn't hand \(appName) the signing certificate (\(short(error))). It's installed and ready, but it will ask to resign itself on first sign-in.")
             }
         }
@@ -3767,7 +3777,7 @@ final class Engine {
     /// Hands the pairing to SideStore the way nightly 0.7.0-20260920 and later
     /// read it (see `SideStorePairingHandoff`): one file per protocol, plus the
     /// two settings its own import writes. Older builds read `ALTPairingFile`,
-    /// written just before, so failures here only log. Runs on `deviceQueue`.
+    /// written just before, so failures here log and leave a notice (C25). Runs on `deviceQueue`.
     private func handOffSplitPairing(placementPath: String, bundleID: String,
                                      appName: String, home: SideStoreHome, udid: String?) {
         do {
@@ -3794,6 +3804,12 @@ final class Engine {
             }
             log("Set \(appName) to load its \(active) pairing file (/\(prefsPath)), as its own import does.")
         } catch {
+            // C25：只记日志不够——对方日后遇到要配对文件时，这边没有
+            // 任何提示能把两件事连起来；进度卡下方留一句（run 照常成功）。
+            // 照抄 C23（SideBySideView:1796-1799），复用同一条 key。
+            Task { @MainActor in
+                self.handOffNotice = [self.handOffNotice, L("The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.")].compactMap { $0 }.joined(separator: "\n")
+            }
             log("⚠️ Couldn't hand \(appName) its pairing in the newer format (\(short(error))). SideStore nightlies from 20 September 2026 on may ask for the pairing file; older builds are set.")
         }
     }

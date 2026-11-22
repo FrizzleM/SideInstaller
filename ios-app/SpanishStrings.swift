@@ -505,6 +505,8 @@ let spanishStrings: [String: String] = [
         "Omitido: actualización detenida.",
     "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
         "El emparejamiento no se entregó en el nuevo formato. SideStore podría pedir el archivo de emparejamiento.",
+    "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
+        "El certificado de firma no se entregó. SideStore podría pedir una nueva firma en el primer inicio de sesión.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "No se pudieron aplicar los ajustes de anisette de SideStore. Si el inicio de sesión falla con -80046, desactiva Anisette en el dispositivo y la rotación automática, y elige “SideStore (New)”。",
     "Last refresh (its notification couldn't be delivered): %@":

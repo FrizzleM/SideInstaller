@@ -2384,9 +2384,15 @@ private struct LibraryIPAPicker: View {
         let key = cacheKey(item)
         guard !iconsTried.contains(key) else { return }
         iconsTried.insert(key)
-        Task.detached { [url = item.url, path = item.url.path] in
+        Task.detached { [url = item.url, path = item.url.path,
+                         size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
             guard let data = IPALibrary.iconData(at: url),
                   let image = UIImage(data: data) else { return }
+            // C30（B12-6 同款核对）：解包途中文件被替换就丢掉旧图。
+            let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+            let liveSize = attrs?[.size] as? Int
+            let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+            guard liveSize == size, liveModified == modified else { return }
             await MainActor.run { icons[path] = image }
         }
     }
@@ -2395,8 +2401,14 @@ private struct LibraryIPAPicker: View {
         let key = cacheKey(item)
         guard !infosTried.contains(key) else { return }
         infosTried.insert(key)
-        Task.detached { [url = item.url, path = item.url.path] in
+        Task.detached { [url = item.url, path = item.url.path,
+                         size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
             guard let info = IPALibrary.appInfo(at: url) else { return }
+            // C30（B12-6 同款核对）：解析途中文件被替换就丢掉旧信息。
+            let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+            let liveSize = attrs?[.size] as? Int
+            let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+            guard liveSize == size, liveModified == modified else { return }
             await MainActor.run { infos[path] = info }
         }
     }

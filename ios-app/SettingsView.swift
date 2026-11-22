@@ -666,6 +666,7 @@ struct SettingsView: View {
                     .keyboardType(.numbersAndPunctuation)
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(.secondary)
+                    .onSubmit { validateDeviceIP() }
             }
         } header: {
             Text(L("Advanced"))

@@ -529,6 +529,8 @@ let turkishStrings: [String: String] = [
         "Atlandı: yenileme durduruldu.",
     "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
         "Eşleştirme yeni biçimde aktarılamadı. SideStore ilk açılışta eşleştirme dosyasını isteyebilir.",
+    "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
+        "İmzalama sertifikası aktarılamadı. SideStore ilk oturum açışta yeniden imzalamayı isteyebilir.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "SideStore'un anisette ayarları uygulanamadı. Girişi -80046 hatasıyla başarısız olursa cihaz içi Anisette'i ve otomatik döndürmeyi kapatıp “SideStore (New)” öğesini seçin.",
     "Last refresh (its notification couldn't be delivered): %@":

@@ -532,7 +532,12 @@ final class SideloadedAppsManager: ObservableObject {
             return
         }
         guard !engine.isRunning else {
-            lastError = L("An install is already running. Wait for it to finish, then refresh.")
+            // C27：照 C3 其余三道守卫——只有界面入口（onlyBundleIDs == nil）
+            // 才置 lastError；快捷指令/自动巡检入口只写日志，不留过期弹窗。
+            if onlyBundleIDs == nil {
+                lastError = L("An install is already running. Wait for it to finish, then refresh.")
+            }
+            engine.log("Refresh all: install already running.")
             return
         }
         // 续签不再以 WiFi 为前置（2026-10-29）：隧道是本机回环
@@ -893,6 +898,14 @@ final class SideloadedAppsManager: ObservableObject {
     /// 先（必要时）加载设备上的可续签列表，再开续签。
     @MainActor
     private func loadThenRefreshAll() async {
+        // C27：安装进行中时快捷指令/待续签续签静默落空——入口先拦，
+        // 照抄 tick()（AutoRefreshService:101-102）的做法；拦下时发
+        // 一条通知（复用 refreshAll 守卫里已有的 key，0 新 key），
+        // 不走到 refreshAll 那道会留过期 lastError 的守卫。
+        guard !engine.isRunning else {
+            await postResignNotification(title: L("续签失败"), body: L("An install is already running. Wait for it to finish, then refresh."))
+            return
+        }
         // C5：快捷指令每次都重读一次设备再续签——只在 hasLoaded 时跳过，
         // 用的是上次的清单，设备上 App 变了（新装/已删/到期日变了）
         // 续签集就是错的。等这一轮 load 跑完（最多 20 秒）再决定。

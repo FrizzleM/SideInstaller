@@ -402,11 +402,11 @@ final class LANTransferServer: ObservableObject {
             }
             sendFile(connection, file: file)
         case ("GET", "/del"):
-            guard let rel = request.query["path"], let file = resolve(rel) else {
+            guard let rel = request.query["path"], let file = resolve(rel),
+                  deleteFile(at: file) else {
                 sendText(connection, status: "400 Bad Request", text: L("Invalid path"))
                 return
             }
-            deleteFile(at: file)
             redirect(connection)
         case ("POST", "/upload"):
             guard let contentType = request.headers["content-type"],
@@ -423,7 +423,10 @@ final class LANTransferServer: ObservableObject {
     }
 
     /// 把相对路径钉回 Documents 里，逃不出去。
+    /// C28：空串 split 得 0 分量会原样返回 Documents 根目录，
+    /// /del?path= 能删整个 Documents——空 rel 直接拒掉。
     private func resolve(_ rel: String) -> URL? {
+        guard !rel.isEmpty else { return nil }
         let decoded = rel.removingPercentEncoding ?? rel
         var url = root
         for component in decoded.split(separator: "/") {
@@ -435,15 +438,25 @@ final class LANTransferServer: ObservableObject {
         return url
     }
 
-    private func deleteFile(at file: URL) {
+    /// C28：目录不删——/del?path=Signed 会删整个已签名目录。只拦目录：
+    /// 不存在的文件沿用老路（try? 空操作，照旧 303），不扩大改动面。
+    /// 返回 false 只表示“目录，拒绝”，调用方回 400。
+    private func deleteFile(at file: URL) -> Bool {
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: file.path, isDirectory: &isDir),
+           isDir.boolValue {
+            return false
+        }
         let relDir = file.deletingLastPathComponent().path
             .replacingOccurrences(of: root.path, with: "")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         if relDir == "Signed",
            let record = SignedIPAStore.load().first(where: { $0.fileName == file.lastPathComponent }) {
             SignedIPAStore.remove(record)
+            return true
         } else {
             try? FileManager.default.removeItem(at: file)
+            return true
         }
     }
 

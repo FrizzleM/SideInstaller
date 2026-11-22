@@ -503,6 +503,8 @@ let vietnameseStrings: [String: String] = [
         "Đã bỏ qua: đã dừng gia hạn.",
     "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
         "Không thể chuyển tệp ghép nối ở định dạng mới. SideStore có thể yêu cầu tệp ghép nối khi mở lần đầu.",
+    "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
+        "Không thể chuyển chứng chỉ ký. SideStore có thể yêu cầu ký lại khi đăng nhập lần đầu.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "Không thể đặt cài đặt anisette của SideStore. Nếu đăng nhập lỗi -80046, hãy tắt Anisette trên thiết bị và tính năng tự động xoay, và chọn “SideStore (New)”。",
     "Last refresh (its notification couldn't be delivered): %@":

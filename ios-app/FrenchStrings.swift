@@ -507,6 +507,8 @@ let frenchStrings: [String: String] = [
         "Ignoré : actualisation arrêtée.",
     "The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.":
         "Le jumelage n'a pas été transmis dans le nouveau format. SideStore pourrait demander le fichier de jumelage.",
+    "The signing certificate wasn't handed over. SideStore may ask to resign itself on first sign-in.":
+        "Le certificat de signature n'a pas été transmis. SideStore pourrait demander une nouvelle signature à la première connexion.",
     "SideStore's anisette settings weren't set. If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation and pick “SideStore (New)”.":
         "Les réglages anisette de SideStore n'ont pas pu être définis. Si sa connexion échoue avec -80046, désactivez Anisette sur l'appareil et la rotation automatique, et choisissez « SideStore (New) ».",
     "Last refresh (its notification couldn't be delivered): %@":

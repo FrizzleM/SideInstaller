@@ -1827,8 +1827,8 @@ struct FilesTabView: View {
         let query = librarySearchText.lowercased()
         return unsignedIPAs.filter { item in
             item.name.lowercased().contains(query)
-                || (unsignedInfo[item.url.path]?.name.lowercased().contains(query) == true)
-                || (unsignedInfo[item.url.path]?.bundleID.lowercased().contains(query) == true)
+                || (unsignedInfo[unsignedInfoKey(for: item.url.path)]?.name.lowercased().contains(query) == true)
+                || (unsignedInfo[unsignedInfoKey(for: item.url.path)]?.bundleID.lowercased().contains(query) == true)
         }
     }
 
@@ -2113,7 +2113,7 @@ struct FilesTabView: View {
     }()
 
     private func unsignedDisplayName(_ item: LocalFileItem) -> String {
-        if let name = unsignedInfo[item.url.path]?.name, !name.isEmpty {
+        if let name = unsignedInfo[unsignedInfoKey(for: item.url.path)]?.name, !name.isEmpty {
             return name
         }
         return (item.name as NSString).deletingPathExtension
@@ -2123,7 +2123,7 @@ struct FilesTabView: View {
     /// 解析失败只显示大小，不造假。
     private func unsignedSecondLine(_ item: LocalFileItem) -> String {
         let size = ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file)
-        guard let info = unsignedInfo[item.url.path] else { return size }
+        guard let info = unsignedInfo[unsignedInfoKey(for: item.url.path)] else { return size }
         var parts: [String] = []
         if let version = info.version, !version.isEmpty {
             parts.append("V\(version)")
@@ -2155,23 +2155,32 @@ struct FilesTabView: View {
     /// 把还没试过的路径在后台统一解析，结果按路径缓存；解析失败也记
     /// 已尝试，不重复读盘。删掉的路径清掉缓存，免得同名新文件沿用旧信息。
     private func ensureUnsignedInfo() {
-        let current = Set(unsignedIPAs.map { $0.url.path })
+        // C30：缓存键改成“路径#指纹”（大小 + 修改时间，复用
+        // iconFingerprint）：同路径文件被替换后 key 变了，旧信息被
+        // 下面的过滤清掉、重新排队解析，不再沿用旧名字/版本/Bundle ID。
+        // 图标路（unsignedIconsTried）早就是这个键，信息路补齐。
+        let current = Set(unsignedIPAs.map { unsignedInfoKey(for: $0.url.path) })
         unsignedInfo = unsignedInfo.filter { current.contains($0.key) }
         unsignedInfoTried = unsignedInfoTried.intersection(current)
-        let pending = unsignedIPAs.filter { !unsignedInfoTried.contains($0.url.path) }
+        let pending = unsignedIPAs.filter { !unsignedInfoTried.contains(unsignedInfoKey(for: $0.url.path)) }
         guard !pending.isEmpty else { return }
-        for item in pending { unsignedInfoTried.insert(item.url.path) }
+        for item in pending { unsignedInfoTried.insert(unsignedInfoKey(for: item.url.path)) }
+        let keys = pending.map { unsignedInfoKey(for: $0.url.path) }
+        let pathByKey = Dictionary(uniqueKeysWithValues: zip(keys, pending.map { $0.url.path }))
         let urls = pending.map { $0.url }
         Task.detached(priority: .userInitiated) {
             var found: [String: IPALibrary.AppInfo] = [:]
-            for url in urls {
+            for (url, key) in zip(urls, keys) {
                 if let info = IPALibrary.appInfo(at: url) {
-                    found[url.path] = info
+                    found[key] = info
                 }
             }
             await MainActor.run {
-                for (path, info) in found {
-                    self.unsignedInfo[path] = info
+                for (key, info) in found {
+                    // C30（B12-6 同款核对）：解析途中文件被替换、key 已变
+                    // 时丢掉旧结果；tried 集里仍是旧 key，下一轮重排。
+                    guard let path = pathByKey[key], self.unsignedInfoKey(for: path) == key else { continue }
+                    self.unsignedInfo[key] = info
                 }
             }
         }
@@ -2208,14 +2217,24 @@ struct FilesTabView: View {
             unsignedIcons[path] = nil
         }
         let url = URL(fileURLWithPath: path)
-        Task.detached(priority: .userInitiated) {
+        Task.detached(priority: .userInitiated) { [key] in
             guard let data = IPALibrary.iconData(at: url),
                   let image = UIImage(data: data) else { return }
             await MainActor.run {
+                // C30（B12-6 同款核对）：解码途中文件被替换、key 已变
+                // 时丢掉旧图；新 key 的任务会重取，不钉住错图。
+                guard "\(path)#\(self.iconFingerprint(for: path))" == key else { return }
                 if signed { self.signedIcons[path] = image }
                 else { self.unsignedIcons[path] = image }
             }
         }
+    }
+
+    /// C30：信息缓存键——路径 + 文件指纹，与图标路的 key 同形
+    /// （loadLibraryIcon :2646 拼的是 "\(path)#\(iconFingerprint)"）。
+    /// 名字叫 unsignedInfoKey：infoKey 已被 MadeiraSigningHandoff.infoKey 占用。
+    private func unsignedInfoKey(for path: String) -> String {
+        "\(path)#\(iconFingerprint(for: path))"
     }
 
     /// 图标指纹：文件大小 + 修改时间（重签覆盖同路径时变）。
