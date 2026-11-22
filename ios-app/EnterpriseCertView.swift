@@ -133,6 +133,11 @@ struct EnterpriseCertView: View {
     /// select() 是唯一的选中入口（库里点选、别页传过来都走它），
     /// 取消选中时一并清空，不会残留旧值。
     @State private var selectedInfo: IPALibrary.AppInfo?
+    /// 已选 IPA 行图标缓存（文件页应用库同款三件套的本页份，只服务 selectedIPASummary 这一行）。
+    @State private var unsignedIcons: [String: UIImage] = [:]
+    @State private var unsignedIconsTried: Set<String> = []
+    @State private var signedIcons: [String: UIImage] = [:]
+    @State private var signedIconsTried: Set<String> = []
 
     private var certReady: Bool { hasP12 && hasProvision && !password.isEmpty }
     /// 证书组收起行缺件状态：三件（p12、描述文件、密码）缺哪件说哪件，
@@ -1417,6 +1422,53 @@ struct EnterpriseCertView: View {
                     .foregroundStyle(.red)
             }
         }
+    }
+
+    private func libraryIcon(for path: String, signed: Bool) -> some View {
+        if let image = signed ? signedIcons[path] : unsignedIcons[path] {
+            Image(uiImage: image)
+                .resizable()
+                .frame(width: 60, height: 60)
+                .cornerRadius(13)
+        } else {
+            RoundedRectangle(cornerRadius: 13)
+                .fill(Color.secondary.opacity(0.15))
+                .frame(width: 60, height: 60)
+        }
+    }
+
+    /// 行内图标加载（只取可见行，行 .task 触发）：key 已尝试直接跳过
+    /// （含取失败，不重复解包）；文件变了 key 就变，先清旧图再取，
+    /// 不让旧图标冒充新文件。解包只取图标文件，不整包解压。
+    private func loadLibraryIcon(for path: String, signed: Bool) {
+        let key = "\(path)#\(iconFingerprint(for: path))"
+        if signed {
+            guard !signedIconsTried.contains(key) else { return }
+            signedIconsTried.insert(key)
+            signedIcons[path] = nil
+        } else {
+            guard !unsignedIconsTried.contains(key) else { return }
+            unsignedIconsTried.insert(key)
+            unsignedIcons[path] = nil
+        }
+        let url = URL(fileURLWithPath: path)
+        Task.detached(priority: .userInitiated) {
+            guard let data = IPALibrary.iconData(at: url),
+                  let image = UIImage(data: data) else { return }
+            await MainActor.run {
+                if signed { self.signedIcons[path] = image }
+                else { self.unsignedIcons[path] = image }
+            }
+        }
+    }
+
+    /// 图标指纹：文件大小 + 修改时间（重签覆盖同路径时变）。
+    /// 文件没了就返回空串，key 照样唯一，不会死循环重取。
+    private func iconFingerprint(for path: String) -> String {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let size = attrs[.size] as? Int,
+              let modified = attrs[.modificationDate] as? Date else { return "" }
+        return "\(size)-\(modified.timeIntervalSince1970)"
     }
 
     private func selectedIPASummary(_ url: URL) -> some View {
