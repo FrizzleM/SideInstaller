@@ -1620,6 +1620,7 @@ private struct AppProfileDetail: View {
         exportError = nil
         Task {
             do {
+                try await certManager.ensureSignedIn()
                 let (p12Data, password) = try certManager.exportP12()
                 let tempURL = FileManager.default.temporaryDirectory
                     .appendingPathComponent("certificate.p12")

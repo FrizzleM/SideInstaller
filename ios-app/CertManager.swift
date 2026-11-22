@@ -520,6 +520,19 @@ final class CertManager: ObservableObject {
         throw EngineError.message(L("Couldn't use that certificate: %@", msg))
     }
 
+    /// Makes sure there is a live Apple sign-in session, signing in first
+    /// if needed — the same auto-login `loadCerts` and the import flow do.
+    /// Export used to just guard on the session, so opening the app detail
+    /// page without ever visiting the certificates page always failed with
+    /// "Not signed in." Throws the sign-in error itself when login fails.
+    func ensureSignedIn() async throws {
+        let id = engine.normalizedAppleID, pw = engine.applePassword
+        guard !id.isEmpty, !pw.isEmpty else {
+            throw EngineError.message(L("No Apple ID saved. Add one in Settings › Account."))
+        }
+        if session == nil { try await signIn(id: id, pw: pw) }
+    }
+
     /// Export the signing certificate as p12 (base64) + password.
     /// Returns (p12Data, password).
     func exportP12() throws -> (Data, String) {
