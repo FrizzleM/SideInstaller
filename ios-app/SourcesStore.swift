@@ -161,7 +161,11 @@ final class SourceStore: ObservableObject {
     /// shape: a missing or unreadable file just means "fetch fresh". Lets a
     /// document survive an app restart, so reopening the sources page
     /// within 15 minutes doesn't cost another download.
-    private static var sourceCacheURL: URL {
+    /// nonisolated：下面四件（URL、队列、两个 Locked helper）全在
+    /// `cacheQueue.sync` 的同步闭包里跑——闭包是非隔离上下文，@MainActor
+    /// 的成员在里面调不到；它们只碰文件 I/O、不碰 actor 状态，串行化
+    /// 由队列给，不靠 MainActor。
+    nonisolated private static var sourceCacheURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base.appendingPathComponent("sourceDocuments.json")
@@ -170,16 +174,16 @@ final class SourceStore: ObservableObject {
     /// A3+A4：磁盘缓存读写走同一条串行队列——fetchAll 并行跑多个源的 fetch，
     /// 只标 nonisolated 不够：MainActor 的序列化拿掉后，两个源的 save 会交错
     /// 读改写同一文件。队列内 helper 后缀 Locked，调用方须已在队列上。
-    private static let cacheQueue = DispatchQueue(label: "sideinstaller.source-cache")
+    nonisolated private static let cacheQueue = DispatchQueue(label: "sideinstaller.source-cache")
 
-    private static func loadSourceCacheLocked() -> [String: CachedSource] {
+    nonisolated private static func loadSourceCacheLocked() -> [String: CachedSource] {
         guard let data = try? Data(contentsOf: sourceCacheURL),
               let cached = try? JSONDecoder().decode([String: CachedSource].self, from: data)
         else { return [:] }
         return cached
     }
 
-    private static func writeSourceCacheLocked(_ cached: [String: CachedSource]) {
+    nonisolated private static func writeSourceCacheLocked(_ cached: [String: CachedSource]) {
         if let data = try? JSONEncoder().encode(cached) {
             try? data.write(to: sourceCacheURL, options: .atomic)
         }
