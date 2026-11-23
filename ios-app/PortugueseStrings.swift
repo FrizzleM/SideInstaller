@@ -1353,4 +1353,18 @@ let portugueseStrings: [String: String] = [
     "%@ (extracted)": "%@ (extraído)",
     "Source is too large": "A fonte é grande demais",
     "Folders can't be deleted": "As pastas não podem ser excluídas",
+    // SIDE-36 (0.9.125): new keys.
+    "Couldn't read this source": "Não foi possível ler esta fonte",
+    "Couldn't read the certificate list: %@": "Não foi possível ler a lista de certificados: %@",
+    "Listing certificates failed: %@": "Falha ao listar os certificados: %@",
+    "Revoke failed: %@": "Falha ao revogar: %@",
+    "Couldn't read what the import did: %@": "Não foi possível ler o resultado da importação: %@",
+    "Couldn't parse p12 export result.": "Não foi possível analisar o resultado da exportação p12.",
+    "Export failed: %@": "Falha na exportação: %@",
+    "Couldn't read the App ID list: %@": "Não foi possível ler a lista de IDs de app: %@",
+    "Listing App IDs failed: %@": "Falha ao listar os IDs de app: %@",
+    "Couldn't read Apple's reply: %@": "Não foi possível ler a resposta da Apple: %@",
+    "Enabling entitlements failed: %@": "Falha ao ativar os direitos: %@",
+    "Waiting for this install to finish…": "Aguardando esta instalação terminar…",
+    "This file is being installed. Wait until it finishes.": "Este arquivo está sendo instalado. Aguarde terminar.",
 ]

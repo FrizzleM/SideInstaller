@@ -1226,19 +1226,33 @@ enum SignedIPAStore {
         dir.appendingPathComponent(record.fileName)
     }
 
+    /// A-8（SIDE-36）：清单缓存——load() 原来每次都读盘 + 解码 +
+    /// 逐条 fileExists，文件页 / 证书页 / 续签循环各路都调；
+    /// 现在只在首次（或写失败后）读盘，其余走内存。缓存只钉
+    /// 私有 save()（本 Store 的唯一写入口：add / remove /
+    /// fillMissingCertInfo / renameFile 全经它），写回成功才更新
+    /// 缓存，写失败清缓存、下次重读盘，不拿内存冒充磁盘。
+    private static let cacheLock = NSLock()
+    private static var cachedRecords: [SignedIPARecord]?
+
     static func load() -> [SignedIPARecord] {
-        guard let data = try? Data(contentsOf: manifestURL),
-              let records = try? JSONDecoder().decode([SignedIPARecord].self, from: data)
-        else { return [] }
+        let records: [SignedIPARecord] = {
+            cacheLock.lock()
+            defer { cacheLock.unlock() }
+            if let cached = cachedRecords { return cached }
+            let loaded = loadRaw()
+            cachedRecords = loaded
+            return loaded
+        }()
         return records
             .filter { FileManager.default.fileExists(atPath: url(for: $0).path) }
             .sorted { $0.date > $1.date }
     }
 
-    /// 未过滤的原单：只给保存用。load() 按文件存在过滤，拿它
-    /// 当保存底本会把“移出 Signed 目录”的记录永久抹掉（文件
-    /// 移回来也找不回）；显示层继续用 load()，移走的文件本
-    /// 来就不该显示，但记录要留着等人移回来。
+    /// 未过滤的原单：保存的底本 + load() 首次读盘的来源（A-8 缓存）。
+    /// load() 按文件存在过滤，拿它当保存底本会把“移出 Signed 目录”
+    /// 的记录永久抹掉（文件移回来也找不回）；显示层继续用 load()，
+    /// 移走的文件本来就不该显示，但记录要留着等人移回来。
     static func loadRaw() -> [SignedIPARecord] {
         guard let data = try? Data(contentsOf: manifestURL),
               let records = try? JSONDecoder().decode([SignedIPARecord].self, from: data)
@@ -1247,8 +1261,17 @@ enum SignedIPAStore {
     }
 
     private static func save(_ records: [SignedIPARecord]) {
-        if let data = try? JSONEncoder().encode(records) {
-            try? data.write(to: manifestURL, options: .atomic)
+        do {
+            let data = try JSONEncoder().encode(records)
+            try data.write(to: manifestURL, options: .atomic)
+            cacheLock.lock()
+            defer { cacheLock.unlock() }
+            cachedRecords = records
+        } catch {
+            // 写失败：清缓存，下次 load() 重读盘，不拿内存冒充磁盘。
+            cacheLock.lock()
+            defer { cacheLock.unlock() }
+            cachedRecords = nil
         }
     }
 

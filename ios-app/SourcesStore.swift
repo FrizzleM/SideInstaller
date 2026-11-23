@@ -252,7 +252,14 @@ final class SourceStore: ObservableObject {
             throw NSError(domain: "SourceStore", code: -1,
                           userInfo: [NSLocalizedDescriptionKey: L("Source is too large")])
         }
-        return try JSONDecoder().decode(AltSource.self, from: data)
+        // C-4：解码失败不再透传 DecodingError 的技术原串——行上只说
+        // 读不出这个源；网络错（URLError）与 HTTP 状态码走原路，不动。
+        do {
+            return try JSONDecoder().decode(AltSource.self, from: data)
+        } catch is DecodingError {
+            throw NSError(domain: "SourceStore", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: L("Couldn't read this source")])
+        }
     }
 
     /// Fetch (or refetch) one source document. Within 15 minutes of the last

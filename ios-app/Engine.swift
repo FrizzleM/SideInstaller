@@ -582,14 +582,23 @@ final class Engine {
         startStatusMonitor()
         // Refresh the anisette server picker from the live community list.
         loadAnisetteServers()
-        // Reflect an IPA imported in an earlier run.
-        showCustomImport(IPALibrary.customImport()?.url)
-        // A Madeira CI build from before Madeira had channels is its nightly.
-        IPALibrary.moveMadeiraCIBuildsToNightly()
         // What's installed may have changed while the app was away.
         NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
                                                object: nil, queue: .main) { [weak self] _ in
             self?.foregroundVisits += 1
+        }
+        // A-11：启动时三件磁盘活（自定义导入读盘 + 源识别 + Madeira CI
+        // 搬家）移出主线程——以前在 init 里同步跑，进页第一帧就卡；
+        // 算完回主线程一次写回。showCustomImport 的 build 参数接
+        // 预计算值，不再主线程上重读 zip。
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            let customURL = IPALibrary.customImport()?.url
+            let build = customURL.flatMap { IPALibrary.knownSource(ofIPAAt: $0) }
+            IPALibrary.moveMadeiraCIBuildsToNightly()
+            await MainActor.run {
+                self.showCustomImport(customURL, build: build)
+            }
         }
     }
 
@@ -1806,6 +1815,24 @@ final class Engine {
         return "\(source.displayName) \(version.title)"
     }
 
+    /// B-8（SIDE-36）：这个路径（或它的祖先目录）是不是正在安装的源文件——
+    /// 文件页删 / 改名 / 移走它会打断签名步。判据：
+    /// downloadedIPAPath 是管线记下的源路径；下载步还没跑到的窗口
+    /// （配对 / 登录阶段）用自定义源兜底：仅 installSource == .custom
+    /// 时比对当前导入文件。没在跑就不拦；祖先目录用 path + "/" 前缀，
+    /// 不用裸 hasPrefix（Foo.ipa 与 Foo.ipa2 会撞车）。
+    func isInstallingSource(path: String) -> Bool {
+        guard isRunning else { return false }
+        if let installing = downloadedIPAPath,
+           installing == path || installing.hasPrefix(path + "/") {
+            return true
+        }
+        guard installSource == .custom,
+              let custom = IPALibrary.customImport()?.url.path,
+              custom == path || custom.hasPrefix(path + "/") else { return false }
+        return true
+    }
+
     /// Point the rest of the pipeline at an IPA on disk, whatever its origin.
     @MainActor
     private func adopt(_ url: URL, source: InstallSource, channel: ReleaseChannel,
@@ -2090,9 +2117,11 @@ final class Engine {
 
     /// Shows the custom import at `url`, or none, on the Install tab: its name,
     /// and the build of SideInstaller's own it is.
-    private func showCustomImport(_ url: URL?) {
+    /// A-11：build 参数接启动时预计算的源识别值；不传时照旧现算
+    /// （导入完成 / 刷新走的老路，不动）。
+    private func showCustomImport(_ url: URL?, build: InstallSource? = nil) {
         customIPAName = url?.lastPathComponent
-        customIPABuild = url.flatMap(IPALibrary.knownSource(ofIPAAt:))
+        customIPABuild = build ?? url.flatMap(IPALibrary.knownSource(ofIPAAt:))
     }
 
     /// Log the way past a failed download: rename a stray IPA, or fetch one

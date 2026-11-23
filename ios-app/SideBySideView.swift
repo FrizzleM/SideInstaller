@@ -2787,7 +2787,9 @@ struct SideBySideView: View {
 
     /// The header says the run stopped, so then the card says where.
     private var progressTitle: String {
-        if manager.isCancelling { return L("Cancelling") }
+        // B-5：取消安装不是立刻停——要等设备上正在跑的安装收尾，
+        // 文案说清在等，别让用户以为点取消没反应。
+        if manager.isCancelling { return L("Waiting for this install to finish…") }
         let steps = manager.runSteps
         if let failed = steps.firstIndex(where: { manager.stepStates[$0] == .failed }) {
             return L("Step %@ of %@", "\(failed + 1)", "\(steps.count)")

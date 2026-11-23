@@ -386,12 +386,14 @@ final class EntitlementsManager: ObservableObject {
             do {
                 return try JSONDecoder().decode([AppIdentifier].self, from: Data(s.utf8))
             } catch {
-                throw EngineError.message("Couldn't read the App ID list: \(error)")
+                // C-5：App ID 列表读失败的原串进 L()，给翻译表留位置；
+                // error 原文作 %@ 参数，不改写。
+                throw EngineError.message(L("Couldn't read the App ID list: %@", "\(error)"))
             }
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message("Listing App IDs failed: \(msg)")
+            throw EngineError.message(L("Listing App IDs failed: %@", msg))
         }
     }
 
@@ -406,12 +408,13 @@ final class EntitlementsManager: ObservableObject {
             do {
                 return try JSONDecoder().decode([EntitlementOutcome].self, from: Data(s.utf8))
             } catch {
-                throw EngineError.message("Couldn't read Apple's reply: \(error)")
+                // C-5：同上。
+                throw EngineError.message(L("Couldn't read Apple's reply: %@", "\(error)"))
             }
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message("Enabling entitlements failed: \(msg)")
+            throw EngineError.message(L("Enabling entitlements failed: %@", msg))
         }
     }
 

@@ -1331,4 +1331,18 @@ let koreanStrings: [String: String] = [
     "%@ (extracted)": "%@ (압축 해제됨)",
     "Source is too large": "소스가 너무 큽니다",
     "Folders can't be deleted": "폴더는 삭제할 수 없습니다",
+    // SIDE-36 (0.9.125): new keys.
+    "Couldn't read this source": "이 소스를 읽지 못했습니다",
+    "Couldn't read the certificate list: %@": "인증서 목록을 읽지 못했습니다: %@",
+    "Listing certificates failed: %@": "인증서 목록을 가져오지 못했습니다: %@",
+    "Revoke failed: %@": "해지에 실패했습니다: %@",
+    "Couldn't read what the import did: %@": "가져오기 결과를 읽지 못했습니다: %@",
+    "Couldn't parse p12 export result.": "p12 내보내기 결과를 분석하지 못했습니다.",
+    "Export failed: %@": "내보내기에 실패했습니다: %@",
+    "Couldn't read the App ID list: %@": "App ID 목록을 읽지 못했습니다: %@",
+    "Listing App IDs failed: %@": "App ID 목록을 가져오지 못했습니다: %@",
+    "Couldn't read Apple's reply: %@": "Apple의 응답을 읽지 못했습니다: %@",
+    "Enabling entitlements failed: %@": "권한을 활성화하지 못했습니다: %@",
+    "Waiting for this install to finish…": "이번 설치가 끝나기를 기다리는 중…",
+    "This file is being installed. Wait until it finishes.": "이 파일은 설치 중입니다. 끝날 때까지 기다리세요.",
 ]

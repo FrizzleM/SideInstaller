@@ -1330,4 +1330,18 @@ let japaneseStrings: [String: String] = [
     "%@ (extracted)": "%@（展開済み）",
     "Source is too large": "ソースが大きすぎます",
     "Folders can't be deleted": "フォルダは削除できません",
+    // SIDE-36 (0.9.125): new keys.
+    "Couldn't read this source": "このソースを読み取れませんでした",
+    "Couldn't read the certificate list: %@": "証明書の一覧を読み取れませんでした：%@",
+    "Listing certificates failed: %@": "証明書の一覧の取得に失敗しました：%@",
+    "Revoke failed: %@": "失効に失敗しました：%@",
+    "Couldn't read what the import did: %@": "インポート結果を読み取れませんでした：%@",
+    "Couldn't parse p12 export result.": "p12 書き出し結果を解析できませんでした。",
+    "Export failed: %@": "書き出しに失敗しました：%@",
+    "Couldn't read the App ID list: %@": "App ID の一覧を読み取れませんでした：%@",
+    "Listing App IDs failed: %@": "App ID の一覧の取得に失敗しました：%@",
+    "Couldn't read Apple's reply: %@": "Apple の返信を読み取れませんでした：%@",
+    "Enabling entitlements failed: %@": "エンタイトルメントの有効化に失敗しました：%@",
+    "Waiting for this install to finish…": "このインストールの終了を待っています…",
+    "This file is being installed. Wait until it finishes.": "このファイルはインストール中です。終わるまで待ってください。",
 ]

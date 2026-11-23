@@ -1049,7 +1049,9 @@ struct ContentView: View {
 
     private var progressTitle: String {
         if engine.finished { return L("Installed") }
-        return engine.isCancelling ? L("Cancelling") : L("Installing")
+        // B-5：取消安装不是立刻停——要等设备上正在跑的安装收尾，
+        // 文案说清在等，别让用户以为点取消没反应。
+        return engine.isCancelling ? L("Waiting for this install to finish…") : L("Installing")
     }
 
     /// The X in the card's corner, which stops the run after asking. It dims

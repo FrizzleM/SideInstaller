@@ -89,6 +89,11 @@ final class DownloadsManager: ObservableObject {
     @MainActor
     func delete(_ item: DownloadedIPA) {
         guard deletingID == nil else { return }
+        // B-8：正在安装的源文件不删——删了签名步读不到文件，安装死在签名失败。
+        if engine.isInstallingSource(path: item.url.path) {
+            lastError = L("This file is being installed. Wait until it finishes.")
+            return
+        }
         deletingID = item.id
         lastError = nil
         do {
@@ -131,7 +136,15 @@ struct DownloadsListView: View {
                     .font(.caption)
                     .foregroundStyle(Theme.negative)
             }
-            if manager.hasLoaded && manager.downloads.isEmpty {
+            // UI-4：没扫完先给加载行，别让列表空白看着像没东西。
+            if !manager.hasLoaded {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text(L("Loading…"))
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.muted)
+                }
+            } else if manager.downloads.isEmpty {
                 Text(L("No downloaded IPAs. Ones you install from a source or a file are cached here."))
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
@@ -144,6 +157,7 @@ struct DownloadsListView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.displayName)
                                 .font(.subheadline.weight(.medium))
+                                .lineLimit(1)
                             if let modified = item.modified {
                                 let when = modified.formatted(
                                     Date.FormatStyle(date: .abbreviated, time: .shortened)

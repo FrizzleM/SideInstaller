@@ -1360,4 +1360,18 @@ let vietnameseStrings: [String: String] = [
     "%@ (extracted)": "%@ (đã giải nén)",
     "Source is too large": "Nguồn quá lớn",
     "Folders can't be deleted": "Không thể xóa thư mục",
+    // SIDE-36 (0.9.125): new keys.
+    "Couldn't read this source": "Không đọc được nguồn này",
+    "Couldn't read the certificate list: %@": "Không đọc được danh sách chứng chỉ: %@",
+    "Listing certificates failed: %@": "Liệt kê chứng chỉ thất bại: %@",
+    "Revoke failed: %@": "Thu hồi thất bại: %@",
+    "Couldn't read what the import did: %@": "Không đọc được kết quả nhập: %@",
+    "Couldn't parse p12 export result.": "Không phân tích được kết quả xuất p12.",
+    "Export failed: %@": "Xuất thất bại: %@",
+    "Couldn't read the App ID list: %@": "Không đọc được danh sách App ID: %@",
+    "Listing App IDs failed: %@": "Liệt kê App ID thất bại: %@",
+    "Couldn't read Apple's reply: %@": "Không đọc được phản hồi của Apple: %@",
+    "Enabling entitlements failed: %@": "Bật quyền thất bại: %@",
+    "Waiting for this install to finish…": "Đang chờ lần cài đặt này hoàn tất…",
+    "This file is being installed. Wait until it finishes.": "Tệp này đang được cài đặt. Hãy chờ cho đến khi xong.",
 ]

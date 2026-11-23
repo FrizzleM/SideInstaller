@@ -146,7 +146,6 @@ struct SourcesView: View {
             TextField(L("搜索"), text: $sourceSearchText)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-                .multilineTextAlignment(.center)
         }
         .padding(8)
         .background(Color.secondary.opacity(0.12))
@@ -387,7 +386,6 @@ struct SourceAppsView: View {
             TextField(L("搜索"), text: $appSearchText)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-                .multilineTextAlignment(.center)
         }
         .padding(8)
         .background(Color.secondary.opacity(0.12))

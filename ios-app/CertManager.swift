@@ -534,12 +534,14 @@ final class CertManager: ObservableObject {
             do {
                 return try JSONDecoder().decode([DevCert].self, from: Data(s.utf8))
             } catch {
-                throw EngineError.message("Couldn't read the certificate list: \(error)")
+                // C-5：证书列表读失败的原串进 L()，给翻译表留位置；
+                // error 原文作 %@ 参数，不改写。
+                throw EngineError.message(L("Couldn't read the certificate list: %@", "\(error)"))
             }
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message("Listing certificates failed: \(msg)")
+            throw EngineError.message(L("Listing certificates failed: %@", msg))
         }
     }
 
@@ -550,7 +552,7 @@ final class CertManager: ObservableObject {
         if rc != 0 {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message("Revoke failed: \(msg)")
+            throw EngineError.message(L("Revoke failed: %@", msg))
         }
     }
 
@@ -574,7 +576,8 @@ final class CertManager: ObservableObject {
             do {
                 return try JSONDecoder().decode(CertImportResult.self, from: Data(s.utf8))
             } catch {
-                throw EngineError.message("Couldn't read what the import did: \(error)")
+                // C-5：同上。
+                throw EngineError.message(L("Couldn't read what the import did: %@", "\(error)"))
             }
         }
         let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
@@ -621,13 +624,14 @@ final class CertManager: ObservableObject {
                   let b64 = obj["p12_b64"],
                   let password = obj["password"],
                   let p12Data = Data(base64Encoded: b64) else {
-                throw EngineError.message("Couldn't parse p12 export result.")
+                // C-5：p12 导出结果解析失败的文案进 L()。
+                throw EngineError.message(L("Couldn't parse p12 export result."))
             }
             return (p12Data, password)
         } else {
             let msg = outError.map { String(cString: $0) } ?? "rc=\(rc)"
             outError.map { si_string_free($0) }
-            throw EngineError.message("Export failed: \(msg)")
+            throw EngineError.message(L("Export failed: %@", msg))
         }
     }
 

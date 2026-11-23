@@ -43,16 +43,10 @@ enum AppFileLibrary {
             let values = try? url.resourceValues(
                 forKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey])
             let isDirectory = values?.isDirectory == true
-            let rel = url.path.replacingOccurrences(of: root.path + "/", with: "")
+            // A-6：相对路径不用 replacingOccurrences 全串扫描——
+            // 枚举出的 url 一定以 root.path + "/" 开头，直接按前缀长切。
+            let rel = String(url.path.dropFirst(root.path.count + 1))
             let dir = (rel as NSString).deletingLastPathComponent
-            // 文件夹数直接子项（不含隐藏项），文件恒为 0。
-            let childCount: Int
-            if isDirectory {
-                let children = (try? fm.contentsOfDirectory(atPath: url.path)) ?? []
-                childCount = children.filter { !$0.hasPrefix(".") }.count
-            } else {
-                childCount = 0
-            }
             items.append(LocalFileItem(
                 url: url,
                 name: url.lastPathComponent,
@@ -60,7 +54,27 @@ enum AppFileLibrary {
                 size: values?.fileSize ?? 0,
                 modified: values?.contentModificationDate,
                 isDirectory: isDirectory,
-                childCount: childCount))
+                childCount: 0))
+        }
+        // A-6：childCount 不再每目录多一次 listing——枚举时顺带累计：
+        // 每个条目的 relativeDir 就是它所属目录的相对路径，计数一次
+        // 即得全部目录的直接子项数；枚举器已跳过隐藏项，与旧算法
+        // （contentsOfDirectory 后滤掉 . 开头）数出来一致。
+        var childCounts: [String: Int] = [:]
+        for item in items {
+            childCounts[item.relativeDir, default: 0] += 1
+        }
+        items = items.map { item in
+            guard item.isDirectory else { return item }
+            let ownRel = item.relativeDir.isEmpty ? item.name : "\(item.relativeDir)/\(item.name)"
+            return LocalFileItem(
+                url: item.url,
+                name: item.name,
+                relativeDir: item.relativeDir,
+                size: item.size,
+                modified: item.modified,
+                isDirectory: true,
+                childCount: childCounts[ownRel] ?? 0)
         }
         return items.sorted { ($0.modified ?? .distantPast) > ($1.modified ?? .distantPast) }
     }
@@ -101,6 +115,9 @@ struct FilesTabView: View {
     /// 路径#大小#修改时间，文件换了就重取，不死循环重试）。
     @State private var fileIcons: [String: UIImage] = [:]
     @State private var fileIconsTried: Set<String> = []
+    /// A-5(c)：文件行图标的批量写回（loadFileIcon 攒 50ms 合并一次写回，
+    /// 不再每张图各触发一次整页 body 求值；懒建，首次加载时立）。
+    @State private var fileIconBatcher: BatchWriteback<String, UIImage>?
     /// Declared so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @EnvironmentObject private var workspace: CertWorkspace
@@ -137,6 +154,8 @@ struct FilesTabView: View {
     /// 解析一次；键带大小 + 修改时间，文件换了就重解析。
     @State private var fileIPAInfo: [String: IPALibrary.AppInfo] = [:]
     @State private var fileIPAInfoTried: Set<String> = []
+    /// A-5(c)：文件行信息的批量写回（loadFileIPAInfo 同款，懒建）。
+    @State private var fileInfoBatcher: BatchWriteback<String, IPALibrary.AppInfo>?
     /// 续签源清单缓存（路径/包名 → 续签用的 App）：行内「续签」角标
     /// 与详情页同认；进页时读一次，不每行读盘。删文件时的提示走
     /// RenewalSourceStore.source 现读，不用这份缓存。
@@ -147,9 +166,11 @@ struct FilesTabView: View {
     @State private var pendingDeleteItem: LocalFileItem?
     /// 批量删除待确认（工具栏“删除所选”点后先弹确认，带数量）。
     @State private var pendingDeleteSelection = false
-    /// 删除失败 / 文件夹禁删的可见提示（B-3：只写页尾 opMessage 顶部看不到，
-    /// 再加一条 alert；B-2 的禁删提示复用同一状态）。
-    @State private var deleteErrorMessage: String?
+    /// 通用失败提示（UI-5：由 B-3 的删除失败 alert 泛化而来——页尾 opMessage
+    /// 在列表底下，顶部看不到，任何失败都可经这条 alert 可见；
+    /// UI-2(b)：opMessage 的 .onChange 里 opFailed == true 时也会把
+    /// opMessage 写到这里（不逐个改写各失败写入点）。
+    @State private var opErrorMessage: String?
     /// 当前进的文件夹（相对 Documents 的路径，"" = 根目录）：
     /// 点文件夹行就进，返回条回上级；删了当前文件夹就回根目录。
     @State private var currentDir = ""
@@ -205,6 +226,10 @@ struct FilesTabView: View {
     @State private var unsignedIconsTried: Set<String> = []
     @State private var signedIcons: [String: UIImage] = [:]
     @State private var signedIconsTried: Set<String> = []
+    /// A-5(c)：应用库图标的批量写回（loadLibraryIcon 同款，已签名 /
+    /// 未签名各一台，懒建）。
+    @State private var librarySignedIconBatcher: BatchWriteback<String, UIImage>?
+    @State private var libraryUnsignedIconBatcher: BatchWriteback<String, UIImage>?
     @State private var signedRecords = SignedIPAStore.load()
     @State private var selectingSigned = false
     @State private var selectedSignedIDs: Set<String> = []
@@ -336,6 +361,12 @@ struct FilesTabView: View {
         let key = "\(item.url.path)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)"
         guard !fileIPAInfoTried.contains(key) else { return }
         fileIPAInfoTried.insert(key)
+        // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
+        if fileInfoBatcher == nil {
+            fileInfoBatcher = BatchWriteback { batch in
+                for (path, info) in batch { self.fileIPAInfo[path] = info }
+            }
+        }
         // 显式捕获（loadFileIcon 同例）：不把整个 item 隐式带进
         // detached 任务，免得 Swift 6 并发检查找麻烦。
         Task.detached(priority: .userInitiated) { [url = item.url, path = item.url.path,
@@ -346,7 +377,7 @@ struct FilesTabView: View {
             let liveSize = attrs?[.size] as? Int
             let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
             guard liveSize == size, liveModified == modified else { return }
-            await MainActor.run { self.fileIPAInfo[path] = info }
+            await MainActor.run { self.fileInfoBatcher?.enqueue(info, for: path) }
         }
     }
 
@@ -851,6 +882,14 @@ struct FilesTabView: View {
             .scrollBounceBehavior(.basedOnSize)
             .blueTopBar()
             .navigationBarTitleDisplayMode(.inline)
+            // UI-2(b)：失败统一走顶部 alert——opMessage 一变、且本次是失败
+            // （opFailed == true），就把文案写到 opErrorMessage 里；
+            // 成功路径不触发（opFailed 为 false），静默。
+            .onChange(of: opMessage) { _, new in
+                if opFailed, let new {
+                    opErrorMessage = new
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text(L("文件列表"))
@@ -978,14 +1017,16 @@ struct FilesTabView: View {
                 Text(L("删除后无法恢复"))
             }
         }
-        // B-3：删除失败 / 文件夹禁删的可见提示（页尾 importCard 的
-        // opMessage 在列表底下，顶部看不到；失败 alert 只在删除执行后
+        // UI-5：通用失败提示（B-3 的删除失败 alert 泛化而来——页尾 importCard 的
+        // opMessage 在列表底下，顶部看不到；失败 alert 只在操作执行后
         // 才立起，此时确认 alert 已收起，不跟 B-1 的确认抢 present）。
-        .alert(deleteErrorMessage ?? "", isPresented: Binding(
-            get: { deleteErrorMessage != nil },
-            set: { if !$0 { deleteErrorMessage = nil } }
+        .alert(L("Error"), isPresented: Binding(
+            get: { opErrorMessage != nil },
+            set: { if !$0 { opErrorMessage = nil } }
         )) {
-            Button(L("OK"), role: .cancel) { deleteErrorMessage = nil }
+            Button(L("OK"), role: .cancel) { opErrorMessage = nil }
+        } message: {
+            Text(opErrorMessage ?? "")
         }
         // 点行弹出的底部动作菜单：与长按菜单同一动作集（见 fileActionButtons），
         // 适用性按行类型裁剪；查看文件位置切到该行所在的切栏 + 文件夹
@@ -1076,18 +1117,28 @@ struct FilesTabView: View {
                 // 整个循环移进 detached 任务，结束回主线程一次写回 + 重扫。
                 // L() 只在主线程调（文案格式化），detached 里只攒原始错误串。
                 Task.detached {
-                    var lastFailure: String?
+                    // B-7：攒全部失败（文件名 + 个数），不再只留最后一次——
+                    // 先坏后好的组合里，坏掉的那个文件会无声消失。
+                    var failures: [(name: String, reason: String)] = []
                     for url in urls {
                         do {
                             _ = try AppFileLibrary.importIntoDocuments(url)
-                            lastFailure = nil
                         } catch {
-                            lastFailure = error.localizedDescription
+                            failures.append((url.lastPathComponent, error.localizedDescription))
                         }
                     }
-                    let failure = lastFailure
+                    let failureText: String? = {
+                        guard !failures.isEmpty else { return nil }
+                        let first = failures[0]
+                        return "\(failures.count) 个文件，首个 \(first.name)：\(first.reason)"
+                    }()
                     await MainActor.run {
-                        importError = failure.map { L("导入失败：%@", $0) }
+                        importError = failureText.map { L("导入失败：%@", $0) }
+                        // UI-2(b)：导入失败同时走顶部 alert 通道（页尾
+                        // importCard 在列表底下）；页尾渲染保留。
+                        if let failureText {
+                            opErrorMessage = L("导入失败：%@", failureText)
+                        }
                         refreshFiles()
                     }
                 }
@@ -1375,16 +1426,23 @@ struct FilesTabView: View {
         let key = fileIconKey(item)
         guard !fileIconsTried.contains(key) else { return }
         fileIconsTried.insert(key)
+        // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
+        if fileIconBatcher == nil {
+            fileIconBatcher = BatchWriteback { batch in
+                for (id, image) in batch { self.fileIcons[id] = image }
+            }
+        }
         Task.detached { [url = item.url, id = item.id, path = item.url.path,
                          size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
             guard let data = IPALibrary.iconData(at: url),
-                  let image = UIImage(data: data) else { return }
+                  // A-7：下采样在 detached 里做——行高 60pt，用 120×120 缩略图。
+                  let image = IPALibrary.thumbnail(from: data, maxPixelSize: 120) else { return }
             // B31-1（ECV 同款核对）：解包途中文件被替换就丢掉旧图。
             let attrs = try? FileManager.default.attributesOfItem(atPath: path)
             let liveSize = attrs?[.size] as? Int
             let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
             guard liveSize == size, liveModified == modified else { return }
-            await MainActor.run { fileIcons[id] = image }
+            await MainActor.run { self.fileIconBatcher?.enqueue(image, for: id) }
         }
     }
 
@@ -1561,8 +1619,15 @@ struct FilesTabView: View {
         // Signed 文件夹本身就是目录行，一并拦住；提示走 B-3 的 alert，
         // 不要只禁不提示。
         guard !item.isDirectory else {
-            deleteErrorMessage = L("Folders can't be deleted")
+            opErrorMessage = L("Folders can't be deleted")
             opMessage = L("Folders can't be deleted")
+            opFailed = true
+            return
+        }
+        // B-8：正在安装的源文件不删——删了签名步读不到文件，安装死在签名失败。
+        guard !engine.isInstallingSource(path: item.url.path) else {
+            opErrorMessage = L("This file is being installed. Wait until it finishes.")
+            opMessage = L("This file is being installed. Wait until it finishes.")
             opFailed = true
             return
         }
@@ -1585,7 +1650,7 @@ struct FilesTabView: View {
             opMessage = L("删除失败，文件仍在")
             opFailed = true
             // B-3：失败提示再走一条顶部可见的 alert（页尾 opMessage 在列表底下）。
-            deleteErrorMessage = L("删除失败，文件仍在")
+            opErrorMessage = L("删除失败，文件仍在")
         }
     }
 
@@ -1677,6 +1742,13 @@ struct FilesTabView: View {
             opFailed = true
             return
         }
+        // B-8：正在安装的源文件不移走——移走后签名步读不到文件。
+        guard !engine.isInstallingSource(path: item.url.path) else {
+            opErrorMessage = L("This file is being installed. Wait until it finishes.")
+            opMessage = L("This file is being installed. Wait until it finishes.")
+            opFailed = true
+            return
+        }
         do {
             try FileManager.default.moveItem(at: item.url, to: dest)
             refreshFiles(resetDir: true)
@@ -1735,6 +1807,7 @@ struct FilesTabView: View {
     private func deleteSelection() {
         var failed = 0
         var skippedFolders = 0
+        var skippedInstalling = 0
         var hadIPA = false
         // A-2：已签名项先分区——一次 load 取出对应记录，一次批量 remove
         // （一次读清单、一次写回）；非签名项仍逐项 removeFileFromDisk。
@@ -1744,6 +1817,9 @@ struct FilesTabView: View {
         for item in files where selection.contains(item.id) {
             // B-2：文件夹跳过不删，记数后统一提示。
             if item.isDirectory { skippedFolders += 1; continue }
+            // B-8：正在安装的源文件跳过不删，记数后统一提示
+            // （与单删同动作：批量删是单删的另一入口，不另立规则）。
+            if engine.isInstallingSource(path: item.url.path) { skippedInstalling += 1; continue }
             if item.isIPA { hadIPA = true }
             if item.isInSignedDir,
                let record = signedRecords.first(where: { $0.fileName == item.name }) {
@@ -1770,12 +1846,17 @@ struct FilesTabView: View {
             opMessage = L("有 %d 个文件删除失败", failed)
             opFailed = true
             // B-3：失败提示再走一条顶部可见的 alert。
-            deleteErrorMessage = L("有 %d 个文件删除失败", failed)
+            opErrorMessage = L("有 %d 个文件删除失败", failed)
         } else if skippedFolders > 0 {
             // B-2：只跳过了文件夹、其余全删干净时，也要可见地报一句。
             opMessage = L("Folders can't be deleted")
             opFailed = true
-            deleteErrorMessage = L("Folders can't be deleted")
+            opErrorMessage = L("Folders can't be deleted")
+        } else if skippedInstalling > 0 {
+            // B-8：只跳过了正在安装的文件、其余全删干净时，也要可见地报一句。
+            opMessage = L("This file is being installed. Wait until it finishes.")
+            opFailed = true
+            opErrorMessage = L("This file is being installed. Wait until it finishes.")
         }
     }
 
@@ -1795,6 +1876,14 @@ struct FilesTabView: View {
     private func performRename() {
         guard let item = renameItem else { return }
         renameItem = nil
+        // B-8：正在安装的源文件不改名——改名框先收起（renameItem = nil 在前），
+        // 再立失败 alert，不跟改名框抢 present。
+        guard !engine.isInstallingSource(path: item.url.path) else {
+            opErrorMessage = L("This file is being installed. Wait until it finishes.")
+            opMessage = L("This file is being installed. Wait until it finishes.")
+            opFailed = true
+            return
+        }
         var newName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !newName.isEmpty, newName != item.name,
               !newName.contains("/"), !newName.hasPrefix(".") else { return }
@@ -1987,8 +2076,15 @@ struct FilesTabView: View {
         .alert(L("删除这个已签名 IPA？"), isPresented: $showingDeleteConfirm) {
             Button(L("Delete"), role: .destructive) {
                 if let record = recordPendingDelete {
-                    SignedIPAStore.remove(record)
-                    signedRecords = SignedIPAStore.load()
+                    // B-8：正在安装的已签名 IPA 不删——删了签名步读不到文件。
+                    if engine.isInstallingSource(path: SignedIPAStore.url(for: record).path) {
+                        opErrorMessage = L("This file is being installed. Wait until it finishes.")
+                        opMessage = L("This file is being installed. Wait until it finishes.")
+                        opFailed = true
+                    } else {
+                        SignedIPAStore.remove(record)
+                        signedRecords = SignedIPAStore.load()
+                    }
                 }
                 recordPendingDelete = nil
             }
@@ -2001,10 +2097,26 @@ struct FilesTabView: View {
         .alert(L("删除选中的已签名 IPA？"), isPresented: $showingBatchDeleteConfirm) {
             Button(L("Delete"), role: .destructive) {
                 let targets = signedRecords.filter { selectedSignedIDs.contains($0.id) }
-                SignedIPAStore.remove(targets)
+                // B-8：正在安装的跳过不删（与单删同动作），其余照常删。
+                var blocked = false
+                let deletable = targets.filter { record in
+                    if engine.isInstallingSource(path: SignedIPAStore.url(for: record).path) {
+                        blocked = true
+                        return false
+                    }
+                    return true
+                }
+                if !deletable.isEmpty {
+                    SignedIPAStore.remove(deletable)
+                }
                 signedRecords = SignedIPAStore.load()
                 selectedSignedIDs.removeAll()
                 selectingSigned = false
+                if blocked {
+                    opErrorMessage = L("This file is being installed. Wait until it finishes.")
+                    opMessage = L("This file is being installed. Wait until it finishes.")
+                    opFailed = true
+                }
             }
             Button(L("Cancel"), role: .cancel) {}
         } message: {
@@ -2500,21 +2612,37 @@ struct FilesTabView: View {
             guard !signedIconsTried.contains(key) else { return }
             signedIconsTried.insert(key)
             signedIcons[path] = nil
+            // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
+            if librarySignedIconBatcher == nil {
+                librarySignedIconBatcher = BatchWriteback { batch in
+                    for (path, image) in batch { self.signedIcons[path] = image }
+                }
+            }
         } else {
             guard !unsignedIconsTried.contains(key) else { return }
             unsignedIconsTried.insert(key)
             unsignedIcons[path] = nil
+            if libraryUnsignedIconBatcher == nil {
+                libraryUnsignedIconBatcher = BatchWriteback { batch in
+                    for (path, image) in batch { self.unsignedIcons[path] = image }
+                }
+            }
         }
         let url = URL(fileURLWithPath: path)
         Task.detached(priority: .userInitiated) { [key] in
             guard let data = IPALibrary.iconData(at: url),
-                  let image = UIImage(data: data) else { return }
+                  // A-7：下采样在 detached 里做——行高 60pt，用 120×120 缩略图。
+                  let image = IPALibrary.thumbnail(from: data, maxPixelSize: 120) else { return }
+            // A-12：C30 核对从 MainActor.run 里移出来——attributesOfItem 磁盘 stat
+            // 在 detached 里做，解码途中文件被替换、key 已变时丢掉旧图；新 key 的
+            // 任务会重取，不钉住错图。MainActor.run 内只剩批量写回。
+            guard "\(path)#\(self.iconFingerprint(for: path))" == key else { return }
             await MainActor.run {
-                // C30（B12-6 同款核对）：解码途中文件被替换、key 已变
-                // 时丢掉旧图；新 key 的任务会重取，不钉住错图。
-                guard "\(path)#\(self.iconFingerprint(for: path))" == key else { return }
-                if signed { self.signedIcons[path] = image }
-                else { self.unsignedIcons[path] = image }
+                if signed {
+                    self.librarySignedIconBatcher?.enqueue(image, for: path)
+                } else {
+                    self.libraryUnsignedIconBatcher?.enqueue(image, for: path)
+                }
             }
         }
     }

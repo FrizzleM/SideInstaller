@@ -1,6 +1,7 @@
 import Compression
 import CryptoKit
 import Foundation
+import UIKit
 
 /// Which release track to pull the IPA from.
 enum ReleaseChannel: String, CaseIterable, Identifiable, Codable {
@@ -2120,12 +2121,18 @@ extension IPALibrary {
     private static let appInfoLock = NSLock()
     private static var appInfoCache: [String: AppInfo] = [:]
 
-    /// A-4：iconData 的缓存（与 A8 的 appInfoCache 同款）——键复用
+    /// A-4/A-10：iconData 的缓存（与 A8 的 appInfoCache 同款）——键复用
     /// fileFingerprint（路径 + 大小 + 修改时间），文件换了键变旧条目
     /// 自然失效；缓存 Data 不缓存 UIImage（解码仍在各调用方做）。
-    /// 与 appInfoCache 各用一把锁，互不串扰。
-    private static let iconDataLock = NSLock()
-    private static var iconDataCache: [String: Data] = [:]
+    /// A-10：字典 + 手工锁改 NSCache，按 cost 记字节数、上限 64MB，
+    /// 系统内存紧张时自动逐出（逐出后下次访问重解，zip 解析本身便宜）；
+    /// NSCache 自带线程安全，不再另加锁。AppInfo 是结构体、进不了
+    /// NSCache，appInfoCache 不动。
+    private static let iconDataCache: NSCache<NSString, NSData> = {
+        let cache = NSCache<NSString, NSData>()
+        cache.totalCostLimit = 64 * 1024 * 1024
+        return cache
+    }()
 
     /// A-4/A-5：文件指纹（路径 # 大小 @ 修改时间秒），文件已删时 nil。
     /// A8 的缓存键、选包脱壳复用、补团队号 tried 集三处共用同一格式。
@@ -2181,19 +2188,37 @@ extension IPALibrary {
     /// 5.0.0 both carry loose AppIcon60x60@2x.png in the .app root.
     /// A-4：先查缓存再解（与 appInfo(at:) 同款：查一次、解完再按
     /// 当时指纹存一次）；指纹取不到（文件已删）时不缓存。
+    /// A-10：缓存本体是 NSCache，cost 按字节数记。
     static func iconData(at url: URL) -> Data? {
-        if let key = fileFingerprint(of: url) {
-            iconDataLock.lock()
-            defer { iconDataLock.unlock() }
-            if let cached = iconDataCache[key] { return cached }
+        if let key = fileFingerprint(of: url),
+           let cached = iconDataCache.object(forKey: key as NSString) {
+            return cached as Data
         }
         guard let data = parseIconData(at: url) else { return nil }
         if let key = fileFingerprint(of: url) {
-            iconDataLock.lock()
-            defer { iconDataLock.unlock() }
-            iconDataCache[key] = data
+            iconDataCache.setObject(data as NSData, forKey: key as NSString, cost: data.count)
         }
         return data
+    }
+
+    /// A-7（SIDE-36）：把图标 Data 解成指定边长的缩略图再显示——
+    /// UIImage(data:) 是惰性解码，首次绘制才在主线程解全尺寸图；
+    /// 这里在 detached 任务里先画进位图上下文解掉，@State 里只留缩略图。
+    /// 长边超过 maxPixelSize 才缩小，小图原样返回；解不出返回 nil，
+    /// 调用方显示中性占位，不造假图。行高 60pt 用 120、44pt 用 88、
+    /// 52pt 用 104（@2x 像素数，见各 load* 调用点）。
+    static func thumbnail(from data: Data, maxPixelSize: CGFloat) -> UIImage? {
+        guard let image = UIImage(data: data) else { return nil }
+        let longest = max(image.size.width, image.size.height)
+        guard longest > maxPixelSize else { return image }
+        let scale = maxPixelSize / longest
+        let target = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        return UIGraphicsImageRenderer(size: target, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: target))
+        }
     }
 
     private static func parseIconData(at url: URL) -> Data? {

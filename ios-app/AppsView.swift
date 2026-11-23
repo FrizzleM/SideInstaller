@@ -1087,6 +1087,8 @@ struct AppsView: View {
     /// 单个图标条目），没配对 IPA 的行继续用虚线占位。
     @State private var rowIcons: [String: UIImage] = [:]
     @State private var rowIconsTried: Set<String> = []
+    /// A-5(c)：行图标的批量写回（loadRowIcon 同款，懒建）。
+    @State private var rowIconBatcher: BatchWriteback<String, UIImage>?
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -1428,19 +1430,26 @@ struct AppsView: View {
         guard let job = manager.refreshable.first(where: { $0.bundleID == status.app.bundleID }) else { return }
         let ipa = job.ipa
         let bundleID = status.app.bundleID
+        // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
+        if rowIconBatcher == nil {
+            rowIconBatcher = BatchWriteback { batch in
+                for (bundleID, image) in batch { self.rowIcons[bundleID] = image }
+            }
+        }
         // A-1（SIDE-33）：大小/修改时间复用 pair() 的快照，不再二次 stat；
         // 解包途中文件被替换的校验仍用快照值比对。
         let size = job.ipaSize
         let modified = job.ipaModified
         Task.detached { [ipa, bundleID, path = ipa.path, size, modified] in
             guard let data = IPALibrary.iconData(at: ipa),
-                  let image = UIImage(data: data) else { return }
+                  // A-7：下采样在 detached 里做——行高 44pt，用 88×88 缩略图。
+                  let image = IPALibrary.thumbnail(from: data, maxPixelSize: 88) else { return }
             // B31-1（ECV 同款核对）：解包途中文件被替换就丢掉旧图。
             let liveAttrs = try? FileManager.default.attributesOfItem(atPath: path)
             let liveSize = liveAttrs?[.size] as? Int
             let liveModified = (liveAttrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
             guard liveSize == size, liveModified == modified else { return }
-            await MainActor.run { rowIcons[bundleID] = image }
+            await MainActor.run { self.rowIconBatcher?.enqueue(image, for: bundleID) }
         }
     }
 
@@ -1471,6 +1480,7 @@ struct AppsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(status.app.name)
                         .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
                     // The App ID, which is what a profile is issued against —
                     // the bundle id alone doesn't say which team signed it.
                     Text(profile?.applicationIdentifier ?? status.app.applicationIdentifier ?? status.app.bundleID)
@@ -1542,6 +1552,7 @@ struct AppsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(profile.appIDName.isEmpty ? profile.bundleIdentifier : profile.appIDName)
                                 .font(.subheadline.weight(.medium))
+                                .lineLimit(1)
                             Text(profile.applicationIdentifier)
                                 .font(.caption.monospaced())
                                 .foregroundStyle(Theme.muted)

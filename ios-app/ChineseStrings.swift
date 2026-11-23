@@ -1343,4 +1343,18 @@ let chineseStrings: [String: String] = [
     "%@ (extracted)": "%@（已解压）",
     "Source is too large": "源文件过大",
     "Folders can't be deleted": "文件夹不能删除",
+    // SIDE-36 (0.9.125): new keys.
+    "Couldn't read this source": "无法读取这个源",
+    "Couldn't read the certificate list: %@": "无法读取证书列表：%@",
+    "Listing certificates failed: %@": "列出证书失败：%@",
+    "Revoke failed: %@": "吊销失败：%@",
+    "Couldn't read what the import did: %@": "无法读取导入结果：%@",
+    "Couldn't parse p12 export result.": "无法解析 p12 导出结果。",
+    "Export failed: %@": "导出失败：%@",
+    "Couldn't read the App ID list: %@": "无法读取 App ID 列表：%@",
+    "Listing App IDs failed: %@": "列出 App ID 失败：%@",
+    "Couldn't read Apple's reply: %@": "无法读取 Apple 的回复：%@",
+    "Enabling entitlements failed: %@": "启用权限失败：%@",
+    "Waiting for this install to finish…": "正在等本次安装收尾…",
+    "This file is being installed. Wait until it finishes.": "正在安装这个文件，等安装结束再操作。",
 ]

@@ -632,7 +632,19 @@ final class CrashDiagnostics: NSObject, ObservableObject, MXMetricManagerSubscri
 
     /// Loads what's saved and starts listening. Called once, at launch.
     func start() {
-        crashes = Self.load()
+        // A-11：load() 读盘 + 解码移出主线程；写回按 id 合并——
+        // start() 期间 receive(pastDiagnosticPayloads) 可能已先写进
+        // crashes，直接赋值会把刚收到的崩溃覆盖掉。
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let loaded = Self.load()
+            await MainActor.run {
+                guard let self else { return }
+                let known = Set(self.crashes.map(\.id))
+                let missing = loaded.filter { !known.contains($0.id) }
+                guard !missing.isEmpty else { return }
+                self.crashes = Self.prune(self.crashes + missing)
+            }
+        }
         MXMetricManager.shared.add(self)
         // What iOS delivered before anything was listening.
         receive(MXMetricManager.shared.pastDiagnosticPayloads)

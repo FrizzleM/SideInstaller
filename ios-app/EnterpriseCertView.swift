@@ -150,6 +150,9 @@ struct EnterpriseCertView: View {
     @State private var unsignedIconsTried: Set<String> = []
     @State private var signedIcons: [String: UIImage] = [:]
     @State private var signedIconsTried: Set<String> = []
+    /// A-5(c)：已选 IPA 行图标的批量写回（loadLibraryIcon 同款，懒建）。
+    @State private var librarySignedIconBatcher: BatchWriteback<String, UIImage>?
+    @State private var libraryUnsignedIconBatcher: BatchWriteback<String, UIImage>?
     /// 已选 IPA 图标指纹缓存（A-1）：只在 selectedIPA 变化时重算，
     /// .task(id:) 读缓存值，不再每 body 求值 stat 磁盘。
     @State private var selectedIPAFingerprint = ""
@@ -1505,18 +1508,33 @@ struct EnterpriseCertView: View {
             guard !signedIconsTried.contains(key) else { return }
             signedIconsTried.insert(key)
             signedIcons[path] = nil
+            // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
+            if librarySignedIconBatcher == nil {
+                librarySignedIconBatcher = BatchWriteback { batch in
+                    for (path, image) in batch { self.signedIcons[path] = image }
+                }
+            }
         } else {
             guard !unsignedIconsTried.contains(key) else { return }
             unsignedIconsTried.insert(key)
             unsignedIcons[path] = nil
+            if libraryUnsignedIconBatcher == nil {
+                libraryUnsignedIconBatcher = BatchWriteback { batch in
+                    for (path, image) in batch { self.unsignedIcons[path] = image }
+                }
+            }
         }
         let url = URL(fileURLWithPath: path)
         Task.detached(priority: .userInitiated) {
             guard let data = IPALibrary.iconData(at: url),
-                  let image = UIImage(data: data) else { return }
+                  // A-7：下采样在 detached 里做——行高 60pt，用 120×120 缩略图。
+                  let image = IPALibrary.thumbnail(from: data, maxPixelSize: 120) else { return }
             await MainActor.run {
-                if signed { self.signedIcons[path] = image }
-                else { self.unsignedIcons[path] = image }
+                if signed {
+                    self.librarySignedIconBatcher?.enqueue(image, for: path)
+                } else {
+                    self.libraryUnsignedIconBatcher?.enqueue(image, for: path)
+                }
             }
         }
     }
@@ -1651,7 +1669,9 @@ struct EnterpriseCertView: View {
             }
             guard decodedIconData != data else { return }
             let decoded = await Task.detached(priority: .userInitiated) {
-                UIImage(data: data)
+                // A-7：用户自选图标也在 detached 里下采样——显示 40pt，
+                // 用 80×80 缩略图；不是 IPA 内图标，是 Photos picker 选的图。
+                IPALibrary.thumbnail(from: data, maxPixelSize: 80)
             }.value
             guard mods.icon == data else { return }
             decodedIcon = decoded
@@ -1907,6 +1927,13 @@ struct EnterpriseCertView: View {
                         // 但循环内现读仍是隐患，快照后中途改值也影响不到
                         // 正在签的副本（见 S11）。
                         let startIdx = multiStart
+                        // B-9：逐个签、逐个记——某个副本失败不再让整批
+                        // 抛错白跑（旧逻辑：循环里一抛，前面签好的副本
+                        // 也不报数）；成功/失败各记一条日志，结尾按
+                        // 成功数报数，失败了也告诉用户是第几个、为什么。
+                        var ok = 0
+                        var fail = 0
+                        var firstError: String?
                         for j in 0..<multiCount {
                             let idx = startIdx + j
                             var copy = mods
@@ -1915,15 +1942,37 @@ struct EnterpriseCertView: View {
                             // 和原包同 ID，装的时候会顶掉原包，不静默造假）。
                             copy.bundleID = baseID.isEmpty ? "" : "\(baseID).\(idx)"
                             copy.outputName = "\(baseOutput) \(idx)"
-                            _ = try await CertSigner.signToFile(ipa: url, mods: copy)
+                            do {
+                                let record = try await CertSigner.signToFile(ipa: url, mods: copy)
+                                ok += 1
+                                CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
+                                    appName: record.appName, kind: .signOnly, success: true,
+                                    detail: L("已存到「已签名」")))
+                            } catch {
+                                fail += 1
+                                let message = (error as? LocalizedError)?.errorDescription
+                                    ?? String(describing: error)
+                                let friendly = friendlySignError(message)
+                                if firstError == nil { firstError = friendly }
+                                CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
+                                    appName: "\(baseName) \(idx)", kind: .signOnly, success: false,
+                                    detail: friendly))
+                            }
                         }
-                        CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
-                            appName: baseName, kind: .signOnly, success: true,
-                            detail: L("已签出 %d 个副本，存到「已签名」。", multiCount)))
-                        signOnlyMessage = L("已签出 %d 个副本，存到「应用库 → 已签名」，逐个点安装。", multiCount)
-                        localInstall.appendStepLog(L("签名成功：%@（%d 个副本）", baseName, multiCount))
-                        CZFHaptics.notification(.success)
-                        signOnlyFailed = false
+                        if fail == 0 {
+                            CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
+                                appName: baseName, kind: .signOnly, success: true,
+                                detail: L("已签出 %d 个副本，存到「已签名」。", multiCount)))
+                            signOnlyMessage = L("已签出 %d 个副本，存到「应用库 → 已签名」，逐个点安装。", multiCount)
+                            localInstall.appendStepLog(L("签名成功：%@（%d 个副本）", baseName, multiCount))
+                            CZFHaptics.notification(.success)
+                            signOnlyFailed = false
+                        } else {
+                            signOnlyMessage = L("批量签完：成功 %d 个，失败 %d 个。", ok, fail) + " " + (firstError ?? "")
+                            signOnlyFailed = true
+                            localInstall.appendStepLog(L("批量签完：成功 %d 个，失败 %d 个。", ok, fail))
+                            CZFHaptics.notification(.error)
+                        }
                     } else {
                         let record = try await CertSigner.signToFile(ipa: url, mods: mods)
                         CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
@@ -2342,6 +2391,9 @@ private struct LibraryIPAPicker: View {
     @State private var iconsTried: Set<String> = []
     @State private var infos: [String: IPALibrary.AppInfo] = [:]
     @State private var infosTried: Set<String> = []
+    /// A-5(c)：IPA 选择器行图标 / 信息的批量写回（loadIcon/loadInfo 同款，懒建）。
+    @State private var pickerIconBatcher: BatchWriteback<String, UIImage>?
+    @State private var pickerInfoBatcher: BatchWriteback<String, IPALibrary.AppInfo>?
     // 3.8.900（SIDE-4/S2）：文件列表只扫一次——原来 ipas 是计算属性，
     // query 每敲一字 → body 重算 → 全量递归扫一遍 Documents。
     // 改 @State + 下方 .task 扫一次；picker 关闭即丢弃，不跨页缓存。
@@ -2467,16 +2519,23 @@ private struct LibraryIPAPicker: View {
         let key = cacheKey(item)
         guard !iconsTried.contains(key) else { return }
         iconsTried.insert(key)
+        // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
+        if pickerIconBatcher == nil {
+            pickerIconBatcher = BatchWriteback { batch in
+                for (path, image) in batch { self.icons[path] = image }
+            }
+        }
         Task.detached { [url = item.url, path = item.url.path,
                          size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
             guard let data = IPALibrary.iconData(at: url),
-                  let image = UIImage(data: data) else { return }
+                  // A-7：下采样在 detached 里做——选择器行高 52pt，用 104×104 缩略图。
+                  let image = IPALibrary.thumbnail(from: data, maxPixelSize: 104) else { return }
             // C30（B12-6 同款核对）：解包途中文件被替换就丢掉旧图。
             let attrs = try? FileManager.default.attributesOfItem(atPath: path)
             let liveSize = attrs?[.size] as? Int
             let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
             guard liveSize == size, liveModified == modified else { return }
-            await MainActor.run { icons[path] = image }
+            await MainActor.run { self.pickerIconBatcher?.enqueue(image, for: path) }
         }
     }
 
@@ -2484,6 +2543,12 @@ private struct LibraryIPAPicker: View {
         let key = cacheKey(item)
         guard !infosTried.contains(key) else { return }
         infosTried.insert(key)
+        // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
+        if pickerInfoBatcher == nil {
+            pickerInfoBatcher = BatchWriteback { batch in
+                for (path, info) in batch { self.infos[path] = info }
+            }
+        }
         Task.detached { [url = item.url, path = item.url.path,
                          size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
             guard let info = IPALibrary.appInfo(at: url) else { return }
@@ -2492,7 +2557,7 @@ private struct LibraryIPAPicker: View {
             let liveSize = attrs?[.size] as? Int
             let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
             guard liveSize == size, liveModified == modified else { return }
-            await MainActor.run { infos[path] = info }
+            await MainActor.run { self.pickerInfoBatcher?.enqueue(info, for: path) }
         }
     }
 }

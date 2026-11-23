@@ -1278,4 +1278,18 @@ let turkishStrings: [String: String] = [
     "%@ (extracted)": "%@ (çıkarıldı)",
     "Source is too large": "Kaynak çok büyük",
     "Folders can't be deleted": "Klasörler silinemez",
+    // SIDE-36 (0.9.125): new keys.
+    "Couldn't read this source": "Bu kaynak okunamadı",
+    "Couldn't read the certificate list: %@": "Sertifika listesi okunamadı: %@",
+    "Listing certificates failed: %@": "Sertifikalar listelenemedi: %@",
+    "Revoke failed: %@": "İptal başarısız oldu: %@",
+    "Couldn't read what the import did: %@": "İçe aktarma sonucu okunamadı: %@",
+    "Couldn't parse p12 export result.": "p12 dışa aktarma sonucu ayrıştırılamadı.",
+    "Export failed: %@": "Dışa aktarma başarısız oldu: %@",
+    "Couldn't read the App ID list: %@": "App ID listesi okunamadı: %@",
+    "Listing App IDs failed: %@": "App ID'leri listelenemedi: %@",
+    "Couldn't read Apple's reply: %@": "Apple'ın yanıtı okunamadı: %@",
+    "Enabling entitlements failed: %@": "Yetkiler etkinleştirilemedi: %@",
+    "Waiting for this install to finish…": "Bu yüklemenin bitmesi bekleniyor…",
+    "This file is being installed. Wait until it finishes.": "Bu dosya yükleniyor. Bitene kadar bekleyin.",
 ]
