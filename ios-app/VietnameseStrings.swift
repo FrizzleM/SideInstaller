@@ -722,7 +722,20 @@ let vietnameseStrings: [String: String] = [
         "Chế độ nhà phát triển sẽ được bật và iPhone này khởi động lại ngay bây giờ. Sau khi mở khóa, hãy chạm Bật.",
     "An install is already running. Wait for it to finish, then try again.":
         "Đang có một lượt cài đặt chạy. Hãy đợi xong rồi thử lại.",
-    "An import is already running. Wait for it to finish, then try again.": "An import is already running. Wait for it to finish, then try again.",
+    "An import is already running. Wait for it to finish, then try again.": "Đã có một quá trình nhập đang chạy. Hãy đợi nó hoàn tất rồi thử lại.",
+    "%@ will be signed again with the Apple ID that signed it and installed over the copy on this device. It keeps its data, and its seven days start over.": "%@ sẽ được ký lại bằng ID Apple đã ký nó và cài đè lên bản sao trên thiết bị này. Dữ liệu được giữ nguyên và bảy ngày sẽ được tính lại từ đầu.",
+    "%d apps will be signed again, each with the Apple ID that signed it, and installed over the copies on this device. They keep their data, and their seven days start over.": "%d ứng dụng sẽ được ký lại, mỗi ứng dụng bằng ID Apple đã ký nó, và cài đè lên các bản sao trên thiết bị này. Dữ liệu được giữ nguyên và bảy ngày sẽ được tính lại từ đầu.",
+    "%d app here is signed under a team that matches no saved Apple ID, so it is left out. Switch to the Apple ID that signed it and sign in once, then reload, and it will join the list. Enterprise-signed apps stay excluded.": "%d ứng dụng ở đây được ký bởi một nhóm không khớp với ID Apple đã lưu nào nên bị loại khỏi danh sách. Hãy chuyển sang ID Apple đã ký nó, đăng nhập một lần rồi tải lại, ứng dụng sẽ được thêm vào danh sách. Ứng dụng ký doanh nghiệp vẫn bị loại.",
+    "%d apps here are signed under teams that match no saved Apple ID, so they are left out. Switch to the Apple ID that signed them and sign in once, then reload, and they will join the list. Enterprise-signed apps stay excluded.": "%d ứng dụng ở đây được ký bởi các nhóm không khớp với ID Apple đã lưu nào nên bị loại khỏi danh sách. Hãy chuyển sang ID Apple đã ký chúng, đăng nhập một lần rồi tải lại, các ứng dụng sẽ được thêm vào danh sách. Ứng dụng ký doanh nghiệp vẫn bị loại.",
+    "These apps were signed under %d Apple IDs, so each group is signed with its own Apple ID.": "Các ứng dụng này được ký bằng %d ID Apple nên mỗi nhóm được ký bằng ID Apple của riêng mình.",
+    "Couldn't sign in as %@ (%@). Switch to that account and refresh again.": "Không thể đăng nhập với tên %@ (%@). Hãy chuyển sang tài khoản đó rồi làm mới lại.",
+    "Skipped: no saved Apple ID matches this app's team (%@). Switch to that account and refresh again.": "Đã bỏ qua: không có ID Apple đã lưu nào khớp với nhóm của ứng dụng này (%@). Hãy chuyển sang tài khoản đó rồi làm mới lại.",
+    "Skipped: signed in as %@, but this app's team is %@. Switch to that account and refresh again.": "Đã bỏ qua: đã đăng nhập với tên %@ nhưng nhóm của ứng dụng này là %@. Hãy chuyển sang tài khoản đó rồi làm mới lại.",
+    "Refreshing %@ as %@": "Đang gia hạn %@ với tên %@",
+    "Invalid device IP": "IP thiết bị không hợp lệ",
+    "The address was invalid, reset to 10.7.0.1.": "Địa chỉ không hợp lệ, đã đặt lại thành 10.7.0.1.",
+    "Bundle Identifier": "Mã định danh gói",
+    "rpath": "rpath",
     "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
         "iOS chỉ bật Chế độ nhà phát triển từ đây khi iPhone này không có mật mã. Hãy chạm “Hiện Chế độ nhà phát triển trong Cài đặt” rồi bật nó ở đó.",
     "This iPhone didn't take the Developer Mode request: %@":

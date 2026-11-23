@@ -242,7 +242,7 @@ enum EnterpriseCertStore {
                   let pname = provisionInfo(at: oldProvision)?.name, !pname.isEmpty {
             name = pname
         } else {
-            name = L("证书")
+            name = L("Certificates")
         }
         saveProfiles([EnterpriseCertProfile(id: id, name: name)])
         UserDefaults.standard.set(id.uuidString, forKey: activeProfileIDKey)
@@ -275,7 +275,13 @@ enum EnterpriseCertStore {
     /// 当前激活 profile：记的 id 找不着（删激活后已回落过、
     /// 或 index 被外改）就回落到第一个；一个没有就 nil。
     static func activeProfile() -> EnterpriseCertProfile? {
-        let all = profiles()
+        activeProfile(profiles: profiles())
+    }
+
+    /// 同上，但用调用方已读好的列表，不再重读一次（见
+    /// EnterpriseCertView.refreshCertState 的一次读三遍修法）。
+    static func activeProfile(profiles: [EnterpriseCertProfile]) -> EnterpriseCertProfile? {
+        let all = profiles
         if let id = activeProfileIDValue, let found = all.first(where: { $0.id == id }) { return found }
         return all.first
     }
@@ -443,8 +449,15 @@ enum EnterpriseCertStore {
     /// 证书材料指纹（A1+A2）：激活 p12 + 激活描述文件 + 各 profile 描述文件
     /// 的大小与修改时间；变了才重解析（见 EnterpriseCertView.refreshCertState）。
     static func certStateFingerprint() -> String {
+        certStateFingerprint(profiles: profiles())
+    }
+
+    /// 同上，但用调用方已读好的列表，不再重读一次（见
+    /// EnterpriseCertView.refreshCertState 的一次读三遍修法）。
+    /// 指纹格式与无参版完全一致。
+    static func certStateFingerprint(profiles: [EnterpriseCertProfile]) -> String {
         var urls = [p12URL, provisionURL]
-        urls += profiles().map { profileDir(for: $0).appendingPathComponent("profile.mobileprovision") }
+        urls += profiles.map { profileDir(for: $0).appendingPathComponent("profile.mobileprovision") }
         return urls.map { url in
             guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
                   let size = attrs[.size] as? Int,

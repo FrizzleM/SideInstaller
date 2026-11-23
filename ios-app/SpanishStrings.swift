@@ -725,7 +725,20 @@ let spanishStrings: [String: String] = [
         "El Modo desarrollador se va a activar y este iPhone se reinicia ahora. Cuando lo desbloquees, toca Activar.",
     "An install is already running. Wait for it to finish, then try again.":
         "Ya hay una instalación en curso. Espera a que termine y vuelve a intentarlo.",
-    "An import is already running. Wait for it to finish, then try again.": "An import is already running. Wait for it to finish, then try again.",
+    "An import is already running. Wait for it to finish, then try again.": "Ya hay una importación en curso. Espera a que termine e inténtalo de nuevo.",
+    "%@ will be signed again with the Apple ID that signed it and installed over the copy on this device. It keeps its data, and its seven days start over.": "%@ se firmará de nuevo con el ID de Apple que lo firmó y se instalará sobre la copia de este dispositivo. Conserva sus datos y sus siete días empiezan de nuevo.",
+    "%d apps will be signed again, each with the Apple ID that signed it, and installed over the copies on this device. They keep their data, and their seven days start over.": "%d apps se firmarán de nuevo, cada una con el ID de Apple que la firmó, y se instalarán sobre las copias de este dispositivo. Conservan sus datos y sus siete días empiezan de nuevo.",
+    "%d app here is signed under a team that matches no saved Apple ID, so it is left out. Switch to the Apple ID that signed it and sign in once, then reload, and it will join the list. Enterprise-signed apps stay excluded.": "%d app de aquí está firmada por un equipo que no corresponde a ningún ID de Apple guardado, por lo que queda fuera. Cambia al ID de Apple que la firmó, inicia sesión una vez y vuelve a cargar; se añadirá a la lista. Las apps firmadas por empresa siguen excluidas.",
+    "%d apps here are signed under teams that match no saved Apple ID, so they are left out. Switch to the Apple ID that signed them and sign in once, then reload, and they will join the list. Enterprise-signed apps stay excluded.": "%d apps de aquí están firmadas por equipos que no corresponden a ningún ID de Apple guardado, por lo que quedan fuera. Cambia al ID de Apple que las firmó, inicia sesión una vez y vuelve a cargar; se añadirán a la lista. Las apps firmadas por empresa siguen excluidas.",
+    "These apps were signed under %d Apple IDs, so each group is signed with its own Apple ID.": "Estas apps se firmaron con %d ID de Apple, por lo que cada grupo se firma con su propio ID de Apple.",
+    "Couldn't sign in as %@ (%@). Switch to that account and refresh again.": "No se pudo iniciar sesión como %@ (%@). Cambia a esa cuenta e inténtalo de nuevo.",
+    "Skipped: no saved Apple ID matches this app's team (%@). Switch to that account and refresh again.": "Omitida: ningún ID de Apple guardado corresponde al equipo de esta app (%@). Cambia a esa cuenta e inténtalo de nuevo.",
+    "Skipped: signed in as %@, but this app's team is %@. Switch to that account and refresh again.": "Omitida: sesión iniciada como %@, pero el equipo de esta app es %@. Cambia a esa cuenta e inténtalo de nuevo.",
+    "Refreshing %@ as %@": "Renovando %@ como %@",
+    "Invalid device IP": "IP del dispositivo no válida",
+    "The address was invalid, reset to 10.7.0.1.": "La dirección no era válida; se restableció a 10.7.0.1.",
+    "Bundle Identifier": "Identificador de bundle",
+    "rpath": "rpath",
     "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
         "iOS solo activa el Modo desarrollador desde aquí si este iPhone no tiene código. Toca “Mostrar el Modo desarrollador en Ajustes” y actívalo ahí.",
     "This iPhone didn't take the Developer Mode request: %@":

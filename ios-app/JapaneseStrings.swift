@@ -638,7 +638,20 @@ let japaneseStrings: [String: String] = [
         "デベロッパモードがオンになるよう設定しました。この iPhone は今から再起動します。ロックを解除したら「オンにする」をタップしてください。",
     "An install is already running. Wait for it to finish, then try again.":
         "インストールがすでに実行中です。終わるまで待ってから、もう一度お試しください。",
-    "An import is already running. Wait for it to finish, then try again.": "An import is already running. Wait for it to finish, then try again.",
+    "An import is already running. Wait for it to finish, then try again.": "すでにインポートが実行中です。完了するまで待ってから、もう一度お試しください。",
+    "%@ will be signed again with the Apple ID that signed it and installed over the copy on this device. It keeps its data, and its seven days start over.": "%@ は、署名した Apple ID で再度署名され、このデバイス上のコピーに上書きインストールされます。データは保持され、7 日間が最初から数え直されます。",
+    "%d apps will be signed again, each with the Apple ID that signed it, and installed over the copies on this device. They keep their data, and their seven days start over.": "%d 個の App は、それぞれ署名した Apple ID で再度署名され、このデバイス上のコピーに上書きインストールされます。データは保持され、7 日間が最初から数え直されます。",
+    "%d app here is signed under a team that matches no saved Apple ID, so it is left out. Switch to the Apple ID that signed it and sign in once, then reload, and it will join the list. Enterprise-signed apps stay excluded.": "ここの %d 個の App は、保存済みの Apple ID に一致するチームで署名されていないため、対象外です。署名した Apple ID に切り替えて一度サインインし、再読み込みするとリストに加わります。エンタープライズ署名の App は対象外のままです。",
+    "%d apps here are signed under teams that match no saved Apple ID, so they are left out. Switch to the Apple ID that signed them and sign in once, then reload, and they will join the list. Enterprise-signed apps stay excluded.": "ここの %d 個の App は、保存済みの Apple ID に一致するチームで署名されていないため、対象外です。署名した Apple ID に切り替えて一度サインインし、再読み込みするとリストに加わります。エンタープライズ署名の App は対象外のままです。",
+    "These apps were signed under %d Apple IDs, so each group is signed with its own Apple ID.": "これらの App は %d 個の Apple ID で署名されているため、各グループはそれぞれの Apple ID で署名されます。",
+    "Couldn't sign in as %@ (%@). Switch to that account and refresh again.": "%@（%@）としてサインインできませんでした。そのアカウントに切り替えて、もう一度更新してください。",
+    "Skipped: no saved Apple ID matches this app's team (%@). Switch to that account and refresh again.": "スキップ：この App のチーム（%@）に一致する保存済みの Apple ID がありません。そのアカウントに切り替えて、もう一度更新してください。",
+    "Skipped: signed in as %@, but this app's team is %@. Switch to that account and refresh again.": "スキップ：%@ としてサインインしていますが、この App のチームは %@ です。そのアカウントに切り替えて、もう一度更新してください。",
+    "Refreshing %@ as %@": "%@ を %@ として更新中",
+    "Invalid device IP": "デバイス IP が無効です",
+    "The address was invalid, reset to 10.7.0.1.": "アドレスが無効だったため、10.7.0.1 にリセットしました。",
+    "Bundle Identifier": "バンドル ID",
+    "rpath": "rpath",
     "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
         "ここからデベロッパモードをオンにできるのは、この iPhone にパスコードが設定されていない場合だけです。「設定にデベロッパモードを表示」をタップして、そこでオンにしてください。",
     "This iPhone didn't take the Developer Mode request: %@":

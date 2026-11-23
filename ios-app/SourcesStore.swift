@@ -236,26 +236,21 @@ final class SourceStore: ObservableObject {
     nonisolated private static func fetchSourceDocument(url: URL) async throws -> AltSource {
         var request = URLRequest(url: url)
         request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
-        let (bytes, response) = try await Self.fetchSession.bytes(for: request)
+        let (data, response) = try await Self.fetchSession.data(for: request)
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             throw NSError(domain: "SourceStore", code: http.statusCode,
                           userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"])
         }
-        // C-6：边读边计——声明超限直接抛，不读体；累计超限立即停读。
+        // C-6 / A-2（SIDE-32）：声明超限直接抛；实收超限也抛，不解码。
+        // data(for:) 一次取体再判长——两道上限只决定收不收进解码，
+        // 不再边读边停（10MB 内进内存可接受，解码本来也要全量 Data）。
         if response.expectedContentLength > Int64(Self.sourceBodyCap) {
             throw NSError(domain: "SourceStore", code: -1,
                           userInfo: [NSLocalizedDescriptionKey: "Source is too large"])
         }
-        var data = Data()
-        if response.expectedContentLength > 0 {
-            data.reserveCapacity(Int(min(response.expectedContentLength, Int64(Self.sourceBodyCap))))
-        }
-        for try await byte in bytes {
-            data.append(byte)
-            if data.count > Self.sourceBodyCap {
-                throw NSError(domain: "SourceStore", code: -1,
-                              userInfo: [NSLocalizedDescriptionKey: "Source is too large"])
-            }
+        if data.count > Self.sourceBodyCap {
+            throw NSError(domain: "SourceStore", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Source is too large"])
         }
         return try JSONDecoder().decode(AltSource.self, from: data)
     }
@@ -321,6 +316,39 @@ final class SourceStore: ObservableObject {
     }
 }
 
+/// A-1（SIDE-32）：源安装下载的进度节流器，与 SideStoreDownloader 的
+/// `ProgressThrottler` 同逻辑（变化 ≥0.5% 或距上次发布 ≥100ms 才放行，
+/// 最后一块强制发布）——那只是本文件的 `private` 类型，此处照抄一份，
+/// 改名避免同模块同名 `private` 类型混淆。IPADownloader 实例是
+/// @StateObject、跨多次下载复用，`reset()` 在每次下载起跑时清掉上次
+/// 的发布记录；一个下载一个实例的状态，两个下载并行不互相压。
+private final class IPADownloadProgressThrottler: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lastPublished: Double?
+    private var lastPublishedAt: Date?
+
+    /// Gates `fraction` through `send`; the last chunk always goes through.
+    func publish(_ fraction: Double, send: (Double) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        let now = Date()
+        if fraction < 1,
+           let last = lastPublished, let at = lastPublishedAt,
+           abs(fraction - last) < 0.005, now.timeIntervalSince(at) < 0.1 { return }
+        lastPublished = fraction
+        lastPublishedAt = now
+        send(fraction)
+    }
+
+    /// Forget the previous download's last publish, for the next download.
+    func reset() {
+        lock.lock()
+        defer { lock.unlock() }
+        lastPublished = nil
+        lastPublishedAt = nil
+    }
+}
+
 // MARK: - IPA download with progress
 
 /// Downloads one IPA from a source into a private staging folder in the
@@ -340,11 +368,15 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     private var session: URLSession?
     private var continuation: CheckedContinuation<URL, Error>?
 
+    /// A-1（SIDE-32）：本下载的进度节流器（delegate 队列是串行的，锁只是兜底）。
+    private let progressThrottler = IPADownloadProgressThrottler()
+
     /// Download `url` and return the staged file. Throws on a non-2xx answer
     /// or a transport error.
     func download(from url: URL) async throws -> URL {
         cancel()
         progress = 0
+        progressThrottler.reset()
         let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
         self.session = session
         var request = URLRequest(url: url)
@@ -388,7 +420,10 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         }
         guard totalBytesExpectedToWrite > 0 else { return }
         let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        Task { @MainActor in self.progress = fraction }
+        // A-1（SIDE-32）：每 chunk 先过节流器再发布，不再每次都跳主线程写 @Published。
+        progressThrottler.publish(fraction) { value in
+            Task { @MainActor in self.progress = value }
+        }
     }
 
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
@@ -412,6 +447,10 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         do {
             try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
             try FileManager.default.moveItem(at: location, to: dest)
+            // A-1（SIDE-32）：成功时强制发 1.0（fraction == 1 一定过节流器）。
+            progressThrottler.publish(1.0) { value in
+                Task { @MainActor in self.progress = value }
+            }
             Task { @MainActor in self.finish(.success(dest)) }
         } catch {
             // N3(C)：建目录/移文件失败也会留一个空 ipa-source-* 目录，顺手删掉。

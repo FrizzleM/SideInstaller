@@ -639,7 +639,20 @@ let koreanStrings: [String: String] = [
         "개발자 모드가 켜지도록 설정되었으며, 이 iPhone이 지금 재시동됩니다. 잠금을 해제한 뒤 “켜기”를 탭하세요.",
     "An install is already running. Wait for it to finish, then try again.":
         "이미 설치가 진행 중입니다. 끝날 때까지 기다린 뒤 다시 시도하세요.",
-    "An import is already running. Wait for it to finish, then try again.": "An import is already running. Wait for it to finish, then try again.",
+    "An import is already running. Wait for it to finish, then try again.": "이미 가져오기가 진행 중입니다. 완료될 때까지 기다렸다가 다시 시도하세요.",
+    "%@ will be signed again with the Apple ID that signed it and installed over the copy on this device. It keeps its data, and its seven days start over.": "%@이(가) 서명에 사용된 Apple ID로 다시 서명되어 이 기기의 복사본 위에 설치됩니다. 데이터는 유지되며 7일이 처음부터 다시 시작됩니다.",
+    "%d apps will be signed again, each with the Apple ID that signed it, and installed over the copies on this device. They keep their data, and their seven days start over.": "%d개의 앱이 각각 서명에 사용된 Apple ID로 다시 서명되어 이 기기의 복사본 위에 설치됩니다. 데이터는 유지되며 7일이 처음부터 다시 시작됩니다.",
+    "%d app here is signed under a team that matches no saved Apple ID, so it is left out. Switch to the Apple ID that signed it and sign in once, then reload, and it will join the list. Enterprise-signed apps stay excluded.": "여기에 있는 %d개의 앱은 저장된 Apple ID와 일치하는 팀으로 서명되지 않아 제외되었습니다. 서명한 Apple ID로 전환해 한 번 로그인한 뒤 새로고침하면 목록에 포함됩니다. 기업용 인증서로 서명된 앱은 계속 제외됩니다.",
+    "%d apps here are signed under teams that match no saved Apple ID, so they are left out. Switch to the Apple ID that signed them and sign in once, then reload, and they will join the list. Enterprise-signed apps stay excluded.": "여기에 있는 %d개의 앱은 저장된 Apple ID와 일치하는 팀으로 서명되지 않아 제외되었습니다. 서명한 Apple ID로 전환해 한 번 로그인한 뒤 새로고침하면 목록에 포함됩니다. 기업용 인증서로 서명된 앱은 계속 제외됩니다.",
+    "These apps were signed under %d Apple IDs, so each group is signed with its own Apple ID.": "이 앱들은 %d개의 Apple ID로 서명되었으므로 각 그룹은 해당 Apple ID로 서명됩니다.",
+    "Couldn't sign in as %@ (%@). Switch to that account and refresh again.": "%@(%@)(으)로 로그인할 수 없습니다. 해당 계정으로 전환한 뒤 다시 새로고침하세요.",
+    "Skipped: no saved Apple ID matches this app's team (%@). Switch to that account and refresh again.": "건너뜀: 이 앱의 팀(%@)과 일치하는 저장된 Apple ID가 없습니다. 해당 계정으로 전환한 뒤 다시 새로고침하세요.",
+    "Skipped: signed in as %@, but this app's team is %@. Switch to that account and refresh again.": "건너뜀: %@ (으)로 로그인되어 있지만 이 앱의 팀은 %@입니다. 해당 계정으로 전환한 뒤 다시 새로고침하세요.",
+    "Refreshing %@ as %@": "%@을(를) %@ (으)로 갱신 중",
+    "Invalid device IP": "기기 IP가 잘못되었습니다",
+    "The address was invalid, reset to 10.7.0.1.": "주소가 잘못되어 10.7.0.1(으)로 재설정했습니다.",
+    "Bundle Identifier": "번들 식별자",
+    "rpath": "rpath",
     "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
         "iOS는 iPhone에 암호가 없을 때만 여기에서 개발자 모드를 켤 수 있습니다. 대신 “설정에서 개발자 모드 표시”를 탭하고 설정에서 켜세요.",
     "This iPhone didn't take the Developer Mode request: %@":

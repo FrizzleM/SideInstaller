@@ -89,6 +89,10 @@ final class CertManager: ObservableObject {
     var isBusy: Bool { isWorking || isImporting || revokingID != nil }
 
     private var session: OpaquePointer?            // CertSession*
+    /// B-5：ensureLoaded 在加载在途时被调，then 暂存于此——在途那次
+    /// loadCerts 成功（或取消）后顺带跑掉；失败时丢弃不跑。单槽：
+    /// 唯一调用点是安装页证书冲突弹窗的吊销按钮，不会同时排两个。
+    private var pendingThen: (() -> Void)?
     /// A2：登录代际号——signOut 递增；signIn 完成后核对，未变才写会话。
     private var signInGeneration = 0
     private let queue = DispatchQueue(label: "sideinstaller.certs")
@@ -130,7 +134,14 @@ final class CertManager: ObservableObject {
     /// Sign in if needed and reload the list; `then` runs only if it arrived.
     @MainActor
     func loadCerts(then: (() -> Void)? = nil) {
-        guard !isWorking, revokingID == nil else { return }
+        // B-5：loadCerts 本身也有同款静默守卫——在途时直接调它，
+        // then 同样暂存进 pendingThen，免得静默丢掉（吊销在途时
+        // 不存：那时没有在途加载，存了也没人跑）。
+        if isWorking {
+            if let then { pendingThen = then }
+            return
+        }
+        guard revokingID == nil else { return }
         let id = engine.normalizedAppleID, pw = engine.applePassword
         guard !id.isEmpty, !pw.isEmpty else {
             lastError = L("No Apple ID saved. Add one in Settings › Account.")
@@ -148,6 +159,10 @@ final class CertManager: ObservableObject {
                 engine.log("Certificates: \(list.count) iOS development certificate(s).")
                 isWorking = false
                 then?()
+                // B-5：在途加载期间 ensureLoaded 暂存的回调，成功路顺带跑掉。
+                let pending = pendingThen
+                pendingThen = nil
+                pending?()
                 return
             } catch is CancellationError {
                 // Not currently cancellable; handled for consistency with Engine.
@@ -157,12 +172,18 @@ final class CertManager: ObservableObject {
                 engine.log("Certificates: load cancelled.")
                 isWorking = false
                 then?()
+                // B-5：取消路与成功路同口径，暂存的回调也跑掉。
+                let pending = pendingThen
+                pendingThen = nil
+                pending?()
                 return
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Certificates: \(lastError ?? "failed")")
             }
             isWorking = false
+            // B-5：失败路不跑暂存的回调，直接丢弃。
+            pendingThen = nil
         }
     }
 
@@ -343,7 +364,13 @@ final class CertManager: ObservableObject {
     /// revoke chooser.
     @MainActor
     func ensureLoaded(then: @escaping () -> Void) {
-        guard !isWorking, revokingID == nil else { return }
+        guard revokingID == nil else { return }
+        if isWorking {
+            // B-5：加载在途时 then 不再静默丢掉，暂存进 pendingThen，
+            // 在途那次 loadCerts 成功后顺带跑掉；失败时丢弃。
+            pendingThen = then
+            return
+        }
         if hasLoaded, session != nil {
             then()
             return

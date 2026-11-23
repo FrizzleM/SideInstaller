@@ -437,6 +437,10 @@ final class SideloadedAppsManager: ObservableObject {
     /// The refresh in flight, kept so it can be called off between apps.
     private var refreshTask: Task<Void, Never>?
 
+    /// The load in flight, kept so a caller that arrived after it started
+    /// can await it instead of polling `isWorking` (A-5, SIDE-32).
+    private var loadTask: Task<Void, Never>?
+
     /// What went wrong last, as a popup `RootView` stacks over the app.
     var popups: [ToolPopup] { lastError.map { [.error($0)] } ?? [] }
 
@@ -463,14 +467,18 @@ final class SideloadedAppsManager: ObservableObject {
     }
 
     /// Ask the device what it has. `quiet` logs failures instead of showing them.
-    func load(quiet: Bool = false) {
-        guard !isWorking, !isRefreshing else { return }
+    /// Returns the Task doing the load (nil when the guard declines because
+    /// one is already running), so a caller that must wait on it can await
+    /// the Task instead of polling `isWorking` (A-5, SIDE-32).
+    @discardableResult
+    func load(quiet: Bool = false) -> Task<Void, Never>? {
+        guard !isWorking, !isRefreshing else { return nil }
         isWorking = true
         if !quiet { lastError = nil }
         if !quiet { engine.log("=== Sideloaded apps: reading the device ===") }
         // B-3：Swift 5.0 模式下 plain Task 不继承 MainActor，await 回来仍在
         // 全局执行器，随后的 @Published 写会落在主线程外——显式进主 actor。
-        Task { @MainActor in
+        let task = Task { @MainActor in
             do {
                 let inventory = try await engine.sideloadedAppInventory()
                 let apps = inventory.apps.compactMap(SideloadedApp.init(plist:))
@@ -498,7 +506,10 @@ final class SideloadedAppsManager: ObservableObject {
                 }
             }
             isWorking = false
+            loadTask = nil
         }
+        loadTask = task
+        return task
     }
 
     // MARK: - Refresh all
@@ -913,12 +924,14 @@ final class SideloadedAppsManager: ObservableObject {
         }
         // C5：快捷指令每次都重读一次设备再续签——只在 hasLoaded 时跳过，
         // 用的是上次的清单，设备上 App 变了（新装/已删/到期日变了）
-        // 续签集就是错的。等这一轮 load 跑完（最多 20 秒）再决定。
+        // 续签集就是错的。等这一轮 load 跑完再决定。
         let failedBefore = lastLoadFailed
-        load(quiet: true)
-        for _ in 0..<40 {
-            if !isWorking { break }
-            try? await Task.sleep(nanoseconds: 500_000_000)
+        // A-5（SIDE-32）：直接等 load 起的那只 Task，不再 0.5 秒轮询
+        // isWorking。load 没起跑时（已有另一路 load 在跑）等那只在途的；
+        // 两只都没有（正刷续签、load 起不来）时直接往下走判定——与旧的
+        // “isWorking 为假即跳出”同义。
+        if let task = load(quiet: true) ?? loadTask {
+            await task.value
         }
         if isWorking {
             await postResignNotification(title: L("续签失败"), body: L("读取设备失败，请打开 SideInstaller 查看。"))

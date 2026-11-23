@@ -8,9 +8,9 @@ private enum SourceSort: String, CaseIterable {
     var label: String {
         switch self {
         case .default: return L("默认")
-        case .name: return L("名称")
+        case .name: return L("Name")
         case .size: return L("Size")
-        case .newest: return L("最新")
+        case .newest: return L("Latest")
         }
     }
 }

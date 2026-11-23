@@ -397,13 +397,12 @@ final class Engine {
     /// True while the one-click pipeline is running.
     var isRunning: Bool = false
 
-    /// 本次安装会话的归属凭证：runInstallSignedIPA 真正起跑时
-    /// 同步置一个新 UUID。Engine 是单管线，isRunning 只能说
-    /// “有安装在跑”，说不出是谁的——企业页起跑失败（别的安装
-    /// 已在跑）时若留着进行中标志，之后别人的安装结束会被误
-    /// 认成这次的；调用方起跑后快照它、结束时比对才认。跑完
-    /// 不清零（下一跑起跑时自然轮换；清零会让结束时的比对
-    /// 永远对不上）。
+    /// 本次安装会话的归属凭证：三条管线起跑时（resetRun 之后、
+    /// isRunning = true 之前）各 mint 一个新 UUID，resetRun 先把
+    /// 旧值清掉，旧凭证从此再匹配不上。Engine 是单管线，isRunning
+    /// 只能说“有安装在跑”，说不出是谁的——企业页/文件页起跑后快照
+    /// 它、结束时比对才认。跑完不清零（下一跑起跑时自然轮换；
+    /// 清零会让结束时的比对永远对不上）。
     var installSessionID: UUID?
 
     /// True from a cancel until the run stops, which waits for the step in
@@ -655,6 +654,10 @@ final class Engine {
             self.deviceSummary = nil
             self.deviceUDID = nil
             self.deviceName = nil
+            // B-2：旧会话凭证在此过期——三个入口在 resetRun 之后、
+            // isRunning = true 之前各 mint 一个新 UUID；跑完不清零
+            //（结束时的比对还要认它），下一跑起跑时自然轮换。
+            self.installSessionID = nil
             self.lastError = nil
             self.finished = false
             self.successClosed = false
@@ -749,6 +752,8 @@ final class Engine {
             return
         }
         resetRun()
+        // B-2：起跑前 mint 新会话凭证（resetRun 已清掉旧值）。
+        installSessionID = UUID()
         isRunning = true
         log("=== Starting one-click install ===")
         // 切后台断安装的根因：InstallActivity（iOS 26 的
@@ -2322,6 +2327,8 @@ final class Engine {
             return
         }
         resetRun()
+        // B-2：起跑前 mint 新会话凭证（resetRun 已清掉旧值）。
+        installSessionID = UUID()
         isRunning = true
         log("=== Starting enterprise-cert install ===")
 
@@ -2354,6 +2361,11 @@ final class Engine {
                 log("Install cancelled.")
                 for s in Step.allCases { stepStates[s] = .pending }
                 installProgress = 0
+                // B-1：照抄 runOneClick 取消分支——清掉设备摘要，
+                // 否则状态 pill 还显示上一轮设备，盖住隧道状态。
+                deviceSummary = nil
+                deviceUDID = nil
+                deviceName = nil
                 setGuide(nil)
             } catch {
                 let msg = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
@@ -2460,8 +2472,10 @@ final class Engine {
             return
         }
         resetRun()
-        isRunning = true
+        // B-2：起跑前 mint 新会话凭证（resetRun 已清掉旧值；
+        // 原先这句在 isRunning = true 之后，现并入统一 mint 点）。
         installSessionID = UUID()
+        isRunning = true
         log("=== Installing already-signed IPA ===")
 
         pipelineTask = Task { @MainActor in
@@ -2503,6 +2517,11 @@ final class Engine {
                 log("Install cancelled.")
                 for s in Step.allCases { stepStates[s] = .pending }
                 installProgress = 0
+                // B-1：照抄 runOneClick 取消分支——清掉设备摘要，
+                // 否则状态 pill 还显示上一轮设备，盖住隧道状态。
+                deviceSummary = nil
+                deviceUDID = nil
+                deviceName = nil
                 setGuide(nil)
             } catch {
                 let msg = (error as? LocalizedError)?.errorDescription ?? String(describing: error)

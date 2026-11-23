@@ -372,7 +372,7 @@ struct EnterpriseCertView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         infoRow(L("描述文件"), info.name.isEmpty ? L("（无名称）") : info.name)
                         if !info.teamName.isEmpty {
-                            infoRow(L("团队"), info.teamName)
+                            infoRow(L("Team"), info.teamName)
                         }
                         if let expiration = info.expiration {
                             HStack {
@@ -413,9 +413,9 @@ struct EnterpriseCertView: View {
                 }
             }
             if let cert = certInfo, !cert.name.isEmpty {
-                signGroup(title: L("证书")) {
+                signGroup(title: L("Certificates")) {
                     VStack(alignment: .leading, spacing: 8) {
-                        infoRow(L("证书"), cert.name)
+                        infoRow(L("Certificates"), cert.name)
                         if let expiration = cert.expiration {
                             infoRow(L("证书到期日"), "\(expiration.formatted(date: .abbreviated, time: .omitted))\(remainingText(expiration))")
                         }
@@ -549,7 +549,7 @@ struct EnterpriseCertView: View {
         }
         .alert(L("移除证书材料？"), isPresented: $confirmingRemoveCert) {
             Button(L("Cancel"), role: .cancel) {}
-            Button(L("移除"), role: .destructive) {
+            Button(L("Remove"), role: .destructive) {
                 EnterpriseCertStore.removeAll()
                 password = ""
                 refreshCertState()
@@ -734,7 +734,7 @@ struct EnterpriseCertView: View {
 
     private func remainingText(_ expiration: Date) -> String {
         let days = remainingDays(to: expiration)
-        if days < 0 { return L("（已过期）") }
+        if days < 0 { return L(" (expired)") }
         if days == 0 { return L("（今天到期）") }
         return L("（剩 %d 天）", days)
     }
@@ -820,14 +820,14 @@ struct EnterpriseCertView: View {
         // 切 profile 后这里重读新 profile 的密码；onChange 写回
         // 的是同一个值，无害）。
         profiles = EnterpriseCertStore.profiles()
-        activeProfileID = EnterpriseCertStore.activeProfile()?.id
+        activeProfileID = EnterpriseCertStore.activeProfile(profiles: profiles)?.id
         password = EnterpriseCertStore.password
         // A1+A2：证书解析（读 p12 + SecPKCS12Import + 全量 plist 解析）是主线程
         // 上的重活，9 个调用点每次都同步重跑。指纹没变时跳过重解析——材料
         // 没变，解析结果也不会变；变了才在后台重解析，解析完回主线程写
         // @State。写回时指纹/密码/激活三者须与调用时一致，防切走后旧结果
         // 盖住新表单；两个解析中途的写回内容相同，无害。
-        let fingerprint = EnterpriseCertStore.certStateFingerprint()
+        let fingerprint = EnterpriseCertStore.certStateFingerprint(profiles: profiles)
         let storePassword = EnterpriseCertStore.password
         let activeID = activeProfileID
         let currentProfiles = profiles
@@ -887,11 +887,17 @@ struct EnterpriseCertView: View {
     private func checkRevocation() {
         guard !revocationChecking, hasP12 else { return }
         revocationChecking = true
+        // 照抄 refreshCertState 的三重守卫模式：调用前抓指纹，
+        // 写回前核对未变才写状态；revocationChecking 复位放守卫外，
+        // 任何出口都复位。
+        let fingerprint = EnterpriseCertStore.certStateFingerprint()
         Task.detached(priority: .userInitiated) {
             let status = CertRevocationChecker.check(force: true)
             await MainActor.run {
-                self.revocationStatus = status
-                self.revocationCheckedAt = Date()
+                if fingerprint == EnterpriseCertStore.certStateFingerprint() {
+                    self.revocationStatus = status
+                    self.revocationCheckedAt = Date()
+                }
                 self.revocationChecking = false
             }
         }
@@ -967,7 +973,7 @@ struct EnterpriseCertView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.seal.fill")
                             .foregroundStyle(certReady ? Theme.muted : Theme.warning)
-                        Text(L("证书"))
+                        Text(L("Certificates"))
                             .font(.headline)
                         Spacer()
                         if certReady {
@@ -1568,7 +1574,7 @@ struct EnterpriseCertView: View {
                 signOnlyMessage = nil
                 signBlockedMessage = nil
             } label: {
-                Text(L("更换"))
+                Text(L("Replace"))
                     .font(.footnote)
             }
         }
@@ -1594,7 +1600,7 @@ struct EnterpriseCertView: View {
                     decodedIcon = nil
                     decodedIconData = nil
                 } label: {
-                    Text(L("清除"))
+                    Text(L("Clear"))
                         .font(.footnote)
                 }
                 Button {
@@ -1927,7 +1933,7 @@ struct EnterpriseCertView: View {
                     let friendly = friendlySignError(message)
                     signOnlyMessage = friendly
                     signOnlyFailed = true
-                    localInstall.appendStepLog(L("签名失败：%@", friendly))
+                    localInstall.appendStepLog(L("Signing failed: %@", friendly))
                     CZFHaptics.notification(.error)
                     CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
                         appName: selectedInfo?.name ?? url.deletingPathExtension().lastPathComponent,
@@ -1964,7 +1970,7 @@ struct EnterpriseCertView: View {
                     let friendly = friendlySignError(message)
                     signOnlyMessage = friendly
                     signOnlyFailed = true
-                    localInstall.appendStepLog(L("签名失败：%@", friendly))
+                    localInstall.appendStepLog(L("Signing failed: %@", friendly))
                     CZFHaptics.notification(.error)
                     CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
                         appName: selectedInfo?.name ?? url.deletingPathExtension().lastPathComponent,
@@ -2170,7 +2176,7 @@ struct EnterpriseCertView: View {
                 .frame(maxHeight: 200)
                 .background(Color.secondary.opacity(0.08))
                 .cornerRadius(8)
-                Button(L("复制日志")) {
+                Button(L("Copy logs")) {
                     var text = localInstall.diagnosticLog.joined(separator: "\n")
                     let recentEngine = LogStore.shared.lines.suffix(40)
                     if !recentEngine.isEmpty {
@@ -2215,7 +2221,7 @@ struct EnterpriseCertView: View {
             return L("正在连接隧道…")
         }
         if states[.pair] == .active || states[.pair] == .waiting {
-            return L("正在配对…")
+            return L("Pairing…")
         }
         if states[.connect] == .active || states[.connect] == .waiting {
             return L("正在打开设备连接…")
@@ -2299,7 +2305,7 @@ struct EnterpriseCertView: View {
                     }
                 }
                 if !localInstall.diagnosticLog.isEmpty {
-                    Button(L("复制日志")) {
+                    Button(L("Copy logs")) {
                         UIPasteboard.general.string = localInstall.diagnosticLog.joined(separator: "\n")
                     }
                     .font(.footnote)

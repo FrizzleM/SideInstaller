@@ -108,6 +108,10 @@ struct FilesTabView: View {
     /// First scan happens in onAppear; starting empty so the list isn't
     /// scanned twice on first appearance.
     @State private var files: [LocalFileItem] = []
+    /// B-3：文件列表重扫代际号——每次 refreshFiles 调用 +1 并捕获，
+    /// 写回前核对，旧扫描直接丢弃；delete 成功路也 +1，使在途的
+    /// 旧扫描失效，已删文件不再被它的写回带回列表。
+    @State private var filesRefreshGeneration = 0
     @State private var showImporter = false
     @State private var importError: String?
     // 多选 / 重命名 / 压缩解压
@@ -182,6 +186,10 @@ struct FilesTabView: View {
     @State private var libraryTab = CertLibraryTab.unsigned
     @State private var librarySearchText = ""
     @State private var unsignedIPAs: [LocalFileItem] = []
+    /// B-3：未签名列表重扫代际号（与 filesRefreshGeneration 各管各路）——
+    /// 每次 refreshUnsignedIPAs 调用 +1 并捕获，写回前核对，旧扫描
+    /// 直接丢弃，连带 onRefreshed 的选中裁剪也不按旧列表跑。
+    @State private var unsignedIPAsRefreshGeneration = 0
     /// 未签名栏的 IPA 信息缓存（路径 → Info.plist 解析结果），只解析一次。
     @State private var unsignedInfo: [String: IPALibrary.AppInfo] = [:]
     /// 已经试过的路径（含解析失败），避免重复读盘。
@@ -239,9 +247,9 @@ struct FilesTabView: View {
         var label: String {
             switch self {
             case .default: return L("默认")
-            case .name: return L("名称")
+            case .name: return L("Name")
             case .size: return L("Size")
-            case .newest: return L("最新")
+            case .newest: return L("Latest")
             }
         }
     }
@@ -1156,7 +1164,7 @@ struct FilesTabView: View {
                             .font(.footnote)
                             .foregroundStyle(lanCopied ? Theme.positive : Theme.muted)
                         if lanCopied {
-                            Text(L("已复制"))
+                            Text(L("Copied"))
                                 .font(.footnote)
                                 .foregroundStyle(Theme.positive)
                         }
@@ -1459,10 +1467,15 @@ struct FilesTabView: View {
     /// 不在主线程同步扫盘。resetDir 为 true 时，写完列表后立即按新
     /// 列表复核 currentDir——删/移/改名后原地复核用的就是新列表，
     /// 语义与同步扫盘时一致（只换线程，不换顺序）。
+    /// B-3：调用时 filesRefreshGeneration +1 并捕获，写回前核对代际，
+    /// 过期的旧扫描直接丢弃，不盖住新列表。
     private func refreshFiles(resetDir: Bool = false) {
+        filesRefreshGeneration += 1
+        let generation = filesRefreshGeneration
         Task.detached {
             let items = AppFileLibrary.scan()
             await MainActor.run {
+                guard generation == self.filesRefreshGeneration else { return }
                 files = items
                 if resetDir { resetCurrentDirIfNeeded() }
             }
@@ -1515,6 +1528,9 @@ struct FilesTabView: View {
             files.removeAll {
                 $0.url.path == item.url.path || $0.url.path.hasPrefix(item.url.path + "/")
             }
+            // B-3：本地已删掉，在途的旧重扫若还写回会把已删文件带回来——
+            // 代际号 +1 使它过期，写回时直接丢弃；本路不另调 refreshFiles。
+            filesRefreshGeneration += 1
             resetCurrentDirIfNeeded()
             // C8：删掉的 IPA 可能是某 App 的续签源，应用页的可续签数
             // 只在 load/续签时重算——这里只重算配对，不重读设备。
@@ -1922,7 +1938,7 @@ struct FilesTabView: View {
                             CZFHaptics.impact()
                             selectedUnsignedIDs = Set(filteredUnsigned.map { $0.id })
                         } label: {
-                            Text(L("全选")).font(.footnote)
+                            Text(L("Select all")).font(.footnote)
                         }
                         Button {
                             CZFHaptics.impact()
@@ -2224,7 +2240,7 @@ struct FilesTabView: View {
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                     Spacer()
-                    Text(entry.success ? L("成功") : L("失败"))
+                    Text(entry.success ? L("成功") : L("Failed"))
                         .font(.caption)
                         .foregroundStyle(entry.success ? Theme.positive : Theme.negative)
                 }
@@ -2290,10 +2306,15 @@ struct FilesTabView: View {
     /// 新出现的 IPA 排队解析；先写列表再跑它，顺序与同步扫盘时一致）。
     /// onRefreshed 在列表写完后、同一主线程块里跑：批量签完那处靠它
     /// 按新列表裁掉已签走的选中项（同步扫盘时 intersection 读的就是新列表）。
+    /// B-3：调用时 unsignedIPAsRefreshGeneration +1 并捕获，写回前核对
+    /// 代际，过期的旧扫描直接丢弃，onRefreshed 也不按旧列表跑。
     private func refreshUnsignedIPAs(onRefreshed: (() -> Void)? = nil) {
+        unsignedIPAsRefreshGeneration += 1
+        let generation = unsignedIPAsRefreshGeneration
         Task.detached {
             let items = AppFileLibrary.scan().filter { $0.isIPA && !$0.isInSignedDir }
             await MainActor.run {
+                guard generation == self.unsignedIPAsRefreshGeneration else { return }
                 unsignedIPAs = items
                 ensureUnsignedInfo()
                 onRefreshed?()
@@ -2414,7 +2435,7 @@ struct FilesTabView: View {
                             // 全选只选当前可见的（搜了就只选搜到的）。
                             selectedSignedIDs = Set(filteredSigned.map { $0.id })
                         } label: {
-                            Text(L("全选"))
+                            Text(L("Select all"))
                                 .font(.footnote)
                         }
                         Button {
@@ -2574,14 +2595,21 @@ struct FilesTabView: View {
     }
 
     /// 吊销检查放后台线程跑（信任评估可能联网 OCSP）。
+    /// B-4：照抄 EnterpriseCertView.refreshCertState 的指纹守卫——调用前
+    /// 抓 EnterpriseCertStore.certStateFingerprint()，写回前核对指纹未变
+    /// 才写 revocationStatus/revocationCheckedAt；revocationChecking = false
+    /// 复位放在守卫外（if 块之后），任何出口都复位，不卡住下次检查。
     private func checkRevocation() {
         guard !revocationChecking, EnterpriseCertStore.hasP12 else { return }
         revocationChecking = true
+        let fingerprint = EnterpriseCertStore.certStateFingerprint()
         Task.detached(priority: .userInitiated) {
             let status = CertRevocationChecker.check()
             await MainActor.run {
-                self.revocationStatus = status
-                self.revocationCheckedAt = Date()
+                if fingerprint == EnterpriseCertStore.certStateFingerprint() {
+                    self.revocationStatus = status
+                    self.revocationCheckedAt = Date()
+                }
                 self.revocationChecking = false
             }
         }
@@ -2630,7 +2658,7 @@ private struct FileDetailSheet: View {
                 detailRow(L("Size"), item.isDirectory
                           ? L("%d 项", item.childCount)
                           : ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file))
-                detailRow(L("修改时间"), item.modified?.formatted(date: .abbreviated, time: .standard) ?? L("未知"))
+                detailRow(L("修改时间"), item.modified?.formatted(date: .abbreviated, time: .standard) ?? L("unknown"))
                 detailRow(L("路径"), item.url.path)
                 if let renewalAppName {
                     detailRow(L("续签用的应用"), renewalAppName)

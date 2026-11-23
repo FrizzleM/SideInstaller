@@ -1267,7 +1267,7 @@ private struct PrecheckSheet: View {
     @ViewBuilder
     private var wifiRow: some View {
         if wifiPrecheckState(engine) == .ok {
-            precheckRow(title: L("Wi-Fi"), state: .ok, detail: L("已连接"))
+            precheckRow(title: L("Wi-Fi"), state: .ok, detail: L("connected"))
         } else if wifiPrecheckState(engine) == .blocked {
             precheckRow(title: L("Wi-Fi"), state: .blocked, detail: L("未连接——本次配对需要 Wi-Fi"))
         } else {
@@ -1281,19 +1281,19 @@ private struct PrecheckSheet: View {
     @ViewBuilder
     private var tunnelRow: some View {
         if tunnelPrecheckState(engine) == .ok {
-            precheckRow(title: L("隧道"), state: .ok, detail: L("已连接"))
+            precheckRow(title: L("Tunnel"), state: .ok, detail: L("connected"))
         } else if tunnelPrecheckState(engine) == .warn {
             if BuiltinTunnel.useBuiltinDirectly || engine.localDevVPNInstalled {
-                precheckRow(title: L("隧道"), state: .warn, detail: L("未连接，安装时自动启动"),
+                precheckRow(title: L("Tunnel"), state: .warn, detail: L("未连接，安装时自动启动"),
                             fixTitle: L("立即启动"), fix: startTunnel)
             } else {
-                precheckRow(title: L("隧道"), state: .warn, detail: L("未连接，安装时自动启动（需先装 LocalDevVPN）"))
+                precheckRow(title: L("Tunnel"), state: .warn, detail: L("未连接，安装时自动启动（需先装 LocalDevVPN）"))
             }
         } else if engine.localDevVPNInstalled {
-            precheckRow(title: L("隧道"), state: .blocked, detail: L("未连接，且不会自动启动"),
+            precheckRow(title: L("Tunnel"), state: .blocked, detail: L("未连接，且不会自动启动"),
                         fixTitle: L("打开 LocalDevVPN"), fix: { engine.startLocalDevVPN() })
         } else {
-            precheckRow(title: L("隧道"), state: .blocked, detail: L("未连接，且不会自动启动——点继续安装时会提示安装 LocalDevVPN"))
+            precheckRow(title: L("Tunnel"), state: .blocked, detail: L("未连接，且不会自动启动——点继续安装时会提示安装 LocalDevVPN"))
         }
     }
 
@@ -1302,14 +1302,14 @@ private struct PrecheckSheet: View {
     @ViewBuilder
     private var pairingRow: some View {
         if pairingPrecheckState(engine) == .blocked {
-            precheckRow(title: L("配对文件"), state: .blocked, detail: L("未导入"),
-                        fixTitle: L("导入配对文件"), fix: { showPairingPicker = true })
+            precheckRow(title: L("Pairing file"), state: .blocked, detail: L("未导入"),
+                        fixTitle: L("Import pairing file"), fix: { showPairingPicker = true })
         } else if engine.canSelfPair {
-            precheckRow(title: L("配对文件"), state: .ok, detail: L("本机可自配对，不需要文件"))
+            precheckRow(title: L("Pairing file"), state: .ok, detail: L("本机可自配对，不需要文件"))
         } else if let name = engine.importedPairingName {
-            precheckRow(title: L("配对文件"), state: .ok, detail: L("已导入：%@", name))
+            precheckRow(title: L("Pairing file"), state: .ok, detail: L("已导入：%@", name))
         } else {
-            precheckRow(title: L("配对文件"), state: .ok, detail: L("已导入配对文件"))
+            precheckRow(title: L("Pairing file"), state: .ok, detail: L("imported pairing file"))
         }
     }
 

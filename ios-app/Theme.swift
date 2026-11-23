@@ -211,9 +211,9 @@ struct AppBackground: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        // Ticks every frame, with the points derived from the clock so the
-        // motion is continuous rather than resetting on a keyframe.
-        TimelineView(.animation) { timeline in
+        // A-3（SIDE-32）：10Hz 就够——动画只是缓慢摇摆，不必逐帧重算
+        // MeshGradient + blur；点仍由时钟推导，运动连续不跳变。
+        TimelineView(.animation(minimumInterval: 0.1, paused: false)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             let light = colorScheme == .light
             ZStack {
