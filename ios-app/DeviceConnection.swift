@@ -341,6 +341,14 @@ final class DeviceConnection {
     /// iPhone's own), the port this iPhone advertises over Bonjour is looked
     /// up and dialled too: the listener takes whatever port is free when it
     /// starts (`NetworkStatus.ownRemotePairingAdvert`).
+    ///
+    /// A refusal is retried (R-1): the listener may not be up yet when the
+    /// tunnel just came back, so up to three attempts are made with a ~2 s
+    /// backoff between them, re-checking Bonjour each round for a moved port.
+    /// Timeouts and other failures are not retried. The loop runs on the
+    /// device queue — blocking, like the dial itself — so the wait is a plain
+    /// thread sleep, bounded to 4 s total; the pipeline's cancellation is
+    /// honoured at the next checkpoint after `connect()` returns.
     private func connectRemotePairing(deviceIP: String, pairingFilePath: String,
                                       hostname: String, findsMovedPort: Bool) throws {
         var pf: OpaquePointer?
@@ -354,30 +362,64 @@ final class DeviceConnection {
         // RSD address, loopback, then these local interface addresses, all
         // within one shared timeout.
         let candidates = NetworkStatus.tunnelHostCandidates()
-        guard var failure = try dialRemotePairing(pairingFile, deviceIP: deviceIP, port: Self.rsdPort,
-                                                  hostname: hostname, candidates: candidates) else { return }
+        let maxAttempts = 3
+        let retryBackoff: TimeInterval = 2
         var port = Self.rsdPort
-        if findsMovedPort, failure.kind == TunnelFailureRsdUnreachable, Self.wasRefused(failure.raw) {
-            let advert = NetworkStatus.ownRemotePairingAdvert()
-            Engine.shared.log("Port \(port) refused. This iPhone's remote pairing advertisement: \(advert.summary).")
-            if let moved = advert.port, moved != port {
-                Engine.shared.log("Dialling the advertised port \(moved) instead …")
-                port = moved
-                guard let retried = try dialRemotePairing(pairingFile, deviceIP: deviceIP, port: moved,
+        var failure: DialFailure?
+        // The Bonjour result of the last lookup, for the failure text (R-3).
+        var lastAdvertSummary: String?
+        var attempt = 0
+        while attempt < maxAttempts {
+            attempt += 1
+            Engine.shared.log("Dialling remote pairing at \(deviceIP):\(port) (attempt \(attempt)/\(maxAttempts)) …")
+            guard let dialFailure = try dialRemotePairing(pairingFile, deviceIP: deviceIP, port: port,
                                                           hostname: hostname, candidates: candidates) else {
-                    Engine.shared.log("The tunnel opened on port \(moved).")
-                    return
+                if attempt > 1 {
+                    Engine.shared.log("The tunnel opened on port \(port) after \(attempt) attempts.")
                 }
-                failure = retried
+                return
+            }
+            failure = dialFailure
+            // Only a refusal is retried: anything else keeps its existing
+            // classification and fails at once.
+            guard dialFailure.kind == TunnelFailureRsdUnreachable,
+                  Self.wasRefused(dialFailure.raw) else { break }
+            if findsMovedPort {
+                let advert = NetworkStatus.ownRemotePairingAdvert()
+                lastAdvertSummary = advert.summary
+                Engine.shared.log("Port \(port) refused. This iPhone's remote pairing advertisement: \(advert.summary).")
+                if let moved = advert.port, moved != port {
+                    Engine.shared.log("Dialling the advertised port \(moved) instead …")
+                    port = moved
+                }
+            }
+            if attempt < maxAttempts {
+                Engine.shared.log("Remote pairing refused; waiting \(Int(retryBackoff)) s before attempt \(attempt + 1)/\(maxAttempts) …")
+                Thread.sleep(forTimeInterval: retryBackoff)
             }
         }
-        throw TunnelError(kind: failure.kind,
-                          advice: tunnelAdvice(kind: failure.kind,
-                                               deviceIP: deviceIP,
-                                               port: port,
-                                               candidates: candidates,
-                                               raw: failure.raw),
-                          underlying: failure.raw)
+        guard let failure = failure else { throw fail("no dial attempt was made") }
+        // R-3: the failure text carries what the next failure needs to be
+        // told apart — the Bonjour result and the Developer Mode reading —
+        // instead of leaving both in the log only.
+        var advice = tunnelAdvice(kind: failure.kind,
+                                  deviceIP: deviceIP,
+                                  port: port,
+                                  candidates: candidates,
+                                  raw: failure.raw)
+        if failure.kind == TunnelFailureRsdUnreachable {
+            let developerMode: String
+            switch Engine.developerModeIsOn {
+            case true?:
+                developerMode = "on"
+            case false?:
+                developerMode = "off"
+            case nil:
+                developerMode = "unknown"
+            }
+            advice += "\n\nDiagnostics: remote pairing advertisement: \(lastAdvertSummary ?? "not checked"); Developer Mode: \(developerMode)."
+        }
+        throw TunnelError(kind: failure.kind, advice: advice, underlying: failure.raw)
     }
 
     /// Why a `dialRemotePairing` failed.
