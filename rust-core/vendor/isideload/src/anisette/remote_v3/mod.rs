@@ -47,9 +47,8 @@ pub const WINDOWS_CLIENT_INFO: &str =
 const AKD_USER_AGENT: &str = "akd/1.0 CFNetwork/808.1.4";
 
 /// What GrandSlam is told the client is on a server on Apple's macOS ADI
-/// library that names a Mac older than macOS 10.13: a current Mac, with the
-/// user agent to match. Both are SideStore's own defaults (AnisetteKit's
-/// `defaultClientInfo` and `defaultUserAgent`).
+/// library that names a Mac older than macOS 10.13: a Mac on macOS 10.15.7
+/// (Catalina's last), with its akd's user agent.
 ///
 /// The macOS-ADI servers (new.ani.sidestore.io, mac-ani.jkcoxson.com,
 /// ani.iloader.app, ani3.stikstore.app, and since about 2026-10-22
@@ -59,13 +58,22 @@ const AKD_USER_AGENT: &str = "akd/1.0 CFNetwork/808.1.4";
 /// required", SideInstaller issue #89) and asked others for a code by text it
 /// then wouldn't send (2026-10-16). Since Apple started answering anisette
 /// from its Android library with -80046 at the token request (2026-10-21),
-/// the working route is these servers with this Mac: SideStore with its
-/// default headers, on-device anisette off and a macOS-ADI server picked. Apple
-/// takes it on a macOS-ADI identity (-20970 for a made-up account, 2026-10-23),
-/// including for provisioning.
+/// the working route is these servers with a newer Mac.
+///
+/// Until SideInstaller 2.1.0 that Mac was SideStore's default,
+/// `<MacBookPro18,3> <macOS;26.6;25F84>`. Since 2026-11-20 (about 02:20 UTC)
+/// Apple's edge answers GsService2 with HTTP 503 for every client that names
+/// its OS `macOS`, whatever the version, server or identity, while it lets
+/// `Mac OS X` through (SideInstaller #146–#161, siboot #153; anisette.lillq.me's
+/// hourly probes show the same). Big Sur renamed the token, so Catalina is
+/// the newest Mac that still sends `Mac OS X`, and it is over the 10.13
+/// floor. Measured 2026-11-21 with made-up accounts through anisette.lillq.me,
+/// new.ani.sidestore.io and mac-ani.jkcoxson.com: this Mac gets -20970, as the
+/// servers' Sierra Mac does, and `macOS;26.6` gets 503, also on an identity
+/// provisioned as it (which this one takes, so none is provisioned again).
 pub const CURRENT_MAC_CLIENT_INFO: &str =
-    "<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
-const CURRENT_MAC_USER_AGENT: &str = "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)";
+    "<MacBookPro16,1> <Mac OS X;10.15.7;19H2> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+const CURRENT_MAC_USER_AGENT: &str = "akd/1.0 CFNetwork/1128.0.1 Darwin/19.6.0";
 
 /// Device and OS of the stock client info of anisette-v3-server and of
 /// AltServer/omnisette. Servers hand these out whatever library they run, and
@@ -586,8 +594,13 @@ impl RemoteV3AnisetteProvider {
             }
             // "ADI Login error: -45061" from the Windows-ADI servers,
             // "provision.adi.ADIException: not provisioned (-45061)" from the
-            // Android-ADI ones.
-            AnisetteHeaders::GetHeadersError { message } if message.contains("-45061") => {
+            // Android-ADI ones. "adi_pb too large" is how the macOS-ADI
+            // servers answer an identity anisette.lillq.me provisioned (10 KB,
+            // where theirs are under 1 KB; 2026-11-21): one made for other
+            // servers, as -45061 says, which another stored one may fit.
+            AnisetteHeaders::GetHeadersError { message }
+                if message.contains("-45061") || message.contains("adi_pb too large") =>
+            {
                 Err(report!(SideloadError::AnisetteNotProvisioned)
                     .attach(message)
                     .into())
@@ -860,6 +873,11 @@ mod tests {
         assert_eq!(used.user_agent, CURRENT_MAC_USER_AGENT);
         let older = "<MacBookPro11,1> <Mac OS X;10.9.5;13F1911> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
         assert_eq!(client_info_to_use(&info(older, "")).client_info, CURRENT_MAC_CLIENT_INFO);
+        // Over that floor, under the OS name Apple's edge still lets through
+        // (`macOS` gets HTTP 503 since 2026-11-20).
+        assert!(is_current_mac(CURRENT_MAC_CLIENT_INFO));
+        assert!(CURRENT_MAC_CLIENT_INFO.contains("<Mac OS X;"));
+        assert!(!CURRENT_MAC_CLIENT_INFO.contains("<macOS;"));
         // 10.13 is the floor Apple named with -23782, so it stays.
         let high_sierra = "<MacBookPro14,1> <Mac OS X;10.13.6;17G66> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
         assert_eq!(client_info_to_use(&info(high_sierra, "")).client_info, high_sierra);
@@ -882,7 +900,7 @@ mod tests {
     #[test]
     fn mac_versions_are_read_from_either_spelling() {
         assert_eq!(mac_version(SIERRA_MAC), Some((10, 12)));
-        assert_eq!(mac_version(CURRENT_MAC_CLIENT_INFO), Some((26, 6)));
+        assert_eq!(mac_version(CURRENT_MAC_CLIENT_INFO), Some((10, 15)));
         assert_eq!(mac_version("<Mac15,7> <macOS;27.0;26A5378j> <x>"), Some((27, 0)));
         assert_eq!(mac_version("<iMac21,1> <macOS;15;24A335> <x>"), Some((15, 0)));
         assert_eq!(mac_version(WINDOWS_CLIENT_INFO), None);
@@ -974,6 +992,12 @@ mod tests {
                             "X-Apple-I-MD": "otp",
                             "X-Apple-I-MD-M": "machine",
                             "X-Apple-I-MD-RINFO": "17106176",
+                        })
+                    } else if blob.first() == Some(&POOL) {
+                        // What the macOS-ADI servers say to lillq's identities.
+                        serde_json::json!({
+                            "result": "GetHeadersError",
+                            "message": "adi_pb too large",
                         })
                     } else {
                         serde_json::json!({
@@ -1162,6 +1186,31 @@ mod tests {
     }
 
     const MAC: u8 = b'M';
+    /// anisette.lillq.me's, which no other server takes.
+    const POOL: u8 = b'P';
+
+    #[test]
+    fn an_identity_too_large_for_a_server_is_passed_over() {
+        let storage = Shared(Arc::new(InMemoryStorage::new()));
+        store_identity(&storage, "anisette_state_2", MAC);
+        store_identity(&storage, "anisette_state_3", POOL);
+        let mut slots = Slots::default();
+        slots.used.insert("anisette_state_2".into(), 1);
+        // lillq's signed in last, so it's the first one a new server is offered.
+        slots.used.insert("anisette_state_3".into(), 2);
+        slots.save(&storage).unwrap();
+
+        let mac = serve(MAC, SIERRA_MAC);
+        run(async {
+            generator(&mac.url, &storage)
+                .get_anisette_data(no_bag())
+                .await
+                .unwrap()
+        });
+        assert_eq!(state_key_for(&storage, &mac.url), "anisette_state_2");
+        // Offered lillq's identity, then the one it took.
+        assert_eq!(mac.header_requests.load(Ordering::SeqCst), 3);
+    }
 
     #[test]
     fn a_full_sign_in_leaves_an_old_mac_identity_to_its_saved_token() {

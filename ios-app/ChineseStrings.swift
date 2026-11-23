@@ -1278,6 +1278,31 @@ let chineseStrings: [String: String] = [
     "Pick the team again?": "重新选择团队？",
     "Pick Again": "重新选择",
     "The next sign-in with “%@” asks which developer team signs.": "下次用“%@”登录时，会询问用哪个开发团队签名。",
+    // Shortcuts actions (ShortcutsSupport.swift and the *Shortcuts.swift files).
+    "%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.":
+        "无法续签 %@：SideInstaller 没有可用来重新签名的 IPA。请在安装它的应用里续签，或先将它的 .ipa 导入 SideInstaller。",
+    "%@ is installed.":
+        "%@ 已安装。",
+    "Apple is asking you to finish signing in. Continue in SideInstaller to answer it.":
+        "Apple 要求你完成登录。请在 SideInstaller 中继续操作。",
+    "LocalDevVPN is connected.":
+        "LocalDevVPN 已连接。",
+    "LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.":
+        "LocalDevVPN 未连接。请在此操作运行前连接它：“快捷指令”的 VPN 操作可以做到；也可以在 SideInstaller 的设置中打开“需要时打开 LocalDevVPN”。",
+    "LocalDevVPN isn't connected. Continue in SideInstaller to connect it.":
+        "LocalDevVPN 未连接。请在 SideInstaller 中继续以连接它。",
+    "No route is playing.":
+        "没有正在播放的路线。",
+    "Open SideInstaller and accept its terms first.":
+        "请先打开 SideInstaller 并接受其条款。",
+    "Pick where the route starts, or set a location first.":
+        "请选择路线的起点，或先设置一个位置。",
+    "Route started: %@, about %@.":
+        "路线已开始：%@，约 %@。",
+    "That place has no coordinates. Pick it on the map, or type its address.":
+        "该地点没有坐标。请在地图上选择，或输入它的地址。",
+    "The install didn't start. Open SideInstaller to see why.":
+        "安装没有开始。请打开 SideInstaller 查看原因。",
 
     // MARK: - Sources
 

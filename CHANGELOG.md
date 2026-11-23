@@ -5,6 +5,23 @@ All notable changes to SideInstaller are documented here.
 ## Unreleased
 
 ### Added
+- **Shortcuts actions.** SideInstaller's tools can now run from the Shortcuts app, automations, the
+  Action button and Siri: 24 actions, each waiting for its result and handing it on. Location
+  spoofing has them all: set the location to a place, coordinates or a saved place, reset it, read
+  where it's set, play a GPX file, travel to a place along a route planned over OpenStreetMap, stop
+  a route, and save or delete places. Get Sideloaded Apps lists each app with its expiry, and
+  Refresh All Apps and Refresh App renew them; Install App, Install IPA and Install IPA from URL
+  install as the Install tab does. The pairing file can be fetched, imported and installed into
+  apps, Developer Mode shown in Settings, LocalDevVPN checked and connected, and the activity log
+  read. Everything but installing runs in the background over LocalDevVPN; when its tunnel is down
+  and “Start LocalDevVPN when needed” is on, the action asks to continue in SideInstaller, which
+  connects it. A spoofed location stays set until it's reset, as one set in the app does. Siri
+  takes “Spoof my location to *saved place* with SideInstaller”, “Reset my location with
+  SideInstaller” and “Refresh my apps with SideInstaller”.
+- **The pairing file goes into ARMSX3.** The Pairing page lists ARMSX3 next to the other apps and
+  writes the pairing file's remote pairing record, the only kind its JIT reads, into its Documents
+  folder as `pairingFile.plist`, where ARMSX3 takes it in the next time it opens. A pairing file
+  without a remote pairing record isn't written.
 - **Sources.** A new page under Tools, like SideStore's: add an AltStore-format source (its
   https link, an `altstore://` or `sidestore://` source link, or a .json source file) and its apps
   are listed with their icons and versions. An app's page has its release notes, its description
@@ -19,7 +36,28 @@ All notable changes to SideInstaller are documented here.
   SideInstaller checks for its own updates; pull down on Sources, or tap Check for updates, to
   check again.
 
+### Changed
+- **The Location spoofing page opens on the spoofed location**, which a shortcut may have set while
+  the page was closed, rather than always on the same spot.
+
+## 2.1.1
+
+### Changed
+- **lillq is the first anisette server.** anisette.lillq.me, a pool of anisette servers that checks
+  every hour which clients Apple lets through and hands out one that passes, is now on the list in
+  Settings › Anisette Server, and a first sign-in starts there. With Auto on, it comes right after
+  the server that signed in last and the others that share its anisette identity, since those keep
+  the saved sign-in: lillq's identities work on no other server, and theirs not on lillq. A sign-in
+  that moves between lillq and another server makes that server an identity of its own instead of
+  stopping at the one it can't use.
+
 ### Fixed
+- **Signing in to Apple works again.** Since 20 November Apple has answered sign-ins through every
+  Mac anisette server with HTTP 503, “Service Temporarily Unavailable” (#146–#161): it now turns
+  away any client that calls its system “macOS”, and SideInstaller signed in as a Mac on macOS 26.6.
+  It now signs in as a Mac on macOS 10.15.7, the newest that still calls its system “Mac OS X”,
+  which Apple lets through and which is new enough for the accounts Apple asks for macOS 10.13 or
+  later (#89). The anisette identities made since 1.6.1 work with it as they are.
 - **The device link finds the pairing port when it isn't 49152.** iOS gives this iPhone's remote
   pairing listener whatever port is free when it starts, so it isn't always on 49152, and the
   device link was refused there with Developer Mode and LocalDevVPN both on. When 49152 refuses

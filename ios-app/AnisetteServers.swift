@@ -19,16 +19,15 @@ extension AnisetteServer {
     }
 
     /// The default server for a first sign-in, and the fallback when a saved
-    /// one can't be honoured: "SideStore (New)", on Apple's macOS ADI library.
+    /// one can't be honoured: lillq's pool (`ADILibrary.pool`), since 2.1.1.
     ///
     /// Since 2026-10-21 Apple refuses the sign-in token for anisette from its
-    /// Android library (-80046), and since about 2026-10-22 jkcoxson's and
-    /// StikStore's former Windows servers run the macOS library too, so the
-    /// macOS servers are the ones left. SideStore users got past -80046 with
-    /// this one picked, on-device anisette and auto-rotation off, and a new
-    /// anisette identity; iLoader and xtool start on mac-ani.jkcoxson.com, which
-    /// takes the same identity (see `candidates`).
-    static let fallback = AnisetteServer(name: "SideStore (New)", address: "https://new.ani.sidestore.io")
+    /// Android library (-80046), so the servers on its macOS library are the
+    /// ones left, and until 2.1.0 the default was "SideStore (New)"
+    /// (new.ani.sidestore.io), one of them. lillq runs a pool of its own on
+    /// the macOS library, checks hourly which clients Apple lets through, and
+    /// hands out one that passes.
+    static let fallback = AnisetteServer(name: "lillq", address: "https://anisette.lillq.me")
 
     /// The default until 1.5.2, on Apple's Android ADI library. It wasn't
     /// saved while it stayed the default, so it's what anyone who signed in
@@ -36,9 +35,11 @@ extension AnisetteServer {
     static let legacyDefault = AnisetteServer(name: "SideStore", address: "https://ani.sidestore.io")
 
     /// Servers on Apple's macOS ADI library that aren't on the community list,
-    /// added to it. iLoader lists StikStore's next to jkcoxson's, and
-    /// isideload defaults to its own since 2026-10-22.
+    /// added to it. lillq comes first, as the default; iLoader lists
+    /// StikStore's next to jkcoxson's, and isideload defaults to its own since
+    /// 2026-10-22.
     static let extras: [AnisetteServer] = [
+        fallback,
         AnisetteServer(name: "StikStore (Mac ADI)", address: "https://ani3.stikstore.app"),
         AnisetteServer(name: "StikStore 2 (Mac ADI)", address: "https://ani2.stikstore.app"),
         AnisetteServer(name: "iLoader (Mac ADI)", address: "https://ani.iloader.app"),
@@ -97,7 +98,9 @@ extension AnisetteServer {
     enum ADILibrary {
         /// macOS's, the one Xcode signs in with. These servers name a Mac on
         /// macOS 10.12.6, which Apple calls too old for some accounts, so
-        /// sign-in reports a current Mac instead, as SideStore does (isideload's
+        /// sign-in reports a newer Mac instead: macOS 10.15.7, the newest that
+        /// still calls its OS "Mac OS X", since Apple's edge has answered
+        /// "macOS" with HTTP 503 since 2026-11-20 (isideload's
         /// `client_info_to_use`).
         case mac
         /// Windows's, as iTunes and iCloud for Windows use it. These servers
@@ -109,11 +112,25 @@ extension AnisetteServer {
         /// saved token through one and never logs in (isideload's
         /// `android_adi`); Auto leaves them out.
         case android
+        /// lillq's pool (`poolHosts`): servers of its own that pick the library
+        /// by what Apple lets through (macOS's since 2026-11-20, Android's for
+        /// most of that day), with identities that work nowhere else. The
+        /// macOS servers answer them "adi_pb too large" and lillq answers
+        /// theirs -45061 (2026-11-21), so moving between the two makes a new
+        /// identity, and a token Apple refuses through it says nothing about
+        /// them. It hands out the servers' Sierra Mac, so sign-in reports the
+        /// same Mac as through them.
+        case pool
 
         /// The device sign-in reports to Apple through a server on this
         /// library. Apple's HTTP 503 refusals have gone by it, whatever the
         /// server.
-        var client: Client { self == .mac ? .mac : .windows }
+        var client: Client {
+            switch self {
+            case .mac, .pool: return .mac
+            case .windows, .android: return .windows
+            }
+        }
 
         enum Client { case mac, windows }
     }
@@ -131,11 +148,15 @@ extension AnisetteServer {
     /// Hosts of the servers known to run Apple's Windows ADI library.
     static let windowsADIHosts: Set<String> = ["win.ani.sidestore.io"]
 
+    /// Hosts of lillq's pool (`ADILibrary.pool`).
+    static let poolHosts: Set<String> = ["anisette.lillq.me"]
+
     /// The library `address` runs: a known host's, else what the list's name
     /// for it says ("… (Windows ADI)", "… (Mac ADI)"), else Android's.
     static func library(of address: String, in servers: [AnisetteServer] = bundledDefaults) -> ADILibrary {
         let key = normalized(address)
         if let host = URL(string: key)?.host?.lowercased() {
+            if poolHosts.contains(host) { return .pool }
             if macADIHosts.contains(host) { return .mac }
             if windowsADIHosts.contains(host) { return .windows }
         }
@@ -149,19 +170,23 @@ extension AnisetteServer {
 
     /// Addresses to sign in through with Auto on, de-duplicated and most likely
     /// to work first: `pick` (the last one that signed in) first with the rest
-    /// of its library, then the macOS-ADI servers (`macADIOrder`, then any
-    /// other in list order), then the Windows-ADI ones. Within each of those
-    /// groups, the servers in `failing` (`RecentFailures`) go last.
+    /// of its library, then lillq's pool (`poolHosts`), then the macOS-ADI
+    /// servers (`macADIOrder`, then any other in list order), then the
+    /// Windows-ADI ones. Within each of those groups, the servers in `failing`
+    /// (`RecentFailures`) go last.
     ///
     /// The pick keeps its anisette identity, and with it the saved developer
     /// token and Apple's trust in that machine, and so do the servers on its
+    /// library; lillq's identities work nowhere else, so a lillq pick is alone
+    /// in its group. From 2.1.1 lillq is the default (`fallback`), so a first
+    /// sign-in starts there, and it's the first server after the pick's
     /// library. The Android-ADI servers are left out: since 2026-10-21 Apple
     /// takes the password and the code through them and then refuses the
     /// sign-in token (-80046). An Android pick is still tried first, on its
     /// own, for its saved token; isideload doesn't log in through it
     /// (`AppleRefusals` then skips the rest of its kind). The macOS servers are
     /// what iLoader, xtool and SideStore's users sign in through now, and
-    /// SideInstaller reports a current Mac through them; the Windows servers
+    /// SideInstaller reports a newer Mac through them; the Windows servers
     /// come after, since jkcoxson's and StikStore's moved to the macOS library
     /// and win.ani.sidestore.io, the one left, was down on 2026-10-23.
     ///
@@ -188,11 +213,13 @@ extension AnisetteServer {
             macServers.first { URL(string: normalized($0))?.host?.lowercased() == host }
         } + macServers
         let windows = addresses.filter { library(of: $0, in: servers) == .windows }
+        let pool = addresses.filter { library(of: $0, in: servers) == .pool }
         switch library(of: pick, in: servers) {
-        case .mac:     add([pick] + mac)
-        case .windows: add([pick] + windows)
-        case .android: add([pick])
+        case .mac:            add([pick] + mac)
+        case .windows:        add([pick] + windows)
+        case .pool, .android: add([pick])
         }
+        add(pool)
         add(mac)
         add(windows)
         return out

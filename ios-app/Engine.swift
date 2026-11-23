@@ -2473,6 +2473,22 @@ final class Engine {
         return true
     }
 
+    /// Gives ARMSX3 the RPPairing record on its own (see
+    /// `ARMSX3PairingHandoff`). Returns false, writing nothing, when the
+    /// pairing file has none. Runs on `deviceQueue`.
+    private func handOffARMSX3Pairing(placementPath: String, bundleID: String) throws -> Bool {
+        let file = try Data(contentsOf: URL(fileURLWithPath: placementPath))
+        guard let record = ARMSX3PairingHandoff.record(from: file) else {
+            log("⚠️ This pairing file has no RPPairing record, the only kind ARMSX3's JIT reads, so nothing was written. Import a remote pairing file (from idevice_pair or iLoader) here, or generate one on iOS 27, then try again.")
+            return false
+        }
+        let rel = ARMSX3PairingHandoff.remoteRelativePath
+        log("Writing the RPPairing record into \(bundleID) /Documents/\(rel) …")
+        let written = try connection.writeFile(intoBundleID: bundleID, remoteRelativePath: rel, data: record)
+        log("Pairing file written into ARMSX3 and read-back VERIFIED (\(written) bytes). ARMSX3 takes it in the next time it opens; if it's open now, close it in the app switcher first.")
+        return true
+    }
+
     /// Gives Madeira the sign-in it renews its own signing with (see
     /// `MadeiraSigningHandoff`), as `madeiraSigningAccountJSON` built it. Returns
     /// whether it's there; failures only log. Runs on `deviceQueue`.
@@ -3057,6 +3073,22 @@ final class Engine {
         }
     }
 
+    /// Imports a pairing file a Shortcuts action was handed, as the picker's
+    /// import does, throwing what the picker would show.
+    @MainActor
+    func importPairingFile(data: Data, name: String) throws {
+        guard !isRunning else {
+            throw EngineError.message(L("An install is already running. Wait for it to finish, then try again."))
+        }
+        let kind = PairingFileKind.of(data: data)
+        guard data.count <= 1 << 20, kind.isUsable else {
+            throw EngineError.message(ErrorHelp.explained(L("%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.",
+                                                            name)))
+        }
+        log("Importing pairing file \(name) from Shortcuts …")
+        try adoptPairingFile(data, kind: kind, name: name)
+    }
+
     /// Makes a checked pairing file the one in use, replacing the one on disk,
     /// and shows it under `name` as the imported file.
     @MainActor
@@ -3451,7 +3483,10 @@ final class Engine {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
         let bundleID = target.bundleID
         if target.app.takesRemoteRecordOnly {
-            guard try handOffMadeiraPairing(placementPath: placementPath, bundleID: bundleID) else {
+            let handed = try target.name == ARMSX3PairingHandoff.appName
+                ? handOffARMSX3Pairing(placementPath: placementPath, bundleID: bundleID)
+                : handOffMadeiraPairing(placementPath: placementPath, bundleID: bundleID)
+            guard handed else {
                 throw EngineError.message(L("This pairing file has no RPPairing record, the only kind %@ reads.", target.name))
             }
             return

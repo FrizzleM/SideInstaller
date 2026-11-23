@@ -1289,6 +1289,31 @@ let japaneseStrings: [String: String] = [
     "Pick the team again?": "チームを選び直しますか？",
     "Pick Again": "選び直す",
     "The next sign-in with “%@” asks which developer team signs.": "次回「%@」でサインインするときに、署名に使う開発者チームを確認します。",
+    // Shortcuts actions (ShortcutsSupport.swift and the *Shortcuts.swift files).
+    "%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.":
+        "%@ を更新できません。SideInstaller に署名し直すための IPA がありません。インストール元のアプリで更新するか、先にその .ipa を SideInstaller に読み込んでください。",
+    "%@ is installed.":
+        "%@ をインストールしました。",
+    "Apple is asking you to finish signing in. Continue in SideInstaller to answer it.":
+        "Apple がサインインの完了を求めています。SideInstaller で続けて応答してください。",
+    "LocalDevVPN is connected.":
+        "LocalDevVPN は接続されています。",
+    "LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.":
+        "LocalDevVPN が接続されていません。このアクションの実行前に接続してください。ショートカットの VPN アクションで接続できます。または、SideInstaller の設定で「必要なときに LocalDevVPN を開始」をオンにしてください。",
+    "LocalDevVPN isn't connected. Continue in SideInstaller to connect it.":
+        "LocalDevVPN が接続されていません。接続するには SideInstaller で続けてください。",
+    "No route is playing.":
+        "再生中のルートはありません。",
+    "Open SideInstaller and accept its terms first.":
+        "先に SideInstaller を開いて、利用規約に同意してください。",
+    "Pick where the route starts, or set a location first.":
+        "ルートの出発地点を選ぶか、先に位置情報を設定してください。",
+    "Route started: %@, about %@.":
+        "ルートを開始しました: %@、約 %@。",
+    "That place has no coordinates. Pick it on the map, or type its address.":
+        "その場所には座標がありません。地図で選ぶか、住所を入力してください。",
+    "The install didn't start. Open SideInstaller to see why.":
+        "インストールが開始されませんでした。SideInstaller を開いて理由を確認してください。",
 
     // MARK: - Sources
 
