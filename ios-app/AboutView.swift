@@ -277,7 +277,7 @@ private struct CryptoDonationsView: View {
                     Label(L("Send each coin only on the network shown. Crypto sent on another network can't be recovered."),
                           systemImage: "exclamationmark.triangle")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }

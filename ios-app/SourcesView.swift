@@ -142,7 +142,7 @@ struct SourcesView: View {
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             TextField(L("搜索"), text: $sourceSearchText)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
@@ -191,7 +191,7 @@ struct SourcesView: View {
             image.resizable().scaledToFill()
         } placeholder: {
             Image(systemName: "shippingbox")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
         }
         .frame(width: 44, height: 44)
         .background(Color(.secondarySystemBackground))
@@ -383,7 +383,7 @@ struct SourceAppsView: View {
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             TextField(L("搜索"), text: $appSearchText)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
@@ -472,7 +472,7 @@ struct SourceAppsView: View {
             image.resizable().scaledToFill()
         } placeholder: {
             Image(systemName: "app")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
         }
         .frame(width: 60, height: 60)
         .background(Color(.secondarySystemBackground))

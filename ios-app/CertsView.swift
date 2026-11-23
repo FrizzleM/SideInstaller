@@ -307,7 +307,7 @@ struct CertsView: View {
                     .font(.headline)
                 Text(L("This Apple ID has no development certificates to revoke."))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)

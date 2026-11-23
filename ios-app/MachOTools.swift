@@ -92,7 +92,7 @@ struct MachOView: View {
                                 if slice.deps.isEmpty && slice.rpaths.isEmpty {
                                     Text(L("没有 dylib 依赖"))
                                         .font(.footnote)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Theme.muted)
                                 }
                             } header: {
                                 Text(slice.arch)
@@ -108,7 +108,7 @@ struct MachOView: View {
                     VStack(spacing: 10) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.largeTitle)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                         Text(loadError)
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)

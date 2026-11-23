@@ -179,13 +179,13 @@ struct SettingsView: View {
                             .font(.body)
                         Text(enterpriseCertName)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                     Spacer()
                     if let exp = enterpriseCertExpiration {
                         Text(exp.formatted(Date.FormatStyle(date: .abbreviated).locale(Localizer.locale)))
                             .font(.footnote)
-                            .foregroundStyle(enterpriseCertExpirationSoon ? Theme.negative : .secondary)
+                            .foregroundStyle(enterpriseCertExpirationSoon ? Theme.negative : Theme.muted)
                     }
                 }
             }
@@ -348,7 +348,7 @@ struct SettingsView: View {
         return HStack(spacing: 12) {
             Image(systemName: "person.crop.circle")
                 .font(.title3)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.appleID)
                     .font(.subheadline.weight(isActive ? .medium : .regular))
@@ -774,7 +774,7 @@ private struct ToolRow: View {
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
         }
     }

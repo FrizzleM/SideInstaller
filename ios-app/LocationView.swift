@@ -1283,7 +1283,7 @@ struct LocationView: View {
                         Menu { stopMenu(stop, index: index) } label: {
                             Image(systemName: "ellipsis.circle")
                                 .font(.title3)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                                 .frame(width: 36, height: 36)
                                 .contentShape(Rectangle())
                         }
@@ -1419,7 +1419,7 @@ struct LocationView: View {
             Button { manager.removePlannedRoute() } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .frame(width: 32, height: 32)
             }
             .accessibilityLabel(L("Remove"))
@@ -1435,7 +1435,7 @@ struct LocationView: View {
             } else {
                 Image(systemName: mode.systemImage)
                     .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .frame(width: 44, height: 44)
                     .background(Circle().fill(Theme.control))
             }
@@ -1532,7 +1532,7 @@ struct LocationView: View {
             } label: {
                 Image(systemName: "ellipsis.circle")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .frame(width: 36, height: 36)
                     .contentShape(Rectangle())
             }
@@ -1597,7 +1597,7 @@ struct LocationView: View {
             Button { manager.removeRoute() } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title3)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .frame(width: 32, height: 32)
             }
             .accessibilityLabel(L("Remove"))
@@ -1617,7 +1617,7 @@ struct LocationView: View {
                 Spacer()
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
             .fieldBackground()
             .contentShape(Rectangle())

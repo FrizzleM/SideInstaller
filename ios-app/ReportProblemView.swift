@@ -96,7 +96,7 @@ struct ReportProblemView: View {
                     Text(L("Error"))
                     Text(error)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

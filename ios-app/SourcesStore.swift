@@ -202,9 +202,11 @@ final class SourceStore: ObservableObject {
     /// Network + byte loop + decode for one source document, off the main
     /// actor: `SourceStore` is @MainActor, so a plain static func here would
     /// still be MainActor-isolated — `nonisolated` is what moves the work.
-    /// Only touches static state (`fetchSession`, `sourceBodyCap`); error and
-    /// cancellation semantics are unchanged (AsyncBytes.next() throws
-    /// CancellationError on cancel, which propagates to `fetch`'s catch).
+    /// Only touches static state (`fetchSession`, `sourceBodyCap`); error
+    /// semantics are unchanged. Cancellation: URLSession's async methods
+    /// throw `URLError(.cancelled)` (-999) on cancel, NOT CancellationError
+    /// (only checkCancellation/Task.sleep guarantee that) — `fetch` catches
+    /// both below, so a cancelled fetch leaves no fake error on the row.
     nonisolated private static func fetchSourceDocument(url: URL) async throws -> AltSource {
         var request = URLRequest(url: url)
         request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
@@ -271,6 +273,11 @@ final class SourceStore: ObservableObject {
         } catch is CancellationError {
             // 取消不是错误：只把 isLoading 复位，不写 errorMessage——
             // 视图消失导致 .task 取消时，行上不能留一条假错误。
+            guard let index = sources.firstIndex(where: { $0.url == url }) else { return }
+            sources[index].isLoading = false
+        } catch let error as URLError where error.code == .cancelled {
+            // URLSession 的 async 方法取消时抛 URLError(.cancelled)（-999），
+            // 不是 CancellationError；与上一分支同处理。
             guard let index = sources.firstIndex(where: { $0.url == url }) else { return }
             sources[index].isLoading = false
         } catch {

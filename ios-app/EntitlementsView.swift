@@ -570,7 +570,7 @@ struct EntitlementsView: View {
                     .font(.headline)
                 Text(L("This Apple ID hasn't registered any apps yet. Install something with SideInstaller first, then come back."))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)

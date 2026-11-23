@@ -213,7 +213,7 @@ struct PairingView: View {
                     .font(.headline)
                 Text(L("Install an app like SideStore, StikDebug, or Feather first, then rescan."))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)

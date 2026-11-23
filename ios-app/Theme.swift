@@ -526,7 +526,7 @@ private struct PopupCloseButton: View {
         Button(action: action) {
             Image(systemName: "xmark")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(Theme.control))
                 .contentShape(Circle())
@@ -796,7 +796,7 @@ struct PairingCodePopup: View {
                 PairingCodeDigits(pin: pin)
                 Text(caption)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }

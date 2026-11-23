@@ -2212,7 +2212,7 @@ struct SideBySideView: View {
                     Text(manager.isImportingIPA ? L("Importing…") : L("Use a custom .ipa instead"))
                 }
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .padding(.vertical, 4)
                 .contentShape(Rectangle())
             }
@@ -2287,7 +2287,7 @@ struct SideBySideView: View {
                         L("SideInstaller recognizes this as %@ and sets it up just like its own download.", $0.displayName)
                     } ?? L("Signed with the Apple ID and installed as it is, without a pairing file."))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                         .transition(.opacity)
                 }
@@ -2693,7 +2693,7 @@ struct SideBySideView: View {
                         PairingCodeDigits(pin: pin)
                         Text(L("Type this into the prompt on their iPhone."))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 12)
@@ -2713,7 +2713,7 @@ struct SideBySideView: View {
                         ProgressView().controlSize(.small)
                         Text(L("Waiting for their iPhone…"))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                     .transition(.opacity)
                 }
@@ -2742,7 +2742,7 @@ struct SideBySideView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Text(detail)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -2805,7 +2805,7 @@ struct SideBySideView: View {
         } label: {
             Image(systemName: "xmark")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(Theme.control))
                 .contentShape(Circle())
@@ -2935,7 +2935,7 @@ struct SideBySideView: View {
 
             Label(L("This iPhone no longer keeps a pairing with theirs."), systemImage: "lock.shield")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
                 .cascadeItem(3)
@@ -3037,7 +3037,7 @@ private struct AppGlyph: View {
                     Rectangle().fill(Theme.raised)
                     Image(systemName: app.symbol)
                         .font(.system(size: size * 0.44))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
             }
         }
@@ -3118,7 +3118,7 @@ private struct OptionRow: View {
             HStack(spacing: 16) {
                 Image(systemName: symbol)
                     .font(.system(size: 17))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .frame(width: 36, height: 36)
                     .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.control))
                 VStack(alignment: .leading, spacing: 4) {
@@ -3127,7 +3127,7 @@ private struct OptionRow: View {
                         .foregroundStyle(.primary)
                     Text(detail)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(wrapsDetail ? nil : 2)
                         .truncationMode(.middle)
                         .multilineTextAlignment(.leading)

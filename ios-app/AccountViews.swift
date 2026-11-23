@@ -161,7 +161,7 @@ struct OfficialSourceQuestion: View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.shield")
                 .font(.system(size: 48))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .padding(.bottom, 4)
                 .cascadeItem(0)
             Text(L("Did you download SideInstaller from sideinstaller.net?"))
@@ -241,7 +241,7 @@ struct OfficialSourceWarningActions: View {
             .buttonStyle(PrimaryButtonStyle())
             Button(L("Back"), action: onBack)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .buttonStyle(.plain, sound: .tap)
 
             // Kept small and dim on purpose, and behind a confirmation, so

@@ -766,7 +766,7 @@ struct FilesTabView: View {
                             } else if visibleDirItems.isEmpty {
                                 Text(L("没有匹配的 IPA。"))
                                     .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Theme.muted)
                             } else {
                                 folderSection(items: visibleDirItems).cascadeItem(2)
                             }
@@ -1085,7 +1085,7 @@ struct FilesTabView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Image(systemName: "folder.badge.plus")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Text(L("文件管理"))
                         .font(.headline)
                 }
@@ -1109,7 +1109,7 @@ struct FilesTabView: View {
                         ProgressView()
                         Text(L("处理中…"))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                 } else if let opMessage {
                     Text(opMessage)
@@ -1127,7 +1127,7 @@ struct FilesTabView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: "wifi")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 Text(L("局域网传输"))
                     .font(.headline)
             }
@@ -1196,7 +1196,7 @@ struct FilesTabView: View {
     private var fileSearchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             TextField(L("搜索"), text: $fileSearchText)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
@@ -1226,7 +1226,7 @@ struct FilesTabView: View {
                 Spacer()
                 Text(L("%d 项", currentDirItems.count))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
         }
     }
@@ -1255,7 +1255,7 @@ struct FilesTabView: View {
                      ? (fileTab == .unsigned ? L("还没有未签名的 IPA。") : L("还没有已签名的 IPA。"))
                      : L("没有匹配的 IPA。"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             } else {
                 ForEach(filteredIPAs) { item in
                     fileRow(item)
@@ -1306,7 +1306,7 @@ struct FilesTabView: View {
             // IPA 还没取到图、取图失败、非 IPA 文件：一律中性占位，
             // 不造假图、不空框（IPA 占位与应用库同款灰色文档标）。
             Image(systemName: "doc")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .font(.title3)
                 .frame(width: 60, height: 60)
         }
@@ -1549,7 +1549,7 @@ struct FilesTabView: View {
                 if moveDestinations(for: item).isEmpty {
                     Text(L("没有可移动到的文件夹，先新建一个。"))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
                 ForEach(moveDestinations(for: item), id: \.dir) { dest in
                     Button {
@@ -1783,7 +1783,7 @@ struct FilesTabView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "square.stack")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 Text(L("应用库"))
                     .font(.headline)
                 Spacer()
@@ -1823,7 +1823,7 @@ struct FilesTabView: View {
             // 轻松签应用页同款浅灰搜索框，两个切栏都按名字过滤。
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 TextField(L("搜索"), text: $librarySearchText)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
@@ -1842,7 +1842,7 @@ struct FilesTabView: View {
                             .font(.footnote)
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .font(.footnote)
                     }
                 }
@@ -2172,7 +2172,7 @@ struct FilesTabView: View {
                 HStack(spacing: 12) {
                     Text(L("共 %d 条", logEntries.count))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Spacer()
                     Button { showingLogClearConfirm = true } label: {
                         Text(L("清空")).font(.footnote)
@@ -2393,7 +2393,7 @@ struct FilesTabView: View {
             } else if filteredSigned.isEmpty {
                 Text(L("没有匹配的已签名 IPA。"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             } else {
                 if selectingSigned {
                     HStack(spacing: 12) {

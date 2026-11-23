@@ -1250,7 +1250,7 @@ struct AppsView: View {
             if case let .failed(message) = job.state {
                 Text(message)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.negative)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -1456,7 +1456,7 @@ struct AppsView: View {
                     .font(.headline)
                 Text(L("Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here."))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)

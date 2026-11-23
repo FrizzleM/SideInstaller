@@ -365,7 +365,7 @@ struct EnterpriseCertView: View {
                         if let expiration = info.expiration {
                             HStack {
                                 Text(L("到期"))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Theme.muted)
                                 Spacer()
                                 Text(expiration.formatted(date: .abbreviated, time: .omitted) + remainingText(expiration))
                                     .foregroundStyle(expirySoon(expiration) ? Theme.negative : .primary)
@@ -389,7 +389,7 @@ struct EnterpriseCertView: View {
                                 }
                                 Text(udid)
                                     .font(.system(.footnote, design: .monospaced))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Theme.muted)
                                     .textSelection(.enabled)
                             } else {
                                 Text(L("描述文件限定了设备（共 %d 台）：如果是开发证书且本机不在列表里，签名后装不上；企业证书通常不限设备。", info.provisionedDeviceCount))
@@ -417,7 +417,7 @@ struct EnterpriseCertView: View {
                     HStack(spacing: 10) {
                         Text(L("吊销状态"))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                         Text(revocationText)
                             .font(.footnote)
                             .foregroundStyle(revocationColor)
@@ -700,7 +700,7 @@ struct EnterpriseCertView: View {
     private func infoRow(_ title: String, _ value: String) -> some View {
         HStack {
             Text(title)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             Spacer()
             Text(value)
                 .multilineTextAlignment(.trailing)
@@ -858,7 +858,7 @@ struct EnterpriseCertView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             PanelCard {
                 content()
             }
@@ -928,13 +928,13 @@ struct EnterpriseCertView: View {
                             if let name = certInfo?.name, !name.isEmpty {
                                 Text(name)
                                     .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Theme.muted)
                                     .lineLimit(1)
                             }
                             if let expiration = certInfo?.expiration ?? provisionInfo?.expiration {
                                 Text(expiration.formatted(date: .abbreviated, time: .omitted) + remainingText(expiration))
                                     .font(.footnote)
-                                    .foregroundStyle(expirySoon(expiration) ? Theme.negative : .secondary)
+                                    .foregroundStyle(expirySoon(expiration) ? Theme.negative : Theme.muted)
                             }
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(Theme.positive)
@@ -946,7 +946,7 @@ struct EnterpriseCertView: View {
                                 .foregroundStyle(Theme.warning)
                         }
                         Image(systemName: (certGroupExpanded ?? !certReady) ? "chevron.up" : "chevron.down")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .font(.footnote)
                     }
                 }
@@ -1017,7 +1017,7 @@ struct EnterpriseCertView: View {
                                 .lineLimit(1)
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                                 .font(.footnote)
                         }
                     }
@@ -1081,11 +1081,11 @@ struct EnterpriseCertView: View {
                 } else if workspace.signBusy {
                     Text(L("正在签名，请稍候…"))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 } else if enterpriseInstallInFlight {
                     Text(installStageText)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 } else if let error = enterpriseInstallErrorText {
                     Text(error)
                         .font(.footnote)
@@ -1327,7 +1327,7 @@ struct EnterpriseCertView: View {
                         Spacer()
                         Button { removePreset(preset) } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                         }
                         .buttonStyle(.plain)
                     }
@@ -1336,7 +1336,7 @@ struct EnterpriseCertView: View {
             if let presetMessage {
                 Text(presetMessage)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
         }
     }
@@ -1400,7 +1400,7 @@ struct EnterpriseCertView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "puzzlepiece.extension")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                         Text(url.lastPathComponent)
                             .font(.footnote)
                             .lineLimit(1)
@@ -1410,7 +1410,7 @@ struct EnterpriseCertView: View {
                             CertPluginStore.remove(url)
                         } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                         }
                         .buttonStyle(.plain)
                     }
@@ -2032,11 +2032,11 @@ struct EnterpriseCertView: View {
                 if engine.installProgress > 0 {
                     Text(L("配对安装进行中（%d%%）", Int(engine.installProgress * 100)))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 } else {
                     Text(L("配对安装进行中"))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
                 Spacer()
                 Button(L("取消安装")) { CZFHaptics.impact(.light); engine.cancelOneClick() }
@@ -2118,7 +2118,7 @@ struct EnterpriseCertView: View {
         } label: {
             Text(L("安装诊断日志"))
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
         }
     }
 
@@ -2208,7 +2208,7 @@ struct EnterpriseCertView: View {
                         ProgressView()
                         Text(installStageText)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     } else if showingEnterpriseInstallSuccessAlert {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(Theme.positive)
@@ -2222,10 +2222,10 @@ struct EnterpriseCertView: View {
                             .foregroundStyle(Theme.negative)
                     } else {
                         Image(systemName: "circle")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                         Text(L("安装未开始"))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                 }
                 if !localInstall.diagnosticLog.isEmpty {
@@ -2280,7 +2280,7 @@ private struct LibraryIPAPicker: View {
                 // 应用库同款浅灰搜索框：按文件名/App 名/Bundle ID 过滤。
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     TextField(L("搜索"), text: $query)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -2353,7 +2353,7 @@ private struct LibraryIPAPicker: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
                 Image(systemName: "doc")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .font(.title3)
                     .frame(width: 52, height: 52)
             }

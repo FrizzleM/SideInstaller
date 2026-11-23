@@ -323,7 +323,7 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .frame(width: 28, height: 28)
                             .background(Circle().fill(Theme.control))
                             .contentShape(Circle())
@@ -374,7 +374,7 @@ struct ContentView: View {
                         Spacer()
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.footnote.weight(.medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                     // Kept to a plain field's height, the icon included.
                     .padding(.vertical, -4)
@@ -505,7 +505,7 @@ struct ContentView: View {
             HStack(spacing: 8) {
                 Image(systemName: "link")
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 TextField(L("Paste a download link"), text: $ipaLink)
                     .textFieldStyle(.plain)
                     .focused($linkFieldFocused)
@@ -519,7 +519,7 @@ struct ContentView: View {
                 if !ipaLink.isEmpty {
                     Button { ipaLink = "" } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                     .buttonStyle(.plain, sound: .tick)
                 }
@@ -747,7 +747,7 @@ struct ContentView: View {
             Button { CZFHaptics.impact(); engine.requestSideStorePairing() } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.uturn.backward.circle")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Text(L("Get it from SideStore"))
                         .foregroundStyle(.primary)
                     Spacer()
@@ -885,7 +885,7 @@ struct ContentView: View {
                     } else {
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.footnote.weight(.medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                 }
                 .fieldBackground()
@@ -953,7 +953,7 @@ struct ContentView: View {
                         .font(.subheadline.weight(.medium))
                     Text(L("Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network."))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -1061,7 +1061,7 @@ struct ContentView: View {
         } label: {
             Image(systemName: "xmark")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(Theme.control))
                 .contentShape(Circle())
@@ -1096,7 +1096,7 @@ struct ContentView: View {
     private func disclosureChevron(expanded: Bool) -> some View {
         Image(systemName: "chevron.down")
             .font(.footnote.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.muted)
             .rotationEffect(.degrees(expanded ? 180 : 0))
             .frame(width: 28, height: 28)
             .background(Circle().fill(Theme.control))
@@ -1384,7 +1384,7 @@ private func precheckRow(title: String, state: PrecheckState, detail: String,
                     .font(.subheadline.weight(.semibold))
                 Text(detail)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
