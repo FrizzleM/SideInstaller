@@ -23,8 +23,10 @@ struct PairingTargetApp: Identifiable, Equatable {
     }
 
     /// True for an app that is handed the RPPairing record alone and nothing
-    /// else; see `MadeiraPairingHandoff`.
-    var takesRemoteRecordOnly: Bool { name == MadeiraPairingHandoff.appName }
+    /// else; see `MadeiraPairingHandoff` and `ARMSX3PairingHandoff`.
+    var takesRemoteRecordOnly: Bool {
+        name == MadeiraPairingHandoff.appName || name == ARMSX3PairingHandoff.appName
+    }
 
     /// The supported apps, in display order. `StikDebug (Sideloaded)` is
     /// reached only through the bundle-id check in `PairingTargets.match`.
@@ -70,6 +72,9 @@ struct PairingTargetApp: Identifiable, Equatable {
               bundleIDContains: nil),
         .init(name: MadeiraPairingHandoff.appName,
               remoteRelativePath: MadeiraPairingHandoff.remoteRelativePath,
+              bundleIDContains: nil),
+        .init(name: ARMSX3PairingHandoff.appName,
+              remoteRelativePath: ARMSX3PairingHandoff.remoteRelativePath,
               bundleIDContains: nil),
     ]
 }
@@ -329,6 +334,38 @@ enum MadeiraPairingHandoff {
     /// none that Madeira would accept.
     static func record(from pairingFile: Data) -> Data? {
         // The same test Madeira runs: both keys 32 bytes, and an identifier.
+        guard PairingFileKind.of(data: pairingFile).hasRemotePairing else { return nil }
+        return (try? SideStorePairingHandoff.split(pairingFile, udid: nil))?.remote
+    }
+}
+
+/// The pairing hand-off ARMSX3 reads.
+///
+/// ARMSX3's JIT keeps this iPhone's RPPairing file in its Library, at
+/// `Application Support/StikJIT/pairingFile.plist`, which house_arrest can't
+/// reach. Every time it opens, before `main()`, it moves in a
+/// `pairingFile.plist` it finds at the top of its Documents, replacing the one
+/// it had, and deletes that copy (`Armsx3TakeDocumentsDrop` in ARMSX3's
+/// `ios/jit-enabler/StikJITExtensionLauncher.m`). That is the folder ARMSX3
+/// tells its users to drop the file in from Files, and house_arrest reaches it.
+///
+/// ARMSX3 takes the file only if it is an RPPairing record (its JIT reaches
+/// lockdownd through the RSD tunnel, never with a lockdown record), and leaves
+/// anything else lying in Documents. So, as for Madeira, a pairing file without
+/// one isn't written at all, and one that also holds a lockdown record is cut
+/// down to the RPPairing keys.
+enum ARMSX3PairingHandoff {
+
+    /// ARMSX3's home-screen name, as installation_proxy reports it.
+    static let appName = "ARMSX3"
+    /// Where the record goes, relative to ARMSX3's Documents.
+    static let remoteRelativePath = "pairingFile.plist"
+
+    /// The RPPairing record in `pairingFile` on its own, or nil if it holds
+    /// none that ARMSX3 would accept.
+    static func record(from pairingFile: Data) -> Data? {
+        // The same test ARMSX3 runs (`armsx3_pairing_shape_of`): both keys 32
+        // bytes, and an identifier.
         guard PairingFileKind.of(data: pairingFile).hasRemotePairing else { return nil }
         return (try? SideStorePairingHandoff.split(pairingFile, udid: nil))?.remote
     }

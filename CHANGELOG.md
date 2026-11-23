@@ -18,6 +18,10 @@ All notable changes to SideInstaller are documented here.
   connects it. A spoofed location stays set until it's reset, as one set in the app does. Siri
   takes “Spoof my location to *saved place* with SideInstaller”, “Reset my location with
   SideInstaller” and “Refresh my apps with SideInstaller”.
+- **The pairing file goes into ARMSX3.** The Pairing page lists ARMSX3 next to the other apps and
+  writes the pairing file's remote pairing record, the only kind its JIT reads, into its Documents
+  folder as `pairingFile.plist`, where ARMSX3 takes it in the next time it opens. A pairing file
+  without a remote pairing record isn't written.
 
 ### Changed
 - **The Location spoofing page opens on the spoofed location**, which a shortcut may have set while
