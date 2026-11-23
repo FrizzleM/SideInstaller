@@ -59,16 +59,30 @@ final class DownloadsManager: ObservableObject {
 
     // MARK: - Actions
 
+    /// 下载列表重扫代际号（FilesTabView.refreshFiles 同模式）：每次
+    /// refresh() 调用 +1 并捕获，写回前核对，旧扫描直接丢弃；delete
+    /// 成功路也 +1，使在途的旧扫描失效，已删文件不再被它的写回带回列表。
+    private var refreshGeneration = 0
+
     /// Rebuild the list from disk, scanning the directory so hand-copied files
-    /// appear too. Safe to call repeatedly.
+    /// appear too. Safe to call repeatedly. The scan runs off the main thread
+    /// (FilesTabView.refreshFiles 同款）：进页先显示旧列表，扫完再换新。
     @MainActor
     func refresh() {
-        downloads = IPALibrary.scan().map {
-            DownloadedIPA(source: $0.source, channel: $0.channel, url: $0.url,
-                          size: $0.size, modified: $0.modified, isImported: $0.isImported,
-                          version: $0.version)
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        Task.detached { [weak self] in
+            let entries = IPALibrary.scan()
+            await MainActor.run {
+                guard let self, generation == self.refreshGeneration else { return }
+                self.downloads = entries.map {
+                    DownloadedIPA(source: $0.source, channel: $0.channel, url: $0.url,
+                                  size: $0.size, modified: $0.modified, isImported: $0.isImported,
+                                  version: $0.version)
+                }
+                self.hasLoaded = true
+            }
         }
-        hasLoaded = true
     }
 
     /// Delete one downloaded IPA, then refresh the list.
@@ -91,6 +105,9 @@ final class DownloadsManager: ObservableObject {
             // 数字只在 load/续签时重算，不联动这里就会一直显示旧数。
             // 只重算配对，不重读设备。
             SideloadedAppsManager.shared.refreshRefreshableOnly()
+            // A-6：本地先去掉已删行，列表立即正确；末尾 refresh() 的
+            // 后台重扫随后确认真相（FilesTabView.delete 同款）。
+            downloads.removeAll { $0.id == item.id }
         } catch {
             lastError = L("Couldn't delete %@: %@", item.fileName, error.localizedDescription)
             engine.log("⛔️ Downloads: \(lastError ?? "delete failed")")

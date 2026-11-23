@@ -556,7 +556,6 @@ let turkishStrings: [String: String] = [
     "Unused profiles": "Kullanılmayan profiller",
     "Issued to App IDs no installed app is running on.": "Yüklü hiçbir uygulamanın çalışmadığı App ID'lere verilmiş.",
     "Older profiles": "Eski profiller",
-    "Bundle identifier": "Paket tanımlayıcı",
     "App ID": "App ID",
     "Version": "Sürüm",
     "Profile name": "Profil adı",

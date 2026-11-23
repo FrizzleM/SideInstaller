@@ -2350,10 +2350,17 @@ final class Engine {
                 tunnelAcquired = true
                 try await ensureNetwork()
                 try await pairAndConnect()
+                // SIDE-33 B-1：配对边界复核取消——取消落在配对等待期间时，
+                // onDeviceQueue 跑完才返回，这里拦住，不再继续签名/安装。
+                try Task.checkCancellation()
                 downloadedIPAPath = ipaURL.path
                 downloadedSource = .custom
                 try await signAppWithCert(mods: mods)
+                // SIDE-33 B-1：签名边界复核取消。
+                try Task.checkCancellation()
                 try await install(prestaged: nil)
+                // SIDE-33 B-1：安装边界复核取消——拦在 finishSuccess() 之前，不谎报成功。
+                try Task.checkCancellation()
                 finishSuccess()
                 outcome = .installed
             } catch is CancellationError {
@@ -2495,6 +2502,9 @@ final class Engine {
                 tunnelAcquired = true
                 try await ensureNetwork()
                 try await pairAndConnect()
+                // SIDE-33 B-1：配对边界复核取消——取消落在配对等待期间时，
+                // onDeviceQueue 跑完才返回，这里拦住，不再继续解包/安装。
+                try Task.checkCancellation()
                 downloadedIPAPath = ipaURL.path
                 downloadedSource = .custom
                 setStep(.sign, .active)
@@ -2509,7 +2519,11 @@ final class Engine {
                 signedAppPath = bundle
                 signedDisplayName = signedAppName()
                 setStep(.sign, .done)
+                // SIDE-33 B-1：解包边界复核取消。
+                try Task.checkCancellation()
                 try await install(prestaged: nil)
+                // SIDE-33 B-1：安装边界复核取消——拦在 finishSuccess() 之前，不谎报成功。
+                try Task.checkCancellation()
                 finishSuccess()
                 outcome = .installed
             } catch is CancellationError {
@@ -2758,6 +2772,9 @@ final class Engine {
         } else {
             accountConfig = await accountConfigJSON(source: source)
         }
+        // SIDE-33 B-2：交接落定后复核取消——覆盖 handOff 与 accountConfigJSON
+        // 两个分支；拦住时配对文件不写入。
+        try Task.checkCancellation()
         let udid = deviceUDID
         do {
             let handed = try await onDeviceQueue {
@@ -2779,6 +2796,9 @@ final class Engine {
                 log("⚠️ Couldn't seed the pairing file into \(installedAppName) (\(short(error))). It's installed and ready — only AltStore-family apps need that file.")
             }
         }
+        // SIDE-33 B-2：写盘返回后复核取消——拦在 setStep(.done) 与
+        // finishSuccess() 之前；已发生的写盘保留，只是不再谎报成功。
+        try Task.checkCancellation()
         setStep(.writePairing, .done)
     }
 

@@ -139,13 +139,30 @@ final class AutoRefreshService {
 
         // 读一次设备清单（安静模式，失败就等下一轮）。
         let failedBefore = manager.lastLoadFailed
-        manager.load(quiet: true)
-        for _ in 0..<40 {
-            if !manager.isWorking { break }
-            try? await Task.sleep(nanoseconds: 500_000_000)
+        // A-4（SIDE-33）：load 起的那只 Task（没起跑时等那只在途的）
+        // 与 20 秒 sleep 竞速，先到者恢复 continuation；load 的
+        // Task<Void, Never>.value 不响应取消，task group 限不住时限，
+        // 改用单次恢复守卫的 continuation 竞速，落败的 helper 空转
+        // 结束、无害。两只都没有（正刷续签、load 起不来）时直接往下
+        // 走判定，与旧的“isWorking 为假即跳出”同义。
+        let loadTask = manager.load(quiet: true) ?? manager.inFlightLoadTask
+        var loadTimedOut = false
+        if let loadTask {
+            let finished: Bool = await withCheckedContinuation { continuation in
+                let gate = SingleResume()
+                Task {
+                    await loadTask.value
+                    if gate.claim() { continuation.resume(returning: true) }
+                }
+                Task {
+                    try? await Task.sleep(nanoseconds: 20 * 1_000_000_000)
+                    if gate.claim() { continuation.resume(returning: false) }
+                }
+            }
+            loadTimedOut = !finished
         }
         guard !manager.isRefreshing else { return false }
-        if manager.isWorking {
+        if loadTimedOut {
             engine.log("Auto refresh: device list still loading after 20s, skipping this round.")
             return false
         }
@@ -224,6 +241,22 @@ final class AutoRefreshService {
             Engine.shared.log("Auto refresh: notification failed to send (\(error.localizedDescription)).")
             return false
         }
+    }
+}
+
+/// Single-fire gate for the load/timeout race in `tick()`: whichever helper
+/// wins resumes the continuation, the loser is a no-op (BuiltinTunnel 的
+/// TunnelWaitState 同款：NSLock + resumed 标志）。
+private final class SingleResume: @unchecked Sendable {
+    private let lock = NSLock()
+    private var resumed = false
+    /// True only for the first caller.
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !resumed else { return false }
+        resumed = true
+        return true
     }
 }
 

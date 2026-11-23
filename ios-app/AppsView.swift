@@ -220,10 +220,12 @@ enum ExpiryUrgency {
         let formatted = expiration.formatted(
             Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Localizer.locale))
         if profile.isExpired { return L("Expired %@", formatted) }
-        switch profile.daysRemaining {
+        // 每行算一次存局部量：switch 与插值各取一次会重复算日历差。
+        let days = profile.daysRemaining
+        switch days {
         case 0:         return L("Expires today")
         case 1:         return L("Expires tomorrow")
-        case .some(2...): return L("Expires in %d days — %@", profile.daysRemaining ?? 0, formatted)
+        case .some(2...): return L("Expires in %d days — %@", days ?? 0, formatted)
         default:        return L("Expires %@", formatted)
         }
     }
@@ -345,6 +347,13 @@ struct RefreshJob: Identifiable, Equatable {
     let bundleID: String
     let name: String
     let ipa: URL
+    /// Size in bytes of the IPA at pair time, from the library scan —
+    /// the row icon key reads this snapshot instead of statting the disk
+    /// on every body evaluation (A-1, SIDE-33).
+    let ipaSize: Int
+    /// Modification time of the IPA at pair time, seconds since 1970
+    /// (0 when the scan saw no date); same snapshot purpose as `ipaSize`.
+    let ipaModified: TimeInterval
     /// Team ID the app is currently signed under (from its current profile).
     let teamID: String?
     var state: State = .pending
@@ -441,6 +450,10 @@ final class SideloadedAppsManager: ObservableObject {
     /// can await it instead of polling `isWorking` (A-5, SIDE-32).
     private var loadTask: Task<Void, Never>?
 
+    /// Internal read of the load in flight, so the auto-refresh patrol can
+    /// await it instead of polling `isWorking` (A-4, SIDE-33).
+    var inFlightLoadTask: Task<Void, Never>? { loadTask }
+
     /// What went wrong last, as a popup `RootView` stacks over the app.
     var popups: [ToolPopup] { lastError.map { [.error($0)] } ?? [] }
 
@@ -481,19 +494,26 @@ final class SideloadedAppsManager: ObservableObject {
         let task = Task { @MainActor in
             do {
                 let inventory = try await engine.sideloadedAppInventory()
-                let apps = inventory.apps.compactMap(SideloadedApp.init(plist:))
-                // TestFlight apps' profiles would otherwise show as unused.
-                let profiles = inventory.profiles.compactMap(ProvisioningProfile.init(data:))
-                    .filter { !$0.isAppStoreDistribution }
-                let matched = ProfileMatcher.match(apps: apps, profiles: profiles)
-                entries = matched.entries
-                unmatched = matched.unmatched
+                // A-3（SIDE-33）：三步解析（两个 compactMap + match）是
+                // 非隔离纯函数，放 detached 里算完，只把赋值留在主线程。
+                // SideloadedApp / ProvisioningProfile / ProfileMatcher 皆为
+                // 非隔离 struct/enum，无 @MainActor，移过去无隔离问题。
+                let parsed = await Task.detached {
+                    let apps = inventory.apps.compactMap(SideloadedApp.init(plist:))
+                    // TestFlight apps' profiles would otherwise show as unused.
+                    let profiles = inventory.profiles.compactMap(ProvisioningProfile.init(data:))
+                        .filter { !$0.isAppStoreDistribution }
+                    let matched = ProfileMatcher.match(apps: apps, profiles: profiles)
+                    return (apps: apps, profiles: profiles, matched: matched)
+                }.value
+                entries = parsed.matched.entries
+                unmatched = parsed.matched.unmatched
                 await rebuildRefreshable()
                 hasLoaded = true
                 lastRefreshed = Date()
                 lastLoadFailed = nil
                 lastLoadError = nil
-                engine.log("Sideloaded apps: \(apps.count) sideloaded, \(profiles.count) profile(s) decoded.")
+                engine.log("Sideloaded apps: \(parsed.apps.count) sideloaded, \(parsed.profiles.count) profile(s) decoded.")
             } catch {
                 let message = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
                 lastLoadFailed = Date()
@@ -951,6 +971,9 @@ final class SideloadedAppsManager: ObservableObject {
             await postResignNotification(title: L("续签完成"), body: L("没有需要续签的应用。"))
             return
         }
+        // B-4（SIDE-33）：load 的数秒内另起了一轮续签时静默返回——
+        // 再调 refreshAll() 会撞 isRefreshing 守卫、弹一条假错误。
+        guard !isRefreshing else { return }
         refreshAll()
     }
 
@@ -1036,7 +1059,9 @@ final class SideloadedAppsManager: ObservableObject {
                                          teamID: app.teamID)
             }) else { return nil }
             return RefreshJob(bundleID: app.bundleID, name: app.name,
-                              ipa: match.entry.url, teamID: app.teamID)
+                              ipa: match.entry.url, ipaSize: match.entry.size,
+                              ipaModified: match.entry.modified?.timeIntervalSince1970 ?? 0,
+                              teamID: app.teamID)
         }
     }
 }
@@ -1388,11 +1413,10 @@ struct AppsView: View {
     /// 可续签列表变了（刚读完设备、或导入新 IPA）或同路径文件被替换
     /// 就重取。
     private func rowIconKey(for status: SideloadedAppStatus) -> String {
-        let ipa = manager.refreshable.first { $0.bundleID == status.app.bundleID }?.ipa
-        let attrs = ipa.flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path) }
-        let size = attrs?[.size] as? Int ?? 0
-        let modified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
-        return "\(status.app.bundleID)#\(ipa?.path ?? "")#\(size)#\(modified)"
+        // A-1（SIDE-33）：只读 pair() 时快照的存量，不再 stat 磁盘——
+        // body 每次求值都会调这里。键格式不变。
+        let job = manager.refreshable.first { $0.bundleID == status.app.bundleID }
+        return "\(status.app.bundleID)#\(job?.ipa.path ?? "")#\(job?.ipaSize ?? 0)#\(job?.ipaModified ?? 0)"
     }
 
     /// 行图标：配对 IPA 的真图放后台取，取到写缓存；没配对 IPA、
@@ -1401,11 +1425,13 @@ struct AppsView: View {
         let key = rowIconKey(for: status)
         guard !rowIconsTried.contains(key) else { return }
         rowIconsTried.insert(key)
-        guard let ipa = manager.refreshable.first(where: { $0.bundleID == status.app.bundleID })?.ipa else { return }
+        guard let job = manager.refreshable.first(where: { $0.bundleID == status.app.bundleID }) else { return }
+        let ipa = job.ipa
         let bundleID = status.app.bundleID
-        let attrs = try? FileManager.default.attributesOfItem(atPath: ipa.path)
-        let size = attrs?[.size] as? Int
-        let modified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        // A-1（SIDE-33）：大小/修改时间复用 pair() 的快照，不再二次 stat；
+        // 解包途中文件被替换的校验仍用快照值比对。
+        let size = job.ipaSize
+        let modified = job.ipaModified
         Task.detached { [ipa, bundleID, path = ipa.path, size, modified] in
             guard let data = IPALibrary.iconData(at: ipa),
                   let image = UIImage(data: data) else { return }
@@ -1586,7 +1612,7 @@ private struct AppProfileDetail: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(status.app.name)
                     .font(.title3.weight(.semibold))
-                field(L("Bundle identifier"), status.app.bundleID)
+                field(L("Bundle Identifier"), status.app.bundleID)
                 if let identifier = status.app.applicationIdentifier ?? status.current?.applicationIdentifier {
                     field(L("App ID"), identifier)
                 }

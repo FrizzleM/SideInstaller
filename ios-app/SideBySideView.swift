@@ -569,6 +569,10 @@ final class SideBySideManager: ObservableObject {
                 try await signApp(app)
                 try await install(ip: address)
                 if let setsUp { try await setUp(setsUp, ip: address, appleID: credentials.id) }
+                // SIDE-33 B-3：末步边界复核取消——取消落在 install（无 setUp 时）
+                // 或 setUp 的 FFI 等待期间时，拦在 finishSuccess() 之前，
+                // 不报成功、不清对方会话与配对记录。
+                try Task.checkCancellation()
                 finishSuccess()
             } catch let error where error is CancellationError || Task.isCancelled {
                 // A blocking call that was under way when Cancel was tapped can

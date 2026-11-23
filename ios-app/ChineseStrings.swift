@@ -538,7 +538,6 @@ let chineseStrings: [String: String] = [
     "Issued to App IDs no installed app is running on.":
         "签发给了没有任何已安装应用在使用的 App ID。",
     "Older profiles": "较旧的描述文件",
-    "Bundle identifier": "Bundle 标识符",
     "Bundle Identifier": "Bundle 标识符",
     "App ID": "App ID",
     "Version": "版本",
@@ -1252,7 +1251,6 @@ let chineseStrings: [String: String] = [
     "Loading…": "正在加载…",
     "Import failed": "导入失败",
     "Export certificate (p12)": "导出证书（p12）",
-    "Bundle ID": "Bundle 标识符",
     "Certificate password:": "证书密码：",
     "No IPA imported.": "没有导入 IPA。",
     "The built-in tunnel couldn't start. See the log for the reason, then try again.":

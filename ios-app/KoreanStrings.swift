@@ -418,7 +418,7 @@ let koreanStrings: [String: String] = [
 
     // MARK: - Entitlements tab
 
-    "Entitlements": "Entitlements",
+    "Entitlements": "권한",
     "Load apps": "앱 불러오기",
     "%d App ID": "App ID %d개",
     "%d App IDs": "App ID %d개",
@@ -519,7 +519,6 @@ let koreanStrings: [String: String] = [
     "Issued to App IDs no installed app is running on.":
         "설치된 어떤 앱도 사용하지 않는 App ID에 발급된 프로파일입니다.",
     "Older profiles": "이전 프로파일",
-    "Bundle identifier": "번들 ID",
     "App ID": "App ID",
     "Version": "버전",
     "Profile name": "프로파일 이름",
@@ -660,7 +659,7 @@ let koreanStrings: [String: String] = [
 
     // MARK: - Release channels & downloads
 
-    "Stable": "Stable",
+    "Stable": "안정 버전",
     "Nightly": "Nightly",
 
     // Version picker (Advanced)

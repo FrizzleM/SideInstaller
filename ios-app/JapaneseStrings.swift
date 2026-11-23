@@ -518,7 +518,6 @@ let japaneseStrings: [String: String] = [
     "Issued to App IDs no installed app is running on.":
         "インストール済みのアプリが使用していない App ID に発行されたものです。",
     "Older profiles": "古いプロファイル",
-    "Bundle identifier": "バンドル識別子",
     "App ID": "App ID",
     "Version": "バージョン",
     "Profile name": "プロファイル名",

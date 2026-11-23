@@ -531,7 +531,6 @@ let italianStrings: [String: String] = [
     "Issued to App IDs no installed app is running on.":
         "Rilasciati per App ID su cui non gira nessuna app installata.",
     "Older profiles": "Profili più vecchi",
-    "Bundle identifier": "Identificativo bundle",
     "App ID": "App ID",
     "Version": "Versione",
     "Profile name": "Nome del profilo",

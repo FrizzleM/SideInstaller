@@ -532,7 +532,6 @@ let vietnameseStrings: [String: String] = [
     "Issued to App IDs no installed app is running on.":
         "Được cấp cho các App ID mà không ứng dụng nào đã cài đang chạy trên đó.",
     "Older profiles": "Hồ sơ cũ hơn",
-    "Bundle identifier": "Định danh bundle",
     "App ID": "App ID",
     "Version": "Phiên bản",
     "Profile name": "Tên hồ sơ",

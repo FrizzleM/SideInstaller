@@ -430,7 +430,7 @@ let portugueseStrings: [String: String] = [
 
     // MARK: - Entitlements tab
 
-    "Entitlements": "Entitlements",
+    "Entitlements": "Permissões",
     "Load apps": "Carregar apps",
     "%d App ID": "%d App ID",
     "%d App IDs": "%d App IDs",
@@ -533,7 +533,6 @@ let portugueseStrings: [String: String] = [
     "Issued to App IDs no installed app is running on.":
         "Emitidos para App IDs que nenhum app instalado está usando.",
     "Older profiles": "Perfis mais antigos",
-    "Bundle identifier": "Identificador do pacote",
     "App ID": "App ID",
     "Version": "Versão",
     "Profile name": "Nome do perfil",

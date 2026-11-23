@@ -150,6 +150,9 @@ struct EnterpriseCertView: View {
     @State private var unsignedIconsTried: Set<String> = []
     @State private var signedIcons: [String: UIImage] = [:]
     @State private var signedIconsTried: Set<String> = []
+    /// 已选 IPA 图标指纹缓存（A-1）：只在 selectedIPA 变化时重算，
+    /// .task(id:) 读缓存值，不再每 body 求值 stat 磁盘。
+    @State private var selectedIPAFingerprint = ""
 
     private var certReady: Bool { hasP12 && hasProvision && !password.isEmpty }
     /// 证书组收起行缺件状态：三件（p12、描述文件、密码）缺哪件说哪件，
@@ -846,9 +849,9 @@ struct EnterpriseCertView: View {
                 }
             }
             await MainActor.run {
-                guard fingerprint == EnterpriseCertStore.certStateFingerprint(),
+                guard fingerprint == EnterpriseCertStore.certStateFingerprint(profiles: currentProfiles),
                       storePassword == EnterpriseCertStore.password,
-                      activeID == EnterpriseCertStore.activeProfile()?.id
+                      activeID == EnterpriseCertStore.activeProfile(profiles: currentProfiles)?.id
                 else { return }
                 self.provisionInfo = provision
                 self.certInfo = cert
@@ -890,11 +893,12 @@ struct EnterpriseCertView: View {
         // 照抄 refreshCertState 的三重守卫模式：调用前抓指纹，
         // 写回前核对未变才写状态；revocationChecking 复位放守卫外，
         // 任何出口都复位。
-        let fingerprint = EnterpriseCertStore.certStateFingerprint()
+        let profiles = EnterpriseCertStore.profiles()
+        let fingerprint = EnterpriseCertStore.certStateFingerprint(profiles: profiles)
         Task.detached(priority: .userInitiated) {
             let status = CertRevocationChecker.check(force: true)
             await MainActor.run {
-                if fingerprint == EnterpriseCertStore.certStateFingerprint() {
+                if fingerprint == EnterpriseCertStore.certStateFingerprint(profiles: profiles) {
                     self.revocationStatus = status
                     self.revocationCheckedAt = Date()
                 }
@@ -1568,6 +1572,7 @@ struct EnterpriseCertView: View {
             Spacer()
             Button {
                 selectedIPA = nil
+                selectedIPAFingerprint = ""
                 selectedInfo = nil
                 signError = nil
                 resetMods()
@@ -1578,7 +1583,7 @@ struct EnterpriseCertView: View {
                     .font(.footnote)
             }
         }
-        .task(id: "\(url.path)#\(iconFingerprint(for: url.path))") {
+        .task(id: "\(url.path)#\(selectedIPAFingerprint)") {
             loadLibraryIcon(for: url.path, signed: false)
         }
     }
@@ -1682,12 +1687,14 @@ struct EnterpriseCertView: View {
         // 明说文件找不到了、进口按钮就在下面可重试，绝不空白。
         guard FileManager.default.fileExists(atPath: url.path) else {
             selectedIPA = nil
+            selectedIPAFingerprint = ""
             selectedInfo = nil
             selectedUndumpedFingerprint = nil
             signError = L("这个文件找不到了，请重新选择。")
             return
         }
         selectedIPA = url
+        selectedIPAFingerprint = iconFingerprint(for: url.path)
         // 从库里点选就是来签名的，直接切到签名段，别让用户再往上翻。
         resetMods()
         iconItem = nil
