@@ -219,7 +219,8 @@ final class SourcesManager: ObservableObject {
         var picture: URL? { URL(string: "https://github.com/\(gitHub).png?size=128") }
     }
 
-    /// The official sources of the apps SideInstaller works with, and Haven.
+    /// The official sources of the apps SideInstaller installs. Any other
+    /// source is added by its link.
     static let suggestions: [Suggestion] = [
         Suggestion(name: "SideStore", developer: "SideStore",
                    url: URL(string: "https://apps.sidestore.io")!, gitHub: "SideStore"),
@@ -228,8 +229,6 @@ final class SourcesManager: ObservableObject {
         Suggestion(name: "LiveContainer + SideStore", developer: "LiveContainer",
                    url: URL(string: "https://github.com/LiveContainer/LiveContainer/releases/download/1.0/apps_ss_lc.json")!,
                    gitHub: "LiveContainer"),
-        Suggestion(name: "Haven", developer: "TinusTK",
-                   url: URL(string: "https://tinustk.github.io/Haven/source.json")!, gitHub: "TinusTK"),
     ]
 
     /// The suggestions not added yet.
