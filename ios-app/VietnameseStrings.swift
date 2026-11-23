@@ -1321,4 +1321,29 @@ let vietnameseStrings: [String: String] = [
     "Pick Again": "Chọn lại",
     "The next sign-in with “%@” asks which developer team signs.":
         "Lần đăng nhập tiếp theo bằng “%@” sẽ hỏi ký bằng nhóm nhà phát triển nào.",
+    // Shortcuts actions (ShortcutsSupport.swift and the *Shortcuts.swift files).
+    "%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.":
+        "Không thể gia hạn %@: SideInstaller không có tệp IPA để ký lại. Hãy gia hạn trong ứng dụng đã cài nó, hoặc nhập tệp .ipa của nó vào SideInstaller trước.",
+    "%@ is installed.":
+        "%@ đã được cài đặt.",
+    "Apple is asking you to finish signing in. Continue in SideInstaller to answer it.":
+        "Apple đang yêu cầu bạn hoàn tất đăng nhập. Hãy tiếp tục trong SideInstaller để trả lời.",
+    "LocalDevVPN is connected.":
+        "LocalDevVPN đã được kết nối.",
+    "LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.":
+        "LocalDevVPN chưa được kết nối. Hãy kết nối trước khi tác vụ này chạy: tác vụ VPN trong Phím tắt làm được việc đó. Hoặc bật “Khởi động LocalDevVPN khi cần” trong Cài đặt của SideInstaller.",
+    "LocalDevVPN isn't connected. Continue in SideInstaller to connect it.":
+        "LocalDevVPN chưa được kết nối. Hãy tiếp tục trong SideInstaller để kết nối.",
+    "No route is playing.":
+        "Không có lộ trình nào đang phát.",
+    "Open SideInstaller and accept its terms first.":
+        "Hãy mở SideInstaller và chấp nhận điều khoản của ứng dụng trước.",
+    "Pick where the route starts, or set a location first.":
+        "Hãy chọn nơi lộ trình bắt đầu, hoặc đặt một vị trí trước.",
+    "Route started: %@, about %@.":
+        "Đã bắt đầu lộ trình: %@, khoảng %@.",
+    "That place has no coordinates. Pick it on the map, or type its address.":
+        "Địa điểm đó không có tọa độ. Hãy chọn trên bản đồ hoặc nhập địa chỉ.",
+    "The install didn't start. Open SideInstaller to see why.":
+        "Việc cài đặt chưa bắt đầu. Hãy mở SideInstaller để xem lý do.",
 ]

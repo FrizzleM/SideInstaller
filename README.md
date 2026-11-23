@@ -127,6 +127,33 @@ Discord and most chat apps only make `https://` links tappable, so to post an in
 where the IPA downloads from and hands it to `sideinstaller://install`, with a button for when iOS
 doesn't open the app on its own.
 
+### Shortcuts
+
+SideInstaller's tools are actions in the Shortcuts app, so a shortcut, an automation, the Action
+button or Siri can run them:
+
+- **Location spoofing:** Set Location (a place picked on the map, an address, or a location from
+  another action), Set Location to Coordinates, Set Location to Saved Place, Reset Location, Get
+  Spoofed Location, Is Location Spoofed, Play GPX Route, Travel to Place (a route planned over
+  OpenStreetMap, walked, cycled, or driven at each road's speed limit), Stop Route, Save Place and
+  Delete Saved Place.
+- **Sideloaded apps:** Get Sideloaded Apps (each with the day it expires and the days left),
+  Refresh All Apps and Refresh App.
+- **Install:** Install App (SideStore, LiveContainer + SideStore, Madeira or AltStore, stable or
+  nightly), Install IPA and Install IPA from URL. These open SideInstaller, since an install can
+  stop to ask something there.
+- **Pairing and the rest:** Get Pairing File, Import Pairing File, Install Pairing File into Apps,
+  Show Developer Mode in Settings, Is LocalDevVPN Connected, Connect LocalDevVPN and Get Activity
+  Log.
+
+The others run in the background, over LocalDevVPN like the app's own pages, so its tunnel has to
+be up: connect it before them (Shortcuts' Set VPN action can), or turn on **Start LocalDevVPN when
+needed**, and the action asks to continue in SideInstaller to connect it. A location set from a
+shortcut stays set until Reset Location: SideInstaller keeps running in the background to hold it,
+as it does when you set one in the app. Siri knows “Spoof my location to *saved place* with
+SideInstaller”, “Reset my location with SideInstaller” and “Refresh my apps with SideInstaller”.
+The actions' names are in English; what they say when they run is in SideInstaller's language.
+
 
 ## Compatibility
 

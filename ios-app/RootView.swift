@@ -59,9 +59,11 @@ struct RootView: View {
     /// Owned here so they survive tab switches and share the one `Engine`.
     @StateObject private var certManager = CertManager()
     @StateObject private var pairingManager = PairingManager()
-    @StateObject private var locationManager = LocationManager()
+    /// The app's own, shared with the Shortcuts actions.
+    @ObservedObject private var locationManager = LocationManager.shared
     @StateObject private var entitlementsManager = EntitlementsManager()
-    @StateObject private var appsManager = SideloadedAppsManager()
+    /// The app's own, shared with the Shortcuts actions.
+    @ObservedObject private var appsManager = SideloadedAppsManager.shared
     @StateObject private var sideBySideManager = SideBySideManager()
     /// What the sign-in sheet showed last, so it keeps its content while it
     /// slides away after the sign-in clears it.

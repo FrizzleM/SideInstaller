@@ -1330,4 +1330,29 @@ let frenchStrings: [String: String] = [
     "Pick Again": "Choisir à nouveau",
     "The next sign-in with “%@” asks which developer team signs.":
         "La prochaine connexion avec « %@ » demandera quelle équipe de développement signe.",
+    // Shortcuts actions (ShortcutsSupport.swift and the *Shortcuts.swift files).
+    "%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.":
+        "Impossible de renouveler %@ : SideInstaller n'a pas d'IPA pour la signer à nouveau. Renouvelez-la dans l'app qui l'a installée, ou importez d'abord son .ipa dans SideInstaller.",
+    "%@ is installed.":
+        "%@ est installé.",
+    "Apple is asking you to finish signing in. Continue in SideInstaller to answer it.":
+        "Apple vous demande de terminer la connexion. Continuez dans SideInstaller pour y répondre.",
+    "LocalDevVPN is connected.":
+        "LocalDevVPN est connecté.",
+    "LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.":
+        "LocalDevVPN n'est pas connecté. Connectez-le avant que cette action ne s'exécute : l'action VPN de Raccourcis peut le faire. Sinon, activez « Lancer LocalDevVPN au besoin » dans les Réglages de SideInstaller.",
+    "LocalDevVPN isn't connected. Continue in SideInstaller to connect it.":
+        "LocalDevVPN n'est pas connecté. Continuez dans SideInstaller pour le connecter.",
+    "No route is playing.":
+        "Aucun itinéraire n'est en cours de lecture.",
+    "Open SideInstaller and accept its terms first.":
+        "Ouvrez d'abord SideInstaller et acceptez ses conditions.",
+    "Pick where the route starts, or set a location first.":
+        "Choisissez le point de départ de l'itinéraire, ou définissez d'abord une position.",
+    "Route started: %@, about %@.":
+        "Itinéraire lancé : %@, environ %@.",
+    "That place has no coordinates. Pick it on the map, or type its address.":
+        "Ce lieu n'a pas de coordonnées. Choisissez-le sur la carte, ou saisissez son adresse.",
+    "The install didn't start. Open SideInstaller to see why.":
+        "L'installation n'a pas démarré. Ouvrez SideInstaller pour en voir la raison.",
 ]

@@ -1291,4 +1291,29 @@ let koreanStrings: [String: String] = [
     "Pick the team again?": "팀을 다시 고를까요?",
     "Pick Again": "다시 고르기",
     "The next sign-in with “%@” asks which developer team signs.": "다음에 “%@”(으)로 로그인할 때 서명할 개발자 팀을 묻습니다.",
+    // Shortcuts actions (ShortcutsSupport.swift and the *Shortcuts.swift files).
+    "%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.":
+        "%@을(를) 갱신할 수 없습니다. SideInstaller에 다시 서명할 IPA가 없습니다. 설치한 도구에서 갱신하거나, 먼저 해당 .ipa를 SideInstaller로 가져오세요.",
+    "%@ is installed.":
+        "%@ 앱이 설치되었습니다.",
+    "Apple is asking you to finish signing in. Continue in SideInstaller to answer it.":
+        "Apple이 로그인을 마치도록 요청하고 있습니다. SideInstaller에서 계속하여 응답하세요.",
+    "LocalDevVPN is connected.":
+        "LocalDevVPN이 연결되어 있습니다.",
+    "LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.":
+        "LocalDevVPN이 연결되어 있지 않습니다. 이 동작이 실행되기 전에 연결하세요. 단축어의 VPN 동작으로 연결할 수 있습니다. 또는 SideInstaller 설정에서 “필요할 때 LocalDevVPN 시작”을 켜세요.",
+    "LocalDevVPN isn't connected. Continue in SideInstaller to connect it.":
+        "LocalDevVPN이 연결되어 있지 않습니다. 연결하려면 SideInstaller에서 계속하세요.",
+    "No route is playing.":
+        "재생 중인 경로가 없습니다.",
+    "Open SideInstaller and accept its terms first.":
+        "먼저 SideInstaller를 열고 약관에 동의하세요.",
+    "Pick where the route starts, or set a location first.":
+        "경로의 출발 지점을 고르거나, 먼저 위치를 설정하세요.",
+    "Route started: %@, about %@.":
+        "경로를 시작했습니다: %@, 약 %@.",
+    "That place has no coordinates. Pick it on the map, or type its address.":
+        "그 장소에는 좌표가 없습니다. 지도에서 고르거나 주소를 입력하세요.",
+    "The install didn't start. Open SideInstaller to see why.":
+        "설치가 시작되지 않았습니다. SideInstaller를 열어 이유를 확인하세요.",
 ]

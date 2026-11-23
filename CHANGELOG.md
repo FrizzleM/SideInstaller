@@ -2,6 +2,27 @@
 
 All notable changes to SideInstaller are documented here.
 
+## Unreleased
+
+### Added
+- **Shortcuts actions.** SideInstaller's tools can now run from the Shortcuts app, automations, the
+  Action button and Siri: 24 actions, each waiting for its result and handing it on. Location
+  spoofing has them all: set the location to a place, coordinates or a saved place, reset it, read
+  where it's set, play a GPX file, travel to a place along a route planned over OpenStreetMap, stop
+  a route, and save or delete places. Get Sideloaded Apps lists each app with its expiry, and
+  Refresh All Apps and Refresh App renew them; Install App, Install IPA and Install IPA from URL
+  install as the Install tab does. The pairing file can be fetched, imported and installed into
+  apps, Developer Mode shown in Settings, LocalDevVPN checked and connected, and the activity log
+  read. Everything but installing runs in the background over LocalDevVPN; when its tunnel is down
+  and “Start LocalDevVPN when needed” is on, the action asks to continue in SideInstaller, which
+  connects it. A spoofed location stays set until it's reset, as one set in the app does. Siri
+  takes “Spoof my location to *saved place* with SideInstaller”, “Reset my location with
+  SideInstaller” and “Refresh my apps with SideInstaller”.
+
+### Changed
+- **The Location spoofing page opens on the spoofed location**, which a shortcut may have set while
+  the page was closed, rather than always on the same spot.
+
 ## 2.1.1
 
 ### Changed

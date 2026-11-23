@@ -1185,4 +1185,29 @@ let turkishStrings: [String: String] = [
     "Pick Again": "Yeniden seç",
     "The next sign-in with “%@” asks which developer team signs.":
         "“%@” ile bir sonraki oturum açmada hangi geliştirici ekibinin imzalayacağı sorulur.",
+    // Shortcuts actions (ShortcutsSupport.swift and the *Shortcuts.swift files).
+    "%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.":
+        "%@ yenilenemiyor: SideInstaller'da onu yeniden imzalayacak IPA yok. Onu yükleyen uygulamada yenile ya da önce .ipa dosyasını SideInstaller'a aktar.",
+    "%@ is installed.":
+        "%@ yüklendi.",
+    "Apple is asking you to finish signing in. Continue in SideInstaller to answer it.":
+        "Apple oturum açmayı bitirmeni istiyor. Yanıtlamak için SideInstaller'da devam et.",
+    "LocalDevVPN is connected.":
+        "LocalDevVPN bağlı.",
+    "LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.":
+        "LocalDevVPN bağlı değil. Bu eylem çalışmadan önce bağla: Kestirmeler'deki VPN eylemi bunu yapabilir. Ya da SideInstaller'ın Ayarlar'ında “Gerektiğinde LocalDevVPN'i başlat”ı aç.",
+    "LocalDevVPN isn't connected. Continue in SideInstaller to connect it.":
+        "LocalDevVPN bağlı değil. Bağlamak için SideInstaller'da devam et.",
+    "No route is playing.":
+        "Oynatılan bir rota yok.",
+    "Open SideInstaller and accept its terms first.":
+        "Önce SideInstaller'ı aç ve koşullarını kabul et.",
+    "Pick where the route starts, or set a location first.":
+        "Rotanın nereden başlayacağını seç ya da önce bir konum ayarla.",
+    "Route started: %@, about %@.":
+        "Rota başladı: %@, yaklaşık %@.",
+    "That place has no coordinates. Pick it on the map, or type its address.":
+        "Bu yerin koordinatları yok. Haritada seç ya da adresini yaz.",
+    "The install didn't start. Open SideInstaller to see why.":
+        "Yükleme başlamadı. Nedenini görmek için SideInstaller'ı aç.",
 ]

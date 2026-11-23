@@ -3057,6 +3057,22 @@ final class Engine {
         }
     }
 
+    /// Imports a pairing file a Shortcuts action was handed, as the picker's
+    /// import does, throwing what the picker would show.
+    @MainActor
+    func importPairingFile(data: Data, name: String) throws {
+        guard !isRunning else {
+            throw EngineError.message(L("An install is already running. Wait for it to finish, then try again."))
+        }
+        let kind = PairingFileKind.of(data: data)
+        guard data.count <= 1 << 20, kind.isUsable else {
+            throw EngineError.message(ErrorHelp.explained(L("%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.",
+                                                            name)))
+        }
+        log("Importing pairing file \(name) from Shortcuts …")
+        try adoptPairingFile(data, kind: kind, name: name)
+    }
+
     /// Makes a checked pairing file the one in use, replacing the one on disk,
     /// and shows it under `name` as the imported file.
     @MainActor

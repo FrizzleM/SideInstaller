@@ -366,8 +366,14 @@ struct RouteProgress: Equatable {
 /// Drives the Location page: fetch and mount the developer disk image, then
 /// hold a DVT session open and keep pushing the chosen coordinate at it. Only
 /// UI state lives here — the shared `Engine` owns the device connection.
+///
+/// One for the app, so Shortcuts actions (LocationShortcuts.swift) drive the
+/// same session as the page, even when iOS starts the app in the background
+/// for them and no page exists.
 @MainActor
 final class LocationManager: ObservableObject {
+
+    static let shared = LocationManager()
 
     /// Setup progress (not shown in the UI). Resets to `.notReady` on any
     /// session error, since re-pairing tears down the device link.
@@ -514,8 +520,7 @@ final class LocationManager: ObservableObject {
     /// the page opened). Setup errors are shown to the user here.
     func simulate(_ coordinate: CLLocationCoordinate2D, name: String? = nil) {
         guard !isBusy else { return }
-        guard (-90...90).contains(coordinate.latitude),
-              (-180...180).contains(coordinate.longitude) else {
+        guard Self.isValid(coordinate) else {
             lastError = ErrorHelp.explained(L("That isn't a valid coordinate."))
             return
         }
@@ -525,24 +530,34 @@ final class LocationManager: ObservableObject {
         lastSuccess = nil
         Task {
             do {
-                try await ensureReady()
-                try await engine.simulateLocation(latitude: coordinate.latitude,
-                                                  longitude: coordinate.longitude)
-                simulated = coordinate
-                keepAlive.startAudio()
-                startResending()
-                // A planned route starting at the device would start elsewhere now.
-                if startsFromDevice { dropPlannedRoute() }
+                try await performSimulate(coordinate)
                 lastSuccess = L("Location set to %@.", name ?? Self.format(coordinate))
-                engine.log("Location: simulating \(Self.format(coordinate)).")
             } catch {
-                // A dropped session can't be re-used; setup has to run again.
-                stage = .notReady
-                simulated = nil
-                stopResending()
                 lastError = message(error)
             }
             isBusy = false
+        }
+    }
+
+    /// Sets up if needed, sets `coordinate` and keeps re-sending it. The
+    /// caller holds `isBusy`.
+    private func performSimulate(_ coordinate: CLLocationCoordinate2D) async throws {
+        do {
+            try await ensureReady()
+            try await engine.simulateLocation(latitude: coordinate.latitude,
+                                              longitude: coordinate.longitude)
+            simulated = coordinate
+            keepAlive.startAudio()
+            startResending()
+            // A planned route starting at the device would start elsewhere now.
+            if startsFromDevice { dropPlannedRoute() }
+            engine.log("Location: simulating \(Self.format(coordinate)).")
+        } catch {
+            // A dropped session can't be re-used; setup has to run again.
+            stage = .notReady
+            simulated = nil
+            stopResending()
+            throw error
         }
     }
 
@@ -556,17 +571,28 @@ final class LocationManager: ObservableObject {
         stopResending()
         Task {
             do {
-                try await engine.stopSimulatingLocation()
+                try await performStop()
                 lastSuccess = L("Location reset. The device is using its own again.")
             } catch {
                 lastError = message(error)
             }
+            isBusy = false
+        }
+    }
+
+    /// Stops playback and re-sending, gives the device its own location back,
+    /// and leaves setup to run again next time, even when the reset fails.
+    /// The caller holds `isBusy`.
+    private func performStop() async throws {
+        cancelPlayback()
+        stopResending()
+        defer {
             simulated = nil
             if startsFromDevice { dropPlannedRoute() }
             stage = .notReady
             keepAlive.stopAll()
-            isBusy = false
         }
+        try await engine.stopSimulatingLocation()
     }
 
     /// Re-sends `simulated` on a timer. Individual send failures are ignored
@@ -610,12 +636,15 @@ final class LocationManager: ObservableObject {
 
     /// Saves `coordinate` under `name`, or under the coordinate itself when the
     /// name is left blank (as StikDebug does).
-    func savePlace(named name: String, at coordinate: CLLocationCoordinate2D) {
+    @discardableResult
+    func savePlace(named name: String, at coordinate: CLLocationCoordinate2D) -> SavedPlace {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        savedPlaces.append(SavedPlace(name: trimmed.isEmpty ? Self.format(coordinate) : trimmed,
-                                      latitude: coordinate.latitude,
-                                      longitude: coordinate.longitude))
+        let place = SavedPlace(name: trimmed.isEmpty ? Self.format(coordinate) : trimmed,
+                               latitude: coordinate.latitude,
+                               longitude: coordinate.longitude)
+        savedPlaces.append(place)
         storeSavedPlaces()
+        return place
     }
 
     func deletePlace(_ place: SavedPlace) {
@@ -631,6 +660,8 @@ final class LocationManager: ObservableObject {
     private func storeSavedPlaces() {
         guard let data = try? JSONEncoder().encode(savedPlaces) else { return }
         UserDefaults.standard.set(data, forKey: Self.savedPlacesKey)
+        // Siri's "Spoof my location to …" phrases name the saved places.
+        SideInstallerShortcuts.updateAppShortcutParameters()
     }
 
     // MARK: Routes
@@ -683,26 +714,37 @@ final class LocationManager: ObservableObject {
         } else {
             return
         }
-        guard let start = timeline.points.first else { return }
+        guard !timeline.points.isEmpty else { return }
         isBusy = true
         lastError = nil
         lastSuccess = nil
         Task {
             do {
-                try await ensureReady()
-                try await engine.simulateLocation(latitude: start.latitude,
-                                                  longitude: start.longitude)
-                simulated = start
-                keepAlive.startAudio()
-                startPlayback(timeline)
-                engine.log("Location: playing \(name) over \(Int(timeline.duration)) s.")
+                try await beginPlayback(timeline, name: name)
             } catch {
-                stage = .notReady
-                simulated = nil
-                stopResending()
                 lastError = message(error)
             }
             isBusy = false
+        }
+    }
+
+    /// Sets up if needed, puts the device on the timeline's first point and
+    /// starts moving it. The caller holds `isBusy`.
+    private func beginPlayback(_ timeline: RouteTimeline, name: String) async throws {
+        guard let start = timeline.points.first else { return }
+        do {
+            try await ensureReady()
+            try await engine.simulateLocation(latitude: start.latitude,
+                                              longitude: start.longitude)
+            simulated = start
+            keepAlive.startAudio()
+            startPlayback(timeline)
+            engine.log("Location: playing \(name) over \(Int(timeline.duration)) s.")
+        } catch {
+            stage = .notReady
+            simulated = nil
+            stopResending()
+            throw error
         }
     }
 
@@ -854,10 +896,134 @@ final class LocationManager: ObservableObject {
         plannedRoute = nil
     }
 
+    // MARK: Shortcuts
+    //
+    // What the Shortcuts actions run (LocationShortcuts.swift): the page's own
+    // steps, each waiting its turn behind whatever the page is doing and
+    // returning once the device has the result, which they report themselves.
+    // A popup left from an earlier tap would be out of date by then, so it
+    // goes.
+
+    /// Sets the device's location to `coordinate` and keeps re-sending it, as
+    /// Set location does. Stops a playing route.
+    func setLocation(_ coordinate: CLLocationCoordinate2D) async throws {
+        guard Self.isValid(coordinate) else {
+            throw EngineError.message(L("That isn't a valid coordinate."))
+        }
+        try await beginShortcutStep()
+        defer { endShortcutStep() }
+        cancelPlayback()
+        try await performSimulate(coordinate)
+    }
+
+    /// Hands the device its real location back, as Reset to real location
+    /// does. Nothing happens when nothing is simulated.
+    func resetLocation() async throws {
+        try await waitUntilIdle()
+        isBusy = true
+        defer { isBusy = false }
+        lastError = nil
+        lastSuccess = nil
+        try await performStop()
+    }
+
+    /// Loads `imported` as the page's route and plays it at `speed`, in place
+    /// of any route playing now.
+    func play(_ imported: GPXRoute, at speed: RouteSpeed) async throws {
+        try await beginShortcutStep()
+        defer { endShortcutStep() }
+        cancelPlayback()
+        dropPlannedRoute()
+        route = imported
+        routeSpeed = imported.speeds.contains(speed) ? speed : .walk
+        try await beginPlayback(RouteTimeline(route: imported, speed: routeSpeed), name: imported.name)
+    }
+
+    /// Plans a route to `destination` over OpenStreetMap and plays it, as
+    /// Find route then Play route do. It starts at `start`, or where the
+    /// device is simulated now when that's nil.
+    func travel(to destination: RouteStop, from start: RouteStop?,
+                by mode: TravelMode) async throws -> PlannedRoute {
+        try await beginShortcutStep()
+        defer { endShortcutStep() }
+        guard let origin = start?.coordinate ?? simulated else {
+            throw EngineError.message(L("Pick where the route starts, or set a location first."))
+        }
+        cancelPlayback()
+        // The page shows the route as if it had been planned there.
+        startsFromDevice = start == nil
+        travelMode = mode
+        stops = [start, destination].compactMap { $0 }
+        isPlanningRoute = true
+        var planned: PlannedRoute
+        do {
+            planned = try await RoutePlanner.plan(through: [origin, destination.coordinate], mode: mode)
+        } catch {
+            isPlanningRoute = false
+            throw error
+        }
+        isPlanningRoute = false
+        planned.deviceStart = start == nil ? origin : nil
+        route = nil
+        plannedRoute = planned
+        engine.log("Location: planned a \(mode.rawValue) route over OpenStreetMap for Shortcuts "
+                   + "(\(planned.points.count) points, \(Int(planned.distance)) m, \(Int(planned.duration)) s).")
+        try await beginPlayback(planned.timeline, name: "the planned \(mode.rawValue) route")
+        return planned
+    }
+
+    /// Stops a playing route where it is. False when none was playing.
+    @discardableResult
+    func stopRouteForShortcut() -> Bool {
+        guard isPlayingRoute else { return false }
+        endPlayback()
+        lastError = nil
+        lastSuccess = nil
+        engine.log("Location: route stopped.")
+        return true
+    }
+
+    /// Waits for the page's work, refuses during an install (it rebuilds the
+    /// tunnel the session runs over), then takes `isBusy`.
+    ///
+    /// An action usually runs with SideInstaller in the background, where iOS
+    /// gives it only so long, and a first setup (the disk image's download and
+    /// mount) or a long drive's plan can take longer. The silent audio that
+    /// holds a location keeps the app running through those too.
+    private func beginShortcutStep() async throws {
+        try await waitUntilIdle()
+        guard !engine.isRunning else {
+            throw EngineError.message(L("An install is already running. Wait for it to finish, then try again."))
+        }
+        isBusy = true
+        lastError = nil
+        lastSuccess = nil
+        keepAlive.startAudio()
+    }
+
+    /// Ends what `beginShortcutStep` began. The audio plays on only while the
+    /// device is being told a location.
+    private func endShortcutStep() {
+        isBusy = false
+        if simulated == nil { keepAlive.stopAll() }
+    }
+
+    /// Returns once nothing is setting up, setting or resetting. Setup ends
+    /// one way or the other: a stalled download times out.
+    private func waitUntilIdle() async throws {
+        while isBusy {
+            try await Task.sleep(for: .milliseconds(200))
+        }
+    }
+
     // MARK: Helpers
 
-    static func format(_ coordinate: CLLocationCoordinate2D) -> String {
+    nonisolated static func format(_ coordinate: CLLocationCoordinate2D) -> String {
         String(format: "%.5f, %.5f", coordinate.latitude, coordinate.longitude)
+    }
+
+    nonisolated static func isValid(_ coordinate: CLLocationCoordinate2D) -> Bool {
+        (-90...90).contains(coordinate.latitude) && (-180...180).contains(coordinate.longitude)
     }
 
     private func message(_ error: Error) -> String {
@@ -967,7 +1133,12 @@ struct LocationView: View {
         }
         // Start setup in the background so it's ready when the user picks a
         // place. See `prepareQuietly`.
-        .onAppear { manager.prepareQuietly() }
+        .onAppear {
+            manager.prepareQuietly()
+            // Show where the device is, which a shortcut may have set while
+            // the page was closed.
+            if let simulated = manager.simulated { moveMap(to: simulated) }
+        }
     }
 
     // MARK: Header
@@ -1749,12 +1920,12 @@ struct LocationView: View {
         return "\(speed.title) · \(rate)"
     }
 
-    private static func formatDistance(_ meters: CLLocationDistance) -> String {
+    static func formatDistance(_ meters: CLLocationDistance) -> String {
         Measurement(value: meters, unit: UnitLength.meters)
             .formatted(.measurement(width: .abbreviated, usage: .road).locale(Localizer.locale))
     }
 
-    private static func formatDuration(_ seconds: TimeInterval) -> String {
+    static func formatDuration(_ seconds: TimeInterval) -> String {
         Duration.seconds(seconds.rounded())
             .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated,
                               maximumUnitCount: 2)
