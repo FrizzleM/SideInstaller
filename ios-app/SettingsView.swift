@@ -151,7 +151,7 @@ struct SettingsView: View {
             if accounts.accounts.isEmpty {
                 Text(L("No Apple ID saved yet. Add one and SideInstaller will use it for every sign-in."))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
             Button { editorTarget = .new } label: {
                 Label(L("Add Apple ID"), systemImage: "plus.circle")
@@ -251,7 +251,7 @@ struct SettingsView: View {
                 Text(L("Version"))
                 Spacer()
                 Text(aboutVersionText)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
             Button(L("About")) { showingAbout = true }
                 .foregroundStyle(Theme.accent2)
@@ -324,7 +324,7 @@ struct SettingsView: View {
                     } else {
                         Text(L("Wi-Fi not connected"))
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                     Text(L("Anyone on your LAN can access it without a password. Turn it off when done."))
                         .font(.caption)

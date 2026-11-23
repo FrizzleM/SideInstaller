@@ -509,7 +509,7 @@ struct TwoFactorSheet: View {
                 }
                 Section {
                     Text(instructions)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     if prompt.expectsCode {
                         TextField(L("6-digit code"), text: $code)
                             .keyboardType(.numberPad)
@@ -527,7 +527,7 @@ struct TwoFactorSheet: View {
                         HStack(spacing: 8) {
                             ProgressView()
                             Text(status(for: pending))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                         }
                     }
                 } footer: {

@@ -199,6 +199,39 @@ final class SourceStore: ObservableObject {
         }
     }
 
+    /// Network + byte loop + decode for one source document, off the main
+    /// actor: `SourceStore` is @MainActor, so a plain static func here would
+    /// still be MainActor-isolated — `nonisolated` is what moves the work.
+    /// Only touches static state (`fetchSession`, `sourceBodyCap`); error and
+    /// cancellation semantics are unchanged (AsyncBytes.next() throws
+    /// CancellationError on cancel, which propagates to `fetch`'s catch).
+    nonisolated private static func fetchSourceDocument(url: URL) async throws -> AltSource {
+        var request = URLRequest(url: url)
+        request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        let (bytes, response) = try await Self.fetchSession.bytes(for: request)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw NSError(domain: "SourceStore", code: http.statusCode,
+                          userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"])
+        }
+        // C-6：边读边计——声明超限直接抛，不读体；累计超限立即停读。
+        if response.expectedContentLength > Int64(Self.sourceBodyCap) {
+            throw NSError(domain: "SourceStore", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Source is too large"])
+        }
+        var data = Data()
+        if response.expectedContentLength > 0 {
+            data.reserveCapacity(Int(min(response.expectedContentLength, Int64(Self.sourceBodyCap))))
+        }
+        for try await byte in bytes {
+            data.append(byte)
+            if data.count > Self.sourceBodyCap {
+                throw NSError(domain: "SourceStore", code: -1,
+                              userInfo: [NSLocalizedDescriptionKey: "Source is too large"])
+            }
+        }
+        return try JSONDecoder().decode(AltSource.self, from: data)
+    }
+
     /// Fetch (or refetch) one source document. Within 15 minutes of the last
     /// successful fetch, a cached document (memory, then disk) is used
     /// instead of the network, mirroring `loadReleaseCatalog`'s TTL; `force`
@@ -229,35 +262,17 @@ final class SourceStore: ObservableObject {
         sources[index].isLoading = true
         sources[index].errorMessage = nil
         do {
-            var request = URLRequest(url: url)
-            request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
-            let (bytes, response) = try await Self.fetchSession.bytes(for: request)
-            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                throw NSError(domain: "SourceStore", code: http.statusCode,
-                              userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"])
-            }
-            // C-6：边读边计——声明超限直接抛，不读体；累计超限立即停读。
-            if response.expectedContentLength > Int64(Self.sourceBodyCap) {
-                throw NSError(domain: "SourceStore", code: -1,
-                              userInfo: [NSLocalizedDescriptionKey: "Source is too large"])
-            }
-            var data = Data()
-            if response.expectedContentLength > 0 {
-                data.reserveCapacity(Int(min(response.expectedContentLength, Int64(Self.sourceBodyCap))))
-            }
-            for try await byte in bytes {
-                data.append(byte)
-                if data.count > Self.sourceBodyCap {
-                    throw NSError(domain: "SourceStore", code: -1,
-                                  userInfo: [NSLocalizedDescriptionKey: "Source is too large"])
-                }
-            }
-            let model = try JSONDecoder().decode(AltSource.self, from: data)
+            let model = try await Self.fetchSourceDocument(url: url)
             guard let index = sources.firstIndex(where: { $0.url == url }) else { return }
             sources[index].model = model
             sources[index].fetchedAt = Date()
             sources[index].isLoading = false
             Self.saveSourceCache(url: url, model: model)
+        } catch is CancellationError {
+            // 取消不是错误：只把 isLoading 复位，不写 errorMessage——
+            // 视图消失导致 .task 取消时，行上不能留一条假错误。
+            guard let index = sources.firstIndex(where: { $0.url == url }) else { return }
+            sources[index].isLoading = false
         } catch {
             guard let index = sources.firstIndex(where: { $0.url == url }) else { return }
             sources[index].errorMessage = error.localizedDescription

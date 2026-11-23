@@ -1218,7 +1218,7 @@ struct AppsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(L("Refresh all"))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     // Enumerated so rows redraw on a language change.
                     ForEach(Array(manager.jobs.enumerated()), id: \.element.id) { _, job in
                         jobRow(job)
@@ -1325,7 +1325,7 @@ struct AppsView: View {
                          ? L("%d app", manager.entries.count)
                          : L("%d apps", manager.entries.count))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Spacer()
                     if let refreshed = manager.lastRefreshed {
                         Text(refreshed.formatted(Date.FormatStyle(date: .omitted, time: .shortened)
@@ -1475,7 +1475,7 @@ struct AppsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(L("Unused profiles"))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Text(L("Issued to App IDs no installed app is running on."))
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
@@ -1536,7 +1536,7 @@ private struct AppProfileDetail: View {
                     HStack {
                         Text(L("Older profiles"))
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                         Spacer()
                     }
                     .cascadeItem(2)

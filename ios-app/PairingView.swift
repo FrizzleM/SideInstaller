@@ -169,7 +169,7 @@ struct PairingView: View {
                          ? L("%d supported app installed", manager.targets.count)
                          : L("%d supported apps installed", manager.targets.count))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Spacer()
                 }
                 .cascadeItem(3)

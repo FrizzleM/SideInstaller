@@ -817,7 +817,7 @@ struct SectionTitle: View {
         Label {
             Text(title)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
         } icon: {
             Image(systemName: systemImage)
                 .font(.subheadline)
@@ -943,7 +943,7 @@ struct BrandHeader<Accessory: View>: View {
                     if let subtitle {
                         Text(subtitle)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                 }
                 accessory()

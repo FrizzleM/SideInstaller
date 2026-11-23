@@ -46,7 +46,7 @@ struct SourcesView: View {
             searchBar
             if store.sources.isEmpty {
                 Text(L("No sources yet. Tap + to add one."))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
             ForEach(displayedSources) { source in
                 NavigationLink {
@@ -164,7 +164,7 @@ struct SourcesView: View {
                 if let subtitle = source.model?.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                 }
             }
@@ -179,7 +179,7 @@ struct SourcesView: View {
             } else if source.model != nil {
                 Text(L("%d apps", source.apps.count))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
         }
     }
@@ -250,7 +250,7 @@ struct SourceAppsView: View {
                     HStack(spacing: 10) {
                         ProgressView()
                         Text(L("Loading…"))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                 } else if let error = source.errorMessage, source.model == nil {
                     Label(error, systemImage: "exclamationmark.triangle")
@@ -316,11 +316,11 @@ struct SourceAppsView: View {
                         .lineLimit(1)
                     Text(sourceLine(for: app))
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                     Text(metaLine(for: app))
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                 }
                 Spacer()

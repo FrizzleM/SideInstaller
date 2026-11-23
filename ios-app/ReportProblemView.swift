@@ -124,7 +124,7 @@ struct ReportProblemView: View {
                 HStack(spacing: 8) {
                     ProgressView()
                     Text(L("Looking for crash logs …"))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
             } else {
                 Button {

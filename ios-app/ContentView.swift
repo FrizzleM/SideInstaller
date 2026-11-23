@@ -866,7 +866,7 @@ struct ContentView: View {
         return VStack(alignment: .leading, spacing: 12) {
             Label(L("%@ version", source.shortName), systemImage: "clock.arrow.circlepath")
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             Menu {
                 Picker(L("Version"), selection: Bindable(engine).selectedVersion) {
                     Text(latestLabel(latest)).tag(ReleaseVersion?.none)
@@ -929,7 +929,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label(L("Pairing file"), systemImage: "lock.doc")
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             Text(L("(Optional)"))
                 .font(.footnote)
                 .foregroundStyle(Theme.muted)
@@ -1615,7 +1615,7 @@ struct InstallPopup: View {
                     }
                     Text(installLinkMessage)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     linkButtons(L("Download and install"), systemImage: "arrow.down.app")
                 }
@@ -1638,7 +1638,7 @@ struct InstallPopup: View {
                     }
                     Text(pairingLinkMessage(file))
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     linkButtons(L("Import"), systemImage: "square.and.arrow.down")
                 }
@@ -1651,7 +1651,7 @@ struct InstallPopup: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(L("A link sent SideInstaller a signing certificate. Only use it if you asked for one: SideInstaller will sign apps with it from now on, in place of its own. It's used only if it's one of your Apple ID's certificates."))
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     linkButtons(L("Use it"), systemImage: "checkmark.seal")
                 }
@@ -1716,7 +1716,7 @@ struct InstallPopup: View {
                      ? L("Apple won't issue a second signing certificate for this Apple ID. If SideStore made the one it has, SideInstaller can sign with that one too, and nothing is revoked. Revoking it lets the install continue as well — but it can't be undone.")
                      : L("Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone."))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 if sideStoreCertificate {
                     Button {

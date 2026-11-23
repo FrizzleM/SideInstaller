@@ -117,7 +117,7 @@ struct DownloadsListView: View {
             if manager.hasLoaded && manager.downloads.isEmpty {
                 Text(L("No downloaded IPAs. Ones you install from a source or a file are cached here."))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             } else {
                 ForEach(manager.downloads) { item in
                     HStack(spacing: 12) {

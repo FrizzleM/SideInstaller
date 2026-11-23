@@ -286,7 +286,7 @@ struct CertsView: View {
                     // Count only; Apple doesn't report the account's limit.
                     Text(L("%d certificate(s)", manager.certs.count))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Spacer()
                 }
                 .cascadeItem(2)

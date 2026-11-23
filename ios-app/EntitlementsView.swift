@@ -513,7 +513,7 @@ struct EntitlementsView: View {
                          ? L("%d App ID", manager.apps.count)
                          : L("%d App IDs", manager.apps.count))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Spacer()
                 }
                 .cascadeItem(2)
