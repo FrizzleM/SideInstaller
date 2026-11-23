@@ -74,6 +74,32 @@ NS_ASSUME_NONNULL_BEGIN
 
 NS_ASSUME_NONNULL_END
 
+// CZF: (SIDE-23 C22-1) per-request upload body limit — min(8GB, free space
+// minus a 1GB reserve), computed fresh on every request so a disk that
+// filled up since the server started is still honoured. Returns 0 when
+// free space is at or under the reserve (caller refuses everything with
+// 507); fails open to 8GB if the free-space lookup itself errors.
+// 下次上游同步需重贴。
+static NSUInteger CZFUploadBodyLimit(void) {
+  static const NSUInteger kCZFMaxUploadBody = 8ULL * 1024 * 1024 * 1024;
+  static const NSUInteger kCZFUploadBodyReserve = 1ULL * 1024 * 1024 * 1024;
+  NSError* error = nil;
+  NSDictionary* attrs = [[NSFileManager defaultManager] attributesOfFileSystemForPath:NSTemporaryDirectory() error:&error];
+  if (attrs == nil) {
+    return kCZFMaxUploadBody;
+  }
+  NSNumber* free = [attrs objectForKey:NSFileSystemFreeSize];
+  if (free == nil) {
+    return kCZFMaxUploadBody;
+  }
+  unsigned long long freeBytes = [free unsignedLongLongValue];
+  if (freeBytes <= kCZFUploadBodyReserve) {
+    return 0;
+  }
+  NSUInteger headroom = (NSUInteger)(freeBytes - kCZFUploadBodyReserve);
+  return headroom < kCZFMaxUploadBody ? headroom : kCZFMaxUploadBody;
+}
+
 @implementation GCDWebServerConnection {
   CFSocketNativeHandle _socket;
   BOOL _virtualHEAD;
@@ -84,6 +110,10 @@ NS_ASSUME_NONNULL_END
   CFHTTPMessageRef _responseMessage;
   GCDWebServerResponse* _response;
   NSInteger _statusCode;
+
+  // CZF: (SIDE-23 C22-1) per-request upload body cap, see CZFUploadBodyLimit().
+  NSUInteger _czfBodyLimit;
+  NSUInteger _czfBodyBytesWritten;
 
   BOOL _opened;
 #ifdef __GCDWEBSERVER_ENABLE_TESTING__
@@ -308,6 +338,23 @@ NS_ASSUME_NONNULL_END
               self->_request.localAddressData = self.localAddressData;
               self->_request.remoteAddressData = self.remoteAddressData;
               if ([self->_request hasBody]) {
+                // CZF: (SIDE-23 C22-1) refuse an oversize upload before any
+                // byte hits the disk. Non-chunked: a declared body over the
+                // limit gets 413; free space at or under the 1GB reserve
+                // refuses everything with 507. Chunked bodies carry no
+                // declared length (NSUIntegerMax), so they are capped per
+                // chunk in readNextBodyChunk:.
+                NSUInteger czfLimit = CZFUploadBodyLimit();
+                if (czfLimit == 0) {
+                  [self abortRequest:self->_request withStatusCode:kGCDWebServerHTTPStatusCode_InsufficientStorage];
+                  return;
+                }
+                if (!self->_request.usesChunkedTransferEncoding && (self->_request.contentLength > czfLimit)) {
+                  [self abortRequest:self->_request withStatusCode:kGCDWebServerHTTPStatusCode_RequestEntityTooLarge];
+                  return;
+                }
+                self->_czfBodyLimit = czfLimit;
+                self->_czfBodyBytesWritten = 0;
                 [self->_request prepareForWriting];
                 if (self->_request.usesChunkedTransferEncoding || (extraData.length <= self->_request.contentLength)) {
                   NSString* expectHeader = [requestHeaders objectForKey:@"Expect"];
@@ -529,6 +576,15 @@ static inline NSUInteger _ScanHexNumber(const void* bytes, NSUInteger size) {
         if ((*ptr == '\r') && (*(ptr + 1) == '\n')) {
           NSError* error = nil;
           if ([_request performWriteData:[chunkData subdataWithRange:NSMakeRange(range.location + range.length, length)] error:&error]) {
+            // CZF: (SIDE-23 C22-1) chunked bodies carry no declared length,
+            // so cap them per chunk; over the limit abort with 413 and
+            // return WITHOUT calling the block — the caller ignores the
+            // success flag and would otherwise go on to process the body.
+            self->_czfBodyBytesWritten += length;
+            if (self->_czfBodyBytesWritten > self->_czfBodyLimit) {
+              [self abortRequest:self->_request withStatusCode:kGCDWebServerHTTPStatusCode_RequestEntityTooLarge];
+              return;
+            }
             [chunkData replaceBytesInRange:NSMakeRange(0, range.location + range.length + length + 2) withBytes:NULL length:0];
           } else {
             GWS_LOG_ERROR(@"Failed writing request body on socket %i: %@", _socket, error);

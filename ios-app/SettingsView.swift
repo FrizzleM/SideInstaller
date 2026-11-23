@@ -221,21 +221,21 @@ struct SettingsView: View {
         Group {
             Section {
                 NavigationLink { SideBySideView(manager: sideBySideManager) } label: {
-                    ToolRow(icon: "square.on.square", color: .purple, title: L("Side by Side"), beta: true)
+                    ToolRow(icon: "square.on.square", color: Theme.tilePurple, title: L("Side by Side"), beta: true)
                 }
                 if Engine.deviceCanSelfPair {
                     NavigationLink { PairingView(manager: pairingManager) } label: {
-                        ToolRow(icon: "link", color: .teal, title: L("Pairing"))
+                        ToolRow(icon: "link", color: Theme.tileTeal, title: L("Pairing"))
                     }
                 }
                 NavigationLink { CertsView(manager: certManager) } label: {
-                    ToolRow(icon: "checkmark.seal", color: .blue, title: L("Apple ID 证书"))
+                    ToolRow(icon: "checkmark.seal", color: Theme.blue, title: L("Apple ID 证书"))
                 }
                 NavigationLink { EntitlementsView(manager: entitlementsManager) } label: {
-                    ToolRow(icon: "checklist", color: .orange, title: L("Entitlements"))
+                    ToolRow(icon: "checklist", color: Theme.badgeWarning, title: L("Entitlements"))
                 }
                 NavigationLink { LocationView(manager: locationManager) } label: {
-                    ToolRow(icon: "location.fill", color: .green, title: L("Location spoofing"))
+                    ToolRow(icon: "location.fill", color: Theme.badgePositive, title: L("Location spoofing"))
                 }
             } header: {
                 Text(L("Tools"))
@@ -288,7 +288,7 @@ struct SettingsView: View {
                 )) {
                     HStack(spacing: 14) {
                         ZStack {
-                            Rectangle().fill(Theme.gradient(.cyan))
+                            Rectangle().fill(Theme.tileCyan)
                             Image(systemName: "server.rack")
                                 .font(.system(size: 22, weight: .semibold))
                                 .foregroundStyle(.white)
@@ -784,7 +784,10 @@ private struct ToolRow: View {
     /// in body are untouched.
     private var glyph: some View {
         ZStack {
-            Rectangle().fill(Theme.gradient(color))
+            // B-11：瓦填充去透明渐变——Theme.gradient 第二站 0.72 透明，
+            // 浅色卡上会把深瓦色冲淡到底角 3.14–3.55:1；调用方传的已是
+            // 深瓦色，纯色填充即是满值。
+            Rectangle().fill(color)
             Image(systemName: icon)
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(.white)

@@ -126,7 +126,7 @@ struct AboutView: View {
                 sectionTitle(L("Built with"), systemImage: "shippingbox")
                 Text(L("The open source work this app is built on:"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 AboutRow(systemImage: "iphone.gen3",
                          title: "idevice",
@@ -207,7 +207,7 @@ private struct AboutRow: View {
                 if let detail {
                     Text(detail)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -304,7 +304,7 @@ private struct CryptoDonationsView: View {
                     .accessibilityLabel(L("QR code for the %@ address", wallet.name))
                 Text(L("Network: %@", wallet.network))
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 // One line, shrunk to fit: wrapped, it gets hyphenated in some
                 // languages, and a hyphen copied by hand breaks the address.
                 Text(wallet.address)

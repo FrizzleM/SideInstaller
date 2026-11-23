@@ -195,6 +195,12 @@ final class CZFWebDAVServer: ObservableObject {
         guard let url = resolve(request.path, under: root) else {
             return GCDWebServerResponse(statusCode: 403)
         }
+        // C-2 同款：. 开头的名字文件页看不到（FilesTabView 用 .skipsHiddenFiles
+        // 枚举）；守卫放在 resolve 之后，%2E 编码的点解码后同样拦住。
+        // url != root 顺手拦 PUT /（否则拿文件替换整个 Documents 目录）。
+        guard url != root, !url.lastPathComponent.hasPrefix(".") else {
+            return GCDWebServerResponse(statusCode: 400)
+        }
         let parent = url.deletingLastPathComponent()
         var parentIsDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: parent.path, isDirectory: &parentIsDir),
@@ -250,6 +256,11 @@ final class CZFWebDAVServer: ObservableObject {
     private func handleMkcol(_ request: GCDWebServerRequest, root: URL) -> GCDWebServerResponse? {
         guard let url = resolve(request.path, under: root) else {
             return GCDWebServerResponse(statusCode: 403)
+        }
+        // C-2 同款：见 handlePut（. 开头的名字文件页看不到；守卫在
+        // resolve 之后，%2E 编码同样拦住；根目录也不许建）。
+        guard url != root, !url.lastPathComponent.hasPrefix(".") else {
+            return GCDWebServerResponse(statusCode: 400)
         }
         if FileManager.default.fileExists(atPath: url.path) {
             return GCDWebServerResponse(statusCode: 405)

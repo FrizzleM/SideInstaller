@@ -1138,7 +1138,7 @@ struct LocationView: View {
     private var crosshair: some View {
         Image(systemName: "mappin.circle.fill")
             .font(.system(size: 30))
-            .foregroundStyle(.white, Theme.accent)
+            .foregroundStyle(.white, Theme.blue)
             .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
     }
 
@@ -1247,7 +1247,7 @@ struct LocationView: View {
                         .multilineTextAlignment(.leading)
                 }
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             }
         }
     }
@@ -1490,7 +1490,7 @@ struct LocationView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "mappin.circle.fill")
                         .font(.title3)
-                        .foregroundStyle(.white, Theme.accent)
+                        .foregroundStyle(.white, Theme.blue)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(place.name)
                             .font(.subheadline.weight(.medium))

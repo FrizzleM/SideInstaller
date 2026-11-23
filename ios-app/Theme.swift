@@ -112,6 +112,11 @@ enum Theme {
     /// 徽章类深填充（圆点/绿 pill 用，白字均过 5:1，双模式通用固定值）。
     static let badgePositive = Color(red: 30/255,  green: 125/255, blue: 50/255)  // #1E7D32，白字 5.20:1
     static let badgeWarning  = Color(red: 140/255, green: 94/255,  blue: 0)       // #8C5E00，白字 5.65:1
+    /// Tools 行深瓦色（B-11）：白字图标均过 4.5:1，双模式通用固定值。
+    /// 绿/橙复用徽章深填充，蓝复用 Theme.blue。
+    static let tilePurple = Color(red: 107/255, green: 33/255,  blue: 168/255)  // #6B21A8，白字 8.72:1
+    static let tileTeal   = Color(red: 14/255,  green: 116/255, blue: 144/255)  // #0E7490，白字 5.36:1
+    static let tileCyan   = Color(red: 3/255,   green: 105/255, blue: 161/255)  // #0369A1，白字 5.93:1
 
     // MARK: Shape
 

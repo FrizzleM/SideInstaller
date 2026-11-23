@@ -113,6 +113,17 @@ final class SourceStore: ObservableObject {
     /// Preset on first run, when the user has never had a source list.
     static let defaultSourceURL = "https://xiaofang-source.pages.dev/source.json"
 
+    /// C-6：源 JSON 专用 session——不用 shared：30 秒空闲 + 120 秒总时长
+    /// 双上限（shared 默认空闲 60 秒、总时长 7 天，一个 trickle 源能挂一行 7 天）。
+    private static let fetchSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 120
+        return URLSession(configuration: config)
+    }()
+    /// C-6：源 JSON body 上限 10MB（默认源 71KB 的约 140 倍）。
+    private static let sourceBodyCap = 10 * 1024 * 1024
+
     init() {
         var stored = UserDefaults.standard.stringArray(forKey: Self.urlsKey)
         if stored == nil {
@@ -210,10 +221,26 @@ final class SourceStore: ObservableObject {
         do {
             var request = URLRequest(url: url)
             request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (bytes, response) = try await Self.fetchSession.bytes(for: request)
             if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
                 throw NSError(domain: "SourceStore", code: http.statusCode,
                               userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"])
+            }
+            // C-6：边读边计——声明超限直接抛，不读体；累计超限立即停读。
+            if response.expectedContentLength > Int64(Self.sourceBodyCap) {
+                throw NSError(domain: "SourceStore", code: -1,
+                              userInfo: [NSLocalizedDescriptionKey: "Source is too large"])
+            }
+            var data = Data()
+            if response.expectedContentLength > 0 {
+                data.reserveCapacity(Int(min(response.expectedContentLength, Int64(Self.sourceBodyCap))))
+            }
+            for try await byte in bytes {
+                data.append(byte)
+                if data.count > Self.sourceBodyCap {
+                    throw NSError(domain: "SourceStore", code: -1,
+                                  userInfo: [NSLocalizedDescriptionKey: "Source is too large"])
+                }
             }
             let model = try JSONDecoder().decode(AltSource.self, from: data)
             guard let index = sources.firstIndex(where: { $0.url == url }) else { return }
@@ -244,6 +271,11 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
 
     @Published private(set) var progress: Double = 0
 
+    /// C-6：源下载的 IPA 上限 8GB——与解压总量上限（enterprise.rs）同数。
+    /// 不要与源 JSON 的 10MB 共用一个常量：IPA 常规就是几十 MB 到 1GB+，
+    /// 10MB 会断掉几乎全部源安装。
+    private static let ipaDownloadCap: Int64 = 8 * 1024 * 1024 * 1024
+
     private var session: URLSession?
     private var continuation: CheckedContinuation<URL, Error>?
 
@@ -268,6 +300,10 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     func cancel() {
         session?.invalidateAndCancel()
         session = nil
+        // C-4：当场结算旧 continuation，不等 delegate 回调——旧错随后到时
+        // continuation 已是 nil，finish 的守卫让它空操作，不会二次恢复。
+        // 只做 A（同步结算），不做 generation：旧 Task 的泄漏只有 A 能堵。
+        finish(.failure(URLError(.cancelled)))
     }
 
     /// Resume the waiting download exactly once.
@@ -283,6 +319,12 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
                                 didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
                                 totalBytesExpectedToWrite: Int64) {
+        // C-6：超 8GB 即停——检查必须放在 totalBytesExpectedToWrite 的
+        // guard 之前（未知总长的下载它是 -1，放 guard 里就永远查不到）。
+        if totalBytesWritten > Self.ipaDownloadCap {
+            downloadTask.cancel()
+            return
+        }
         guard totalBytesExpectedToWrite > 0 else { return }
         let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
         Task { @MainActor in self.progress = fraction }

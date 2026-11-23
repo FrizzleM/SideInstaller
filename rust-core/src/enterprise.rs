@@ -969,6 +969,11 @@ fn unzip_archive_inner(archive_path: &str, dest: &std::path::Path) -> Result<(),
         if let Some(parent) = out.parent() {
             std::fs::create_dir_all(parent).map_err(|e| format!("解压失败：{e}"))?;
         }
+        // C-3 补：先看声明大小再落盘——超限直接报错，不写一字节；
+        // entry.size() 是中央目录里的未压缩大小，无需解压即可得。
+        if total.saturating_add(entry.size()) > TOTAL_LIMIT {
+            return Err("解压失败：展开总量超过 8GB 上限".to_string());
+        }
         let mut target = std::fs::File::create(&out).map_err(|e| format!("解压失败：{e}"))?;
         let written = std::io::copy(&mut entry, &mut target).map_err(|e| format!("解压失败：{e}"))?;
         total = total.saturating_add(written);

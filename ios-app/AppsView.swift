@@ -1226,7 +1226,7 @@ struct AppsView: View {
                     if let summary = manager.refreshSummary {
                         Text(summary)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1351,7 +1351,7 @@ struct AppsView: View {
                    let background = manager.lastBackgroundRefreshResult {
                     Text(L("Last refresh (its notification couldn't be delivered): %@", background))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 ForEach(Array(manager.entries.enumerated()), id: \.element.id) { idx, status in
@@ -1421,7 +1421,7 @@ struct AppsView: View {
                     // the bundle id alone doesn't say which team signed it.
                     Text(profile?.applicationIdentifier ?? status.app.applicationIdentifier ?? status.app.bundleID)
                         .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     expiryLabel(profile, urgency: urgency)
@@ -1550,6 +1550,7 @@ private struct AppProfileDetail: View {
         .background(AppBackground())
         .navigationTitle(status.app.name)
         .navigationBarTitleDisplayMode(.inline)
+        .onDisappear { Self.deleteExportTempFiles() }
     }
 
     private var appCard: some View {
@@ -1637,9 +1638,18 @@ private struct AppProfileDetail: View {
         }
     }
 
+    /// N4：同 CertsView.deleteExportTempFiles（同款两份）——证书导出把
+    /// 明文密码写进 tmp，导出开始时清上一份，页面离开时清最后一份。
+    private static func deleteExportTempFiles() {
+        let tmp = FileManager.default.temporaryDirectory
+        try? FileManager.default.removeItem(at: tmp.appendingPathComponent("certificate.p12"))
+        try? FileManager.default.removeItem(at: tmp.appendingPathComponent("certificate-password.txt"))
+    }
+
     private func doExportCert() {
         isExporting = true
         exportError = nil
+        Self.deleteExportTempFiles()
         Task {
             do {
                 try await certManager.ensureSignedIn()
@@ -1753,7 +1763,7 @@ private struct AppProfileDetail: View {
                 ForEach(keys, id: \.self) { key in
                     Text(key)
                         .font(.caption2.monospaced())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }

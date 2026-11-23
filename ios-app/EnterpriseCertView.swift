@@ -327,7 +327,7 @@ struct EnterpriseCertView: View {
                 .buttonStyle(.bordered)
                 Text(L("点一行切换当前证书；新证书导入后要填一次它的密码。"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
         }
     }
@@ -439,7 +439,7 @@ struct EnterpriseCertView: View {
                     if let checked = revocationCheckedAt {
                         Text(L("上次检查：%@", checked.formatted(date: .abbreviated, time: .shortened)))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                 }
             }
@@ -1031,7 +1031,7 @@ struct EnterpriseCertView: View {
                             .textInputAutocapitalization(.never)
                         Text(L("将保存为：%@；重名自动加序号", effectiveOutputName))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                     }
                 }
                 // 轻松签式脱壳提示：选好 IPA 就预检，加密的直接在

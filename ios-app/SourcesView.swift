@@ -405,7 +405,7 @@ struct SourceAppsView: View {
                     .frame(width: 72)
                 Text(L("Downloading… %d%%", Int(downloader.progress * 100)))
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
         case .failed(let message):
             VStack(alignment: .trailing, spacing: 4) {

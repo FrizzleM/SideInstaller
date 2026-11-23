@@ -932,7 +932,7 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
             Text(L("(Optional)"))
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             pairingImportButton
             pairingDocsLink
         }
@@ -976,7 +976,7 @@ struct ContentView: View {
                         .font(.subheadline.weight(.medium))
                     Text(L("Install LocalDevVPN and connect it. The install runs over its tunnel."))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     if engine.localDevVPNInstalled {
                         // 装了就直接打开 LocalDevVPN 连接并自动跳回，不再去 App Store 获取
@@ -986,7 +986,7 @@ struct ContentView: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        .tint(.red)
+                        .tint(Theme.accent)
                         .padding(.top, 2)
                     } else if let label = Guides.vpn.actionLabel, let url = Guides.vpn.actionURL {
                         Button { openURL(url) } label: {
@@ -1220,7 +1220,7 @@ private struct PrecheckSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(L("绿的是已齐，红的是缺了会卡住，橙的是安装时会自动启动；行内能修的直接点右边的按钮。"))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     wifiRow
                     tunnelRow
@@ -1497,7 +1497,7 @@ struct InstallPopup: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(L("New App IDs"))
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                         ForEach(cost.newIDs, id: \.self) { id in
                             Text(id)
                                 .font(.caption.monospaced())
@@ -1533,7 +1533,7 @@ struct InstallPopup: View {
                 .foregroundStyle(tint)
             Text(label)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
@@ -1608,7 +1608,7 @@ struct InstallPopup: View {
                             .truncationMode(.middle)
                         Text(url.absoluteString)
                             .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .lineLimit(3)
                             .truncationMode(.middle)
                             .textSelection(.enabled)
@@ -1998,13 +1998,14 @@ struct StepNode: View {
         switch state {
         case .done:            Theme.control
         case .failed, .waiting: color.opacity(0.14)
+        case .pending:         Theme.muted.opacity(0.08)
         default:               .clear
         }
     }
 
     private var stroke: Color {
         switch state {
-        case .pending: Theme.ice.opacity(0.18)
+        case .pending: Theme.muted.opacity(0.5)
         case .active:  Theme.accent
         case .done:    Theme.hairline
         default:       color.opacity(0.4)

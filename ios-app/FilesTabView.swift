@@ -816,7 +816,7 @@ struct FilesTabView: View {
                     Text(L("%d 个文件 · %@", files.count,
                            ByteCountFormatter.string(fromByteCount: Int64(totalSize), countStyle: .file)))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .padding([.horizontal, .top], 20)

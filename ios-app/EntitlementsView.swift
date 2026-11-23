@@ -653,7 +653,7 @@ private struct EntitlementPicker: View {
                 ForEach(Entitlement.inGroup(group)) { entitlement in
                     row(entitlement)
                     if entitlement.id != Entitlement.inGroup(group).last?.id {
-                        Divider().overlay(Color.white.opacity(0.06))
+                        Divider()
                     }
                 }
             }
@@ -758,7 +758,7 @@ struct EntitlementsPopup: View {
                             .font(.caption.weight(.medium))
                         Text(outcome.error)
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }

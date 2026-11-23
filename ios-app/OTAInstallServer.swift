@@ -42,6 +42,56 @@ final class OTAInstallServer: ObservableObject {
     private var hardStopWork: DispatchWorkItem?
     private var unavailableReported = false
 
+    /// C-7：在途连接登记表——stop() 与 60 秒空闲超时靠它掐断僵尸连接。
+    /// 全部在 ota 串行队列上读写（handle/receive/send 全走这条队列），不用加锁。
+    private struct LiveConnection {
+        let connection: NWConnection
+        var lastActivity: Date
+        var idleCheck: DispatchWorkItem?
+    }
+    private var liveConnections: [ObjectIdentifier: LiveConnection] = [:]
+    private static let connectionIdleTimeout: TimeInterval = 60
+    /// C-7：服务世代——stop() 加一；上一轮的 sendFile 完成分支看到世代
+    /// 已换就不再重立 stopWork，免得新一轮安装被旧轮的 20 秒停掐掉。
+    private var serveGeneration = 0
+
+    /// 登记一条在途连接并排上它的空闲检查。只在 ota 串行队列上调。
+    private func registerConnection(_ connection: NWConnection) {
+        let id = ObjectIdentifier(connection)
+        liveConnections[id] = LiveConnection(connection: connection, lastActivity: Date(), idleCheck: nil)
+        scheduleIdleCheck(for: id)
+    }
+
+    /// 摘除一条连接（终结/取消/响应发完时调），并取消它待跑的空闲检查。
+    private func unregisterConnection(_ connection: NWConnection) {
+        let id = ObjectIdentifier(connection)
+        liveConnections[id]?.idleCheck?.cancel()
+        liveConnections.removeValue(forKey: id)
+    }
+
+    /// 有数据/发完就摸一下，空闲计时从此刻重算。
+    private func touchConnection(_ connection: NWConnection) {
+        liveConnections[ObjectIdentifier(connection)]?.lastActivity = Date()
+    }
+
+    /// 到期检查：已摘除就什么都不做；空闲满 60 秒就掐断，否则按剩余时间重排。
+    private func scheduleIdleCheck(for id: ObjectIdentifier, after delay: TimeInterval = Self.connectionIdleTimeout) {
+        liveConnections[id]?.idleCheck?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            guard let entry = self.liveConnections[id] else { return }
+            let idle = Date().timeIntervalSince(entry.lastActivity)
+            if idle >= Self.connectionIdleTimeout {
+                self.liveConnections.removeValue(forKey: id)
+                entry.connection.cancel()
+            } else {
+                self.scheduleIdleCheck(for: id, after: Self.connectionIdleTimeout - idle)
+            }
+        }
+        liveConnections[id]?.idleCheck = work
+        queue.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
     /// 对一个已签好的 IPA 拉起本机安装。
     func install(record: SignedIPARecord) {
         guard !record.bundleID.isEmpty else {
@@ -154,6 +204,19 @@ final class OTAInstallServer: ObservableObject {
         DispatchQueue.main.async {
             self.isRunning = false
         }
+        // C-7：停 listener 只拦新连接——在途的 installd 下载也得掐断，
+        // 世代加一，上一轮 sendFile 的完成分支不再重立 stopWork。
+        // 登记表在 ota 队列上，异步清掉（串行队列保证先于之后新登记
+        // 的连接执行，不会误掐新连接）。
+        serveGeneration += 1
+        queue.async { [weak self] in
+            guard let self else { return }
+            for entry in self.liveConnections.values {
+                entry.idleCheck?.cancel()
+                entry.connection.cancel()
+            }
+            self.liveConnections.removeAll()
+        }
     }
 
     // MARK: - 服务
@@ -257,6 +320,7 @@ final class OTAInstallServer: ObservableObject {
 
     private func handle(_ connection: NWConnection) {
         connection.start(queue: queue)
+        registerConnection(connection)
         receive(connection, buffer: Data())
     }
 
@@ -268,10 +332,14 @@ final class OTAInstallServer: ObservableObject {
                 return
             }
             var buf = buffer
-            if let data { buf.append(data) }
+            if let data {
+                buf.append(data)
+                self.touchConnection(connection)
+            }
             if let path = Self.requestPath(buf) {
                 self.respond(connection, path: path)
             } else if isComplete || error != nil || buf.count > (1 << 20) {
+                self.unregisterConnection(connection)
                 connection.cancel()
             } else {
                 self.receive(connection, buffer: buf)
@@ -292,7 +360,8 @@ final class OTAInstallServer: ObservableObject {
     private func respond(_ connection: NWConnection, path: String) {
         if path == "/\(installID)/manifest.plist" {
             send(connection, status: "200 OK", contentType: "text/xml",
-                 length: manifestData.count, body: manifestData) {
+                 length: manifestData.count, body: manifestData) { [weak self] in
+                self?.unregisterConnection(connection)
                 connection.cancel()
             }
             return
@@ -301,7 +370,10 @@ final class OTAInstallServer: ObservableObject {
             guard let size = (try? FileManager.default.attributesOfItem(atPath: ipaURL.path))?[.size] as? Int,
                   let handle = try? FileHandle(forReadingFrom: ipaURL) else {
                 send(connection, status: "404 Not Found", contentType: "text/plain",
-                     length: 0, body: Data()) { connection.cancel() }
+                     length: 0, body: Data()) { [weak self] in
+                    self?.unregisterConnection(connection)
+                    connection.cancel()
+                }
                 // A4：文件没了，安装器拿 404 也装不成——别空转到 600 秒硬停。
                 setStatus(L("签好的文件找不到了，先重签一次。"))
                 stop()
@@ -309,14 +381,20 @@ final class OTAInstallServer: ObservableObject {
             }
             // 安装器下载包时 App 已退到后台，分片发、发完再停，
             // 别把 17MB 一次塞进内存。
+            // C-7：记下当前世代——发完包时世代已换（新一轮 install 调过
+            // stop()），就不再重立 stopWork，免得掐掉新安装。
+            let generation = serveGeneration
             send(connection, status: "200 OK", contentType: "application/octet-stream",
                  length: size, body: nil) { [weak self] in
-                self?.sendFile(connection, handle: handle, remaining: size)
+                self?.sendFile(connection, handle: handle, remaining: size, generation: generation)
             }
             return
         }
         send(connection, status: "404 Not Found", contentType: "text/plain",
-             length: 0, body: Data()) { connection.cancel() }
+             length: 0, body: Data()) { [weak self] in
+            self?.unregisterConnection(connection)
+            connection.cancel()
+        }
     }
 
     private func send(_ connection: NWConnection, status: String, contentType: String,
@@ -330,11 +408,21 @@ final class OTAInstallServer: ObservableObject {
         connection.send(content: payload, completion: .contentProcessed { _ in done() })
     }
 
-    private func sendFile(_ connection: NWConnection, handle: FileHandle, remaining: Int) {
+    private func sendFile(_ connection: NWConnection, handle: FileHandle, remaining: Int, generation: Int) {
+        // C-7：连接已不在登记表（被 stop() 掐断）就别再发——stop() 之后
+        // 在途的 send completion 仍会跑进来，靠登记表拦住它。
+        guard liveConnections[ObjectIdentifier(connection)] != nil else {
+            try? handle.close()
+            connection.cancel()
+            return
+        }
         guard remaining > 0 else {
             try? handle.close()
             connection.cancel()
-            // 包发完了：留 20 秒给安装器重试，之后停服务。
+            unregisterConnection(connection)
+            // 包发完了：留 20 秒给安装器重试，之后停服务——但只在
+            // 仍是同一轮安装时；世代已换说明新一轮开始了，别掐它。
+            guard generation == serveGeneration else { return }
             stopWork?.cancel()
             let work = DispatchWorkItem { [weak self] in self?.stop() }
             stopWork = work
@@ -345,6 +433,7 @@ final class OTAInstallServer: ObservableObject {
         guard !chunk.isEmpty else {
             LogStore.shared.append("⚠️ Install truncated: \(ipaURL?.lastPathComponent ?? "?") stopped with \(remaining) bytes left.")
             try? handle.close()
+            unregisterConnection(connection)
             connection.cancel()
             // A4：包发一半文件没了——别静默空转，停服务并告诉用户重签。
             setStatus(L("签好的文件找不到了，先重签一次。"))
@@ -352,7 +441,8 @@ final class OTAInstallServer: ObservableObject {
             return
         }
         connection.send(content: chunk, completion: .contentProcessed { [weak self] _ in
-            self?.sendFile(connection, handle: handle, remaining: remaining - chunk.count)
+            self?.touchConnection(connection)
+            self?.sendFile(connection, handle: handle, remaining: remaining - chunk.count, generation: generation)
         })
     }
 

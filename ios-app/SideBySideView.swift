@@ -3180,7 +3180,7 @@ private struct StageDots: View {
         HStack(spacing: 8) {
             ForEach(1...total, id: \.self) { index in
                 Capsule()
-                    .fill(index <= current ? Theme.accent : Theme.ice.opacity(0.14))
+                    .fill(index <= current ? Theme.accent : Theme.muted.opacity(0.35))
                     .frame(width: index == current ? 24 : 8, height: 8)
             }
         }

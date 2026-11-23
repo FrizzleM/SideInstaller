@@ -38,6 +38,7 @@ struct CertsView: View {
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .onAppear { manager.autoLoad() }
+        .onDisappear { Self.deleteExportTempFiles() }
         .alert(L("Revoke this certificate?"),
                isPresented: Binding(get: { pendingRevoke != nil },
                                     set: { if !$0 { pendingRevoke = nil } })) {
@@ -228,10 +229,20 @@ struct CertsView: View {
         }
     }
 
+    /// N4：证书导出把明文密码写进 tmp（certificate-password.txt），
+    /// 分享完就删——导出开始时清上一份，页面离开时清最后一份；
+    /// 固定名，下次导出直接覆盖，残留最多只剩最新的一组。
+    private static func deleteExportTempFiles() {
+        let tmp = FileManager.default.temporaryDirectory
+        try? FileManager.default.removeItem(at: tmp.appendingPathComponent("certificate.p12"))
+        try? FileManager.default.removeItem(at: tmp.appendingPathComponent("certificate-password.txt"))
+    }
+
     private func doExport() {
         isExporting = true
         exportError = nil
         exportURL = nil
+        Self.deleteExportTempFiles()
         Task {
             do {
                 // 证书页导出同款：先自动登录再导出，否则刚启动没开过证书页
@@ -363,7 +374,7 @@ struct CertsView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(.red)
+                .tint(Theme.negative)
                 .controlSize(.regular)
                 .disabled(revoking || manager.isWorking || manager.revokingID != nil)
             }

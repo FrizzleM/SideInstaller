@@ -15,6 +15,69 @@ final class LANTransferServer: ObservableObject {
     private var activeCandidate = 0
     private let queue = DispatchQueue(label: "czf.lan.transfer")
 
+    /// C-7：在途连接登记表——stop() 与 60 秒空闲超时靠它掐断僵尸连接。
+    /// 全部在 lan 串行队列上读写（handle/receive/send 全走这条队列），不用加锁。
+    private struct LiveConnection {
+        let connection: NWConnection
+        var lastActivity: Date
+        var idleCheck: DispatchWorkItem?
+    }
+    private var liveConnections: [ObjectIdentifier: LiveConnection] = [:]
+    private static let connectionIdleTimeout: TimeInterval = 60
+
+    /// 登记一条在途连接并排上它的空闲检查。只在 lan 串行队列上调。
+    private func registerConnection(_ connection: NWConnection) {
+        let id = ObjectIdentifier(connection)
+        liveConnections[id] = LiveConnection(connection: connection, lastActivity: Date(), idleCheck: nil)
+        scheduleIdleCheck(for: id)
+    }
+
+    /// 摘除一条连接（终结/取消/响应发完时调），并取消它待跑的空闲检查。
+    private func unregisterConnection(_ connection: NWConnection) {
+        let id = ObjectIdentifier(connection)
+        liveConnections[id]?.idleCheck?.cancel()
+        liveConnections.removeValue(forKey: id)
+    }
+
+    /// 有数据/发完就摸一下，空闲计时从此刻重算。
+    private func touchConnection(_ connection: NWConnection) {
+        liveConnections[ObjectIdentifier(connection)]?.lastActivity = Date()
+    }
+
+    /// 到期检查：已摘除就什么都不做；空闲满 60 秒就掐断，否则按剩余时间重排。
+    private func scheduleIdleCheck(for id: ObjectIdentifier, after delay: TimeInterval = Self.connectionIdleTimeout) {
+        liveConnections[id]?.idleCheck?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            guard let entry = self.liveConnections[id] else { return }
+            let idle = Date().timeIntervalSince(entry.lastActivity)
+            if idle >= Self.connectionIdleTimeout {
+                self.liveConnections.removeValue(forKey: id)
+                entry.connection.cancel()
+            } else {
+                self.scheduleIdleCheck(for: id, after: Self.connectionIdleTimeout - idle)
+            }
+        }
+        liveConnections[id]?.idleCheck = work
+        queue.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    /// N1(C)：单次上传 body 上限——min(8GB, 空闲 − 1GB)，每请求现算；
+    /// 与 WebDAV 侧同数。空闲 ≤ 1GB 时返回 0（全部上传拒掉）。
+    /// 字节数一律走 int64Value——intValue 在 2GB 以上会截断。
+    private static func uploadBodyLimit() -> Int {
+        let maxLimit: Int64 = 8 * 1024 * 1024 * 1024
+        let reserve: Int64 = 1 * 1024 * 1024 * 1024
+        guard let attrs = try? FileManager.default.attributesOfFileSystemForPath(
+                FileManager.default.temporaryDirectory.path),
+              let free = attrs[.systemFreeSize] as? NSNumber else {
+            return Int(maxLimit)
+        }
+        let freeBytes = free.int64Value
+        guard freeBytes > reserve else { return 0 }
+        return Int(min(maxLimit, freeBytes - reserve))
+    }
+
     /// S19：列表扫盘的短 TTL 缓存——GET / 每次都全量递归扫盘，上传/
     /// 删除后 303 再扫一次；电脑端列表最多滞后 TTL。只在 lan 串行
     /// 队列上读写（respond 全走这条队列），不用加锁；上传/删除后
@@ -50,6 +113,17 @@ final class LANTransferServer: ObservableObject {
         listener = nil
         isRunning = false
         port = 0
+        // C-7：停 listener 只拦新连接——在途的也得掐断，否则传一半的文件
+        // 还会完整落盘。登记表在 lan 队列上，异步清掉（串行队列保证
+        // 先于之后新登记的连接执行，不会误掐新连接）。
+        queue.async { [weak self] in
+            guard let self else { return }
+            for entry in self.liveConnections.values {
+                entry.idleCheck?.cancel()
+                entry.connection.cancel()
+            }
+            self.liveConnections.removeAll()
+        }
     }
 
     private func tryPort(_ candidate: Int) {
@@ -100,6 +174,7 @@ final class LANTransferServer: ObservableObject {
 
     private func handle(_ connection: NWConnection) {
         connection.start(queue: queue)
+        registerConnection(connection)
         receive(connection, buffer: Data())
     }
 
@@ -111,7 +186,10 @@ final class LANTransferServer: ObservableObject {
                 return
             }
             var buf = buffer
-            if let data { buf.append(data) }
+            if let data {
+                buf.append(data)
+                self.touchConnection(connection)
+            }
             if let (head, bodyStart) = Self.parseHead(buf) {
                 // S20：POST /upload 走流式落盘，body 不再整条攒进内存；
                 // 没 boundary 的畸形上传仍走老路（攒满后 saveUpload 回 400）。
@@ -126,11 +204,13 @@ final class LANTransferServer: ObservableObject {
                 if let request = Self.parse(buf) {
                     self.respond(connection, request: request)
                 } else if isComplete || error != nil || buf.count > (256 << 20) {
+                    self.unregisterConnection(connection)
                     connection.cancel()
                 } else {
                     self.receive(connection, buffer: buf)
                 }
             } else if isComplete || error != nil || buf.count > (256 << 20) {
+                self.unregisterConnection(connection)
                 connection.cancel()
             } else {
                 self.receive(connection, buffer: buf)
@@ -211,6 +291,9 @@ final class LANTransferServer: ObservableObject {
         guard let quoteEnd = afterName.firstIndex(of: "\"") else { return nil }
         let rawName = String(afterName[..<quoteEnd])
         let fileName = rawName.split(separator: "/").last.map(String.init) ?? "upload.bin"
+        // N2(C)：. 开头的名字文件页看不到（.skipsHiddenFiles）——直接拒掉，
+        // 流式路与老路共用本函数，两路同治。
+        guard !fileName.hasPrefix(".") else { return nil }
         return fileName.isEmpty ? nil : fileName
     }
 
@@ -237,17 +320,19 @@ final class LANTransferServer: ObservableObject {
         let handle: FileHandle
         let fileName: String
         let contentLength: Int
+        let limit: Int
         var received: Int
         var pending = Data()
         var markerFound = false
 
         init(boundary: String, tempURL: URL, handle: FileHandle,
-             fileName: String, contentLength: Int, received: Int) {
+             fileName: String, contentLength: Int, limit: Int, received: Int) {
             self.tailMarker = Data("\r\n--\(boundary)".utf8)
             self.tempURL = tempURL
             self.handle = handle
             self.fileName = fileName
             self.contentLength = contentLength
+            self.limit = limit
             self.received = received
         }
     }
@@ -256,6 +341,12 @@ final class LANTransferServer: ObservableObject {
     /// 文件，进内容流。part 头本身很小，超 64KB 就是非法请求。
     private func receiveUploadHead(_ connection: NWConnection, head: RequestHead,
                                    boundary: String, body: Data, received: Int) {
+        // N1(C)：先看声明总量再建 sink——超限直接 400，不建临时文件。
+        let limit = Self.uploadBodyLimit()
+        if head.contentLength > limit {
+            sendText(connection, status: "400 Bad Request", text: L("Couldn't parse the upload"))
+            return
+        }
         let headEnd = Data("\r\n\r\n".utf8)
         if let range = body.range(of: headEnd) {
             let partHead = String(decoding: body[..<range.lowerBound], as: UTF8.self)
@@ -271,7 +362,7 @@ final class LANTransferServer: ObservableObject {
                 return
             }
             let sink = UploadSink(boundary: boundary, tempURL: tempURL, handle: handle,
-                                  fileName: fileName, contentLength: head.contentLength,
+                                  fileName: fileName, contentLength: head.contentLength, limit: limit,
                                   // R-1：received 初值只算 part 头那段——首块内容马上要当
                                   // chunk 传给 receiveUploadBody 再加一次，初值里不能再算它，
                                   // 否则 received 虚高、收尾 marker 没到就提前 finishUpload 回 400。
@@ -292,6 +383,7 @@ final class LANTransferServer: ObservableObject {
             [weak self] data, _, isComplete, error in
             guard let self else { connection.cancel(); return }
             if let data {
+                self.touchConnection(connection)
                 var next = body
                 let take = min(data.count, head.contentLength - received)
                 next.append(data.prefix(take))
@@ -336,6 +428,12 @@ final class LANTransferServer: ObservableObject {
             }
         }
         sink.received += chunk.count
+        // N1(C)：流式上传总量上限——received 记的是整个 multipart body
+        // （R-1 语义），比落盘字节只多不少，拿它当上限是保守的。
+        if sink.received > sink.limit {
+            failUpload(connection, sink: sink)
+            return
+        }
         if sink.received >= sink.contentLength {
             finishUpload(connection, sink: sink)
             return
@@ -350,6 +448,7 @@ final class LANTransferServer: ObservableObject {
                 return
             }
             if let data {
+                self.touchConnection(connection)
                 let take = min(data.count, sink.contentLength - sink.received)
                 self.receiveUploadBody(connection, sink: sink, chunk: Data(data.prefix(take)))
             } else if isComplete || error != nil {
@@ -384,6 +483,7 @@ final class LANTransferServer: ObservableObject {
     private func failUpload(_ connection: NWConnection, sink: UploadSink) {
         try? sink.handle.close()
         try? FileManager.default.removeItem(at: sink.tempURL)
+        unregisterConnection(connection)
         connection.cancel()
     }
 
@@ -478,7 +578,8 @@ final class LANTransferServer: ObservableObject {
         head += "\r\n"
         var data = Data(head.utf8)
         data.append(body)
-        connection.send(content: data, completion: .contentProcessed { _ in
+        connection.send(content: data, completion: .contentProcessed { [weak self] _ in
+            self?.unregisterConnection(connection)
             connection.cancel()
         })
     }
@@ -507,12 +608,14 @@ final class LANTransferServer: ObservableObject {
                 connection.cancel()
                 return
             }
+            self.touchConnection(connection)
             self.streamFile(connection, file: file, offset: 0)
         })
     }
 
     private func streamFile(_ connection: NWConnection, file: URL, offset: Int) {
         guard let handle = try? FileHandle(forReadingFrom: file) else {
+            unregisterConnection(connection)
             connection.cancel()
             return
         }
@@ -526,13 +629,16 @@ final class LANTransferServer: ObservableObject {
                 if expected < 0 || offset != expected {
                     LogStore.shared.append("⚠️ Download truncated: \(file.lastPathComponent) stopped at \(offset)/\(expected) bytes.")
                 }
+                unregisterConnection(connection)
                 connection.cancel()
                 return
             }
             connection.send(content: chunk, completion: .contentProcessed { [weak self] _ in
+                self?.touchConnection(connection)
                 self?.streamFile(connection, file: file, offset: offset + chunk.count)
             })
         } catch {
+            unregisterConnection(connection)
             connection.cancel()
         }
     }

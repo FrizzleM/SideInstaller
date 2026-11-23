@@ -179,7 +179,7 @@ struct MachOView: View {
             } label: {
                 Label(L("改名"), systemImage: "pencil")
             }
-            .tint(.blue)
+            .tint(Theme.blue)
         }
     }
 
