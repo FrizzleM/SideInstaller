@@ -22,6 +22,20 @@ All notable changes to SideInstaller are documented here.
   writes the pairing file's remote pairing record, the only kind its JIT reads, into its Documents
   folder as `pairingFile.plist`, where ARMSX3 takes it in the next time it opens. A pairing file
   without a remote pairing record isn't written.
+- **Sources.** A new page under Tools, like SideStore's: add an AltStore-format source (its
+  https link, an `altstore://` or `sidestore://` source link, or a .json source file) and its apps
+  are listed with their icons and versions. An app's page has its release notes, its description
+  and every earlier version, and Install downloads the IPA from the source and goes through the
+  same "Install from a link?" question as a `sideinstaller://install` link, so it's signed and
+  installed like a custom .ipa. FrizzleM's source is built in; SideStore's, AltStore's and
+  LiveContainer + SideStore's own sources are suggested under Add a source, one tap each. Your
+  sources lists each one under its developer, with their GitHub picture (or the app's icon when
+  there's none).
+- **Updates for the apps from sources.** With LocalDevVPN on, SideInstaller reads which apps are
+  installed, as Sideloaded apps does, and an app a source has a newer version of gets an Update tag,
+  with the count on the Sources tile. The sources are checked once when SideInstaller opens, as
+  SideInstaller checks for its own updates; pull down on Sources, or tap Check for updates, to
+  check again.
 
 ### Changed
 - **The Location spoofing page opens on the spoofed location**, which a shortcut may have set while

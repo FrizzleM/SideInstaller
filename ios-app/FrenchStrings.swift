@@ -1355,4 +1355,75 @@ let frenchStrings: [String: String] = [
         "Ce lieu n'a pas de coordonnées. Choisissez-le sur la carte, ou saisissez son adresse.",
     "The install didn't start. Open SideInstaller to see why.":
         "L'installation n'a pas démarré. Ouvrez SideInstaller pour en voir la raison.",
+
+    // MARK: - Sources
+
+    "Suggested":
+        "Suggestions",
+
+    "Paste the link of a SideStore or AltStore source, or of a .json source file. Its apps, their updates and release notes show here.":
+        "Collez le lien d'une source SideStore ou AltStore, ou d'un fichier source .json. Ses apps, leurs mises à jour et leurs notes de version s'affichent ici.",
+
+    "Sources":
+        "Sources",
+    "Add a source":
+        "Ajouter une source",
+    "Add":
+        "Ajouter",
+    "Apps":
+        "Apps",
+    "Updates":
+        "Mises à jour",
+    "Update":
+        "Mettre à jour",
+    "Your sources":
+        "Vos sources",
+    "Check for updates":
+        "Rechercher des mises à jour",
+    "Copy link":
+        "Copier le lien",
+    "Source options":
+        "Options de la source",
+    "Loading…":
+        "Chargement…",
+    "What's new":
+        "Nouveautés",
+    "Version history":
+        "Historique des versions",
+    "This version has no release notes.":
+        "Cette version n'a pas de notes de version.",
+    "%d update":
+        "%d mise à jour",
+    "%d updates":
+        "%d mises à jour",
+    "%d source":
+        "%d source",
+    "%d sources":
+        "%d sources",
+    "Update to %@":
+        "Mettre à jour vers %@",
+    "Install %@ %@?":
+        "Installer %@ %@ ?",
+    "Version %@ · from %@":
+        "Version %@ · de %@",
+    "%@ installed · %@ available":
+        "%@ installée · %@ disponible",
+    "%@ installed · up to date":
+        "%@ installée · à jour",
+    "That source is already added.":
+        "Cette source est déjà ajoutée.",
+    "The source answered with HTTP %d.":
+        "La source a répondu avec HTTP %d.",
+    "Couldn't reach the source: %@":
+        "Impossible de joindre la source : %@",
+    "That isn't a source link. Paste the whole https:// address of the source.":
+        "Ce n'est pas un lien de source. Collez l'adresse https:// complète de la source.",
+    "That link didn't return a source. It has to be the source's JSON file itself.":
+        "Ce lien n'a pas renvoyé de source. Il doit pointer vers le fichier JSON de la source lui-même.",
+    "Downloads the IPA from the source, then signs it with your Apple ID and installs it, as a custom .ipa would be.":
+        "Télécharge l'IPA depuis la source, puis la signe avec votre identifiant Apple et l'installe, comme un .ipa personnalisé.",
+    "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
+        "Cette version est plus ancienne que la dernière. Elle est installée par-dessus la copie de cet iPhone, qui risque de ne pas ouvrir les données enregistrées par une version plus récente.",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "Cette version est plus ancienne que celle de cet iPhone (%@). Installée par-dessus, elle risque de ne pas ouvrir les données enregistrées par la version plus récente.",
 ]

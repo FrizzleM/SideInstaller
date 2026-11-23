@@ -65,6 +65,7 @@ struct RootView: View {
     /// The app's own, shared with the Shortcuts actions.
     @ObservedObject private var appsManager = SideloadedAppsManager.shared
     @StateObject private var sideBySideManager = SideBySideManager()
+    @StateObject private var sourcesManager = SourcesManager()
     /// What the sign-in sheet showed last, so it keeps its content while it
     /// slides away after the sign-in clears it.
     @State private var shownSignInSheet: SignInSheet?
@@ -81,7 +82,8 @@ struct RootView: View {
                       locationManager: locationManager,
                       entitlementsManager: entitlementsManager,
                       appsManager: appsManager,
-                      sideBySideManager: sideBySideManager)
+                      sideBySideManager: sideBySideManager,
+                      sourcesManager: sourcesManager)
                 .tabItem { Label(L("Tools"), systemImage: "wrench.and.screwdriver") }
                 .tag(Page.tools)
             AboutView()
@@ -118,6 +120,10 @@ struct RootView: View {
             entitlementsManager.signOut()
             sideBySideManager.signOut()
         }
+        // The sources are checked for updates once when SideInstaller opens,
+        // as SideInstallerApp checks SideInstaller itself, so the Sources tile
+        // can show how many there are.
+        .task { await sourcesManager.checkAtLaunch(apps: appsManager) }
         .tint(Theme.accent)
         .preferredColorScheme(.dark)
         // A swipe down is a cancel; the sign-in closing it is not.
@@ -546,6 +552,7 @@ struct ToolsView: View {
     @ObservedObject var entitlementsManager: EntitlementsManager
     @ObservedObject var appsManager: SideloadedAppsManager
     @ObservedObject var sideBySideManager: SideBySideManager
+    @ObservedObject var sourcesManager: SourcesManager
 
     @State private var showSettings = false
 
@@ -601,6 +608,14 @@ struct ToolsView: View {
                         }
                         .buttonStyle(.plain, sound: .tick)
                         .cascadeItem(rowIndex(5))
+                        NavigationLink {
+                            SourcesView(manager: sourcesManager, appsManager: appsManager)
+                        } label: {
+                            ToolTile(image: "SourcesLogo", title: L("Sources"),
+                                     count: sourcesManager.updateCount(installed: appsManager.entries))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(rowIndex(6))
                     }
                 }
                 // No bottom padding: the tab bar's inset already clears the last
@@ -641,6 +656,8 @@ private struct ToolTile: View {
     var title: String
     /// Shows a Beta badge in the top corner.
     var beta: Bool = false
+    /// A count in the top corner, such as the updates Sources found. 0 hides it.
+    var count: Int = 0
 
     var body: some View {
         let logo = RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -664,6 +681,16 @@ private struct ToolTile: View {
             if beta {
                 BetaBadge()
                     .padding(12)
+            }
+            if count > 0 {
+                Text("\(count)")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 24, minHeight: 24)
+                    .padding(.horizontal, count > 9 ? 4 : 0)
+                    .background(Capsule().fill(Theme.warning))
+                    .padding(12)
+                    .accessibilityLabel(count == 1 ? L("%d update", count) : L("%d updates", count))
             }
         }
         .cardSurface(in: tile)

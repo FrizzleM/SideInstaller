@@ -1346,4 +1346,75 @@ let vietnameseStrings: [String: String] = [
         "Địa điểm đó không có tọa độ. Hãy chọn trên bản đồ hoặc nhập địa chỉ.",
     "The install didn't start. Open SideInstaller to see why.":
         "Việc cài đặt chưa bắt đầu. Hãy mở SideInstaller để xem lý do.",
+
+    // MARK: - Sources
+
+    "Suggested":
+        "Gợi ý",
+
+    "Paste the link of a SideStore or AltStore source, or of a .json source file. Its apps, their updates and release notes show here.":
+        "Dán liên kết của một nguồn SideStore hoặc AltStore, hoặc của một tệp nguồn .json. Ứng dụng, bản cập nhật và ghi chú phát hành của nguồn sẽ hiện ở đây.",
+
+    "Sources":
+        "Nguồn",
+    "Add a source":
+        "Thêm nguồn",
+    "Add":
+        "Thêm",
+    "Apps":
+        "Ứng dụng",
+    "Updates":
+        "Cập nhật",
+    "Update":
+        "Cập nhật",
+    "Your sources":
+        "Nguồn của bạn",
+    "Check for updates":
+        "Kiểm tra cập nhật",
+    "Copy link":
+        "Sao chép liên kết",
+    "Source options":
+        "Tùy chọn nguồn",
+    "Loading…":
+        "Đang tải…",
+    "What's new":
+        "Có gì mới",
+    "Version history":
+        "Lịch sử phiên bản",
+    "This version has no release notes.":
+        "Phiên bản này không có ghi chú phát hành.",
+    "%d update":
+        "%d bản cập nhật",
+    "%d updates":
+        "%d bản cập nhật",
+    "%d source":
+        "%d nguồn",
+    "%d sources":
+        "%d nguồn",
+    "Update to %@":
+        "Cập nhật lên %@",
+    "Install %@ %@?":
+        "Cài %@ %@?",
+    "Version %@ · from %@":
+        "Phiên bản %@ · từ %@",
+    "%@ installed · %@ available":
+        "Đã cài %@ · có %@",
+    "%@ installed · up to date":
+        "Đã cài %@ · mới nhất",
+    "That source is already added.":
+        "Nguồn đó đã được thêm.",
+    "The source answered with HTTP %d.":
+        "Nguồn trả về HTTP %d.",
+    "Couldn't reach the source: %@":
+        "Không thể kết nối tới nguồn: %@",
+    "That isn't a source link. Paste the whole https:// address of the source.":
+        "Đó không phải liên kết nguồn. Hãy dán toàn bộ địa chỉ https:// của nguồn.",
+    "That link didn't return a source. It has to be the source's JSON file itself.":
+        "Liên kết đó không trả về nguồn. Nó phải là chính tệp JSON của nguồn.",
+    "Downloads the IPA from the source, then signs it with your Apple ID and installs it, as a custom .ipa would be.":
+        "Tải IPA từ nguồn, rồi ký bằng Apple ID của bạn và cài đặt, giống như một .ipa tùy chỉnh.",
+    "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
+        "Phiên bản này cũ hơn bản mới nhất. Nó được cài đè lên bản trên iPhone này và có thể không mở được dữ liệu mà phiên bản mới hơn đã lưu.",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "Phiên bản này cũ hơn bản trên iPhone này (%@). Khi cài đè lên, nó có thể không mở được dữ liệu mà phiên bản mới hơn đã lưu.",
 ]

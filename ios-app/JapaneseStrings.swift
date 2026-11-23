@@ -1314,4 +1314,75 @@ let japaneseStrings: [String: String] = [
         "その場所には座標がありません。地図で選ぶか、住所を入力してください。",
     "The install didn't start. Open SideInstaller to see why.":
         "インストールが開始されませんでした。SideInstaller を開いて理由を確認してください。",
+
+    // MARK: - Sources
+
+    "Suggested":
+        "おすすめ",
+
+    "Paste the link of a SideStore or AltStore source, or of a .json source file. Its apps, their updates and release notes show here.":
+        "SideStore または AltStore のソース、または .json ソースファイルのリンクを貼り付けてください。アプリ、アップデート、リリースノートがここに表示されます。",
+
+    "Sources":
+        "ソース",
+    "Add a source":
+        "ソースを追加",
+    "Add":
+        "追加",
+    "Apps":
+        "アプリ",
+    "Updates":
+        "アップデート",
+    "Update":
+        "アップデート",
+    "Your sources":
+        "追加したソース",
+    "Check for updates":
+        "アップデートを確認",
+    "Copy link":
+        "リンクをコピー",
+    "Source options":
+        "ソースのオプション",
+    "Loading…":
+        "読み込み中…",
+    "What's new":
+        "新機能",
+    "Version history":
+        "バージョン履歴",
+    "This version has no release notes.":
+        "このバージョンにはリリースノートがありません。",
+    "%d update":
+        "%d 件のアップデート",
+    "%d updates":
+        "%d 件のアップデート",
+    "%d source":
+        "%d 件のソース",
+    "%d sources":
+        "%d 件のソース",
+    "Update to %@":
+        "%@ にアップデート",
+    "Install %@ %@?":
+        "%@ %@ をインストールしますか？",
+    "Version %@ · from %@":
+        "バージョン %@ · %@ から",
+    "%@ installed · %@ available":
+        "%@ をインストール済み · %@ が利用可能",
+    "%@ installed · up to date":
+        "%@ をインストール済み · 最新",
+    "That source is already added.":
+        "そのソースは追加済みです。",
+    "The source answered with HTTP %d.":
+        "ソースが HTTP %d を返しました。",
+    "Couldn't reach the source: %@":
+        "ソースに接続できませんでした：%@",
+    "That isn't a source link. Paste the whole https:// address of the source.":
+        "ソースのリンクではありません。ソースの https:// アドレスを丸ごと貼り付けてください。",
+    "That link didn't return a source. It has to be the source's JSON file itself.":
+        "そのリンクはソースを返しませんでした。ソースの JSON ファイルそのものを指定してください。",
+    "Downloads the IPA from the source, then signs it with your Apple ID and installs it, as a custom .ipa would be.":
+        "ソースから IPA をダウンロードし、あなたの Apple ID で署名してインストールします。カスタム .ipa と同じです。",
+    "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
+        "このバージョンは最新より古いものです。この iPhone のアプリに上書きでインストールされ、新しいバージョンが保存したデータを開けない場合があります。",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "このバージョンは、この iPhone にあるもの（%@）より古いものです。上書きでインストールすると、新しいバージョンが保存したデータを開けない場合があります。",
 ]
