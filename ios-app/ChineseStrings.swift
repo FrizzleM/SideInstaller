@@ -479,6 +479,24 @@ let chineseStrings: [String: String] = [
         "已跳过：续签开始后找不到了，IPA 可能已被删除。",
     "Skipped: this app has no team on its signing profile, so it can't be refreshed.":
         "已跳过：这个 App 的签名描述文件里没有团队号，无法续签。",
+    "Skipped: no saved Apple ID matches this app's team (%@). Switch to that account and refresh again.":
+        "已跳过：没有已保存的 Apple ID 对应这个 App 的团队（%@）。请切换到那个账号再续签。",
+    "Couldn't sign in as %@ (%@). Switch to that account and refresh again.":
+        "没能以 %@ 登录（%@）。请切换到那个账号再续签。",
+    "Skipped: signed in as %@, but this app's team is %@. Switch to that account and refresh again.":
+        "已跳过：已登录 %@，但这个 App 的团队是 %@。请切换到那个账号再续签。",
+    "Refreshing %@ as %@":
+        "正在续签 %@（以 %@ 的身份）",
+    "%@ will be signed again with the Apple ID that signed it and installed over the copy on this device. It keeps its data, and its seven days start over.":
+        "%@ 将用当初给它签名的 Apple ID 重新签名，并覆盖安装到这台设备上的副本。数据会保留，七天从头算。",
+    "%d apps will be signed again, each with the Apple ID that signed it, and installed over the copies on this device. They keep their data, and their seven days start over.":
+        "%d 个应用将分别用当初给它们签名的 Apple ID 重新签名，并覆盖安装到这台设备上的副本。数据会保留，七天从头算。",
+    "These apps were signed under %d Apple IDs, so each group is signed with its own Apple ID.":
+        "这些应用是在 %d 个 Apple ID 下签名的，所以每组用各自的 Apple ID 签。",
+    "%d app here is signed under a team that matches no saved Apple ID, so it is left out. Switch to the Apple ID that signed it and sign in once, then reload, and it will join the list. Enterprise-signed apps stay excluded.":
+        "这里有 %d 个应用是在没有对应已保存 Apple ID 的团队下签名的，所以不在列表里。请切换到当初给它签名的 Apple ID 登录一次，再重新加载，它就会加入列表。企业签名的应用始终不在内。",
+    "%d apps here are signed under teams that match no saved Apple ID, so they are left out. Switch to the Apple ID that signed them and sign in once, then reload, and they will join the list. Enterprise-signed apps stay excluded.":
+        "这里有 %d 个应用是在没有对应已保存 Apple ID 的团队下签名的，所以不在列表里。请切换到当初给它们签名的 Apple ID 登录一次，再重新加载，它们就会加入列表。企业签名的应用始终不在内。",
     "Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.":
         "已吊销，但证书列表刷新失败，重新加载前可能显示旧的。",
 
@@ -551,6 +569,7 @@ let chineseStrings: [String: String] = [
         "签发给了没有任何已安装应用在使用的 App ID。",
     "Older profiles": "较旧的描述文件",
     "Bundle identifier": "Bundle 标识符",
+    "Bundle Identifier": "Bundle 标识符",
     "App ID": "App ID",
     "Version": "版本",
     "Profile name": "描述文件名称",
@@ -1048,6 +1067,8 @@ let chineseStrings: [String: String] = [
     "Tap “Import Certificate From SideStore”.":
         "轻点“Import Certificate From SideStore”。",
     "Wrong device IP": "设备 IP 有误",
+    "Invalid device IP": "设备 IP 无效",
+    "The address was invalid, reset to 10.7.0.1.": "地址无效，已重置为 10.7.0.1。",
     "The address in Settings › Advanced › Device IP is one this iPhone already holds, so there's nothing at the other end to connect to.":
         "“设置 › 高级 › 设备 IP”中填的地址是本机已有的地址，另一端没有可连接的对象。",
     "Set it back to 10.7.0.1, the default. In LocalDevVPN that's the value under Settings › Device IP — not the address on its main screen, which is the tunnel's own end.":
@@ -1268,6 +1289,7 @@ let chineseStrings: [String: String] = [
 
     // MARK: - 补漏（设置页 / 外观 / 应用源：原表缺失，L() 回落英文）
 
+    "rpath": "rpath",
     "Appearance": "外观",
     "Follow System": "跟随系统",
     "Light": "浅色",

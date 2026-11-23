@@ -1234,7 +1234,7 @@ private struct PrecheckSheet: View {
                             Text(L("继续安装"))
                         }
                         .buttonStyle(PrimaryButtonStyle())
-                        Button(L("取消")) { CZFHaptics.impact(); dismiss() }
+                        Button(L("Cancel")) { CZFHaptics.impact(); dismiss() }
                             .buttonStyle(.bordered, sound: .tap)
                             .tint(Theme.muted)
                     }

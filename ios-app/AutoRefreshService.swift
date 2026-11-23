@@ -113,6 +113,30 @@ final class AutoRefreshService {
             return false
         }
 
+        // 到期判定（抽成小 helper：下面的跳过判断与正式决策用同一份定义）。
+        func dueBundleIDs() -> Set<String> {
+            Set(manager.refreshable.filter { job in
+                guard let entry = manager.entries.first(where: { $0.app.bundleID == job.bundleID })
+                else { return false }
+                switch ExpiryUrgency.of(entry.current) {
+                case .expired, .critical, .soon: return true
+                default: return false
+                }
+            }.map(\.bundleID))
+        }
+
+        // A-3：内存清单已够判到期，就不拉隧道读设备——99% 的轮次结论
+        // 都是“无到期”。四条全满足才跳过；任一条不满足走下面的全量 load。
+        // 跳过时直接 return true（与“无到期”同一返回值），不盖去重戳、
+        // 不重排到期通知——下次真 load 时再排。
+        if manager.hasLoaded,
+           let lastRefreshed = manager.lastRefreshed,
+           Date().timeIntervalSince(lastRefreshed) < 24 * 3600,
+           manager.lastLoadFailed.map({ $0 < lastRefreshed }) ?? true,
+           dueBundleIDs().isEmpty {
+            return true
+        }
+
         // 读一次设备清单（安静模式，失败就等下一轮）。
         let failedBefore = manager.lastLoadFailed
         manager.load(quiet: true)
@@ -144,14 +168,7 @@ final class AutoRefreshService {
         ExpiryNotificationScheduler.reschedule(for: manager.entries)
 
         // 可续签的 App 里，描述文件已过期或 3 天内到期的才算到期。
-        let dueIDs = Set(manager.refreshable.filter { job in
-            guard let entry = manager.entries.first(where: { $0.app.bundleID == job.bundleID })
-            else { return false }
-            switch ExpiryUrgency.of(entry.current) {
-            case .expired, .critical, .soon: return true
-            default: return false
-            }
-        }.map(\.bundleID))
+        let dueIDs = dueBundleIDs()
         guard !dueIDs.isEmpty else { return true }
 
         // 最短间隔：上一轮自动续签在 6 小时内就不重复跑。

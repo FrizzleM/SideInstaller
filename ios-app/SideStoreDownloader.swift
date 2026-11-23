@@ -1019,6 +1019,8 @@ enum SideStoreDownloader {
         let dest = staging.appendingPathComponent(name)
 
         return try await withCheckedThrowingContinuation { cont in
+            // A-2：KVO 路的进度节流器（与 byte-loop 路同一 helper，各自的状态）。
+            let progressThrottler = ProgressThrottler()
             // Progress is observed via KVO on the task's `Progress` instead of
             // a download delegate, which would conflict over the downloaded file.
             var observation: NSKeyValueObservation?
@@ -1047,7 +1049,7 @@ enum SideStoreDownloader {
                 }
             }
             observation = task.progress.observe(\.fractionCompleted) { done, _ in
-                progress(done.fractionCompleted)
+                progressThrottler.publish(done.fractionCompleted, send: progress)
             }
             task.resume()
         }
@@ -1500,6 +1502,29 @@ enum SideStoreDownloader {
 /// from the start link. The rest must be of the same file: a 206 with another
 /// ETag starts the download over, for a nightly replaced meanwhile. `If-Range`
 /// asks for that too, but GitHub's release storage ignores it.
+/// A-2：下载进度节流——断点续传路每 chunk、KVO 路每次变化都调 progress，
+/// 再经 Engine/SBS 的 report 闭包每次 `Task { @MainActor in }` 发布一次。
+/// 变化 ≥0.5% 或距上次发布 ≥100ms 才放行，最后一块强制发布。
+/// 一个下载一个实例（状态跟下载走，两个下载并行不互相压）。
+private final class ProgressThrottler: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lastPublished: Double?
+    private var lastPublishedAt: Date?
+
+    /// Gates `fraction` through `send`; the last chunk always goes through.
+    func publish(_ fraction: Double, send: (Double) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        let now = Date()
+        if fraction < 1,
+           let last = lastPublished, let at = lastPublishedAt,
+           abs(fraction - last) < 0.005, now.timeIntervalSince(at) < 0.1 { return }
+        lastPublished = fraction
+        lastPublishedAt = now
+        send(fraction)
+    }
+}
+
 private final class ResumingDownload: NSObject, URLSessionDataDelegate, @unchecked Sendable {
 
     /// The request timeout until something has answered: URLSession's
@@ -1531,6 +1556,8 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
     private let idleTimeout: TimeInterval
     /// Told the fraction that has arrived, once the file's size is known.
     private let progress: (@Sendable (Double) -> Void)?
+    /// A-2：本下载的进度节流器（delegate 队列是串行的，锁只是兜底）。
+    private let progressThrottler = ProgressThrottler()
     private let log: (String) -> Void
     private let queue: OperationQueue = {
         let queue = OperationQueue()
@@ -1742,7 +1769,7 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
             try output?.write(contentsOf: data)
             written += data.count
             if let progress, let total, total > 0 {
-                progress(min(1, Double(written) / Double(total)))
+                progressThrottler.publish(min(1, Double(written) / Double(total))) { progress($0) }
             }
         } catch {
             writeError = error
@@ -2093,12 +2120,18 @@ extension IPALibrary {
     private static let appInfoLock = NSLock()
     private static var appInfoCache: [String: AppInfo] = [:]
 
-    private static func appInfoCacheKey(_ url: URL) -> String? {
+    /// A-4/A-5：文件指纹（路径 # 大小 @ 修改时间秒），文件已删时 nil。
+    /// A8 的缓存键、选包脱壳复用、补团队号 tried 集三处共用同一格式。
+    static func fileFingerprint(of url: URL) -> String? {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
               let size = attrs[.size] as? Int,
               let modified = attrs[.modificationDate] as? Date
         else { return nil }
         return "\(url.path)#\(size)@\(Int(modified.timeIntervalSince1970))"
+    }
+
+    private static func appInfoCacheKey(_ url: URL) -> String? {
+        fileFingerprint(of: url)
     }
 
     static func appInfo(at url: URL) -> AppInfo? {
@@ -2354,6 +2387,25 @@ extension IPALibrary {
             return parts.count == 3 && parts[0] == "Payload"
                 && parts[1].hasSuffix(".app") && parts[2] == "Info.plist"
         }
+    }
+
+    /// A-5：只读 IPA 里 `Payload/*.app/embedded.mobileprovision` 这一条目，
+    /// 不解压整个包（provisionTeamID 用）。mobileprovision 只有几十 KB，
+    /// 现有 4MB 单条目上限够用；多 .app 时取 central directory 里第一个，
+    /// 与 provisionTeamID 现行的 `payload.first(where: { .pathExtension == "app" })`
+    /// 同口径。
+    static func embeddedProvisionData(inIPA url: URL) -> Data? {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size),
+              let entry = directory.first(where: { entry in
+                  let parts = entry.name.split(separator: "/", omittingEmptySubsequences: false)
+                  return parts.count == 3 && parts[0] == "Payload"
+                      && parts[1].hasSuffix(".app") && parts[2] == "embedded.mobileprovision"
+              }) else { return nil }
+        return contents(of: entry, handle)
     }
 
     private static func contents(of entry: ZipEntry, _ handle: FileHandle, maxSize: Int = 4 << 20) -> Data? {

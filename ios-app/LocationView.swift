@@ -1303,8 +1303,8 @@ struct LocationView: View {
                         .font(.caption.weight(.medium))
                 }
                 .alert(L("Clear stops"), isPresented: $showingClearStopsConfirm) {
-                    Button(L("删除"), role: .destructive) { manager.removeAllStops() }
-                    Button(L("取消"), role: .cancel) {}
+                    Button(L("Delete"), role: .destructive) { manager.removeAllStops() }
+                    Button(L("Cancel"), role: .cancel) {}
                 } message: {
                     Text(L("删除后无法恢复"))
                 }

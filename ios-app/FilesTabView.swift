@@ -240,7 +240,7 @@ struct FilesTabView: View {
             switch self {
             case .default: return L("默认")
             case .name: return L("名称")
-            case .size: return L("大小")
+            case .size: return L("Size")
             case .newest: return L("最新")
             }
         }
@@ -381,7 +381,7 @@ struct FilesTabView: View {
                     installSignedFile(item)
                     actionItem = nil
                 } label: {
-                    if useIcons { Label(L("安装"), systemImage: "square.and.arrow.down") } else { Text(L("安装")) }
+                    if useIcons { Label(L("Install"), systemImage: "square.and.arrow.down") } else { Text(L("Install")) }
                 }
             }
             Button {
@@ -431,7 +431,7 @@ struct FilesTabView: View {
             duplicate(item)
             actionItem = nil
         } label: {
-            if useIcons { Label(L("复制"), systemImage: "doc.on.doc") } else { Text(L("复制")) }
+            if useIcons { Label(L("Copy"), systemImage: "doc.on.doc") } else { Text(L("Copy")) }
         }
         if !item.isDirectory {
             Button {
@@ -454,7 +454,7 @@ struct FilesTabView: View {
             pendingDeleteItem = item
             actionItem = nil
         } label: {
-            if useIcons { Label(L("删除"), systemImage: "trash") } else { Text(L("删除")) }
+            if useIcons { Label(L("Delete"), systemImage: "trash") } else { Text(L("Delete")) }
         }
     }
 
@@ -640,7 +640,7 @@ struct FilesTabView: View {
             .navigationTitle(L("Cellular Install (OTA)"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(L("取消")) { otaRecord = nil }
+                    Button(L("Cancel")) { otaRecord = nil }
                 }
             }
         }
@@ -718,7 +718,7 @@ struct FilesTabView: View {
                 VStack(spacing: 18) {
                     // U-UI：文件页顶部分段——文件列表 / 应用文件夹库（证书页搬来的库）。
                     Picker("", selection: $fileView) {
-                        Text(L("文件")).tag(FileViewTab.files)
+                        Text(L("File")).tag(FileViewTab.files)
                         Text(L("应用文件夹库")).tag(FileViewTab.library)
                     }
                     .pickerStyle(.segmented)
@@ -845,14 +845,14 @@ struct FilesTabView: View {
                         Button {
                             refreshFiles(resetDir: true)
                         } label: {
-                            Label(L("刷新"), systemImage: "arrow.clockwise")
+                            Label(L("Refresh"), systemImage: "arrow.clockwise")
                         }
                         if fileView == .files && !files.isEmpty {
                             Button {
                                 selecting.toggle()
                                 selection = []
                             } label: {
-                                Label(selecting ? L("完成") : L("选择"), systemImage: "checkmark.circle")
+                                Label(selecting ? L("Done") : L("选择"), systemImage: "checkmark.circle")
                             }
                         }
                     } label: {
@@ -926,11 +926,11 @@ struct FilesTabView: View {
             get: { pendingDeleteItem != nil },
             set: { if !$0 { pendingDeleteItem = nil } }
         )) {
-            Button(L("删除"), role: .destructive) {
+            Button(L("Delete"), role: .destructive) {
                 if let item = pendingDeleteItem { delete(item) }
                 pendingDeleteItem = nil
             }
-            Button(L("取消"), role: .cancel) { pendingDeleteItem = nil }
+            Button(L("Cancel"), role: .cancel) { pendingDeleteItem = nil }
         } message: {
             if let item = pendingDeleteItem, let warning = renewalDeleteWarning(for: item) {
                 Text(warning)
@@ -940,11 +940,11 @@ struct FilesTabView: View {
         }
         // 批量删确认，带数量。
         .alert(L("删除所选 %d 个？", selection.count), isPresented: $pendingDeleteSelection) {
-            Button(L("删除"), role: .destructive) {
+            Button(L("Delete"), role: .destructive) {
                 pendingDeleteSelection = false
                 deleteSelection()
             }
-            Button(L("取消"), role: .cancel) { pendingDeleteSelection = false }
+            Button(L("Cancel"), role: .cancel) { pendingDeleteSelection = false }
         } message: {
             if let warning = renewalDeleteWarning(forSelection: selection) {
                 Text(warning)
@@ -962,7 +962,7 @@ struct FilesTabView: View {
             if let item = actionItem {
                 fileActionButtons(for: item, useIcons: false)
             }
-            Button(L("取消"), role: .cancel) {
+            Button(L("Cancel"), role: .cancel) {
                 actionItem = nil
             }
         }
@@ -973,8 +973,8 @@ struct FilesTabView: View {
             TextField(L("文件名"), text: $renameText)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-            Button(L("取消"), role: .cancel) { renameItem = nil }
-            Button(L("保存")) { performRename() }
+            Button(L("Cancel"), role: .cancel) { renameItem = nil }
+            Button(L("Save")) { performRename() }
         } message: {
             Text(L("扩展名别改错，不然文件可能打不开。"))
         }
@@ -982,7 +982,7 @@ struct FilesTabView: View {
             TextField(L("请输入文件夹名字"), text: $newFolderName)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-            Button(L("取消"), role: .cancel) { showNewFolderAlert = false }
+            Button(L("Cancel"), role: .cancel) { showNewFolderAlert = false }
             Button(L("创建")) {
                 showNewFolderAlert = false
                 createFolder()
@@ -1025,7 +1025,7 @@ struct FilesTabView: View {
             Button(L("Cellular Install (OTA)")) {
                 if let record = installChoiceRecord { startOTAInstall(record: record) }
             }
-            Button(L("取消"), role: .cancel) { installChoiceRecord = nil }
+            Button(L("Cancel"), role: .cancel) { installChoiceRecord = nil }
         }
         .sheet(item: $otaRecord) { record in
             otaSheet(record: record)
@@ -1215,7 +1215,7 @@ struct FilesTabView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "chevron.left")
-                        Text(L("返回"))
+                        Text(L("Back"))
                     }
                     .font(.footnote.weight(.semibold))
                 }
@@ -1568,7 +1568,7 @@ struct FilesTabView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(L("取消")) { moveItem = nil }
+                    Button(L("Cancel")) { moveItem = nil }
                 }
             }
         }
@@ -1799,7 +1799,7 @@ struct FilesTabView: View {
                             if !selectingSigned { selectedSignedIDs.removeAll() }
                         }
                     } label: {
-                        Text((libraryTab == .unsigned ? batchingUnsigned : selectingSigned) ? L("完成") : L("选择"))
+                        Text((libraryTab == .unsigned ? batchingUnsigned : selectingSigned) ? L("Done") : L("选择"))
                             .font(.footnote)
                     }
                     .disabled(libraryTab == .unsigned ? workspace.batchBusy : false)
@@ -1811,7 +1811,7 @@ struct FilesTabView: View {
                 Button {
                     showIPAPicker = true
                 } label: {
-                    Text(L("导入"))
+                    Text(L("Import"))
                         .font(.footnote)
                 }
             }
@@ -1850,28 +1850,28 @@ struct FilesTabView: View {
             }
         }
         .alert(L("删除这个已签名 IPA？"), isPresented: $showingDeleteConfirm) {
-            Button(L("删除"), role: .destructive) {
+            Button(L("Delete"), role: .destructive) {
                 if let record = recordPendingDelete {
                     SignedIPAStore.remove(record)
                     signedRecords = SignedIPAStore.load()
                 }
                 recordPendingDelete = nil
             }
-            Button(L("取消"), role: .cancel) {
+            Button(L("Cancel"), role: .cancel) {
                 recordPendingDelete = nil
             }
         } message: {
             Text(L("会删掉文件和这条记录，之后要重签才能再装。"))
         }
         .alert(L("删除选中的已签名 IPA？"), isPresented: $showingBatchDeleteConfirm) {
-            Button(L("删除"), role: .destructive) {
+            Button(L("Delete"), role: .destructive) {
                 let targets = signedRecords.filter { selectedSignedIDs.contains($0.id) }
                 SignedIPAStore.remove(targets)
                 signedRecords = SignedIPAStore.load()
                 selectedSignedIDs.removeAll()
                 selectingSigned = false
             }
-            Button(L("取消"), role: .cancel) {}
+            Button(L("Cancel"), role: .cancel) {}
         } message: {
             Text(L("一次删掉选中的 %d 个，文件和记录一起删。", selectedSignedIDs.count))
         }
@@ -1931,7 +1931,7 @@ struct FilesTabView: View {
                                 runBatchSign(targets: pendingBatchTargets, mods: pendingBatchMods)
                                 clearPendingBatch()
                             }
-                            Button(L("取消"), role: .cancel) {
+                            Button(L("Cancel"), role: .cancel) {
                                 clearPendingBatch()
                                 // 批量忙标志在 batchSign 入口就立起来了，取消
                                 // 时这里放掉；确认那路 runBatchSign 自己接管，
@@ -2189,7 +2189,7 @@ struct FilesTabView: View {
                 CertSignLogStore.clear()
                 logEntries = []
             }
-            Button(L("取消"), role: .cancel) {}
+            Button(L("Cancel"), role: .cancel) {}
         } message: {
             Text(L("只删记录，不动已签名的 IPA 文件。"))
         }
@@ -2485,7 +2485,7 @@ struct FilesTabView: View {
                     recordPendingDelete = record
                     showingDeleteConfirm = true
                 } label: {
-                    Label(L("删除"), systemImage: "trash")
+                    Label(L("Delete"), systemImage: "trash")
                 }
             }
         }
@@ -2615,7 +2615,7 @@ private struct FileDetailSheet: View {
         NavigationStack {
             List {
                 detailRow(L("名字"), item.name)
-                detailRow(L("大小"), item.isDirectory
+                detailRow(L("Size"), item.isDirectory
                           ? L("%d 项", item.childCount)
                           : ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file))
                 detailRow(L("修改时间"), item.modified?.formatted(date: .abbreviated, time: .standard) ?? L("未知"))
@@ -2642,12 +2642,12 @@ private struct FileDetailSheet: View {
                     Button {
                         onDuplicate()
                     } label: {
-                        Label(L("复制"), systemImage: "doc.on.doc")
+                        Label(L("Copy"), systemImage: "doc.on.doc")
                     }
                     Button(role: .destructive) {
                         onDelete()
                     } label: {
-                        Label(L("删除"), systemImage: "trash")
+                        Label(L("Delete"), systemImage: "trash")
                     }
                 }
             }
@@ -2655,7 +2655,7 @@ private struct FileDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(L("完成")) { dismiss() }
+                    Button(L("Done")) { dismiss() }
                 }
             }
         }

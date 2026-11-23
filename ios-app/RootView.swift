@@ -93,7 +93,7 @@ struct RootView: View {
         // gearshape 见旧 Tools 行，folder.fill 见旧文件 tab）。
         TabView(selection: tabSelection) {
             FilesTabView()
-                .tabItem { Label(L("文件"), systemImage: "folder.fill") }
+                .tabItem { Label(L("File"), systemImage: "folder.fill") }
                 .tag(Page.files)
             NavigationStack { AppsView(manager: appsManager) }
                 .blueTopBar()
@@ -104,10 +104,10 @@ struct RootView: View {
                 .tag(Page.sources)
             NavigationStack { DownloadsListView() }
                 .blueTopBar()
-                .tabItem { Label(L("下载"), systemImage: "arrow.down.circle") }
+                .tabItem { Label(L("Download"), systemImage: "arrow.down.circle") }
                 .tag(Page.downloads)
             SettingsView(isTab: true, enterpriseRequest: $settingsEnterpriseRequest)
-                .tabItem { Label(L("设置"), systemImage: "gearshape") }
+                .tabItem { Label(L("Settings"), systemImage: "gearshape") }
                 .tag(Page.settings)
         }
         .environmentObject(certWorkspace)

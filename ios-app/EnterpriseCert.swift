@@ -418,8 +418,26 @@ enum EnterpriseCertStore {
         let provisionedDevices: [String]
     }
 
+    /// A-7：store 层解析缓存——certInfo / provisionInfo 是计算属性，
+    /// 每次访问都重读重解析（certInfo 走 SecPKCS12Import，provisionInfo
+    /// 全读描述文件 + 扫 XML + plist 全解析）。设置页一次 body 求值
+    /// 里连调多次，证书页、签前校验等直读方也一样。缓存键：provisionInfo
+    /// 用证书材料指纹，certInfo 用指纹 + 密码（密码变了只失效 certInfo）。
+    /// 结果可为 nil——nil 也缓存，免得每次都重算失败路径。
+    /// 调用方遍布主线程与 detached 任务，缓存读写同一把锁串行化
+    /// （解析本身不回调这两个 getter，不会死锁）。
+    private static let infoCacheLock = NSLock()
+    private static var certInfoCache: (key: String, value: CertInfo?)?
+    private static var provisionInfoCache: (key: String, value: ProvisionInfo?)?
+
     static var provisionInfo: ProvisionInfo? {
-        provisionInfo(at: provisionURL)
+        let key = certStateFingerprint()
+        infoCacheLock.lock()
+        defer { infoCacheLock.unlock() }
+        if let cached = provisionInfoCache, cached.key == key { return cached.value }
+        let value = provisionInfo(at: provisionURL)
+        provisionInfoCache = (key: key, value: value)
+        return value
     }
 
     /// 证书材料指纹（A1+A2）：激活 p12 + 激活描述文件 + 各 profile 描述文件
@@ -509,13 +527,21 @@ enum EnterpriseCertStore {
     }
 
     static var certInfo: CertInfo? {
-        guard let identity = try? identity() else { return nil }
-        var certRef: SecCertificate?
-        guard SecIdentityCopyCertificate(identity, &certRef) == errSecSuccess,
-              let cert = certRef else { return nil }
-        let name = SecCertificateCopySubjectSummary(cert) as String? ?? ""
-        let expiration = X509Validity.notAfter(der: SecCertificateCopyData(cert) as Data)
-        return CertInfo(name: name, expiration: expiration)
+        let key = certStateFingerprint() + "|" + password
+        infoCacheLock.lock()
+        defer { infoCacheLock.unlock() }
+        if let cached = certInfoCache, cached.key == key { return cached.value }
+        let value: CertInfo? = {
+            guard let identity = try? identity() else { return nil }
+            var certRef: SecCertificate?
+            guard SecIdentityCopyCertificate(identity, &certRef) == errSecSuccess,
+                  let cert = certRef else { return nil }
+            let name = SecCertificateCopySubjectSummary(cert) as String? ?? ""
+            let expiration = X509Validity.notAfter(der: SecCertificateCopyData(cert) as Data)
+            return CertInfo(name: name, expiration: expiration)
+        }()
+        certInfoCache = (key: key, value: value)
+        return value
     }
 
     /// 描述文件里内嵌的开发证书 DER 列表（DeveloperCertificates）。
@@ -695,6 +721,24 @@ enum CertRevocationStatus {
     case unknown
     case ok
     case revoked
+
+    /// A-6：缓存往返名（UserDefaults 只存普通字符串）。
+    var cacheName: String {
+        switch self {
+        case .unknown: return "unknown"
+        case .ok: return "ok"
+        case .revoked: return "revoked"
+        }
+    }
+
+    init?(name: String) {
+        switch name {
+        case "unknown": self = .unknown
+        case "ok": self = .ok
+        case "revoked": self = .revoked
+        default: return nil
+        }
+    }
 }
 
 /// 吊销检查：用系统信任评估给已导入的企业证书验一遍，评估
@@ -704,7 +748,53 @@ enum CertRevocationStatus {
 /// 注意：这组 SecTrust API 是本文件新写的，仓库里没有现成
 /// 用例，CI 是最终 verdict。
 enum CertRevocationChecker {
-    static func check() -> CertRevocationStatus {
+    /// A-6：吊销检查结果缓存（UserDefaults，不存证书本身）。
+    /// key = 证书状态指纹；24 小时内同一指纹直接返回缓存状态，
+    /// 不读 p12、不做信任评估（不联网 OCSP）。证书换了指纹就变，
+    /// 缓存自动失效；`.unknown` 也缓存，免得查不出来的证书每进页
+    /// 都重试；手动按钮走 force 路，每次都真查。
+    private static let cacheKey = "CZFCertRevocationCache"
+    private static let cacheLifetime: TimeInterval = 24 * 3600
+
+    static func check(force: Bool = false) -> CertRevocationStatus {
+        let fingerprint = EnterpriseCertStore.certStateFingerprint()
+        if !force, let cached = cachedStatus(), cached.fingerprint == fingerprint,
+           Date().timeIntervalSince(cached.checkedAt) < cacheLifetime {
+            return cached.status
+        }
+        let status = evaluate()
+        saveCache(fingerprint: fingerprint, status: status, checkedAt: Date())
+        return status
+    }
+
+    /// The cached check: fingerprint, status, and check time.
+    private struct CachedStatus {
+        let fingerprint: String
+        let status: CertRevocationStatus
+        let checkedAt: Date
+    }
+
+    private static func cachedStatus() -> CachedStatus? {
+        guard let dict = UserDefaults.standard.dictionary(forKey: cacheKey),
+              let fingerprint = dict["fingerprint"] as? String,
+              let statusName = dict["status"] as? String,
+              let status = CertRevocationStatus(name: statusName),
+              let checkedAt = dict["checkedAt"] as? TimeInterval
+        else { return nil }
+        return CachedStatus(fingerprint: fingerprint, status: status,
+                            checkedAt: Date(timeIntervalSince1970: checkedAt))
+    }
+
+    private static func saveCache(fingerprint: String, status: CertRevocationStatus, checkedAt: Date) {
+        UserDefaults.standard.set([
+            "fingerprint": fingerprint,
+            "status": status.cacheName,
+            "checkedAt": checkedAt.timeIntervalSince1970,
+        ], forKey: cacheKey)
+    }
+
+    /// The real check, without the cache (old `check()` body, renamed).
+    private static func evaluate() -> CertRevocationStatus {
         guard let trust = currentTrust() else { return .unknown }
         SecTrustSetNetworkFetchAllowed(trust, true)
         var error: CFError?
@@ -1064,14 +1154,24 @@ enum SignedIPAStore {
     }
 
     /// 老记录证书段补齐：v61 之前签的记录没存 certName/teamID，
+    /// A-5：补团队号失败过的文件键集（内存，不落盘）。解失败的记录
+    /// （团队与当前证书不符最常见）永远补不上，记下来免得每次进
+    /// 文件页都重解；键 = 文件指纹 + 当前团队——换证书后键变了自动
+    /// 重算，不会把旧证书下的“不符”带到新证书上；文件换了指纹变，
+    /// 旧键自然失效。fillMissingCertInfo 跑在 Task.detached 里，
+    /// .task 重入可能并发，读写同一把锁。
+    private static let provisionTeamTriedLock = NSLock()
+    private static var provisionTeamTried: Set<String> = []
+
     /// 行里不显示证书段。逐条读已签 IPA 里的 embedded.mobileprovision
     ///（CMS 包着 plist，照 BuiltinTunnel 的 latin1 截 XML 办法），
     ///取 TeamIdentifier；团队与当前描述文件一致时才用当前证书名
     ///补 certName（同团队才敢认是同一张证，团队不同就不猜）。
     ///已补过的记录不再重读；读不到/解不出就跳过，不报错。
     ///返回 true 表示改过清单（调用方重读一次）。
-    ///注意：解压整个 IPA 只为读一个小文件，大包会慢一截——
-    ///调用方须在后台跑、每条只跑一次，跑完就不再碰。
+    ///注意：读描述文件只解 central directory 里一条目（A-5），
+    ///不再全量解压；补不上的记 tried 集，进页不再重读。
+    ///调用方须在后台跑。
     static func fillMissingCertInfo() -> Bool {
         guard let currentTeam = EnterpriseCertStore.provisionInfo?.teamID,
               !currentTeam.isEmpty,
@@ -1086,7 +1186,24 @@ enum SignedIPAStore {
             // 换证重签过（或记录本身就是旧证的），不拿当前证书名
             // 去盖它。
             if let storedTeam = old.teamID, storedTeam != currentTeam { continue }
-            guard let team = provisionTeamID(of: url(for: old)), team == currentTeam else { continue }
+            let ipaURL = url(for: old)
+            // A-5：上次补不上（解不出、或团队与当前证书不符）的文件
+            // 不再重解。
+            let triedKey = IPALibrary.fileFingerprint(of: ipaURL).map { "\($0)|\(currentTeam)" }
+            if let triedKey {
+                provisionTeamTriedLock.lock()
+                let tried = provisionTeamTried.contains(triedKey)
+                provisionTeamTriedLock.unlock()
+                if tried { continue }
+            }
+            guard let team = provisionTeamID(of: ipaURL), team == currentTeam else {
+                if let triedKey {
+                    provisionTeamTriedLock.lock()
+                    provisionTeamTried.insert(triedKey)
+                    provisionTeamTriedLock.unlock()
+                }
+                continue
+            }
             if records[index].certName == nil { records[index].certName = currentName }
             if records[index].teamID == nil { records[index].teamID = team }
             changed = true
@@ -1095,19 +1212,10 @@ enum SignedIPAStore {
         return changed
     }
 
-    /// 已签 IPA 里的描述文件团队号：解压到暂存目录，读
-    /// Payload/*.app/embedded.mobileprovision 的 TeamIdentifier。
-    /// 解不出就 nil（调用方跳过，不报错）。
+    /// 已签 IPA 里的描述文件团队号：只读 `Payload/*.app/embedded.mobileprovision`
+    /// 这一条目，不解压整个 IPA。解不出就 nil（调用方跳过，不报错）。
     private static func provisionTeamID(of ipaURL: URL) -> String? {
-        let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CZFProvision-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: tmp) }
-        guard FileZipTool.unzip(archive: ipaURL, to: tmp) == nil,
-              let payload = try? FileManager.default.contentsOfDirectory(
-                  at: tmp.appendingPathComponent("Payload", isDirectory: true),
-                  includingPropertiesForKeys: nil),
-              let appDir = payload.first(where: { $0.pathExtension == "app" }),
-              let data = try? Data(contentsOf: appDir.appendingPathComponent("embedded.mobileprovision")),
+        guard let data = IPALibrary.embeddedProvisionData(inIPA: ipaURL),
               let text = String(data: data, encoding: .isoLatin1),
               let start = text.range(of: "<?xml"),
               let end = text.range(of: "</plist>", options: .backwards) else {

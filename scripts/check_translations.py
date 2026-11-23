@@ -111,10 +111,19 @@ def lex(text: str) -> tuple[str, list[Literal]]:
             continue
         m = OPENING.match(text, i) if c in '"#' else None
         if m:
-            lit, end = read_literal(text, i, len(m.group(1)), m.group(2) == '"""')
+            nested: list[tuple[str, list[Literal]]] = []
+            lit, end = read_literal(text, i, len(m.group(1)), m.group(2) == '"""', nested)
             out.append(f"\x00{len(literals)}\x00")
             out.append("\n" * text.count("\n", i, end))
             literals.append(lit)
+            for span_code, span_literals in nested:
+                # Splice the interpolation's lexed code right after this
+                # literal's marker, remapping its refs to the master list,
+                # so an L("…") inside \(…) is found by the use scan.
+                base = len(literals)
+                span_code = re.sub(LITERAL_REF, lambda m: f"\x00{base + int(m.group(1))}\x00", span_code)
+                out.append(span_code)
+                literals.extend(span_literals)
             i = end
             continue
         out.append(c)
@@ -125,7 +134,8 @@ def lex(text: str) -> tuple[str, list[Literal]]:
 ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "0": "\0", "\\": "\\", '"': '"', "'": "'"}
 
 
-def read_literal(text: str, start: int, hashes: int, multiline: bool) -> tuple[Literal, int]:
+def read_literal(text: str, start: int, hashes: int, multiline: bool,
+                 nested: list | None = None) -> tuple[Literal, int]:
     line = text.count("\n", 0, start) + 1
     quote = '"""' if multiline else '"'
     close = quote + "#" * hashes
@@ -146,7 +156,20 @@ def read_literal(text: str, start: int, hashes: int, multiline: bool) -> tuple[L
             if nxt == "(":
                 interpolated = True
                 chars.append("\\(…)")
-                i = skip_interpolation(text, j)
+                end = skip_interpolation(text, j)
+                if nested is not None:
+                    # C30-3: an L("…") inside \(…) is a real use. The old code
+                    # skipped the whole interpolation, so such keys were
+                    # misreported as stale (LANTransfer's HTML strings). Lex the
+                    # span so its literals are collected like any other; the
+                    # caller splices the span's code after this literal's
+                    # marker and remaps its refs to the master list.
+                    span_code, span_literals = lex(text[j:end])
+                    span_line = text.count("\n", 0, j) + 1
+                    for lit in span_literals:
+                        lit.line += span_line - 1
+                    nested.append((span_code, span_literals))
+                i = end
                 continue
             if nxt == "u" and text.startswith("{", j + 1):
                 k = text.index("}", j)

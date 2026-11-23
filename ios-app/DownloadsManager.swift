@@ -148,25 +148,25 @@ struct DownloadsListView: View {
                         Button(role: .destructive) {
                             pendingDelete = item
                         } label: {
-                            Label(L("删除"), systemImage: "trash")
+                            Label(L("Delete"), systemImage: "trash")
                         }
                     }
                 }
             }
         }
         .listStyle(.plain)
-        .navigationTitle(L("下载"))
+        .navigationTitle(L("Download"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { manager.refresh() }
         .alert(L("删除这个下载的 IPA？"), isPresented: Binding(
             get: { pendingDelete != nil },
             set: { if !$0 { pendingDelete = nil } }
         )) {
-            Button(L("删除"), role: .destructive) {
+            Button(L("Delete"), role: .destructive) {
                 if let item = pendingDelete { manager.delete(item) }
                 pendingDelete = nil
             }
-            Button(L("取消"), role: .cancel) { pendingDelete = nil }
+            Button(L("Cancel"), role: .cancel) { pendingDelete = nil }
         } message: {
             Text(L("只删文件，不影响已装的 App。"))
         }

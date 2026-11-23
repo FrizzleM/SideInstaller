@@ -9,7 +9,7 @@ private enum SourceSort: String, CaseIterable {
         switch self {
         case .default: return L("默认")
         case .name: return L("名称")
-        case .size: return L("大小")
+        case .size: return L("Size")
         case .newest: return L("最新")
         }
     }
@@ -441,7 +441,7 @@ struct SourceAppsView: View {
                     }
                 } label: {
                     HStack {
-                        Text(L("下载"))
+                        Text(L("Download"))
                             .font(.subheadline.weight(.semibold))
                     }
                     .foregroundStyle(.white)
@@ -453,7 +453,7 @@ struct SourceAppsView: View {
             } else {
                 Button { startInstall(app) } label: {
                     HStack {
-                        Text(L("下载"))
+                        Text(L("Download"))
                             .font(.subheadline.weight(.semibold))
                     }
                     .foregroundStyle(.white)
@@ -515,6 +515,13 @@ struct SourceAppsView: View {
                 engine.runOneClick()
                 dismiss()
             } catch {
+                // B-C2：离开源页取消下载时不记失败行——成功路的
+                // Task.isCancelled 守卫同款，catch 里也要有。
+                if Task.isCancelled {
+                    activeID = nil
+                    states[app.id] = nil
+                    return
+                }
                 activeID = nil
                 states[app.id] = .failed(error.localizedDescription)
             }
@@ -564,6 +571,13 @@ struct SourceAppsView: View {
                 states[app.id] = nil
                 dismiss()
             } catch {
+                // B-C2：同上；取消也不污染重试分流（certFailedIDs）。
+                if Task.isCancelled {
+                    activeID = nil
+                    states[app.id] = nil
+                    certFailedIDs.remove(app.id)
+                    return
+                }
                 activeID = nil
                 states[app.id] = .failed(error.localizedDescription)
                 certFailedIDs.insert(app.id)

@@ -454,6 +454,11 @@ final class Engine {
     /// The files signing won't change, copied to the device from the downloaded
     /// IPA while signing runs; see `startPrestage`.
     @ObservationIgnored private var prestage: Task<DeviceConnection.PrestagedBundle?, Never>?
+    /// The certificate hand-off for the build just signed, built on the sign
+    /// queue while the install runs; see `startAccountConfig`. Cancelled with
+    /// the rest of the pipeline (B-C1) — a cancelled run used to leave it
+    /// holding the sign queue.
+    @ObservationIgnored private var accountConfigTask: Task<String?, Never>?
     /// Runs that have ended. A background sign-in carries the count from when it
     /// started, so a 2FA request it makes after its run stopped can be declined.
     /// Main thread only.
@@ -789,13 +794,13 @@ final class Engine {
                 try await signApp()
                 // The certificate hand-off is built on the sign queue, which the
                 // install doesn't use, so it's ready once the install is done.
-                let accountConfig = startAccountConfig()
+                accountConfigTask = startAccountConfig()
                 // Both share the device queue with the install.
                 let prepared = await devicePreparation?.value
                 let staged = await prestage?.value
                 try Task.checkCancellation()
                 try await install(prestaged: staged)
-                try await writePairing(accountConfig: accountConfig, prepared: prepared)
+                try await writePairing(accountConfig: accountConfigTask, prepared: prepared)
                 finishSuccess()
                 outcome = .installed
             } catch is CancellationError {
@@ -835,6 +840,8 @@ final class Engine {
         prefetch?.task.cancel()                 // stop the download now, not at its step
         devicePreparation?.cancel()             // skip its ahead-of-install write
         prestage?.cancel()
+        accountConfigTask?.cancel()             // B-C1：交接任务也随管线取消
+        accountConfigTask = nil
         PairingController.shared.softCancel()   // unblock a pending pairing wait
     }
 
@@ -995,6 +1002,8 @@ final class Engine {
         devicePreparation = nil
         prestage?.cancel()
         prestage = nil
+        accountConfigTask?.cancel()
+        accountConfigTask = nil
         // A sign-in this run left running now declines any 2FA request.
         finishedRuns += 1
     }
@@ -2719,6 +2728,10 @@ final class Engine {
         // device-queue write below; a run starts it during the install.
         let accountConfig: String?
         if let handOff {
+            // B-C1：取消发生在等待之前时直接抛，不等交接任务跑完。
+            // （取消发生在等待期间时仍等那次短 FFI 跑完——接受的残留，
+            // onSignQueue 内不检查取消，Task 取消拦不住它。）
+            try Task.checkCancellation()
             accountConfig = await handOff.value
         } else {
             accountConfig = await accountConfigJSON(source: source)
@@ -4107,12 +4120,24 @@ final class Engine {
             releaseLocationTunnelHold()
             return
         }
+        // B-C3：clear 失败也不能漏了 end + 释放——以前 clear 一抛，
+        // 后面的 endLocationSimulation() 与 releaseLocationTunnelHold()
+        // 都不跑，隧道租约永久 +1、isSimulatingLocation 一直为真。
+        // clear 失败只记日志继续走：设备位置按注释会自行失效，
+        // 本地会话关了、重发停了，目标（停止模拟）已经达到。
+        // defer 保证任何出口都释放持有（没持有时空操作）。
+        defer { releaseLocationTunnelHold() }
+        do {
+            try await onDeviceQueue {
+                try self.connection.clearSimulatedLocation()
+            }
+        } catch {
+            log("⚠️ Couldn't clear the simulated location (\(short(error))); closing the session anyway.")
+        }
         try await onDeviceQueue {
-            try self.connection.clearSimulatedLocation()
             self.connection.endLocationSimulation()
         }
         log("Simulated location cleared.")
-        releaseLocationTunnelHold()
     }
 
     // MARK: - Developer Mode (Settings)

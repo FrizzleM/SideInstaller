@@ -98,7 +98,7 @@ struct SettingsView: View {
                            account.appleID))
                 }
             }
-            .navigationTitle(isTab ? L("设置") : L("Settings"))
+            .navigationTitle(L("Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -695,8 +695,8 @@ struct SettingsView: View {
                     Label(L("Clear"), systemImage: "trash")
                 }
                 .alert(L("Clear"), isPresented: $showingClearLogConfirm) {
-                    Button(L("删除"), role: .destructive) { LogStore.shared.clear() }
-                    Button(L("取消"), role: .cancel) {}
+                    Button(L("Delete"), role: .destructive) { LogStore.shared.clear() }
+                    Button(L("Cancel"), role: .cancel) {}
                 } message: {
                     Text(L("删除后无法恢复"))
                 }

@@ -123,7 +123,7 @@ struct MachOView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(L("完成")) { dismiss() }
+                    Button(L("Done")) { dismiss() }
                 }
             }
         }
@@ -135,8 +135,8 @@ struct MachOView: View {
             TextField(L("新名字"), text: $renameText)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-            Button(L("取消"), role: .cancel) { renameTarget = nil }
-            Button(L("保存")) { performRename() }
+            Button(L("Cancel"), role: .cancel) { renameTarget = nil }
+            Button(L("Save")) { performRename() }
         } message: {
             Text(L("新名字必须装得进原来的命令长度，太长会改不了。"))
         }
@@ -170,7 +170,7 @@ struct MachOView: View {
                 Button(role: .destructive) {
                     performRemove(dep)
                 } label: {
-                    Label(L("删除"), systemImage: "trash")
+                    Label(L("Delete"), systemImage: "trash")
                 }
             }
             Button {

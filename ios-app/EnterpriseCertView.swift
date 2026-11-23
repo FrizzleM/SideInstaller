@@ -98,6 +98,9 @@ struct EnterpriseCertView: View {
     /// 选中 IPA 里未脱壳的 .app 名（与 selectedCryptid 同步写）：
     /// 表单提示逐个报名字，不只含糊说“程序”（见 SS2）。
     @State private var selectedUndumpedApps: [String] = []
+    /// A-4：选包时存的文件指纹——签时文件没变且脱壳预检已算出，
+    /// startSign 直接复用 selectedUndumpedApps，不再解压第二遍。
+    @State private var selectedUndumpedFingerprint: String?
     // 多开：数量与起始序号（只对「仅签名」生效，见 multiOpenSection）
     @State private var multiCountText = "1"
     @State private var multiStartText = "1"
@@ -314,7 +317,7 @@ struct EnterpriseCertView: View {
                                 editingProfileName = profile.name
                             }
                         } label: {
-                            Text(editingProfileID == profile.id ? L("完成") : L("改名"))
+                            Text(editingProfileID == profile.id ? L("Done") : L("改名"))
                                 .font(.footnote)
                         }
                         .buttonStyle(.bordered)
@@ -545,7 +548,7 @@ struct EnterpriseCertView: View {
             }
         }
         .alert(L("移除证书材料？"), isPresented: $confirmingRemoveCert) {
-            Button(L("取消"), role: .cancel) {}
+            Button(L("Cancel"), role: .cancel) {}
             Button(L("移除"), role: .destructive) {
                 EnterpriseCertStore.removeAll()
                 password = ""
@@ -616,10 +619,10 @@ struct EnterpriseCertView: View {
         }
         .alert(L("新证书密码"), isPresented: $showingNewProfilePasswordAlert) {
             SecureField(L("证书密码"), text: $newProfilePassword)
-            Button(L("导入")) {
+            Button(L("Import")) {
                 confirmNewProfileImport()
             }
-            Button(L("取消"), role: .cancel) {
+            Button(L("Cancel"), role: .cancel) {
                 pendingNewProfileP12 = nil
                 pendingNewProfileProvision = nil
                 newProfilePassword = ""
@@ -628,10 +631,10 @@ struct EnterpriseCertView: View {
             Text(L("输入这张 .p12 的密码，导完就切到这张证书。"))
         }
         .alert(L("删除证书？"), isPresented: $showingDeleteProfileAlert) {
-            Button(L("取消"), role: .cancel) {
+            Button(L("Cancel"), role: .cancel) {
                 deletingProfile = nil
             }
-            Button(L("删除"), role: .destructive) {
+            Button(L("Delete"), role: .destructive) {
                 if let profile = deletingProfile {
                     EnterpriseCertStore.removeProfile(profile)
                     deletingProfile = nil
@@ -655,7 +658,7 @@ struct EnterpriseCertView: View {
                     startEngineInstall(record: record)
                 }
             }
-            Button(L("取消"), role: .cancel) {}
+            Button(L("Cancel"), role: .cancel) {}
         } message: {
             Text(loopbackFailureText ?? "")
         }
@@ -880,11 +883,12 @@ struct EnterpriseCertView: View {
     }
 
     /// 吊销检查放后台线程跑（信任评估可能联网 OCSP）。
+    /// 手动按钮：每次都真查（force），不读 A-6 的 24 小时缓存。
     private func checkRevocation() {
         guard !revocationChecking, hasP12 else { return }
         revocationChecking = true
         Task.detached(priority: .userInitiated) {
-            let status = CertRevocationChecker.check()
+            let status = CertRevocationChecker.check(force: true)
             await MainActor.run {
                 self.revocationStatus = status
                 self.revocationCheckedAt = Date()
@@ -1242,7 +1246,7 @@ struct EnterpriseCertView: View {
                 }
                 clearPendingSign()
             }
-            Button(L("取消"), role: .cancel) {
+            Button(L("Cancel"), role: .cancel) {
                 clearPendingSign()
             }
         } message: {
@@ -1350,7 +1354,7 @@ struct EnterpriseCertView: View {
                 TextField(L("新预设名称"), text: $presetNameText)
                     .textFieldStyle(.roundedBorder)
                     .font(.footnote)
-                Button(L("保存")) { saveCurrentPreset() }
+                Button(L("Save")) { saveCurrentPreset() }
                     .font(.footnote)
                     .disabled(presetNameText.trimmingCharacters(in: .whitespaces).isEmpty)
                 Spacer()
@@ -1663,6 +1667,7 @@ struct EnterpriseCertView: View {
         multiStartText = "1"
         selectedCryptid = nil
         selectedUndumpedApps = []
+        selectedUndumpedFingerprint = nil
     }
 
     private func select(_ url: URL) {
@@ -1672,6 +1677,7 @@ struct EnterpriseCertView: View {
         guard FileManager.default.fileExists(atPath: url.path) else {
             selectedIPA = nil
             selectedInfo = nil
+            selectedUndumpedFingerprint = nil
             signError = L("这个文件找不到了，请重新选择。")
             return
         }
@@ -1698,6 +1704,8 @@ struct EnterpriseCertView: View {
         // 空（全已脱壳）→ 0；非空 → 1，表单只判 != 0（见 SS2）。
         selectedCryptid = nil
         selectedUndumpedApps = []
+        // A-4：记下当前文件的指纹——签时文件没变且预检已算出就复用。
+        selectedUndumpedFingerprint = IPALibrary.fileFingerprint(of: url)
         Task.detached(priority: .userInitiated) {
             let undumped = IPADecryptionCheck.undumpedApps(of: url)
             await MainActor.run {
@@ -1770,7 +1778,19 @@ struct EnterpriseCertView: View {
             // 防 stale 语义保留：写回时加 selectedIPA == url 守卫（:1660 同款），
             // 解析失败留旧值，签名那步自会按文件报错。
             let fresh = IPALibrary.appInfo(at: url)
-            let undumped = IPADecryptionCheck.undumpedApps(of: url)
+            // A-4：选包时已算过脱壳预检、文件没变时直接复用，不再全量解压
+            // 第二次。指纹在 select() 时存；选包 detached 还没算完
+            // （selectedCryptid 仍 nil）或文件被替换时照常重算。
+            let currentFingerprint = IPALibrary.fileFingerprint(of: url)
+            let reusedUndumped: [String]? = await MainActor.run {
+                guard self.selectedIPA == url,
+                      let fingerprint = self.selectedUndumpedFingerprint,
+                      fingerprint == currentFingerprint,
+                      self.selectedCryptid != nil
+                else { return nil }
+                return self.selectedUndumpedApps
+            }
+            let undumped = reusedUndumped ?? IPADecryptionCheck.undumpedApps(of: url)
             await MainActor.run {
                 if self.selectedIPA == url, let fresh {
                     self.selectedInfo = fresh
@@ -1819,6 +1839,14 @@ struct EnterpriseCertView: View {
     }
 
     private func executeSign(kind: CertSignKind, url: URL, mods: CertSignMods) {
+        // B-C8：签前预检期间切了 IPA，照签旧包就错了——预检回主线程
+        // 时 selectedIPA 已是新包。入口一处拦两条路（startSign 直调
+        // 与警告框“继续签名”都走这里）；只复位 signBusy，不写
+        // signError——用户只是切走了包，再点一次签名即走新包。
+        guard selectedIPA == url else {
+            workspace.signBusy = false
+            return
+        }
         // 源文件早拦：签名页记住的是旧路径，文件被移走/删掉后
         // 再点签名，isideload 只会报看不懂的 Application path
         // does not exist（2026-11-02 19:17 实证）。这里先验
@@ -2346,7 +2374,7 @@ private struct LibraryIPAPicker: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(L("取消")) { dismiss() }
+                    Button(L("Cancel")) { dismiss() }
                 }
             }
             .task {
