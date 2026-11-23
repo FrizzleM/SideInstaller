@@ -1415,4 +1415,6 @@ let vietnameseStrings: [String: String] = [
         "Tải IPA từ nguồn, rồi ký bằng Apple ID của bạn và cài đặt, giống như một .ipa tùy chỉnh.",
     "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
         "Phiên bản này cũ hơn bản mới nhất. Nó được cài đè lên bản trên iPhone này và có thể không mở được dữ liệu mà phiên bản mới hơn đã lưu.",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "Phiên bản này cũ hơn bản trên iPhone này (%@). Khi cài đè lên, nó có thể không mở được dữ liệu mà phiên bản mới hơn đã lưu.",
 ]

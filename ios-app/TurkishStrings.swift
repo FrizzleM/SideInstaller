@@ -1279,4 +1279,6 @@ let turkishStrings: [String: String] = [
         "IPA'yı kaynaktan indirir, ardından Apple Kimliğinizle imzalayıp yükler; özel bir .ipa gibi.",
     "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
         "Bu sürüm en yenisinden daha eski. Bu iPhone'daki kopyanın üzerine yüklenir ve daha yeni bir sürümün kaydettiği verileri açamayabilir.",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "Bu sürüm, bu iPhone'daki sürümden (%@) daha eski. Üzerine yüklendiğinde, daha yeni sürümün kaydettiği verileri açamayabilir.",
 ]

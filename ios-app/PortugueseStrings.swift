@@ -1409,4 +1409,6 @@ let portugueseStrings: [String: String] = [
         "Baixa o IPA da fonte, depois o assina com seu Apple ID e o instala, como um .ipa personalizado.",
     "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
         "Esta versão é mais antiga que a mais recente. Ela é instalada sobre a cópia deste iPhone, que pode não abrir dados salvos por uma versão mais nova.",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "Esta versão é mais antiga que a deste iPhone (%@). Instalada por cima, ela pode não abrir dados salvos pela versão mais nova.",
 ]

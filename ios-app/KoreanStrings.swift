@@ -1385,4 +1385,6 @@ let koreanStrings: [String: String] = [
         "소스에서 IPA를 다운로드한 다음 사용자의 Apple ID로 서명하고 설치합니다. 사용자 지정 .ipa와 같습니다.",
     "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
         "이 버전은 최신 버전보다 오래되었습니다. 이 iPhone의 앱 위에 설치되며, 최신 버전이 저장한 데이터를 열지 못할 수 있습니다.",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "이 버전은 이 iPhone에 있는 버전(%@)보다 오래되었습니다. 그 위에 설치하면 최신 버전이 저장한 데이터를 열지 못할 수 있습니다.",
 ]

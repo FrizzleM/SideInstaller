@@ -1383,4 +1383,6 @@ let japaneseStrings: [String: String] = [
         "ソースから IPA をダウンロードし、あなたの Apple ID で署名してインストールします。カスタム .ipa と同じです。",
     "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
         "このバージョンは最新より古いものです。この iPhone のアプリに上書きでインストールされ、新しいバージョンが保存したデータを開けない場合があります。",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "このバージョンは、この iPhone にあるもの（%@）より古いものです。上書きでインストールすると、新しいバージョンが保存したデータを開けない場合があります。",
 ]

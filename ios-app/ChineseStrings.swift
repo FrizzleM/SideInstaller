@@ -1372,4 +1372,6 @@ let chineseStrings: [String: String] = [
         "从源下载 IPA，然后用你的 Apple 账户签名并安装，与自定义 .ipa 相同。",
     "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
         "此版本比最新版本旧。它会覆盖安装在此 iPhone 上的副本，可能无法打开较新版本保存的数据。",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "此版本比此 iPhone 上的版本（%@）旧。覆盖安装后，它可能无法打开较新版本保存的数据。",
 ]

@@ -55,11 +55,19 @@ struct SourceApp: Decodable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case bundleIdentifier, name, developerName, subtitle, localizedDescription,
-             iconURL, versions, version, versionDate, versionDescription, downloadURL, size
+             iconURL, versions, version, versionDate, versionDescription, downloadURL, size,
+             patreon
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        // AltStore shows an app with Patreon terms only to the developer's
+        // patrons, and its downloads are patreon.com links that need their
+        // Patreon sign-in: AltStore's own source lists its betas that way.
+        if c.contains(.patreon), (try? c.decodeNil(forKey: .patreon)) == false {
+            throw DecodingError.dataCorruptedError(forKey: .patreon, in: c,
+                                                   debugDescription: "only for Patreon backers")
+        }
         bundleIdentifier = try c.decode(String.self, forKey: .bundleIdentifier)
         name = try c.decode(String.self, forKey: .name)
         developerName = try? c.decode(String.self, forKey: .developerName)
@@ -85,7 +93,7 @@ struct SourceApp: Decodable, Equatable {
         self.versions = versions
     }
 
-    /// An https link, or nil for anything else.
+    /// An http(s) link, or nil for anything else.
     static func url(_ text: String?) -> URL? {
         guard let text, let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)),
               let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http"
@@ -158,12 +166,26 @@ struct SourceListing: Identifiable, Equatable {
     /// The version on this iPhone, when the device has been read.
     let installedVersion: String?
 
-    var id: String { sourceURL.absoluteString + "|" + app.bundleIdentifier }
+    /// With the newest download too: a source may list several builds of one
+    /// app under the same bundle id.
+    var id: String {
+        [sourceURL.absoluteString, app.bundleIdentifier, app.latest?.downloadURL.absoluteString ?? ""]
+            .joined(separator: "|")
+    }
 
     /// True when the source has a newer version than the installed one.
     var hasUpdate: Bool {
         guard let installedVersion, let latest = app.latest?.version else { return false }
         return UpdateChecker.isNewer(latest, than: installedVersion)
+    }
+
+    /// True when this iPhone has a newer version than `version`, so installing
+    /// it goes back one. A source can lag behind the app's releases, and then
+    /// even its newest version does: in November 2026 SideStore's own source
+    /// still listed 0.6.2, though SideStore had released 0.6.4.
+    func isDowngrade(to version: SourceVersion) -> Bool {
+        guard let installedVersion else { return false }
+        return UpdateChecker.isNewer(installedVersion, than: version.version)
     }
 }
 
@@ -932,7 +954,11 @@ struct SourceAppView: View {
             }
             Button(L("Cancel"), role: .cancel) { confirm = nil }
         } message: {
-            Text(L("This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved."))
+            if let confirm, listing.isDowngrade(to: confirm), let installed = listing.installedVersion {
+                Text(L("This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.", installed))
+            } else {
+                Text(L("This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved."))
+            }
         }
     }
 
@@ -975,7 +1001,14 @@ struct SourceAppView: View {
     private var installButton: some View {
         if let latest = app.latest {
             VStack(spacing: 8) {
-                Button { manager.install(latest, of: app) } label: {
+                Button {
+                    // Asks first when the iPhone's copy is newer than the source's.
+                    if listing.isDowngrade(to: latest) {
+                        confirm = latest
+                    } else {
+                        manager.install(latest, of: app)
+                    }
+                } label: {
                     HStack(spacing: 8) {
                         Image(systemName: listing.hasUpdate ? "arrow.down.circle" : "square.and.arrow.down")
                         Text(listing.hasUpdate ? L("Update to %@", latest.version)
@@ -1088,6 +1121,17 @@ struct ReleaseNotesText: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
         .textSelection(.enabled)
+        // Anyone can publish a source, so its links open only web pages. An
+        // app's link acts as soon as it's tapped: sidestore://pairing?urlname=
+        // hands SideStore's pairing file to the app it names.
+        .environment(\.openURL, OpenURLAction { url in
+            Self.opensLink(url) ? .systemAction : .discarded
+        })
+    }
+
+    /// Whether a link in a source's text opens: http(s) only.
+    static func opensLink(_ url: URL) -> Bool {
+        ["http", "https"].contains(url.scheme?.lowercased() ?? "")
     }
 
     enum Block: Equatable {
