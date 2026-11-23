@@ -636,7 +636,10 @@ final class CrashDiagnostics: NSObject, ObservableObject, MXMetricManagerSubscri
         // start() 期间 receive(pastDiagnosticPayloads) 可能已先写进
         // crashes，直接赋值会把刚收到的崩溃覆盖掉。
         Task.detached(priority: .userInitiated) { [weak self] in
-            let loaded = Self.load()
+            // 返回类型写明：CrashDiagnostics 是 NSObject 子类，
+            // 无标注的 Self.load() 会在自家 load() -> [Crash] 与
+            // NSObject.load()（ObjC +load）之间二义。
+            let loaded: [Crash] = Self.load()
             await MainActor.run {
                 guard let self else { return }
                 let known = Set(self.crashes.map(\.id))
