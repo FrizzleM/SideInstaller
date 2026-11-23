@@ -1739,7 +1739,7 @@ private struct AppProfileDetail: View {
                     // is the usual reason an entitlement won't stick.
                     Text(L("Wildcard App ID — it covers any bundle id under it, and can't carry app-specific capabilities."))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let created = profile.creationDate {
@@ -1759,7 +1759,7 @@ private struct AppProfileDetail: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(L("Capabilities"))
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 ForEach(keys, id: \.self) { key in
                     Text(key)
                         .font(.caption2.monospaced())
@@ -1790,7 +1790,7 @@ private struct AppProfileDetail: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             Text(value)
                 .font(.caption.monospaced())
                 .textSelection(.enabled)

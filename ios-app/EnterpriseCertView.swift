@@ -2075,7 +2075,7 @@ struct EnterpriseCertView: View {
                         if localInstall.diagnosticLog.isEmpty {
                             Text(L("暂无安装日志。"))
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                         } else {
                             ForEach(Array(localInstall.diagnosticLog.enumerated()), id: \.offset) { _, line in
                                 Text(verbatim: line)
@@ -2087,7 +2087,7 @@ struct EnterpriseCertView: View {
                             Divider()
                             Text(L("Engine 步骤日志（最近 40 行）"))
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                             ForEach(Array(LogStore.shared.lines.suffix(40).enumerated()), id: \.offset) { _, entry in
                                 Text(verbatim: "\(entry.stamp)  \(entry.text)")
                                     .font(.system(.caption, design: .monospaced))
@@ -2364,11 +2364,11 @@ private struct LibraryIPAPicker: View {
                     .lineLimit(1)
                 Text(secondLine(item))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(1)
                 Text(item.name)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(1)
             }
             Spacer()

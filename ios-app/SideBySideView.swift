@@ -3212,7 +3212,7 @@ private struct SideBySideStepRow: View {
                 HStack(spacing: 8) {
                     Text(title)
                         .font(.subheadline)
-                        .foregroundStyle(state == .pending ? .secondary : .primary)
+                        .foregroundStyle(state == .pending ? Theme.muted : .primary)
                     Spacer(minLength: 4)
                     if state == .waiting {
                         Text(L("Action needed"))
@@ -3225,7 +3225,7 @@ private struct SideBySideStepRow: View {
                 if let detail {
                     Text(detail)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .contentTransition(.numericText())
                         .transition(.opacity)
                 }

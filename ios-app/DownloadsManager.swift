@@ -133,7 +133,7 @@ struct DownloadsListView: View {
                                         .locale(Localizer.locale))
                                 Text(item.isImported ? L("Added %@", when) : L("Downloaded %@", when))
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Theme.muted)
                             }
                         }
                         Spacer()

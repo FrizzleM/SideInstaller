@@ -146,7 +146,7 @@ struct PairingView: View {
                 .foregroundStyle(Theme.negative)
             Text(L("Connect LocalDevVPN to scan and install. The write runs over its tunnel."))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)

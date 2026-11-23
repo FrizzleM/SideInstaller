@@ -158,7 +158,7 @@ struct MachOView: View {
                 if dep.kind == "id" {
                     Text(L("它自己的名字"))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
             }
             Text(dep.name)

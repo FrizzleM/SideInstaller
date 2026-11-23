@@ -159,7 +159,7 @@ struct ReportProblemView: View {
                 Text(title)
                 Text(detail)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(2)
             }
         }

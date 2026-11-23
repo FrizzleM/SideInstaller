@@ -1236,7 +1236,7 @@ private struct PrecheckSheet: View {
                         .buttonStyle(PrimaryButtonStyle())
                         Button(L("取消")) { CZFHaptics.impact(); dismiss() }
                             .buttonStyle(.bordered, sound: .tap)
-                            .tint(.secondary)
+                            .tint(Theme.muted)
                     }
                     .padding(.top, 4)
                 }
@@ -1629,7 +1629,7 @@ struct InstallPopup: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("UDID")
                                 .font(.caption.weight(.medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                             Text(udid)
                                 .font(.caption.monospaced())
                                 .lineLimit(1)
@@ -1884,7 +1884,7 @@ private struct StepRow: View {
                 HStack {
                     Text(title)
                         .font(.subheadline)
-                        .foregroundStyle(state == .pending ? .secondary : .primary)
+                        .foregroundStyle(state == .pending ? Theme.muted : .primary)
                     Spacer()
                     StepBadge(step: step, state: state, installProgress: installProgress)
                 }

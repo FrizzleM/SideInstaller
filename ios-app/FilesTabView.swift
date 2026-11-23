@@ -2218,12 +2218,12 @@ struct FilesTabView: View {
                 }
                 Text("\(logKindText(entry.kind)) · \(Self.logDateFormatter.string(from: entry.date))")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(1)
                 if !entry.detail.isEmpty {
                     Text(entry.detail)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(2)
                 }
             }
@@ -2665,7 +2665,7 @@ private struct FileDetailSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             Text(value)
                 .font(.subheadline)
         }

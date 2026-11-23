@@ -1445,7 +1445,7 @@ struct LocationView: View {
                     .lineLimit(1)
                 Text(Self.roadDetail(stretch))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(2)
             }
             Spacer(minLength: 0)
@@ -1640,7 +1640,7 @@ struct LocationView: View {
                        Self.formatClock(progress.elapsed, total: progress.duration),
                        Self.formatClock(progress.duration, total: progress.duration)))
                     .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
             .transition(.opacity)
 
