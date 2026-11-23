@@ -28,6 +28,15 @@ struct EnterpriseCertView: View {
     @State private var password = EnterpriseCertStore.password
     @State private var provisionInfo = EnterpriseCertStore.provisionInfo
     @State private var certInfo = EnterpriseCertStore.certInfo
+    /// 各 profile 描述文件的到期日缓存（A1）：列表行只读这份缓存，不再每
+    /// 次 body 求值都重解 mobileprovision；由 refreshCertState 后台填充。
+    @State private var profileExpirations: [UUID: Date] = [:]
+    /// 上次解析完的证书材料指纹（A1+A2）：与当前指纹相同就跳过重解析。
+    /// 初值即创建时的指纹——@State 初值那次解析（:29–30）用的就是这批文件。
+    @State private var certParsedFingerprint: String? = EnterpriseCertStore.certStateFingerprint()
+    /// 上次解析完时用的证书密码（A1+A2）：密码错误提示只在密码变了才重算。
+    /// 初值 nil——进页第一次 refresh 必须跑一次解析，把密码错提示算出来。
+    @State private var certParsedPassword: String? = nil
     @State private var showP12Picker = false
     @State private var showProvisionPicker = false
     // 轻松签式“导入证书库”：一次选 .p12 + 描述文件，配对才进。
@@ -285,7 +294,7 @@ struct EnterpriseCertView: View {
                                             .font(.caption.weight(.semibold))
                                             .foregroundStyle(Theme.positive)
                                     }
-                                    if let expiration = EnterpriseCertStore.provisionInfo(for: profile)?.expiration {
+                                    if let expiration = profileExpirations[profile.id] {
                                         Text(expiration.formatted(date: .abbreviated, time: .omitted) + remainingText(expiration))
                                             .font(.caption)
                                             .foregroundStyle(expirySoon(expiration) ? Theme.negative : Theme.muted)
@@ -804,20 +813,53 @@ struct EnterpriseCertView: View {
     private func refreshCertState() {
         hasP12 = EnterpriseCertStore.hasP12
         hasProvision = EnterpriseCertStore.hasProvision
-        provisionInfo = EnterpriseCertStore.provisionInfo
-        certInfo = EnterpriseCertStore.certInfo
         // 多证书库：列表、激活、密码（密码 @State 跟着激活走，
         // 切 profile 后这里重读新 profile 的密码；onChange 写回
         // 的是同一个值，无害）。
         profiles = EnterpriseCertStore.profiles()
         activeProfileID = EnterpriseCertStore.activeProfile()?.id
         password = EnterpriseCertStore.password
-        // 密码错不要等到签名才说：p12 解不开就在密码组下红字明说。
-        // 只在已导入 p12 时校验；没导入、或解得开，都不提示。
-        if hasP12, (try? EnterpriseCertStore.identityDERs()) == nil {
-            certPasswordError = L("密码错误，请重新输入")
-        } else {
-            certPasswordError = nil
+        // A1+A2：证书解析（读 p12 + SecPKCS12Import + 全量 plist 解析）是主线程
+        // 上的重活，9 个调用点每次都同步重跑。指纹没变时跳过重解析——材料
+        // 没变，解析结果也不会变；变了才在后台重解析，解析完回主线程写
+        // @State。写回时指纹/密码/激活三者须与调用时一致，防切走后旧结果
+        // 盖住新表单；两个解析中途的写回内容相同，无害。
+        let fingerprint = EnterpriseCertStore.certStateFingerprint()
+        let storePassword = EnterpriseCertStore.password
+        let activeID = activeProfileID
+        let currentProfiles = profiles
+        // 材料没变、密码没变，解析结果也不会变——跳过重解析（@State 里已是
+        // 这批文件 + 这个密码的结果）。密码只在回车提交时才触发 refresh，
+        // 所以密码变了一定会进解析，密码错提示不会被跳过。
+        guard fingerprint != certParsedFingerprint || storePassword != certParsedPassword else { return }
+        Task.detached(priority: .userInitiated) {
+            let provision = EnterpriseCertStore.provisionInfo
+            let cert = EnterpriseCertStore.certInfo
+            let passwordOK = (try? EnterpriseCertStore.identityDERs()) != nil
+            var expirations: [UUID: Date] = [:]
+            for profile in currentProfiles {
+                if let expiration = EnterpriseCertStore.provisionInfo(for: profile)?.expiration {
+                    expirations[profile.id] = expiration
+                }
+            }
+            await MainActor.run {
+                guard fingerprint == EnterpriseCertStore.certStateFingerprint(),
+                      storePassword == EnterpriseCertStore.password,
+                      activeID == EnterpriseCertStore.activeProfile()?.id
+                else { return }
+                self.provisionInfo = provision
+                self.certInfo = cert
+                self.profileExpirations = expirations
+                self.certParsedFingerprint = fingerprint
+                self.certParsedPassword = storePassword
+                // 密码错不要等到签名才说：p12 解不开就在密码组下红字明说。
+                // 只在已导入 p12 时校验；没导入、或解得开，都不提示。
+                if self.hasP12, !passwordOK {
+                    self.certPasswordError = L("密码错误，请重新输入")
+                } else {
+                    self.certPasswordError = nil
+                }
+            }
         }
     }
 
@@ -1722,17 +1764,17 @@ struct EnterpriseCertView: View {
         signBlockedMessage = nil
         workspace.signBusy = true
         signOnlyMessage = nil
-        // 表单缓存 stale（见 SS1）：selectedInfo 只在选中时解析
-        // 一次，同路径文件在文件页被替换后它还是旧 App 的；签
-        // 名执行前按文件重解析一次，解析失败（文件又没了）时
-        // 留旧值——签名那步自会按文件报错，不在这里拦。
-        if let fresh = IPALibrary.appInfo(at: url) {
-            selectedInfo = fresh
-        }
         let currentMods = effectiveMods
         Task.detached(priority: .userInitiated) {
+            // A7：签名前重解析挪进 detached 任务——主线程不再同步解 IPA。
+            // 防 stale 语义保留：写回时加 selectedIPA == url 守卫（:1660 同款），
+            // 解析失败留旧值，签名那步自会按文件报错。
+            let fresh = IPALibrary.appInfo(at: url)
             let undumped = IPADecryptionCheck.undumpedApps(of: url)
             await MainActor.run {
+                if self.selectedIPA == url, let fresh {
+                    self.selectedInfo = fresh
+                }
                 var warnings: [String] = []
                 if self.revocationStatus == .revoked {
                     warnings.append(L("证书已经掉签，签名后可能无法安装。"))

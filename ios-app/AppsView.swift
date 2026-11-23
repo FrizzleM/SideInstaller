@@ -468,7 +468,9 @@ final class SideloadedAppsManager: ObservableObject {
         isWorking = true
         if !quiet { lastError = nil }
         if !quiet { engine.log("=== Sideloaded apps: reading the device ===") }
-        Task {
+        // B-3：Swift 5.0 模式下 plain Task 不继承 MainActor，await 回来仍在
+        // 全局执行器，随后的 @Published 写会落在主线程外——显式进主 actor。
+        Task { @MainActor in
             do {
                 let inventory = try await engine.sideloadedAppInventory()
                 let apps = inventory.apps.compactMap(SideloadedApp.init(plist:))
@@ -566,7 +568,8 @@ final class SideloadedAppsManager: ObservableObject {
         // 续签全程开无声保活，息屏/切后台也不会被系统挂起
         keepAlive.startAudio()
 
-        refreshTask = Task {
+        // B-3：同上——defer 里的 @Published 写也要在主线程上。
+        refreshTask = Task { @MainActor in
             // 原账号：全程结束（正常、失败、取消）都要切回来。activate
             // 是同步的，放 defer 里保证任何出口都执行；defer 不能
             // await，所以内存 session 的重登放在正文末尾尽力做。

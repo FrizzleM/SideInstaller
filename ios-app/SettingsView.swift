@@ -542,7 +542,8 @@ struct SettingsView: View {
         guard !developerModeBusy else { return }
         developerModeBusy = true
         developerModeNote = nil
-        Task {
+        // B-3：View struct 的普通方法本就非隔离，裸 Task 写 @State 落在主线程外。
+        Task { @MainActor in
             do {
                 let text: String
                 switch try await engine.requestDeveloperMode(request) {

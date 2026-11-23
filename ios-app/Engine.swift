@@ -1761,6 +1761,18 @@ final class Engine {
             Task { @MainActor in self?.downloadProgress = fraction }
         }
         guard let version else {
+            // A5：开过版本选择器、内存目录新鲜时，直接取目录里“最新”那一项，
+            // 不再为同一份目录多拉一次 feed JSON / artifacts 列表。只复用与
+            // downloadLatest 同口径的两种情形（feed 源、Madeira nightly）；
+            // GitHub 直链源（latestAsset 路）仍走 downloadLatest，不复用。
+            if let catalog = releaseCatalogs[source],
+               Date().timeIntervalSince(catalog.fetched) < 15 * 60,
+               let latest = catalog.latest[channel],
+               source.feed != nil || source.actionsBuild(channel) != nil {
+                return try await SideStoreDownloader.$reportProgress.withValue(report) {
+                    try await SideStoreDownloader.download(latest, source: source, channel: channel, log: log)
+                }
+            }
             return try await SideStoreDownloader.$reportProgress.withValue(report) {
                 try await SideStoreDownloader.downloadLatest(source: source, channel: channel, log: log)
             }
@@ -1800,17 +1812,31 @@ final class Engine {
         return base.appendingPathComponent("releaseCatalogs.json")
     }
 
-    private static func loadCatalogCache() -> [InstallSource: ReleaseCatalog] {
+    /// A3+A4：与 SourcesStore 的源缓存同一条道理——磁盘缓存的编解码移出主
+    /// 线程，读写走同一条串行队列（队列内 helper 后缀 Locked）。Engine 本
+    /// 身不是 @MainActor，这两个 static func 天生非隔离，async 就能跳出
+    /// 主线程（不必再标 nonisolated）。
+    private static let catalogCacheQueue = DispatchQueue(label: "sideinstaller.catalog-cache")
+
+    private static func loadCatalogCacheLocked() -> [InstallSource: ReleaseCatalog] {
         guard let data = try? Data(contentsOf: catalogCacheURL),
               let cached = try? JSONDecoder().decode([InstallSource: ReleaseCatalog].self, from: data)
         else { return [:] }
         return cached
     }
 
-    private static func saveCatalogCache(_ catalogs: [InstallSource: ReleaseCatalog]) {
+    private static func writeCatalogCacheLocked(_ catalogs: [InstallSource: ReleaseCatalog]) {
         if let data = try? JSONEncoder().encode(catalogs) {
             try? data.write(to: catalogCacheURL, options: .atomic)
         }
+    }
+
+    private static func loadCatalogCache() async -> [InstallSource: ReleaseCatalog] {
+        catalogCacheQueue.sync { loadCatalogCacheLocked() }
+    }
+
+    private static func saveCatalogCache(_ catalogs: [InstallSource: ReleaseCatalog]) async {
+        catalogCacheQueue.sync { writeCatalogCacheLocked(catalogs) }
     }
 
     // 上游 Madeira 稳定版检查（与 fork 目录缓存双留）。
@@ -1845,7 +1871,7 @@ final class Engine {
            Date().timeIntervalSince(cached.fetched) < 15 * 60 { return }
         // Disk cache, same 15-minute rule: a catalog saved by an earlier
         // launch still counts, so reopening the picker doesn't refetch.
-        if !force, let disk = Self.loadCatalogCache()[source],
+        if !force, let disk = await Self.loadCatalogCache()[source],
            Date().timeIntervalSince(disk.fetched) < 15 * 60 {
             releaseCatalogs[source] = disk
             log("Versions: using saved \(source.displayName) catalog.")
@@ -1859,7 +1885,7 @@ final class Engine {
             let catalog = try await SideStoreDownloader.releaseCatalog(source: source)
             releaseCatalogs[source] = catalog
             // Persist for the next launch (same 15-minute rule applies on read).
-            Self.saveCatalogCache(releaseCatalogs)
+            await Self.saveCatalogCache(releaseCatalogs)
             log("Versions: \(source.displayName) has \(catalog.others[.stable]?.count ?? 0) stable and \(catalog.others[.nightly]?.count ?? 0) pre-release builds besides the latest.")
         } catch is CancellationError {
             // The picker closed mid-fetch; opening it again retries.
@@ -3100,12 +3126,17 @@ final class Engine {
     //
     // A full-tunnel VPN (case (c) in `NetworkStatus`) is judged by a TCP probe
     // of Device IP. It runs off the main thread, one at a time, and its answer
-    // is kept for `fullTunnelProbeLifetime` per Device IP and tunnel address.
+    // is kept per Device IP and tunnel address: a success for
+    // `fullTunnelProbeSuccessLifetime`, a failure for `fullTunnelProbeLifetime`.
     // LocalDevVPN, and no VPN at all, never get here.
     // Restored from 2df7e76 ("Tunnel: accept full-tunnel proxy VPNs that loop
     // Device IP back"); the scan family it reuses was never dropped.
 
     private static let fullTunnelProbeLifetime: TimeInterval = 5
+
+    /// 成功答案的寿命（B-1，O-29 Side 版）：探通一次后 60 秒内不再重探。
+    /// 失败/超时答案仍只活 `fullTunnelProbeLifetime`——VPN 恢复后 5 秒内即知。
+    private static let fullTunnelProbeSuccessLifetime: TimeInterval = 60
 
     private typealias NetworkReading = (vpn: Bool, wifi: Bool, detail: String)
 
@@ -3145,10 +3176,14 @@ final class Engine {
         return freshFullTunnelAnswer(for: target) == nil
     }
 
-    /// The last answer for `target`, if it's recent.
+    /// The last answer for `target`, if it's recent. A success answer
+    /// (`answered`: connected or refused) lives 60 seconds; a failure or
+    /// timeout lives only `fullTunnelProbeLifetime`, so a recovered VPN is
+    /// noticed within 5 seconds (B-1).
     private func freshFullTunnelAnswer(for target: NetworkStatus.ProbeTarget) -> NetworkStatus.ProbeResult? {
-        guard let last = lastFullTunnelProbe, last.key == target.key,
-              Date().timeIntervalSince(last.date) < Self.fullTunnelProbeLifetime
+        guard let last = lastFullTunnelProbe, last.key == target.key else { return nil }
+        let lifetime = last.result.answered ? Self.fullTunnelProbeSuccessLifetime : Self.fullTunnelProbeLifetime
+        guard Date().timeIntervalSince(last.date) < lifetime
         else { return nil }
         return last.result
     }

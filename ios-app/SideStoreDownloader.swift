@@ -2085,7 +2085,38 @@ extension IPALibrary {
 
     /// Reads an IPA's main `Info.plist`. Nil if it can't be read; such files are
     /// left out of the refresh list.
+    ///
+    /// A8：结果按路径 + 文件指纹（大小-修改时间）缓存——续签配对每次都要把
+    /// 磁盘上每个 IPA 的 Info.plist 重新解压解析一遍，未变的文件不再重复
+    /// 解。调用方遍布主线程与 detached 任务，缓存读写用同一把锁串行化；
+    /// 指纹取不到（文件已删）时不缓存，每次都重新解析。
+    private static let appInfoLock = NSLock()
+    private static var appInfoCache: [String: AppInfo] = [:]
+
+    private static func appInfoCacheKey(_ url: URL) -> String? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? Int,
+              let modified = attrs[.modificationDate] as? Date
+        else { return nil }
+        return "\(url.path)#\(size)@\(Int(modified.timeIntervalSince1970))"
+    }
+
     static func appInfo(at url: URL) -> AppInfo? {
+        if let key = appInfoCacheKey(url) {
+            appInfoLock.lock()
+            defer { appInfoLock.unlock() }
+            if let cached = appInfoCache[key] { return cached }
+        }
+        guard let info = parseAppInfo(at: url) else { return nil }
+        if let key = appInfoCacheKey(url) {
+            appInfoLock.lock()
+            defer { appInfoLock.unlock() }
+            appInfoCache[key] = info
+        }
+        return info
+    }
+
+    private static func parseAppInfo(at url: URL) -> AppInfo? {
         guard let raw = infoPlist(inIPA: url),
               let plist = try? PropertyListSerialization.propertyList(from: raw, format: nil),
               let dict = plist as? [String: Any],
@@ -2708,49 +2739,82 @@ enum DownloadLedger {
         return String(path.dropFirst(docs.count + 1))
     }
 
-    private static var table: [String: String] {
-        get { UserDefaults.standard.dictionary(forKey: defaultsKey) as? [String: String] ?? [:] }
-        set { UserDefaults.standard.set(newValue, forKey: defaultsKey) }
+    /// A9：两张表改内存常驻 + 写透——首次访问时从 UserDefaults 读一次进
+    /// 内存，之后读写只碰内存、写时同步写回 UserDefaults。scan() 每文件
+    /// 都要查 isManaged，以前每次都全量读字典。读改写（record/forget）
+    /// 在同一把锁里一次完成，不留交错丢更新的窗口；调用方须已持有
+    /// ledgerLock 的 helper 后缀 Locked。
+    private static let ledgerLock = NSLock()
+    private static var cachedTable: [String: String]?
+    private static var cachedEtags: [String: String]?
+
+    private static func tableLocked() -> [String: String] {
+        if cachedTable == nil {
+            cachedTable = UserDefaults.standard.dictionary(forKey: defaultsKey) as? [String: String] ?? [:]
+        }
+        return cachedTable!
+    }
+
+    private static func setTableLocked(_ value: [String: String]) {
+        cachedTable = value
+        UserDefaults.standard.set(value, forKey: defaultsKey)
+    }
+
+    private static func etagsLocked() -> [String: String] {
+        if cachedEtags == nil {
+            cachedEtags = UserDefaults.standard.dictionary(forKey: etagsKey) as? [String: String] ?? [:]
+        }
+        return cachedEtags!
+    }
+
+    private static func setEtagsLocked(_ value: [String: String]) {
+        cachedEtags = value
+        UserDefaults.standard.set(value, forKey: etagsKey)
     }
 
     /// True only for a file this app downloaded and nothing has touched since.
     static func isManaged(_ url: URL) -> Bool {
         guard let fp = fingerprint(url) else { return false }
-        return table[key(url)] == fp
+        ledgerLock.lock()
+        defer { ledgerLock.unlock() }
+        return tableLocked()[key(url)] == fp
     }
 
     /// ETags by ledger key, each stored as "<fingerprint>|<etag>" so it only ever
     /// describes the exact file it was recorded with.
-    private static var etags: [String: String] {
-        get { UserDefaults.standard.dictionary(forKey: etagsKey) as? [String: String] ?? [:] }
-        set { UserDefaults.standard.set(newValue, forKey: etagsKey) }
-    }
 
     static func record(_ url: URL, etag: String? = nil) {
         guard let fp = fingerprint(url) else { return }
-        var t = table
+        ledgerLock.lock()
+        defer { ledgerLock.unlock() }
+        var t = tableLocked()
         t[key(url)] = fp
-        table = t
+        setTableLocked(t)
         // Replaced, or dropped when this download came without one.
-        var e = etags
+        var e = etagsLocked()
         e[key(url)] = etag.map { "\(fp)|\($0)" }
-        etags = e
+        setEtagsLocked(e)
     }
 
     /// The ETag GitHub served `url` with, while the file is still exactly the one
     /// that was downloaded.
     static func etag(for url: URL) -> String? {
-        guard let fp = fingerprint(url), table[key(url)] == fp,
-              let entry = etags[key(url)], entry.hasPrefix(fp + "|") else { return nil }
+        guard let fp = fingerprint(url) else { return nil }
+        ledgerLock.lock()
+        defer { ledgerLock.unlock() }
+        guard tableLocked()[key(url)] == fp,
+              let entry = etagsLocked()[key(url)], entry.hasPrefix(fp + "|") else { return nil }
         return String(entry.dropFirst(fp.count + 1))
     }
 
     static func forget(_ url: URL) {
-        var t = table
+        ledgerLock.lock()
+        defer { ledgerLock.unlock() }
+        var t = tableLocked()
         t.removeValue(forKey: key(url))
-        table = t
-        var e = etags
+        setTableLocked(t)
+        var e = etagsLocked()
         e.removeValue(forKey: key(url))
-        etags = e
+        setEtagsLocked(e)
     }
 }

@@ -154,11 +154,7 @@ final class SourceStore: ObservableObject {
         let removed = offsets.map { sources[$0].url.absoluteString }
         sources.remove(atOffsets: offsets)
         persist()
-        var cached = Self.loadSourceCache()
-        for key in removed { cached.removeValue(forKey: key) }
-        if let data = try? JSONEncoder().encode(cached) {
-            try? data.write(to: Self.sourceCacheURL, options: .atomic)
-        }
+        Self.removeFromSourceCache(keys: removed)
     }
 
     /// Disk cache for source documents, in Engine's `releaseCatalogs.json`
@@ -171,21 +167,47 @@ final class SourceStore: ObservableObject {
         return base.appendingPathComponent("sourceDocuments.json")
     }
 
-    private static func loadSourceCache() -> [String: CachedSource] {
+    /// A3+A4：磁盘缓存读写走同一条串行队列——fetchAll 并行跑多个源的 fetch，
+    /// 只标 nonisolated 不够：MainActor 的序列化拿掉后，两个源的 save 会交错
+    /// 读改写同一文件。队列内 helper 后缀 Locked，调用方须已在队列上。
+    private static let cacheQueue = DispatchQueue(label: "sideinstaller.source-cache")
+
+    private static func loadSourceCacheLocked() -> [String: CachedSource] {
         guard let data = try? Data(contentsOf: sourceCacheURL),
               let cached = try? JSONDecoder().decode([String: CachedSource].self, from: data)
         else { return [:] }
         return cached
     }
 
-    private static func saveSourceCache(url: URL, model: AltSource, fetched: Date = Date()) {
-        var cached = loadSourceCache()
-        cached[url.absoluteString] = CachedSource(model: model, fetched: fetched)
-        // N3(A)：顺带淘汰 15 分钟以上的条目（与 fetch 的 TTL 同数），
-        // 一次成功 fetch 即压缩全文件，不另起定时任务。
-        cached = cached.filter { Date().timeIntervalSince($0.value.fetched) < 15 * 60 }
+    private static func writeSourceCacheLocked(_ cached: [String: CachedSource]) {
         if let data = try? JSONEncoder().encode(cached) {
             try? data.write(to: sourceCacheURL, options: .atomic)
+        }
+    }
+
+    /// 读整份磁盘缓存（后台线程上跑，不在主线程）。
+    nonisolated private static func loadSourceCache() async -> [String: CachedSource] {
+        cacheQueue.sync { loadSourceCacheLocked() }
+    }
+
+    /// 写回整份磁盘缓存（后台线程上跑；读改写在队列内一次完成）。
+    nonisolated private static func saveSourceCache(url: URL, model: AltSource, fetched: Date = Date()) async {
+        cacheQueue.sync {
+            var cached = loadSourceCacheLocked()
+            cached[url.absoluteString] = CachedSource(model: model, fetched: fetched)
+            // N3(A)：顺带淘汰 15 分钟以上的条目（与 fetch 的 TTL 同数），
+            // 一次成功 fetch 即压缩全文件，不另起定时任务。
+            cached = cached.filter { Date().timeIntervalSince($0.value.fetched) < 15 * 60 }
+            writeSourceCacheLocked(cached)
+        }
+    }
+
+    /// 删源时清它的磁盘缓存条目（同步调用点，仍走同一条队列串行化）。
+    private static func removeFromSourceCache(keys: [String]) {
+        cacheQueue.sync {
+            var cached = loadSourceCacheLocked()
+            for key in keys { cached.removeValue(forKey: key) }
+            writeSourceCacheLocked(cached)
         }
     }
 
@@ -254,7 +276,7 @@ final class SourceStore: ObservableObject {
         // Disk cache, same 15-minute rule: a document saved by an earlier
         // launch still counts, so reopening the sources page doesn't refetch.
         // isLoading is left alone here — a fetch may already be in flight.
-        if !force, let cached = Self.loadSourceCache()[url.absoluteString],
+        if !force, let cached = await Self.loadSourceCache()[url.absoluteString],
            Date().timeIntervalSince(cached.fetched) < 15 * 60 {
             sources[index].model = cached.model
             sources[index].fetchedAt = cached.fetched
@@ -269,7 +291,7 @@ final class SourceStore: ObservableObject {
             sources[index].model = model
             sources[index].fetchedAt = Date()
             sources[index].isLoading = false
-            Self.saveSourceCache(url: url, model: model)
+            await Self.saveSourceCache(url: url, model: model)
         } catch is CancellationError {
             // 取消不是错误：只把 isLoading 复位，不写 errorMessage——
             // 视图消失导致 .task 取消时，行上不能留一条假错误。

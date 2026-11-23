@@ -422,6 +422,20 @@ enum EnterpriseCertStore {
         provisionInfo(at: provisionURL)
     }
 
+    /// 证书材料指纹（A1+A2）：激活 p12 + 激活描述文件 + 各 profile 描述文件
+    /// 的大小与修改时间；变了才重解析（见 EnterpriseCertView.refreshCertState）。
+    static func certStateFingerprint() -> String {
+        var urls = [p12URL, provisionURL]
+        urls += profiles().map { profileDir(for: $0).appendingPathComponent("profile.mobileprovision") }
+        return urls.map { url in
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let size = attrs[.size] as? Int,
+                  let modified = attrs[.modificationDate] as? Date
+            else { return "missing" }
+            return "\(size)-\(modified.timeIntervalSince1970)"
+        }.joined(separator: "|")
+    }
+
     /// 删除已导入的证书材料（证书页的「移除证书」）：多证书
     /// 库下只清当前激活 profile（文件 + 密码 + index 条目），
     /// 激活自动回落到另一张；其余 profile 在证书库列表里各删
