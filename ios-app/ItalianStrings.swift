@@ -1356,4 +1356,10 @@ let italianStrings: [String: String] = [
     "导出后可在 LiveContainer 里导入同一张证书，不用再找原文件；密码不一起导出，导入时再填一次。": "Dopo l’esportazione puoi importare lo stesso certificato in LiveContainer senza cercare il file originale; la password non viene esportata, la inserirai di nuovo all’importazione.",
     "Beta": "Beta",
     "名字不能以. 开头": "Il nome non può iniziare con un punto",
+    // SIDE-35 (0.9.124): new keys.
+    "Modified edition": "Edizione modificata",
+    "Archive": "Archivio",
+    "%@ (extracted)": "%@ (estratto)",
+    "Source is too large": "La sorgente è troppo grande",
+    "Folders can't be deleted": "Le cartelle non possono essere eliminate",
 ]

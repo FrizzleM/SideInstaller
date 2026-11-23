@@ -1324,4 +1324,10 @@ let japaneseStrings: [String: String] = [
     "导出描述文件": "プロビジョニングプロファイルを書き出す",
     "导出后可在 LiveContainer 里导入同一张证书，不用再找原文件；密码不一起导出，导入时再填一次。": "書き出し後、元のファイルを探さなくても同じ証明書を LiveContainer にインポートできます。パスワードは一緒に書き出されないため、インポート時に再度入力してください。",
     "名字不能以. 开头": "名前は「.」で始めることはできません",
+    // SIDE-35 (0.9.124): new keys.
+    "Modified edition": "改変版",
+    "Archive": "アーカイブ",
+    "%@ (extracted)": "%@（展開済み）",
+    "Source is too large": "ソースが大きすぎます",
+    "Folders can't be deleted": "フォルダは削除できません",
 ]

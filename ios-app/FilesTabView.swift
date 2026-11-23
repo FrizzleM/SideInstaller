@@ -147,6 +147,9 @@ struct FilesTabView: View {
     @State private var pendingDeleteItem: LocalFileItem?
     /// 批量删除待确认（工具栏“删除所选”点后先弹确认，带数量）。
     @State private var pendingDeleteSelection = false
+    /// 删除失败 / 文件夹禁删的可见提示（B-3：只写页尾 opMessage 顶部看不到，
+    /// 再加一条 alert；B-2 的禁删提示复用同一状态）。
+    @State private var deleteErrorMessage: String?
     /// 当前进的文件夹（相对 Documents 的路径，"" = 根目录）：
     /// 点文件夹行就进，返回条回上级；删了当前文件夹就回根目录。
     @State private var currentDir = ""
@@ -465,7 +468,10 @@ struct FilesTabView: View {
         }
         Button(role: .destructive) {
             CZFHaptics.impact(.light)
-            pendingDeleteItem = item
+            // B-1（shareFile 同例）：菜单本身正在收起，pendingDeleteItem
+            // 推迟一轮 runloop 再立，免得确认弹窗被收起中的 presentation 吞掉；
+            // actionItem = nil 仍立即执行，菜单马上收起。
+            DispatchQueue.main.async { pendingDeleteItem = item }
             actionItem = nil
         } label: {
             if useIcons { Label(L("Delete"), systemImage: "trash") } else { Text(L("Delete")) }
@@ -750,7 +756,13 @@ struct FilesTabView: View {
                         .pickerStyle(.segmented)
                         // 切栏触感：点切栏、或菜单“查看文件位置”切栏变化时
                         // 各震一次 .light；后者菜单按钮本身不另震，免得一次点按震两次。
-                        .onChange(of: fileTab) { _, _ in CZFHaptics.impact(.light) }
+                        .onChange(of: fileTab) { _, _ in
+                            CZFHaptics.impact(.light)
+                            // B-6：切栏清掉根列表的选择集，免得工具栏还停在
+                            // 选择模式；应用库两栏自有独立选择集，不动。
+                            selection = []
+                            selecting = false
+                        }
                         fileSearchBar
                         // 排序：只改显示顺序（IPA 列表、文件夹内列表、其他文件
                         // 组都按同一规则排）；默认保持扫描顺序，不动老习惯。
@@ -966,6 +978,15 @@ struct FilesTabView: View {
                 Text(L("删除后无法恢复"))
             }
         }
+        // B-3：删除失败 / 文件夹禁删的可见提示（页尾 importCard 的
+        // opMessage 在列表底下，顶部看不到；失败 alert 只在删除执行后
+        // 才立起，此时确认 alert 已收起，不跟 B-1 的确认抢 present）。
+        .alert(deleteErrorMessage ?? "", isPresented: Binding(
+            get: { deleteErrorMessage != nil },
+            set: { if !$0 { deleteErrorMessage = nil } }
+        )) {
+            Button(L("OK"), role: .cancel) { deleteErrorMessage = nil }
+        }
         // 点行弹出的底部动作菜单：与长按菜单同一动作集（见 fileActionButtons），
         // 适用性按行类型裁剪；查看文件位置切到该行所在的切栏 + 文件夹
         // 并清搜索，让行直接可见。
@@ -1008,7 +1029,9 @@ struct FilesTabView: View {
         .sheet(item: $detailItem) { item in
             FileDetailSheet(item: item, renewalAppName: renewalSource(for: item)?.appName, onDelete: {
                 detailItem = nil
-                pendingDeleteItem = item
+                // B-1（fileActionButtons 同例）：sheet 正在收起，确认弹窗
+                // 推迟一轮 runloop 再立，免得被收起中的 sheet 吞掉。
+                DispatchQueue.main.async { pendingDeleteItem = item }
             }, onRename: {
                 detailItem = nil
                 renameText = item.name
@@ -1049,15 +1072,25 @@ struct FilesTabView: View {
                 allowedContentTypes: [.item],
                 allowsMultipleSelection: true
             ) { urls in
-                for url in urls {
-                    do {
-                        _ = try AppFileLibrary.importIntoDocuments(url)
-                        importError = nil
-                    } catch {
-                        importError = L("导入失败：%@", error.localizedDescription)
+                // A-1：逐个 copyItem 全在主线程，大 IPA 导入时 UI 全程冻结；
+                // 整个循环移进 detached 任务，结束回主线程一次写回 + 重扫。
+                // L() 只在主线程调（文案格式化），detached 里只攒原始错误串。
+                Task.detached {
+                    var lastFailure: String?
+                    for url in urls {
+                        do {
+                            _ = try AppFileLibrary.importIntoDocuments(url)
+                            lastFailure = nil
+                        } catch {
+                            lastFailure = error.localizedDescription
+                        }
+                    }
+                    let failure = lastFailure
+                    await MainActor.run {
+                        importError = failure.map { L("导入失败：%@", $0) }
+                        refreshFiles()
                     }
                 }
-                refreshFiles()
             }
         }
     }
@@ -1264,16 +1297,18 @@ struct FilesTabView: View {
     /// 无卡片头（参考图里列表就是平铺的），跟其他文件组区分开。
     private var ipaList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if filteredIPAs.isEmpty {
+            // A-5(a)：ForEach 外求一次存局部量，不再每行重建数组。
+            let list = filteredIPAs
+            if list.isEmpty {
                 Text(fileSearchText.isEmpty
                      ? (fileTab == .unsigned ? L("还没有未签名的 IPA。") : L("还没有已签名的 IPA。"))
                      : L("没有匹配的 IPA。"))
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
             } else {
-                ForEach(filteredIPAs) { item in
+                ForEach(list) { item in
                     fileRow(item)
-                    if item.id != filteredIPAs.last?.id {
+                    if item.id != list.last?.id {
                         Divider()
                     }
                 }
@@ -1503,19 +1538,17 @@ struct FilesTabView: View {
     /// 下次就续不了。按路径认，改名/移过文件夹后按包名认（行上已解
     /// 析的 Bundle ID 优先，取不到就现解析，只读 central directory）。
     private func renewalDeleteWarning(for item: LocalFileItem) -> String? {
-        guard item.isIPA else { return nil }
-        let info = fileIPAInfo[item.url.path] ?? IPALibrary.appInfo(at: item.url)
-        guard let entry = RenewalSourceStore.source(forFileURL: item.url, bundleID: info?.bundleID) else { return nil }
+        // A-2：读内存里的 renewalSources（进页时已读好），不再每行现读
+        // RenewalSources.json + 解码；匹配逻辑就是 renewalSource(for:)。
+        guard let entry = renewalSource(for: item) else { return nil }
         return L("这是 %@ 续签用的文件，删了它下次就续不了，要重新导入 IPA 才能续。删除后无法恢复", entry.appName)
     }
 
     /// 批量删里的续签源提示：选中的文件里有续签用过的，就把 App 名列出来。
     private func renewalDeleteWarning(forSelection selected: Set<String>) -> String? {
-        let names = files.filter { selected.contains($0.id) && $0.isIPA }
-            .compactMap { item -> String? in
-                let info = fileIPAInfo[item.url.path] ?? IPALibrary.appInfo(at: item.url)
-                return RenewalSourceStore.source(forFileURL: item.url, bundleID: info?.bundleID)?.appName
-            }
+        // A-2：同上，读内存缓存，不逐条读盘（renewalSource(for:) 内含 isIPA 门）。
+        let names = files.filter { selected.contains($0.id) }
+            .compactMap { renewalSource(for: $0)?.appName }
         guard !names.isEmpty else { return nil }
         return L("其中 %@ 是续签用的文件，删了它们下次就续不了，要重新导入 IPA 才能续。删除后无法恢复", names.joined(separator: "、"))
     }
@@ -1524,6 +1557,15 @@ struct FilesTabView: View {
     /// 不用整树重扫；删除没成功（文件还在）就重扫恢复真相，
     /// 别把还在的文件藏掉。
     private func delete(_ item: LocalFileItem) {
+        // B-2：文件夹禁删（LAN/WebDAV 早已同规则，应用内对齐）——
+        // Signed 文件夹本身就是目录行，一并拦住；提示走 B-3 的 alert，
+        // 不要只禁不提示。
+        guard !item.isDirectory else {
+            deleteErrorMessage = L("Folders can't be deleted")
+            opMessage = L("Folders can't be deleted")
+            opFailed = true
+            return
+        }
         if removeFileFromDisk(item) {
             files.removeAll {
                 $0.url.path == item.url.path || $0.url.path.hasPrefix(item.url.path + "/")
@@ -1532,14 +1574,18 @@ struct FilesTabView: View {
             // 代际号 +1 使它过期，写回时直接丢弃；本路不另调 refreshFiles。
             filesRefreshGeneration += 1
             resetCurrentDirIfNeeded()
-            // C8：删掉的 IPA 可能是某 App 的续签源，应用页的可续签数
-            // 只在 load/续签时重算——这里只重算配对，不重读设备。
+            // C8/A-9：删掉的 IPA 可能是某 App 的续签源——只当删的是 IPA
+            // 才重算配对（installable() 只产 IPA，删非 IPA 不可能改配对）。
             // 文件页本身不隔离在 @MainActor 上，包进 Task 回主线程调。
-            Task { @MainActor in SideloadedAppsManager.shared.refreshRefreshableOnly() }
+            if item.isIPA {
+                Task { @MainActor in SideloadedAppsManager.shared.refreshRefreshableOnly() }
+            }
         } else {
             refreshFiles(resetDir: true)
             opMessage = L("删除失败，文件仍在")
             opFailed = true
+            // B-3：失败提示再走一条顶部可见的 alert（页尾 opMessage 在列表底下）。
+            deleteErrorMessage = L("删除失败，文件仍在")
         }
     }
 
@@ -1634,6 +1680,9 @@ struct FilesTabView: View {
         do {
             try FileManager.default.moveItem(at: item.url, to: dest)
             refreshFiles(resetDir: true)
+            // B-4：移动后刷新续签缓存与应用库列表，角标立即跟新位置。
+            renewalSources = RenewalSourceStore.load()
+            refreshUnsignedIPAs()
             opMessage = L("已移动到 %@", destDir.isEmpty ? L("根目录") : destDir)
             opFailed = false
         } catch {
@@ -1646,16 +1695,35 @@ struct FilesTabView: View {
     /// 文件夹整目录拷；已签名 IPA 的副本只是文件，不自动进已签名
     /// 清单（清单是记录制，跟手动拷进 Signed 目录同例）。
     private func duplicate(_ item: LocalFileItem) {
+        // A-1：uniqueSibling 只算名字不建文件（主线程算好目标名），
+        // copyItem 本体放 detached——1.26GB 拷贝不再冻住主线程；
+        // 目标已存在时 copyItem 抛错，失败分支写提示，不静默覆盖。
+        // 写法照抄同文件 runZip 的 Task + detached 模式。
         let stem = item.url.deletingPathExtension().lastPathComponent
         let dest = uniqueSibling(of: item, stem: stem, ext: item.url.pathExtension)
-        do {
-            try FileManager.default.copyItem(at: item.url, to: dest)
+        opBusy = true
+        opMessage = nil
+        Task {
+            let error: String? = await Task.detached { [source = item.url, dest] -> String? in
+                do {
+                    try FileManager.default.copyItem(at: source, to: dest)
+                    return nil
+                } catch {
+                    return error.localizedDescription
+                }
+            }.value
+            opBusy = false
             refreshFiles()
-            opMessage = L("已复制为 %@", dest.lastPathComponent)
-            opFailed = false
-        } catch {
-            opMessage = error.localizedDescription
-            opFailed = true
+            if let error {
+                opMessage = error
+                opFailed = true
+            } else {
+                opMessage = L("已复制为 %@", dest.lastPathComponent)
+                opFailed = false
+                // B-4：副本落盘后续签缓存与应用库列表同步刷新。
+                renewalSources = RenewalSourceStore.load()
+                refreshUnsignedIPAs()
+            }
         }
     }
 
@@ -1663,17 +1731,48 @@ struct FilesTabView: View {
     /// 删 N 个就是 N 次整树枚举，全在主线程）。
     private func deleteSelection() {
         var failed = 0
+        var skippedFolders = 0
+        var hadIPA = false
+        // A-2：已签名项先分区——一次 load 取出对应记录，一次批量 remove
+        // （一次读清单、一次写回）；非签名项仍逐项 removeFileFromDisk。
+        // 清单里没记录的已签名文件（幽灵文件）回落逐项删，不漏删。
+        var signedToRemove: [SignedIPARecord] = []
+        let signedRecords = SignedIPAStore.load()
         for item in files where selection.contains(item.id) {
+            // B-2：文件夹跳过不删，记数后统一提示。
+            if item.isDirectory { skippedFolders += 1; continue }
+            if item.isIPA { hadIPA = true }
+            if item.isInSignedDir,
+               let record = signedRecords.first(where: { $0.fileName == item.name }) {
+                signedToRemove.append(record)
+                continue
+            }
             if !removeFileFromDisk(item) { failed += 1 }
+        }
+        if !signedToRemove.isEmpty {
+            SignedIPAStore.remove(signedToRemove)
+            for record in signedToRemove
+            where FileManager.default.fileExists(atPath: SignedIPAStore.url(for: record).path) {
+                failed += 1
+            }
         }
         selection = []
         selecting = false
         refreshFiles(resetDir: true)
-        // C8：批量删完只重算一次配对（同上；每项各算一次是白扫盘）。
-        Task { @MainActor in SideloadedAppsManager.shared.refreshRefreshableOnly() }
+        // C8/A-9：选中项里含 IPA 才重算一次配对；删的全是非 IPA 就不算。
+        if hadIPA {
+            Task { @MainActor in SideloadedAppsManager.shared.refreshRefreshableOnly() }
+        }
         if failed > 0 {
             opMessage = L("有 %d 个文件删除失败", failed)
             opFailed = true
+            // B-3：失败提示再走一条顶部可见的 alert。
+            deleteErrorMessage = L("有 %d 个文件删除失败", failed)
+        } else if skippedFolders > 0 {
+            // B-2：只跳过了文件夹、其余全删干净时，也要可见地报一句。
+            opMessage = L("Folders can't be deleted")
+            opFailed = true
+            deleteErrorMessage = L("Folders can't be deleted")
         }
     }
 
@@ -1727,6 +1826,9 @@ struct FilesTabView: View {
                 refreshFiles(resetDir: true)
             }
             resetCurrentDirIfNeeded()
+            // B-4：改名后刷新续签缓存与应用库列表，角标立即跟新名。
+            renewalSources = RenewalSourceStore.load()
+            refreshUnsignedIPAs()
             opMessage = L("已改名")
             opFailed = false
         } catch {
@@ -1753,10 +1855,12 @@ struct FilesTabView: View {
             return
         }
         let root = IPALibrary.documentsDir
-        var out = root.appendingPathComponent("打包.zip")
+        // C-2：产物名本地化（Archive.zip / Archive 2.zip），计数器循环原样。
+        let archiveStem = L("Archive")
+        var out = root.appendingPathComponent(archiveStem + ".zip")
         var counter = 2
         while FileManager.default.fileExists(atPath: out.path) {
-            out = root.appendingPathComponent("打包 \(counter).zip")
+            out = root.appendingPathComponent("\(archiveStem) \(counter).zip")
             counter += 1
         }
         runZip(paths: items.map { $0.url }, out: out)
@@ -1785,7 +1889,7 @@ struct FilesTabView: View {
 
     private func unzip(_ item: LocalFileItem) {
         let stem = item.url.deletingPathExtension().lastPathComponent
-        let dest = uniqueSibling(of: item, stem: "\(stem)-解压", ext: "")
+        let dest = uniqueSibling(of: item, stem: L("%@ (extracted)", stem), ext: "")
         opBusy = true
         opMessage = nil
         Task {
@@ -1925,7 +2029,9 @@ struct FilesTabView: View {
     /// 「去签名」就进签名段表单。扁平列表，不按目录分组。
     private var unsignedList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if filteredUnsigned.isEmpty {
+            // A-5(a)：ForEach 外求一次存局部量，不再每行重建数组。
+            let list = filteredUnsigned
+            if list.isEmpty {
                 Text(librarySearchText.isEmpty
                      ? L("文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。")
                      : L("没有匹配的 IPA。"))
@@ -1936,7 +2042,7 @@ struct FilesTabView: View {
                     HStack(spacing: 12) {
                         Button {
                             CZFHaptics.impact()
-                            selectedUnsignedIDs = Set(filteredUnsigned.map { $0.id })
+                            selectedUnsignedIDs = Set(list.map { $0.id })
                         } label: {
                             Text(L("Select all")).font(.footnote)
                         }
@@ -1976,9 +2082,9 @@ struct FilesTabView: View {
                             .foregroundStyle(batchFailed ? Theme.negative : Theme.positive)
                     }
                 }
-                ForEach(filteredUnsigned) { item in
+                ForEach(list) { item in
                     unsignedRow(item)
-                    if item.id != filteredUnsigned.last?.id {
+                    if item.id != list.last?.id {
                         Divider()
                     }
                 }
@@ -1993,8 +2099,8 @@ struct FilesTabView: View {
         let query = librarySearchText.lowercased()
         return unsignedIPAs.filter { item in
             item.name.lowercased().contains(query)
-                || (unsignedInfo[unsignedInfoKey(for: item.url.path)]?.name.lowercased().contains(query) == true)
-                || (unsignedInfo[unsignedInfoKey(for: item.url.path)]?.bundleID.lowercased().contains(query) == true)
+                || (unsignedInfo[unsignedInfoKey(for: item)]?.name.lowercased().contains(query) == true)
+                || (unsignedInfo[unsignedInfoKey(for: item)]?.bundleID.lowercased().contains(query) == true)
         }
     }
 
@@ -2279,7 +2385,7 @@ struct FilesTabView: View {
     }()
 
     private func unsignedDisplayName(_ item: LocalFileItem) -> String {
-        if let name = unsignedInfo[unsignedInfoKey(for: item.url.path)]?.name, !name.isEmpty {
+        if let name = unsignedInfo[unsignedInfoKey(for: item)]?.name, !name.isEmpty {
             return name
         }
         return (item.name as NSString).deletingPathExtension
@@ -2289,7 +2395,7 @@ struct FilesTabView: View {
     /// 解析失败只显示大小，不造假。
     private func unsignedSecondLine(_ item: LocalFileItem) -> String {
         let size = ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file)
-        guard let info = unsignedInfo[unsignedInfoKey(for: item.url.path)] else { return size }
+        guard let info = unsignedInfo[unsignedInfoKey(for: item)] else { return size }
         var parts: [String] = []
         if let version = info.version, !version.isEmpty {
             parts.append("V\(version)")
@@ -2311,6 +2417,15 @@ struct FilesTabView: View {
     private func refreshUnsignedIPAs(onRefreshed: (() -> Void)? = nil) {
         unsignedIPAsRefreshGeneration += 1
         let generation = unsignedIPAsRefreshGeneration
+        // A-3：files 已有同一棵树的扫描结果，直接派生，不再整树重扫；
+        // 冷启动兜底：files 还空（refreshFiles 的 detached 扫描没落地）
+        // 才走一次旧的扫盘路径，免得进页即空列表。
+        if !files.isEmpty {
+            unsignedIPAs = files.filter { $0.isIPA && !$0.isInSignedDir }
+            ensureUnsignedInfo()
+            onRefreshed?()
+            return
+        }
         Task.detached {
             let items = AppFileLibrary.scan().filter { $0.isIPA && !$0.isInSignedDir }
             await MainActor.run {
@@ -2326,18 +2441,18 @@ struct FilesTabView: View {
     /// 把还没试过的路径在后台统一解析，结果按路径缓存；解析失败也记
     /// 已尝试，不重复读盘。删掉的路径清掉缓存，免得同名新文件沿用旧信息。
     private func ensureUnsignedInfo() {
-        // C30：缓存键改成“路径#指纹”（大小 + 修改时间，复用
-        // iconFingerprint）：同路径文件被替换后 key 变了，旧信息被
+        // C30/A-5(b)：缓存键是“路径#指纹”（大小 + 修改时间，取自
+        // LocalFileItem 自带字段，不读盘）：同路径文件被替换后 key 变了，旧信息被
         // 下面的过滤清掉、重新排队解析，不再沿用旧名字/版本/Bundle ID。
         // 图标路（unsignedIconsTried）早就是这个键，信息路补齐。
-        let current = Set(unsignedIPAs.map { unsignedInfoKey(for: $0.url.path) })
+        let current = Set(unsignedIPAs.map { unsignedInfoKey(for: $0) })
         unsignedInfo = unsignedInfo.filter { current.contains($0.key) }
         unsignedInfoTried = unsignedInfoTried.intersection(current)
-        let pending = unsignedIPAs.filter { !unsignedInfoTried.contains(unsignedInfoKey(for: $0.url.path)) }
+        let pending = unsignedIPAs.filter { !unsignedInfoTried.contains(unsignedInfoKey(for: $0)) }
         guard !pending.isEmpty else { return }
-        for item in pending { unsignedInfoTried.insert(unsignedInfoKey(for: item.url.path)) }
-        let keys = pending.map { unsignedInfoKey(for: $0.url.path) }
-        let pathByKey = Dictionary(uniqueKeysWithValues: zip(keys, pending.map { $0.url.path }))
+        for item in pending { unsignedInfoTried.insert(unsignedInfoKey(for: item)) }
+        let keys = pending.map { unsignedInfoKey(for: $0) }
+        let itemByKey = Dictionary(uniqueKeysWithValues: zip(keys, pending))
         let urls = pending.map { $0.url }
         Task.detached(priority: .userInitiated) {
             var found: [String: IPALibrary.AppInfo] = [:]
@@ -2350,7 +2465,7 @@ struct FilesTabView: View {
                 for (key, info) in found {
                     // C30（B12-6 同款核对）：解析途中文件被替换、key 已变
                     // 时丢掉旧结果；tried 集里仍是旧 key，下一轮重排。
-                    guard let path = pathByKey[key], self.unsignedInfoKey(for: path) == key else { continue }
+                    guard let item = itemByKey[key], self.unsignedInfoKey(for: item) == key else { continue }
                     self.unsignedInfo[key] = info
                 }
             }
@@ -2401,11 +2516,13 @@ struct FilesTabView: View {
         }
     }
 
-    /// C30：信息缓存键——路径 + 文件指纹，与图标路的 key 同形
-    /// （loadLibraryIcon :2646 拼的是 "\(path)#\(iconFingerprint)"）。
-    /// 名字叫 unsignedInfoKey：infoKey 已被 MadeiraSigningHandoff.infoKey 占用。
-    private func unsignedInfoKey(for path: String) -> String {
-        "\(path)#\(iconFingerprint(for: path))"
+    /// C30：信息缓存键——路径 + 文件指纹；名字叫 unsignedInfoKey：
+    /// infoKey 已被 MadeiraSigningHandoff.infoKey 占用。
+    /// A-5(b)：指纹改取 LocalFileItem 自带的 size/modified，不再
+    /// attributesOfItem 磁盘 stat；key 格式不变（"路径#大小-修改时间秒"），
+    /// 图标路（loadLibraryIcon）仍走 iconFingerprint，不动。
+    private func unsignedInfoKey(for item: LocalFileItem) -> String {
+        "\(item.url.path)#\(item.size)-\(item.modified?.timeIntervalSince1970 ?? 0)"
     }
 
     /// 图标指纹：文件大小 + 修改时间（重签覆盖同路径时变）。
@@ -2419,11 +2536,13 @@ struct FilesTabView: View {
 
     private var signedList: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // A-5(a)：ForEach 外求一次存局部量，不再每行重建数组。
+            let list = filteredSigned
             if signedRecords.isEmpty {
                 Text(L("还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。"))
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
-            } else if filteredSigned.isEmpty {
+            } else if list.isEmpty {
                 Text(L("没有匹配的已签名 IPA。"))
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
@@ -2433,7 +2552,7 @@ struct FilesTabView: View {
                         Button {
                             CZFHaptics.impact()
                             // 全选只选当前可见的（搜了就只选搜到的）。
-                            selectedSignedIDs = Set(filteredSigned.map { $0.id })
+                            selectedSignedIDs = Set(list.map { $0.id })
                         } label: {
                             Text(L("Select all"))
                                 .font(.footnote)
@@ -2456,9 +2575,9 @@ struct FilesTabView: View {
                         .disabled(selectedSignedIDs.isEmpty)
                     }
                 }
-                ForEach(filteredSigned) { record in
+                ForEach(list) { record in
                     signedRow(record)
-                    if record.id != filteredSigned.last?.id {
+                    if record.id != list.last?.id {
                         Divider()
                     }
                 }

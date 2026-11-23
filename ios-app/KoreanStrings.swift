@@ -1325,4 +1325,10 @@ let koreanStrings: [String: String] = [
     "导出描述文件": "프로비저닝 프로파일 내보내기",
     "导出后可在 LiveContainer 里导入同一张证书，不用再找原文件；密码不一起导出，导入时再填一次。": "내보낸 뒤 원본 파일을 찾지 않고도 같은 인증서를 LiveContainer로 가져올 수 있습니다. 비밀번호는 함께 내보내지지 않으므로 가져올 때 다시 입력하세요.",
     "名字不能以. 开头": "이름은 '.'로 시작할 수 없습니다",
+    // SIDE-35 (0.9.124): new keys.
+    "Modified edition": "수정된 버전",
+    "Archive": "보관 파일",
+    "%@ (extracted)": "%@ (압축 해제됨)",
+    "Source is too large": "소스가 너무 큽니다",
+    "Folders can't be deleted": "폴더는 삭제할 수 없습니다",
 ]

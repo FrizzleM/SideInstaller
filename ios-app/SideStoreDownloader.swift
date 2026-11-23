@@ -2120,6 +2120,13 @@ extension IPALibrary {
     private static let appInfoLock = NSLock()
     private static var appInfoCache: [String: AppInfo] = [:]
 
+    /// A-4：iconData 的缓存（与 A8 的 appInfoCache 同款）——键复用
+    /// fileFingerprint（路径 + 大小 + 修改时间），文件换了键变旧条目
+    /// 自然失效；缓存 Data 不缓存 UIImage（解码仍在各调用方做）。
+    /// 与 appInfoCache 各用一把锁，互不串扰。
+    private static let iconDataLock = NSLock()
+    private static var iconDataCache: [String: Data] = [:]
+
     /// A-4/A-5：文件指纹（路径 # 大小 @ 修改时间秒），文件已删时 nil。
     /// A8 的缓存键、选包脱壳复用、补团队号 tried 集三处共用同一格式。
     static func fileFingerprint(of url: URL) -> String? {
@@ -2172,7 +2179,24 @@ extension IPALibrary {
     /// return nil — the caller shows a neutral square for those, not a
     /// fake app icon. Verified on real IPAs: Side's own IPA and ESign
     /// 5.0.0 both carry loose AppIcon60x60@2x.png in the .app root.
+    /// A-4：先查缓存再解（与 appInfo(at:) 同款：查一次、解完再按
+    /// 当时指纹存一次）；指纹取不到（文件已删）时不缓存。
     static func iconData(at url: URL) -> Data? {
+        if let key = fileFingerprint(of: url) {
+            iconDataLock.lock()
+            defer { iconDataLock.unlock() }
+            if let cached = iconDataCache[key] { return cached }
+        }
+        guard let data = parseIconData(at: url) else { return nil }
+        if let key = fileFingerprint(of: url) {
+            iconDataLock.lock()
+            defer { iconDataLock.unlock() }
+            iconDataCache[key] = data
+        }
+        return data
+    }
+
+    private static func parseIconData(at url: URL) -> Data? {
         guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
               size > 22,
               let handle = try? FileHandle(forReadingFrom: url) else { return nil }

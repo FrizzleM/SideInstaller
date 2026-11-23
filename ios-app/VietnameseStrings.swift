@@ -1354,4 +1354,10 @@ let vietnameseStrings: [String: String] = [
     "导出后可在 LiveContainer 里导入同一张证书，不用再找原文件；密码不一起导出，导入时再填一次。": "Sau khi xuất, bạn có thể nhập cùng một chứng chỉ vào LiveContainer mà không cần tìm lại tệp gốc; mật khẩu không được xuất kèm, bạn sẽ nhập lại khi nhập.",
     "Beta": "Beta",
     "名字不能以. 开头": "Tên không được bắt đầu bằng dấu chấm",
+    // SIDE-35 (0.9.124): new keys.
+    "Modified edition": "Bản chỉnh sửa",
+    "Archive": "Tệp lưu trữ",
+    "%@ (extracted)": "%@ (đã giải nén)",
+    "Source is too large": "Nguồn quá lớn",
+    "Folders can't be deleted": "Không thể xóa thư mục",
 ]

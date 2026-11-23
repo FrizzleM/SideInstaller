@@ -246,11 +246,11 @@ final class SourceStore: ObservableObject {
         // 不再边读边停（10MB 内进内存可接受，解码本来也要全量 Data）。
         if response.expectedContentLength > Int64(Self.sourceBodyCap) {
             throw NSError(domain: "SourceStore", code: -1,
-                          userInfo: [NSLocalizedDescriptionKey: "Source is too large"])
+                          userInfo: [NSLocalizedDescriptionKey: L("Source is too large")])
         }
         if data.count > Self.sourceBodyCap {
             throw NSError(domain: "SourceStore", code: -1,
-                          userInfo: [NSLocalizedDescriptionKey: "Source is too large"])
+                          userInfo: [NSLocalizedDescriptionKey: L("Source is too large")])
         }
         return try JSONDecoder().decode(AltSource.self, from: data)
     }

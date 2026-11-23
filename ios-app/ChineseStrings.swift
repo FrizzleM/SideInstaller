@@ -1337,4 +1337,10 @@ let chineseStrings: [String: String] = [
     "File": "文件",
     "Size": "大小",
     "名字不能以. 开头": "名字不能以. 开头",
+    // SIDE-35 (0.9.124): new keys.
+    "Modified edition": "修改版",
+    "Archive": "压缩包",
+    "%@ (extracted)": "%@（已解压）",
+    "Source is too large": "源文件过大",
+    "Folders can't be deleted": "文件夹不能删除",
 ]

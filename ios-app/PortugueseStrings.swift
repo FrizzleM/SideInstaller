@@ -1347,4 +1347,10 @@ let portugueseStrings: [String: String] = [
     "导出描述文件": "Exportar perfil de provisionamento",
     "导出后可在 LiveContainer 里导入同一张证书，不用再找原文件；密码不一起导出，导入时再填一次。": "Depois de exportar, você pode importar o mesmo certificado no LiveContainer sem procurar o arquivo original; a senha não é exportada, você a digitará novamente na importação.",
     "名字不能以. 开头": "O nome não pode começar com um ponto",
+    // SIDE-35 (0.9.124): new keys.
+    "Modified edition": "Edição modificada",
+    "Archive": "Arquivo",
+    "%@ (extracted)": "%@ (extraído)",
+    "Source is too large": "A fonte é grande demais",
+    "Folders can't be deleted": "As pastas não podem ser excluídas",
 ]
