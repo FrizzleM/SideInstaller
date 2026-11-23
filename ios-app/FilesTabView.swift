@@ -1704,7 +1704,10 @@ struct FilesTabView: View {
         opBusy = true
         opMessage = nil
         Task {
-            let error: String? = await Task.detached { [source = item.url, dest] -> String? in
+            // 修法（checks 首轮红）：trailing closure 签名里 `[capture] -> T in`
+            // 不带参数列表编不过（1707:92 Consecutive statements / Expected expression）；
+            // 去掉显式返回类型，靠外层 `let error: String?` 标注推断（runZip 同款）。
+            let error: String? = await Task.detached { [source = item.url, dest] in
                 do {
                     try FileManager.default.copyItem(at: source, to: dest)
                     return nil
