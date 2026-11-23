@@ -471,7 +471,7 @@ struct ContentView: View {
                     Image(systemName: engine.customIPAName == nil
                           ? "square.and.arrow.down" : "checkmark.circle")
                         .contentTransition(.symbolEffect(.replace))
-                        .foregroundStyle(engine.customIPAName == nil ? Color.secondary : Theme.accent)
+                        .foregroundStyle(engine.customIPAName == nil ? Theme.muted : Theme.accent)
                 }
                 Text(importLabel)
                     .lineLimit(1)
@@ -796,7 +796,7 @@ struct ContentView: View {
                     Image(systemName: engine.importedPairingName == nil
                           ? "square.and.arrow.down" : "checkmark.circle")
                         .contentTransition(.symbolEffect(.replace))
-                        .foregroundStyle(engine.importedPairingName == nil ? Color.secondary : Theme.accent)
+                        .foregroundStyle(engine.importedPairingName == nil ? Theme.muted : Theme.accent)
                 }
                 Text(engine.importedPairingName ?? L("Import pairing file"))
                     .lineLimit(1)

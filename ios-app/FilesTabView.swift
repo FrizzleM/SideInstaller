@@ -1148,7 +1148,7 @@ struct FilesTabView: View {
                             .font(.footnote.monospaced().weight(.semibold))
                         Image(systemName: lanCopied ? "checkmark" : "doc.on.doc")
                             .font(.footnote)
-                            .foregroundStyle(lanCopied ? Color.green : Color.secondary)
+                            .foregroundStyle(lanCopied ? Theme.positive : Theme.muted)
                         if lanCopied {
                             Text(L("已复制"))
                                 .font(.footnote)
@@ -1339,7 +1339,7 @@ struct FilesTabView: View {
                 if selecting {
                     Image(systemName: selection.contains(item.id)
                           ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(selection.contains(item.id) ? Theme.accent : .secondary)
+                        .foregroundStyle(selection.contains(item.id) ? Theme.accent : Theme.muted)
                 }
                 // 轻松签文件列表式：IPA 有真实图标就显示真图（应用库
                 // 同款解析，见 loadFileIcon），没取到就中性占位；
@@ -1362,7 +1362,7 @@ struct FilesTabView: View {
                             .lineLimit(1)
                         Text(item.name)
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                     }
                 } else {
@@ -1980,11 +1980,11 @@ struct FilesTabView: View {
                 .lineLimit(1)
             Text(unsignedSecondLine(item))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .lineLimit(1)
             Text(item.name)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2004,7 +2004,7 @@ struct FilesTabView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: selectedUnsignedIDs.contains(item.id) ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(selectedUnsignedIDs.contains(item.id) ? Theme.accent : Color.secondary)
+                        .foregroundStyle(selectedUnsignedIDs.contains(item.id) ? Theme.accent : Theme.muted)
                     libraryIcon(for: item.url.path, signed: false)
                     unsignedRowTexts(item)
                 }
@@ -2455,7 +2455,7 @@ struct FilesTabView: View {
                     if selectingSigned {
                         Image(systemName: selectedSignedIDs.contains(record.id)
                               ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(selectedSignedIDs.contains(record.id) ? Theme.accent : Color.secondary)
+                            .foregroundStyle(selectedSignedIDs.contains(record.id) ? Theme.accent : Theme.muted)
                     }
                     libraryIcon(for: iconPath, signed: true)
                     VStack(alignment: .leading, spacing: 2) {
@@ -2464,11 +2464,11 @@ struct FilesTabView: View {
                             .lineLimit(1)
                         Text(signedSecondLine(record))
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                         Text(record.fileName)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                     }
                     Spacer()

@@ -195,7 +195,7 @@ enum ExpiryUrgency {
             ? UIColor(red: 214/255, green: 194/255, blue: 86/255, alpha: 1)   // 深色保持 #D6C256
             : UIColor(red: 122/255, green: 106/255, blue: 0, alpha: 1) })     // 浅色 #7A6A00，白底 5.40:1 / 浅卡 4.84:1
         case .comfortable:        return Theme.positive
-        case .unknown:            return .secondary
+        case .unknown:            return Theme.muted
         }
     }
 
@@ -1277,7 +1277,7 @@ struct AppsView: View {
 
     private static func stateColor(_ state: RefreshJob.State) -> Color {
         switch state {
-        case .pending, .working: return .secondary
+        case .pending, .working: return Theme.muted
         case .done:              return Theme.positive
         case .failed:            return Theme.negative
         }
@@ -1490,7 +1490,7 @@ struct AppsView: View {
                                 .font(.subheadline.weight(.medium))
                             Text(profile.applicationIdentifier)
                                 .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                             Text(ExpiryUrgency.text(for: profile))

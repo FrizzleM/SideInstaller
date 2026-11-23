@@ -300,7 +300,7 @@ struct SettingsView: View {
                                 .font(.headline)
                             Text(L("Transfer files to Documents over LAN"))
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                         }
                     }
                 }
@@ -524,7 +524,7 @@ struct SettingsView: View {
                 Label(note.text, systemImage: note.failed ? "exclamationmark.triangle"
                                                           : "checkmark.circle")
                     .font(.caption)
-                    .foregroundStyle(note.failed ? AnyShapeStyle(Theme.negative) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(note.failed ? AnyShapeStyle(Theme.negative) : AnyShapeStyle(Theme.muted))
             }
         } header: {
             Text(L("Developer Mode"))

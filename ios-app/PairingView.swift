@@ -234,7 +234,7 @@ struct PairingView: View {
                             .font(.subheadline.weight(.medium))
                         Text(target.bundleID)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }

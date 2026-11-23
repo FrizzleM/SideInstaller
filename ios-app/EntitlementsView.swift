@@ -543,7 +543,7 @@ struct EntitlementsView: View {
                         .font(.subheadline.weight(.medium))
                     Text(app.identifier)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     if let results = manager.outcomes[app.id] {
@@ -618,7 +618,7 @@ private struct EntitlementPicker: View {
                     .font(.title3.weight(.semibold))
                 Text(app.identifier)
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 HStack(spacing: 8) {
                     Button(L("Recommended")) { selected = Entitlement.recommendedIDs }
                         .buttonStyle(SecondaryButtonStyle(), sound: .tap)
@@ -668,7 +668,7 @@ private struct EntitlementPicker: View {
             HStack(spacing: 12) {
                 Image(systemName: selected.contains(entitlement.id) ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(selected.contains(entitlement.id) ? Theme.accent : .secondary)
+                    .foregroundStyle(selected.contains(entitlement.id) ? Theme.accent : Theme.muted)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(entitlement.name)
                         .font(.subheadline.weight(.medium))

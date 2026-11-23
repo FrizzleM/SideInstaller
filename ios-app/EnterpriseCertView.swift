@@ -288,7 +288,7 @@ struct EnterpriseCertView: View {
                                     if let expiration = EnterpriseCertStore.provisionInfo(for: profile)?.expiration {
                                         Text(expiration.formatted(date: .abbreviated, time: .omitted) + remainingText(expiration))
                                             .font(.caption)
-                                            .foregroundStyle(expirySoon(expiration) ? Theme.negative : Color.secondary)
+                                            .foregroundStyle(expirySoon(expiration) ? Theme.negative : Theme.muted)
                                     }
                                     Spacer()
                                 }
@@ -920,7 +920,7 @@ struct EnterpriseCertView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.seal.fill")
-                            .foregroundStyle(certReady ? Color.secondary : Theme.warning)
+                            .foregroundStyle(certReady ? Theme.muted : Theme.warning)
                         Text(L("证书"))
                             .font(.headline)
                         Spacer()
@@ -1290,7 +1290,7 @@ struct EnterpriseCertView: View {
                 .font(.footnote)
             Text(L("签名时先改包再签：删 Watch / 扩展能减小体积，去设备限制让更多设备能装；顺手清掉包里 .DS_Store 等垃圾。"))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
         }
     }
 
@@ -1316,7 +1316,7 @@ struct EnterpriseCertView: View {
             if presets.isEmpty {
                 Text(L("把常用的插件、最低系统版本、多开数量存成预设，下次直接套用（名字、Bundle ID、版本是每 App 自己的，不进预设）。"))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             } else {
                 ForEach(presets) { preset in
                     HStack(spacing: 8) {
@@ -1394,7 +1394,7 @@ struct EnterpriseCertView: View {
             if mods.plugins.isEmpty {
                 Text(L("可选：.dylib / .deb / .zip，签名前注入"))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             } else {
                 ForEach(mods.plugins, id: \.path) { url in
                     HStack(spacing: 8) {
@@ -1494,17 +1494,17 @@ struct EnterpriseCertView: View {
                 if let info = selectedInfo {
                     Text(info.bundleID)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                 }
                 Text(url.lastPathComponent)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(1)
                 if certReady {
                     Text(L("用证书：%@", certRowText))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                 } else {
                     Text(L("证书未就绪，签不了"))

@@ -1092,7 +1092,7 @@ struct LocationView: View {
         HStack(spacing: 8) {
             Label(LocationManager.format(target), systemImage: "scope")
                 .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .lineLimit(1)
             Spacer(minLength: 0)
             Button { addStopAtPin() } label: {
@@ -1219,7 +1219,7 @@ struct LocationView: View {
 
                 Text(Self.modeExplanation(manager.travelMode))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
                 // Playing moves the device, which isn't where the route started.
@@ -1334,7 +1334,7 @@ struct LocationView: View {
                     .lineLimit(1)
                 Text(LocationManager.format(coordinate))
                     .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -1386,7 +1386,7 @@ struct LocationView: View {
         if manager.routeWaypoints.count == 1 {
             Text(L("Add one more stop to plan a route."))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
         }
     }
 
@@ -1404,7 +1404,7 @@ struct LocationView: View {
                     .font(.subheadline.weight(.medium))
                 Text(Self.routeDetail(planned))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
@@ -1498,7 +1498,7 @@ struct LocationView: View {
                             .lineLimit(1)
                         Text(LocationManager.format(place.coordinate))
                             .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 0)
@@ -1583,7 +1583,7 @@ struct LocationView: View {
                 Text("\(Self.formatDistance(route.distance)) · "
                      + Self.formatDuration(route.duration(at: manager.routeSpeed)))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
             Spacer(minLength: 0)
             Button {

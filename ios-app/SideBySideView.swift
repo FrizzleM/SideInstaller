@@ -2244,7 +2244,7 @@ struct SideBySideView: View {
                         if manager.customIPA != nil {
                             Text(SideBySideApp.custom.displayName)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                         }
                     }
                 }
@@ -2256,7 +2256,7 @@ struct SideBySideView: View {
                             Image(systemName: manager.customIPA == nil
                                   ? "square.and.arrow.down" : "checkmark.circle")
                                 .contentTransition(.symbolEffect(.replace))
-                                .foregroundStyle(manager.customIPA == nil ? Color.secondary : Theme.accent)
+                                .foregroundStyle(manager.customIPA == nil ? Theme.muted : Theme.accent)
                         }
                         Text(manager.isImportingIPA ? L("Importing…")
                              : manager.customIPA?.file.lastPathComponent ?? L("Import .ipa"))
@@ -2384,7 +2384,7 @@ struct SideBySideView: View {
                 }
                 Text(addressHint)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -2592,7 +2592,7 @@ struct SideBySideView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Text(value)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.primary)
@@ -2992,7 +2992,7 @@ struct SideBySideView: View {
                     StageDots(current: number, total: Stage.numberedCount)
                     Text(L("Step %@ of %@", "\(number)", "\(Stage.numberedCount)"))
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -3074,7 +3074,7 @@ private struct AppChoiceCard: View {
                         .minimumScaleFactor(0.8)
                     Label(detail, systemImage: app.requirementSymbol)
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(selected ? Theme.accent : .secondary)
+                        .foregroundStyle(selected ? Theme.accent : Theme.muted)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 2)
