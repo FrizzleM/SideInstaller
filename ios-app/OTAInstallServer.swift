@@ -59,7 +59,7 @@ final class OTAInstallServer: ObservableObject {
     private func registerConnection(_ connection: NWConnection) {
         let id = ObjectIdentifier(connection)
         liveConnections[id] = LiveConnection(connection: connection, lastActivity: Date(), idleCheck: nil)
-        scheduleIdleCheck(for: id)
+        scheduleIdleCheck(for: id, after: Self.connectionIdleTimeout)
     }
 
     /// 摘除一条连接（终结/取消/响应发完时调），并取消它待跑的空闲检查。
@@ -75,7 +75,7 @@ final class OTAInstallServer: ObservableObject {
     }
 
     /// 到期检查：已摘除就什么都不做；空闲满 60 秒就掐断，否则按剩余时间重排。
-    private func scheduleIdleCheck(for id: ObjectIdentifier, after delay: TimeInterval = Self.connectionIdleTimeout) {
+    private func scheduleIdleCheck(for id: ObjectIdentifier, after delay: TimeInterval) {
         liveConnections[id]?.idleCheck?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
