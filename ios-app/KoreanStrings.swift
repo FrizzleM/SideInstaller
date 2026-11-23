@@ -16,8 +16,8 @@ let koreanStrings: [String: String] = [
     "Password": "암호",
     "Install": "설치",
     // U-UI (0.9.102): new tab bar / source + file list redesign.
-    "源": "소스",
-    "应用": "앱",
+    "Apps": "앱",
+    "Sources": "소스",
     "AppStore": "AppStore",
     "软件源": "소프트웨어 소스",
     "文件列表": "파일 목록",
@@ -27,14 +27,10 @@ let koreanStrings: [String: String] = [
     "应用文件夹库": "앱 폴더 라이브러리",
     "应用 - %@": "앱 - %@",
     "No downloaded IPAs. Ones you install from a source or a file are cached here.": "다운로드한 IPA가 없습니다. 소스나 파일에서 설치한 항목은 여기에 캐시됩니다.",
-    "“%@” (%@) will be removed. You can download it again any time from the Downloads tab.": "“%@”(%@)이(가) 삭제됩니다. 다운로드 탭에서 언제든지 다시 다운로드할 수 있습니다.",
     "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "파일이 아직 없습니다. 위의 ‘파일 가져오기’로 IPA를 넣거나 소스 페이지에서 다운로드하면 여기에 표시됩니다.",
     "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "라이브러리에 서명되지 않은 IPA가 아직 없습니다. 파일 페이지에서 가져오거나 설정의 기업 인증서 페이지에서 ‘파일에서 가져오기’를 탭하세요.",
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "먼저 설정의 기업 인증서 페이지에서 인증서, 프로파일, 비밀번호를 준비하세요.",
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "서명된 IPA가 아직 없습니다. 설정의 기업 인증서 페이지에서 ‘서명만’을 사용해 서명하면 여기에 저장되어 언제든지 설치하고 공유할 수 있습니다.",
-    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone, so use theirs. To install on this one, use the install screen.": "“%@”은(는) 이 iPhone이 이미 가진 주소입니다. Side by Side는 다른 사람의 iPhone에 설치하는 기능이므로 상대방 주소를 사용하세요. 이 기기에 설치하려면 설치 화면을 사용하세요.",
-    "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the install screen.": "페어링된 iPhone이 이 기기입니다. 상대방 iPhone의 설정에서 페어링하세요. 이 기기에 설치하려면 설치 화면을 사용하세요.",
-    "SideInstaller is already waiting for an iPhone to pair with it, from the install screen, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.": "SideInstaller가 이미 iPhone 페어링을 기다리고 있습니다(설치 화면, 페어링 페이지 또는 이전 시도에서). 해당 페어링을 완료하거나 SideInstaller를 닫았다 다시 열고 다시 시도하세요.",
     "Installing": "설치 중",
     "Cancelling": "취소 중",
     "Installed": "설치됨",
@@ -79,8 +75,6 @@ let koreanStrings: [String: String] = [
     "Remove": "삭제",
     "No Apple ID saved yet. Add one and SideInstaller will use it for every sign-in.":
         "저장된 Apple ID가 없습니다. 하나 추가하면 SideInstaller가 로그인할 때마다 사용합니다.",
-    "Saved in this iPhone's keychain, and sent only to Apple when signing in. Swipe a row to edit its password or remove it.":
-        "이 iPhone의 키체인에 저장되며, 로그인할 때 Apple에만 전송됩니다. 행을 살짝 밀면 암호를 수정하거나 삭제할 수 있습니다.",
     "Remove this Apple ID?": "이 Apple ID를 삭제하시겠습니까?",
     "“%@” and its saved password will be deleted from this iPhone. Nothing changes on your Apple account.":
         "“%@” 및 저장된 암호가 이 iPhone에서 삭제됩니다. Apple 계정에는 아무 영향이 없습니다.",
@@ -103,7 +97,6 @@ let koreanStrings: [String: String] = [
     "Certificates": "인증서",
     "Two-Factor Code": "2단계 인증 코드",
     "6-digit code": "6자리 코드",
-    "Submit": "제출",
     "Enter the code Apple just sent to your trusted device.":
         "Apple이 방금 신뢰할 수 있는 기기로 보낸 코드를 입력하세요.",
     "Enter the code Apple texted to %@.":
@@ -153,9 +146,6 @@ let koreanStrings: [String: String] = [
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ 버전을 사용할 수 있습니다. 현재 버전은 %@입니다.",
     "Get the latest version": "최신 버전 받기",
-    "From the website": "웹사이트에서 받기",
-    "Sign it with your Apple ID": "내 Apple ID로 서명",
-    "Install it in LiveContainer": "LiveContainer에 설치",
     "Release": "릴리즈 채널",
     "Reinstall": "다시 설치",
     "Install %@": "%@ 설치",
@@ -305,21 +295,8 @@ let koreanStrings: [String: String] = [
         "이 인증서에는 일련번호가 없어서 폐기할 수 없습니다.",
 
     // Export: the certificate SideInstaller signs with, as a .p12
-    "This certificate has no serial number, so it can't be exported.":
-        "이 인증서에는 일련번호가 없어서 내보낼 수 없습니다.",
-    "Only the certificate SideInstaller signs with can be exported: the private key of any other stays on the device that asked Apple for it.":
-        "SideInstaller가 서명에 사용하는 인증서만 내보낼 수 있습니다. 다른 인증서의 개인 키는 Apple에 인증서를 요청한 기기에만 남아 있습니다.",
-    "Couldn't export the certificate: %@": "인증서를 내보내지 못했습니다: %@",
-    "Export certificate": "인증서 내보내기",
     "Import to %@": "%@로 가져오기",
-    "Password (optional)": "암호(선택)",
-    "Export": "내보내기",
     "Exporting": "내보내는 중",
-    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password, which you'll need to import the file, or leave it empty: signing apps import it without one, but a Mac won't. Keep the file to yourself.":
-        "이 인증서와 개인 키를 .p12 파일로 저장합니다. 다른 서명 앱이나 컴퓨터에서 서명할 때 사용할 수 있습니다. 암호를 정하면 파일을 가져올 때 필요합니다. 비워 두어도 서명 앱은 가져올 수 있지만 Mac은 가져올 수 없습니다. 파일은 본인만 보관하세요.",
-    "SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it.":
-        "SideInstaller는 서명에 사용하는 인증서만 내보낼 수 있는데, 이 목록에는 해당하는 인증서가 없습니다. 인증서의 개인 키는 Apple에 인증서를 요청한 기기에만 남아 있기 때문입니다.",
-    "SideInstaller signs with this one": "SideInstaller가 이 인증서로 서명합니다",
 
     // MARK: - SideStore's certificate (sidestore://certificate)
 
@@ -467,8 +444,6 @@ let koreanStrings: [String: String] = [
     // Refresh all: signing the installed apps again.
     "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
         "iOS %@ 버전은 지원되지 않습니다. SideInstaller는 iOS %@ 이상이 필요합니다.",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Under Tools › Certificates, use SideStore's certificate or revoke that one, then refresh again.":
-        "Apple이 이 Apple ID에 서명 인증서를 발급하지 않습니다. 이미 인증서가 있다고 응답했습니다(오류 7460). 도구 › 인증서에서 SideStore의 인증서를 사용하거나 기존 인증서를 폐기한 뒤 다시 갱신하세요.",
     "An install is already running. Wait for it to finish, then refresh.":
         "이미 설치가 진행 중입니다. 끝날 때까지 기다린 뒤 다시 갱신하세요.",
     "A refresh is already running. Wait for it to finish, then try again.":
@@ -511,17 +486,11 @@ let koreanStrings: [String: String] = [
     "Getting ready": "준비 중",
     "Stopping after this app": "이 앱까지 진행하고 중단하는 중",
     "Refreshing %@": "%@ 갱신 중",
-    "Signed by team %@, not the one you're signed in as — refreshing it here would install a second copy.":
-        "지금 로그인한 팀이 아닌 %@ 팀이 서명한 앱입니다. 여기서 갱신하면 사본이 하나 더 설치됩니다.",
     "Refreshed. Its seven days start again now.": "갱신했습니다. 7일이 지금부터 다시 시작됩니다.",
     "Nothing was refreshed.": "갱신된 앱이 없습니다.",
     "Refreshed %d of %d apps.": "앱 %d개를 갱신했습니다(전체 %d개).",
     "Refresh all apps?": "모든 앱을 갱신하시겠습니까?",
     "Refresh all": "모두 갱신",
-    "%@ will be signed again with your Apple ID and installed over the copy on this device. It keeps its data, and its seven days start over.":
-        "%@ 앱을 Apple ID로 다시 서명해 이 기기에 있는 앱 위에 설치합니다. 데이터는 그대로 유지되고, 7일이 다시 시작됩니다.",
-    "%d apps will be signed again with your Apple ID and installed over the copies on this device. They keep their data, and their seven days start over.":
-        "앱 %d개를 Apple ID로 다시 서명해 이 기기에 있는 앱 위에 설치합니다. 데이터는 그대로 유지되고, 7일이 다시 시작됩니다.",
     "%d app can be signed again from an IPA already on this iPhone.":
         "앱 %d개를 이 iPhone에 이미 있는 IPA로 다시 서명할 수 있습니다.",
     "%d apps can be signed again from IPAs already on this iPhone.":
@@ -634,27 +603,16 @@ let koreanStrings: [String: String] = [
     "When on, operations that need the tunnel try the built-in tunnel first and start LocalDevVPN when needed. When off, LocalDevVPN is never started automatically; the built-in tunnel still starts on demand, and the manual pill switch is unaffected.":
         "켜져 있으면 터널이 필요한 작업은 내장 터널을 먼저 시도하고 필요할 때 LocalDevVPN을 시작합니다. 꺼져 있으면 LocalDevVPN이 자동으로 시작되지 않습니다. 내장 터널은 여전히 필요할 때 시작되며, 수동 pill 스위치에는 영향이 없습니다.",
 
-    "Downloaded IPAs": "다운로드한 IPA",
-    "%@ used": "%@ 사용 중",
     "imported": "가져옴",
-    "No downloaded IPAs. Ones you install from the Install tab are cached here.":
-        "다운로드한 IPA가 없습니다. 설치 탭에서 설치한 IPA가 여기에 보관됩니다.",
     "Downloaded %@": "%@ 다운로드됨",
     "Added %@": "%@ 추가됨",
-    "Delete this download?": "이 다운로드를 삭제하시겠습니까?",
     "Delete": "삭제",
-    "“%@” (%@) will be removed. You can download it again any time from the Install tab.":
-        "“%@”(%@) 파일이 삭제됩니다. 설치 탭에서 언제든 다시 다운로드할 수 있습니다.",
     "Couldn't delete %@: %@": "%@ 파일을 삭제하지 못했습니다: %@",
     "Server": "서버",
     "Custom…": "직접 입력…",
     "Server URL": "서버 URL",
     "Anisette Server": "Anisette 서버",
     "Starts with %@": "%@부터 시작",
-    "Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.":
-        "자동은 마지막으로 로그인에 성공한 서버부터 시작해서, 작동할 가능성이 높은 순서대로 나머지 서버를 시도합니다.",
-    "Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others.":
-        "이 서버만 시도합니다. 실패하면 로그인도 실패하므로, 자동을 선택해 SideInstaller가 다른 서버를 시도하게 하세요.",
     "Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.":
         "설정 › Anisette 서버에서 선택한 서버만 시도했습니다. 그곳에서 자동을 선택하면 실패했을 때 SideInstaller가 다른 서버를 시도합니다.",
     "Device IP": "기기 IP",
@@ -670,8 +628,6 @@ let koreanStrings: [String: String] = [
     "Show Developer Mode in Settings": "설정에서 개발자 모드 표시",
     "Turn on Developer Mode": "개발자 모드 켜기",
     "Asking this iPhone…": "이 iPhone에 요청하는 중…",
-    "Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there.":
-        "두 방법 모두 이미 작동하는 이 iPhone과의 연결이 필요합니다. LocalDevVPN과, iOS 17.4~26에서 가져온 것과 같은 페어링 파일이 있어야 합니다. iOS 27에서는 연결 자체에 개발자 모드가 필요하므로, 사라진 옵션을 이 방법으로 되살릴 수 없습니다.",
     "Turn on Developer Mode?": "개발자 모드를 켜시겠습니까?",
     "Turn On and Restart": "켜고 재시동",
     "This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode.":
@@ -683,6 +639,7 @@ let koreanStrings: [String: String] = [
         "개발자 모드가 켜지도록 설정되었으며, 이 iPhone이 지금 재시동됩니다. 잠금을 해제한 뒤 “켜기”를 탭하세요.",
     "An install is already running. Wait for it to finish, then try again.":
         "이미 설치가 진행 중입니다. 끝날 때까지 기다린 뒤 다시 시도하세요.",
+    "An import is already running. Wait for it to finish, then try again.": "An import is already running. Wait for it to finish, then try again.",
     "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
         "iOS는 iPhone에 암호가 없을 때만 여기에서 개발자 모드를 켤 수 있습니다. 대신 “설정에서 개발자 모드 표시”를 탭하고 설정에서 켜세요.",
     "This iPhone didn't take the Developer Mode request: %@":
@@ -910,8 +867,6 @@ let koreanStrings: [String: String] = [
     "Open Apple Account":
         "Apple 계정 열기",
     "No App IDs left this week": "이번 주에는 남은 App ID가 없습니다",
-    "Every app SideInstaller signs needs an App ID, which its extensions share. A free Apple ID can register 10 a week, and each one counts for 7 days.":
-        "SideInstaller가 서명하는 모든 앱에는 App ID가 필요하며, 앱의 확장 기능은 이 App ID를 함께 사용합니다. 무료 Apple ID는 일주일에 10개를 등록할 수 있고, 등록한 App ID는 각각 7일 동안 개수에 포함됩니다.",
     "They can't be deleted sooner. Wait until some expire, then tap Install again.":
         "그보다 일찍 삭제할 수는 없습니다. 일부가 만료될 때까지 기다린 뒤 설치를 다시 탭하세요.",
     "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
@@ -934,18 +889,6 @@ let koreanStrings: [String: String] = [
     "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
         "여기로 돌아와 “페어링 파일 가져오기”를 탭하고 그 파일을 선택하세요. 이후는 iOS %@에서와 똑같이 작동합니다.",
     "Get jitterbugpair": "jitterbugpair 받기",
-    "From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.":
-        "iOS 26.4부터는 원격 페어링 파일이어야 합니다. 이 iPhone은 jitterbugpair가 만든 것 같은 lockdown 방식 파일이 LocalDevVPN을 통해 들어오면 연결을 끊습니다.",
-    "Get idevice_pair": "idevice_pair 받기",
-    "Make a remote pairing file": "원격 페어링 파일 만들기",
-    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
-        "가져온 페어링 파일은 lockdown 방식입니다. iOS 26.4부터 이 iPhone은 이런 파일이 LocalDevVPN을 통해 들어오면 연결을 끊으므로 연결할 수 없으며, 같은 방식으로 새로 만들어도 마찬가지입니다.",
-    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
-        "여기로 돌아와 페어링 파일 카드에서 “교체”를 탭하고 해당 파일을 선택하세요.",
-    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
-        "Mac, Windows PC 또는 Linux 컴퓨터에서 idevice_pair를 열고 이 iPhone을 연결한 뒤, 요청이 표시되면 신뢰를 탭하세요. 목록에서 이 iPhone을 선택하고 “Remote pairing”을 고른 다음 “Create”를 클릭하세요. 완료될 때까지 iPhone의 잠금을 해제한 상태로 두세요.",
-    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
-        "“Save to file…”을 클릭하고, 파일을 AirDrop, iCloud Drive 또는 케이블로 이 iPhone에 보내세요. iLoader에서 내보낸 페어링 파일도 사용할 수 있습니다.",
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
@@ -994,16 +937,12 @@ let koreanStrings: [String: String] = [
         "기본값인 10.7.0.1로 되돌리세요. LocalDevVPN에서는 설정 › 기기 IP에 있는 값입니다. 메인 화면에 표시된 주소는 터널의 이 기기 쪽 끝이므로 해당하지 않습니다.",
     "If you changed LocalDevVPN's addresses, copy its Device IP here — including the /32, if it shows one.":
         "LocalDevVPN의 주소를 변경했다면 그 기기 IP를 여기에 복사하세요. /32가 표시된다면 그것도 포함하세요.",
-    "Device IP is %@, one of this iPhone's own addresses, and iOS won't let an app connect to those. In Settings › Advanced, set Device IP to the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default, not the “Connected to” address on its main screen.":
-        "기기 IP가 %@인데, 이는 이 iPhone 자체의 주소 중 하나이며 iOS는 앱이 이런 주소에 연결하는 것을 허용하지 않습니다. 설정 › 고급에서 기기 IP를 LocalDevVPN의 설정 › 기기 IP에 있는 주소(기본값 10.7.0.1)로 설정하세요. LocalDevVPN 메인 화면의 “Connected to” 주소가 아닙니다.",
     "iOS refused the connection to %@ on this iPhone, before anything was sent. It does that for this iPhone's own addresses, like the “Connected to” address on LocalDevVPN's main screen. Device IP, in Settings › Advanced, has to be the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off and on again, then try again.":
         "iOS가 이 iPhone에서 %@ 주소로 향하는 연결을 아무 데이터도 보내기 전에 거부했습니다. LocalDevVPN 메인 화면의 “Connected to” 주소처럼 이 iPhone 자체의 주소에는 이렇게 동작합니다. 설정 › 고급의 기기 IP는 LocalDevVPN의 설정 › 기기 IP에 있는 주소(기본값 10.7.0.1)여야 합니다. 이미 그렇게 설정되어 있다면 LocalDevVPN을 껐다 켠 뒤 다시 시도하세요.",
     "This iPhone hung up on the connection as soon as it opened. From iOS 26.4 on it does that to lockdown pairing files, like this one, when they come through LocalDevVPN. Pair this iPhone with itself instead: tap “Regenerate” under Tools › Pairing, or tap Install, which pairs it first.":
         "이 iPhone이 연결이 열리자마자 끊었습니다. iOS 26.4부터는 이 파일 같은 lockdown 방식 페어링 파일이 LocalDevVPN을 통해 들어오면 이렇게 동작합니다. 대신 이 iPhone을 자기 자신과 페어링하세요. 도구 › 페어링에서 “다시 생성”을 탭하거나, 먼저 페어링을 진행하는 설치를 탭하세요.",
     "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
         "이 iPhone이 연결이 열리자마자 끊었습니다. iOS 26.4부터는 이 파일 같은 lockdown 방식 페어링 파일이 LocalDevVPN을 통해 들어오면 이렇게 동작하므로, 같은 방식으로 새로 만들어도 소용없습니다. 원격 페어링 파일은 계속 사용할 수 있습니다. 컴퓨터에서 idevice_pair를 열고 “Remote pairing”을 선택한 뒤 “Create”를 클릭하고 “Save to file…”을 클릭하세요. 그런 다음 “페어링 파일”에서 그 파일을 가져오세요.",
-    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
-        "이 iPhone이 연결을 끊었습니다. iOS 26.4부터는 이 파일 같은 lockdown 방식 페어링 파일이 LocalDevVPN을 통해 들어오면 이렇게 동작합니다. 위의 단계를 참고하세요.",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "이 iPhone을 페어링하려면 필요합니다. 설정이 찾을 수 있도록 SideInstaller가 로컬 네트워크에 자신을 알립니다.",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
@@ -1119,10 +1058,6 @@ let koreanStrings: [String: String] = [
     "The developer disk image location spoofing mounts. Mirrored by doronz88.":
         "위치 변경 도구가 마운트하는 개발자 디스크 이미지입니다. doronz88이 미러링했습니다.",
 
-    "Where to get it": "받을 수 있는 곳",
-    "Only the builds on the official install page and repository are mine. Anyone can fork the source, add a credential stealer and ship it under the same name and icon — so don't trust your Apple ID to a copy from anywhere else.":
-        "공식 설치 페이지와 저장소의 빌드만 제가 만든 것입니다. 누구나 소스를 포크해 자격 증명 탈취 코드를 넣고 같은 이름과 아이콘으로 배포할 수 있으니, 다른 곳의 사본에는 Apple ID를 맡기지 마세요.",
-    "Install page": "설치 페이지",
     "Terms": "약관",
 
     // MARK: - Madeira
@@ -1345,7 +1280,6 @@ let koreanStrings: [String: String] = [
     "Add": "추가",
     "Add Source": "소스 추가",
     "Anyone on your LAN can access it without a password. Turn it off when done.": "같은 LAN에 있는 사람은 누구나 비밀번호 없이 접근할 수 있습니다. 사용이 끝나면 꺼 주세요.",
-    "App Sources": "앱 소스",
     "Appearance": "모양",
     "Apple ID sign-in failed on %@. Last error: %@": "%@에서 Apple ID 로그인에 실패했습니다. 마지막 오류: %@",
     "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.": "Apple은 이 Apple ID에 서명 인증서를 발급하지 않습니다. 이미 존재한다고 보고합니다(오류 7460). 도구 › 인증서에서 이를 해지한 뒤 다시 새로 고침하세요.",

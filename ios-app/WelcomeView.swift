@@ -91,7 +91,7 @@ struct WelcomeView: View {
             .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1))
     }
 
-    /// The tickbox row, where only "TOS" itself opens the terms page.
+    /// The tickbox row, where only "Terms" itself opens the terms page.
     private var checkboxRow: some View {
         HStack(spacing: 4) {
             Button {
@@ -118,12 +118,12 @@ struct WelcomeView: View {
             .buttonStyle(.plain, sound: accepted ? .fall : .rise)
             // A tickbox to assistive tech, with an on/off value, not a button.
             .accessibilityRepresentation {
-                Toggle(L("I have accepted the") + " TOS",
+                Toggle(L("I have accepted the") + " " + L("Terms"),
                        isOn: $accepted.animation(.snappy(duration: 0.25)))
             }
 
             Link(destination: URL(string: "https://sideinstaller.net/terms.html")!) {
-                Text("TOS")
+                Text(L("Terms"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.accent2)
                     .underline()

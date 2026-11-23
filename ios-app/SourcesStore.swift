@@ -287,6 +287,9 @@ final class SourceStore: ObservableObject {
             sources[index].errorMessage = nil
             return
         }
+        // 在途去重：同一源已有 fetch 在跑时直接返回，等那次的结果；
+        // 两路缓存命中已在上面返回，不受守卫影响。
+        guard sources[index].isLoading == false else { return }
         sources[index].isLoading = true
         sources[index].errorMessage = nil
         do {

@@ -200,13 +200,14 @@ final class AutoRefreshService {
         let now = Date().timeIntervalSince1970
         let last = UserDefaults.standard.double(forKey: Self.lastAlertKey)
         guard now - last >= Self.minAlertInterval else { return }
-        UserDefaults.standard.set(now, forKey: Self.lastAlertKey)
-        await postNotification(
+        guard await postNotification(
             title: L("续签提醒"),
             body: L("有 %d 个应用即将过期，但隧道未连接。连接隧道后将自动续签。", critical.count))
+        else { return }
+        UserDefaults.standard.set(now, forKey: Self.lastAlertKey)
     }
 
-    private func postNotification(title: String, body: String) async {
+    private func postNotification(title: String, body: String) async -> Bool {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
@@ -216,10 +217,12 @@ final class AutoRefreshService {
             content: content, trigger: nil)
         do {
             try await UNUserNotificationCenter.current().add(request)
+            return true
         } catch {
             // C11：到期提醒本身也可能发不出去——记一行日志，
             // 别用 try? 静默吞掉。
             Engine.shared.log("Auto refresh: notification failed to send (\(error.localizedDescription)).")
+            return false
         }
     }
 }

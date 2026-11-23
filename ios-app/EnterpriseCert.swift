@@ -865,6 +865,112 @@ enum IPADecryptionCheck {
         return undumped
     }
 
+    /// Fast path for `undumpedApps(of:)`: reads only each executable's file
+    /// head out of the zip (prefix inflate, no full extraction). Returns nil
+    /// when the zip can't be read this way — the caller falls back to the
+    /// slow path. A non-nil result means the same as the slow path's
+    /// (nil = unreadable, empty = all dumped, names = still encrypted).
+    static func undumpedAppsFast(of ipaURL: URL) -> [String]? {
+        guard let entries = IPALibrary.appExecutableEntries(inIPA: ipaURL) else { return nil }
+        var undumped: [String] = []
+        for (appName, exePath) in entries {
+            guard let cryptid = cryptidFast(of: exePath, inIPA: ipaURL) else { return nil }
+            if cryptid != 0 { undumped.append(appName) }
+        }
+        return undumped
+    }
+
+    /// cryptid for one executable, from a memory prefix: 4KB first to find
+    /// the arm64 slice, then up to sliceOffset + 1MB (thin binaries: 1MB).
+    /// nil = couldn't read or parse (same as the file-based path's nil).
+    /// The prefix target is capped: a fat binary whose arm64 slice sits
+    /// past 128MB falls back to the slow path instead of inflating that
+    /// much into memory.
+    private static func cryptidFast(of exePath: String, inIPA ipaURL: URL) -> Int? {
+        guard let head = IPALibrary.executablePrefixData(inIPA: ipaURL, entryName: exePath, byteCount: 4096),
+              head.count >= 4 else { return nil }
+        let magic = head[0..<4]
+        var target = 1 << 20
+        if magic.elementsEqual([0xCA, 0xFE, 0xBA, 0xBE]) {
+            // 胖二进制：大端序，找 arm64 切片的偏移。
+            guard head.count >= 8 else { return nil }
+            let narch = Int(u32be(head, 4))
+            var offset = 8
+            var sliceOffset: Int?
+            for _ in 0..<narch {
+                guard head.count >= offset + 20 else { return nil }
+                if u32be(head, offset) == 0x0100_000C {
+                    sliceOffset = Int(u32be(head, offset + 8))
+                    break
+                }
+                offset += 20
+            }
+            guard let sliceOffset else { return nil }
+            target = sliceOffset + (1 << 20)
+        } else if magic.elementsEqual([0xCA, 0xFE, 0xBA, 0xBF]) {
+            // 64 位胖二进制：每项 32 字节，offset 是 8 字节大端值，
+            // 低 32 位在 +12 处（IPA 不到 4GB，低 32 位够用）。
+            guard head.count >= 8 else { return nil }
+            let narch = Int(u32be(head, 4))
+            var offset = 8
+            var sliceOffset: Int?
+            for _ in 0..<narch {
+                guard head.count >= offset + 32 else { return nil }
+                if u32be(head, offset) == 0x0100_000C {
+                    sliceOffset = Int(u32be(head, offset + 12))
+                    break
+                }
+                offset += 32
+            }
+            guard let sliceOffset else { return nil }
+            target = sliceOffset + (1 << 20)
+        }
+        guard target <= 128 << 20 else { return nil }
+        guard let prefix = IPALibrary.executablePrefixData(inIPA: ipaURL, entryName: exePath, byteCount: target) else { return nil }
+        return parseCryptidFromPrefix(prefix)
+    }
+
+    /// cryptid from an in-memory executable prefix: the fat header's arm64
+    /// slice is cut out of the same prefix (no file re-open). Mirrors
+    /// `parseCryptid`, but the slice comes from `prefix`, not a seek.
+    private static func parseCryptidFromPrefix(_ prefix: Data) -> Int? {
+        guard prefix.count >= 4 else { return nil }
+        let magic = prefix[0..<4]
+        if magic.elementsEqual([0xCA, 0xFE, 0xBA, 0xBE]) {
+            guard prefix.count >= 8 else { return nil }
+            let narch = Int(u32be(prefix, 4))
+            var offset = 8
+            for _ in 0..<narch {
+                guard prefix.count >= offset + 20 else { return nil }
+                let cputype = u32be(prefix, offset)
+                let sliceOffset = Int(u32be(prefix, offset + 8))
+                if cputype == 0x0100_000C {
+                    guard prefix.count >= sliceOffset + 32 else { return nil }
+                    return thinCryptid(Data(prefix[sliceOffset...]))
+                }
+                offset += 20
+            }
+            return nil
+        }
+        if magic.elementsEqual([0xCA, 0xFE, 0xBA, 0xBF]) {
+            guard prefix.count >= 8 else { return nil }
+            let narch = Int(u32be(prefix, 4))
+            var offset = 8
+            for _ in 0..<narch {
+                guard prefix.count >= offset + 32 else { return nil }
+                let cputype = u32be(prefix, offset)
+                let sliceOffset = Int(u32be(prefix, offset + 12))
+                if cputype == 0x0100_000C {
+                    guard prefix.count >= sliceOffset + 32 else { return nil }
+                    return thinCryptid(Data(prefix[sliceOffset...]))
+                }
+                offset += 32
+            }
+            return nil
+        }
+        return thinCryptid(prefix)
+    }
+
     private static func cryptid(ofAppDir appDir: URL) -> Int? {
         let executableName: String
         if let plistData = try? Data(contentsOf: appDir.appendingPathComponent("Info.plist")),

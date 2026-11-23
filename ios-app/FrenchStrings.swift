@@ -14,8 +14,8 @@ let frenchStrings: [String: String] = [
     "Password": "Mot de passe",
     "Install": "Installer",
     // U-UI (0.9.102): new tab bar / source + file list redesign.
-    "源": "Sources",
-    "应用": "Apps",
+    "Apps": "Apps",
+    "Sources": "Sources",
     "AppStore": "AppStore",
     "软件源": "Sources logicielles",
     "文件列表": "Liste des fichiers",
@@ -25,14 +25,10 @@ let frenchStrings: [String: String] = [
     "应用文件夹库": "Bibliothèque d'apps",
     "应用 - %@": "App - %@",
     "No downloaded IPAs. Ones you install from a source or a file are cached here.": "Aucun IPA téléchargé. Ceux installés depuis une source ou un fichier sont mis en cache ici.",
-    "“%@” (%@) will be removed. You can download it again any time from the Downloads tab.": "« %@ » (%@) sera supprimé. Vous pourrez le télécharger à nouveau depuis l'onglet Téléchargements.",
     "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "Aucun fichier. Touchez « Importer » ci-dessus pour ajouter un IPA, ou téléchargez-en un depuis la page des sources.",
     "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "Aucun IPA non signé dans la bibliothèque. Importez-en un depuis la page Fichiers, ou touchez « Importer un fichier » sur la page des certificats d'entreprise dans Réglages.",
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Préparez d'abord le certificat, le profil et le mot de passe dans le groupe de certificats de la page des certificats d'entreprise dans Réglages.",
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "Aucun IPA signé pour l'instant. Signez-en un avec « Signer seulement » sur la page des certificats d'entreprise dans Réglages : il sera stocké ici, prêt à installer et à partager.",
-    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone, so use theirs. To install on this one, use the install screen.": "« %@ » est une adresse que cet iPhone possède déjà. Side by Side installe sur l'iPhone de quelqu'un d'autre : utilisez la sienne. Pour installer sur celui-ci, utilisez l'écran d'installation.",
-    "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the install screen.": "L'iPhone appairé est celui-ci. Appariez plutôt depuis les Réglages de son iPhone. Pour installer sur celui-ci, utilisez l'écran d'installation.",
-    "SideInstaller is already waiting for an iPhone to pair with it, from the install screen, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.": "SideInstaller attend déjà un iPhone à appairer, depuis l'écran d'installation, la page d'appairage ou une tentative précédente. Terminez cet appairage, ou fermez puis rouvrez SideInstaller avant de réessayer.",
     "Installing": "Installation en cours",
     "Cancelling": "Annulation en cours",
     "Installed": "Installé",
@@ -78,8 +74,6 @@ let frenchStrings: [String: String] = [
     "Remove": "Supprimer",
     "No Apple ID saved yet. Add one and SideInstaller will use it for every sign-in.":
         "Aucun Apple ID enregistré. Ajoutez-en un et SideInstaller l'utilisera à chaque connexion.",
-    "Saved in this iPhone's keychain, and sent only to Apple when signing in. Swipe a row to edit its password or remove it.":
-        "Enregistré dans le trousseau de cet iPhone, et envoyé uniquement à Apple lors de la connexion. Balayez une ligne pour modifier son mot de passe ou la supprimer.",
     "Remove this Apple ID?": "Supprimer cet Apple ID ?",
     "“%@” and its saved password will be deleted from this iPhone. Nothing changes on your Apple account.":
         "« %@ » et son mot de passe enregistré seront supprimés de cet iPhone. Votre compte Apple reste inchangé.",
@@ -104,7 +98,6 @@ let frenchStrings: [String: String] = [
     "Certificates": "Certificats",
     "Two-Factor Code": "Code de validation",
     "6-digit code": "Code à 6 chiffres",
-    "Submit": "Envoyer",
     "Enter the code Apple just sent to your trusted device.":
         "Saisissez le code qu'Apple vient d'envoyer à votre appareil de confiance.",
     "Enter the code Apple texted to %@.":
@@ -154,9 +147,6 @@ let frenchStrings: [String: String] = [
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ est disponible — vous utilisez la %@.",
     "Get the latest version": "Obtenir la dernière version",
-    "From the website": "Depuis le site web",
-    "Sign it with your Apple ID": "La signer avec votre Apple ID",
-    "Install it in LiveContainer": "L'installer dans LiveContainer",
     "Release": "Canal",
     "Reinstall": "Réinstaller",
     "Install %@": "Installer %@",
@@ -309,21 +299,8 @@ let frenchStrings: [String: String] = [
         "Ce certificat n'a pas de numéro de série, il ne peut donc pas être révoqué.",
 
     // Export: the certificate SideInstaller signs with, as a .p12
-    "This certificate has no serial number, so it can't be exported.":
-        "Ce certificat n'a pas de numéro de série, il ne peut donc pas être exporté.",
-    "Only the certificate SideInstaller signs with can be exported: the private key of any other stays on the device that asked Apple for it.":
-        "Seul le certificat avec lequel SideInstaller signe peut être exporté : la clé privée de tout autre reste sur l'appareil qui l'a demandé à Apple.",
-    "Couldn't export the certificate: %@": "Impossible d'exporter le certificat : %@",
-    "Export certificate": "Exporter le certificat",
     "Import to %@": "Importer dans %@",
-    "Password (optional)": "Mot de passe (facultatif)",
-    "Export": "Exporter",
     "Exporting": "Exportation",
-    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password, which you'll need to import the file, or leave it empty: signing apps import it without one, but a Mac won't. Keep the file to yourself.":
-        "Enregistre ce certificat et sa clé privée dans un fichier .p12, avec lequel une autre app de signature ou un ordinateur peut signer. Choisissez un mot de passe, qu'il vous faudra pour importer le fichier, ou laissez le champ vide : les apps de signature l'importent sans mot de passe, mais pas un Mac. Ne le donnez à personne.",
-    "SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it.":
-        "SideInstaller ne peut exporter que le certificat avec lequel il signe, et aucun de ceux-ci ne l'est : la clé privée d'un certificat reste sur l'appareil qui l'a demandé à Apple.",
-    "SideInstaller signs with this one": "SideInstaller signe avec celui-ci",
 
     // MARK: - SideStore's certificate (sidestore://certificate)
 
@@ -483,8 +460,6 @@ let frenchStrings: [String: String] = [
     // Refresh all: signing the installed apps again.
     "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
         "iOS %@ n'est pas pris en charge : SideInstaller nécessite iOS %@ ou une version ultérieure.",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Under Tools › Certificates, use SideStore's certificate or revoke that one, then refresh again.":
-        "Apple ne délivre pas de certificat de signature pour cet Apple ID : elle indique qu'il en existe déjà un (erreur 7460). Dans Outils › Certificats, utilisez le certificat de SideStore ou révoquez celui-ci, puis renouvelez à nouveau.",
     "An install is already running. Wait for it to finish, then refresh.":
         "Une installation est déjà en cours. Attendez qu'elle se termine, puis renouvelez.",
     "A refresh is already running. Wait for it to finish, then try again.":
@@ -527,18 +502,12 @@ let frenchStrings: [String: String] = [
     "Getting ready": "Préparation",
     "Stopping after this app": "Arrêt après cette app",
     "Refreshing %@": "Renouvellement de %@",
-    "Signed by team %@, not the one you're signed in as — refreshing it here would install a second copy.":
-        "Signée par l'équipe %@, pas celle avec laquelle vous êtes connecté : la renouveler ici installerait une deuxième copie.",
     "Refreshed. Its seven days start again now.":
         "Renouvelée. Ses sept jours repartent maintenant.",
     "Nothing was refreshed.": "Rien n'a été renouvelé.",
     "Refreshed %d of %d apps.": "%d app sur %d renouvelées.",
     "Refresh all apps?": "Renouveler toutes les apps ?",
     "Refresh all": "Tout renouveler",
-    "%@ will be signed again with your Apple ID and installed over the copy on this device. It keeps its data, and its seven days start over.":
-        "%@ sera signée à nouveau avec votre Apple ID et installée par-dessus la copie présente sur cet appareil. Elle conserve ses données et ses sept jours repartent de zéro.",
-    "%d apps will be signed again with your Apple ID and installed over the copies on this device. They keep their data, and their seven days start over.":
-        "%d apps seront signées à nouveau avec votre Apple ID et installées par-dessus les copies présentes sur cet appareil. Elles conservent leurs données et leurs sept jours repartent de zéro.",
     "%d app can be signed again from an IPA already on this iPhone.":
         "%d app peut être signée à nouveau depuis un IPA déjà présent sur cet iPhone.",
     "%d apps can be signed again from IPAs already on this iPhone.":
@@ -723,27 +692,16 @@ let frenchStrings: [String: String] = [
     "When on, operations that need the tunnel try the built-in tunnel first and start LocalDevVPN when needed. When off, LocalDevVPN is never started automatically; the built-in tunnel still starts on demand, and the manual pill switch is unaffected.":
         "Activé, les opérations qui ont besoin du tunnel essaient d'abord le tunnel intégré, puis démarrent LocalDevVPN si nécessaire. Désactivé, LocalDevVPN n'est jamais démarré automatiquement ; le tunnel intégré démarre toujours à la demande, et l'interrupteur manuel (pill) n'est pas affecté.",
 
-    "Downloaded IPAs": "IPA téléchargés",
-    "%@ used": "%@ utilisés",
     "imported": "importé",
-    "No downloaded IPAs. Ones you install from the Install tab are cached here.":
-        "Aucun IPA téléchargé. Ceux que vous installez depuis l'onglet Installer sont conservés ici.",
     "Downloaded %@": "Téléchargé le %@",
     "Added %@": "Ajouté %@",
-    "Delete this download?": "Supprimer ce téléchargement ?",
     "Delete": "Supprimer",
-    "“%@” (%@) will be removed. You can download it again any time from the Install tab.":
-        "« %@ » (%@) sera supprimé. Vous pourrez le retélécharger à tout moment depuis l'onglet Installer.",
     "Couldn't delete %@: %@": "Impossible de supprimer %@ : %@",
     "Server": "Serveur",
     "Custom…": "Personnalisé…",
     "Server URL": "URL du serveur",
     "Anisette Server": "Serveur Anisette",
     "Starts with %@": "Commence par %@",
-    "Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.":
-        "Le mode Automatique commence par le serveur de la dernière connexion réussie, puis essaie les autres, en commençant par ceux qui ont le plus de chances de fonctionner.",
-    "Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others.":
-        "Seul ce serveur est essayé. S'il échoue, la connexion échoue aussi : choisissez Automatique pour que SideInstaller essaie les autres.",
     "Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.":
         "Seul le serveur choisi dans Réglages › Serveur Anisette a été essayé. Choisissez Automatique à cet endroit pour que SideInstaller essaie les autres quand l'un échoue.",
     "Device IP": "IP de l'appareil",
@@ -759,8 +717,6 @@ let frenchStrings: [String: String] = [
     "Show Developer Mode in Settings": "Afficher le mode développeur dans Réglages",
     "Turn on Developer Mode": "Activer le mode développeur",
     "Asking this iPhone…": "Interrogation de cet iPhone…",
-    "Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there.":
-        "Les deux nécessitent une liaison avec cet iPhone qui fonctionne déjà : LocalDevVPN et un fichier de jumelage, par exemple importé sous iOS 17.4 à 26. Sous iOS 27, la liaison elle-même nécessite le mode développeur : ils ne peuvent donc pas faire réapparaître l'option si elle a disparu.",
     "Turn on Developer Mode?": "Activer le mode développeur ?",
     "Turn On and Restart": "Activer et redémarrer",
     "This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode.":
@@ -772,6 +728,7 @@ let frenchStrings: [String: String] = [
         "Le mode développeur va s'activer, et cet iPhone redémarre maintenant. Une fois qu'il est déverrouillé, touchez Activer.",
     "An install is already running. Wait for it to finish, then try again.":
         "Une installation est déjà en cours. Attendez qu'elle se termine, puis réessayez.",
+    "An import is already running. Wait for it to finish, then try again.": "An import is already running. Wait for it to finish, then try again.",
     "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
         "iOS n'active le mode développeur depuis ici que si cet iPhone n'a pas de code. Touchez « Afficher le mode développeur dans Réglages » et activez-le à cet endroit.",
     "This iPhone didn't take the Developer Mode request: %@":
@@ -1003,8 +960,6 @@ let frenchStrings: [String: String] = [
     "Open Apple Account":
         "Ouvrir le compte Apple",
     "No App IDs left this week": "Plus d'App ID cette semaine",
-    "Every app SideInstaller signs needs an App ID, which its extensions share. A free Apple ID can register 10 a week, and each one counts for 7 days.":
-        "Chaque app que SideInstaller signe a besoin d'un App ID, que ses extensions partagent. Un Apple ID gratuit peut en enregistrer 10 par semaine, et chacun compte pendant 7 jours.",
     "They can't be deleted sooner. Wait until some expire, then tap Install again.":
         "Ils ne peuvent pas être supprimés plus tôt. Attendez que certains expirent, puis touchez à nouveau Installer.",
     "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
@@ -1027,18 +982,6 @@ let frenchStrings: [String: String] = [
     "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
         "Revenez ici, touchez « Importer le fichier de jumelage » et choisissez-le. Ensuite, tout fonctionne comme sur iOS %@.",
     "Get jitterbugpair": "Télécharger jitterbugpair",
-    "From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.":
-        "Depuis iOS 26.4, ce doit être un fichier « Remote pairing » : cet iPhone coupe la connexion avec les fichiers lockdown, comme celui de jitterbugpair, quand ils passent par LocalDevVPN.",
-    "Get idevice_pair": "Télécharger idevice_pair",
-    "Make a remote pairing file": "Créer un fichier « Remote pairing »",
-    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
-        "Le fichier de jumelage que vous avez importé est de type lockdown. Depuis iOS 26.4, cet iPhone coupe la connexion avec ces fichiers quand ils passent par LocalDevVPN : il ne peut donc pas se connecter, et un nouveau fichier du même type non plus.",
-    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
-        "Revenez ici, touchez « Remplacer » sur la carte « Fichier de jumelage » et choisissez-le.",
-    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
-        "Sur un Mac, un PC Windows ou Linux, ouvrez idevice_pair, branchez cet iPhone et faites confiance à l'ordinateur s'il le demande. Sélectionnez-le, choisissez « Remote pairing », cliquez sur « Create » et gardez cet iPhone déverrouillé jusqu'à la fin.",
-    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
-        "Cliquez sur « Save to file… » et envoyez le fichier vers cet iPhone, par AirDrop, iCloud Drive ou un câble. Un fichier de jumelage exporté depuis iLoader fonctionne aussi.",
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
@@ -1088,16 +1031,12 @@ let frenchStrings: [String: String] = [
         "Remettez-la à 10.7.0.1, la valeur par défaut. Dans LocalDevVPN, c’est la valeur sous Réglages › Device IP, et non l’adresse de l’écran principal, qui est l’extrémité du tunnel lui-même.",
     "If you changed LocalDevVPN's addresses, copy its Device IP here — including the /32, if it shows one.":
         "Si vous avez modifié les adresses de LocalDevVPN, copiez ici son Device IP — y compris le /32, s'il en affiche un.",
-    "Device IP is %@, one of this iPhone's own addresses, and iOS won't let an app connect to those. In Settings › Advanced, set Device IP to the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default, not the “Connected to” address on its main screen.":
-        "L’IP de l’appareil est %@, l’une des adresses de cet iPhone, et iOS ne laisse aucune app s’y connecter. Dans Réglages › Avancé, indiquez comme IP de l’appareil l’adresse sous Réglages › Device IP dans LocalDevVPN (10.7.0.1 par défaut), et non celle qui suit « Connecté à » sur son écran principal.",
     "iOS refused the connection to %@ on this iPhone, before anything was sent. It does that for this iPhone's own addresses, like the “Connected to” address on LocalDevVPN's main screen. Device IP, in Settings › Advanced, has to be the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off and on again, then try again.":
         "iOS a refusé la connexion à %@ sur cet iPhone, avant que quoi que ce soit ne soit envoyé. Il le fait pour les adresses de cet iPhone lui-même, comme celle qui suit « Connecté à » sur l’écran principal de LocalDevVPN. L’IP de l’appareil, dans Réglages › Avancé, doit être l’adresse sous Réglages › Device IP dans LocalDevVPN (10.7.0.1 par défaut). Si c’est déjà le cas, désactivez puis réactivez LocalDevVPN, puis réessayez.",
     "This iPhone hung up on the connection as soon as it opened. From iOS 26.4 on it does that to lockdown pairing files, like this one, when they come through LocalDevVPN. Pair this iPhone with itself instead: tap “Regenerate” under Tools › Pairing, or tap Install, which pairs it first.":
         "Cet iPhone a coupé la connexion dès son ouverture. Depuis iOS 26.4, il le fait avec les fichiers de jumelage lockdown, comme celui-ci, quand ils passent par LocalDevVPN. Jumelez plutôt cet iPhone avec lui-même : touchez « Régénérer » dans Outils › Jumelage, ou touchez Installer, qui le jumelle d'abord.",
     "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
         "Cet iPhone a coupé la connexion dès son ouverture. Depuis iOS 26.4, il le fait avec les fichiers de jumelage lockdown, comme celui-ci, quand ils passent par LocalDevVPN : en refaire un du même type n'y changera rien. Un fichier de jumelage « Remote pairing » fonctionne toujours : sur un ordinateur, ouvrez idevice_pair, choisissez « Remote pairing », cliquez sur « Create » puis sur « Save to file… », et importez le fichier dans « Fichier de jumelage ».",
-    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
-        "Cet iPhone a coupé la connexion : depuis iOS 26.4, il le fait avec les fichiers de jumelage lockdown comme celui-ci quand ils passent par LocalDevVPN. Voir les étapes ci-dessus.",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "L’appairage de cet iPhone en a besoin : SideInstaller s’annonce sur le réseau local pour que Réglages le trouve.",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
@@ -1151,10 +1090,6 @@ let frenchStrings: [String: String] = [
     "The developer disk image location spoofing mounts. Mirrored by doronz88.":
         "L’image disque développeur que monte la simulation de position. Miroir de doronz88.",
 
-    "Where to get it": "Où le télécharger",
-    "Only the builds on the official install page and repository are mine. Anyone can fork the source, add a credential stealer and ship it under the same name and icon — so don't trust your Apple ID to a copy from anywhere else.":
-        "Seules les versions publiées sur la page d’installation et le dépôt officiels sont les miennes. N’importe qui peut forker le code, y ajouter un voleur d’identifiants et le diffuser sous le même nom et la même icône : ne confiez pas votre Apple ID à une copie trouvée ailleurs.",
-    "Install page": "Page d’installation",
     "Terms": "Conditions",
 
     // MARK: - Madeira
@@ -1382,7 +1317,6 @@ let frenchStrings: [String: String] = [
     "Add": "Ajouter",
     "Add Source": "Ajouter une source",
     "Anyone on your LAN can access it without a password. Turn it off when done.": "Toute personne sur votre réseau local peut y accéder sans mot de passe. Éteignez-le quand vous avez terminé.",
-    "App Sources": "Sources d’apps",
     "Appearance": "Apparence",
     "Apple ID sign-in failed on %@. Last error: %@": "La connexion à l’identifiant Apple a échoué sur %@. Dernière erreur : %@",
     "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.": "Apple ne délivrera pas de certificat de signature pour cet identifiant Apple : il signale qu’il en existe déjà un (erreur 7460). Révoquez-le sous Outils › Certificats, puis actualisez à nouveau.",

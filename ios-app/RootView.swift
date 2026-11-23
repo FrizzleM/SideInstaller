@@ -97,10 +97,10 @@ struct RootView: View {
                 .tag(Page.files)
             NavigationStack { AppsView(manager: appsManager) }
                 .blueTopBar()
-                .tabItem { Label(L("应用"), systemImage: "square.grid.2x2") }
+                .tabItem { Label(L("Apps"), systemImage: "square.grid.2x2") }
                 .tag(Page.apps)
             NavigationStack { SourcesView() }
-                .tabItem { Label(L("源"), systemImage: "storefront") }
+                .tabItem { Label(L("Sources"), systemImage: "storefront") }
                 .tag(Page.sources)
             NavigationStack { DownloadsListView() }
                 .blueTopBar()

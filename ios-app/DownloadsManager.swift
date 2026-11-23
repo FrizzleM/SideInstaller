@@ -150,6 +150,7 @@ struct DownloadsListView: View {
                         } label: {
                             Label(L("Delete"), systemImage: "trash")
                         }
+                        .disabled(manager.deletingID != nil)
                     }
                 }
             }

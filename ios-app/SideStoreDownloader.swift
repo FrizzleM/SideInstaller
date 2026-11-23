@@ -2408,6 +2408,68 @@ extension IPALibrary {
         return contents(of: entry, handle)
     }
 
+    /// Every app in the IPA with its executable's zip path: all
+    /// `Payload/*.app/Info.plist` entries, read for `CFBundleExecutable`
+    /// (falling back to the `.app` name, same as the slow path). Returns nil
+    /// when the central directory can't be read or any app's executable
+    /// can't be found — the caller falls back to full extraction.
+    static func appExecutableEntries(inIPA url: URL) -> [(appName: String, executablePath: String)]? {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size) else { return nil }
+        let plists = directory.filter { entry in
+            let parts = entry.name.split(separator: "/", omittingEmptySubsequences: false)
+            return parts.count == 3 && parts[0] == "Payload"
+                && parts[1].hasSuffix(".app") && parts[2] == "Info.plist"
+        }.sorted { $0.name < $1.name }
+        guard !plists.isEmpty else { return nil }
+        var out: [(appName: String, executablePath: String)] = []
+        for plistEntry in plists {
+            guard let data = contents(of: plistEntry, handle),
+                  let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
+                  let dict = plist as? [String: Any] else { return nil }
+            let parts = plistEntry.name.split(separator: "/")
+            guard parts.count == 3 else { return nil }
+            let appName = String(parts[1])
+            let exe = (dict["CFBundleExecutable"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                ?? (appName as NSString).deletingPathExtension
+            let exePath = "Payload/\(appName)/\(exe)"
+            guard directory.contains(where: { $0.name == exePath }) else { return nil }
+            out.append((appName: appName, executablePath: exePath))
+        }
+        return out
+    }
+
+    /// The first `byteCount` uncompressed bytes of one zip entry, without
+    /// inflating the whole entry. Stored entries are read straight off disk;
+    /// deflated ones stream-inflate only until the prefix is produced.
+    /// Returns fewer bytes when the entry itself is shorter, nil when the
+    /// entry can't be located or the data is damaged.
+    static func executablePrefixData(inIPA url: URL, entryName: String, byteCount: Int) -> Data? {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size),
+              let entry = directory.first(where: { $0.name == entryName }),
+              entry.uncompressedSize > 0,
+              let start = dataOffset(of: entry, handle),
+              (try? handle.seek(toOffset: UInt64(start))) != nil else { return nil }
+        switch entry.method {
+        case 0:
+            guard let data = try? handle.read(upToCount: min(byteCount, entry.uncompressedSize)),
+                  !data.isEmpty else { return nil }
+            return data
+        case 8:
+            guard entry.compressedSize > 0 else { return nil }
+            return inflatePrefix(entry.compressedSize, from: handle, upTo: byteCount)
+        default:
+            return nil
+        }
+    }
+
     private static func contents(of entry: ZipEntry, _ handle: FileHandle, maxSize: Int = 4 << 20) -> Data? {
         // Sanity limit: an Info.plist is only kilobytes, and the inflate below
         // allocates this size.
@@ -2535,6 +2597,70 @@ extension IPALibrary {
             }
             guard let ended else { return nil }
             if ended { return written }
+        }
+        return nil          // the zip ended before the stream did
+    }
+
+    /// Inflates the next `count` compressed bytes of `input`, raw DEFLATE,
+    /// into memory, stopping as soon as `byteCount` bytes are produced.
+    /// Returns the prefix (fewer bytes when the entry itself is shorter),
+    /// or nil when the data is damaged or cut short, or a read fails.
+    /// Same loop as `inflate(_:from:to:)`, with a memory sink and an early
+    /// exit; the result is truncated to exactly `byteCount` bytes.
+    private static func inflatePrefix(_ count: Int, from input: FileHandle, upTo byteCount: Int) -> Data? {
+        let chunkSize = 1 << 20
+        let stream = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
+        defer { stream.deallocate() }
+        guard compression_stream_init(stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB)
+                == COMPRESSION_STATUS_OK else { return nil }
+        defer { compression_stream_destroy(stream) }
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: chunkSize)
+        defer { buffer.deallocate() }
+
+        var out = Data()
+        var left = count
+        while left > 0 {
+            // True at the end of the stream, false once a chunk is used up.
+            let ended: Bool? = autoreleasepool {
+                guard let chunk = try? input.read(upToCount: min(left, chunkSize)), !chunk.isEmpty
+                else { return nil }
+                left -= chunk.count
+                let flags = left == 0 ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0
+                return chunk.withUnsafeBytes { raw -> Bool? in
+                    stream.pointee.src_ptr = raw.bindMemory(to: UInt8.self).baseAddress!
+                    stream.pointee.src_size = raw.count
+                    var idle = 0
+                    while true {
+                        stream.pointee.dst_ptr = buffer
+                        stream.pointee.dst_size = chunkSize
+                        let status = compression_stream_process(stream, flags)
+                        let produced = chunkSize - stream.pointee.dst_size
+                        if produced > 0 {
+                            out.append(buffer, count: produced)
+                            if out.count >= byteCount { return true }
+                        }
+                        switch status {
+                        case COMPRESSION_STATUS_END:
+                            return true
+                        case COMPRESSION_STATUS_OK:
+                            // Input used up with room to spare: the next chunk.
+                            // Finishing, there's none, and it still holds output,
+                            // so it's called until the end unless it stops moving.
+                            guard stream.pointee.src_size == 0, stream.pointee.dst_size > 0 else { continue }
+                            if flags == 0 { return false }
+                            idle = produced == 0 ? idle + 1 : 0
+                            if idle == 3 { return nil }
+                        default:
+                            return nil
+                        }
+                    }
+                }
+            }
+            guard let ended else { return nil }
+            if ended {
+                if out.count > byteCount { out.removeLast(out.count - byteCount) }
+                return out
+            }
         }
         return nil          // the zip ended before the stream did
     }

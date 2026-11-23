@@ -1707,7 +1707,7 @@ struct EnterpriseCertView: View {
         // A-4：记下当前文件的指纹——签时文件没变且预检已算出就复用。
         selectedUndumpedFingerprint = IPALibrary.fileFingerprint(of: url)
         Task.detached(priority: .userInitiated) {
-            let undumped = IPADecryptionCheck.undumpedApps(of: url)
+            let undumped = IPADecryptionCheck.undumpedAppsFast(of: url) ?? IPADecryptionCheck.undumpedApps(of: url)
             await MainActor.run {
                 if self.selectedIPA == url {
                     self.selectedCryptid = undumped.map { $0.isEmpty ? 0 : 1 }
@@ -1790,7 +1790,7 @@ struct EnterpriseCertView: View {
                 else { return nil }
                 return self.selectedUndumpedApps
             }
-            let undumped = reusedUndumped ?? IPADecryptionCheck.undumpedApps(of: url)
+            let undumped = reusedUndumped ?? IPADecryptionCheck.undumpedAppsFast(of: url) ?? IPADecryptionCheck.undumpedApps(of: url)
             await MainActor.run {
                 if self.selectedIPA == url, let fresh {
                     self.selectedInfo = fresh

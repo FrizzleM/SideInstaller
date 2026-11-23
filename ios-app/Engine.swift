@@ -811,6 +811,9 @@ final class Engine {
                 for s in Step.allCases { stepStates[s] = .pending }
                 installProgress = 0
                 downloadProgress = 0
+                deviceSummary = nil
+                deviceUDID = nil
+                deviceName = nil
                 setGuide(nil)
             } catch {
                 let msg = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
@@ -1929,7 +1932,7 @@ final class Engine {
     @MainActor
     func importCustomIPA(from url: URL) async -> Bool {
         guard !isImportingIPA else {
-            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            lastError = L("An import is already running. Wait for it to finish, then try again.")
             log("⛔️ Import: \(lastError ?? "")")
             // N3(C)：defer 还没装上，竞态撞进来的这份 picker 拷贝不会被删，
             // 在这里显式删掉，不然整只 IPA 留在 tmp 里。
@@ -1972,7 +1975,7 @@ final class Engine {
     @MainActor
     func importCustomIPA(fromLink text: String) async -> Bool {
         guard !isImportingIPA else {
-            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            lastError = L("An import is already running. Wait for it to finish, then try again.")
             log("⛔️ Import: \(lastError ?? "")")
             return false
         }

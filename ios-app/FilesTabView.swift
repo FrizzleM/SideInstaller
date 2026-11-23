@@ -327,8 +327,14 @@ struct FilesTabView: View {
         fileIPAInfoTried.insert(key)
         // 显式捕获（loadFileIcon 同例）：不把整个 item 隐式带进
         // detached 任务，免得 Swift 6 并发检查找麻烦。
-        Task.detached(priority: .userInitiated) { [url = item.url, path = item.url.path] in
+        Task.detached(priority: .userInitiated) { [url = item.url, path = item.url.path,
+                         size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
             guard let info = IPALibrary.appInfo(at: url) else { return }
+            // B31-1（ECV 同款核对）：解析途中文件被替换就丢掉旧信息。
+            let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+            let liveSize = attrs?[.size] as? Int
+            let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+            guard liveSize == size, liveModified == modified else { return }
             await MainActor.run { self.fileIPAInfo[path] = info }
         }
     }
@@ -1326,9 +1332,15 @@ struct FilesTabView: View {
         let key = fileIconKey(item)
         guard !fileIconsTried.contains(key) else { return }
         fileIconsTried.insert(key)
-        Task.detached { [url = item.url, id = item.id] in
+        Task.detached { [url = item.url, id = item.id, path = item.url.path,
+                         size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
             guard let data = IPALibrary.iconData(at: url),
                   let image = UIImage(data: data) else { return }
+            // B31-1（ECV 同款核对）：解包途中文件被替换就丢掉旧图。
+            let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+            let liveSize = attrs?[.size] as? Int
+            let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+            guard liveSize == size, liveModified == modified else { return }
             await MainActor.run { fileIcons[id] = image }
         }
     }
@@ -2078,7 +2090,7 @@ struct FilesTabView: View {
             for url in urls {
                 // 按 IPA 粒度判定：包里任一 .app 未脱壳即该 IPA
                 // 未脱壳（见 SS2），不再只看第一个 .app。
-                if let undumped = IPADecryptionCheck.undumpedApps(of: url), !undumped.isEmpty {
+                if let undumped = IPADecryptionCheck.undumpedAppsFast(of: url) ?? IPADecryptionCheck.undumpedApps(of: url), !undumped.isEmpty {
                     undumpedURLs.append(url)
                 }
             }

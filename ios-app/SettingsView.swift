@@ -189,8 +189,6 @@ struct SettingsView: View {
                     }
                 }
             }
-        } header: {
-            Text(L("企业证书"))
         }
     }
 

@@ -15,8 +15,8 @@ let vietnameseStrings: [String: String] = [
     "Password": "Mật khẩu",
     "Install": "Cài ứng dụng",
     // U-UI (0.9.102): new tab bar / source + file list redesign.
-    "源": "Nguồn",
-    "应用": "Ứng dụng",
+    "Apps": "Ứng dụng",
+    "Sources": "Nguồn",
     "AppStore": "AppStore",
     "软件源": "Nguồn phần mềm",
     "文件列表": "Danh sách tệp",
@@ -26,14 +26,10 @@ let vietnameseStrings: [String: String] = [
     "应用文件夹库": "Thư viện thư mục ứng dụng",
     "应用 - %@": "Ứng dụng - %@",
     "No downloaded IPAs. Ones you install from a source or a file are cached here.": "Chưa có IPA nào được tải xuống. Các IPA cài từ nguồn hoặc tệp sẽ được lưu đệm tại đây.",
-    "“%@” (%@) will be removed. You can download it again any time from the Downloads tab.": "“%@” (%@) sẽ bị xóa. Bạn có thể tải lại bất cứ lúc nào từ tab Tải xuống.",
     "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "Chưa có tệp nào. Nhấn «Nhập tệp» ở trên để thêm IPA, hoặc tải xuống từ trang nguồn.",
     "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "Thư viện chưa có IPA nào chưa ký. Hãy nhập một IPA từ trang Tệp, hoặc nhấn «Nhập từ tệp» trên trang chứng chỉ doanh nghiệp trong Cài đặt.",
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Trước tiên, hãy chuẩn bị chứng chỉ, hồ sơ và mật khẩu trên trang chứng chỉ doanh nghiệp trong Cài đặt.",
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "Chưa có IPA nào đã ký. Hãy ký một IPA bằng «Chỉ ký» trên trang chứng chỉ doanh nghiệp trong Cài đặt: nó sẽ được lưu tại đây, sẵn sàng cài đặt và chia sẻ.",
-    "%@ is an address this iPhone already holds. Side by Side installs onto someone else's iPhone, so use theirs. To install on this one, use the install screen.": "“%@” là địa chỉ mà iPhone này đã có. Side by Side cài lên iPhone của người khác, vì vậy hãy dùng địa chỉ của họ. Để cài lên máy này, hãy dùng màn hình cài đặt.",
-    "The iPhone that paired was this one. Pair from their iPhone's Settings instead. To install on this iPhone, use the install screen.": "iPhone đã ghép nối chính là máy này. Hãy ghép nối từ phần Cài đặt trên iPhone của họ. Để cài lên máy này, hãy dùng màn hình cài đặt.",
-    "SideInstaller is already waiting for an iPhone to pair with it, from the install screen, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again.": "SideInstaller đã đang chờ một iPhone để ghép nối, từ màn hình cài đặt, trang Ghép nối hoặc một lần thử trước đó. Hãy hoàn tất lần ghép nối đó, hoặc đóng rồi mở lại SideInstaller rồi thử lại.",
     "Installing": "Đang cài đặt",
     "Cancelling": "Đang hủy",
     "Installed": "Đã cài đặt",
@@ -78,8 +74,6 @@ let vietnameseStrings: [String: String] = [
     "Remove": "Xóa",
     "No Apple ID saved yet. Add one and SideInstaller will use it for every sign-in.":
         "Chưa lưu Apple ID nào. Thêm một tài khoản và SideInstaller sẽ dùng nó cho mọi lần đăng nhập.",
-    "Saved in this iPhone's keychain, and sent only to Apple when signing in. Swipe a row to edit its password or remove it.":
-        "Được lưu trong keychain của iPhone này và chỉ gửi cho Apple khi đăng nhập. Vuốt một hàng để sửa mật khẩu hoặc xóa.",
     "Remove this Apple ID?": "Xóa Apple ID này?",
     "“%@” and its saved password will be deleted from this iPhone. Nothing changes on your Apple account.":
         "“%@” và mật khẩu đã lưu sẽ bị xóa khỏi iPhone này. Tài khoản Apple của bạn không thay đổi.",
@@ -104,7 +98,6 @@ let vietnameseStrings: [String: String] = [
     "Certificates": "Chứng chỉ",
     "Two-Factor Code": "Mã xác minh",
     "6-digit code": "Mã gồm 6 chữ số",
-    "Submit": "Gửi",
     "Enter the code Apple just sent to your trusted device.":
         "Nhập mã mà Apple vừa gửi đến thiết bị tin cậy của bạn.",
     "Enter the code Apple texted to %@.":
@@ -154,9 +147,6 @@ let vietnameseStrings: [String: String] = [
     "SideInstaller %@ is available — you're on %@.":
         "Đã có SideInstaller %@ — bạn đang dùng bản %@.",
     "Get the latest version": "Tải phiên bản mới nhất",
-    "From the website": "Từ trang web",
-    "Sign it with your Apple ID": "Ký bằng Apple ID của bạn",
-    "Install it in LiveContainer": "Cài vào LiveContainer",
     "Release": "Kênh",
     "Reinstall": "Cài đặt lại",
     "Install %@": "Cài đặt %@",
@@ -309,21 +299,8 @@ let vietnameseStrings: [String: String] = [
         "Chứng chỉ này không có số sê-ri nên không thể thu hồi.",
 
     // Export: the certificate SideInstaller signs with, as a .p12
-    "This certificate has no serial number, so it can't be exported.":
-        "Chứng chỉ này không có số sê-ri nên không thể xuất.",
-    "Only the certificate SideInstaller signs with can be exported: the private key of any other stays on the device that asked Apple for it.":
-        "Chỉ có thể xuất chứng chỉ mà SideInstaller dùng để ký: khóa riêng của mọi chứng chỉ khác nằm trên thiết bị đã yêu cầu nó từ Apple.",
-    "Couldn't export the certificate: %@": "Không thể xuất chứng chỉ: %@",
-    "Export certificate": "Xuất chứng chỉ",
     "Import to %@": "Nhập vào %@",
-    "Password (optional)": "Mật khẩu (không bắt buộc)",
-    "Export": "Xuất",
     "Exporting": "Đang xuất",
-    "Saves this certificate and its private key as a .p12 file, for another signing app or a computer to sign with. Choose a password, which you'll need to import the file, or leave it empty: signing apps import it without one, but a Mac won't. Keep the file to yourself.":
-        "Lưu chứng chỉ này và khóa riêng của nó thành tệp .p12, để một ứng dụng ký khác hoặc máy tính ký bằng nó. Hãy chọn mật khẩu (bạn sẽ cần nó để nhập tệp) hoặc để trống: các ứng dụng ký nhập được tệp không có mật khẩu, nhưng máy Mac thì không. Đừng đưa tệp cho ai.",
-    "SideInstaller can export only the certificate it signs with, and none of these is it: a certificate's private key stays on the device that asked Apple for it.":
-        "SideInstaller chỉ có thể xuất chứng chỉ mà nó dùng để ký, và không chứng chỉ nào ở đây là nó: khóa riêng của một chứng chỉ nằm trên thiết bị đã yêu cầu nó từ Apple.",
-    "SideInstaller signs with this one": "SideInstaller ký bằng chứng chỉ này",
 
     // MARK: - SideStore's certificate (sidestore://certificate)
 
@@ -479,8 +456,6 @@ let vietnameseStrings: [String: String] = [
     // Refresh all: signing the installed apps again.
     "iOS %@ isn't supported — SideInstaller needs iOS %@ or later.":
         "iOS %@ không được hỗ trợ — SideInstaller cần iOS %@ trở lên.",
-    "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Under Tools › Certificates, use SideStore's certificate or revoke that one, then refresh again.":
-        "Apple không cấp chứng chỉ ký cho Apple ID này: nó báo rằng đã có một chứng chỉ (lỗi 7460). Trong Công cụ › Chứng chỉ, hãy dùng chứng chỉ của SideStore hoặc thu hồi chứng chỉ đó, rồi gia hạn lại.",
     "An install is already running. Wait for it to finish, then refresh.":
         "Đang có một lượt cài đặt chạy. Hãy đợi xong rồi gia hạn.",
     "A refresh is already running. Wait for it to finish, then try again.":
@@ -523,18 +498,12 @@ let vietnameseStrings: [String: String] = [
     "Getting ready": "Đang chuẩn bị",
     "Stopping after this app": "Sẽ dừng sau ứng dụng này",
     "Refreshing %@": "Đang gia hạn %@",
-    "Signed by team %@, not the one you're signed in as — refreshing it here would install a second copy.":
-        "Được ký bởi nhóm %@, không phải nhóm bạn đang đăng nhập — gia hạn ở đây sẽ cài thêm một bản thứ hai.",
     "Refreshed. Its seven days start again now.":
         "Đã gia hạn. Bảy ngày bắt đầu lại từ bây giờ.",
     "Nothing was refreshed.": "Không có ứng dụng nào được gia hạn.",
     "Refreshed %d of %d apps.": "Đã gia hạn %d trong %d ứng dụng.",
     "Refresh all apps?": "Gia hạn tất cả ứng dụng?",
     "Refresh all": "Gia hạn tất cả",
-    "%@ will be signed again with your Apple ID and installed over the copy on this device. It keeps its data, and its seven days start over.":
-        "%@ sẽ được ký lại bằng Apple ID của bạn và cài đè lên bản đang có trên thiết bị này. Ứng dụng giữ nguyên dữ liệu, và bảy ngày bắt đầu lại.",
-    "%d apps will be signed again with your Apple ID and installed over the copies on this device. They keep their data, and their seven days start over.":
-        "%d ứng dụng sẽ được ký lại bằng Apple ID của bạn và cài đè lên các bản đang có trên thiết bị này. Chúng giữ nguyên dữ liệu, và bảy ngày bắt đầu lại.",
     "%d app can be signed again from an IPA already on this iPhone.":
         "%d ứng dụng có thể được ký lại từ một tệp IPA đã có trên iPhone này.",
     "%d apps can be signed again from IPAs already on this iPhone.":
@@ -717,27 +686,16 @@ let vietnameseStrings: [String: String] = [
     "When on, operations that need the tunnel try the built-in tunnel first and start LocalDevVPN when needed. When off, LocalDevVPN is never started automatically; the built-in tunnel still starts on demand, and the manual pill switch is unaffected.":
         "Khi bật, các thao tác cần đường hầm sẽ thử đường hầm tích hợp trước rồi khởi động LocalDevVPN khi cần. Khi tắt, LocalDevVPN không bao giờ tự khởi động; đường hầm tích hợp vẫn khởi động khi cần, và công tắc pill thủ công không bị ảnh hưởng.",
 
-    "Downloaded IPAs": "Tệp IPA đã tải",
-    "%@ used": "Đã dùng %@",
     "imported": "đã nhập",
-    "No downloaded IPAs. Ones you install from the Install tab are cached here.":
-        "Chưa có tệp IPA nào được tải. Những tệp bạn cài từ tab Cài ứng dụng sẽ được lưu ở đây.",
     "Downloaded %@": "Đã tải vào %@",
     "Added %@": "Đã thêm %@",
-    "Delete this download?": "Xóa bản tải này?",
     "Delete": "Xóa",
-    "“%@” (%@) will be removed. You can download it again any time from the Install tab.":
-        "“%@” (%@) sẽ bị xóa. Bạn có thể tải lại bất cứ lúc nào từ tab Cài ứng dụng.",
     "Couldn't delete %@: %@": "Không thể xóa %@: %@",
     "Server": "Máy chủ",
     "Custom…": "Tùy chỉnh…",
     "Server URL": "URL máy chủ",
     "Anisette Server": "Máy chủ Anisette",
     "Starts with %@": "Bắt đầu với %@",
-    "Auto starts with the server that signed in last, then tries the others, the ones most likely to work first.":
-        "Chế độ Tự động bắt đầu với máy chủ đã đăng nhập thành công gần nhất, sau đó thử các máy chủ khác, ưu tiên những máy chủ có khả năng hoạt động cao nhất.",
-    "Only this server is tried. If it fails, so does sign-in: choose Auto to have SideInstaller try the others.":
-        "Chỉ máy chủ này được thử. Nếu nó lỗi, đăng nhập cũng thất bại: chọn Tự động để SideInstaller thử các máy chủ khác.",
     "Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.":
         "Chỉ máy chủ đã chọn trong Cài đặt › Máy chủ Anisette được thử. Chọn Tự động ở đó để SideInstaller thử các máy chủ khác khi một máy chủ lỗi.",
     "Device IP": "IP thiết bị",
@@ -753,8 +711,6 @@ let vietnameseStrings: [String: String] = [
     "Show Developer Mode in Settings": "Hiện Chế độ nhà phát triển trong Cài đặt",
     "Turn on Developer Mode": "Bật Chế độ nhà phát triển",
     "Asking this iPhone…": "Đang hỏi iPhone này…",
-    "Both need a link to this iPhone that already works: LocalDevVPN plus a pairing file, such as one imported on iOS 17.4 to 26. On iOS 27 the link itself needs Developer Mode, so they can't bring back a missing option there.":
-        "Cả hai đều cần một kết nối tới iPhone này đã hoạt động sẵn: LocalDevVPN cùng một tệp ghép nối, chẳng hạn tệp được nhập trên iOS 17.4 đến 26. Trên iOS 27, chính kết nối đó cần Chế độ nhà phát triển, nên chúng không thể khôi phục tùy chọn đã biến mất.",
     "Turn on Developer Mode?": "Bật Chế độ nhà phát triển?",
     "Turn On and Restart": "Bật và khởi động lại",
     "This iPhone restarts right away. Once you unlock it, tap Turn On in the alert that appears. iOS allows this only while the iPhone has no passcode.":
@@ -766,6 +722,7 @@ let vietnameseStrings: [String: String] = [
         "Chế độ nhà phát triển sẽ được bật và iPhone này khởi động lại ngay bây giờ. Sau khi mở khóa, hãy chạm Bật.",
     "An install is already running. Wait for it to finish, then try again.":
         "Đang có một lượt cài đặt chạy. Hãy đợi xong rồi thử lại.",
+    "An import is already running. Wait for it to finish, then try again.": "An import is already running. Wait for it to finish, then try again.",
     "iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead.":
         "iOS chỉ bật Chế độ nhà phát triển từ đây khi iPhone này không có mật mã. Hãy chạm “Hiện Chế độ nhà phát triển trong Cài đặt” rồi bật nó ở đó.",
     "This iPhone didn't take the Developer Mode request: %@":
@@ -995,8 +952,6 @@ let vietnameseStrings: [String: String] = [
     "Open Apple Account":
         "Mở Apple Account",
     "No App IDs left this week": "Đã hết App ID trong tuần này",
-    "Every app SideInstaller signs needs an App ID, which its extensions share. A free Apple ID can register 10 a week, and each one counts for 7 days.":
-        "Mỗi ứng dụng mà SideInstaller ký đều cần một App ID, và các tiện ích mở rộng của nó dùng chung App ID đó. Apple ID miễn phí chỉ đăng ký được 10 App ID mỗi tuần, và mỗi App ID được tính trong 7 ngày.",
     "They can't be deleted sooner. Wait until some expire, then tap Install again.":
         "Không thể xóa chúng sớm hơn. Hãy đợi một số hết hạn, rồi chạm vào Cài ứng dụng lần nữa.",
     "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
@@ -1019,18 +974,6 @@ let vietnameseStrings: [String: String] = [
     "Come back here, tap “Import pairing file”, and pick it. Everything after that works as it does on iOS %@.":
         "Quay lại đây, chạm “Nhập tệp ghép nối” và chọn tệp. Sau đó mọi thứ hoạt động giống như trên iOS %@.",
     "Get jitterbugpair": "Tải jitterbugpair",
-    "From iOS 26.4 on it has to be a remote pairing file: this iPhone hangs up on lockdown ones, like jitterbugpair's, when they come through LocalDevVPN.":
-        "Từ iOS 26.4, đó phải là tệp “Remote pairing”: iPhone này ngắt kết nối với các tệp lockdown, như tệp của jitterbugpair, khi chúng đi qua LocalDevVPN.",
-    "Get idevice_pair": "Tải idevice_pair",
-    "Make a remote pairing file": "Tạo một tệp “Remote pairing”",
-    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
-        "Tệp ghép nối bạn đã nhập là loại lockdown. Từ iOS 26.4, iPhone này ngắt kết nối với các tệp đó khi chúng đi qua LocalDevVPN, nên tệp này không kết nối được, và một tệp mới cùng loại cũng vậy.",
-    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
-        "Quay lại đây, chạm “Thay” trên thẻ “Tệp ghép nối” và chọn tệp đó.",
-    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
-        "Trên Mac, PC Windows hoặc Linux, mở idevice_pair, cắm iPhone này vào và chạm Tin cậy nếu được hỏi. Chọn iPhone này, chọn “Remote pairing”, bấm “Create” và giữ iPhone này ở trạng thái mở khóa cho đến khi xong.",
-    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
-        "Bấm “Save to file…” rồi gửi tệp sang iPhone này bằng AirDrop, iCloud Drive hoặc cáp. Tệp ghép nối xuất từ iLoader cũng dùng được.",
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
@@ -1079,16 +1022,12 @@ let vietnameseStrings: [String: String] = [
         "Đặt lại thành 10.7.0.1, giá trị mặc định. Trong LocalDevVPN đó là giá trị ở Cài đặt › Device IP — không phải địa chỉ trên màn hình chính, vốn là đầu của chính đường hầm.",
     "If you changed LocalDevVPN's addresses, copy its Device IP here — including the /32, if it shows one.":
         "Nếu bạn đã đổi địa chỉ của LocalDevVPN, hãy sao chép Device IP của nó vào đây — kể cả phần /32, nếu có hiển thị.",
-    "Device IP is %@, one of this iPhone's own addresses, and iOS won't let an app connect to those. In Settings › Advanced, set Device IP to the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default, not the “Connected to” address on its main screen.":
-        "IP thiết bị đang là %@, một trong các địa chỉ của chính iPhone này, và iOS không cho ứng dụng kết nối tới các địa chỉ đó. Trong Cài đặt › Nâng cao, hãy đặt IP thiết bị thành địa chỉ ở Cài đặt › Device IP của LocalDevVPN (mặc định là 10.7.0.1), không phải địa chỉ sau “Connected to” trên màn hình chính của nó.",
     "iOS refused the connection to %@ on this iPhone, before anything was sent. It does that for this iPhone's own addresses, like the “Connected to” address on LocalDevVPN's main screen. Device IP, in Settings › Advanced, has to be the address under LocalDevVPN's Settings › Device IP: 10.7.0.1 by default. If it already is, turn LocalDevVPN off and on again, then try again.":
         "iOS đã từ chối kết nối tới %@ ngay trên iPhone này, trước khi bất cứ thứ gì được gửi đi. iOS làm vậy với các địa chỉ của chính iPhone này, như địa chỉ sau “Connected to” trên màn hình chính của LocalDevVPN. IP thiết bị, trong Cài đặt › Nâng cao, phải là địa chỉ ở Cài đặt › Device IP của LocalDevVPN (mặc định là 10.7.0.1). Nếu đã đúng như vậy, hãy tắt rồi bật lại LocalDevVPN, sau đó thử lại.",
     "This iPhone hung up on the connection as soon as it opened. From iOS 26.4 on it does that to lockdown pairing files, like this one, when they come through LocalDevVPN. Pair this iPhone with itself instead: tap “Regenerate” under Tools › Pairing, or tap Install, which pairs it first.":
         "iPhone này đã ngắt kết nối ngay khi nó vừa mở. Từ iOS 26.4, nó làm vậy với các tệp ghép nối lockdown, như tệp này, khi chúng đi qua LocalDevVPN. Thay vào đó, hãy ghép nối iPhone này với chính nó: chạm “Tạo lại” trong Công cụ › Ghép nối, hoặc chạm Cài ứng dụng, thao tác này sẽ ghép nối trước.",
     "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
         "iPhone này đã ngắt kết nối ngay khi nó vừa mở. Từ iOS 26.4, nó làm vậy với các tệp ghép nối lockdown, như tệp này, khi chúng đi qua LocalDevVPN, nên tạo một tệp mới cùng loại cũng không giúp được gì. Tệp ghép nối “Remote pairing” vẫn dùng được: trên máy tính, mở idevice_pair, chọn “Remote pairing”, bấm “Create”, rồi “Save to file…”, và nhập tệp đó trong “Tệp ghép nối”.",
-    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
-        "iPhone này đã ngắt kết nối: từ iOS 26.4, nó làm vậy với các tệp ghép nối lockdown như tệp này khi chúng đi qua LocalDevVPN. Xem các bước ở trên.",
     "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
         "Việc ghép nối iPhone này cần đến nó: SideInstaller quảng bá chính mình trên mạng nội bộ để Cài đặt tìm thấy.",
     "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
@@ -1142,10 +1081,6 @@ let vietnameseStrings: [String: String] = [
     "The developer disk image location spoofing mounts. Mirrored by doronz88.":
         "Ảnh đĩa nhà phát triển mà chức năng giả lập vị trí gắn kết. Được doronz88 lưu bản sao.",
 
-    "Where to get it": "Nơi tải ứng dụng",
-    "Only the builds on the official install page and repository are mine. Anyone can fork the source, add a credential stealer and ship it under the same name and icon — so don't trust your Apple ID to a copy from anywhere else.":
-        "Chỉ những bản dựng trên trang cài đặt và kho mã chính thức mới là của tôi. Bất kỳ ai cũng có thể fork mã nguồn, thêm mã đánh cắp thông tin đăng nhập rồi phát hành với cùng tên và biểu tượng — vì vậy đừng giao Apple ID của bạn cho một bản sao lấy từ nơi khác.",
-    "Install page": "Trang cài đặt",
     "Terms": "Điều khoản",
 
     // MARK: - Madeira
@@ -1373,7 +1308,6 @@ let vietnameseStrings: [String: String] = [
     "Add": "Thêm",
     "Add Source": "Thêm nguồn",
     "Anyone on your LAN can access it without a password. Turn it off when done.": "Bất kỳ ai trong mạng LAN đều có thể truy cập mà không cần mật khẩu. Hãy tắt khi dùng xong.",
-    "App Sources": "Nguồn ứng dụng",
     "Appearance": "Giao diện",
     "Apple ID sign-in failed on %@. Last error: %@": "Đăng nhập Apple ID trên %@ không thành công. Lỗi cuối cùng: %@",
     "Apple won't issue a signing certificate for this Apple ID: it reports that one already exists (error 7460). Revoke it under Tools › Certificates, then refresh again.": "Apple sẽ không cấp chứng chỉ ký cho Apple ID này: hệ thống báo đã tồn tại một chứng chỉ (lỗi 7460). Hãy thu hồi nó trong Công cụ › Chứng chỉ, rồi làm mới lại.",

@@ -1371,11 +1371,15 @@ struct AppsView: View {
         }
     }
 
-    /// 行图标取图键：已装包名 + 配对 IPA 路径——可续签列表变了（刚
-    /// 读完设备、或导入新 IPA）就重取。
+    /// 行图标取图键：已装包名 + 配对 IPA 路径 + 大小 + 修改时间——
+    /// 可续签列表变了（刚读完设备、或导入新 IPA）或同路径文件被替换
+    /// 就重取。
     private func rowIconKey(for status: SideloadedAppStatus) -> String {
-        let ipa = manager.refreshable.first { $0.bundleID == status.app.bundleID }?.ipa.path ?? ""
-        return "\(status.app.bundleID)#\(ipa)"
+        let ipa = manager.refreshable.first { $0.bundleID == status.app.bundleID }?.ipa
+        let attrs = ipa.flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path) }
+        let size = attrs?[.size] as? Int ?? 0
+        let modified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        return "\(status.app.bundleID)#\(ipa?.path ?? "")#\(size)#\(modified)"
     }
 
     /// 行图标：配对 IPA 的真图放后台取，取到写缓存；没配对 IPA、
@@ -1386,9 +1390,17 @@ struct AppsView: View {
         rowIconsTried.insert(key)
         guard let ipa = manager.refreshable.first(where: { $0.bundleID == status.app.bundleID })?.ipa else { return }
         let bundleID = status.app.bundleID
-        Task.detached { [ipa, bundleID] in
+        let attrs = try? FileManager.default.attributesOfItem(atPath: ipa.path)
+        let size = attrs?[.size] as? Int
+        let modified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        Task.detached { [ipa, bundleID, path = ipa.path, size, modified] in
             guard let data = IPALibrary.iconData(at: ipa),
                   let image = UIImage(data: data) else { return }
+            // B31-1（ECV 同款核对）：解包途中文件被替换就丢掉旧图。
+            let liveAttrs = try? FileManager.default.attributesOfItem(atPath: path)
+            let liveSize = liveAttrs?[.size] as? Int
+            let liveModified = (liveAttrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+            guard liveSize == size, liveModified == modified else { return }
             await MainActor.run { rowIcons[bundleID] = image }
         }
     }
