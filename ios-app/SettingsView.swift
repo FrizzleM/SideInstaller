@@ -453,7 +453,7 @@ struct SettingsView: View {
                     .autocorrectionDisabled()
                     .keyboardType(.numbersAndPunctuation)
                     .multilineTextAlignment(.trailing)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .onSubmit {
                         // 写坏了就回默认，别把非法地址存进隧道配置。
                         let trimmed = builtinTunnelIfaceIP
@@ -475,7 +475,7 @@ struct SettingsView: View {
                     .autocorrectionDisabled()
                     .keyboardType(.numbersAndPunctuation)
                     .multilineTextAlignment(.trailing)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .onSubmit { validateDeviceIP() }
             }
         } header: {
@@ -666,7 +666,7 @@ struct SettingsView: View {
                     .autocorrectionDisabled()
                     .keyboardType(.numbersAndPunctuation)
                     .multilineTextAlignment(.trailing)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .onSubmit { validateDeviceIP() }
             }
         } header: {

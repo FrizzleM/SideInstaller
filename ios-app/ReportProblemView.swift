@@ -143,7 +143,7 @@ struct ReportProblemView: View {
                 Text(L("No crash logs from SideStore, LiveContainer or Madeira in the last %d days.",
                        DeviceCrashLog.maxAgeDays))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
         } header: {
             Text(L("Crash logs"))

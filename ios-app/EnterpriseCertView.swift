@@ -470,7 +470,7 @@ struct EnterpriseCertView: View {
                     .buttonStyle(.bordered)
                     Text(L("证书库一次选 .p12 和描述文件两个，配不上会报错；单导 p12 走上面那个按钮。"))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
             }
             // 导出给 LiveContainer：只发 .p12 文件和描述文件本身，
@@ -494,7 +494,7 @@ struct EnterpriseCertView: View {
                         .font(.footnote)
                         Text(L("导出后可在 LiveContainer 里导入同一张证书，不用再找原文件；密码不一起导出，导入时再填一次。"))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -502,7 +502,7 @@ struct EnterpriseCertView: View {
             if certReady {
                 Text(L("企业证书装完后，首次打开 App 前要去「设置 → 通用 → VPN 与设备管理」信任这张证书。"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             signGroup(title: L("证书密码")) {
@@ -774,7 +774,7 @@ struct EnterpriseCertView: View {
                              ? L("签出来的包装上去也是闪退。先换一张没过期的描述文件，重新导入。")
                              : L("到期日 %@%@，请及时重新导入。", expiration.formatted(date: .abbreviated, time: .omitted), remainingText(expiration)))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -793,7 +793,7 @@ struct EnterpriseCertView: View {
                              ? L("签出来的包装上去也是闪退。先换一张没过期的证书，重新导入。")
                              : L("到期日 %@%@，请及时重新导入。", expiration.formatted(date: .abbreviated, time: .omitted), remainingText(expiration)))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -1161,7 +1161,7 @@ struct EnterpriseCertView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(L("选一个 IPA，可以先改名称、Bundle ID、版本、最低系统版本和图标，再用企业证书签名。"))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                         HStack(spacing: 10) {
                             Button {
                                 showIPAPicker = true
@@ -1251,11 +1251,11 @@ struct EnterpriseCertView: View {
             if multiCount > 1 {
                 Text(L("会签出 %d 个副本（Bundle ID 加 .序号区分），多开只对「仅签名」生效；开着「签名后立即安装」时「开始签名」仍只签 1 个。", multiCount))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             } else {
                 Text(L("可选：一次签出多个副本，装到桌面上互不冲突。"))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             }
             // 非法输入以前静默按边界算（“abc”变 1、“99”变 20），
             // 用户不知道自己填错了：非空非法时橙字明说。正在

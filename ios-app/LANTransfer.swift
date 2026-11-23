@@ -201,6 +201,13 @@ final class LANTransferServer: ObservableObject {
                                            received: min(buf.count - bodyStart, head.contentLength))
                     return
                 }
+                // 非流式上传：body 超 1MB 直接 400，不攒 buf。
+                // 合法非流式 body 在此服务上不存在（只有 POST /upload 收 body，
+                // 且有 boundary 的已走流式路）；未知路由的大 body 同样是垃圾请求。
+                if head.contentLength > (1 << 20) {
+                    sendText(connection, status: "400 Bad Request", text: L("Couldn't parse the upload"))
+                    return
+                }
                 if let request = Self.parse(buf) {
                     self.respond(connection, request: request)
                 } else if isComplete || error != nil || buf.count > (256 << 20) {
@@ -278,7 +285,7 @@ final class LANTransferServer: ObservableObject {
     /// 没有或为空就是非法上传。
     private static func uploadBoundary(contentType: String?) -> String? {
         guard let contentType,
-              let boundaryRange = contentType.range(of: "boundary=") else { return nil }
+              let boundaryRange = contentType.range(of: "boundary=", options: .caseInsensitive) else { return nil }
         let boundary = String(contentType[boundaryRange.upperBound...])
             .trimmingCharacters(in: CharacterSet(charactersIn: "\" "))
         return boundary.isEmpty ? nil : boundary

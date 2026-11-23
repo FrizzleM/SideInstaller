@@ -1091,7 +1091,7 @@ struct FilesTabView: View {
                 }
                 Text(L("这里是 App 自己的文件目录：下载的、导入的、已签名的 IPA 都在这。也可以在「文件」App 里往 SideInstaller 的目录放文件，回到这里就能看到。"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 Button {
                     showImporter = true
                 } label: {
@@ -1134,7 +1134,7 @@ struct FilesTabView: View {
             if lanServer.isRunning {
                 Text(L("电脑和手机连同一个 Wi-Fi，浏览器打开这个地址就能上传、下载、删除这里的文件："))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 Button {
                     UIPasteboard.general.string = lanServer.addressText
                     withAnimation { lanCopied = true }
@@ -1167,7 +1167,7 @@ struct FilesTabView: View {
             } else {
                 Text(L("开启后，同一 Wi-Fi 下的电脑打开网页就能往这里传文件，不用数据线。关掉就停，只在本机开着时有效。"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 Button {
                     lanServer.start()
                 } label: {
@@ -1187,7 +1187,7 @@ struct FilesTabView: View {
         PanelCard {
             Text(L("还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。"))
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
         }
     }
 
@@ -1902,7 +1902,7 @@ struct FilesTabView: View {
                      ? L("文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。")
                      : L("没有匹配的 IPA。"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             } else {
                 if batchingUnsigned {
                     HStack(spacing: 12) {
@@ -2167,7 +2167,7 @@ struct FilesTabView: View {
             if logEntries.isEmpty {
                 Text(L("还没有签名记录。签一次就会记一条，成功失败都有。"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             } else {
                 HStack(spacing: 12) {
                     Text(L("共 %d 条", logEntries.count))
@@ -2389,7 +2389,7 @@ struct FilesTabView: View {
             if signedRecords.isEmpty {
                 Text(L("还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
             } else if filteredSigned.isEmpty {
                 Text(L("没有匹配的已签名 IPA。"))
                     .font(.footnote)

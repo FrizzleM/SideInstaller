@@ -1037,9 +1037,12 @@ enum SideStoreDownloader {
                     try FileManager.default.moveItem(at: file, to: dest)
                     cont.resume(returning: dest)
                 } catch let urlError as URLError {
+                    // N3(C)：失败路只 resume、不删 staging，会留空 ipa-link-* 目录。
+                    try? FileManager.default.removeItem(at: staging)
                     cont.resume(throwing: urlError.code == .cancelled
                                 ? CancellationError() : DownloadError.unreachable(urlError))
                 } catch {
+                    try? FileManager.default.removeItem(at: staging)
                     cont.resume(throwing: error)
                 }
             }

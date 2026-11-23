@@ -1003,7 +1003,7 @@ struct LocationView: View {
                     .foregroundStyle(Theme.negative)
                 Text(L("Connect LocalDevVPN. Spoofing runs over its tunnel, like everything else here."))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -1257,7 +1257,7 @@ struct LocationView: View {
         if manager.stops.isEmpty {
             Text(L("Move the map so the pin is on a place, then tap Add stop. Add as many as you like: the route goes to each in order."))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
         } else {
             VStack(spacing: 2) {
@@ -1467,7 +1467,7 @@ struct LocationView: View {
                 if manager.savedPlaces.isEmpty {
                     Text(L("Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away."))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     VStack(spacing: 2) {
@@ -1551,7 +1551,7 @@ struct LocationView: View {
                 } else {
                     Text(L("Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point."))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     Button { showRouteImporter = true } label: {
                         HStack(spacing: 8) {

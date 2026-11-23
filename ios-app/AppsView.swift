@@ -1584,7 +1584,7 @@ private struct AppProfileDetail: View {
                         VStack(spacing: 4) {
                             Text(L("Certificate password:"))
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(Theme.muted)
                             Text(pwd)
                                 .font(.system(.body, design: .monospaced))
                                 .textSelection(.enabled)
@@ -1779,7 +1779,7 @@ private struct AppProfileDetail: View {
                     .font(.subheadline.weight(.medium))
                 Text(L("The device has no provisioning profile for this App ID. The app may already have stopped launching — install it again to fix that."))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

@@ -150,8 +150,15 @@ final class SourceStore: ObservableObject {
 
     /// Remove the sources at `offsets` (a list swipe) and save the list.
     func removeSource(at offsets: IndexSet) {
+        // N3(A)：删源时顺带清掉它的磁盘缓存条目，不然删掉的源还占着缓存。
+        let removed = offsets.map { sources[$0].url.absoluteString }
         sources.remove(atOffsets: offsets)
         persist()
+        var cached = Self.loadSourceCache()
+        for key in removed { cached.removeValue(forKey: key) }
+        if let data = try? JSONEncoder().encode(cached) {
+            try? data.write(to: Self.sourceCacheURL, options: .atomic)
+        }
     }
 
     /// Disk cache for source documents, in Engine's `releaseCatalogs.json`
@@ -174,6 +181,9 @@ final class SourceStore: ObservableObject {
     private static func saveSourceCache(url: URL, model: AltSource, fetched: Date = Date()) {
         var cached = loadSourceCache()
         cached[url.absoluteString] = CachedSource(model: model, fetched: fetched)
+        // N3(A)：顺带淘汰 15 分钟以上的条目（与 fetch 的 TTL 同数），
+        // 一次成功 fetch 即压缩全文件，不另起定时任务。
+        cached = cached.filter { Date().timeIntervalSince($0.value.fetched) < 15 * 60 }
         if let data = try? JSONEncoder().encode(cached) {
             try? data.write(to: sourceCacheURL, options: .atomic)
         }
@@ -353,6 +363,8 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
             try FileManager.default.moveItem(at: location, to: dest)
             Task { @MainActor in self.finish(.success(dest)) }
         } catch {
+            // N3(C)：建目录/移文件失败也会留一个空 ipa-source-* 目录，顺手删掉。
+            try? FileManager.default.removeItem(at: staging)
             Task { @MainActor in self.finish(.failure(error)) }
         }
     }

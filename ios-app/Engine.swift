@@ -1896,6 +1896,9 @@ final class Engine {
         guard !isImportingIPA else {
             lastError = L("An install is already running. Wait for it to finish, then try again.")
             log("⛔️ Import: \(lastError ?? "")")
+            // N3(C)：defer 还没装上，竞态撞进来的这份 picker 拷贝不会被删，
+            // 在这里显式删掉，不然整只 IPA 留在 tmp 里。
+            Self.discardInboxCopy(url)
             return false
         }
         isImportingIPA = true
@@ -2015,6 +2018,13 @@ final class Engine {
         let tmp = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path
         guard url.resolvingSymlinksInPath().path.hasPrefix(tmp + "/") else { return }
         try? FileManager.default.removeItem(at: url)
+        // N3(C)：源页下载的 IPA 住在 ipa-source-<UUID>/ 里，只删文件会留
+        // 一个空目录；顺手删掉空的父目录（前缀限定，配对导入等别的
+        // picker 拷贝不受影响；非空目录 removeItem 会抛错，try? 天然只删空的）。
+        let parent = url.deletingLastPathComponent()
+        if parent.lastPathComponent.hasPrefix("ipa-source-") {
+            try? FileManager.default.removeItem(at: parent)
+        }
     }
 
     /// Copies a picked IPA into the custom import slot on a background queue.

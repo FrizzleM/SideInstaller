@@ -162,7 +162,7 @@ struct CertsView: View {
                     VStack(spacing: 4) {
                         Text(L("Certificate password:"))
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Theme.muted)
                         Text(pwd)
                             .font(.system(.body, design: .monospaced))
                             .textSelection(.enabled)

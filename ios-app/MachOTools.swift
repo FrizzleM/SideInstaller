@@ -101,7 +101,7 @@ struct MachOView: View {
                         Section {
                             Text(L("删掉或改名后，这个文件的签名会失效：拿去注入签名时会被重新签，没问题；直接当插件用的话要先重签。装进 App 的依赖一般别乱删，删了 App 可能打不开。"))
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.muted)
                         }
                     }
                 } else if let loadError {
@@ -111,7 +111,7 @@ struct MachOView: View {
                             .foregroundStyle(.secondary)
                         Text(loadError)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.muted)
                             .multilineTextAlignment(.center)
                     }
                     .padding(30)
