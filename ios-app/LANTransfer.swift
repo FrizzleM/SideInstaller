@@ -68,7 +68,7 @@ final class LANTransferServer: ObservableObject {
     private static func uploadBodyLimit() -> Int {
         let maxLimit: Int64 = 8 * 1024 * 1024 * 1024
         let reserve: Int64 = 1 * 1024 * 1024 * 1024
-        guard let attrs = try? FileManager.default.attributesOfFileSystemForPath(
+        guard let attrs = try? FileManager.default.attributesOfFileSystem(forPath:
                 FileManager.default.temporaryDirectory.path),
               let free = attrs[.systemFreeSize] as? NSNumber else {
             return Int(maxLimit)
