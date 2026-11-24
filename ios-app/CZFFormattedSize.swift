@@ -7,7 +7,6 @@ enum CZFFormattedSize {
     static let byteCount: ByteCountFormatter = {
         let f = ByteCountFormatter()
         f.countStyle = .file
-        f.locale = .autoupdatingCurrent
         return f
     }()
     static func size(_ bytes: Int) -> String {
