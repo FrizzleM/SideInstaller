@@ -1842,6 +1842,33 @@ private final class ReleaseTagRecorder: NSObject, URLSessionTaskDelegate {
 
 // MARK: - IPAs already on disk
 
+/// A-37-3：七只 UIImage 缩略图桶的共享后备——同一 IPA 在文件行/应用库/
+/// 证书页/应用页各解一份（120×120 约 57KB/张），50 只 IPA 近 14MB
+/// 且无驱逐。路径为键（各桶本来就按路径查；文件行 key 的 id 就是
+/// url.path），解码统一 120（各处最大需求），NSCache 按 cost 驱逐；
+/// 各页仍用自己的 tried 集防重取、iconEpoch 触发重绘。
+enum ThumbnailCache {
+    private static let cache: NSCache<NSString, UIImage> = {
+        let c = NSCache<NSString, UIImage>()
+        c.totalCostLimit = 24 * 1024 * 1024
+        c.name = "ThumbnailCache"
+        return c
+    }()
+
+    static func image(for path: String) -> UIImage? {
+        cache.object(forKey: path as NSString)
+    }
+
+    static func set(_ image: UIImage, for path: String) {
+        let cost = image.cgImage.map { $0.width * $0.height * 4 } ?? 0
+        cache.setObject(image, forKey: path as NSString, cost: cost)
+    }
+
+    static func remove(_ path: String) {
+        cache.removeObject(forKey: path as NSString)
+    }
+}
+
 /// IPAs in the app's Documents directory, whether downloaded, imported, or
 /// copied in with the Files app.
 enum IPALibrary {

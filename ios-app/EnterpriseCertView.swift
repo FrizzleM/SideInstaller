@@ -145,11 +145,12 @@ struct EnterpriseCertView: View {
     /// select() 是唯一的选中入口（库里点选、别页传过来都走它），
     /// 取消选中时一并清空，不会残留旧值。
     @State private var selectedInfo: IPALibrary.AppInfo?
-    /// 已选 IPA 行图标缓存（文件页应用库同款三件套的本页份，只服务 selectedIPASummary 这一行）。
-    @State private var unsignedIcons: [String: UIImage] = [:]
+    /// 已选 IPA 行图标已尝试集合（文件页应用库同款三件套的本页份，只服务
+    /// selectedIPASummary 这一行）。图标本体在共享 ThumbnailCache 里
+    /// （A-37-3），重绘由 iconEpoch 触发。
     @State private var unsignedIconsTried: Set<String> = []
-    @State private var signedIcons: [String: UIImage] = [:]
     @State private var signedIconsTried: Set<String> = []
+    @State private var iconEpoch = 0
     /// A-5(c)：已选 IPA 行图标的批量写回（loadLibraryIcon 同款，懒建）。
     @State private var librarySignedIconBatcher: BatchWriteback<String, UIImage>?
     @State private var libraryUnsignedIconBatcher: BatchWriteback<String, UIImage>?
@@ -1382,6 +1383,7 @@ struct EnterpriseCertView: View {
                         Button { applyPreset(preset) } label: {
                             Text(preset.name)
                                 .font(.footnote)
+                                .lineLimit(1)
                         }
                         Spacer()
                         Button { removePreset(preset) } label: {
@@ -1487,7 +1489,11 @@ struct EnterpriseCertView: View {
     /// 取不到时显示中性灰圆角方块（不是假 App 图，只占位）。
     @ViewBuilder
     private func libraryIcon(for path: String, signed: Bool) -> some View {
-        if let image = signed ? signedIcons[path] : unsignedIcons[path] {
+        // A-37-3：读 iconEpoch 建立依赖——图标本体在共享缓存里，
+        // 批量写回只 bump epoch、不写 @State；不读它，body 不会
+        // 重算，图就永远不出现。别把这行当死代码清掉。
+        let _ = iconEpoch
+        if let image = ThumbnailCache.image(for: path) {
             Image(uiImage: image)
                 .resizable()
                 .frame(width: 60, height: 60)
@@ -1502,25 +1508,34 @@ struct EnterpriseCertView: View {
     /// 行内图标加载（只取可见行，行 .task 触发）：key 已尝试直接跳过
     /// （含取失败，不重复解包）；文件变了 key 就变，先清旧图再取，
     /// 不让旧图标冒充新文件。解包只取图标文件，不整包解压。
-    private func loadLibraryIcon(for path: String, signed: Bool) {
-        let key = "\(path)#\(iconFingerprint(for: path))"
+    /// A-37-1：调用方有指纹快照时传 fingerprint（已选行传
+    /// selectedIPAFingerprint），不再主线程 stat 磁盘；没快照的
+    /// 调用方不传，走现查。
+    private func loadLibraryIcon(for path: String, signed: Bool, fingerprint: String? = nil) {
+        let key = "\(path)#\(fingerprint ?? iconFingerprint(for: path))"
         if signed {
             guard !signedIconsTried.contains(key) else { return }
             signedIconsTried.insert(key)
-            signedIcons[path] = nil
+            // A-37-3：清共享缓存里的旧图 + bump epoch（行回占位，等新图）。
+            ThumbnailCache.remove(path)
+            iconEpoch += 1
             // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
             if librarySignedIconBatcher == nil {
                 librarySignedIconBatcher = BatchWriteback { batch in
-                    for (path, image) in batch { self.signedIcons[path] = image }
+                    for (path, image) in batch { ThumbnailCache.set(image, for: path) }
+                    self.iconEpoch += 1
                 }
             }
         } else {
             guard !unsignedIconsTried.contains(key) else { return }
             unsignedIconsTried.insert(key)
-            unsignedIcons[path] = nil
+            // A-37-3：清共享缓存里的旧图 + bump epoch（行回占位，等新图）。
+            ThumbnailCache.remove(path)
+            iconEpoch += 1
             if libraryUnsignedIconBatcher == nil {
                 libraryUnsignedIconBatcher = BatchWriteback { batch in
-                    for (path, image) in batch { self.unsignedIcons[path] = image }
+                    for (path, image) in batch { ThumbnailCache.set(image, for: path) }
+                    self.iconEpoch += 1
                 }
             }
         }
@@ -1602,7 +1617,7 @@ struct EnterpriseCertView: View {
             }
         }
         .task(id: "\(url.path)#\(selectedIPAFingerprint)") {
-            loadLibraryIcon(for: url.path, signed: false)
+            loadLibraryIcon(for: url.path, signed: false, fingerprint: selectedIPAFingerprint)
         }
     }
 
@@ -1892,6 +1907,9 @@ struct EnterpriseCertView: View {
             return
         }
         workspace.signBusy = true
+        // B1：签名在跑时把源路径登记进 Engine，文件页/LAN/WebDAV 的删/
+        // 移/改名入口会拒掉这个源；两 Task 分支的收尾处注销。
+        engine.signingSourcePaths.insert(url.path)
         // 上次安装失败的旧错误在这里清掉：不然一次成功的仅签名
         // 仍在按钮下顶着旧安装错误（状态行优先级里错误排在签名
         // 结果前面），看着像这次又失败了。签名并安装路的安装错
@@ -1995,6 +2013,8 @@ struct EnterpriseCertView: View {
                         appName: selectedInfo?.name ?? url.deletingPathExtension().lastPathComponent,
                         kind: .signOnly, success: false, detail: friendly))
                 }
+                // B1：签名收尾，注销源路径（与入口登记配对）。
+                engine.signingSourcePaths.remove(url.path)
                 workspace.signBusy = false
             }
         case .signAndInstall:
@@ -2032,6 +2052,8 @@ struct EnterpriseCertView: View {
                         appName: selectedInfo?.name ?? url.deletingPathExtension().lastPathComponent,
                         kind: .signAndInstall, success: false, detail: friendly))
                 }
+                // B1：签名收尾，注销源路径（与入口登记配对）。
+                engine.signingSourcePaths.remove(url.path)
                 workspace.signBusy = false
             }
         }
@@ -2387,8 +2409,10 @@ private struct LibraryIPAPicker: View {
     var onPick: (URL) -> Void
 
     @State private var query = ""
-    @State private var icons: [String: UIImage] = [:]
+    /// 选择器行图标已试集合（键见 cacheKey）。图标本体在共享
+    /// ThumbnailCache 里（A-37-3），重绘由 iconEpoch 触发。
     @State private var iconsTried: Set<String> = []
+    @State private var iconEpoch = 0
     @State private var infos: [String: IPALibrary.AppInfo] = [:]
     @State private var infosTried: Set<String> = []
     /// A-5(c)：IPA 选择器行图标 / 信息的批量写回（loadIcon/loadInfo 同款，懒建）。
@@ -2479,8 +2503,12 @@ private struct LibraryIPAPicker: View {
     }
 
     private func pickerRow(_ item: LocalFileItem) -> some View {
+        // A-37-3：读 iconEpoch 建立依赖——图标本体在共享缓存里，
+        // 批量写回只 bump epoch、不写 @State；不读它，body 不会
+        // 重算，图就永远不出现。别把这行当死代码清掉。
+        let _ = iconEpoch
         HStack(spacing: 8) {
-            if let uiImage = icons[item.url.path] {
+            if let uiImage = ThumbnailCache.image(for: item.url.path) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
@@ -2522,14 +2550,18 @@ private struct LibraryIPAPicker: View {
         // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
         if pickerIconBatcher == nil {
             pickerIconBatcher = BatchWriteback { batch in
-                for (path, image) in batch { self.icons[path] = image }
+                // A-37-3：写共享缓存，再 bump iconEpoch 触发重绘。
+                for (path, image) in batch { ThumbnailCache.set(image, for: path) }
+                self.iconEpoch += 1
             }
         }
         Task.detached { [url = item.url, path = item.url.path,
                          size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
             guard let data = IPALibrary.iconData(at: url),
-                  // A-7：下采样在 detached 里做——选择器行高 52pt，用 104×104 缩略图。
-                  let image = IPALibrary.thumbnail(from: data, maxPixelSize: 104) else { return }
+                  // A-7：下采样在 detached 里做——选择器行高 52pt，原来用 104×104；
+                  // A-37-3：共享缓存按路径只存一份，各处取最大 120，行上显示
+                  // 时再缩到 52pt，不模糊。
+                  let image = IPALibrary.thumbnail(from: data, maxPixelSize: 120) else { return }
             // C30（B12-6 同款核对）：解包途中文件被替换就丢掉旧图。
             let attrs = try? FileManager.default.attributesOfItem(atPath: path)
             let liveSize = attrs?[.size] as? Int

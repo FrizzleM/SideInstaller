@@ -31,7 +31,6 @@ let spanishStrings: [String: String] = [
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Primero prepara el certificado, el perfil y la contraseña en el grupo de certificados de la página de certificados empresariales en Ajustes.",
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "Aún no hay IPA firmados. Firma uno con «Solo firmar» en la página de certificados empresariales en Ajustes: quedará aquí, listo para instalar y compartir.",
     "Installing": "Instalando",
-    "Cancelling": "Cancelando",
     "Installed": "Instalado",
     "Something went wrong": "Algo ha ido mal",
     "an app by Frizzle": "una app de Frizzle",

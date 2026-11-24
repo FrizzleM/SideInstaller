@@ -88,7 +88,8 @@ struct SettingsView: View {
                    isPresented: Binding(get: { pendingRemove != nil },
                                         set: { if !$0 { pendingRemove = nil } })) {
                 Button(L("Remove"), role: .destructive) {
-                    if let account = pendingRemove { accounts.remove(account) }
+                    // B6：安装进行中不删账号（同上，revision bump 会掉 session）。
+                    if let account = pendingRemove, !engine.isRunning { accounts.remove(account) }
                     pendingRemove = nil
                 }
                 Button(L("Cancel"), role: .cancel) { pendingRemove = nil }
@@ -161,9 +162,17 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(Theme.warning)
             }
+            // B6：安装进行中时切账号会掉登录 session（见本节注释），
+            // 整区禁用 + 一行说明，装完再切。
+            if engine.isRunning {
+                Text(L("An install is already running. Wait for it to finish, then try again."))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+            }
         } header: {
             Text(L("Account"))
         }
+        .disabled(engine.isRunning)
     }
     /// U-UI：企业证书区（签名段从原证书页搬到 EnterpriseCertView 后，
     /// 设置页只留这一行摘要 + 推入链接；证书本身的表单全在那一页）。

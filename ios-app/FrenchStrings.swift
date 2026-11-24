@@ -30,7 +30,6 @@ let frenchStrings: [String: String] = [
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Préparez d'abord le certificat, le profil et le mot de passe dans le groupe de certificats de la page des certificats d'entreprise dans Réglages.",
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "Aucun IPA signé pour l'instant. Signez-en un avec « Signer seulement » sur la page des certificats d'entreprise dans Réglages : il sera stocké ici, prêt à installer et à partager.",
     "Installing": "Installation en cours",
-    "Cancelling": "Annulation en cours",
     "Installed": "Installé",
     "Something went wrong": "Une erreur s'est produite",
     "an app by Frizzle": "une app de Frizzle",

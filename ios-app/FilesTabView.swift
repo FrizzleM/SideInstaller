@@ -111,10 +111,11 @@ struct FilesTabView: View {
     /// 文件页安装的传输不再走它的 install()，只用 appendStepLog
     /// 记配对安装开始/完成/失败，证书页的诊断日志里能看到。
     @ObservedObject private var localInstall = LocalHTTPInstallServer.shared
-    /// IPA 文件行图标缓存（路径 → 解码后的图标）与已试集合（键 =
-    /// 路径#大小#修改时间，文件换了就重取，不死循环重试）。
-    @State private var fileIcons: [String: UIImage] = [:]
+    /// IPA 文件行图标已试集合（键 = 路径#大小#修改时间，文件换了就重取，
+    /// 不死循环重试）。图标本体在共享 ThumbnailCache 里（A-37-3），
+    /// 本页只留一个 iconEpoch：批量写回/清旧图时 +1 触发重绘。
     @State private var fileIconsTried: Set<String> = []
+    @State private var iconEpoch = 0
     /// A-5(c)：文件行图标的批量写回（loadFileIcon 攒 50ms 合并一次写回，
     /// 不再每张图各触发一次整页 body 求值；懒建，首次加载时立）。
     @State private var fileIconBatcher: BatchWriteback<String, UIImage>?
@@ -218,13 +219,11 @@ struct FilesTabView: View {
     @State private var unsignedInfo: [String: IPALibrary.AppInfo] = [:]
     /// 已经试过的路径（含解析失败），避免重复读盘。
     @State private var unsignedInfoTried: Set<String> = []
-    /// 应用库图标缓存（路径 → IPA 里取的真实图标，大圆角显示）。
-    /// 已尝试集合存“路径#指纹”（大小 + 修改时间），文件变了
-    /// （重签覆盖、删了重导同名）就换 key 重取，不沿用旧图。
-    /// 加载是行内 .task 触发（只取可见行），不在列表刷新时批量跑。
-    @State private var unsignedIcons: [String: UIImage] = [:]
+    /// 应用库图标已尝试集合（存“路径#指纹”，文件变了就换 key 重取，
+    /// 不沿用旧图）。图标本体在共享 ThumbnailCache 里（A-37-3），
+    /// 重绘由 iconEpoch（见文件行图标处）触发。加载是行内 .task 触发
+    /// （只取可见行），不在列表刷新时批量跑。
     @State private var unsignedIconsTried: Set<String> = []
-    @State private var signedIcons: [String: UIImage] = [:]
     @State private var signedIconsTried: Set<String> = []
     /// A-5(c)：应用库图标的批量写回（loadLibraryIcon 同款，已签名 /
     /// 未签名各一台，懒建）。
@@ -265,8 +264,19 @@ struct FilesTabView: View {
     private var totalSize: Int { files.reduce(0) { $0 + $1.size } }
 
     /// 切栏计数：未签名/已签名 IPA 各多少（搜索不影响切栏总数）。
-    private var unsignedCount: Int { ipas.filter { !$0.isInSignedDir }.count }
-    private var signedCount: Int { ipas.filter { $0.isInSignedDir }.count }
+    /// 一次遍历同时数——原来每标签各 filter 一遍 ipas（ipas 本身又是
+    /// files 的一遍 filter），每 body 求值 4 遍遍历；现在每标签一遍
+    /// files，结果与原来一致。
+    private var ipaCounts: (unsigned: Int, signed: Int) {
+        var unsigned = 0
+        var signed = 0
+        for item in files where item.isIPA {
+            if item.isInSignedDir { signed += 1 } else { unsigned += 1 }
+        }
+        return (unsigned, signed)
+    }
+    private var unsignedCount: Int { ipaCounts.unsigned }
+    private var signedCount: Int { ipaCounts.signed }
 
     /// 文件列表排序：默认扫描顺序 / 名称 / 大小（大在前）/ 最新
     /// （修改时间晚在前）。只改显示顺序，不动磁盘顺序。
@@ -1390,13 +1400,17 @@ struct FilesTabView: View {
     /// 真图 52×52 圆角填满；系统标放 52×52 框里居中，行高对齐。
     @ViewBuilder
     private func fileIcon(for item: LocalFileItem) -> some View {
+        // A-37-3：读 iconEpoch 建立依赖——图标本体在共享缓存里，
+        // 批量写回只 bump epoch、不写 @State；不读它，body 不会
+        // 重算，图就永远不出现。别把这行当死代码清掉。
+        let _ = iconEpoch
         if item.isDirectory {
             Image(systemName: "folder.fill")
                 .foregroundStyle(Theme.accent)
                 .font(.title3)
                 .frame(width: 60, height: 60)
         } else if item.isIPA,
-                  let uiImage = fileIcons[item.id] {
+                  let uiImage = ThumbnailCache.image(for: item.id) {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFill()
@@ -1429,7 +1443,10 @@ struct FilesTabView: View {
         // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
         if fileIconBatcher == nil {
             fileIconBatcher = BatchWriteback { batch in
-                for (id, image) in batch { self.fileIcons[id] = image }
+                // A-37-3：写共享缓存（路径为键，id 就是 url.path），
+                // 再 bump iconEpoch 触发重绘；@State 字典不再存图。
+                for (id, image) in batch { ThumbnailCache.set(image, for: id) }
+                self.iconEpoch += 1
             }
         }
         Task.detached { [url = item.url, id = item.id, path = item.url.path,
@@ -1611,6 +1628,26 @@ struct FilesTabView: View {
         return L("其中 %@ 是续签用的文件，删了它们下次就续不了，要重新导入 IPA 才能续。删除后无法恢复", names.joined(separator: "、"))
     }
 
+    /// B1+B5：签名/续签进行中的源文件不删不移不改名——签名步/续签步正读它。
+    /// 只拦集里的路径，不拦无关文件。返回 true 表示已拒并已置失败提示，
+    /// 调用方直接 return；批量删的计数循环不用它（见 deleteSelection，
+    /// 那里要分别计数再统一报）。
+    private func rejectIfBusySigningOrRenewing(path: String) -> Bool {
+        if engine.isSigningSource(path: path) {
+            opErrorMessage = L("This file is being signed. Wait until it finishes.")
+            opMessage = L("This file is being signed. Wait until it finishes.")
+            opFailed = true
+            return true
+        }
+        if engine.isRenewingSource(path: path) {
+            opErrorMessage = L("This file is being renewed. Wait until it finishes.")
+            opMessage = L("This file is being renewed. Wait until it finishes.")
+            opFailed = true
+            return true
+        }
+        return false
+    }
+
     /// 单删：磁盘上确认没了才从数组里去掉它（含文件夹子项），
     /// 不用整树重扫；删除没成功（文件还在）就重扫恢复真相，
     /// 别把还在的文件藏掉。
@@ -1631,6 +1668,8 @@ struct FilesTabView: View {
             opFailed = true
             return
         }
+        // B1+B5：正在签名/续签的源文件不删——签名步/续签步正读它。
+        guard !rejectIfBusySigningOrRenewing(path: item.url.path) else { return }
         if removeFileFromDisk(item) {
             files.removeAll {
                 $0.url.path == item.url.path || $0.url.path.hasPrefix(item.url.path + "/")
@@ -1749,6 +1788,8 @@ struct FilesTabView: View {
             opFailed = true
             return
         }
+        // B1+B5：正在签名/续签的源文件不移走——签名步/续签步正读它。
+        guard !rejectIfBusySigningOrRenewing(path: item.url.path) else { return }
         do {
             try FileManager.default.moveItem(at: item.url, to: dest)
             refreshFiles(resetDir: true)
@@ -1808,6 +1849,8 @@ struct FilesTabView: View {
         var failed = 0
         var skippedFolders = 0
         var skippedInstalling = 0
+        var skippedSigning = 0
+        var skippedRenewing = 0
         var hadIPA = false
         // A-2：已签名项先分区——一次 load 取出对应记录，一次批量 remove
         // （一次读清单、一次写回）；非签名项仍逐项 removeFileFromDisk。
@@ -1820,6 +1863,9 @@ struct FilesTabView: View {
             // B-8：正在安装的源文件跳过不删，记数后统一提示
             // （与单删同动作：批量删是单删的另一入口，不另立规则）。
             if engine.isInstallingSource(path: item.url.path) { skippedInstalling += 1; continue }
+            // B1+B5：正在签名/续签的源文件同样跳过不删，记数后统一提示。
+            if engine.isSigningSource(path: item.url.path) { skippedSigning += 1; continue }
+            if engine.isRenewingSource(path: item.url.path) { skippedRenewing += 1; continue }
             if item.isIPA { hadIPA = true }
             if item.isInSignedDir,
                let record = signedRecords.first(where: { $0.fileName == item.name }) {
@@ -1857,6 +1903,16 @@ struct FilesTabView: View {
             opMessage = L("This file is being installed. Wait until it finishes.")
             opFailed = true
             opErrorMessage = L("This file is being installed. Wait until it finishes.")
+        } else if skippedSigning > 0 {
+            // B1：只跳过了正在签名的文件、其余全删干净时，也要可见地报一句。
+            opMessage = L("This file is being signed. Wait until it finishes.")
+            opFailed = true
+            opErrorMessage = L("This file is being signed. Wait until it finishes.")
+        } else if skippedRenewing > 0 {
+            // B5：只跳过了正在续签的文件、其余全删干净时，也要可见地报一句。
+            opMessage = L("This file is being renewed. Wait until it finishes.")
+            opFailed = true
+            opErrorMessage = L("This file is being renewed. Wait until it finishes.")
         }
     }
 
@@ -1884,6 +1940,8 @@ struct FilesTabView: View {
             opFailed = true
             return
         }
+        // B1+B5：正在签名/续签的源文件不改名——签名步/续签步正读它。
+        guard !rejectIfBusySigningOrRenewing(path: item.url.path) else { return }
         var newName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !newName.isEmpty, newName != item.name,
               !newName.contains("/"), !newName.hasPrefix(".") else { return }
@@ -2077,9 +2135,18 @@ struct FilesTabView: View {
             Button(L("Delete"), role: .destructive) {
                 if let record = recordPendingDelete {
                     // B-8：正在安装的已签名 IPA 不删——删了签名步读不到文件。
+                    // B1+B5：正在签名/续签的同样不删。
                     if engine.isInstallingSource(path: SignedIPAStore.url(for: record).path) {
                         opErrorMessage = L("This file is being installed. Wait until it finishes.")
                         opMessage = L("This file is being installed. Wait until it finishes.")
+                        opFailed = true
+                    } else if engine.isSigningSource(path: SignedIPAStore.url(for: record).path) {
+                        opErrorMessage = L("This file is being signed. Wait until it finishes.")
+                        opMessage = L("This file is being signed. Wait until it finishes.")
+                        opFailed = true
+                    } else if engine.isRenewingSource(path: SignedIPAStore.url(for: record).path) {
+                        opErrorMessage = L("This file is being renewed. Wait until it finishes.")
+                        opMessage = L("This file is being renewed. Wait until it finishes.")
                         opFailed = true
                     } else {
                         SignedIPAStore.remove(record)
@@ -2098,10 +2165,21 @@ struct FilesTabView: View {
             Button(L("Delete"), role: .destructive) {
                 let targets = signedRecords.filter { selectedSignedIDs.contains($0.id) }
                 // B-8：正在安装的跳过不删（与单删同动作），其余照常删。
+                // B1+B5：正在签名/续签的同样跳过。
                 var blocked = false
+                var blockedSigning = false
+                var blockedRenewing = false
                 let deletable = targets.filter { record in
                     if engine.isInstallingSource(path: SignedIPAStore.url(for: record).path) {
                         blocked = true
+                        return false
+                    }
+                    if engine.isSigningSource(path: SignedIPAStore.url(for: record).path) {
+                        blockedSigning = true
+                        return false
+                    }
+                    if engine.isRenewingSource(path: SignedIPAStore.url(for: record).path) {
+                        blockedRenewing = true
                         return false
                     }
                     return true
@@ -2115,6 +2193,14 @@ struct FilesTabView: View {
                 if blocked {
                     opErrorMessage = L("This file is being installed. Wait until it finishes.")
                     opMessage = L("This file is being installed. Wait until it finishes.")
+                    opFailed = true
+                } else if blockedSigning {
+                    opErrorMessage = L("This file is being signed. Wait until it finishes.")
+                    opMessage = L("This file is being signed. Wait until it finishes.")
+                    opFailed = true
+                } else if blockedRenewing {
+                    opErrorMessage = L("This file is being renewed. Wait until it finishes.")
+                    opMessage = L("This file is being renewed. Wait until it finishes.")
                     opFailed = true
                 }
             }
@@ -2213,9 +2299,11 @@ struct FilesTabView: View {
         guard !librarySearchText.isEmpty else { return unsignedIPAs }
         let query = librarySearchText.lowercased()
         return unsignedIPAs.filter { item in
-            item.name.lowercased().contains(query)
-                || (unsignedInfo[unsignedInfoKey(for: item)]?.name.lowercased().contains(query) == true)
-                || (unsignedInfo[unsignedInfoKey(for: item)]?.bundleID.lowercased().contains(query) == true)
+            // A-37-2：key + 查表每项只求一次（原来名字、Bundle ID 各求一遍）。
+            let info = unsignedInfo[unsignedInfoKey(for: item)]
+            return item.name.lowercased().contains(query)
+                || (info?.name.lowercased().contains(query) == true)
+                || (info?.bundleID.lowercased().contains(query) == true)
         }
     }
 
@@ -2259,7 +2347,7 @@ struct FilesTabView: View {
                 }
             }
             .buttonStyle(.plain)
-            .task(id: "\(item.url.path)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)") { loadLibraryIcon(for: item.url.path, signed: false) }
+            .task(id: "\(item.url.path)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)") { loadLibraryIcon(for: item.url.path, signed: false, fingerprint: item.modified.map { "\(item.size)-\($0.timeIntervalSince1970)" }) }
         } else {
             Button {
                 workspace.selectedIPA = item.url
@@ -2271,7 +2359,7 @@ struct FilesTabView: View {
                 }
             }
             .buttonStyle(.plain)
-            .task(id: "\(item.url.path)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)") { loadLibraryIcon(for: item.url.path, signed: false) }
+            .task(id: "\(item.url.path)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)") { loadLibraryIcon(for: item.url.path, signed: false, fingerprint: item.modified.map { "\(item.size)-\($0.timeIntervalSince1970)" }) }
         }
     }
 
@@ -2370,6 +2458,9 @@ struct FilesTabView: View {
     /// batchSign 本来就不走 multiCount，这里也不新开行为）。
     private func runBatchSign(targets: [LocalFileItem], mods: CertSignMods) {
         workspace.batchBusy = true
+        // B1：批量签名在跑时把目标路径登记进 Engine，文件页/LAN/WebDAV
+        // 的删/移/改名入口会拒掉这些源；收尾 MainActor.run 里注销。
+        for item in targets { engine.signingSourcePaths.insert(item.url.path) }
         batchMessage = nil
         Task {
             var ok = 0
@@ -2397,6 +2488,8 @@ struct FilesTabView: View {
                     self.selectedUnsignedIDs = self.selectedUnsignedIDs.intersection(self.unsignedIPAs.map { $0.id })
                 }
                 self.logEntries = CertSignLogStore.load()
+                // B1：批量签名收尾，注销目标路径（与入口登记配对）。
+                for item in targets { self.engine.signingSourcePaths.remove(item.url.path) }
                 self.workspace.batchBusy = false
                 if fail == 0 {
                     self.batchMessage = L("批量签完：%d 个已存到「已签名」。", ok)
@@ -2591,7 +2684,11 @@ struct FilesTabView: View {
     /// 取不到时显示中性灰圆角方块（不是假 App 图，只占位）。
     @ViewBuilder
     private func libraryIcon(for path: String, signed: Bool) -> some View {
-        if let image = signed ? signedIcons[path] : unsignedIcons[path] {
+        // A-37-3：读 iconEpoch 建立依赖——图标本体在共享缓存里，
+        // 批量写回只 bump epoch、不写 @State；不读它，body 不会
+        // 重算，图就永远不出现。别把这行当死代码清掉。
+        let _ = iconEpoch
+        if let image = ThumbnailCache.image(for: path) {
             Image(uiImage: image)
                 .resizable()
                 .frame(width: 60, height: 60)
@@ -2606,25 +2703,34 @@ struct FilesTabView: View {
     /// 行内图标加载（只取可见行，行 .task 触发）：key 已尝试直接跳过
     /// （含取失败，不重复解包）；文件变了 key 就变，先清旧图再取，
     /// 不让旧图标冒充新文件。解包只取图标文件，不整包解压。
-    private func loadLibraryIcon(for path: String, signed: Bool) {
-        let key = "\(path)#\(iconFingerprint(for: path))"
+    /// A-37-1：调用方有大小/修改时间快照时传 fingerprint（未签名行传
+    /// LocalFileItem 的 size/modified），不再主线程 stat 磁盘；没快照
+    /// 的调用方（已签名行、日志行）不传，走现查。
+    private func loadLibraryIcon(for path: String, signed: Bool, fingerprint: String? = nil) {
+        let key = "\(path)#\(fingerprint ?? iconFingerprint(for: path))"
         if signed {
             guard !signedIconsTried.contains(key) else { return }
             signedIconsTried.insert(key)
-            signedIcons[path] = nil
+            // A-37-3：清共享缓存里的旧图 + bump epoch（行回占位，等新图）。
+            ThumbnailCache.remove(path)
+            iconEpoch += 1
             // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
             if librarySignedIconBatcher == nil {
                 librarySignedIconBatcher = BatchWriteback { batch in
-                    for (path, image) in batch { self.signedIcons[path] = image }
+                    for (path, image) in batch { ThumbnailCache.set(image, for: path) }
+                    self.iconEpoch += 1
                 }
             }
         } else {
             guard !unsignedIconsTried.contains(key) else { return }
             unsignedIconsTried.insert(key)
-            unsignedIcons[path] = nil
+            // A-37-3：清共享缓存里的旧图 + bump epoch（行回占位，等新图）。
+            ThumbnailCache.remove(path)
+            iconEpoch += 1
             if libraryUnsignedIconBatcher == nil {
                 libraryUnsignedIconBatcher = BatchWriteback { batch in
-                    for (path, image) in batch { self.unsignedIcons[path] = image }
+                    for (path, image) in batch { ThumbnailCache.set(image, for: path) }
+                    self.iconEpoch += 1
                 }
             }
         }

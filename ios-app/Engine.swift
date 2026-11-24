@@ -534,6 +534,14 @@ final class Engine {
     /// before any sign-in has happened this run.
     static let savedTeamKey = "CZFSavedSigningTeamID"
     var downloadedIPAPath: String?
+    /// B2：两路已签名安装（企业证书 / 已签 IPA）在配对窗口期的源路径——
+    /// 配对完成前 downloadedIPAPath 还没置位，isInstallingSource 认不出
+    /// 源文件，删/移/改名会把安装读的文件弄没。起跑时（isRunning = true
+    /// 之后、管线 Task 之前）登记，收尾（isRunning = false 处）注销；
+    /// 只做守卫用，不进 download() 的“已下载”快路径（那是
+    /// downloadedIPAPath 的事，提前置它会让后续 custom 一键安装误采
+    /// 残留路径——importCustomIPA 只在新导入时清它）。
+    var installingSourcePath: String?
     // Source, channel and picked version (nil: latest) the current download
     // corresponds to.
     private var downloadedSource: InstallSource?
@@ -842,6 +850,8 @@ final class Engine {
             // 删失败静默（helper 内 try?），下次重装同名目录会先清旧的。
             if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
             signedAppPath = nil
+            // B2：收尾注销配对窗口期的源路径登记（与起跑登记配对）。
+            installingSourcePath = nil
             isRunning = false
             isCancelling = false
             pairingPIN = nil
@@ -1823,6 +1833,11 @@ final class Engine {
     /// 不用裸 hasPrefix（Foo.ipa 与 Foo.ipa2 会撞车）。
     func isInstallingSource(path: String) -> Bool {
         guard isRunning else { return false }
+        // B2：配对窗口期的源（downloadedIPAPath 还没置位那段）。
+        if let installing = installingSourcePath,
+           installing == path || installing.hasPrefix(path + "/") {
+            return true
+        }
         if let installing = downloadedIPAPath,
            installing == path || installing.hasPrefix(path + "/") {
             return true
@@ -1831,6 +1846,22 @@ final class Engine {
               let custom = IPALibrary.customImport()?.url.path,
               custom == path || custom.hasPrefix(path + "/") else { return false }
         return true
+    }
+
+    /// B1：正在签名的源文件路径集——ECV 单签（executeSign）与文件页批量签名
+    /// （runBatchSign）在跑时登记，跑完注销。B5：正在续签的源文件路径集——
+    /// 续签循环 .working 的那项登记，.done/.failed 注销。文件页/LAN/WebDAV
+    /// 的删/移/改名入口只拦集里的路径，不拦无关文件；祖先目录语义同
+    /// isInstallingSource（path + "/" 前缀），不用裸 hasPrefix。
+    var signingSourcePaths: Set<String> = []
+    var renewingSourcePaths: Set<String> = []
+
+    func isSigningSource(path: String) -> Bool {
+        signingSourcePaths.contains { $0 == path || $0.hasPrefix(path + "/") }
+    }
+
+    func isRenewingSource(path: String) -> Bool {
+        renewingSourcePaths.contains { $0 == path || $0.hasPrefix(path + "/") }
     }
 
     /// Point the rest of the pipeline at an IPA on disk, whatever its origin.
@@ -1963,6 +1994,15 @@ final class Engine {
     /// can't mistake the previous import for this one.
     @MainActor
     func importCustomIPA(from url: URL) async -> Bool {
+        // B3：安装进行中不换 custom 槽——replaceCustomImport 会清空 custom
+        // 目录、置空 downloadedIPAPath，在途安装的源就没了。入口拒掉，
+        // 调用方凭返回值不启动管线（C12）；inbox 拷贝照 N3(C) 同款删掉。
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            Self.discardInboxCopy(url)
+            return false
+        }
         guard !isImportingIPA else {
             lastError = L("An import is already running. Wait for it to finish, then try again.")
             log("⛔️ Import: \(lastError ?? "")")
@@ -2006,6 +2046,12 @@ final class Engine {
     /// overload.
     @MainActor
     func importCustomIPA(fromLink text: String) async -> Bool {
+        // B3：同 from: ——安装进行中不换 custom 槽（链接下载那路同理）。
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            return false
+        }
         guard !isImportingIPA else {
             lastError = L("An import is already running. Wait for it to finish, then try again.")
             log("⛔️ Import: \(lastError ?? "")")
@@ -2359,6 +2405,8 @@ final class Engine {
         // B-2：起跑前 mint 新会话凭证（resetRun 已清掉旧值）。
         installSessionID = UUID()
         isRunning = true
+        // B2：配对窗口期先登记源路径，收尾再注销（见 isInstallingSource）。
+        installingSourcePath = ipaURL.path
         log("=== Starting enterprise-cert install ===")
 
         pipelineTask = Task { @MainActor in
@@ -2416,6 +2464,8 @@ final class Engine {
             // 删失败静默（helper 内 try?），下次重装同名目录会先清旧的。
             if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
             signedAppPath = nil
+            // B2：收尾注销配对窗口期的源路径登记（与起跑登记配对）。
+            installingSourcePath = nil
             isRunning = false
             isCancelling = false
             pairingPIN = nil
@@ -2512,6 +2562,8 @@ final class Engine {
         // 原先这句在 isRunning = true 之后，现并入统一 mint 点）。
         installSessionID = UUID()
         isRunning = true
+        // B2：配对窗口期先登记源路径，收尾再注销（见 isInstallingSource）。
+        installingSourcePath = ipaURL.path
         log("=== Installing already-signed IPA ===")
 
         pipelineTask = Task { @MainActor in
@@ -2579,6 +2631,8 @@ final class Engine {
             // 删失败静默（helper 内 try?），下次重装同名目录会先清旧的。
             if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
             signedAppPath = nil
+            // B2：收尾注销配对窗口期的源路径登记（与起跑登记配对）。
+            installingSourcePath = nil
             isRunning = false
             isCancelling = false
             pairingPIN = nil
@@ -3616,6 +3670,13 @@ final class Engine {
     /// optional (under Advanced) from 27 on.
     @MainActor
     func importPairingFile(from url: URL) async {
+        // B4：安装进行中不换配对文件——connection.disconnect() 会断掉在途
+        // 安装的设备链路。深链弹窗确认路也走这里，同一处拦住。
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            log("⛔️ Pairing import: \(lastError ?? "")")
+            return
+        }
         guard !isImportingPairing else { return }
         isImportingPairing = true
         // Delete the picker's temporary copy once the import is done.

@@ -31,7 +31,6 @@ let chineseStrings: [String: String] = [
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "先去设置里的企业证书页，把证书、描述文件和密码备齐。",
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。",
     "Installing": "正在安装",
-    "Cancelling": "正在取消",
     "Installed": "已安装",
     "Something went wrong": "出了点问题",
     "an app by Frizzle": "由 Frizzle 打造的应用",
@@ -1357,4 +1356,6 @@ let chineseStrings: [String: String] = [
     "Enabling entitlements failed: %@": "启用权限失败：%@",
     "Waiting for this install to finish…": "正在等本次安装收尾…",
     "This file is being installed. Wait until it finishes.": "正在安装这个文件，等安装结束再操作。",
+    "This file is being signed. Wait until it finishes.": "正在签名这个文件，等签名结束再操作。",
+    "This file is being renewed. Wait until it finishes.": "正在续签这个文件，等续签结束再操作。",
 ]

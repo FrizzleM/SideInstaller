@@ -31,7 +31,6 @@ let turkishStrings: [String: String] = [
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Önce Ayarlar'daki kurumsal sertifika sayfasında sertifika, profil ve parolayı hazırlayın.",
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "Henüz imzalanmış IPA yok. Ayarlar'daki kurumsal sertifika sayfasında «Yalnızca imzala» ile imzalayın; burada saklanır, istediğiniz zaman yükleyip paylaşabilirsiniz.",
     "Installing": "Yükleniyor",
-    "Cancelling": "İptal ediliyor",
     "Installed": "Yüklendi",
     "Something went wrong": "Bir şeyler ters gitti",
     "an app by Frizzle": "Frizzle tarafından bir uygulama",

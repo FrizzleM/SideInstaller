@@ -94,6 +94,15 @@ final class DownloadsManager: ObservableObject {
             lastError = L("This file is being installed. Wait until it finishes.")
             return
         }
+        // B1+B5：正在签名/续签的源文件不删——签名步/续签步正读它。
+        if engine.isSigningSource(path: item.url.path) {
+            lastError = L("This file is being signed. Wait until it finishes.")
+            return
+        }
+        if engine.isRenewingSource(path: item.url.path) {
+            lastError = L("This file is being renewed. Wait until it finishes.")
+            return
+        }
         deletingID = item.id
         lastError = nil
         do {

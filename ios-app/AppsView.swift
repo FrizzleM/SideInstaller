@@ -743,18 +743,24 @@ final class SideloadedAppsManager: ObservableObject {
                         continue
                     }
                     jobs[index].state = .working
+                    // B5：这项续签在跑时把源路径登记进 Engine，文件页/LAN/WebDAV
+                    // 的删/移/改名入口会拒掉这个源；.done/.failed 处注销。
+                    engine.renewingSourcePaths.insert(job.ipa.path)
                     refreshStatus = multiAccount
                         ? L("Refreshing %@ as %@", job.name, groupEmail)
                         : L("Refreshing %@", job.name)
                     do {
                         try await engine.refreshInstalledApp(named: job.name, ipaPath: job.ipa.path)
                         jobs[index].state = .done
+                        engine.renewingSourcePaths.remove(job.ipa.path)
                         refreshed += 1
                         // 记一笔续签源：删文件时凭它提示“这是某 App 续签用的文件”。
                         RenewalSourceStore.record(bundleID: job.bundleID, appName: job.name, ipaURL: job.ipa)
                     } catch {
                         let message = Self.text(for: error)
                         jobs[index].state = .failed(message)
+                        // B5：续签失败，注销源路径（与 .working 登记配对）。
+                        engine.renewingSourcePaths.remove(job.ipa.path)
                         engine.log("⛔️ Refresh \(job.name): \(message)")
                     }
                 }
@@ -770,7 +776,12 @@ final class SideloadedAppsManager: ObservableObject {
             // C22：取消只停 Task、不扫尾 jobs——没轮到的 job 仍是 .pending，
             // 卡片常驻显示 "Waiting"，与“本轮已结束”不符；收尾扫一遍改
             // .failed。正常跑完时没有 .pending 残留，扫尾是空操作。
-            for index in jobs.indices where jobs[index].state == .pending {
+            // B5：取消时正在 .working 的那项也要扫尾——否则它的源路径
+            // 会一直留在续签集里，之后删它永远被拒。
+            for index in jobs.indices where jobs[index].state == .pending || jobs[index].state == .working {
+                if jobs[index].state == .working {
+                    engine.renewingSourcePaths.remove(jobs[index].ipa.path)
+                }
                 jobs[index].state = .failed(L("Skipped: refresh stopped."))
             }
             refreshSummary = jobs.count == 1
@@ -1082,11 +1093,12 @@ struct AppsView: View {
     @State private var confirmRefresh = false
     /// Shows the "LocalDevVPN isn't installed" prompt with a link to get it.
     @State private var showInstallLOCPrompt = false
-    /// 行图标缓存（已装包名 → 配对 IPA 的解码后图标）与已试过的键：
-    /// 文件页同款取法（IPALibrary.iconData 只读 central directory +
-    /// 单个图标条目），没配对 IPA 的行继续用虚线占位。
-    @State private var rowIcons: [String: UIImage] = [:]
+    /// 行图标已试过的键：文件页同款取法（IPALibrary.iconData 只读 central
+    /// directory + 单个图标条目），没配对 IPA 的行继续用虚线占位。
+    /// 图标本体在共享 ThumbnailCache 里（A-37-3），按配对 IPA 路径查；
+    /// 重绘由 iconEpoch 触发。
     @State private var rowIconsTried: Set<String> = []
+    @State private var iconEpoch = 0
     /// A-5(c)：行图标的批量写回（loadRowIcon 同款，懒建）。
     @State private var rowIconBatcher: BatchWriteback<String, UIImage>?
     @Environment(\.openURL) private var openURL
@@ -1421,6 +1433,12 @@ struct AppsView: View {
         return "\(status.app.bundleID)#\(job?.ipa.path ?? "")#\(job?.ipaSize ?? 0)#\(job?.ipaModified ?? 0)"
     }
 
+    /// A-37-3：行图标在共享缓存里按 IPA 路径查；行上只有 bundleID，
+    /// 经 refreshable 的配对找路径（rowIconKey 同款查找）。
+    private func rowIconPath(for status: SideloadedAppStatus) -> String? {
+        manager.refreshable.first { $0.bundleID == status.app.bundleID }?.ipa.path
+    }
+
     /// 行图标：配对 IPA 的真图放后台取，取到写缓存；没配对 IPA、
     /// 或 Assets.car 独占图标取不到时，继续用虚线占位，不造假图。
     private func loadRowIcon(for status: SideloadedAppStatus) {
@@ -1429,27 +1447,30 @@ struct AppsView: View {
         rowIconsTried.insert(key)
         guard let job = manager.refreshable.first(where: { $0.bundleID == status.app.bundleID }) else { return }
         let ipa = job.ipa
-        let bundleID = status.app.bundleID
         // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
         if rowIconBatcher == nil {
             rowIconBatcher = BatchWriteback { batch in
-                for (bundleID, image) in batch { self.rowIcons[bundleID] = image }
+                // A-37-3：写共享缓存（路径为键），再 bump iconEpoch 触发重绘。
+                for (path, image) in batch { ThumbnailCache.set(image, for: path) }
+                self.iconEpoch += 1
             }
         }
         // A-1（SIDE-33）：大小/修改时间复用 pair() 的快照，不再二次 stat；
         // 解包途中文件被替换的校验仍用快照值比对。
         let size = job.ipaSize
         let modified = job.ipaModified
-        Task.detached { [ipa, bundleID, path = ipa.path, size, modified] in
+        Task.detached { [ipa, path = ipa.path, size, modified] in
             guard let data = IPALibrary.iconData(at: ipa),
-                  // A-7：下采样在 detached 里做——行高 44pt，用 88×88 缩略图。
-                  let image = IPALibrary.thumbnail(from: data, maxPixelSize: 88) else { return }
+                  // A-7：下采样在 detached 里做——行高 44pt，原来用 88×88；
+                  // A-37-3：共享缓存按路径只存一份，各处取最大 120，行上显示
+                  // 时再缩到 44pt，不模糊。
+                  let image = IPALibrary.thumbnail(from: data, maxPixelSize: 120) else { return }
             // B31-1（ECV 同款核对）：解包途中文件被替换就丢掉旧图。
             let liveAttrs = try? FileManager.default.attributesOfItem(atPath: path)
             let liveSize = liveAttrs?[.size] as? Int
             let liveModified = (liveAttrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
             guard liveSize == size, liveModified == modified else { return }
-            await MainActor.run { self.rowIconBatcher?.enqueue(image, for: bundleID) }
+            await MainActor.run { self.rowIconBatcher?.enqueue(image, for: path) }
         }
     }
 
@@ -1457,7 +1478,11 @@ struct AppsView: View {
     /// 两路不同 View 类型，函数前必须加 @ViewBuilder（AGENTS.md 血泪）。
     @ViewBuilder
     private func rowIcon(for status: SideloadedAppStatus) -> some View {
-        if let uiImage = rowIcons[status.app.bundleID] {
+        // A-37-3：读 iconEpoch 建立依赖——图标本体在共享缓存里，
+        // 批量写回只 bump epoch、不写 @State；不读它，body 不会
+        // 重算，图就永远不出现。别把这行当死代码清掉。
+        let _ = iconEpoch
+        if let path = rowIconPath(for: status), let uiImage = ThumbnailCache.image(for: path) {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFill()

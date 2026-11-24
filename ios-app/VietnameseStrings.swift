@@ -31,7 +31,6 @@ let vietnameseStrings: [String: String] = [
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Trước tiên, hãy chuẩn bị chứng chỉ, hồ sơ và mật khẩu trên trang chứng chỉ doanh nghiệp trong Cài đặt.",
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "Chưa có IPA nào đã ký. Hãy ký một IPA bằng «Chỉ ký» trên trang chứng chỉ doanh nghiệp trong Cài đặt: nó sẽ được lưu tại đây, sẵn sàng cài đặt và chia sẻ.",
     "Installing": "Đang cài đặt",
-    "Cancelling": "Đang hủy",
     "Installed": "Đã cài đặt",
     "Something went wrong": "Đã xảy ra lỗi",
     "an app by Frizzle": "một ứng dụng của Frizzle",

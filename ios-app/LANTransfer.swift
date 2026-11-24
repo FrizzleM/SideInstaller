@@ -515,8 +515,18 @@ final class LANTransferServer: ObservableObject {
             }
             sendFile(connection, file: file)
         case ("GET", "/del"):
-            guard let rel = request.query["path"], let file = resolve(rel),
-                  deleteFile(at: file) else {
+            guard let rel = request.query["path"], let file = resolve(rel) else {
+                sendText(connection, status: "400 Bad Request", text: L("Invalid path"))
+                return
+            }
+            // B7：正在安装的源文件不删——删了签名步读不到文件；回 423，
+            // deleteFile 的 false→400 语义（目录）保持不动。
+            if Engine.shared.isInstallingSource(path: file.path) {
+                Engine.shared.log("⛔️ LAN /del refused: \(file.lastPathComponent) is being installed.")
+                sendText(connection, status: "423 Locked", text: L("This file is being installed. Wait until it finishes."))
+                return
+            }
+            guard deleteFile(at: file) else {
                 sendText(connection, status: "400 Bad Request", text: L("Invalid path"))
                 return
             }

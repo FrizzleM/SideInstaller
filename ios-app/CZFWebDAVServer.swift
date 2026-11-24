@@ -140,31 +140,40 @@ final class CZFWebDAVServer: ObservableObject {
         // Depth: 0 只列自身，1（默认）再列一层子项。
         let depth = request.headers["Depth"] ?? request.headers["depth"] ?? "1"
         var urls: [URL] = [url]
+        // A-37-4：子项一次取齐 isDirectory/size/mdate（readdir 时预取，
+        // 循环里读缓存值，不再每条目 stat 两次）；depth 0 只有自身，
+        // 仍走下面单条目的 attributesOfItem（一次 stat）。
+        let propKeys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey]
         if depth != "0", isDir.boolValue,
-           let children = try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) {
+           let children = try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: propKeys) {
             urls += children.sorted { $0.lastPathComponent < $1.lastPathComponent }
         }
         var xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<D:multistatus xmlns:D=\"DAV:\">\n"
         for item in urls {
-            var itemIsDir: ObjCBool = false
-            _ = fm.fileExists(atPath: item.path, isDirectory: &itemIsDir)
+            let isRootItem = item == url
+            // 根条目用入口 fileExists 的 isDir + 一次 attributesOfItem；
+            // 子项用 contentsOfDirectory 预取的 resourceValues（不 stat）。
+            let values = isRootItem ? nil : try? item.resourceValues(forKeys: Set(propKeys))
+            let itemIsDir = isRootItem ? isDir.boolValue : (values?.isDirectory ?? false)
             let name = item == root ? "" : item.lastPathComponent
             xml += "  <D:response>\n"
             xml += "    <D:href>\(xmlEscape(href(for: item, root: root)))</D:href>\n"
             xml += "    <D:propstat>\n      <D:prop>\n"
             xml += "        <D:displayname>\(xmlEscape(name))</D:displayname>\n"
             // S8：size 与 mdate 一次取字典两项同读——原来每个条目调两次
-            // attributesOfItem（stat 两次）。
-            let attrs = try? fm.attributesOfItem(atPath: item.path)
-            if itemIsDir.boolValue {
+            // attributesOfItem（stat 两次）；子项现在读预取值。
+            let attrs = isRootItem ? try? fm.attributesOfItem(atPath: item.path) : nil
+            let size = isRootItem ? attrs?[.size] as? NSNumber : values?.fileSize.map { NSNumber(value: $0) }
+            let mdate = isRootItem ? attrs?[.modificationDate] as? Date : values?.contentModificationDate
+            if itemIsDir {
                 xml += "        <D:resourcetype><D:collection/></D:resourcetype>\n"
             } else {
                 xml += "        <D:resourcetype/>\n"
-                if let size = attrs?[.size] as? NSNumber {
+                if let size {
                     xml += "        <D:getcontentlength>\(size.intValue)</D:getcontentlength>\n"
                 }
             }
-            if let mdate = attrs?[.modificationDate] as? Date {
+            if let mdate {
                 xml += "        <D:getlastmodified>\(Self.rfc1123.string(from: mdate))</D:getlastmodified>\n"
             }
             xml += "      </D:prop>\n      <D:status>HTTP/1.1 200 OK</D:status>\n    </D:propstat>\n  </D:response>\n"
@@ -208,6 +217,12 @@ final class CZFWebDAVServer: ObservableObject {
             return GCDWebServerResponse(statusCode: 409)
         }
         let existed = FileManager.default.fileExists(atPath: url.path)
+        // B7：正在安装的源文件不覆盖——body 已由框架流到临时文件（C21-1），
+        // 这里只拦“落盘”这一步，不拦收 body；回 423 Locked 并记一笔。
+        if Engine.shared.isInstallingSource(path: url.path) {
+            Engine.shared.log("⛔️ WebDAV PUT refused: \(url.lastPathComponent) is being installed.")
+            return GCDWebServerResponse(statusCode: 423)
+        }
         // C21-1：PUT 走流式 FileRequest，body 落临时文件不进内存；
         // 临时文件在 request 释放时自动删，移走后 unlink 空操作。
         // 覆盖用 replaceItemAt（失败保旧文件），新建用 moveItem。
@@ -242,6 +257,11 @@ final class CZFWebDAVServer: ObservableObject {
         }
         guard FileManager.default.fileExists(atPath: url.path) else {
             return GCDWebServerResponse(statusCode: 404)
+        }
+        // B7：正在安装的源文件不删——删了签名步读不到文件；回 423 Locked 并记一笔。
+        if Engine.shared.isInstallingSource(path: url.path) {
+            Engine.shared.log("⛔️ WebDAV DELETE refused: \(url.lastPathComponent) is being installed.")
+            return GCDWebServerResponse(statusCode: 423)
         }
         do {
             try FileManager.default.removeItem(at: url)
