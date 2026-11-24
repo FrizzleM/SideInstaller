@@ -2,7 +2,7 @@
 
 All notable changes to SideInstaller are documented here.
 
-## Unreleased
+## 2.2.0
 
 ### Added
 - **JIT.** A new page under Tools turns JIT on for apps signed for development, which is how
