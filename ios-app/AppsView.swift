@@ -1232,10 +1232,10 @@ struct AppsView: View {
 
     // MARK: Primary action
 
-    /// "Refresh all" button, shown when at least one app can be refreshed.
+    /// "Refresh all" button, shown once loaded; disabled when no app can be refreshed.
     @ViewBuilder
     private var refreshAllButton: some View {
-        if manager.hasLoaded && !manager.refreshable.isEmpty {
+        if manager.hasLoaded {
             VStack(spacing: 8) {
                 Button { confirmRefresh = true } label: {
                     HStack(spacing: 8) {
@@ -1250,20 +1250,22 @@ struct AppsView: View {
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(manager.isRefreshing || manager.isWorking)
+                .disabled(manager.refreshable.isEmpty || manager.isRefreshing || manager.isWorking)
                 // Only the install step reports progress.
                 if manager.isRefreshing, engine.installProgress > 0, engine.installProgress < 1 {
                     ProgressView(value: engine.installProgress)
                         .tint(Theme.accent)
                 }
-                Text(manager.refreshable.count == 1
-                     ? L("%d app can be signed again from an IPA already on this iPhone.",
-                         manager.refreshable.count)
-                     : L("%d apps can be signed again from IPAs already on this iPhone.",
-                         manager.refreshable.count))
-                    .font(.caption)
-                    .foregroundStyle(Theme.muted)
-                    .multilineTextAlignment(.center)
+                if !manager.refreshable.isEmpty {
+                    Text(manager.refreshable.count == 1
+                         ? L("%d app can be signed again from an IPA already on this iPhone.",
+                             manager.refreshable.count)
+                         : L("%d apps can be signed again from IPAs already on this iPhone.",
+                             manager.refreshable.count))
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.center)
+                }
             }
             .transition(.cardAppear)
             .cascadeItem(1)
@@ -1282,6 +1284,14 @@ struct AppsView: View {
             .controlSize(.large)
             .cascadeItem(2)
         } else if manager.hasLoaded && !manager.refreshable.isEmpty {
+            Button { manager.load() } label: {
+                loadLabel(spinner: Theme.accent).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+            .controlSize(.large)
+            .disabled(manager.isWorking || manager.isRefreshing)
+            .cascadeItem(2)
+        } else if manager.hasLoaded {
             Button { manager.load() } label: {
                 loadLabel(spinner: Theme.accent).frame(maxWidth: .infinity)
             }
