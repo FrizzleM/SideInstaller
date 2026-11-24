@@ -1359,4 +1359,6 @@ let koreanStrings: [String: String] = [
     "%d files, first %@: %@": "%d개의 파일, 첫 번째 %@: %@",
     "%@ isn't listed": "%@가 목록에 없습니다",
     "the data couldn't be read": "데이터를 읽을 수 없습니다",
+    "Couldn't reach this iPhone. Check the connection and try again.": "이 iPhone에 연결할 수 없습니다. 연결을 확인한 후 다시 시도하세요.",
+    "the connection to this iPhone failed": "이 iPhone에 대한 연결에 실패했습니다.",
 ]

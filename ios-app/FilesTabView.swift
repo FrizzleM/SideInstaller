@@ -1452,6 +1452,8 @@ struct FilesTabView: View {
                         Text(L("Back"))
                     }
                     .font(.footnote.weight(.semibold))
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 Text(currentDirName)
@@ -1641,6 +1643,7 @@ struct FilesTabView: View {
                     Image(systemName: "info.circle")
                         .foregroundStyle(Theme.accent)
                     .font(.title3)
+                    .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain)
             }

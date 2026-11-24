@@ -1396,4 +1396,6 @@ let frenchStrings: [String: String] = [
     "%d files, first %@: %@": "%d fichiers, le premier %@ : %@",
     "%@ isn't listed": "%@ n'est pas répertorié",
     "the data couldn't be read": "Les données n'ont pas pu être lues",
+    "Couldn't reach this iPhone. Check the connection and try again.": "Impossible de joindre cet iPhone. Vérifiez la connexion puis réessayez.",
+    "the connection to this iPhone failed": "la connexion à cet iPhone a échoué.",
 ]

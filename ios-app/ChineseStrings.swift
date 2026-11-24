@@ -1371,4 +1371,6 @@ let chineseStrings: [String: String] = [
     "%d files, first %@: %@": "%d 个文件，首个 %@：%@",
     "%@ isn't listed": "%@ 未列出",
     "the data couldn't be read": "数据无法读取",
+    "Couldn't reach this iPhone. Check the connection and try again.": "连不上这台 iPhone，检查连接后重试。",
+    "the connection to this iPhone failed": "与这台 iPhone 的连接失败了。",
 ]

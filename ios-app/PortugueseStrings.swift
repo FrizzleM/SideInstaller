@@ -1381,4 +1381,6 @@ let portugueseStrings: [String: String] = [
     "%d files, first %@: %@": "%d arquivos, o primeiro %@ : %@",
     "%@ isn't listed": "%@ não está listado",
     "the data couldn't be read": "Não foi possível ler os dados",
+    "Couldn't reach this iPhone. Check the connection and try again.": "Não foi possível conectar a este iPhone. Verifique a conexão e tente novamente.",
+    "the connection to this iPhone failed": "a conexão com este iPhone falhou.",
 ]

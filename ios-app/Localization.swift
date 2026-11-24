@@ -158,3 +158,12 @@ func L(_ key: String) -> String {
 func L(_ key: String, _ arguments: CVarArg...) -> String {
     String(format: L(key), arguments: arguments)
 }
+
+/// User-facing text for an error. A raw FFIError is a debug string
+/// ("idevice FFI error code=…"), never a sentence — map it to one generic line.
+func userFacingErrorMessage(_ error: Error) -> String {
+    if error is DeviceConnection.FFIError {
+        return L("Couldn't reach this iPhone. Check the connection and try again.")
+    }
+    return (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+}

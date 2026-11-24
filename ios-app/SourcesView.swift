@@ -417,6 +417,8 @@ struct SourceAppsView: View {
                     }
                 }
                 .disabled(activeID != nil)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
                 Text(message)
                     .font(.caption2)
                     .foregroundStyle(Theme.negative)

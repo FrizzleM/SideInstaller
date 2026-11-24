@@ -1390,4 +1390,6 @@ let italianStrings: [String: String] = [
     "%d files, first %@: %@": "%d file, il primo %@ : %@",
     "%@ isn't listed": "%@ non è elencato",
     "the data couldn't be read": "Impossibile leggere i dati",
+    "Couldn't reach this iPhone. Check the connection and try again.": "Impossibile raggiungere questo iPhone. Controlla la connessione e riprova.",
+    "the connection to this iPhone failed": "la connessione a questo iPhone non è riuscita.",
 ]

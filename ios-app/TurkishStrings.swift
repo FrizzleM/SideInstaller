@@ -1306,4 +1306,6 @@ let turkishStrings: [String: String] = [
     "%d files, first %@: %@": "%d dosya, ilki %@ : %@",
     "%@ isn't listed": "%@ listede yok",
     "the data couldn't be read": "Veriler okunamadı",
+    "Couldn't reach this iPhone. Check the connection and try again.": "Bu iPhone'a ulaşılamıyor. Bağlantıyı kontrol edip yeniden deneyin.",
+    "the connection to this iPhone failed": "bu iPhone'a bağlantı kurulamadı.",
 ]

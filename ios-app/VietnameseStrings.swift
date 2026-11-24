@@ -1388,4 +1388,6 @@ let vietnameseStrings: [String: String] = [
     "%d files, first %@: %@": "%d tệp, tệp đầu tiên %@ : %@",
     "%@ isn't listed": "%@ không có trong danh sách",
     "the data couldn't be read": "Không thể đọc dữ liệu",
+    "Couldn't reach this iPhone. Check the connection and try again.": "Không thể kết nối tới iPhone này. Kiểm tra kết nối rồi thử lại.",
+    "the connection to this iPhone failed": "kết nối tới iPhone này đã thất bại.",
 ]

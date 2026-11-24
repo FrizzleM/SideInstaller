@@ -1358,4 +1358,6 @@ let japaneseStrings: [String: String] = [
     "%d files, first %@: %@": "%d 個のファイル、最初は %@：%@",
     "%@ isn't listed": "%@ は一覧にありません",
     "the data couldn't be read": "データを読み取れませんでした",
+    "Couldn't reach this iPhone. Check the connection and try again.": "この iPhone に接続できません。接続を確認してから、もう一度お試しください。",
+    "the connection to this iPhone failed": "この iPhone への接続に失敗しました。",
 ]

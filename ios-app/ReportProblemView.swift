@@ -182,7 +182,7 @@ struct ReportProblemView: View {
         } catch is CancellationError {
             return
         } catch {
-            crashLookError = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+            crashLookError = userFacingErrorMessage(error)
         }
     }
 

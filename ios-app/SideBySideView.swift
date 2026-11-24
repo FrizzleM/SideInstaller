@@ -2814,7 +2814,8 @@ struct SideBySideView: View {
                 .foregroundStyle(Theme.muted)
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(Theme.control))
-                .contentShape(Circle())
+                .padding(8)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain, sound: .tap)
         .disabled(manager.isCancelling)

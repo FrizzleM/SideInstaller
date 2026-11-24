@@ -533,14 +533,15 @@ final class SideloadedAppsManager: ObservableObject {
                 lastLoadError = nil
                 engine.log("Sideloaded apps: \(parsed.apps.count) sideloaded, \(parsed.profiles.count) profile(s) decoded.")
             } catch {
-                let message = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                let message = userFacingErrorMessage(error)
+                let raw = String(describing: error)
                 lastLoadFailed = Date()
                 lastLoadError = message
                 if quiet {
-                    engine.log("Sideloaded apps: not ready yet (\(message))")
+                    engine.log("Sideloaded apps: not ready yet (\(raw))")
                 } else {
                     lastError = message
-                    engine.log("⛔️ Sideloaded apps: \(message)")
+                    engine.log("⛔️ Sideloaded apps: \(raw)")
                 }
             }
             isWorking = false
@@ -657,9 +658,10 @@ final class SideloadedAppsManager: ObservableObject {
             do {
                 try await engine.prepareRefresh()
             } catch {
-                let message = Self.text(for: error)
+                let message = userFacingErrorMessage(error)
+                let raw = String(describing: error)
                 lastError = message
-                engine.log("⛔️ Refresh all: \(message)")
+                engine.log("⛔️ Refresh all: \(raw)")
                 jobs = []
                 return
             }
@@ -788,11 +790,12 @@ final class SideloadedAppsManager: ObservableObject {
                         // 记一笔续签源：删文件时凭它提示“这是某 App 续签用的文件”。
                         RenewalSourceStore.record(bundleID: job.bundleID, appName: job.name, ipaURL: job.ipa)
                     } catch {
-                        let message = Self.text(for: error)
+                        let message = userFacingErrorMessage(error)
+                        let raw = String(describing: error)
                         jobs[index].state = .failed(message)
                         // B5：续签失败，注销源路径（与 .working 登记配对）。
                         engine.renewingSourcePaths.remove(job.ipa.path)
-                        engine.log("⛔️ Refresh \(job.name): \(message)")
+                        engine.log("⛔️ Refresh \(job.name): \(raw)")
                     }
                 }
             }

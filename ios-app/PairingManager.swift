@@ -199,6 +199,6 @@ final class PairingManager: ObservableObject {
     // MARK: - Helpers
 
     private func message(_ error: Error) -> String {
-        (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+        userFacingErrorMessage(error)
     }
 }

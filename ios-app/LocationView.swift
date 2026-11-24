@@ -1284,7 +1284,7 @@ struct LocationView: View {
                             Image(systemName: "ellipsis.circle")
                                 .font(.title3)
                                 .foregroundStyle(Theme.muted)
-                                .frame(width: 36, height: 36)
+                                .frame(width: 44, height: 44)
                                 .contentShape(Rectangle())
                         }
                         .disabled(manager.isPlayingPlannedRoute)
@@ -1421,6 +1421,8 @@ struct LocationView: View {
                     .font(.title3)
                     .foregroundStyle(Theme.muted)
                     .frame(width: 32, height: 32)
+                    .padding(8)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel(L("Remove"))
             .disabled(manager.isPlayingRoute)
@@ -1533,7 +1535,7 @@ struct LocationView: View {
                 Image(systemName: "ellipsis.circle")
                     .font(.title3)
                     .foregroundStyle(Theme.muted)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
         }
@@ -1599,6 +1601,8 @@ struct LocationView: View {
                     .font(.title3)
                     .foregroundStyle(Theme.muted)
                     .frame(width: 32, height: 32)
+                    .padding(8)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel(L("Remove"))
             .disabled(manager.isPlayingRoute)

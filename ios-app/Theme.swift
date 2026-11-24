@@ -529,7 +529,8 @@ private struct PopupCloseButton: View {
                 .foregroundStyle(Theme.muted)
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(Theme.control))
-                .contentShape(Circle())
+                .padding(8)
+                .contentShape(Rectangle())
         }
         // The card plays the sound, which depends on whether it asks first.
         .buttonStyle(.plain)

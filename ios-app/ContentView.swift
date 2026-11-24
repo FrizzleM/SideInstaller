@@ -326,7 +326,8 @@ struct ContentView: View {
                             .foregroundStyle(Theme.muted)
                             .frame(width: 28, height: 28)
                             .background(Circle().fill(Theme.control))
-                            .contentShape(Circle())
+                            .padding(8)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain, sound: .dismiss)
                 }
@@ -520,6 +521,7 @@ struct ContentView: View {
                     Button { ipaLink = "" } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(Theme.muted)
+                            .frame(minWidth: 44, minHeight: 44)
                     }
                     .buttonStyle(.plain, sound: .tick)
                 }
@@ -527,6 +529,7 @@ struct ContentView: View {
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.title3)
                         .foregroundStyle(linkIsUsable ? Theme.accent : Color.secondary.opacity(0.5))
+                        .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain, sound: .tap)
                 .disabled(!linkIsUsable)
@@ -1066,7 +1069,8 @@ struct ContentView: View {
                 .foregroundStyle(Theme.muted)
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(Theme.control))
-                .contentShape(Circle())
+                .padding(8)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain, sound: .tap)
         .disabled(engine.isCancelling)
@@ -1088,7 +1092,8 @@ struct ContentView: View {
             stepsExpanded.toggle()
         } label: {
             disclosureChevron(expanded: stepsExpanded)
-                .contentShape(Circle())
+                .padding(8)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain, sound: .tick)
         .accessibilityLabel(stepsExpanded ? L("Show fewer steps") : L("Show all steps"))

@@ -838,9 +838,10 @@ final class Engine {
                 deviceName = nil
                 setGuide(nil)
             } catch {
-                let msg = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                let msg = userFacingErrorMessage(error)
+                let raw = String(describing: error)
                 lastError = msg
-                log("⛔️ Stopped: \(msg)")
+                log("⛔️ Stopped: \(raw)")
                 failActiveStep(to: .failed)
             }
             InstallActivity.shared.runEnded(outcome)
@@ -1671,7 +1672,8 @@ final class Engine {
         let version = src == .custom ? nil : selectedVersion
         // Keyed on source, channel and version, so changing any re-fetches.
         if let p = downloadedIPAPath, downloadedSource == src, downloadedChannel == channel,
-           downloadedVersion == version?.tag, FileManager.default.fileExists(atPath: p) {
+           downloadedVersion == version?.tag, FileManager.default.fileExists(atPath: p),
+           DownloadLedger.isManaged(URL(fileURLWithPath: p)) {
             log("\(buildName(src, channel, version)) IPA already downloaded — skipping.")
             setStep(.download, .done)
             return
@@ -2468,9 +2470,10 @@ final class Engine {
                 deviceName = nil
                 setGuide(nil)
             } catch {
-                let msg = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                let msg = userFacingErrorMessage(error)
+                let raw = String(describing: error)
                 lastError = msg
-                log("⛔️ Stopped: \(msg)")
+                log("⛔️ Stopped: \(raw)")
                 failActiveStep(to: .failed)
             }
             InstallActivity.shared.runEnded(outcome)
@@ -2635,9 +2638,10 @@ final class Engine {
                 deviceName = nil
                 setGuide(nil)
             } catch {
-                let msg = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                let msg = userFacingErrorMessage(error)
+                let raw = String(describing: error)
                 lastError = msg
-                log("⛔️ Stopped: \(msg)")
+                log("⛔️ Stopped: \(raw)")
                 failActiveStep(to: .failed)
             }
             InstallActivity.shared.runEnded(outcome)
@@ -4394,7 +4398,7 @@ final class Engine {
         if raw.localizedCaseInsensitiveContains("passcode") {
             return EngineError.message(L("iOS turns Developer Mode on from here only while this iPhone has no passcode. Tap “Show Developer Mode in Settings” and turn it on there instead."))
         }
-        return EngineError.message(L("This iPhone didn't take the Developer Mode request: %@", short(error)))
+        return EngineError.message(L("This iPhone didn't take the Developer Mode request: %@", error is DeviceConnection.FFIError ? L("the connection to this iPhone failed") : short(error)))
     }
 
 

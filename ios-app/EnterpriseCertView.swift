@@ -1389,6 +1389,8 @@ struct EnterpriseCertView: View {
                         Button { removePreset(preset) } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(Theme.muted)
+                                .padding(8)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
@@ -1472,6 +1474,8 @@ struct EnterpriseCertView: View {
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(Theme.muted)
+                                .padding(8)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
