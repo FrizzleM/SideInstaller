@@ -186,6 +186,7 @@ func friendlyRustError(_ raw: String) -> String {
         "插件 zip 读取失败", "建 Frameworks 失败", "参数不对", "压缩失败",
         "读压缩包失败", "压缩包打不开", "建解压目录失败", "解压失败",
         "读文件失败", "写文件失败", "读文件夹失败",
+        "不是 Mach-O 文件", "新名字不能为空", "新名字太长", "没找到这个依赖",
     ]
     for prefix in chinesePrefixes where raw.hasPrefix(prefix) {
         if let colon = raw.firstIndex(of: "：") { return String(raw[..<colon]) }

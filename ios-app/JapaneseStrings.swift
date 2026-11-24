@@ -1013,8 +1013,6 @@ let japaneseStrings: [String: String] = [
         "%@ の相手の iPhone が接続を拒否しました。デベロッパモードが有効なときだけ接続を受け付け、再起動のたびに iOS が確認を求めます。相手の iPhone で「設定 › プライバシーとセキュリティ › デベロッパモード」を有効にしてから、もう一度お試しください。",
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "%@ の相手の iPhone に接続できませんでした。両方の iPhone が同じ Wi-Fi ネットワークに接続されていること、この iPhone の「設定」で SideInstaller のローカルネットワークがオンになっていることを確認してください。ゲストネットワークや公共のネットワークでは、デバイス同士の通信が遮断されることがよくあります。",
-    "The link to their iPhone didn't come up: %@":
-        "相手の iPhone との接続を確立できませんでした：%@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "相手の iPhone で「設定」>「一般」>「VPN とデバイス管理」を開きます。",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
@@ -1380,4 +1378,12 @@ let japaneseStrings: [String: String] = [
     "The route server couldn't plan this route.": "ルートサーバーがこのルートを計画できませんでした。",
     "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "相手の iPhone は接続されましたが、コードを求める前に応答しなくなりました。もう一度ペアリングしてください。",
     "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "ペアリングコードが時間内に入力されませんでした。もう一度ペアリングし、コードが表示されたら入力してください。",
+    "Their iPhone rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with their iPhone again to get a fresh file.":
+        "相手の iPhone がこのペアリングファイルを拒否しました。別のデバイスのものか、ペアリングが無効になっています（リセット、復元、またはデベロッパモードがオフになったため）。相手の iPhone ともう一度ペアリングして、新しいファイルを取得してください。",
+    "Their iPhone answered, but the tunnel port it opened couldn't be reached — something between the two iPhones is forwarding some ports and not others. Check both iPhones are on the same Wi-Fi network (not a guest network), and that Local Network is on for SideInstaller in this iPhone's Settings. Re-pairing won't help — the pairing is fine.":
+        "相手の iPhone は応答しましたが、開いたトンネルのポートに届きませんでした。2 台の iPhone の間にある何かが、一部のポートだけを通しています。両方の iPhone が同じ Wi-Fi ネットワーク（ゲストネットワーク以外）に接続されていること、この iPhone の「設定」で SideInstaller のローカルネットワークがオンになっていることを確認してください。もう一度ペアリングしても意味がありません。ペアリング自体は問題ありません。",
+    "Their iPhone never answered the tunnel port and never refused it — the connection is being swallowed rather than rejected. That's usually the Wi-Fi network or a firewall dropping traffic on the way. Check both iPhones are on the same Wi-Fi network, then try again.":
+        "相手の iPhone はトンネルのポートに応答も拒否もしませんでした。接続は拒否されるのではなく、途中で消えています。通常、Wi-Fi ネットワークやファイアウォールが途中で通信を捨てています。両方の iPhone が同じ Wi-Fi ネットワークに接続されていることを確認してから、もう一度お試しください。",
+    "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
+        "何かがトンネル接続を受け付けましたが、その上の暗号化ハンドシェイクが失敗しました。別のプロセスがそのポートを占有しているか、このペアリングファイルのキーが相手の iPhone と合わなくなっています。もう一度ペアリングしてください。",
 ]

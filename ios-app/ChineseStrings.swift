@@ -601,8 +601,6 @@ let chineseStrings: [String: String] = [
         "对方位于 %@ 的 iPhone 拒绝了连接。只有开启开发者模式时它才接受连接，而且每次重启后 iOS 都会要求再次确认：请在对方 iPhone 的 设置 › 隐私与安全性 › 开发者模式 中打开它，然后重试。",
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "无法连接到位于 %@ 的对方 iPhone。请确认两台 iPhone 连接的是同一个 Wi-Fi 网络，并确认已在这台 iPhone 的 设置 中为 SideInstaller 打开本地网络。访客网络和公共网络通常会阻止设备之间互相连接。",
-    "The link to their iPhone didn't come up: %@":
-        "未能建立与对方 iPhone 的连接：%@",
     "%d%% downloaded": "已下载 %d%%",
     "%d%% uploaded": "已上传 %d%%",
     "Start the install": "开始安装",
@@ -1393,4 +1391,12 @@ let chineseStrings: [String: String] = [
     "The route server couldn't plan this route.": "路线服务器规划不出这条路线。",
     "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "对方 iPhone 连上了，但一直没弹出配对码。重新配对一次。",
     "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "配对码没在规定时间内输入。重新配对，看到码就尽快输入。",
+    "Their iPhone rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with their iPhone again to get a fresh file.":
+        "对方 iPhone 拒了这个配对文件：它属于另一台设备，或配对已被吊销（还原、恢复出厂，或开发模式被关掉）。与对方 iPhone 重新配对一次，拿个新文件。",
+    "Their iPhone answered, but the tunnel port it opened couldn't be reached — something between the two iPhones is forwarding some ports and not others. Check both iPhones are on the same Wi-Fi network (not a guest network), and that Local Network is on for SideInstaller in this iPhone's Settings. Re-pairing won't help — the pairing is fine.":
+        "对方 iPhone 有响应，但它打开的隧道端口够不着——两台手机之间有东西只放行部分端口。检查两台 iPhone 是否在同一个 Wi-Fi 网络（不要用访客网络），并确认本机设置里已给 SideInstaller 开本地网络。重新配对没用——配对本身没问题。",
+    "Their iPhone never answered the tunnel port and never refused it — the connection is being swallowed rather than rejected. That's usually the Wi-Fi network or a firewall dropping traffic on the way. Check both iPhones are on the same Wi-Fi network, then try again.":
+        "对方 iPhone 既不响应也不拒绝隧道端口——连接被吞掉了，不是被拒绝。通常是 Wi-Fi 网络或防火墙在半路丢了流量。检查两台 iPhone 是否在同一个 Wi-Fi 网络，然后重试。",
+    "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
+        "有东西接了隧道连接，但上层的加密握手失败了。要么是别的进程占了这个端口，要么是配对文件的密钥与对方 iPhone 不匹配了。重新配对一次。",
 ]

@@ -1142,10 +1142,13 @@ final class SideBySideManager: ObservableObject {
         throw EngineError.message(ErrorHelp.explained(L("Their iPhone runs iOS %@. From iOS 26.4 on, %@ can't use the pairing their iPhone gives over Wi-Fi. iOS 27 pairs from its own Settings instead, which works: update their iPhone, then try again and answer No when asked for its IP.", version, app.displayName)))
     }
 
-    /// What to say when the link to their iPhone didn't come up. The error's
+    /// What to say when the link to their iPhone didn't come up. RsdUnreachable
+    /// takes the two Side by Side arms below; PairVerify, HostsRefused, Timeout
+    /// and TlsHandshake take this function's own Side by Side wording (the error's
     /// own advice is about the Install tab's loopback VPN, which Side by Side
-    /// doesn't use. `typed` is true when `ip` was typed in here, rather than
-    /// the address their iPhone paired from.
+    /// doesn't use); Other and unknown kinds reuse `error.advice`, which is a
+    /// generic sentence with no VPN wording. `typed` is true when `ip` was typed
+    /// in here, rather than the address their iPhone paired from.
     private static func tunnelAdvice(_ error: DeviceConnection.TunnelError, ip: String,
                                      typed: Bool = false) -> String {
         switch error.kind {
@@ -1154,7 +1157,18 @@ final class SideBySideManager: ObservableObject {
         case TunnelFailureRsdUnreachable:
             return unreachableAdvice(ip: ip, typed: typed)
         default:
-            return L("The link to their iPhone didn't come up: %@", error.underlying.description)
+            switch error.kind {
+            case TunnelFailurePairVerify:
+                return L("Their iPhone rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with their iPhone again to get a fresh file.")
+            case TunnelFailureHostsRefused:
+                return L("Their iPhone answered, but the tunnel port it opened couldn't be reached — something between the two iPhones is forwarding some ports and not others. Check both iPhones are on the same Wi-Fi network (not a guest network), and that Local Network is on for SideInstaller in this iPhone's Settings. Re-pairing won't help — the pairing is fine.")
+            case TunnelFailureTimeout:
+                return L("Their iPhone never answered the tunnel port and never refused it — the connection is being swallowed rather than rejected. That's usually the Wi-Fi network or a firewall dropping traffic on the way. Check both iPhones are on the same Wi-Fi network, then try again.")
+            case TunnelFailureTlsHandshake:
+                return L("Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.")
+            default:
+                return error.advice
+            }
         }
     }
 

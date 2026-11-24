@@ -595,8 +595,6 @@ let vietnameseStrings: [String: String] = [
         "iPhone của họ ở %@ đã từ chối kết nối. Máy chỉ chấp nhận khi bật Chế độ nhà phát triển, và iOS yêu cầu xác nhận lại sau mỗi lần khởi động lại: trên iPhone của họ, hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển rồi thử lại.",
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "Không kết nối được tới iPhone của họ ở %@. Hãy kiểm tra xem hai iPhone có cùng một mạng Wi-Fi không, và Mạng cục bộ đã được bật cho SideInstaller trong Cài đặt của iPhone này chưa. Mạng khách và mạng công cộng thường ngăn các thiết bị kết nối với nhau.",
-    "The link to their iPhone didn't come up: %@":
-        "Không mở được kết nối tới iPhone của họ: %@",
     "%d%% downloaded": "Đã tải %d%%",
     "%d%% uploaded": "Đã tải lên %d%%",
     "Start the install": "Bắt đầu cài đặt",
@@ -1409,4 +1407,12 @@ let vietnameseStrings: [String: String] = [
     "The route server couldn't plan this route.": "Máy chủ tuyến đường không thể lập tuyến đường này.",
     "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "iPhone của họ đã kết nối nhưng ngừng phản hồi trước khi yêu cầu mã. Hãy ghép nối lại.",
     "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "Mã ghép nối chưa được nhập kịp thời. Hãy ghép nối lại và nhập mã ngay khi mã xuất hiện.",
+    "Their iPhone rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with their iPhone again to get a fresh file.":
+        "iPhone của họ đã từ chối tệp ghép nối này: tệp thuộc về một thiết bị khác, hoặc việc ghép nối đã bị thu hồi (đặt lại, khôi phục, hoặc Chế độ nhà phát triển bị tắt). Hãy ghép nối lại với iPhone của họ để lấy một tệp mới.",
+    "Their iPhone answered, but the tunnel port it opened couldn't be reached — something between the two iPhones is forwarding some ports and not others. Check both iPhones are on the same Wi-Fi network (not a guest network), and that Local Network is on for SideInstaller in this iPhone's Settings. Re-pairing won't help — the pairing is fine.":
+        "iPhone của họ đã phản hồi, nhưng không tới được cổng đường hầm mà nó đã mở — có thứ gì đó giữa hai iPhone chỉ cho một số cổng đi qua. Hãy kiểm tra xem hai iPhone có cùng một mạng Wi-Fi (không phải mạng khách) không, và Mạng cục bộ đã được bật cho SideInstaller trong Cài đặt của iPhone này chưa. Ghép nối lại cũng không giúp được gì — việc ghép nối vẫn ổn.",
+    "Their iPhone never answered the tunnel port and never refused it — the connection is being swallowed rather than rejected. That's usually the Wi-Fi network or a firewall dropping traffic on the way. Check both iPhones are on the same Wi-Fi network, then try again.":
+        "iPhone của họ không bao giờ trả lời cổng đường hầm mà cũng không từ chối — kết nối đang bị nuốt mất chứ không phải bị từ chối. Thường là do mạng Wi-Fi hoặc tường lửa làm rớt lưu lượng trên đường đi. Hãy kiểm tra xem hai iPhone có cùng một mạng Wi-Fi không rồi thử lại.",
+    "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
+        "Đã có thứ gì đó chấp nhận kết nối đường hầm, nhưng quá trình bắt tay mã hóa phía trên đã thất bại. Hoặc một tiến trình khác đang giữ cổng đó, hoặc khóa của tệp ghép nối này không còn khớp với iPhone của họ nữa. Hãy ghép nối lại.",
 ]

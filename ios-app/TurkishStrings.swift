@@ -611,7 +611,6 @@ let turkishStrings: [String: String] = [
         "%@ adresindeki diğer iPhone bağlantıyı reddetti. Yalnızca Geliştirici Modu açıkken bağlantı kabul eder ve iOS her yeniden başlatmadan sonra Geliştirici Modu'nu yeniden onaylatır: diğer iPhone'da Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'ndan aç, sonra yeniden dene.",
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "Diğer iPhone'a %@ adresinden ulaşılamadı. İki iPhone'un aynı Wi-Fi ağında olduğunu ve bu iPhone'un Ayarlar'ında SideInstaller için Yerel Ağ'ın açık olduğunu kontrol et. Misafir ve genel ağlar cihazların birbirine ulaşmasını sıkça engeller.",
-    "The link to their iPhone didn't come up: %@": "Diğer iPhone ile bağlantı kurulamadı: %@",
     "%d%% downloaded": "%%%d indirildi",
     "%d%% uploaded": "%%%d yüklendi",
     "Start the install": "Yüklemeyi başlat",
@@ -1328,4 +1327,12 @@ let turkishStrings: [String: String] = [
     "The route server couldn't plan this route.": "Rota sunucusu bu rotayı planlayamadı.",
     "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "Karşı tarafın iPhone'u bağlandı ama kod istemeden yanıt vermeyi kesti. Yeniden eşleştirmeyi deneyin.",
     "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "Eşleştirme kodu zamanında girilmedi. Yeniden eşleştirin ve kod göründüğünde girin.",
+    "Their iPhone rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with their iPhone again to get a fresh file.":
+        "Diğer iPhone bu eşleştirme dosyasını reddetti: dosya başka bir cihaza ait ya da eşleştirme iptal edilmiş (sıfırlama, geri yükleme veya Geliştirici Modu'nun kapatılması). Yeni bir dosya almak için diğer iPhone ile yeniden eşleştir.",
+    "Their iPhone answered, but the tunnel port it opened couldn't be reached — something between the two iPhones is forwarding some ports and not others. Check both iPhones are on the same Wi-Fi network (not a guest network), and that Local Network is on for SideInstaller in this iPhone's Settings. Re-pairing won't help — the pairing is fine.":
+        "Diğer iPhone yanıt verdi, ama açtığı tünel portuna ulaşılamadı. İki iPhone arasında bir şey bazı portları geçirip bazılarını geçirmiyor. İki iPhone'un aynı Wi-Fi ağında (misafir ağı değil) olduğunu ve bu iPhone'un Ayarlar'ında SideInstaller için Yerel Ağ'ın açık olduğunu kontrol et. Yeniden eşleştirmek işe yaramaz, eşleştirme sağlam.",
+    "Their iPhone never answered the tunnel port and never refused it — the connection is being swallowed rather than rejected. That's usually the Wi-Fi network or a firewall dropping traffic on the way. Check both iPhones are on the same Wi-Fi network, then try again.":
+        "Diğer iPhone tünel portuna ne yanıt verdi ne de reddetti. Bağlantı reddedilmiyor, yolda yutuluyor. Genellikle Wi-Fi ağı ya da bir güvenlik duvarı trafiği yolda düşürüyor. İki iPhone'un aynı Wi-Fi ağında olduğunu kontrol edip yeniden dene.",
+    "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
+        "Bir şey tünel bağlantısını kabul etti ama üstündeki şifreli el sıkışma başarısız oldu. Ya başka bir işlem o portu tutuyor ya da bu eşleştirme dosyasının anahtarı artık diğer iPhone ile uyuşmuyor. Yeniden eşleştir.",
 ]

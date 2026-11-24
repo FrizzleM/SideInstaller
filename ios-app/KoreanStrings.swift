@@ -1014,8 +1014,6 @@ let koreanStrings: [String: String] = [
         "%@에 있는 상대방 iPhone이 연결을 거부했습니다. 개발자 모드가 켜져 있을 때만 연결을 받으며, iOS는 재시동할 때마다 개발자 모드를 다시 확인하라고 요청합니다. 상대방 iPhone에서 설정 › 개인정보 보호 및 보안 › 개발자 모드를 켠 뒤 다시 시도하세요.",
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "%@에 있는 상대방 iPhone에 연결할 수 없습니다. 두 iPhone이 같은 Wi-Fi 네트워크에 있는지, 이 iPhone의 설정에서 SideInstaller의 로컬 네트워크가 켜져 있는지 확인하세요. 게스트 네트워크나 공용 네트워크는 기기끼리 연결되지 않는 경우가 많습니다.",
-    "The link to their iPhone didn't come up: %@":
-        "상대방 iPhone과의 연결이 만들어지지 않았습니다: %@",
     "On their iPhone: Settings › General › VPN & Device Management.":
         "상대방 iPhone에서: 설정 › 일반 › VPN 및 기기 관리.",
     "Tap the Apple ID under “Developer App”, then tap Trust.":
@@ -1381,4 +1379,12 @@ let koreanStrings: [String: String] = [
     "The route server couldn't plan this route.": "경로 서버가 이 경로를 계획하지 못했습니다.",
     "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "상대방 iPhone은 연결되었지만 코드를 요청하기 전에 응답을 멈췄습니다. 다시 페어링하세요.",
     "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "페어링 코드가 제시간에 입력되지 않았습니다. 다시 페어링하고 코드가 나타나면 입력하세요.",
+    "Their iPhone rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with their iPhone again to get a fresh file.":
+        "상대방 iPhone이 이 페어링 파일을 거부했습니다. 다른 기기의 파일이거나 페어링이 취소되었습니다(초기화, 복원, 또는 개발자 모드가 꺼진 경우). 상대방 iPhone과 다시 페어링해서 새 파일을 받으세요.",
+    "Their iPhone answered, but the tunnel port it opened couldn't be reached — something between the two iPhones is forwarding some ports and not others. Check both iPhones are on the same Wi-Fi network (not a guest network), and that Local Network is on for SideInstaller in this iPhone's Settings. Re-pairing won't help — the pairing is fine.":
+        "상대방 iPhone은 응답했지만, 연 터널 포트에 닿을 수 없었습니다. 두 iPhone 사이에 있는 무언가가 일부 포트만 통과시키고 있습니다. 두 iPhone이 같은 Wi-Fi 네트워크(게스트 네트워크 제외)에 있는지, 이 iPhone의 설정에서 SideInstaller의 로컬 네트워크가 켜져 있는지 확인하세요. 다시 페어링해도 소용없습니다. 페어링 자체는 문제없습니다.",
+    "Their iPhone never answered the tunnel port and never refused it — the connection is being swallowed rather than rejected. That's usually the Wi-Fi network or a firewall dropping traffic on the way. Check both iPhones are on the same Wi-Fi network, then try again.":
+        "상대방 iPhone은 터널 포트에 응답하지도, 거부하지도 않았습니다. 연결이 거부되는 것이 아니라 삼켜지고 있습니다. 보통 Wi-Fi 네트워크나 방화벽이 도중에 트래픽을 버리기 때문입니다. 두 iPhone이 같은 Wi-Fi 네트워크에 있는지 확인한 뒤 다시 시도하세요.",
+    "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
+        "무언가가 터널 연결을 받아들였지만, 그 위의 암호화된 핸드셰이크가 실패했습니다. 다른 프로세스가 그 포트를 점유하고 있거나, 이 페어링 파일의 키가 더 이상 상대방 iPhone과 맞지 않습니다. 다시 페어링하세요.",
 ]

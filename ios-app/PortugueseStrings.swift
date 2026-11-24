@@ -595,8 +595,6 @@ let portugueseStrings: [String: String] = [
         "O iPhone dele em %@ recusou a conexão. Ele só aceita com o Modo de Desenvolvedor ligado, e o iOS pede para confirmar de novo depois de cada reinício: no iPhone dele, ative em Ajustes › Privacidade e Segurança › Modo de Desenvolvedor e tente outra vez.",
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "Não foi possível alcançar o iPhone dele em %@. Confira se os dois iPhones estão na mesma rede Wi-Fi e se a Rede Local está ativada para o SideInstaller nos Ajustes deste iPhone. Redes de convidados e redes públicas muitas vezes impedem que os aparelhos se comuniquem.",
-    "The link to their iPhone didn't come up: %@":
-        "Não foi possível abrir a conexão com o iPhone dele: %@",
     "%d%% downloaded": "%d%% baixado",
     "%d%% uploaded": "%d%% enviado",
     "Start the install": "Iniciar a instalação",
@@ -1402,4 +1400,12 @@ let portugueseStrings: [String: String] = [
     "The route server couldn't plan this route.": "O servidor de rotas não conseguiu planejar esta rota.",
     "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "O iPhone deles conectou, mas parou de responder antes de pedir um código. Tente parear novamente.",
     "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "O código de pareamento não foi digitado a tempo. Pareie novamente e digite o código quando ele aparecer.",
+    "Their iPhone rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with their iPhone again to get a fresh file.":
+        "O iPhone dele rejeitou este arquivo de pareamento: ele pertence a outro aparelho, ou o pareamento foi revogado (uma redefinição, uma restauração ou o Modo de Desenvolvedor desativado). Pareie o iPhone dele novamente para obter um arquivo novo.",
+    "Their iPhone answered, but the tunnel port it opened couldn't be reached — something between the two iPhones is forwarding some ports and not others. Check both iPhones are on the same Wi-Fi network (not a guest network), and that Local Network is on for SideInstaller in this iPhone's Settings. Re-pairing won't help — the pairing is fine.":
+        "O iPhone dele respondeu, mas não foi possível alcançar a porta do túnel que ele abriu — algo entre os dois iPhones está liberando apenas algumas portas. Confira se os dois iPhones estão na mesma rede Wi-Fi (não uma rede de convidados) e se a Rede Local está ativada para o SideInstaller nos Ajustes deste iPhone. Parear de novo não vai ajudar — o pareamento está bom.",
+    "Their iPhone never answered the tunnel port and never refused it — the connection is being swallowed rather than rejected. That's usually the Wi-Fi network or a firewall dropping traffic on the way. Check both iPhones are on the same Wi-Fi network, then try again.":
+        "O iPhone dele nunca respondeu à porta do túnel nem a recusou — a conexão está sendo engolida, não rejeitada. Geralmente é a rede Wi-Fi ou um firewall descartando o tráfego no caminho. Confira se os dois iPhones estão na mesma rede Wi-Fi e tente outra vez.",
+    "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
+        "Algo aceitou a conexão do túnel, mas o aperto de mão criptografado por cima falhou. Ou outro processo está segurando essa porta, ou a chave deste arquivo de pareamento não corresponde mais ao iPhone dele. Pareie novamente.",
 ]

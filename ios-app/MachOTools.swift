@@ -32,8 +32,9 @@ enum MachOTool {
             if let error { si_string_free(error) }
         }
         guard rc == 0, let json else {
-            throw EngineError.message(
-                error.map { String(cString: $0) } ?? L("不是 Mach-O 文件"))
+            let raw = error.map { String(cString: $0) }
+            if let raw { Engine.shared.log("Mach-O info failed: \(raw)") }
+            throw EngineError.message(raw.map(friendlyRustError) ?? L("不是 Mach-O 文件"))
         }
         return try JSONDecoder().decode(Info.self, from: Data(String(cString: json).utf8))
     }
@@ -48,7 +49,9 @@ enum MachOTool {
         }
         defer { if let error { si_string_free(error) } }
         guard rc == 0 else {
-            return error.map { String(cString: $0) } ?? L("改不了")
+            let raw = error.map { String(cString: $0) }
+            if let raw { Engine.shared.log("Mach-O edit failed: \(raw)") }
+            return raw.map(friendlyRustError) ?? L("改不了")
         }
         return nil
     }
@@ -63,6 +66,9 @@ struct MachOView: View {
     @State private var info: MachOTool.Info?
     @State private var loadError: String?
     @State private var opError: String?
+    /// An edit (remove / rename) is in flight; blocks starting another one
+    /// until it lands, so two edits can't read the same original file.
+    @State private var editBusy = false
     @State private var renameTarget: MachOTool.Dep?
     @State private var renameText = ""
 
@@ -136,7 +142,7 @@ struct MachOView: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
             Button(L("Cancel"), role: .cancel) { renameTarget = nil }
-            Button(L("Save")) { performRename() }
+            Button(L("Save")) { performRename() }.disabled(editBusy)
         } message: {
             Text(L("新名字必须装得进原来的命令长度，太长会改不了。"))
         }
@@ -171,7 +177,7 @@ struct MachOView: View {
                     performRemove(dep)
                 } label: {
                     Label(L("Delete"), systemImage: "trash")
-                }
+                }.disabled(editBusy)
             }
             Button {
                 renameText = dep.name
@@ -180,6 +186,7 @@ struct MachOView: View {
                 Label(L("改名"), systemImage: "pencil")
             }
             .tint(Theme.blue)
+            .disabled(editBusy)
         }
     }
 
@@ -207,12 +214,15 @@ struct MachOView: View {
     }
 
     private func performRemove(_ dep: MachOTool.Dep) {
+        guard !editBusy else { return }
+        editBusy = true
         let target = url
         Task {
             let error = await Task.detached {
                 MachOTool.edit(url: target, op: ["action": "remove", "name": dep.name])
             }.value
             opError = error
+            editBusy = false
             if error == nil { load() }
         }
     }
@@ -222,12 +232,15 @@ struct MachOView: View {
         renameTarget = nil
         let newName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !newName.isEmpty, newName != dep.name else { return }
+        guard !editBusy else { return }
+        editBusy = true
         let target = url
         Task {
             let error = await Task.detached {
                 MachOTool.edit(url: target, op: ["action": "rename", "name": dep.name, "newName": newName])
             }.value
             opError = error
+            editBusy = false
             if error == nil { load() }
         }
     }

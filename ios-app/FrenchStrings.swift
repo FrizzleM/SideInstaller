@@ -600,8 +600,6 @@ let frenchStrings: [String: String] = [
         "Leur iPhone à l'adresse %@ a refusé la connexion. Il n'en accepte qu'avec le mode développeur activé, et iOS demande de le confirmer de nouveau après chaque redémarrage : sur leur iPhone, activez-le dans Réglages › Confidentialité et sécurité › Mode développeur, puis réessayez.",
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "Impossible de joindre leur iPhone à l'adresse %@. Vérifiez que les deux iPhone sont sur le même réseau Wi-Fi et que Réseau local est activé pour SideInstaller dans les Réglages de cet iPhone. Les réseaux invités et publics empêchent souvent les appareils de communiquer entre eux.",
-    "The link to their iPhone didn't come up: %@":
-        "La liaison avec leur iPhone n'a pas pu s'établir : %@",
     "%d%% downloaded": "%d%% téléchargés",
     "%d%% uploaded": "%d%% envoyés",
     "Start the install": "Lancer l'installation",
@@ -1417,4 +1415,12 @@ let frenchStrings: [String: String] = [
     "The route server couldn't plan this route.": "Le serveur d'itinéraires n'a pas pu planifier cet itinéraire.",
     "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "Leur iPhone s'est connecté mais n'a pas répondu avant de demander un code. Essayez de jumeler à nouveau.",
     "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "Le code de jumelage n'a pas été saisi à temps. Jumelez à nouveau et saisissez le code dès qu'il apparaît.",
+    "Their iPhone rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with their iPhone again to get a fresh file.":
+        "Leur iPhone a rejeté ce fichier de jumelage : il appartient à un autre appareil, ou le jumelage a été révoqué (une réinitialisation, une restauration, ou le mode développeur désactivé). Jumelez à nouveau leur iPhone pour obtenir un nouveau fichier.",
+    "Their iPhone answered, but the tunnel port it opened couldn't be reached — something between the two iPhones is forwarding some ports and not others. Check both iPhones are on the same Wi-Fi network (not a guest network), and that Local Network is on for SideInstaller in this iPhone's Settings. Re-pairing won't help — the pairing is fine.":
+        "Leur iPhone a répondu, mais le port du tunnel qu'il a ouvert est inaccessible — quelque chose entre les deux iPhone ne laisse passer que certains ports. Vérifiez que les deux iPhone sont sur le même réseau Wi-Fi (pas un réseau invité) et que Réseau local est activé pour SideInstaller dans les Réglages de cet iPhone. Jumeler à nouveau ne servira à rien — le jumelage est bon.",
+    "Their iPhone never answered the tunnel port and never refused it — the connection is being swallowed rather than rejected. That's usually the Wi-Fi network or a firewall dropping traffic on the way. Check both iPhones are on the same Wi-Fi network, then try again.":
+        "Leur iPhone n'a jamais répondu au port du tunnel, ni refusé la connexion — la connexion est avalée plutôt que rejetée. C'est généralement le réseau Wi-Fi ou un pare-feu qui bloque le trafic en route. Vérifiez que les deux iPhone sont sur le même réseau Wi-Fi, puis réessayez.",
+    "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
+        "Quelque chose a accepté la connexion du tunnel, mais la poignée de main chiffrée par-dessus a échoué. Soit un autre processus occupe ce port, soit la clé de ce fichier de jumelage ne correspond plus à leur iPhone. Jumelez à nouveau.",
 ]
