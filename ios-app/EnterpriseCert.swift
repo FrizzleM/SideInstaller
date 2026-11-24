@@ -1232,13 +1232,18 @@ enum SignedIPAStore {
     /// 私有 save()（本 Store 的唯一写入口：add / remove /
     /// fillMissingCertInfo / renameFile 全经它），写回成功才更新
     /// 缓存，写失败清缓存、下次重读盘，不拿内存冒充磁盘。
-    private static let cacheLock = NSLock()
+    /// B-39-B1：一把锁管缓存 + 清单——旧分工里读盘不拿锁、写盘只在
+    /// 更新缓存时拿锁，六个写点全是无锁 RMW；
+    /// fill 的快照在 Task.detached 里跑数秒，新签记录会被旧快照
+    /// 覆盖丢。storeLock 串行化全部六个写点；解析（秒级）绝不
+    /// 在锁内做，只快照与合并两个瞬间持锁。
+    private static let storeLock = NSLock()
     private static var cachedRecords: [SignedIPARecord]?
 
     static func load() -> [SignedIPARecord] {
         let records: [SignedIPARecord] = {
-            cacheLock.lock()
-            defer { cacheLock.unlock() }
+            storeLock.lock()
+            defer { storeLock.unlock() }
             if let cached = cachedRecords { return cached }
             let loaded = loadRaw()
             cachedRecords = loaded
@@ -1253,24 +1258,23 @@ enum SignedIPAStore {
     /// load() 按文件存在过滤，拿它当保存底本会把“移出 Signed 目录”
     /// 的记录永久抹掉（文件移回来也找不回）；显示层继续用 load()，
     /// 移走的文件本来就不该显示，但记录要留着等人移回来。
-    static func loadRaw() -> [SignedIPARecord] {
+    /// 只许本 Store 内部调（调用方只剩 load() 与六个写点）。
+    private static func loadRaw() -> [SignedIPARecord] {
         guard let data = try? Data(contentsOf: manifestURL),
               let records = try? JSONDecoder().decode([SignedIPARecord].self, from: data)
         else { return [] }
         return records.sorted { $0.date > $1.date }
     }
 
+    /// 写盘 + 更新缓存。调用方必须持有 storeLock（本函数内不再加锁）——
+    /// 六个写点把"读-改-写"整段包进锁里，save() 只做写盘这一步。
     private static func save(_ records: [SignedIPARecord]) {
         do {
             let data = try JSONEncoder().encode(records)
             try data.write(to: manifestURL, options: .atomic)
-            cacheLock.lock()
-            defer { cacheLock.unlock() }
             cachedRecords = records
         } catch {
             // 写失败：清缓存，下次 load() 重读盘，不拿内存冒充磁盘。
-            cacheLock.lock()
-            defer { cacheLock.unlock() }
             cachedRecords = nil
         }
     }
@@ -1278,11 +1282,15 @@ enum SignedIPAStore {
     static func add(_ record: SignedIPARecord) {
         // 同文件名只留一条（id 就是 fileName）：并发签出同名时
         // 不再出现两个同 id 记录，删的时候也不会误删一对。
+        storeLock.lock()
+        defer { storeLock.unlock() }
         save([record] + loadRaw().filter { $0.fileName != record.fileName })
     }
 
     static func remove(_ record: SignedIPARecord) {
         try? FileManager.default.removeItem(at: url(for: record))
+        storeLock.lock()
+        defer { storeLock.unlock() }
         save(loadRaw().filter { $0.fileName != record.fileName })
     }
 
@@ -1291,6 +1299,8 @@ enum SignedIPAStore {
     /// 连刚传上来的新文件一起删掉，绝不能用在这里。
     /// 经私有 save() 走，A-8 缓存同步更新。
     static func forget(_ record: SignedIPARecord) {
+        storeLock.lock()
+        defer { storeLock.unlock() }
         save(loadRaw().filter { $0.fileName != record.fileName })
     }
 
@@ -1300,6 +1310,8 @@ enum SignedIPAStore {
         for record in records {
             try? FileManager.default.removeItem(at: url(for: record))
         }
+        storeLock.lock()
+        defer { storeLock.unlock() }
         save(loadRaw().filter { !names.contains($0.fileName) })
     }
 
@@ -1309,7 +1321,8 @@ enum SignedIPAStore {
     /// 文件页都重解；键 = 文件指纹 + 当前团队——换证书后键变了自动
     /// 重算，不会把旧证书下的“不符”带到新证书上；文件换了指纹变，
     /// 旧键自然失效。fillMissingCertInfo 跑在 Task.detached 里，
-    /// .task 重入可能并发，读写同一把锁。
+    /// .task 重入可能并发；清单 RMW 由 storeLock 串行化（B-39-B1），
+    /// 这把锁只守 provisionTeamTried 集合，不管清单。
     private static let provisionTeamTriedLock = NSLock()
     private static var provisionTeamTried: Set<String> = []
 
@@ -1327,7 +1340,12 @@ enum SignedIPAStore {
               !currentTeam.isEmpty,
               let currentName = EnterpriseCertStore.certInfo?.name,
               !currentName.isEmpty else { return false }
-        var records = loadRaw()
+        // B-39-B1 (a) 快照：持锁读一次，立即放锁；解析在锁外跑。
+        var records: [SignedIPARecord] = {
+            storeLock.lock()
+            defer { storeLock.unlock() }
+            return loadRaw()
+        }()
         var changed = false
         for index in records.indices {
             let old = records[index]
@@ -1358,8 +1376,31 @@ enum SignedIPAStore {
             if records[index].teamID == nil { records[index].teamID = team }
             changed = true
         }
-        if changed { save(records) }
-        return changed
+        guard changed else { return false }
+        // B-39-B1 (c) 合并写回：持锁重读当前清单，只把快照里新补出的
+        // 字段写到当前记录上仍为 nil 的字段；并发新签的原样通过，
+        // 并发删掉的不复活。无字段真正从 nil 变有值就不写盘。
+        return {
+            storeLock.lock()
+            defer { storeLock.unlock() }
+            var current = loadRaw()
+            var didMerge = false
+            let filledByName = Dictionary(records.map { ($0.fileName, $0) },
+                                          uniquingKeysWith: { first, _ in first })
+            for index in current.indices {
+                guard let filled = filledByName[current[index].fileName] else { continue }
+                if current[index].certName == nil, let name = filled.certName {
+                    current[index].certName = name
+                    didMerge = true
+                }
+                if current[index].teamID == nil, let team = filled.teamID {
+                    current[index].teamID = team
+                    didMerge = true
+                }
+            }
+            if didMerge { save(current) }
+            return didMerge
+        }()
     }
 
     /// 已签 IPA 里的描述文件团队号：只读 `Payload/*.app/embedded.mobileprovision`
@@ -1384,6 +1425,8 @@ enum SignedIPAStore {
 
     /// 文件页改名后同步清单里的文件名。
     static func renameFile(from oldName: String, to newName: String) {
+        storeLock.lock()
+        defer { storeLock.unlock() }
         var records = loadRaw()
         for index in records.indices where records[index].fileName == oldName {
             records[index].fileName = newName

@@ -33,7 +33,7 @@ struct DownloadedIPA: Identifiable, Equatable {
 
     /// Human-readable size, e.g. "42.3 MB".
     var sizeText: String {
-        ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
+        CZFFormattedSize.size(size)
     }
 }
 
@@ -138,6 +138,24 @@ struct DownloadsListView: View {
     @StateObject private var manager = DownloadsManager()
     @State private var pendingDelete: DownloadedIPA?
 
+    /// A-39-2：下载行日期文案静态缓存——照抄 SIDE-38 A4 的
+    /// ExpiryUrgency.textCache 模式；每行每 body 求值现建
+    /// Date.FormatStyle 太贵。key 带今天（值本身不依赖今天，防以后
+    /// 加相对文案时跨午夜踩坑）；>512 条整表清掉。调用方全在
+    /// 主线程 body 里，不另加锁。
+    private static var dateTextCache: [String: String] = [:]
+    private static func dateText(for modified: Date) -> String {
+        let today = Calendar.current.startOfDay(for: Date())
+        let key = "\(modified.timeIntervalSince1970)#\(Localizer.locale.identifier)#\(today.timeIntervalSince1970)"
+        if let cached = dateTextCache[key] { return cached }
+        let text = modified.formatted(
+            Date.FormatStyle(date: .abbreviated, time: .shortened)
+                .locale(Localizer.locale))
+        if dateTextCache.count > 512 { dateTextCache.removeAll() }
+        dateTextCache[key] = text
+        return text
+    }
+
     var body: some View {
         List {
             if let error = manager.lastError {
@@ -168,9 +186,7 @@ struct DownloadsListView: View {
                                 .font(.subheadline.weight(.medium))
                                 .lineLimit(1)
                             if let modified = item.modified {
-                                let when = modified.formatted(
-                                    Date.FormatStyle(date: .abbreviated, time: .shortened)
-                                        .locale(Localizer.locale))
+                                let when = Self.dateText(for: modified)
                                 Text(item.isImported ? L("Added %@", when) : L("Downloaded %@", when))
                                     .font(.caption)
                                     .foregroundStyle(Theme.muted)

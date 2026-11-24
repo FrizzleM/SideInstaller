@@ -1302,4 +1302,6 @@ let turkishStrings: [String: String] = [
     "This folder can't be renamed or moved.": "Bu klasör yeniden adlandırılamaz veya taşınamaz.",
     "This file is being signed. Wait until it finishes.": "Bu dosya imzalanıyor. Bitene kadar bekleyin.",
     "This file is being renewed. Wait until it finishes.": "Bu dosya yenileniyor. Bitene kadar bekleyin.",
+    "empty account config": "Hesap yapılandırması boş",
+    "%d files, first %@: %@": "%d dosya, ilki %@ : %@",
 ]

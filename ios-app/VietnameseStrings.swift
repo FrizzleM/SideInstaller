@@ -1384,4 +1384,6 @@ let vietnameseStrings: [String: String] = [
     "This folder can't be renamed or moved.": "Không thể đổi tên hoặc di chuyển thư mục này.",
     "This file is being signed. Wait until it finishes.": "Tệp này đang được ký. Hãy chờ cho đến khi xong.",
     "This file is being renewed. Wait until it finishes.": "Tệp này đang được gia hạn. Hãy chờ cho đến khi xong.",
+    "empty account config": "Cấu hình tài khoản trống",
+    "%d files, first %@: %@": "%d tệp, tệp đầu tiên %@ : %@",
 ]

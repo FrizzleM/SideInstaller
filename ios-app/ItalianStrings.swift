@@ -1386,4 +1386,6 @@ let italianStrings: [String: String] = [
     "This folder can't be renamed or moved.": "Questa cartella non può essere rinominata né spostata.",
     "This file is being signed. Wait until it finishes.": "Questo file è in corso di firma. Attendi che finisca.",
     "This file is being renewed. Wait until it finishes.": "Questo file è in corso di rinnovo. Attendi che finisca.",
+    "empty account config": "Configurazione dell'account vuota",
+    "%d files, first %@: %@": "%d file, il primo %@ : %@",
 ]

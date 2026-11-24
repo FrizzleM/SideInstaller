@@ -41,7 +41,7 @@ struct AltApp: Codable {
     /// Human-readable size, e.g. "42.3 MB"; nil when the source doesn't say.
     var sizeText: String? {
         guard let size, size > 0 else { return nil }
-        return ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
+        return CZFFormattedSize.size(size)
     }
 }
 

@@ -2489,7 +2489,7 @@ private struct LibraryIPAPicker: View {
     }
 
     private func secondLine(_ item: LocalFileItem) -> String {
-        let size = ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file)
+        let size = CZFFormattedSize.size(item.size)
         guard let info = infos[item.url.path] else { return size }
         var parts: [String] = []
         if let version = info.version, !version.isEmpty {

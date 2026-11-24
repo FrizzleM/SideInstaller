@@ -390,7 +390,7 @@ struct FilesTabView: View {
     /// IPA 行第二行（轻松签文件列表同款）：V版本 | 大小 | Bundle ID；
     /// 版本缺了就省掉 V 那段，解析失败只显示大小，不造假。
     private func ipaSecondLine(_ item: LocalFileItem) -> String {
-        let size = ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file)
+        let size = CZFFormattedSize.size(item.size)
         guard let info = fileIPAInfo[item.url.path] else { return size }
         var parts: [String] = []
         if let version = info.version, !version.isEmpty {
@@ -1216,12 +1216,12 @@ struct FilesTabView: View {
                     failures.append((url.lastPathComponent, error.localizedDescription))
                 }
             }
-            let failureText: String? = {
-                guard !failures.isEmpty else { return nil }
-                let first = failures[0]
-                return "\(failures.count) 个文件，首个 \(first.name)：\(first.reason)"
-            }()
+            let failureCount = failures.count
+            let firstFailure = failures.first
             await MainActor.run {
+                let failureText: String? = firstFailure.map {
+                    L("%d files, first %@: %@", failureCount, $0.name, $0.reason)
+                }
                 importError = failureText.map { L("导入失败：%@", $0) }
                 // UI-2(b)：导入失败同时走顶部 alert 通道（页尾
                 // importCard 在列表底下）；页尾渲染保留。
@@ -1513,7 +1513,7 @@ struct FilesTabView: View {
         if item.isDirectory {
             return L("%d 项", item.childCount)
         }
-        let size = ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file)
+        let size = CZFFormattedSize.size(item.size)
         guard let modified = item.modified else { return size }
         return "\(size)  \(fileTimeText(modified))"
     }
@@ -2724,7 +2724,7 @@ struct FilesTabView: View {
     /// 第二行：V版本 | 大小 | Bundle ID；版本缺了就省掉 V 那段，
     /// 解析失败只显示大小，不造假。
     private func unsignedSecondLine(_ item: LocalFileItem) -> String {
-        let size = ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file)
+        let size = CZFFormattedSize.size(item.size)
         guard let info = unsignedInfo[unsignedInfoKey(for: item)] else { return size }
         var parts: [String] = []
         if let version = info.version, !version.isEmpty {
@@ -3016,7 +3016,7 @@ struct FilesTabView: View {
     /// 已签名行第二行（轻松签应用库同款）：V版本 | 大小 | Bundle ID；
     /// 版本缺了就省掉 V 那段（跟未签名行同例）。
     private func signedSecondLine(_ record: SignedIPARecord) -> String {
-        let size = ByteCountFormatter.string(fromByteCount: Int64(record.size), countStyle: .file)
+        let size = CZFFormattedSize.size(record.size)
         var parts: [String] = []
         if let version = record.version, !version.isEmpty {
             parts.append("V\(version)")

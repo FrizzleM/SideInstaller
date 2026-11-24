@@ -376,7 +376,7 @@ final class EntitlementsManager: ObservableObject {
     // MARK: FFI
 
     private func performList() throws -> [AppIdentifier] {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
         var json: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_appid_list(session, &json, &error)
@@ -398,7 +398,7 @@ final class EntitlementsManager: ObservableObject {
     }
 
     private func performEnable(appIdId: String, ids: [String]) throws -> [EntitlementOutcome] {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
         var json: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_appid_enable(session, appIdId, ids.joined(separator: ","), &json, &error)

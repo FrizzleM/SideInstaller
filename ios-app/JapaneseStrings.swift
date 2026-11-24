@@ -1354,4 +1354,6 @@ let japaneseStrings: [String: String] = [
     "This folder can't be renamed or moved.": "このフォルダは名前を変更したり移動したりできません。",
     "This file is being signed. Wait until it finishes.": "このファイルは署名中です。終わるまで待ってください。",
     "This file is being renewed. Wait until it finishes.": "このファイルは更新中です。終わるまで待ってください。",
+    "empty account config": "アカウント設定が空です",
+    "%d files, first %@: %@": "%d 個のファイル、最初は %@：%@",
 ]

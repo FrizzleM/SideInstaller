@@ -994,13 +994,15 @@ final class Engine {
         guard proceed else { return }
         switch link {
         case .install(let url):
-            installSource = .custom
             Task {
                 // C12：只凭这次导入的返回值起管线——进行中被跳过时
                 // importCustomIPA 已置 lastError，旧 IPA 不会再被
                 // 当成新导入的装掉。
                 if await importCustomIPA(fromLink: url.absoluteString),
                    IPALibrary.customImport() != nil {
+                    // B-39-B2：源赋值移到导入成功之后——导入被拒时
+                    // 在途管线读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
+                    installSource = .custom
                     runOneClick()
                 }
             }
@@ -3187,7 +3189,7 @@ final class Engine {
         }
         let payload = json.map { String(cString: $0) } ?? ""
         json.map { si_string_free($0) }
-        guard !payload.isEmpty else { throw EngineError.message("empty account config") }
+        guard !payload.isEmpty else { throw EngineError.message(L("empty account config")) }
         return payload
     }
 

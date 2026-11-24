@@ -150,7 +150,6 @@ struct SideInstallerApp: App {
                 if ["mobiledevicepairing", "plist"].contains(url.pathExtension.lowercased()) {
                     Task { await engine.importPairingFile(from: url) }
                 } else {
-                    engine.installSource = .custom
                     Task {
                         // 从分享/“打开方式”进来的 IPA 直接装：只有这次导入成功
                         // 才起管线（C12：凭返回值判，不再凭 lastError + 旧文件）。
@@ -163,6 +162,9 @@ struct SideInstallerApp: App {
                         if IPALibrary.customImport() != nil {
                             // 先跳安装页：管线在跑时进度在那一页，guard 停下时
                             // 指引卡也在那一页，不用用户自己再去安装页找。
+                            // B-39-B2：源赋值移到导入成功之后——导入被拒时
+                            // 在途管线读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
+                            engine.installSource = .custom
                             engine.sharedIPAReady = true
                             engine.runOneClick()
                         }

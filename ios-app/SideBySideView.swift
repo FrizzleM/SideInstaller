@@ -1888,7 +1888,7 @@ final class SideBySideManager: ObservableObject {
         }
         let payload = json.map { String(cString: $0) } ?? ""
         json.map { si_string_free($0) }
-        guard !payload.isEmpty else { throw EngineError.message("empty account config") }
+        guard !payload.isEmpty else { throw EngineError.message(L("empty account config")) }
         return payload
     }
 

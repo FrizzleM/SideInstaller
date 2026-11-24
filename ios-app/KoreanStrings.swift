@@ -1355,4 +1355,6 @@ let koreanStrings: [String: String] = [
     "This folder can't be renamed or moved.": "이 폴더는 이름을 바꾸거나 이동할 수 없습니다.",
     "This file is being signed. Wait until it finishes.": "이 파일은 서명 중입니다. 끝날 때까지 기다리세요.",
     "This file is being renewed. Wait until it finishes.": "이 파일은 갱신 중입니다. 끝날 때까지 기다리세요.",
+    "empty account config": "계정 구성이 비어 있습니다",
+    "%d files, first %@: %@": "%d개의 파일, 첫 번째 %@: %@",
 ]

@@ -524,7 +524,7 @@ final class CertManager: ObservableObject {
     // MARK: - List / revoke FFI
 
     private func performList() throws -> [DevCert] {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
         var json: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_cert_list(session, &json, &error)
@@ -546,7 +546,7 @@ final class CertManager: ObservableObject {
     }
 
     private func performRevoke(serial: String) throws {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
         var error: UnsafeMutablePointer<CChar>?
         let rc = si_cert_revoke(session, serial, &error)
         if rc != 0 {
@@ -563,7 +563,7 @@ final class CertManager: ObservableObject {
     private struct ImportNotOnTeam: Error {}
 
     private func performImport(p12: Data, password: String) throws -> CertImportResult {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
         var json: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         let rc = p12.withUnsafeBytes { bytes in
@@ -603,7 +603,7 @@ final class CertManager: ObservableObject {
     /// Export the signing certificate as p12 (base64) + password.
     /// Returns (p12Data, password).
     func exportP12() throws -> (Data, String) {
-        guard let session = self.session else { throw EngineError.message("Not signed in.") }
+        guard let session = self.session else { throw EngineError.message(L("Not signed in.")) }
         let email = engine.appleID
         // Machine name: use the first cert's machineName, or fallback
         let machineName = certs.first?.machineName ?? "SideInstaller"
