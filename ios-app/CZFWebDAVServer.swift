@@ -239,6 +239,18 @@ final class CZFWebDAVServer: ObservableObject {
         } catch {
             return GCDWebServerResponse(statusCode: 500)
         }
+        // B-38-B3：覆盖 Signed/ 下的已签 IPA 后，旧记录的 date/size/appName
+        // 描述的是被覆盖掉的旧包，不能留——只删记录（forget 不碰文件）。
+        // 新建（!existed）不做任何清单操作（记录只由签名流程创建）。
+        if existed {
+            let relDir = url.deletingLastPathComponent().path
+                .replacingOccurrences(of: root.path, with: "")
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if relDir == "Signed",
+               let record = SignedIPAStore.load().first(where: { $0.fileName == url.lastPathComponent }) {
+                SignedIPAStore.forget(record)
+            }
+        }
         // 201 新建，204 覆盖。
         return GCDWebServerResponse(statusCode: existed ? 204 : 201)
     }
@@ -262,6 +274,17 @@ final class CZFWebDAVServer: ObservableObject {
         if Engine.shared.isInstallingSource(path: url.path) {
             Engine.shared.log("⛔️ WebDAV DELETE refused: \(url.lastPathComponent) is being installed.")
             return GCDWebServerResponse(statusCode: 423)
+        }
+        // B-38-B3：Signed/ 下的已签 IPA，文件 + 清单记录一起删——只删文件会
+        // 留幽灵记录，同名文件再传进来时旧记录复活（日期/大小全错）。
+        // 判定照抄 LAN deleteFile 的 relDir 算法。
+        let relDir = url.deletingLastPathComponent().path
+            .replacingOccurrences(of: root.path, with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if relDir == "Signed",
+           let record = SignedIPAStore.load().first(where: { $0.fileName == url.lastPathComponent }) {
+            SignedIPAStore.remove(record)
+            return GCDWebServerResponse(statusCode: 204)
         }
         do {
             try FileManager.default.removeItem(at: url)

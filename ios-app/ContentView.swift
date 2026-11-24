@@ -1886,6 +1886,7 @@ private struct StepRow: View {
                 HStack {
                     Text(title)
                         .font(.subheadline)
+                        .lineLimit(1)
                         .foregroundStyle(state == .pending ? Theme.muted : .primary)
                     Spacer()
                     StepBadge(step: step, state: state, installProgress: installProgress)

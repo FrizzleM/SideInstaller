@@ -1286,6 +1286,14 @@ enum SignedIPAStore {
         save(loadRaw().filter { $0.fileName != record.fileName })
     }
 
+    /// B-38-B3：只删记录、不碰磁盘文件——WebDAV PUT 覆盖 Signed/ 下的
+    /// 已签 IPA 后，旧记录描述的是被覆盖掉的旧包；remove(record) 会
+    /// 连刚传上来的新文件一起删掉，绝不能用在这里。
+    /// 经私有 save() 走，A-8 缓存同步更新。
+    static func forget(_ record: SignedIPARecord) {
+        save(loadRaw().filter { $0.fileName != record.fileName })
+    }
+
     /// 批量删除：一次读清单、一次写回，不按条循环调 remove。
     static func remove(_ records: [SignedIPARecord]) {
         let names = Set(records.map { $0.fileName })

@@ -1223,7 +1223,7 @@ final class SideBySideManager: ObservableObject {
                 setStep(.signIn, .done)
                 return
             } catch let error as EngineError {
-                let failure = error.errorDescription ?? "sign-in failed"
+                let failure = error.errorDescription ?? L("Sign-in failed.")
                 // A cancelled 2FA prompt isn't the server's fault.
                 if ticket.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
@@ -3218,6 +3218,7 @@ private struct SideBySideStepRow: View {
                 HStack(spacing: 8) {
                     Text(title)
                         .font(.subheadline)
+                        .lineLimit(1)
                         .foregroundStyle(state == .pending ? Theme.muted : .primary)
                     Spacer(minLength: 4)
                     if state == .waiting {

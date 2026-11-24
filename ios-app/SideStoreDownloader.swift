@@ -1917,7 +1917,9 @@ enum IPALibrary {
     static func scan() -> [Entry] {
         let entries = describe(namesIn: documentsDir).compactMap { (name, url, attrs) -> Entry? in
             guard let kind = classify(name) else { return nil }
-            let isManaged = DownloadLedger.isManaged(url)
+            // A-38-A2：用 describe 已取到的 size/mtime 拼指纹，不再自己 stat。
+            let isManaged = DownloadLedger.isManaged(url, size: (attrs[.size] as? Int) ?? 0,
+                                                     modified: attrs[.modificationDate] as? Date)
             return Entry(source: kind.source, channel: kind.channel, url: url,
                          size: (attrs[.size] as? Int) ?? 0,
                          modified: attrs[.modificationDate] as? Date,
@@ -1945,13 +1947,19 @@ enum IPALibrary {
     }
 
     /// Directory listing paired with each entry's attributes.
+    /// A-38-A2：一次枚举预取 size/mtime（resourceValues），不再每文件
+    /// 各做一次 attributesOfItem；attrs 仍只含 .size 与 .modificationDate 两键，
+    /// 调用方（scan / customImport / installable 的 extra）一字不动。options: []
+    /// 含隐藏文件，与现行 contentsOfDirectory(atPath:) 行为一致。
     private static func describe(namesIn dir: URL) -> [(name: String, url: URL, attrs: [FileAttributeKey: Any])] {
-        let fm = FileManager.default
-        let names = (try? fm.contentsOfDirectory(atPath: dir.path)) ?? []
-        return names.compactMap { name in
-            let url = dir.appendingPathComponent(name)
-            guard let attrs = try? fm.attributesOfItem(atPath: url.path) else { return nil }
-            return (name, url, attrs)
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey], options: [])) ?? []
+        return urls.compactMap { url in
+            guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]) else { return nil }
+            var attrs: [FileAttributeKey: Any] = [:]
+            if let size = values.fileSize { attrs[.size] = size }
+            if let modified = values.contentModificationDate { attrs[.modificationDate] = modified }
+            return (url.lastPathComponent, url, attrs)
         }
     }
 
@@ -1961,6 +1969,25 @@ enum IPALibrary {
     static func entry(source: InstallSource, channel: ReleaseChannel) -> Entry? {
         guard source != .custom else { return customImport() }
         let canonical = source.fileName(channel)
+        // A-38-A3：canonical 快路——先按 canonical 文件名直接命中，省掉全量
+        // scan()。只有命中且 classify 回到同一 source/channel、且是 imported
+        // （rank 0，不可能被超越）、且无版本号时才直接返回；
+        // 其余一律回落全量 scan()（现行逻辑原样）。
+        let canonicalURL = documentsDir.appendingPathComponent(canonical)
+        if FileManager.default.fileExists(atPath: canonicalURL.path),
+           let kind = classify(canonical),
+           kind.source == source, kind.channel == channel,
+           let attrs = try? FileManager.default.attributesOfItem(atPath: canonicalURL.path) {
+            let size = (attrs[.size] as? Int) ?? 0
+            let modified = attrs[.modificationDate] as? Date
+            let isManaged = DownloadLedger.isManaged(canonicalURL, size: size, modified: modified)
+            let version = isManaged ? kind.source.version(inFileName: canonical, channel: channel) : nil
+            if version == nil, !isManaged {
+                return Entry(source: source, channel: channel, url: canonicalURL,
+                             size: size, modified: modified,
+                             isImported: true, version: nil)
+            }
+        }
         func rank(_ e: Entry) -> Int {
             (e.isImported ? 0 : 2) + (e.url.lastPathComponent == canonical ? 0 : 1)
         }
@@ -2193,9 +2220,16 @@ extension IPALibrary {
     private static func parseAppInfo(at url: URL) -> AppInfo? {
         guard let raw = infoPlist(inIPA: url),
               let plist = try? PropertyListSerialization.propertyList(from: raw, format: nil),
-              let dict = plist as? [String: Any],
-              let bundleID = dict["CFBundleIdentifier"] as? String, !bundleID.isEmpty
+              let dict = plist as? [String: Any]
         else { return nil }
+        return appInfo(from: dict)
+    }
+
+    /// A-38-A1：从已解码的 Info.plist 字典派生 AppInfo——
+    /// parseAppInfo 与 appInfoAndIconData 共用。bundleID 缺失/为空时 nil，
+    /// 与原 parseAppInfo 的 nil 语义一致。
+    private static func appInfo(from dict: [String: Any]) -> AppInfo? {
+        guard let bundleID = dict["CFBundleIdentifier"] as? String, !bundleID.isEmpty else { return nil }
         let display = dict["CFBundleDisplayName"] as? String
         let bundleName = dict["CFBundleName"] as? String
         let name = display?.isEmpty == false ? display!
@@ -2228,6 +2262,52 @@ extension IPALibrary {
         return data
     }
 
+    /// A-38-A1：一次开包同时产出 AppInfo + 图标 Data——文件页行与证书页
+    /// 选择器同时要两半，旧路各开一次包（2 次 central directory 解析 +
+    /// 2 次 plist 读解）。指纹只算一次，同时查两路缓存；任一半缺失才解析，
+    /// 解析时一个 FileHandle + 一次 centralDirectory + 一次读主 plist +
+    /// 一次 PropertyListSerialization 解码。两路 nil 语义互相独立：无
+    /// bundleID 不拖死图标（仍走 AppIcon/Icon 回落），Assets.car 独占
+    /// 图标不拖死 info；nil 的一半不缓存（解析失败不缓存、指纹取不到
+    /// 不缓存，保持现状）。单路调用方继续走 appInfo(at:) / iconData(at:)。
+    static func appInfoAndIconData(at url: URL) -> (info: AppInfo?, icon: Data?) {
+        let key = fileFingerprint(of: url)
+        var info: AppInfo?
+        var icon: Data?
+        if let key {
+            appInfoLock.lock()
+            info = appInfoCache[key]
+            appInfoLock.unlock()
+            if let cached = iconDataCache.object(forKey: key as NSString) {
+                icon = cached as Data
+            }
+        }
+        if info != nil, icon != nil { return (info, icon) }
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? Int,
+              size > 22,
+              let handle = try? FileHandle(forReadingFrom: url) else { return (info, icon) }
+        defer { try? handle.close() }
+        guard let directory = centralDirectory(handle, fileSize: size),
+              let plistEntry = mainInfoPlist(in: directory),
+              let appPrefix = appPrefix(in: plistEntry) else { return (info, icon) }
+        let dict = plistDict(of: plistEntry, handle)
+        if info == nil, let dict {
+            info = appInfo(from: dict)
+        }
+        if icon == nil {
+            icon = iconData(fromPlist: dict, directory: directory, appPrefix: appPrefix, handle: handle)
+        }
+        if let key, let info {
+            appInfoLock.lock()
+            appInfoCache[key] = info
+            appInfoLock.unlock()
+        }
+        if let key, let icon {
+            iconDataCache.setObject(icon as NSData, forKey: key as NSString, cost: icon.count)
+        }
+        return (info, icon)
+    }
+
     /// A-7（SIDE-36）：把图标 Data 解成指定边长的缩略图再显示——
     /// UIImage(data:) 是惰性解码，首次绘制才在主线程解全尺寸图；
     /// 这里在 detached 任务里先画进位图上下文解掉，@State 里只留缩略图。
@@ -2254,14 +2334,38 @@ extension IPALibrary {
               let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         guard let directory = centralDirectory(handle, fileSize: size),
-              let plistEntry = mainInfoPlist(in: directory) else { return nil }
+              let plistEntry = mainInfoPlist(in: directory),
+              let appPrefix = appPrefix(in: plistEntry) else { return nil }
+        return iconData(fromPlist: plistDict(of: plistEntry, handle),
+                        directory: directory, appPrefix: appPrefix, handle: handle)
+    }
+
+    /// A-38-A1：从主 Info.plist 条目读解码后的字典；读不出时 nil（
+    /// 调用方仍走 AppIcon/Icon 回落，与 parseIconData 现状一致）。
+    private static func plistDict(of entry: ZipEntry, _ handle: FileHandle) -> [String: Any]? {
+        guard let raw = contents(of: entry, handle),
+              let plist = try? PropertyListSerialization.propertyList(from: raw, format: nil),
+              let dict = plist as? [String: Any]
+        else { return nil }
+        return dict
+    }
+
+    /// A-38-A1：从主 Info.plist 条目名派生 .app 前缀；非 Payload/*.app
+    /// 布局时 nil。
+    private static func appPrefix(in plistEntry: ZipEntry) -> String? {
         let parts = plistEntry.name.split(separator: "/", omittingEmptySubsequences: false)
         guard parts.count == 3, parts[0] == "Payload", parts[1].hasSuffix(".app") else { return nil }
-        let appPrefix = "Payload/\(parts[1])/"
+        return "Payload/\(parts[1])/"
+    }
+
+    /// A-38-A1：从已读 plist 字典 + central directory 派生图标 Data——
+    /// parseIconData 与 appInfoAndIconData 共用。dict 为 nil（plist 读不出）
+    /// 时 iconBases 为空，仍走 AppIcon/Icon 回落；候选路径拼法、
+    /// 同名条目去重、回落排序照抄 parseIconData 现状，一字不动。
+    private static func iconData(fromPlist dict: [String: Any]?, directory: [ZipEntry],
+                                 appPrefix: String, handle: FileHandle) -> Data? {
         var iconBases: [String] = []
-        if let raw = contents(of: plistEntry, handle),
-           let plist = try? PropertyListSerialization.propertyList(from: raw, format: nil),
-           let dict = plist as? [String: Any] {
+        if let dict {
             if let icons = dict["CFBundleIcons"] as? [String: Any],
                let primary = icons["CFBundlePrimaryIcon"] as? [String: Any],
                let files = primary["CFBundleIconFiles"] as? [String] {
@@ -3029,6 +3133,16 @@ enum DownloadLedger {
     /// True only for a file this app downloaded and nothing has touched since.
     static func isManaged(_ url: URL) -> Bool {
         guard let fp = fingerprint(url) else { return false }
+        ledgerLock.lock()
+        defer { ledgerLock.unlock() }
+        return tableLocked()[key(url)] == fp
+    }
+
+    /// A-38-A2：同上，但指纹由调用方传入的 size/mtime 现拼——格式与
+    /// fingerprint(_:) 逐字一致（"<size>@<Int(mtime秒)>"），不再自己 stat。老签名
+    /// 保留给 :820 的下载去重检查用。
+    static func isManaged(_ url: URL, size: Int, modified: Date?) -> Bool {
+        let fp = "\(size)@\(Int(modified?.timeIntervalSince1970 ?? 0))"
         ledgerLock.lock()
         defer { ledgerLock.unlock() }
         return tableLocked()[key(url)] == fp

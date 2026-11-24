@@ -258,22 +258,46 @@ struct FilesTabView: View {
     private enum FileViewTab { case files, library }
     @State private var fileView = FileViewTab.files
 
-    private var ipas: [LocalFileItem] { files.filter { $0.isIPA } }
-    private var others: [LocalFileItem] { files.filter { !$0.isIPA && !$0.isSystem } }
-    private var systemFiles: [LocalFileItem] { files.filter { $0.isSystem } }
-    private var totalSize: Int { files.reduce(0) { $0 + $1.size } }
+    /// A-38-A5：一次遍历同时产出六个派生值——原来 ipas/others/systemFiles/
+    /// totalSize/ipaCounts 各是 files 的一遍 filter/reduce，每 body 求值
+    /// 多遍遍历；现在一次 for 循环全产出。每次求值现算的纯派生，不缓存
+    /// （@State 新增 0）。注意 systemFiles 不排 IPA：原 `files.filter
+    /// { $0.isSystem }` 里 IPA 与系统文件可重叠，语义一字不动。
+    private struct FilePartition {
+        var ipas: [LocalFileItem] = []
+        var others: [LocalFileItem] = []
+        var systemFiles: [LocalFileItem] = []
+        var totalSize: Int = 0
+        var unsigned: Int = 0
+        var signed: Int = 0
+    }
+    private var filePartition: FilePartition {
+        var p = FilePartition()
+        for item in files {
+            p.totalSize += item.size
+            if item.isIPA {
+                p.ipas.append(item)
+                if item.isInSignedDir { p.signed += 1 } else { p.unsigned += 1 }
+            } else if !item.isSystem {
+                p.others.append(item)
+            }
+            if item.isSystem { p.systemFiles.append(item) }
+        }
+        return p
+    }
+
+    /// 下面的五个派生值都是 filePartition 的委托——单点访问仍跑一遍
+    /// 单遍遍历（与原来一遍 filter 同价）；body 内取一次 partition
+    /// 传进各行构建函数，才真正只遍历一次。
+    private var ipas: [LocalFileItem] { filePartition.ipas }
+    private var others: [LocalFileItem] { filePartition.others }
+    private var systemFiles: [LocalFileItem] { filePartition.systemFiles }
+    private var totalSize: Int { filePartition.totalSize }
 
     /// 切栏计数：未签名/已签名 IPA 各多少（搜索不影响切栏总数）。
-    /// 一次遍历同时数——原来每标签各 filter 一遍 ipas（ipas 本身又是
-    /// files 的一遍 filter），每 body 求值 4 遍遍历；现在每标签一遍
-    /// files，结果与原来一致。
     private var ipaCounts: (unsigned: Int, signed: Int) {
-        var unsigned = 0
-        var signed = 0
-        for item in files where item.isIPA {
-            if item.isInSignedDir { signed += 1 } else { unsigned += 1 }
-        }
-        return (unsigned, signed)
+        let p = filePartition
+        return (p.unsigned, p.signed)
     }
     private var unsignedCount: Int { ipaCounts.unsigned }
     private var signedCount: Int { ipaCounts.signed }
@@ -312,16 +336,20 @@ struct FilesTabView: View {
         }
     }
 
-    /// 切栏 + 搜索过滤后的 IPA 列表（根目录视图用，递归扫描的全量）。
-    private var filteredIPAs: [LocalFileItem] {
-        sortedFiles(matching(ipas).filter { fileTabMatches($0) })
+    /// 切栏 + 搜索过滤后的 IPA 列表（根目录视图用，递归扫描的全量）——
+    /// A-38-A5：接受 body-local 的 partition，不再自己读 ipas 派生。
+    private func filteredIPAs(partition: FilePartition) -> [LocalFileItem] {
+        sortedFiles(matching(partition.ipas).filter { fileTabMatches($0) })
     }
 
     /// 当前文件夹视图里切栏过滤后的可见项：未签名 tab 显示未签名 IPA
     /// + 其他文件 + 系统文件；已签名 tab 只显示已签名 IPA（其他文件、
     /// 系统文件与文件夹内的非 IPA 行一律不显示）。
-    private var visibleDirItems: [LocalFileItem] {
-        currentDirItems.filter { item in
+    /// A-38-A5：接受 body-local 的当前文件夹项，body 内只调一次；不取
+    /// partition——它的输入是 currentDirItems（按文件夹过滤），partition
+    /// 的六元组里没有文件夹维度的切分。
+    private func visibleDirItems(in items: [LocalFileItem]) -> [LocalFileItem] {
+        items.filter { item in
             if fileTab == .signed {
                 return item.isIPA && item.isInSignedDir
             }
@@ -347,6 +375,18 @@ struct FilesTabView: View {
         return renewalSources.first(where: { $0.bundleID == bundleID })
     }
 
+    /// A-38-A5：续签源字典版——body 内行构建走字典查表，匹配语义与
+    /// renewalSource(for:) 一字不动（路径优先、包名兜底、非 IPA 不查
+    /// 包名）。本体保留给非 body 调用方（renewalDeleteWarning 等）。
+    private func renewalSource(for item: LocalFileItem,
+                               byPath: [String: RenewalSourceEntry],
+                               byBundleID: [String: RenewalSourceEntry]) -> RenewalSourceEntry? {
+        if let hit = byPath[item.url.path] { return hit }
+        guard item.isIPA else { return nil }
+        guard let bundleID = fileIPAInfo[item.url.path]?.bundleID, !bundleID.isEmpty else { return nil }
+        return byBundleID[bundleID]
+    }
+
     /// IPA 行第二行（轻松签文件列表同款）：V版本 | 大小 | Bundle ID；
     /// 版本缺了就省掉 V 那段，解析失败只显示大小，不造假。
     private func ipaSecondLine(_ item: LocalFileItem) -> String {
@@ -363,31 +403,53 @@ struct FilesTabView: View {
         return parts.joined(separator: " | ")
     }
 
-    /// IPA 行信息解析（只取可见行，行 .task 触发）：键里带大小 +
-    /// 修改时间，文件被覆盖换了就重解析；解析失败也记已尝试，
-    /// 不重复读盘。跟证书页未签名栏同例，只解析 Info.plist。
-    private func loadFileIPAInfo(for item: LocalFileItem) {
+    /// A-38-A1：IPA 行信息 + 图标一次解析（只取可见行，行 .task 触发）：
+    /// 两路各开一次包太贵，合流函数一次开包同产两半；键里带大小 + 修改
+    /// 时间，文件被覆盖换了就重解析；解析失败也记已尝试，不重复读盘。
+    /// 替换途中文件校验只做一次，覆盖两半；写回仍走各自的
+    /// BatchWriteback；两个 tried 集都保留——两半都已尝试才直接返回，
+    /// 否则解析一次、按需写回未尝试的那半。跟证书页未签名栏同例。
+    private func loadFileIPAInfoAndIcon(for item: LocalFileItem) {
         guard item.isIPA else { return }
-        let key = "\(item.url.path)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)"
-        guard !fileIPAInfoTried.contains(key) else { return }
+        // LocalFileItem.id 就是 url.path，两半的键本就是同一个值。
+        let key = fileIconKey(item)
+        let infoTried = fileIPAInfoTried.contains(key)
+        let iconTried = fileIconsTried.contains(key)
+        guard !infoTried || !iconTried else { return }
         fileIPAInfoTried.insert(key)
+        fileIconsTried.insert(key)
         // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
         if fileInfoBatcher == nil {
             fileInfoBatcher = BatchWriteback { batch in
                 for (path, info) in batch { self.fileIPAInfo[path] = info }
             }
         }
-        // 显式捕获（loadFileIcon 同例）：不把整个 item 隐式带进
-        // detached 任务，免得 Swift 6 并发检查找麻烦。
-        Task.detached(priority: .userInitiated) { [url = item.url, path = item.url.path,
-                         size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
-            guard let info = IPALibrary.appInfo(at: url) else { return }
-            // B31-1（ECV 同款核对）：解析途中文件被替换就丢掉旧信息。
+        if fileIconBatcher == nil {
+            fileIconBatcher = BatchWriteback { batch in
+                // A-37-3：写共享缓存（路径为键，id 就是 url.path），
+                // 再 bump iconEpoch 触发重绘；@State 字典不再存图。
+                for (id, image) in batch { ThumbnailCache.set(image, for: id) }
+                self.iconEpoch += 1
+            }
+        }
+        // 显式捕获：不把整个 item 隐式带进 detached 任务，免得
+        // Swift 6 并发检查找麻烦。
+        Task.detached(priority: .userInitiated) { [url = item.url, id = item.id, path = item.url.path,
+                         size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0,
+                         infoTried, iconTried] in
+            let (info, data) = IPALibrary.appInfoAndIconData(at: url)
+            // B31-1（ECV 同款核对）：解析途中文件被替换就丢掉旧信息/旧图。
             let attrs = try? FileManager.default.attributesOfItem(atPath: path)
             let liveSize = attrs?[.size] as? Int
             let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
             guard liveSize == size, liveModified == modified else { return }
-            await MainActor.run { self.fileInfoBatcher?.enqueue(info, for: path) }
+            if !infoTried, let info {
+                await MainActor.run { self.fileInfoBatcher?.enqueue(info, for: path) }
+            }
+            if !iconTried, let data,
+               let image = IPALibrary.thumbnail(from: data, maxPixelSize: 120) {
+                await MainActor.run { self.fileIconBatcher?.enqueue(image, for: id) }
+            }
         }
     }
 
@@ -491,6 +553,7 @@ struct FilesTabView: View {
         } label: {
             if useIcons { Label(L("Copy"), systemImage: "doc.on.doc") } else { Text(L("Copy")) }
         }
+        .disabled(opBusy)
         if !item.isDirectory {
             Button {
                 zipSingle(item)
@@ -498,6 +561,7 @@ struct FilesTabView: View {
             } label: {
                 if useIcons { Label(L("压缩成 ZIP"), systemImage: "archivebox") } else { Text(L("压缩成 ZIP")) }
             }
+            .disabled(opBusy)
             if item.isZip {
                 Button {
                     unzip(item)
@@ -505,6 +569,7 @@ struct FilesTabView: View {
                 } label: {
                     if useIcons { Label(L("解压"), systemImage: "tray.and.arrow.up") } else { Text(L("解压")) }
                 }
+                .disabled(opBusy)
             }
         }
         Button(role: .destructive) {
@@ -774,6 +839,15 @@ struct FilesTabView: View {
     }
 
     var body: some View {
+        // A-38-A5：每 body 求值一次建成——文件分区（单遍遍历）与续签源
+        // 字典（路径/包名各一），传进各行构建函数；行内不再各做一次
+        // filter/first(where:)。全是每求值现算的纯派生，不缓存
+        // （@State 新增 0）。
+        let partition = filePartition
+        let renewalByPath = Dictionary(renewalSources.map { ($0.ipaPath, $0) },
+                                       uniquingKeysWith: { first, _ in first })
+        let renewalByBundleID = Dictionary(renewalSources.map { ($0.bundleID, $0) },
+                                           uniquingKeysWith: { first, _ in first })
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
@@ -785,106 +859,15 @@ struct FilesTabView: View {
                     .pickerStyle(.segmented)
                     .cascadeItem(0)
                     if fileView == .files {
-                        if selecting {
-                            selectionBar.cascadeItem(2)
-                        }
-                        // 轻松签文件列表式切栏（只过滤 IPA 行）：放搜索框上面，
-                        // 跟证书页应用库切栏同例，segmented 样式。
-                        Picker("", selection: $fileTab) {
-                            Text(L("未签名 (%d)", unsignedCount)).tag(FileListTab.unsigned)
-                            Text(L("已签名 (%d)", signedCount)).tag(FileListTab.signed)
-                        }
-                        .pickerStyle(.segmented)
-                        // 切栏触感：点切栏、或菜单“查看文件位置”切栏变化时
-                        // 各震一次 .light；后者菜单按钮本身不另震，免得一次点按震两次。
-                        .onChange(of: fileTab) { _, _ in
-                            CZFHaptics.impact(.light)
-                            // B-6：切栏清掉根列表的选择集，免得工具栏还停在
-                            // 选择模式；应用库两栏自有独立选择集，不动。
-                            selection = []
-                            selecting = false
-                        }
-                        fileSearchBar
-                        // 排序：只改显示顺序（IPA 列表、文件夹内列表、其他文件
-                        // 组都按同一规则排）；默认保持扫描顺序，不动老习惯。
-                        HStack {
-                            Menu {
-                                ForEach(FileSort.allCases, id: \.self) { option in
-                                    Button {
-                                        fileSortRaw = option.rawValue
-                                    } label: {
-                                        if fileSort == option {
-                                            Label(option.label, systemImage: "checkmark")
-                                        } else {
-                                            Text(option.label)
-                                        }
-                                    }
-                                }
-                            } label: {
-                                Label(L("排序：%@", fileSort.label), systemImage: "arrow.up.arrow.down")
-                                    .font(.footnote.weight(.semibold))
-                            }
-                            Spacer()
-                        }
-                        if !currentDir.isEmpty {
-                            currentDirBar
-                            if currentDirItems.isEmpty {
-                                emptyCard.cascadeItem(2)
-                            } else if visibleDirItems.isEmpty {
-                                Text(L("没有匹配的 IPA。"))
-                                    .font(.footnote)
-                                    .foregroundStyle(Theme.muted)
-                            } else {
-                                folderSection(items: visibleDirItems).cascadeItem(2)
-                            }
-                        } else if files.isEmpty {
-                            emptyCard.cascadeItem(2)
-                        } else {
-                            // IPA 行不再单开「IPA 文件」组：切栏 + 搜索过滤
-                            // 后的 ipaList 就是全部 IPA（轻松签文件列表式，
-                            // 无卡片头）；其他文件、系统文件不再分组头，合并为
-                            // 扁平列表（过滤逻辑不动）。
-                            ipaList.cascadeItem(2)
-                            if fileTab == .unsigned {
-                                let flatFiles = sortedFiles(matching(others) + matching(systemFiles))
-                                if !flatFiles.isEmpty {
-                                    VStack(alignment: .leading, spacing: 12) {
-                                        ForEach(flatFiles) { item in
-                                            fileRow(item)
-                                            if item.id != flatFiles.last?.id {
-                                                Divider()
-                                            }
-                                        }
-                                    }
-                                    .cascadeItem(3)
-                                }
-                            }
-                        }
+                        filesBranchContent(partition: partition,
+                                           renewalByPath: renewalByPath,
+                                           renewalByBundleID: renewalByBundleID)
                     } else {
-                        libraryContentView
-                            .task {
-                                signedRecords = SignedIPAStore.load()
-                                let changed = await Task.detached { SignedIPAStore.fillMissingCertInfo() }.value
-                                if changed { signedRecords = SignedIPAStore.load() }
-                                refreshUnsignedIPAs()
-                                logEntries = CertSignLogStore.load()
-                                checkRevocation()
-                            }
-                            .onChange(of: libraryTab) { _, tab in
-                                if tab == .unsigned {
-                                    refreshUnsignedIPAs()
-                                }
-                            }
+                        libraryBranchContent
                     }
                     // 页尾（原来顶栏区的安装状态、导入卡、计数都到这里）：
                     // 安装状态平时不显示，安装进行中/失败时才出现。
-                    fileInstallStatus
-                    importCard.cascadeItem(5)
-                    Text(L("%d 个文件 · %@", files.count,
-                           ByteCountFormatter.string(fromByteCount: Int64(totalSize), countStyle: .file)))
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                    bodyFooter(partition: partition)
                 }
                 .padding([.horizontal, .top], 20)
                 .padding(.bottom, 20)
@@ -907,34 +890,7 @@ struct FilesTabView: View {
                         .foregroundStyle(.white)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button { showImporter = true } label: {
-                            Label(L("导入文件"), systemImage: "square.and.arrow.down")
-                        }
-                        Button {
-                            newFolderName = ""
-                            showNewFolderAlert = true
-                        } label: {
-                            Label(L("新建文件夹"), systemImage: "folder.badge.plus")
-                        }
-                        Button {
-                            refreshFiles(resetDir: true)
-                        } label: {
-                            Label(L("Refresh"), systemImage: "arrow.clockwise")
-                        }
-                        if fileView == .files && !files.isEmpty {
-                            Button {
-                                selecting.toggle()
-                                selection = []
-                            } label: {
-                                Label(selecting ? L("Done") : L("选择"), systemImage: "checkmark.circle")
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                    }
+                    fileMenu
                 }
             }
             .background(Color(.systemBackground))
@@ -957,40 +913,7 @@ struct FilesTabView: View {
         // fileInstallInFlight 期间的变化，ID 线的安装跑完不会误弹
         // 到这里；失败原因快照到页内本地量，不直接绑 engine 的
         // 全局量。文件页安装跑完写一条「仅安装」日志（见 startEnterpriseInstall）。
-        .onChange(of: engine.isRunning) { old, new in
-            if old && !new && fileInstallInFlight {
-                // 当前又有安装在跑（isRunning 已翻回 true）：这次
-                // 投递是上一次安装的滞后投递，不是当前这跑的结束
-                // ——不认、不清，新跑的结束投递随后会来；不清的
-                // 话新跑结束时 inFlight 还在，不会丢完成。
-                guard !engine.isRunning else { return }
-                fileInstallInFlight = false
-                // 归属凭证：只认自己那次安装的结束。凭证对不上
-                // （别的安装在标志立着时结束）时不记日志、不弹框。
-                let runID = fileInstallRunID
-                fileInstallRunID = nil
-                guard runID != nil, runID == engine.installSessionID else { return }
-                if engine.finished {
-                    showingFileInstallSuccessAlert = true
-                    localInstall.appendStepLog(L("配对安装完成"))
-                    CZFHaptics.notification(.success)
-                    if let appName = fileInstallAppName {
-                        CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
-                            appName: appName, kind: .installOnly, success: true,
-                            detail: L("配对安装完成。")))
-                    }
-                } else if let error = engine.lastError {
-                    fileInstallErrorText = error
-                    localInstall.appendStepLog(L("配对安装失败：%@", error))
-                    CZFHaptics.notification(.error)
-                    if let appName = fileInstallAppName {
-                        CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
-                            appName: appName, kind: .installOnly, success: false,
-                            detail: error))
-                    }
-                }
-            }
-        }
+        .onChange(of: engine.isRunning) { old, new in handleEngineRunningChange(old: old, new: new) }
         .alert(L("安装完成"), isPresented: $showingFileInstallSuccessAlert) {
             Button(L("知道了"), role: .cancel) {}
         } message: {
@@ -1078,22 +1001,7 @@ struct FilesTabView: View {
             MachOView(url: item.url, fileName: item.name)
         }
         .sheet(item: $detailItem) { item in
-            FileDetailSheet(item: item, renewalAppName: renewalSource(for: item)?.appName, onDelete: {
-                detailItem = nil
-                // B-1（fileActionButtons 同例）：sheet 正在收起，确认弹窗
-                // 推迟一轮 runloop 再立，免得被收起中的 sheet 吞掉。
-                DispatchQueue.main.async { pendingDeleteItem = item }
-            }, onRename: {
-                detailItem = nil
-                renameText = item.name
-                renameItem = item
-            }, onMove: {
-                detailItem = nil
-                moveItem = item
-            }, onDuplicate: {
-                detailItem = nil
-                duplicate(item)
-            })
+            detailSheetContent(item: item, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID)
         }
         .sheet(item: $moveItem) { item in
             moveSheetContent(item: item)
@@ -1102,18 +1010,7 @@ struct FilesTabView: View {
             get: { installChoiceRecord != nil },
             set: { if !$0 { installChoiceRecord = nil } }
         )) {
-            Button(L("Pairing Install")) {
-                if let record = installChoiceRecord {
-                    installSignedFile(LocalFileItem(url: SignedIPAStore.url(for: record),
-                        name: record.appName, relativeDir: "Signed",
-                        size: record.size, modified: record.date,
-                        isDirectory: false, childCount: 0))
-                }
-            }
-            Button(L("Cellular Install (OTA)")) {
-                if let record = installChoiceRecord { startOTAInstall(record: record) }
-            }
-            Button(L("Cancel"), role: .cancel) { installChoiceRecord = nil }
+            installChoiceButtons()
         }
         .sheet(item: $otaRecord) { record in
             otaSheet(record: record)
@@ -1122,37 +1019,266 @@ struct FilesTabView: View {
             FileImporterRepresentableView(
                 allowedContentTypes: [.item],
                 allowsMultipleSelection: true
-            ) { urls in
-                // A-1：逐个 copyItem 全在主线程，大 IPA 导入时 UI 全程冻结；
-                // 整个循环移进 detached 任务，结束回主线程一次写回 + 重扫。
-                // L() 只在主线程调（文案格式化），detached 里只攒原始错误串。
-                Task.detached {
-                    // B-7：攒全部失败（文件名 + 个数），不再只留最后一次——
-                    // 先坏后好的组合里，坏掉的那个文件会无声消失。
-                    var failures: [(name: String, reason: String)] = []
-                    for url in urls {
-                        do {
-                            _ = try AppFileLibrary.importIntoDocuments(url)
-                        } catch {
-                            failures.append((url.lastPathComponent, error.localizedDescription))
+            ) { urls in importFiles(urls) }
+        }
+    }
+
+    /// A-38-A5：body 拆分——文件列表分支（切栏区 / 搜索排序行 / 列表区）。
+    /// 内容与原 body 一字不动，只把派生值换成 body-local 的 partition
+    /// 与续签源字典（行内不再各做一次 filter/first(where:)）。
+    @ViewBuilder
+    private func filesBranchContent(partition: FilePartition,
+                                    renewalByPath: [String: RenewalSourceEntry],
+                                    renewalByBundleID: [String: RenewalSourceEntry]) -> some View {
+        if selecting {
+            selectionBar.cascadeItem(2)
+        }
+        // 轻松签文件列表式切栏（只过滤 IPA 行）：放搜索框上面，
+        // 跟证书页应用库切栏同例，segmented 样式。
+        Picker("", selection: $fileTab) {
+            Text(L("未签名 (%d)", partition.unsigned)).tag(FileListTab.unsigned)
+            Text(L("已签名 (%d)", partition.signed)).tag(FileListTab.signed)
+        }
+        .pickerStyle(.segmented)
+        // 切栏触感：点切栏、或菜单"查看文件位置"切栏变化时
+        // 各震一次 .light；后者菜单按钮本身不另震，免得一次点按震两次。
+        .onChange(of: fileTab) { _, _ in
+            CZFHaptics.impact(.light)
+            // B-6：切栏清掉根列表的选择集，免得工具栏还停在
+            // 选择模式；应用库两栏自有独立选择集，不动。
+            selection = []
+            selecting = false
+        }
+        fileSearchBar
+        // 排序：只改显示顺序（IPA 列表、文件夹内列表、其他文件
+        // 组都按同一规则排）；默认保持扫描顺序，不动老习惯。
+        HStack {
+            Menu {
+                ForEach(FileSort.allCases, id: \.self) { option in
+                    Button {
+                        fileSortRaw = option.rawValue
+                    } label: {
+                        if fileSort == option {
+                            Label(option.label, systemImage: "checkmark")
+                        } else {
+                            Text(option.label)
                         }
-                    }
-                    let failureText: String? = {
-                        guard !failures.isEmpty else { return nil }
-                        let first = failures[0]
-                        return "\(failures.count) 个文件，首个 \(first.name)：\(first.reason)"
-                    }()
-                    await MainActor.run {
-                        importError = failureText.map { L("导入失败：%@", $0) }
-                        // UI-2(b)：导入失败同时走顶部 alert 通道（页尾
-                        // importCard 在列表底下）；页尾渲染保留。
-                        if let failureText {
-                            opErrorMessage = L("导入失败：%@", failureText)
-                        }
-                        refreshFiles()
                     }
                 }
+            } label: {
+                Label(L("排序：%@", fileSort.label), systemImage: "arrow.up.arrow.down")
+                    .font(.footnote.weight(.semibold))
             }
+            Spacer()
+        }
+        if !currentDir.isEmpty {
+            currentDirBar
+            let dirItems = currentDirItems
+            let dirVisible = visibleDirItems(in: dirItems)
+            if dirItems.isEmpty {
+                emptyCard.cascadeItem(2)
+            } else if dirVisible.isEmpty {
+                Text(L("没有匹配的 IPA。"))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+            } else {
+                folderSection(items: dirVisible, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID).cascadeItem(2)
+            }
+        } else if files.isEmpty {
+            emptyCard.cascadeItem(2)
+        } else {
+            // IPA 行不再单开「IPA 文件」组：切栏 + 搜索过滤
+            // 后的 ipaList 就是全部 IPA（轻松签文件列表式，
+            // 无卡片头）；其他文件、系统文件不再分组头，合并为
+            // 扁平列表（过滤逻辑不动）。
+            ipaList(partition: partition, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID).cascadeItem(2)
+            if fileTab == .unsigned {
+                let flatFiles = sortedFiles(matching(partition.others) + matching(partition.systemFiles))
+                if !flatFiles.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(flatFiles) { item in
+                            fileRow(item, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID)
+                            if item.id != flatFiles.last?.id {
+                                Divider()
+                            }
+                        }
+                    }
+                    .cascadeItem(3)
+                }
+            }
+        }
+    }
+
+    /// A-38-A5：body 拆分——应用文件夹库分支。
+    private var libraryBranchContent: some View {
+        libraryContentView
+            .task {
+                signedRecords = SignedIPAStore.load()
+                let changed = await Task.detached { SignedIPAStore.fillMissingCertInfo() }.value
+                if changed { signedRecords = SignedIPAStore.load() }
+                refreshUnsignedIPAs()
+                logEntries = CertSignLogStore.load()
+                checkRevocation()
+            }
+            .onChange(of: libraryTab) { _, tab in
+                if tab == .unsigned {
+                    refreshUnsignedIPAs()
+                }
+            }
+    }
+
+    /// A-38-A5：body 拆分——页尾（安装状态、导入卡、文件计数）。
+    @ViewBuilder
+    private func bodyFooter(partition: FilePartition) -> some View {
+        fileInstallStatus
+        importCard.cascadeItem(5)
+        Text(L("%d 个文件 · %@", files.count,
+               ByteCountFormatter.string(fromByteCount: Int64(partition.totalSize), countStyle: .file)))
+            .font(.footnote)
+            .foregroundStyle(Theme.muted)
+            .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    /// A-38-A5：body 拆分——配对安装跑完的收尾（finished 置位才算成功，
+    /// 取消不算）。原 onChange(of: engine.isRunning) 闭包本体一字不动。
+    private func handleEngineRunningChange(old: Bool, new: Bool) {
+        if old && !new && fileInstallInFlight {
+            // 当前又有安装在跑（isRunning 已翻回 true）：这次
+            // 投递是上一次安装的滞后投递，不是当前这跑的结束
+            // ——不认、不清，新跑的结束投递随后会来；不清的
+            // 话新跑结束时 inFlight 还在，不会丢完成。
+            guard !engine.isRunning else { return }
+            fileInstallInFlight = false
+            // 归属凭证：只认自己那次安装的结束。凭证对不上
+            // （别的安装在标志立着时结束）时不记日志、不弹框。
+            let runID = fileInstallRunID
+            fileInstallRunID = nil
+            guard runID != nil, runID == engine.installSessionID else { return }
+            if engine.finished {
+                showingFileInstallSuccessAlert = true
+                localInstall.appendStepLog(L("配对安装完成"))
+                CZFHaptics.notification(.success)
+                if let appName = fileInstallAppName {
+                    CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
+                        appName: appName, kind: .installOnly, success: true,
+                        detail: L("配对安装完成。")))
+                }
+            } else if let error = engine.lastError {
+                fileInstallErrorText = error
+                localInstall.appendStepLog(L("配对安装失败：%@", error))
+                CZFHaptics.notification(.error)
+                if let appName = fileInstallAppName {
+                    CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
+                        appName: appName, kind: .installOnly, success: false,
+                        detail: error))
+                }
+            }
+        }
+    }
+
+    /// A-38-A5：body 拆分——IPA 详情 sheet 内容。原 sheet 闭包本体一字
+    /// 不动，只把续签名换成 body-local 的字典查表。
+    private func detailSheetContent(item: LocalFileItem,
+                                    renewalByPath: [String: RenewalSourceEntry],
+                                    renewalByBundleID: [String: RenewalSourceEntry]) -> some View {
+        FileDetailSheet(item: item, renewalAppName: renewalSource(for: item, byPath: renewalByPath, byBundleID: renewalByBundleID)?.appName, onDelete: {
+            detailItem = nil
+            // B-1（fileActionButtons 同例）：sheet 正在收起，确认弹窗
+            // 推迟一轮 runloop 再立，免得被收起中的 sheet 吞掉。
+            DispatchQueue.main.async { pendingDeleteItem = item }
+        }, onRename: {
+            detailItem = nil
+            renameText = item.name
+            renameItem = item
+        }, onMove: {
+            detailItem = nil
+            moveItem = item
+        }, onDuplicate: {
+            detailItem = nil
+            duplicate(item)
+        })
+    }
+
+    /// A-38-A5：body 拆分——导入文件的 detached 任务本体。原 sheet 闭包
+    /// 里的 Task.detached 一字不动。
+    private func importFiles(_ urls: [URL]) {
+        // A-1：逐个 copyItem 全在主线程，大 IPA 导入时 UI 全程冻结；
+        // 整个循环移进 detached 任务，结束回主线程一次写回 + 重扫。
+        // L() 只在主线程调（文案格式化），detached 里只攒原始错误串。
+        Task.detached {
+            // B-7：攒全部失败（文件名 + 个数），不再只留最后一次——
+            // 先坏后好的组合里，坏掉的那个文件会无声消失。
+            var failures: [(name: String, reason: String)] = []
+            for url in urls {
+                do {
+                    _ = try AppFileLibrary.importIntoDocuments(url)
+                } catch {
+                    failures.append((url.lastPathComponent, error.localizedDescription))
+                }
+            }
+            let failureText: String? = {
+                guard !failures.isEmpty else { return nil }
+                let first = failures[0]
+                return "\(failures.count) 个文件，首个 \(first.name)：\(first.reason)"
+            }()
+            await MainActor.run {
+                importError = failureText.map { L("导入失败：%@", $0) }
+                // UI-2(b)：导入失败同时走顶部 alert 通道（页尾
+                // importCard 在列表底下）；页尾渲染保留。
+                if let failureText {
+                    opErrorMessage = L("导入失败：%@", failureText)
+                }
+                refreshFiles()
+            }
+        }
+    }
+
+    /// A-38-A5：body 拆分——已签名安装方式选择 dialog 的按钮组。
+    @ViewBuilder
+    private func installChoiceButtons() -> some View {
+        Button(L("Pairing Install")) {
+            if let record = installChoiceRecord {
+                installSignedFile(LocalFileItem(url: SignedIPAStore.url(for: record),
+                    name: record.appName, relativeDir: "Signed",
+                    size: record.size, modified: record.date,
+                    isDirectory: false, childCount: 0))
+            }
+        }
+        Button(L("Cellular Install (OTA)")) {
+            if let record = installChoiceRecord { startOTAInstall(record: record) }
+        }
+        Button(L("Cancel"), role: .cancel) { installChoiceRecord = nil }
+    }
+
+    /// A-38-A5：body 拆分——右上角 ••• 菜单（导入 / 新建文件夹 / 刷新 / 选择）。
+    private var fileMenu: some View {
+        Menu {
+            Button { showImporter = true } label: {
+                Label(L("导入文件"), systemImage: "square.and.arrow.down")
+            }
+            Button {
+                newFolderName = ""
+                showNewFolderAlert = true
+            } label: {
+                Label(L("新建文件夹"), systemImage: "folder.badge.plus")
+            }
+            Button {
+                refreshFiles(resetDir: true)
+            } label: {
+                Label(L("Refresh"), systemImage: "arrow.clockwise")
+            }
+            if fileView == .files && !files.isEmpty {
+                Button {
+                    selecting.toggle()
+                    selection = []
+                } label: {
+                    Label(selecting ? L("Done") : L("选择"), systemImage: "checkmark.circle")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.title3)
+                .foregroundStyle(.white)
         }
     }
 
@@ -1341,10 +1467,12 @@ struct FilesTabView: View {
 
     /// 当前文件夹内的直接子项（文件夹 + 文件同一列表，轻松签式）：
     /// 行格式跟根目录 fileRow 一模一样，不另起一套。
-    private func folderSection(items: [LocalFileItem]) -> some View {
+    private func folderSection(items: [LocalFileItem],
+                               renewalByPath: [String: RenewalSourceEntry],
+                               renewalByBundleID: [String: RenewalSourceEntry]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(items) { item in
-                fileRow(item)
+                fileRow(item, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID)
                 if item.id != items.last?.id {
                     Divider()
                 }
@@ -1356,10 +1484,13 @@ struct FilesTabView: View {
     /// fileRow 的 IPA 分支（图标 + 名 + 版本|大小|Bundle ID + 文件名），
     /// 点行弹底部动作菜单；空态按切栏/搜索区分文案，不空白。
     /// 无卡片头（参考图里列表就是平铺的），跟其他文件组区分开。
-    private var ipaList: some View {
+    @ViewBuilder
+    private func ipaList(partition: FilePartition,
+                         renewalByPath: [String: RenewalSourceEntry],
+                         renewalByBundleID: [String: RenewalSourceEntry]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             // A-5(a)：ForEach 外求一次存局部量，不再每行重建数组。
-            let list = filteredIPAs
+            let list = filteredIPAs(partition: partition)
             if list.isEmpty {
                 Text(fileSearchText.isEmpty
                      ? (fileTab == .unsigned ? L("还没有未签名的 IPA。") : L("还没有已签名的 IPA。"))
@@ -1368,7 +1499,7 @@ struct FilesTabView: View {
                     .foregroundStyle(Theme.muted)
             } else {
                 ForEach(list) { item in
-                    fileRow(item)
+                    fileRow(item, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID)
                     if item.id != list.last?.id {
                         Divider()
                     }
@@ -1431,39 +1562,9 @@ struct FilesTabView: View {
         "\(item.id)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)"
     }
 
-    /// IPA 行图标解析：复用应用库那套 IPALibrary.iconData（只读
-    /// central directory + 单个图标条目，不整包解压），不为文件页
-    /// 单开一套；耗时放 Task.detached，取到回主线程写缓存；
-    /// Assets.car 独占图标时 iconData 返回 nil，行里显示中性占位。
-    private func loadFileIcon(for item: LocalFileItem) {
-        guard item.isIPA else { return }
-        let key = fileIconKey(item)
-        guard !fileIconsTried.contains(key) else { return }
-        fileIconsTried.insert(key)
-        // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
-        if fileIconBatcher == nil {
-            fileIconBatcher = BatchWriteback { batch in
-                // A-37-3：写共享缓存（路径为键，id 就是 url.path），
-                // 再 bump iconEpoch 触发重绘；@State 字典不再存图。
-                for (id, image) in batch { ThumbnailCache.set(image, for: id) }
-                self.iconEpoch += 1
-            }
-        }
-        Task.detached { [url = item.url, id = item.id, path = item.url.path,
-                         size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
-            guard let data = IPALibrary.iconData(at: url),
-                  // A-7：下采样在 detached 里做——行高 60pt，用 120×120 缩略图。
-                  let image = IPALibrary.thumbnail(from: data, maxPixelSize: 120) else { return }
-            // B31-1（ECV 同款核对）：解包途中文件被替换就丢掉旧图。
-            let attrs = try? FileManager.default.attributesOfItem(atPath: path)
-            let liveSize = attrs?[.size] as? Int
-            let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
-            guard liveSize == size, liveModified == modified else { return }
-            await MainActor.run { self.fileIconBatcher?.enqueue(image, for: id) }
-        }
-    }
-
-    private func fileRow(_ item: LocalFileItem) -> some View {
+    private func fileRow(_ item: LocalFileItem,
+                         renewalByPath: [String: RenewalSourceEntry],
+                         renewalByBundleID: [String: RenewalSourceEntry]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 if selecting {
@@ -1507,7 +1608,7 @@ struct FilesTabView: View {
                     }
                 }
                 Spacer()
-                if let source = renewalSource(for: item) {
+                if let source = renewalSource(for: item, byPath: renewalByPath, byBundleID: renewalByBundleID) {
                     // 续签用的源文件：行内一眼认出，删之前先想想。
                     Text(L("续签"))
                         .font(.caption2.weight(.semibold))
@@ -1530,12 +1631,10 @@ struct FilesTabView: View {
             }
         }
         .contentShape(Rectangle())
-        // IPA 行图标：行出现时触发一次取图（文件换了就重取，
+        // IPA 行图标 + 信息：行出现时触发一次合流解析（文件换了就重取，
         // 键里带大小 + 修改时间；取不到也记 tried，不死循环）。
-        .task(id: fileIconKey(item)) { loadFileIcon(for: item) }
-        // IPA 行信息：行出现时触发一次解析（版本/Bundle ID 用），
-        // 非 IPA 行直接跳过（loadFileIPAInfo 里 guard）。
-        .task(id: "\(item.url.path)#\(item.size)#\(item.modified?.timeIntervalSince1970 ?? 0)") { loadFileIPAInfo(for: item) }
+        // 非 IPA 行直接跳过（loadFileIPAInfoAndIcon 里 guard）。
+        .task(id: fileIconKey(item)) { loadFileIPAInfoAndIcon(for: item) }
         .onTapGesture {
             if selecting {
                 if selection.contains(item.id) {
@@ -1790,6 +1889,14 @@ struct FilesTabView: View {
         }
         // B1+B5：正在签名/续签的源文件不移走——签名步/续签步正读它。
         guard !rejectIfBusySigningOrRenewing(path: item.url.path) else { return }
+        // B-38-B5：保留文件夹（根目录下的 Signed / Custom）不改名/不移动——改名/移走后
+        // 清单按写死路径找文件，整库瞬间不可见。
+        if item.isDirectory && item.relativeDir.isEmpty && (item.name == "Signed" || item.name == "Custom") {
+            opErrorMessage = L("This folder can't be renamed or moved.")
+            opMessage = L("This folder can't be renamed or moved.")
+            opFailed = true
+            return
+        }
         do {
             try FileManager.default.moveItem(at: item.url, to: dest)
             refreshFiles(resetDir: true)
@@ -1812,6 +1919,9 @@ struct FilesTabView: View {
         // copyItem 本体放 detached——1.26GB 拷贝不再冻住主线程；
         // 目标已存在时 copyItem 抛错，失败分支写提示，不静默覆盖。
         // 写法照抄同文件 runZip 的 Task + detached 模式。
+        // B-38-B4：串行守卫——行菜单按钮已禁用（第一道防线），这里是第二道
+        // 防线（防非 UI 调用方与竞态）；同一时刻最多一路在跑，输出名不撞车。
+        guard !opBusy else { return }
         let stem = item.url.deletingPathExtension().lastPathComponent
         let dest = uniqueSibling(of: item, stem: stem, ext: item.url.pathExtension)
         opBusy = true
@@ -1942,6 +2052,14 @@ struct FilesTabView: View {
         }
         // B1+B5：正在签名/续签的源文件不改名——签名步/续签步正读它。
         guard !rejectIfBusySigningOrRenewing(path: item.url.path) else { return }
+        // B-38-B5：保留文件夹（根目录下的 Signed / Custom）不改名/不移动——改名/移走后
+        // 清单按写死路径找文件，整库瞬间不可见。
+        if item.isDirectory && item.relativeDir.isEmpty && (item.name == "Signed" || item.name == "Custom") {
+            opErrorMessage = L("This folder can't be renamed or moved.")
+            opMessage = L("This folder can't be renamed or moved.")
+            opFailed = true
+            return
+        }
         var newName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !newName.isEmpty, newName != item.name,
               !newName.contains("/"), !newName.hasPrefix(".") else { return }
@@ -2019,6 +2137,8 @@ struct FilesTabView: View {
     }
 
     private func runZip(paths: [URL], out: URL) {
+        // B-38-B4：同 duplicate ——入口串行守卫，同时盖住 zipSingle 与 zipSelection 两路。
+        guard !opBusy else { return }
         opBusy = true
         opMessage = nil
         Task {
@@ -2038,6 +2158,8 @@ struct FilesTabView: View {
     }
 
     private func unzip(_ item: LocalFileItem) {
+        // B-38-B4：同 duplicate ——入口串行守卫。
+        guard !opBusy else { return }
         let stem = item.url.deletingPathExtension().lastPathComponent
         let dest = uniqueSibling(of: item, stem: L("%@ (extracted)", stem), ext: "")
         opBusy = true

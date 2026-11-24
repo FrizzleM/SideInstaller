@@ -213,21 +213,39 @@ enum ExpiryUrgency {
     /// out the date is (the user asked for the remaining time under
     /// every app in the resign list — the old 30-day cap left
     /// long-lived profiles showing only a bare date).
+    /// A-38-A4：到期文案按 (expirationDate, locale) 缓存——每行每 body
+    /// 求值现建 Date.FormatStyle 太贵；key 与现行 formatted 用的
+    /// Localizer.locale 同一值；>512 条时整表清掉（简单上限，不引入
+    /// 逐出策略）。调用方全在主线程 body 求值里，不另加锁。
+    /// 审后补丁：key 里必须带今天（startOfDay）——daysRemaining 是按
+    /// 自然日算的，不带今天的话，跨过午夜后缓存的“剩 N 天”会错一天，
+    /// 直到 512 条上限清表或重进 App 才纠正。
+    private static var textCache: [String: String] = [:]
+
     static func text(for profile: ProvisioningProfile?) -> String {
         guard let profile, let expiration = profile.expirationDate else {
             return L("No matching profile")
         }
+        let today = Calendar.current.startOfDay(for: Date())
+        let cacheKey = "\(expiration.timeIntervalSince1970)#\(Localizer.locale.identifier)#\(today.timeIntervalSince1970)"
+        if let cached = textCache[cacheKey] { return cached }
         let formatted = expiration.formatted(
             Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Localizer.locale))
-        if profile.isExpired { return L("Expired %@", formatted) }
-        // 每行算一次存局部量：switch 与插值各取一次会重复算日历差。
-        let days = profile.daysRemaining
-        switch days {
-        case 0:         return L("Expires today")
-        case 1:         return L("Expires tomorrow")
-        case .some(2...): return L("Expires in %d days — %@", days ?? 0, formatted)
-        default:        return L("Expires %@", formatted)
+        let result: String
+        if profile.isExpired { result = L("Expired %@", formatted) }
+        else {
+            // 每行算一次存局部量：switch 与插值各取一次会重复算日历差。
+            let days = profile.daysRemaining
+            switch days {
+            case 0:         result = L("Expires today")
+            case 1:         result = L("Expires tomorrow")
+            case .some(2...): result = L("Expires in %d days — %@", days ?? 0, formatted)
+            default:        result = L("Expires %@", formatted)
+            }
         }
+        if textCache.count > 512 { textCache.removeAll() }
+        textCache[cacheKey] = result
+        return result
     }
 }
 
@@ -575,6 +593,16 @@ final class SideloadedAppsManager: ObservableObject {
             engine.log("Refresh all: install already running.")
             return
         }
+        // B-38-B2（对称口）：导入进行中不点全部续签——rebuildRefreshable
+        // 可能读到正在被 replaceCustomImport 清空的 Custom/。分流照 C3/C27：
+        // 界面入口置 lastError，快捷指令/自动巡检入口只写日志。
+        guard !engine.isImportingIPA && !engine.isImportingPairing else {
+            if onlyBundleIDs == nil {
+                lastError = L("An import is already running. Wait for it to finish, then try again.")
+            }
+            engine.log("Refresh all: import already running.")
+            return
+        }
         // 续签不再以 WiFi 为前置（2026-10-29）：隧道是本机回环
         // utun，包根本不出设备，WiFi 开没开与它无关；引擎的
         // ensurePairingConnection 自己就写着“No Wi-Fi check:
@@ -677,6 +705,9 @@ final class SideloadedAppsManager: ObservableObject {
             // 按团队分组跑：每组先切到该团队的账号、登完核对团队号再
             // 签。组内保持页面顺序，组按首次出现顺序。取消只在组间
             // 和 App 间检查，正在签装的单个 App 不中断。
+            // B-38-B1：整轮登记——待续签的后项在整轮里都有守卫，
+            // 不只当前项。注册点必须在 C4 合并之后（合并会换掉 jobs）。
+            engine.renewingSourcePaths.formUnion(jobs.map { $0.ipa.path })
             let groups = Self.groupedByTeam(jobs)
             let multiAccount = groups.count > 1
             var refreshed = 0
@@ -784,6 +815,9 @@ final class SideloadedAppsManager: ObservableObject {
                 }
                 jobs[index].state = .failed(L("Skipped: refresh stopped."))
             }
+            // B-38-B1：整轮注销——提前 .failed / 取消后 .pending 的项，
+            // 逐项 remove 盖不住，只有整批 subtract 能清掉。
+            engine.renewingSourcePaths.subtract(jobs.map { $0.ipa.path })
             refreshSummary = jobs.count == 1
                 ? (refreshed == 1 ? L("Refreshed. Its seven days start again now.")
                                   : L("Nothing was refreshed."))
@@ -1375,6 +1409,12 @@ struct AppsView: View {
             emptyState.transition(.cardAppear)
         } else if !manager.entries.isEmpty {
             VStack(spacing: 16) {
+                // A-38-A4：一次建成 bundleID → RefreshJob 字典，行图标三处
+                // 查表代替 refreshable.first 线性查找（每行每 body 求值 3 次）。
+                // 必须用 uniquingKeysWith——uniqueKeysWithValues 遇重复
+                // bundleID 直接 trap；refreshable 正常无重复，但防线不能少。
+                let jobsByID = Dictionary(manager.refreshable.map { ($0.bundleID, $0) },
+                                          uniquingKeysWith: { first, _ in first })
                 HStack {
                     Text(manager.entries.count == 1
                          ? L("%d app", manager.entries.count)
@@ -1413,11 +1453,13 @@ struct AppsView: View {
                     NavigationLink {
                         AppProfileDetail(status: status)
                     } label: {
-                        appRow(status)
+                        appRow(status, jobsByID: jobsByID)
                     }
                     .buttonStyle(.plain, sound: .tick)
                     .cascadeItem(5 + idx)
-                    .task(id: rowIconKey(for: status)) { loadRowIcon(for: status) }
+                    .task(id: rowIconKey(for: status, jobsByID: jobsByID)) {
+                        loadRowIcon(for: status, jobsByID: jobsByID)
+                    }
                 }
             }
         }
@@ -1426,26 +1468,27 @@ struct AppsView: View {
     /// 行图标取图键：已装包名 + 配对 IPA 路径 + 大小 + 修改时间——
     /// 可续签列表变了（刚读完设备、或导入新 IPA）或同路径文件被替换
     /// 就重取。
-    private func rowIconKey(for status: SideloadedAppStatus) -> String {
+    private func rowIconKey(for status: SideloadedAppStatus, jobsByID: [String: RefreshJob]) -> String {
         // A-1（SIDE-33）：只读 pair() 时快照的存量，不再 stat 磁盘——
         // body 每次求值都会调这里。键格式不变。
-        let job = manager.refreshable.first { $0.bundleID == status.app.bundleID }
+        // A-38-A4：字典查表代替 refreshable.first 线性查找。
+        let job = jobsByID[status.app.bundleID]
         return "\(status.app.bundleID)#\(job?.ipa.path ?? "")#\(job?.ipaSize ?? 0)#\(job?.ipaModified ?? 0)"
     }
 
     /// A-37-3：行图标在共享缓存里按 IPA 路径查；行上只有 bundleID，
     /// 经 refreshable 的配对找路径（rowIconKey 同款查找）。
-    private func rowIconPath(for status: SideloadedAppStatus) -> String? {
-        manager.refreshable.first { $0.bundleID == status.app.bundleID }?.ipa.path
+    private func rowIconPath(for status: SideloadedAppStatus, jobsByID: [String: RefreshJob]) -> String? {
+        jobsByID[status.app.bundleID]?.ipa.path
     }
 
     /// 行图标：配对 IPA 的真图放后台取，取到写缓存；没配对 IPA、
     /// 或 Assets.car 独占图标取不到时，继续用虚线占位，不造假图。
-    private func loadRowIcon(for status: SideloadedAppStatus) {
-        let key = rowIconKey(for: status)
+    private func loadRowIcon(for status: SideloadedAppStatus, jobsByID: [String: RefreshJob]) {
+        let key = rowIconKey(for: status, jobsByID: jobsByID)
         guard !rowIconsTried.contains(key) else { return }
         rowIconsTried.insert(key)
-        guard let job = manager.refreshable.first(where: { $0.bundleID == status.app.bundleID }) else { return }
+        guard let job = jobsByID[status.app.bundleID] else { return }
         let ipa = job.ipa
         // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
         if rowIconBatcher == nil {
@@ -1477,12 +1520,12 @@ struct AppsView: View {
     /// 行首图标：真图 44×44 圆角填满；没图时虚线占位放同尺寸框里，行高对齐。
     /// 两路不同 View 类型，函数前必须加 @ViewBuilder（AGENTS.md 血泪）。
     @ViewBuilder
-    private func rowIcon(for status: SideloadedAppStatus) -> some View {
+    private func rowIcon(for status: SideloadedAppStatus, jobsByID: [String: RefreshJob]) -> some View {
         // A-37-3：读 iconEpoch 建立依赖——图标本体在共享缓存里，
         // 批量写回只 bump epoch、不写 @State；不读它，body 不会
         // 重算，图就永远不出现。别把这行当死代码清掉。
         let _ = iconEpoch
-        if let path = rowIconPath(for: status), let uiImage = ThumbnailCache.image(for: path) {
+        if let path = rowIconPath(for: status, jobsByID: jobsByID), let uiImage = ThumbnailCache.image(for: path) {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFill()
@@ -1496,12 +1539,12 @@ struct AppsView: View {
         }
     }
 
-    private func appRow(_ status: SideloadedAppStatus) -> some View {
+    private func appRow(_ status: SideloadedAppStatus, jobsByID: [String: RefreshJob]) -> some View {
         let profile = status.current
         let urgency = ExpiryUrgency.of(profile)
         return PanelCard {
             HStack(alignment: .top, spacing: 12) {
-                rowIcon(for: status)
+                rowIcon(for: status, jobsByID: jobsByID)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(status.app.name)
                         .font(.subheadline.weight(.medium))

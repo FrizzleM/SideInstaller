@@ -1372,7 +1372,7 @@ final class Engine {
         // Anisette servers go down often, so with Auto on try each one before
         // giving up. A server picked in Settings is the only one tried.
         let servers = anisetteCandidates()
-        var lastError = "no anisette servers configured"
+        var lastError = L("No anisette servers are configured.")
         var appleRefusals = AnisetteServer.AppleRefusals(servers: anisetteServers)
         var appleUnreachable = 0
 
@@ -1416,7 +1416,7 @@ final class Engine {
             } catch let error as EngineError {
                 // A21-1（A3 同款）：旧登录在 2FA 取消等失败时也不写新账号的 lastError。
                 if generation != signInGeneration { throw CancellationError() }
-                lastError = error.errorDescription ?? "sign-in failed"
+                lastError = error.errorDescription ?? L("Sign-in failed.")
 
                 // A cancelled 2FA prompt isn't the server's fault.
                 if ticket.twoFactorWasCancelled {
@@ -2003,6 +2003,14 @@ final class Engine {
             Self.discardInboxCopy(url)
             return false
         }
+        // B-38-B2：续签进行中不换 custom 槽——replaceCustomImport 会清空
+        // Custom/ 、断掉在途续签的源。拒绝路照 B3 同款（丢 inbox 拷贝）。
+        guard !SideloadedAppsManager.shared.isRefreshing else {
+            lastError = L("A refresh is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            Self.discardInboxCopy(url)
+            return false
+        }
         guard !isImportingIPA else {
             lastError = L("An import is already running. Wait for it to finish, then try again.")
             log("⛔️ Import: \(lastError ?? "")")
@@ -2049,6 +2057,12 @@ final class Engine {
         // B3：同 from: ——安装进行中不换 custom 槽（链接下载那路同理）。
         guard !isRunning else {
             lastError = L("An install is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            return false
+        }
+        // B-38-B2：同 from: ——续签进行中不导入自定义 IPA。
+        guard !SideloadedAppsManager.shared.isRefreshing else {
+            lastError = L("A refresh is already running. Wait for it to finish, then try again.")
             log("⛔️ Import: \(lastError ?? "")")
             return false
         }
@@ -3677,6 +3691,13 @@ final class Engine {
             log("⛔️ Pairing import: \(lastError ?? "")")
             return
         }
+        // B-38-B2：续签进行中不换配对文件——成功路调 connection.disconnect()
+        // 会断掉在途续签的设备链路。
+        guard !SideloadedAppsManager.shared.isRefreshing else {
+            lastError = L("A refresh is already running. Wait for it to finish, then try again.")
+            log("⛔️ Pairing import: \(lastError ?? "")")
+            return
+        }
         guard !isImportingPairing else { return }
         isImportingPairing = true
         // Delete the picker's temporary copy once the import is done.
@@ -5261,7 +5282,7 @@ extension Engine {
     /// Settings, the only one tried, it names that server and points to Auto,
     /// which would have tried the others.
     func anisetteSignInFailure(_ failures: AnisetteServer.SignInFailures) -> String {
-        let error = failures.shown?.error ?? "no anisette servers configured"
+        let error = failures.shown?.error ?? L("No anisette servers are configured.")
         guard anisetteAuto else {
             return L("Apple ID sign-in failed on %@. Error: %@", anisetteName(for: anisetteURL), error)
                 + " " + L("Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.")

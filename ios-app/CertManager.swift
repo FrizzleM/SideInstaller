@@ -417,7 +417,7 @@ final class CertManager: ObservableObject {
         // off); a credential or 2FA error stops the loop.
         let servers = anisetteCandidates()
         let dir = storageDir
-        var lastError = "no anisette servers configured"
+        var lastError = L("No anisette servers are configured.")
         var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
         var appleUnreachable = 0
 
@@ -448,7 +448,7 @@ final class CertManager: ObservableObject {
             } catch let error as EngineError {
                 // A3：旧登录在 2FA 取消等失败时也不写新账号的 lastError。
                 if generation != signInGeneration { throw CancellationError() }
-                lastError = error.errorDescription ?? "sign-in failed"
+                lastError = error.errorDescription ?? L("Sign-in failed.")
                 if ticket.twoFactorWasCancelled {
                     engine.log("Two-factor verification cancelled — stopping.")
                     throw EngineError.message(L("Two-factor verification was cancelled."))

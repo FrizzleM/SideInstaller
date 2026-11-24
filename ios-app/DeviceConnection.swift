@@ -128,35 +128,13 @@ final class DeviceConnection {
         let tried = ([deviceIP, "127.0.0.1"] + candidates).joined(separator: ", ")
         switch kind {
         case TunnelFailureHostsRefused:
-            return """
-                The device answered on the RSD port at \(deviceIP), then the tunnel port \
-                it opened was unreachable on that same address — dropped or refused, \
-                across \(tried). The device is there; what's in front of it is forwarding \
-                some ports and not others. The tunnel opens on a fresh high port every \
-                attempt, so a rule-based proxy that forwards the RSD port alone can never \
-                cover it. Use a loopback VPN that blanket-forwards every port on the RSD \
-                subnet. Re-pairing won't help — the pairing is fine.
-                """
+            return L("The device answered on the RSD port at %@, then the tunnel port it opened was unreachable on that same address — dropped or refused, across %@. The device is there; what's in front of it is forwarding some ports and not others. The tunnel opens on a fresh high port every attempt, so a rule-based proxy that forwards the RSD port alone can never cover it. Use a loopback VPN that blanket-forwards every port on the RSD subnet. Re-pairing won't help — the pairing is fine.", deviceIP, tried)
         case TunnelFailureTimeout:
-            return """
-                The tunnel port never answered and never refused on any address \
-                (\(tried)) — the connection is being swallowed rather than rejected. \
-                That's usually a VPN or firewall dropping traffic on the RSD subnet. \
-                Check the VPN is still up, then try again.
-                """
+            return L("The tunnel port never answered and never refused on any address (%@) — the connection is being swallowed rather than rejected. That's usually a VPN or firewall dropping traffic on the RSD subnet. Check the VPN is still up, then try again.", tried)
         case TunnelFailureTlsHandshake:
-            return """
-                Something accepted the tunnel connection but failed the encrypted \
-                handshake on top of it. Either another process holds that port, or this \
-                pairing file's key no longer matches the device. Pair again, and if that \
-                doesn't take, restart the loopback VPN.
-                """
+            return L("Something accepted the tunnel connection but failed the encrypted handshake on top of it. Either another process holds that port, or this pairing file's key no longer matches the device. Pair again, and if that doesn't take, restart the loopback VPN.")
         case TunnelFailurePairVerify:
-            return """
-                The device rejected this pairing file: it's for a different device, or \
-                the pairing was revoked (a reset, a restore, or Developer Mode being \
-                turned off). Pair with this iPhone again to get a fresh file.
-                """
+            return L("The device rejected this pairing file: it's for a different device, or the pairing was revoked (a reset, a restore, or Developer Mode being turned off). Pair with this iPhone again to get a fresh file.")
         case TunnelFailureRsdUnreachable:
             // ECONNREFUSED means the tunnel works and the address is right, but
             // nothing is listening on the pairing port (often Developer Mode
@@ -178,10 +156,7 @@ final class DeviceConnection {
             return L("Couldn't reach the device at %@:%d at all. The loopback VPN is most likely off, or Device IP isn't the address it carries: in LocalDevVPN that's the one under Settings › Device IP (10.7.0.1 by default), not the “Connected to” address on its main screen. First check that the phone and the computer are on the same Wi-Fi (the local tunnel needs a local network).",
                      deviceIP, Int(Self.rsdPort))
         default:
-            return """
-                The tunnel didn't come up, and the failure didn't match any known cause. \
-                The raw error is in the log.
-                """
+            return L("The tunnel didn't come up, and the failure didn't match any known cause. The raw error is in the log.")
         }
     }
 
@@ -417,7 +392,7 @@ final class DeviceConnection {
             case nil:
                 developerMode = "unknown"
             }
-            advice += "\n\nDiagnostics: remote pairing advertisement: \(lastAdvertSummary ?? "not checked"); Developer Mode: \(developerMode)."
+            advice += "\n\n" + L("Diagnostics: remote pairing advertisement: %@; Developer Mode: %@.", lastAdvertSummary ?? "not checked", developerMode)
         }
         throw TunnelError(kind: failure.kind, advice: advice, underlying: failure.raw)
     }

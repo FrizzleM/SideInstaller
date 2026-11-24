@@ -92,6 +92,8 @@ struct CertsView: View {
                         HStack {
                             Text(cert.displayName)
                                 .font(.subheadline)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
                             Spacer()
                             if let expiry = cert.expiresAt {
                                 Text(expiryLabel(expiry))
@@ -326,6 +328,8 @@ struct CertsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(cert.displayName)
                             .font(.subheadline.weight(.medium))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                         if let machine = cert.machineLabel {
                             Label(machine, systemImage: "desktopcomputer")
                                 .font(.caption)

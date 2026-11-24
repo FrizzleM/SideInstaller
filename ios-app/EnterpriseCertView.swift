@@ -2537,17 +2537,26 @@ private struct LibraryIPAPicker: View {
             Spacer()
         }
         .contentShape(Rectangle())
-        .task(id: cacheKey(item)) {
-            loadIcon(for: item)
-            loadInfo(for: item)
-        }
+        .task(id: cacheKey(item)) { loadInfoAndIcon(for: item) }
     }
 
-    private func loadIcon(for item: LocalFileItem) {
+    /// A-38-A1：选择器行信息 + 图标一次解析——合流函数一次开包同产两半；
+    /// 替换途中文件校验只做一次，覆盖两半；写回仍走各自的
+    /// BatchWriteback；两个 tried 集都保留——两半都已尝试才直接返回，
+    /// 否则解析一次、按需写回未尝试的那半。
+    private func loadInfoAndIcon(for item: LocalFileItem) {
         let key = cacheKey(item)
-        guard !iconsTried.contains(key) else { return }
+        let infoTried = infosTried.contains(key)
+        let iconTried = iconsTried.contains(key)
+        guard !infoTried || !iconTried else { return }
+        infosTried.insert(key)
         iconsTried.insert(key)
         // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
+        if pickerInfoBatcher == nil {
+            pickerInfoBatcher = BatchWriteback { batch in
+                for (path, info) in batch { self.infos[path] = info }
+            }
+        }
         if pickerIconBatcher == nil {
             pickerIconBatcher = BatchWriteback { batch in
                 // A-37-3：写共享缓存，再 bump iconEpoch 触发重绘。
@@ -2556,40 +2565,24 @@ private struct LibraryIPAPicker: View {
             }
         }
         Task.detached { [url = item.url, path = item.url.path,
-                         size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
-            guard let data = IPALibrary.iconData(at: url),
-                  // A-7：下采样在 detached 里做——选择器行高 52pt，原来用 104×104；
-                  // A-37-3：共享缓存按路径只存一份，各处取最大 120，行上显示
-                  // 时再缩到 52pt，不模糊。
-                  let image = IPALibrary.thumbnail(from: data, maxPixelSize: 120) else { return }
-            // C30（B12-6 同款核对）：解包途中文件被替换就丢掉旧图。
+                         size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0,
+                         infoTried, iconTried] in
+            let (info, data) = IPALibrary.appInfoAndIconData(at: url)
+            // C30（B12-6 同款核对）：解包途中文件被替换就丢掉旧信息/旧图。
             let attrs = try? FileManager.default.attributesOfItem(atPath: path)
             let liveSize = attrs?[.size] as? Int
             let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
             guard liveSize == size, liveModified == modified else { return }
-            await MainActor.run { self.pickerIconBatcher?.enqueue(image, for: path) }
-        }
-    }
-
-    private func loadInfo(for item: LocalFileItem) {
-        let key = cacheKey(item)
-        guard !infosTried.contains(key) else { return }
-        infosTried.insert(key)
-        // A-5(c)：批量写回懒建（首次加载时立一次，此后复用）。
-        if pickerInfoBatcher == nil {
-            pickerInfoBatcher = BatchWriteback { batch in
-                for (path, info) in batch { self.infos[path] = info }
+            if !infoTried, let info {
+                await MainActor.run { self.pickerInfoBatcher?.enqueue(info, for: path) }
             }
-        }
-        Task.detached { [url = item.url, path = item.url.path,
-                         size = item.size, modified = item.modified?.timeIntervalSince1970 ?? 0] in
-            guard let info = IPALibrary.appInfo(at: url) else { return }
-            // C30（B12-6 同款核对）：解析途中文件被替换就丢掉旧信息。
-            let attrs = try? FileManager.default.attributesOfItem(atPath: path)
-            let liveSize = attrs?[.size] as? Int
-            let liveModified = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
-            guard liveSize == size, liveModified == modified else { return }
-            await MainActor.run { self.pickerInfoBatcher?.enqueue(info, for: path) }
+            if !iconTried, let data,
+               // A-7：下采样在 detached 里做——选择器行高 52pt，原来用 104×104；
+               // A-37-3：共享缓存按路径只存一份，各处取最大 120，行上显示
+               // 时再缩到 52pt，不模糊。
+               let image = IPALibrary.thumbnail(from: data, maxPixelSize: 120) {
+                await MainActor.run { self.pickerIconBatcher?.enqueue(image, for: path) }
+            }
         }
     }
 }

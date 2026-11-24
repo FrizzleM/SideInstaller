@@ -286,7 +286,7 @@ final class EntitlementsManager: ObservableObject {
             } catch let error as EngineError {
                 // A3：同 CertManager——旧登录的失败不写新账号的 lastError。
                 if generation != signInGeneration { throw CancellationError() }
-                let failure = error.errorDescription ?? "sign-in failed"
+                let failure = error.errorDescription ?? L("Sign-in failed.")
                 if ticket.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
@@ -544,6 +544,7 @@ struct EntitlementsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(app.displayName)
                         .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
                     Text(app.identifier)
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
@@ -675,6 +676,7 @@ private struct EntitlementPicker: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(entitlement.name)
                         .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
                         .foregroundStyle(.primary)
                     Text(entitlement.id)
                         .font(.caption2.monospaced())
