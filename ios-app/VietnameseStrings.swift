@@ -754,7 +754,6 @@ let vietnameseStrings: [String: String] = [
     "bad asset URL": "URL tệp tải không hợp lệ",
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub đang giới hạn số yêu cầu từ mạng này — GitHub không bị chặn, và giới hạn sẽ tự hết. Hãy thử lại %@.",
-    "GitHub answered HTTP %d%@": "GitHub đã trả về HTTP %d%@",
     "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
         "GitHub hiện không cung cấp %@ — kho mã đã bị gỡ, chuyển đi hoặc chuyển thành riêng tư nên không có gì để tải. iPhone này và mạng của nó không có vấn đề gì.",
     "couldn't reach GitHub: %@": "không kết nối được tới GitHub: %@",
@@ -1415,4 +1414,14 @@ let vietnameseStrings: [String: String] = [
         "iPhone của họ không bao giờ trả lời cổng đường hầm mà cũng không từ chối — kết nối đang bị nuốt mất chứ không phải bị từ chối. Thường là do mạng Wi-Fi hoặc tường lửa làm rớt lưu lượng trên đường đi. Hãy kiểm tra xem hai iPhone có cùng một mạng Wi-Fi không rồi thử lại.",
     "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
         "Đã có thứ gì đó chấp nhận kết nối đường hầm, nhưng quá trình bắt tay mã hóa phía trên đã thất bại. Hoặc một tiến trình khác đang giữ cổng đó, hoặc khóa của tệp ghép nối này không còn khớp với iPhone của họ nữa. Hãy ghép nối lại.",
+    "GitHub answered HTTP %d":
+        "GitHub đã trả về HTTP %d",
+    "The code was incorrect. Try again.":
+        "Mã không đúng. Thử lại.",
+    "A code was already sent and is still valid. Enter it.":
+        "Một mã đã được gửi và vẫn còn hiệu lực. Nhập mã đó.",
+    "That way isn't available. Choose another way.":
+        "Cách đó không khả dụng. Chọn cách khác.",
+    "That didn't work. Try another way.":
+        "Không được. Thử cách khác.",
 ]

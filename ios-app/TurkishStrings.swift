@@ -716,7 +716,6 @@ let turkishStrings: [String: String] = [
     "bad asset URL": "geçersiz varlık adresi",
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub bu ağa hız sınırı uyguluyor — engellenmiş değil ve sınır kendiliğinden kalkar. %@ yeniden dene.",
-    "GitHub answered HTTP %d%@": "GitHub HTTP %d%@ yanıtladı",
     "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
         "GitHub şu anda %@ deposunu sunmuyor — depo kaldırılmış, taşınmış veya gizli yapılmış, bu yüzden indirilecek bir şey yok. Bu iPhone'da veya ağında bir sorun yok.",
     "couldn't reach GitHub: %@": "GitHub'a ulaşılamadı: %@",
@@ -1335,4 +1334,14 @@ let turkishStrings: [String: String] = [
         "Diğer iPhone tünel portuna ne yanıt verdi ne de reddetti. Bağlantı reddedilmiyor, yolda yutuluyor. Genellikle Wi-Fi ağı ya da bir güvenlik duvarı trafiği yolda düşürüyor. İki iPhone'un aynı Wi-Fi ağında olduğunu kontrol edip yeniden dene.",
     "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
         "Bir şey tünel bağlantısını kabul etti ama üstündeki şifreli el sıkışma başarısız oldu. Ya başka bir işlem o portu tutuyor ya da bu eşleştirme dosyasının anahtarı artık diğer iPhone ile uyuşmuyor. Yeniden eşleştir.",
+    "GitHub answered HTTP %d":
+        "GitHub HTTP %d yanıtı verdi",
+    "The code was incorrect. Try again.":
+        "Kod yanlıştı. Tekrar deneyin.",
+    "A code was already sent and is still valid. Enter it.":
+        "Bir kod zaten gönderildi ve hâlâ geçerli. Girin.",
+    "That way isn't available. Choose another way.":
+        "Bu yöntem kullanılamıyor. Başka bir yöntem seçin.",
+    "That didn't work. Try another way.":
+        "Olmadı. Başka bir yöntem deneyin.",
 ]

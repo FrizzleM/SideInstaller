@@ -674,7 +674,6 @@ let koreanStrings: [String: String] = [
     "bad asset URL": "잘못된 에셋 URL",
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "이 네트워크에서 GitHub이 요청 횟수를 제한하고 있습니다. 차단된 것은 아니며 제한은 저절로 풀립니다. %@에 다시 시도하세요.",
-    "GitHub answered HTTP %d%@": "GitHub이 HTTP %d로 응답했습니다%@",
     "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
         "지금 GitHub이 %@을(를) 제공하지 않습니다. 저장소가 삭제되었거나 이전되었거나 비공개로 바뀌어서 내려받을 파일이 없습니다. 이 iPhone이나 네트워크에는 문제가 없습니다.",
     "couldn't reach GitHub: %@": "GitHub에 연결할 수 없습니다: %@",
@@ -1387,4 +1386,14 @@ let koreanStrings: [String: String] = [
         "상대방 iPhone은 터널 포트에 응답하지도, 거부하지도 않았습니다. 연결이 거부되는 것이 아니라 삼켜지고 있습니다. 보통 Wi-Fi 네트워크나 방화벽이 도중에 트래픽을 버리기 때문입니다. 두 iPhone이 같은 Wi-Fi 네트워크에 있는지 확인한 뒤 다시 시도하세요.",
     "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
         "무언가가 터널 연결을 받아들였지만, 그 위의 암호화된 핸드셰이크가 실패했습니다. 다른 프로세스가 그 포트를 점유하고 있거나, 이 페어링 파일의 키가 더 이상 상대방 iPhone과 맞지 않습니다. 다시 페어링하세요.",
+    "GitHub answered HTTP %d":
+        "GitHub에서 HTTP %d 응답을 받았습니다",
+    "The code was incorrect. Try again.":
+        "코드가 올바르지 않습니다. 다시 시도하세요.",
+    "A code was already sent and is still valid. Enter it.":
+        "코드가 이미 전송되었고 아직 유효합니다. 입력하세요.",
+    "That way isn't available. Choose another way.":
+        "해당 방법은 사용할 수 없습니다. 다른 방법을 선택하세요.",
+    "That didn't work. Try another way.":
+        "작동하지 않았습니다. 다른 방법을 시도하세요.",
 ]

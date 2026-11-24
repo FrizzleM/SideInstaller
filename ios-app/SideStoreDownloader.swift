@@ -617,13 +617,13 @@ enum SideStoreDownloader {
                 return L("bad asset URL")
             case .notDownloadable:
                 return L("there's nothing to download for a custom IPA — import one first")
-            case let .badStatus(status, detail, retryAfter):
+            case let .badStatus(status, _, retryAfter):
                 // Replace GitHub's rate-limit text with when to retry.
                 if let retryAfter {
                     return L("GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.",
                              Self.relative(retryAfter))
                 }
-                return L("GitHub answered HTTP %d%@", status, detail.map { ": \($0)" } ?? "")
+                return L("GitHub answered HTTP %d", status)
             case let .repoUnavailable(repo):
                 return L("GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.",
                          repo)
@@ -1468,8 +1468,12 @@ enum SideStoreDownloader {
     private static func check(_ response: URLResponse, body: Data? = nil) throws {
         guard let http = response as? HTTPURLResponse else { return }
         guard (200...299).contains(http.statusCode) else {
+            let detail = body.flatMap(errorMessage(in:))
+            // GitHub's own words stay in the log only — the user-facing
+            // description no longer carries them (C-48-1).
+            if let detail { Engine.shared.log("GitHub API error HTTP \(http.statusCode): \(detail)") }
             throw DownloadError.badStatus(status: http.statusCode,
-                                          detail: body.flatMap(errorMessage(in:)),
+                                          detail: detail,
                                           retryAfter: retryAfter(http))
         }
     }

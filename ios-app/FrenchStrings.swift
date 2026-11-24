@@ -760,7 +760,6 @@ let frenchStrings: [String: String] = [
     "bad asset URL": "URL de ressource incorrecte",
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub limite les requêtes de ce réseau — il n'est pas bloqué, et la limite se réinitialise d'elle-même. Réessayez %@.",
-    "GitHub answered HTTP %d%@": "GitHub a répondu HTTP %d%@",
     "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
         "GitHub ne propose pas %@ pour le moment — le dépôt a été retiré, déplacé ou rendu privé, il n'y a donc rien à télécharger. Cet iPhone et son réseau n'y sont pour rien.",
     "couldn't reach GitHub: %@": "impossible de joindre GitHub : %@",
@@ -1423,4 +1422,14 @@ let frenchStrings: [String: String] = [
         "Leur iPhone n'a jamais répondu au port du tunnel, ni refusé la connexion — la connexion est avalée plutôt que rejetée. C'est généralement le réseau Wi-Fi ou un pare-feu qui bloque le trafic en route. Vérifiez que les deux iPhone sont sur le même réseau Wi-Fi, puis réessayez.",
     "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
         "Quelque chose a accepté la connexion du tunnel, mais la poignée de main chiffrée par-dessus a échoué. Soit un autre processus occupe ce port, soit la clé de ce fichier de jumelage ne correspond plus à leur iPhone. Jumelez à nouveau.",
+    "GitHub answered HTTP %d":
+        "GitHub a répondu HTTP %d",
+    "The code was incorrect. Try again.":
+        "Le code était incorrect. Réessayez.",
+    "A code was already sent and is still valid. Enter it.":
+        "Un code a déjà été envoyé et il est toujours valable. Saisissez-le.",
+    "That way isn't available. Choose another way.":
+        "Ce moyen n'est pas disponible. Choisissez-en un autre.",
+    "That didn't work. Try another way.":
+        "Ça n'a pas marché. Essayez un autre moyen.",
 ]

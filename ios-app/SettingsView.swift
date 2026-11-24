@@ -20,6 +20,8 @@ struct SettingsView: View {
     @EnvironmentObject private var locationManager: LocationManager
     @EnvironmentObject private var entitlementsManager: EntitlementsManager
     @EnvironmentObject private var sideBySideManager: SideBySideManager
+    /// B-48-B2：续签进行中时账号区禁用，读这个 live flag。
+    @EnvironmentObject private var appsManager: SideloadedAppsManager
     @Environment(\.dismiss) private var dismiss
 
     /// Owned here; a new instance just rescans the disk.
@@ -164,15 +166,21 @@ struct SettingsView: View {
             }
             // B6：安装进行中时切账号会掉登录 session（见本节注释），
             // 整区禁用 + 一行说明，装完再切。
+            // B-48-B2：续签进行中同理禁用——切账号会清掉续签在用的
+            // signingTeamID，同组剩下的任务全撞第二道闸假失败。
             if engine.isRunning {
                 Text(L("An install is already running. Wait for it to finish, then try again."))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+            } else if appsManager.isRefreshing {
+                Text(L("A refresh is already running. Wait for it to finish, then try again."))
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
             }
         } header: {
             Text(L("Account"))
         }
-        .disabled(engine.isRunning)
+        .disabled(engine.isRunning || appsManager.isRefreshing)
     }
     /// U-UI：企业证书区（签名段从原证书页搬到 EnterpriseCertView 后，
     /// 设置页只留这一行摘要 + 推入链接；证书本身的表单全在那一页）。

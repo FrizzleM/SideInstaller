@@ -740,7 +740,6 @@ let chineseStrings: [String: String] = [
     "bad asset URL": "下载资源的 URL 无效",
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub 正在限制此网络的请求频率 —— 它没有被屏蔽，限制会自动解除。请在%@重试。",
-    "GitHub answered HTTP %d%@": "GitHub 返回了 HTTP %d%@",
     "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
         "GitHub 目前无法提供 %@ —— 该代码仓库已被下架、迁移或设为私有，因此没有可下载的内容。这台 iPhone 及其网络没有任何问题。",
     "couldn't reach GitHub: %@": "无法连接到 GitHub：%@",
@@ -1399,4 +1398,14 @@ let chineseStrings: [String: String] = [
         "对方 iPhone 既不响应也不拒绝隧道端口——连接被吞掉了，不是被拒绝。通常是 Wi-Fi 网络或防火墙在半路丢了流量。检查两台 iPhone 是否在同一个 Wi-Fi 网络，然后重试。",
     "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
         "有东西接了隧道连接，但上层的加密握手失败了。要么是别的进程占了这个端口，要么是配对文件的密钥与对方 iPhone 不匹配了。重新配对一次。",
+    "GitHub answered HTTP %d":
+        "GitHub 返回了 HTTP %d",
+    "The code was incorrect. Try again.":
+        "验证码错了，再试一次。",
+    "A code was already sent and is still valid. Enter it.":
+        "验证码已经发出、还在有效期内，直接输入它。",
+    "That way isn't available. Choose another way.":
+        "这个方式不可用，换个方式。",
+    "That didn't work. Try another way.":
+        "没成，换个方式试试。",
 ]

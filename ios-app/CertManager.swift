@@ -151,9 +151,12 @@ final class CertManager: ObservableObject {
         lastError = nil
         engine.log("=== Certificates: loading ===")
         Task { @MainActor in
+            let generation = signInGeneration
             do {
                 if session == nil { try await signIn(id: id, pw: pw) }
+                guard generation == signInGeneration else { throw CancellationError() }
                 let list = try await onQueue { try self.performList() }
+                guard generation == signInGeneration else { throw CancellationError() }
                 certs = list
                 hasLoaded = true
                 engine.log("Certificates: \(list.count) iOS development certificate(s).")
@@ -202,21 +205,33 @@ final class CertManager: ObservableObject {
         engine.log("Certificates: revoking \(cert.displayName) (\(serial)) …")
         Task { @MainActor in
             var revoked = false
+            let generation = signInGeneration
             do {
                 try await onQueue { try self.performRevoke(serial: serial) }
                 revoked = true
                 engine.log("Certificates: revoked \(cert.displayName).")
+                guard generation == signInGeneration else { throw CancellationError() }
                 do {
                     let list = try await onQueue { try self.performList() }
+                    guard generation == signInGeneration else { throw CancellationError() }
                     certs = list
                 } catch {
                     // C9：吊销成功了，只是列表没刷出来——先把这张从
                     // 列表里拿掉，别让用户再点一次吊销；再告诉他
                     // 列表可能还是旧的，重新加载会刷新。
+                    // B-48-B1：旧账号切走后的刷新失败不许写新账号的 lastError，
+                    // 也不许碰已被 signOut 清空的列表。
+                    guard generation == signInGeneration else { throw CancellationError() }
                     certs.removeAll { $0.id == cert.id }
                     lastError = L("Revoked, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.")
                     engine.log("⛔️ Certificates: revoked \(cert.displayName), but the list refresh failed: \(short(error))")
                 }
+            } catch is CancellationError {
+                // B-48-B1：吊销本身已做成（旧账号），只作废写回与重试，
+                // 不记错。revoked 置 false 使尾部的 `if revoked { onSuccess?() }` 不跑——
+                // 切账号后拿新账号重跑安装是错的，用户手动重试。
+                revoked = false
+                engine.log("Certificates: revoke cancelled (account changed).")
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Revoke failed: \(lastError ?? "")")
@@ -306,20 +321,26 @@ final class CertManager: ObservableObject {
         engine.log("=== Certificates: checking \(title) ===")
         Task { @MainActor in
             defer { isImporting = false }
+            let generation = signInGeneration
             do {
                 if session == nil { try await signIn(id: id, pw: pw) }
+                guard generation == signInGeneration else { throw CancellationError() }
                 let result = try await importFirstOnTeam(candidates)
+                guard generation == signInGeneration else { throw CancellationError() }
                 let name = result.certificate.machineLabel ?? result.certificate.displayName
                 engine.log(result.replacedKey
                     ? "Certificates: signing with \(name) (\(result.certificate.serialNumber)) from now on; nothing was revoked."
                     : "Certificates: \(name) is the certificate SideInstaller signs with already.")
                 do {
                     let list = try await onQueue { try self.performList() }
+                    guard generation == signInGeneration else { throw CancellationError() }
                     certs = list
                     hasLoaded = true
                 } catch {
                     // C17：导入成功了，只是列表没刷出来——告诉他
                     // 列表可能还是旧的，重新加载会刷新。
+                    // B-48-B1：同 C9，旧账号切走后的刷新失败不许写新账号的 lastError。
+                    guard generation == signInGeneration else { throw CancellationError() }
                     lastError = L("Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.")
                     engine.log("⛔️ Certificates: imported \(name), but the list refresh failed: \(short(error))")
                 }

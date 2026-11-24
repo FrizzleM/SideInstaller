@@ -757,7 +757,6 @@ let spanishStrings: [String: String] = [
     "bad asset URL": "URL del recurso incorrecta",
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub está limitando las peticiones de esta red — no está bloqueado, y el límite se restablece solo. Inténtalo de nuevo %@.",
-    "GitHub answered HTTP %d%@": "GitHub ha respondido HTTP %d%@",
     "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
         "GitHub no está ofreciendo %@ ahora mismo — el repositorio se ha retirado, movido o hecho privado, así que no hay nada que descargar. A este iPhone y a su red no les pasa nada.",
     "couldn't reach GitHub: %@": "no se ha podido conectar con GitHub: %@",
@@ -1420,4 +1419,14 @@ let spanishStrings: [String: String] = [
         "Su iPhone nunca respondió al puerto del túnel ni lo rechazó: la conexión se pierde por el camino en lugar de ser rechazada. Normalmente es la red Wi-Fi o un cortafuegos que descarta el tráfico. Comprueba que ambos iPhone estén en la misma red Wi-Fi y vuelve a intentarlo.",
     "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
         "Algo aceptó la conexión del túnel, pero el intercambio cifrado sobre ella falló. O bien otro proceso ocupa ese puerto, o bien la clave de este archivo de emparejamiento ya no coincide con su iPhone. Empareja de nuevo.",
+    "GitHub answered HTTP %d":
+        "GitHub respondió HTTP %d",
+    "The code was incorrect. Try again.":
+        "El código era incorrecto. Inténtalo de nuevo.",
+    "A code was already sent and is still valid. Enter it.":
+        "Ya se envió un código y sigue siendo válido. Introdúcelo.",
+    "That way isn't available. Choose another way.":
+        "Ese método no está disponible. Elige otro.",
+    "That didn't work. Try another way.":
+        "No funcionó. Prueba otro método.",
 ]

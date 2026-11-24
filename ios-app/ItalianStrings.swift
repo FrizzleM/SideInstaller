@@ -753,7 +753,6 @@ let italianStrings: [String: String] = [
     "bad asset URL": "URL della risorsa non valido",
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub sta limitando le richieste da questa rete — non è bloccato, e il limite si azzera da solo. Riprova %@.",
-    "GitHub answered HTTP %d%@": "GitHub ha risposto HTTP %d%@",
     "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
         "GitHub al momento non rende disponibile %@ — il repository è stato rimosso, spostato o reso privato, quindi non c'è nulla da scaricare. Questo iPhone e la sua rete non hanno nessun problema.",
     "couldn't reach GitHub: %@": "impossibile raggiungere GitHub: %@",
@@ -1417,4 +1416,14 @@ let italianStrings: [String: String] = [
         "Il loro iPhone non ha mai risposto alla porta del tunnel né l'ha rifiutata — la connessione viene inghiottita invece che rifiutata. Di solito è la rete Wi-Fi o un firewall che scarta il traffico lungo il percorso. Controlla che entrambi gli iPhone siano sulla stessa rete Wi-Fi, poi riprova.",
     "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
         "Qualcosa ha accettato la connessione del tunnel, ma la negoziazione cifrata sopra di essa è fallita. O un altro processo occupa quella porta, oppure la chiave di questo file di abbinamento non corrisponde più al loro iPhone. Abbina di nuovo.",
+    "GitHub answered HTTP %d":
+        "GitHub ha risposto HTTP %d",
+    "The code was incorrect. Try again.":
+        "Il codice non era corretto. Riprova.",
+    "A code was already sent and is still valid. Enter it.":
+        "Un codice è già stato inviato ed è ancora valido. Inseriscilo.",
+    "That way isn't available. Choose another way.":
+        "Questo metodo non è disponibile. Scegline un altro.",
+    "That didn't work. Try another way.":
+        "Non ha funzionato. Prova un altro metodo.",
 ]

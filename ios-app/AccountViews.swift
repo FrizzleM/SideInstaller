@@ -292,6 +292,8 @@ struct AccountEditor: View {
     // B6：安装进行中时保存会切账号掉 session（revision bump → RootView
     // 丢 session），与设置页账号区禁用同理，编辑器里的保存也禁掉。
     @Environment(Engine.self) private var engine
+    /// B-48-B2：续签进行中时保存也禁掉（同上，切账号会清掉续签在用的 signingTeamID）。
+    @EnvironmentObject private var appsManager: SideloadedAppsManager
     @AppStorage(OfficialSourceCheck.defaultsKey) private var confirmedOfficialSource = false
     @EnvironmentObject private var loc: Localizer
     @Environment(\.dismiss) private var dismiss
@@ -373,7 +375,7 @@ struct AccountEditor: View {
                     accounts.save(appleID: email, password: password, replacing: target.account)
                     dismiss()
                 }
-                .disabled(!canSave || engine.isRunning)
+                .disabled(!canSave || engine.isRunning || appsManager.isRefreshing)
             }
         }
     }

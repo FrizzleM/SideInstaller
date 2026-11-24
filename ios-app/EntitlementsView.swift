@@ -180,9 +180,12 @@ final class EntitlementsManager: ObservableObject {
         lastError = nil
         engine.log("=== Entitlements: loading App IDs ===")
         Task { @MainActor in
+            let generation = signInGeneration
             do {
                 if session == nil { try await signIn(id: id, pw: pw) }
+                guard generation == signInGeneration else { throw CancellationError() }
                 let list = try await onQueue { try self.performList() }
+                guard generation == signInGeneration else { throw CancellationError() }
                 apps = list.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
                 hasLoaded = true
                 engine.log("Entitlements: \(list.count) App ID(s).")
@@ -208,12 +211,17 @@ final class EntitlementsManager: ObservableObject {
         outcomes[app.id] = nil
         engine.log("Entitlements: enabling \(ids.count) capability(ies) on \(app.identifier) …")
         Task { @MainActor in
+            let generation = signInGeneration
             do {
                 let results = try await onQueue { try self.performEnable(appIdId: app.appIdId, ids: ids) }
+                guard generation == signInGeneration else { throw CancellationError() }
                 outcomes[app.id] = results
                 reportedID = app.id
                 let granted = results.filter(\.ok).count
                 engine.log("Entitlements: Apple accepted \(granted)/\(results.count) on \(app.identifier).")
+            } catch is CancellationError {
+                // B-48-B1：切账号后本次启用作废，不记错、不弹结果窗。
+                engine.log("Entitlements: enable cancelled (account changed).")
             } catch {
                 lastError = short(error)
                 engine.log("⛔️ Entitlements: \(lastError ?? "failed")")

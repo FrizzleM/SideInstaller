@@ -673,7 +673,6 @@ let japaneseStrings: [String: String] = [
     "bad asset URL": "ダウンロードリソースの URL が不正です",
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "このネットワークからのアクセスが GitHub によりレート制限されています。ブロックされているわけではなく、制限は自動的に解除されます。%@ 後に再度お試しください。",
-    "GitHub answered HTTP %d%@": "GitHub の応答：HTTP %d%@",
     "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
         "GitHub は現在 %@ を提供していません。リポジトリが削除、移動、または非公開にされたため、ダウンロードできるものがありません。この iPhone やネットワークに問題はありません。",
     "couldn't reach GitHub: %@": "GitHub に接続できませんでした：%@",
@@ -1386,4 +1385,14 @@ let japaneseStrings: [String: String] = [
         "相手の iPhone はトンネルのポートに応答も拒否もしませんでした。接続は拒否されるのではなく、途中で消えています。通常、Wi-Fi ネットワークやファイアウォールが途中で通信を捨てています。両方の iPhone が同じ Wi-Fi ネットワークに接続されていることを確認してから、もう一度お試しください。",
     "Something accepted the tunnel connection but the encrypted handshake on top of it failed. Either another process holds that port, or this pairing file's key no longer matches their iPhone. Pair again.":
         "何かがトンネル接続を受け付けましたが、その上の暗号化ハンドシェイクが失敗しました。別のプロセスがそのポートを占有しているか、このペアリングファイルのキーが相手の iPhone と合わなくなっています。もう一度ペアリングしてください。",
+    "GitHub answered HTTP %d":
+        "GitHub から HTTP %d が返されました",
+    "The code was incorrect. Try again.":
+        "コードが間違っていました。もう一度お試しください。",
+    "A code was already sent and is still valid. Enter it.":
+        "コードはすでに送信済みで、まだ有効です。入力してください。",
+    "That way isn't available. Choose another way.":
+        "その方法は利用できません。別の方法を選んでください。",
+    "That didn't work. Try another way.":
+        "うまくいきませんでした。別の方法をお試しください。",
 ]

@@ -5072,10 +5072,27 @@ struct TwoFactorPrompt: Decodable, Equatable {
         "Apple didn't confirm sending a code to your Apple devices. If one arrived, enter it; if not, try another way.",
     ]
 
-    /// `lastError` as the sheet shows it: Apple's own as it came, isideload's
-    /// in the app's language.
+    /// `lastError` as the sheet shows it: isideload's own sentences in the app's
+    /// language, Apple's service errors by their shape, and anything else as a
+    /// generic nudge — never Apple's raw English. The raw text is already in the
+    /// log (`logLine` carries it on every prompt).
     var shownError: String? {
-        lastError.map { Self.isideloadErrors.contains($0) ? L($0) : $0 }
+        guard let lastError else { return nil }
+        if Self.isideloadErrors.contains(lastError) { return L(lastError) }
+        // Trusted-device wrong code: Rust writes "-21669 - <message>" (:517).
+        if lastError.hasPrefix("-21669 -") { return L("The code was incorrect. Try again.") }
+        // SMS send refused: Rust writes "<title> - <message>" (:577) with no code
+        // in the string; the titles below are Apple's, verified against the
+        // isideload tests for -22979/-22981 and -28248.
+        if lastError.hasPrefix("Too many verification codes") {
+            return L("A code was already sent and is still valid. Enter it.")
+        }
+        if lastError.hasPrefix("Unknown 2FA method") {
+            return L("That way isn't available. Choose another way.")
+        }
+        // SMS wrong code (:628) has no verifiable title in-repo, and anything
+        // else Apple invents lands here too.
+        return L("That didn't work. Try another way.")
     }
 
     /// For a request that can't be read: the one prompt that always makes sense.
