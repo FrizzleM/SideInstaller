@@ -1712,7 +1712,7 @@ final class Engine {
             if let version {
                 cached = IPALibrary.pickedDownload(version.tag, source: src, channel: channel)
             } else {
-                cached = onDisk?.url.flatMap { IPALibrary.looksLikeIPA($0) ? $0 : nil }
+                cached = (onDisk?.url).flatMap { IPALibrary.looksLikeIPA($0) ? $0 : nil }
             }
             if let cached {
                 // C7: the install goes on with the older local copy — say so
