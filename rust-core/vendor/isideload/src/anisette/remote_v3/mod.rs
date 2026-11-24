@@ -47,8 +47,8 @@ pub const WINDOWS_CLIENT_INFO: &str =
 const AKD_USER_AGENT: &str = "akd/1.0 CFNetwork/808.1.4";
 
 /// What GrandSlam is told the client is on a server on Apple's macOS ADI
-/// library that names a Mac older than macOS 10.13: a Mac on macOS 10.15.7
-/// (Catalina's last), with its akd's user agent.
+/// library that names a Mac older than macOS 10.13: a current Mac, a
+/// MacBookPro18,3 on macOS 26.6, with the user agent SideStore sends for it.
 ///
 /// The macOS-ADI servers (new.ani.sidestore.io, mac-ani.jkcoxson.com,
 /// ani.iloader.app, ani3.stikstore.app, and since about 2026-10-22
@@ -60,20 +60,27 @@ const AKD_USER_AGENT: &str = "akd/1.0 CFNetwork/808.1.4";
 /// from its Android library with -80046 at the token request (2026-10-21),
 /// the working route is these servers with a newer Mac.
 ///
-/// Until SideInstaller 2.1.0 that Mac was SideStore's default,
-/// `<MacBookPro18,3> <macOS;26.6;25F84>`. Since 2026-11-20 (about 02:20 UTC)
-/// Apple's edge answers GsService2 with HTTP 503 for every client that names
-/// its OS `macOS`, whatever the version, server or identity, while it lets
-/// `Mac OS X` through (SideInstaller #146–#161, siboot #153; anisette.lillq.me's
-/// hourly probes show the same). Big Sur renamed the token, so Catalina is
-/// the newest Mac that still sends `Mac OS X`, and it is over the 10.13
-/// floor. Measured 2026-11-21 with made-up accounts through anisette.lillq.me,
-/// new.ani.sidestore.io and mac-ani.jkcoxson.com: this Mac gets -20970, as the
-/// servers' Sierra Mac does, and `macOS;26.6` gets 503, also on an identity
-/// provisioned as it (which this one takes, so none is provisioned again).
+/// From SideInstaller 1.6.1 to 2.1.0 that Mac was SideStore's default,
+/// `<MacBookPro18,3> <macOS;26.6;25F84>`, and real accounts signed in as it
+/// (1.6.1 was tried with one). Since 2026-11-20 (about 02:20 UTC) Apple's edge
+/// answers GsService2 with HTTP 503 for every client that names its OS
+/// `macOS`, whatever the version, server or identity (SideInstaller
+/// #146–#161, siboot #153; anisette.lillq.me's hourly probes show the same).
+/// `Mac OS X` is the one spelling it lets through, and it's what Apple's own
+/// frameworks send on every macOS version (AltStore #1875, from AltServer on
+/// macOS 15.8.1), so this is the same Mac with that spelling.
+///
+/// SideInstaller 2.1.1 reported Catalina's Mac instead
+/// (`<MacBookPro16,1> <Mac OS X;10.15.7;19H2>`), taking it for the newest to
+/// say `Mac OS X`; it was never tried with a real account. iLoader 2.4.2 went
+/// back to the servers' Sierra Mac, and its users then got `secondaryAuth`
+/// with 403s from the trusted-number and text-message pages, or -22410 and
+/// -23782, as SideInstaller's did on 2026-10-16; with a current Mac spelled
+/// this way (macOS 26.6, 27.2.1 or 27.3) they got the code on their devices
+/// and signed in (iLoader #1203, #1205, #1304; SideStore #1745).
 pub const CURRENT_MAC_CLIENT_INFO: &str =
-    "<MacBookPro16,1> <Mac OS X;10.15.7;19H2> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
-const CURRENT_MAC_USER_AGENT: &str = "akd/1.0 CFNetwork/1128.0.1 Darwin/19.6.0";
+    "<MacBookPro18,3> <Mac OS X;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+const CURRENT_MAC_USER_AGENT: &str = "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)";
 
 /// Device and OS of the stock client info of anisette-v3-server and of
 /// AltServer/omnisette. Servers hand these out whatever library they run, and
@@ -222,13 +229,19 @@ impl Slots {
     /// Whether the identity `key` can sign in reporting `client`. With
     /// `fresh_mac` (a full sign-in, see
     /// `RemoteV3AnisetteProvider::require_current_mac_identity`) and `client`
-    /// a current Mac, only an identity provisioned as one can: one made as the
-    /// macOS-ADI servers' old Mac before 1.6.1 is left for its saved token, and
-    /// the sign-in provisions a new one, as SideStore's "Reset adi.pb" does
-    /// once the client info has changed.
+    /// a current Mac, only an identity provisioned as that same client can.
+    /// Apple answers a sign-in that reports another client than the identity
+    /// was provisioned as with -22410, "This action could not be completed",
+    /// until it's provisioned again: iLoader's users after their client info
+    /// went from 10.12.6 to 27.2.1 (iLoader #1304), SideStore's after `macOS`
+    /// became `Mac OS X` (AltStore #1875). So one made as another Mac (the
+    /// servers' old one before 1.6.1, macOS 26.6 spelled `macOS` until 2.1.0,
+    /// 2.1.1's Catalina) is left for its saved token, and the sign-in
+    /// provisions a new one, as SideStore's "Reset adi.pb" does once the
+    /// client info has changed.
     fn fits(&self, key: &str, client: &str, fresh_mac: bool) -> bool {
         !(fresh_mac && is_current_mac(client))
-            || self.provisioned_as.get(key).is_some_and(|c| is_current_mac(c))
+            || self.provisioned_as.get(key).is_some_and(|c| c.trim() == client.trim())
     }
 }
 
@@ -900,7 +913,8 @@ mod tests {
     #[test]
     fn mac_versions_are_read_from_either_spelling() {
         assert_eq!(mac_version(SIERRA_MAC), Some((10, 12)));
-        assert_eq!(mac_version(CURRENT_MAC_CLIENT_INFO), Some((10, 15)));
+        assert_eq!(mac_version(CURRENT_MAC_CLIENT_INFO), Some((26, 6)));
+        assert_eq!(mac_version(CATALINA_MAC), Some((10, 15)));
         assert_eq!(mac_version("<Mac15,7> <macOS;27.0;26A5378j> <x>"), Some((27, 0)));
         assert_eq!(mac_version("<iMac21,1> <macOS;15;24A335> <x>"), Some((15, 0)));
         assert_eq!(mac_version(WINDOWS_CLIENT_INFO), None);
@@ -910,18 +924,32 @@ mod tests {
         assert!(!is_current_mac(WINDOWS_CLIENT_INFO));
     }
 
+    /// The Mac SideInstaller 2.1.1 reported.
+    const CATALINA_MAC: &str =
+        "<MacBookPro16,1> <Mac OS X;10.15.7;19H2> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+    /// The Mac SideInstaller 1.6.1 to 2.1.0 reported.
+    const MACOS_26_MAC: &str =
+        "<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+
     #[test]
-    fn a_full_mac_sign_in_only_fits_identities_made_as_a_current_mac() {
+    fn a_full_mac_sign_in_only_fits_identities_made_as_the_same_mac() {
         let mut slots = Slots::default();
         slots.provisioned_as.insert("current".into(), CURRENT_MAC_CLIENT_INFO.into());
         slots.provisioned_as.insert("windows".into(), WINDOWS_CLIENT_INFO.into());
+        slots.provisioned_as.insert("catalina".into(), CATALINA_MAC.into());
+        slots.provisioned_as.insert("macos".into(), MACOS_26_MAC.into());
         // Everything fits outside a full sign-in that reports a current Mac.
-        for key in ["current", "windows", LEGACY_STATE_KEY] {
+        for key in ["current", "windows", "catalina", "macos", LEGACY_STATE_KEY] {
             assert!(slots.fits(key, CURRENT_MAC_CLIENT_INFO, false), "{key}");
             assert!(slots.fits(key, WINDOWS_CLIENT_INFO, true), "{key}");
         }
         assert!(slots.fits("current", CURRENT_MAC_CLIENT_INFO, true));
         assert!(!slots.fits("windows", CURRENT_MAC_CLIENT_INFO, true));
+        // Current Macs too, but other ones: Apple answers -22410 to an identity
+        // signing in as another client than it was provisioned as.
+        assert!(!slots.fits("catalina", CURRENT_MAC_CLIENT_INFO, true));
+        assert!(!slots.fits("macos", CURRENT_MAC_CLIENT_INFO, true));
+        assert!(slots.fits("catalina", CATALINA_MAC, true));
         // Made before 1.6.1, so with nothing recorded.
         assert!(!slots.fits(LEGACY_STATE_KEY, CURRENT_MAC_CLIENT_INFO, true));
     }
@@ -1241,6 +1269,23 @@ mod tests {
         assert!(text.contains("Failed to provision"), "{text}");
         assert_eq!(state_key_for(&storage, &server.url), LEGACY_STATE_KEY);
         assert!(storage.retrieve_data(LEGACY_STATE_KEY).unwrap().is_some());
+
+        // So is one made as another current Mac, 2.1.1's Catalina, though this
+        // server took it last.
+        store_identity(&storage, "anisette_state_3", MAC);
+        let mut slots = Slots::load(&storage);
+        slots.used.insert("anisette_state_3".into(), 2);
+        slots.provisioned_as.insert("anisette_state_3".into(), CATALINA_MAC.into());
+        slots.servers.insert(server_key(&server.url), "anisette_state_3".into());
+        slots.save(&storage).unwrap();
+        let error = run(async {
+            let mut generator = generator(&server.url, &storage);
+            generator.require_current_mac_identity().await;
+            generator.get_anisette_data(no_bag()).await.unwrap_err()
+        });
+        let text = format!("{error:?}");
+        assert!(text.contains("Failed to provision"), "{text}");
+        assert_eq!(state_key_for(&storage, &server.url), "anisette_state_3");
 
         // One made as the current Mac is what a full sign-in picks.
         store_identity(&storage, "anisette_state_2", MAC);

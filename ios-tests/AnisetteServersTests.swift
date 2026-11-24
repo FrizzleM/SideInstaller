@@ -92,11 +92,49 @@ struct AnisetteServerTests {
     @Test("SideStore keeps lillq when it was picked there")
     func sideStoreKeepsLillq() {
         var prefs: [String: Any] = ["useOnDeviceAnisette": false, "disableAnisetteRotation": true,
-                                    "menuAnisetteURL": lillq]
+                                    "menuAnisetteURL": lillq,
+                                    "customAnisetteClientInfo": SideStoreAnisetteHandoff.clientInfo]
         #expect(SideStoreAnisetteHandoff.applySettings(to: &prefs).isEmpty)
         #expect(prefs["menuAnisetteURL"] as? String == lillq)
         prefs["menuAnisetteURL"] = android
         _ = SideStoreAnisetteHandoff.applySettings(to: &prefs)
         #expect(prefs["menuAnisetteURL"] as? String == sideStoreNew)
+    }
+
+    @Test("SideStore is given a Mac that says “Mac OS X” unless it has a working one")
+    func sideStoreClientInfo() {
+        let handoff = SideStoreAnisetteHandoff.self
+        #expect(handoff.clientInfo.contains("<Mac OS X;26.6;"))
+        #expect(!handoff.clientInfo.contains("<macOS;"))
+        let replaced = [
+            nil,  // none saved: SideStore's default says “macOS”, which gets 503s
+            "",
+            "<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
+            "<MacBookPro13,3> <Mac OS X;10.12.6;16G29> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
+            "<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.iTunes/12.12.4.1)>",
+            "<Pixel 7> <Android;14;UQ1A.240205.002> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
+        ]
+        for saved in replaced {
+            var prefs: [String: Any] = ["useOnDeviceAnisette": false, "disableAnisetteRotation": true,
+                                        "menuAnisetteURL": sideStoreNew]
+            if let saved { prefs["customAnisetteClientInfo"] = saved }
+            #expect(handoff.applySettings(to: &prefs).count == 1, "\(saved ?? "none")")
+            #expect(prefs["customAnisetteClientInfo"] as? String == handoff.clientInfo)
+            #expect(prefs["customAnisetteUserAgent"] as? String == handoff.userAgent)
+        }
+        // The SideStore users' own fix, and a High Sierra Mac, stay as they are.
+        for kept in ["<MacBookPro13,3> <Mac OS X;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
+                     "<MacBookPro14,1> <Mac OS X;10.13.6;17G66> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
+                     handoff.clientInfo] {
+            var prefs: [String: Any] = ["useOnDeviceAnisette": false, "disableAnisetteRotation": true,
+                                        "menuAnisetteURL": sideStoreNew,
+                                        "customAnisetteClientInfo": kept,
+                                        "customAnisetteUserAgent": "akd/1.0 CFNetwork/811.5.4 Darwin/16.7.0"]
+            #expect(handoff.applySettings(to: &prefs).isEmpty, "\(kept)")
+            #expect(prefs["customAnisetteClientInfo"] as? String == kept)
+            #expect(prefs["customAnisetteUserAgent"] as? String == "akd/1.0 CFNetwork/811.5.4 Darwin/16.7.0")
+        }
+        #expect(!handoff.keepsClientInfo("<Mac15,7> <Mac OS X;10;x> <y>"))
+        #expect(handoff.keepsClientInfo("<Mac15,7> <Mac OS X;27.2.1;26B131> <y>"))
     }
 }

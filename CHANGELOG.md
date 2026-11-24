@@ -50,6 +50,22 @@ All notable changes to SideInstaller are documented here.
 - **The Location spoofing page opens on the spoofed location**, which a shortcut may have set while
   the page was closed, rather than always on the same spot.
 
+### Fixed
+- **Sign-in reports a current Mac again.** 2.1.1 got past Apple's HTTP 503s by signing in as a Mac
+  on macOS 10.15.7, taken for the newest Mac that still calls its system “Mac OS X”. Apple's own
+  Macs spell it that way on every version, and iLoader's and SideStore's users found Apple answering
+  a Mac that old as it answered SideInstaller in October: with a code by text message that it then
+  won't send, or with -22410 or -23782, where a current Mac spelled “Mac OS X” gets the code on the
+  trusted devices. SideInstaller now signs in as the Mac it used from 1.6.1 to 2.1.0, on macOS 26.6,
+  spelled “Mac OS X”. Apple answers -22410 to an anisette identity made for another Mac, so a
+  sign-in with the password makes a new one for it, and Apple may ask for a code once more.
+- **SideStore gets client info Apple lets through.** SideStore's default client info calls its
+  system “macOS”, which Apple has answered with HTTP 503 since 20 November (SideStore #1745). After
+  installing SideStore, SideInstaller now sets it to the same Mac spelled “Mac OS X”, unless SideStore
+  already has a Mac spelled that way on macOS 10.13 or later. If SideStore's sign-in then fails with
+  -22410, its Settings › User Customizations › Reset adi.pb, with “Keep header customizations”
+  ticked, makes it a new identity for that Mac.
+
 ## 2.1.1
 
 ### Changed

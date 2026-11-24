@@ -282,8 +282,9 @@ where
         return Err(ANDROID_ADI_SKIP.to_string());
     }
     // A sign-in that reports a current Mac does it with an identity
-    // provisioned as one, as SideStore's "Reset adi.pb" after its client info
-    // has changed; an identity from before is left for its saved token.
+    // provisioned as that same Mac (Apple answers another with -22410), as
+    // SideStore's "Reset adi.pb" after its client info has changed; an
+    // identity from before is left for its saved token.
     account.anisette_generator.require_current_mac_identity().await;
 
     tracing::info!("{label}: logging in");

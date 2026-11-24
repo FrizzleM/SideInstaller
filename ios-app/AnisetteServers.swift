@@ -97,10 +97,11 @@ extension AnisetteServer {
     /// isideload keeps one per library (`anisette_slots.json`).
     enum ADILibrary {
         /// macOS's, the one Xcode signs in with. These servers name a Mac on
-        /// macOS 10.12.6, which Apple calls too old for some accounts, so
-        /// sign-in reports a newer Mac instead: macOS 10.15.7, the newest that
-        /// still calls its OS "Mac OS X", since Apple's edge has answered
-        /// "macOS" with HTTP 503 since 2026-11-20 (isideload's
+        /// macOS 10.12.6, which Apple calls too old for some accounts and
+        /// sends others' codes by a text it then won't send, so sign-in
+        /// reports a current Mac instead: macOS 26.6, with its OS spelled
+        /// "Mac OS X" as Apple's own frameworks spell it, since Apple's edge
+        /// has answered "macOS" with HTTP 503 since 2026-11-20 (isideload's
         /// `client_info_to_use`).
         case mac
         /// Windows's, as iTunes and iCloud for Windows use it. These servers

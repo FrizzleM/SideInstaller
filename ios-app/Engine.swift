@@ -3540,8 +3540,8 @@ final class Engine {
     }
 
     /// Sets SideStore up to sign in the way its users got past Apple's -80046
-    /// (`SideStoreAnisetteHandoff`). After the install, as `handOffSplitPairing`;
-    /// failures only log. Runs on `deviceQueue`.
+    /// and HTTP 503s (`SideStoreAnisetteHandoff`). After the install, as
+    /// `handOffSplitPairing`; failures only log. Runs on `deviceQueue`.
     private func handOffSideStoreAnisette(bundleID: String, appName: String, home: SideStoreHome) {
         let prefsPath = home.preferencesPath(hostBundleID: bundleID)
         do {
@@ -3550,10 +3550,12 @@ final class Engine {
                 changes = SideStoreAnisetteHandoff.applySettings(to: &prefs)
             }
             guard !changes.isEmpty else { return }
-            log("Set \(appName)'s anisette the way SideStore's users get past Apple's -80046: \(changes.joined(separator: ", ")) (/\(prefsPath)).")
-            log("If \(appName)'s own sign-in still fails, use its Settings › User Customizations › Reset adi.pb, with “Keep header customizations” unticked, then sign in again.")
+            log("Set \(appName)'s anisette the way SideStore's users get past Apple's -80046 and HTTP 503s: \(changes.joined(separator: ", ")) (/\(prefsPath)).")
+            // -22410 after a change of client info, until the identity is made
+            // again; unticking would put back the default, which gets 503s.
+            log("If \(appName)'s own sign-in still fails (-22410, -45061), use its Settings › User Customizations › Reset adi.pb, with “Keep header customizations” ticked, then sign in again.")
         } catch {
-            log("⚠️ Couldn't set \(appName)'s anisette settings (\(short(error))). If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation in its settings and pick “SideStore (New)”.")
+            log("⚠️ Couldn't set \(appName)'s anisette settings (\(short(error))). If its sign-in fails with -80046 or HTTP 503, turn off On-device Anisette and Auto Rotation in its settings, pick “SideStore (New)”, and set its client info to say “Mac OS X” where it says “macOS”.")
         }
     }
 

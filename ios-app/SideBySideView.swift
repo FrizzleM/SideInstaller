@@ -1732,9 +1732,9 @@ final class SideBySideManager: ObservableObject {
         }
     }
 
-    /// Sets SideStore up to sign in the way its users got past Apple's -80046,
-    /// as `Engine.handOffSideStoreAnisette` does. Runs on `deviceQueue`;
-    /// failures only log.
+    /// Sets SideStore up to sign in the way its users got past Apple's -80046
+    /// and HTTP 503s, as `Engine.handOffSideStoreAnisette` does. Runs on
+    /// `deviceQueue`; failures only log.
     private func handOffAnisette(bundleID: String, appName: String, home: SideStoreHome) {
         let prefsPath = home.preferencesPath(hostBundleID: bundleID)
         do {
@@ -1743,9 +1743,9 @@ final class SideBySideManager: ObservableObject {
                 changes = SideStoreAnisetteHandoff.applySettings(to: &prefs)
             }
             guard !changes.isEmpty else { return }
-            engine.log("Set \(appName)'s anisette the way SideStore's users get past Apple's -80046: \(changes.joined(separator: ", ")) (/\(prefsPath)).")
+            engine.log("Set \(appName)'s anisette the way SideStore's users get past Apple's -80046 and HTTP 503s: \(changes.joined(separator: ", ")) (/\(prefsPath)).")
         } catch {
-            engine.log("⚠️ Couldn't set \(appName)'s anisette settings (\(short(error))). If its sign-in fails with -80046, turn off On-device Anisette and Auto Rotation in its settings and pick “SideStore (New)”.")
+            engine.log("⚠️ Couldn't set \(appName)'s anisette settings (\(short(error))). If its sign-in fails with -80046 or HTTP 503, turn off On-device Anisette and Auto Rotation in its settings, pick “SideStore (New)”, and set its client info to say “Mac OS X” where it says “macOS”.")
         }
     }
 
