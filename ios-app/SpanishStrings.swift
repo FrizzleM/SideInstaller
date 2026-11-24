@@ -1378,4 +1378,6 @@ let spanishStrings: [String: String] = [
     "Enabling entitlements failed: %@": "Error al activar los derechos: %@",
     "Waiting for this install to finish…": "Esperando a que termine esta instalación…",
     "This file is being installed. Wait until it finishes.": "Este archivo se está instalando. Espera a que termine.",
+    "This file is being signed. Wait until it finishes.": "Este archivo se está firmando. Espera a que termine.",
+    "This file is being renewed. Wait until it finishes.": "Este archivo se está renovando. Espera a que termine.",
 ]

@@ -1344,4 +1344,6 @@ let koreanStrings: [String: String] = [
     "Enabling entitlements failed: %@": "권한을 활성화하지 못했습니다: %@",
     "Waiting for this install to finish…": "이번 설치가 끝나기를 기다리는 중…",
     "This file is being installed. Wait until it finishes.": "이 파일은 설치 중입니다. 끝날 때까지 기다리세요.",
+    "This file is being signed. Wait until it finishes.": "이 파일은 서명 중입니다. 끝날 때까지 기다리세요.",
+    "This file is being renewed. Wait until it finishes.": "이 파일은 갱신 중입니다. 끝날 때까지 기다리세요.",
 ]

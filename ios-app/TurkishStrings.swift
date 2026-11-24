@@ -1291,4 +1291,6 @@ let turkishStrings: [String: String] = [
     "Enabling entitlements failed: %@": "Yetkiler etkinleştirilemedi: %@",
     "Waiting for this install to finish…": "Bu yüklemenin bitmesi bekleniyor…",
     "This file is being installed. Wait until it finishes.": "Bu dosya yükleniyor. Bitene kadar bekleyin.",
+    "This file is being signed. Wait until it finishes.": "Bu dosya imzalanıyor. Bitene kadar bekleyin.",
+    "This file is being renewed. Wait until it finishes.": "Bu dosya yenileniyor. Bitene kadar bekleyin.",
 ]

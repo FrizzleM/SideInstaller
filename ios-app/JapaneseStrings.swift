@@ -1343,4 +1343,6 @@ let japaneseStrings: [String: String] = [
     "Enabling entitlements failed: %@": "エンタイトルメントの有効化に失敗しました：%@",
     "Waiting for this install to finish…": "このインストールの終了を待っています…",
     "This file is being installed. Wait until it finishes.": "このファイルはインストール中です。終わるまで待ってください。",
+    "This file is being signed. Wait until it finishes.": "このファイルは署名中です。終わるまで待ってください。",
+    "This file is being renewed. Wait until it finishes.": "このファイルは更新中です。終わるまで待ってください。",
 ]

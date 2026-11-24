@@ -1375,4 +1375,6 @@ let italianStrings: [String: String] = [
     "Enabling entitlements failed: %@": "Abilitazione dei diritti non riuscita: %@",
     "Waiting for this install to finish…": "In attesa del completamento di questa installazione…",
     "This file is being installed. Wait until it finishes.": "Questo file è in corso di installazione. Attendi che finisca.",
+    "This file is being signed. Wait until it finishes.": "Questo file è in corso di firma. Attendi che finisca.",
+    "This file is being renewed. Wait until it finishes.": "Questo file è in corso di rinnovo. Attendi che finisca.",
 ]

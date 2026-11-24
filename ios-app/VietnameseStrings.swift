@@ -1373,4 +1373,6 @@ let vietnameseStrings: [String: String] = [
     "Enabling entitlements failed: %@": "Bật quyền thất bại: %@",
     "Waiting for this install to finish…": "Đang chờ lần cài đặt này hoàn tất…",
     "This file is being installed. Wait until it finishes.": "Tệp này đang được cài đặt. Hãy chờ cho đến khi xong.",
+    "This file is being signed. Wait until it finishes.": "Tệp này đang được ký. Hãy chờ cho đến khi xong.",
+    "This file is being renewed. Wait until it finishes.": "Tệp này đang được gia hạn. Hãy chờ cho đến khi xong.",
 ]

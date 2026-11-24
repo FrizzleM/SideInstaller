@@ -2507,7 +2507,7 @@ private struct LibraryIPAPicker: View {
         // 批量写回只 bump epoch、不写 @State；不读它，body 不会
         // 重算，图就永远不出现。别把这行当死代码清掉。
         let _ = iconEpoch
-        HStack(spacing: 8) {
+        return HStack(spacing: 8) {
             if let uiImage = ThumbnailCache.image(for: item.url.path) {
                 Image(uiImage: uiImage)
                     .resizable()
