@@ -1281,4 +1281,37 @@ let turkishStrings: [String: String] = [
         "Bu sürüm en yenisinden daha eski. Bu iPhone'daki kopyanın üzerine yüklenir ve daha yeni bir sürümün kaydettiği verileri açamayabilir.",
     "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
         "Bu sürüm, bu iPhone'daki sürümden (%@) daha eski. Üzerine yüklendiğinde, daha yeni sürümün kaydettiği verileri açamayabilir.",
+
+    // MARK: - JIT
+
+    "%@ has the JIT memory it asked for, so SideInstaller let go of it. JIT stays on until it quits.":
+        "%@ istediği JIT belleğini aldı, bu yüzden SideInstaller ondan ayrıldı. JIT, uygulama kapanana kadar açık kalır.",
+    "%@ of JIT memory prepared": "%@ JIT belleği hazırlandı",
+    "%d app can use JIT": "%d uygulama JIT kullanabilir",
+    "%d apps can use JIT": "%d uygulama JIT kullanabilir",
+    "Attach and detach": "Bağlan ve ayrıl",
+    "Attaching the debugger": "Hata ayıklayıcı bağlanıyor",
+    "Auto: %@": "Otomatik: %@",
+    "Connecting to this iPhone's debugger": "Bu iPhone'un hata ayıklayıcısına bağlanılıyor",
+    "Couldn't open %@ under the debugger: %@": "%@ hata ayıklayıcıyla açılamadı: %@",
+    "Couldn't reach the debugger on this iPhone: %@":
+        "Bu iPhone'un hata ayıklayıcısına ulaşılamadı: %@",
+    "Enable JIT": "JIT'i etkinleştir",
+    "JIT is on for %@ until it quits.": "%@ için JIT, uygulama kapanana kadar açık.",
+    "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
+        "JIT açık. %@ çalışırken SideInstaller bağlı kalır: SideInstaller'ı arka planda bırak, çünkü kapatmak JIT'i sonlandırır.",
+    "JIT needs Developer Mode. Turn it on under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "JIT için Geliştirici Modu gerekir. Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'ndan aç ve yeniden başlatmadan sonra onayla.",
+    "JIT on for %@": "%@ için JIT açık",
+    "Legacy": "Eski",
+    "No app on this iPhone is signed for development, which a debugger needs. Install the app with SideStore or SideInstaller, which sign apps that way, then load the apps again.":
+        "Bu iPhone'da geliştirme için imzalanmış bir uygulama yok, oysa hata ayıklayıcı buna ihtiyaç duyar. Uygulamayı bu şekilde imzalayan SideStore veya SideInstaller ile yükle, ardından uygulamaları yeniden yükle.",
+    "No apps can use JIT": "JIT kullanabilen uygulama yok",
+    "Opening %@": "%@ açılıyor",
+    "Quit %@": "%@ uygulamasından çık",
+    "The debugger couldn't attach to %@ (%@). Install it again with SideStore or SideInstaller, which sign apps so a debugger can attach.":
+        "Hata ayıklayıcı %@ uygulamasına bağlanamadı (%@). Uygulamaları hata ayıklayıcının bağlanabileceği şekilde imzalayan SideStore veya SideInstaller ile onu yeniden yükle.",
+    "The debugger lost %@ (%@). Open it with JIT again.":
+        "Hata ayıklayıcı %@ ile bağlantıyı kaybetti (%@). Onu yeniden JIT ile aç.",
+    "Universal": "Evrensel",
 ]

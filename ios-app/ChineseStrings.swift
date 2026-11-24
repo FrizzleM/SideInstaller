@@ -1374,4 +1374,35 @@ let chineseStrings: [String: String] = [
         "此版本比最新版本旧。它会覆盖安装在此 iPhone 上的副本，可能无法打开较新版本保存的数据。",
     "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
         "此版本比此 iPhone 上的版本（%@）旧。覆盖安装后，它可能无法打开较新版本保存的数据。",
+
+    // MARK: - JIT
+
+    "%@ has the JIT memory it asked for, so SideInstaller let go of it. JIT stays on until it quits.":
+        "%@ 已拿到所需的 JIT 内存，因此 SideInstaller 已与它分离。JIT 会保持开启，直到它退出。",
+    "%@ of JIT memory prepared": "已准备 %@ JIT 内存",
+    "%d app can use JIT": "%d 个应用可使用 JIT",
+    "%d apps can use JIT": "%d 个应用可使用 JIT",
+    "Attach and detach": "附加后分离",
+    "Attaching the debugger": "正在附加调试器",
+    "Auto: %@": "自动：%@",
+    "Connecting to this iPhone's debugger": "正在连接此 iPhone 的调试器",
+    "Couldn't open %@ under the debugger: %@": "无法在调试器下打开 %@：%@",
+    "Couldn't reach the debugger on this iPhone: %@": "无法连接此 iPhone 的调试器：%@",
+    "Enable JIT": "启用 JIT",
+    "JIT is on for %@ until it quits.": "%@ 的 JIT 已开启，直到它退出。",
+    "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
+        "JIT 已开启。%@ 运行期间，SideInstaller 会保持附加：请让 SideInstaller 留在后台，关闭它会结束 JIT。",
+    "JIT needs Developer Mode. Turn it on under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "JIT 需要开发者模式。在 设置 › 隐私与安全性 › 开发者模式 中打开它，并在重启后确认。",
+    "JIT on for %@": "%@ 的 JIT 已开启",
+    "Legacy": "旧版",
+    "No app on this iPhone is signed for development, which a debugger needs. Install the app with SideStore or SideInstaller, which sign apps that way, then load the apps again.":
+        "此 iPhone 上没有以开发方式签名的应用，而调试器需要这种签名。请用 SideStore 或 SideInstaller 安装该应用（它们都这样签名），然后重新加载应用。",
+    "No apps can use JIT": "没有可使用 JIT 的应用",
+    "Opening %@": "正在打开 %@",
+    "Quit %@": "退出 %@",
+    "The debugger couldn't attach to %@ (%@). Install it again with SideStore or SideInstaller, which sign apps so a debugger can attach.":
+        "调试器无法附加到 %@（%@）。请用 SideStore 或 SideInstaller 重新安装它，它们签名的应用可以被调试器附加。",
+    "The debugger lost %@ (%@). Open it with JIT again.": "调试器与 %@ 断开了（%@）。请再次用 JIT 打开它。",
+    "Universal": "通用",
 ]

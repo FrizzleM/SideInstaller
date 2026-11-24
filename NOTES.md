@@ -1583,6 +1583,82 @@ recognized as AltStore; the record split), and the simulator (picker, version
 list, Side by Side choice). Not verified, since it needs the iPhone and an Apple
 ID: signing and installing AltStore, and AltStore picking up the file.
 
+## JIT
+
+Tools › JIT (2026-11-23) turns JIT on the way StikDebug does, written from
+StikDebug's source (`JITEnableContext.swift`, its scripts) in Swift on the
+idevice FFI the app already links (`JIT.swift`, `JITView.swift`, the debugging
+section of `DeviceConnection.swift`): no Rust change, every symbol was already
+in the xcframework. Its tile sits between Pairing and Certificates.
+
+**Pairing file.** With none on disk, Load apps and Enable JIT generate it on
+iOS 27 before going on (`JITManager.ensurePairingFile`), through the Pairing
+page's own manager (`PairingManager.shared.generateForPage`), so the same code
+and Settings steps come up and closing them stops quietly. Developer Mode and
+the tunnel are checked first, since JIT can't go on without them; opening the
+page never pairs (its quiet load waits for a pairing file). Below iOS 27 the
+connect reports the missing file, as on every Tools page.
+
+**The recipe.** The page lists the apps whose entitlements have
+`get-task-allow` (`JITApp`), which every development profile grants, so
+whatever SideStore or SideInstaller signed. Enable JIT checks Developer Mode,
+runs `ensurePairingConnection` and mounts the personalized disk image
+(`Engine.prepareDeveloperDiskImage`, split out of location setup), then a
+`JITSession` opens DVT (`remote_server_connect_rsd`, `process_control_new`) and
+debugserver (`debug_proxy_connect_rsd`, `com.apple.internal.dt.remote.debugproxy`),
+launches the app suspended (`process_control_launch_app`, KillExisting on, where
+StikDebug passes false: an app checks for JIT as it starts, so a running copy
+is restarted), acks twice, `QStartNoAckMode`, `vAttach;<pid>`. Up to iOS 18,
+and from iOS 26 without TXM, `D` follows at once and JIT stays on until the app
+quits.
+
+**TXM.** From iOS 26 on A15/M2 and later (from iOS 27 everything but the A12Z
+iPad Pros, as StikDebug's `hasTXM` has it; StikDebug's decimal model formula
+also leaves out iPad14,1–14,4, A15 and M2, which `JITDevice` doesn't), a
+debugged app still can't map writable and executable memory: it stops on a
+breakpoint and the debugger prepares the region by writing a byte to each
+16 KB page (`$M<addr>,1:69`, 128 written before their answers are read). The
+debugger stays attached answering, in the ways StikDebug's scripts do, here in
+Swift rather than JavaScriptCore (`JITProtocol`): universal (`brk #0xf00d`,
+`x16` 0 detach, 1 prepare at `x0` or allocate with `_M<size>,rx`, address
+back in `x0`; `#0x69` answered 0xE0000069 as universal.js does), legacy
+(`brk #0x69` regions, then detach: 1 for UTM/DolphiniOS/Flycast/ARMSX2, 3 for
+maciOS) and Geode (`#0x69`, `#0x70` copy ≤ 4 MB, `#0x71`). Auto picks by app
+name from StikDebug's list (`JITApps`), the universal calls for any other app
+on TXM; the menu under an app overrides it (`jitModes` in UserDefaults).
+Differences from the scripts: a stop that isn't a known request passes its
+signal on with `vCont;S<sig>:<tid>` and takes that reply as the next stop
+(universal.js sends another `c` after it, dropping the stop), SIGINT/SIGSTOP
+aren't passed, an unknown `brk` gets SIGTRAP passed so the app crashes as it
+would without a debugger (the scripts loop on it), `#0x71` steps past the
+breakpoint before detaching, and apps' own scripts (`x16 = 2`, `brk #0x68`)
+aren't run, only logged.
+
+**Its own tunnel.** A session runs on its own thread over a second
+`DeviceConnection`, as StikDebug opens a fresh tunnel per session: the shared
+connection reconnects for every page action, which would end a session lasting
+as long as the app runs. On the RPPairing route the session answers the RSD
+heartbeat (`heartbeat_connect_rsd`, as StikDebug does while attached). On the
+lockdown route the two connections share one lockdown heartbeat
+(`acquireHeartbeat`/`releaseHeartbeat`, keyed by device IP, counted), since a
+second heartbeat would close the tunnels opened under the first; with one
+connection every connect still starts a fresh heartbeat, as before. Silent audio
+(`KeepAlive`) keeps SideInstaller running while the app is in front: an app
+waits at each request until the debugger answers. Quit ends a session with
+`process_control_kill_app` from another thread, the one call that doesn't need
+debugserver, which a thread waiting on `c` owns.
+
+Verified 2026-11-23: the simulator build, unit tests for the packet parsing,
+TXM detection and modes (`JITTests.swift`, run by `check-ios.sh`), and the page
+in the simulator with a staged app list and a staged running session (a
+`SIMHOOK_JIT` hook in a scratch snapshot, never committed). 2026-11-24, in the
+iOS 27.2 simulator with the hook counting the tunnel as up: Load apps with no
+pairing file put up the Pairing page's steps and started its pairing run
+(the Live Activity came up), and closing them ended it with no error. Not
+verified, since it needs an iPhone: a pairing that completes and goes on to
+load the apps, everything that talks to debugserver or DVT, the TXM answers,
+and the shared lockdown heartbeat.
+
 ## Running on a device (what you do)
 
 1. Install LocalDevVPN (App Store id 6755608044), connect it, keep Wi-Fi on.

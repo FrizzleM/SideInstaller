@@ -58,6 +58,7 @@ EXTRA_KEY_SETS = [r"\bisideloadErrors\s*:\s*Set<String>\s*=\s*\["]
 SAME_IN_EVERY_LANGUAGE = {
     "Anisette",
     "Discord",
+    "JIT",
     "LocalDevVPN",
     "SideInstaller",
     "Wi-Fi",

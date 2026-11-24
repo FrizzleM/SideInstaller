@@ -5,6 +5,15 @@ All notable changes to SideInstaller are documented here.
 ## Unreleased
 
 ### Added
+- **JIT.** A new page under Tools turns JIT on for apps signed for development, which is how
+  SideStore and SideInstaller sign them, the way StikDebug does: SideInstaller opens the app under
+  the debugger over LocalDevVPN, after setting up the developer disk image the first time. On iOS 27
+  it pairs this iPhone with itself first when there's no pairing file yet, as Tools › Pairing does. Up to
+  iOS 18, and on iPhones without TXM, it lets go at once and JIT stays on until the app quits. From
+  iOS 26 on A15 and later, and on iOS 27, it stays attached while the app runs and prepares the
+  memory the app asks for, answering the same requests as StikDebug's universal, legacy and Geode
+  scripts; SideInstaller picks each known app's way by name, and the menu under an app changes it.
+  Keep SideInstaller in the background meanwhile, and Quit ends the session.
 - **Shortcuts actions.** SideInstaller's tools can now run from the Shortcuts app, automations, the
   Action button and Siri: 24 actions, each waiting for its result and handing it on. Location
   spoofing has them all: set the location to a place, coordinates or a saved place, reset it, read

@@ -1411,4 +1411,37 @@ let portugueseStrings: [String: String] = [
         "Esta versão é mais antiga que a mais recente. Ela é instalada sobre a cópia deste iPhone, que pode não abrir dados salvos por uma versão mais nova.",
     "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
         "Esta versão é mais antiga que a deste iPhone (%@). Instalada por cima, ela pode não abrir dados salvos pela versão mais nova.",
+
+    // MARK: - JIT
+
+    "%@ has the JIT memory it asked for, so SideInstaller let go of it. JIT stays on until it quits.":
+        "%@ já tem a memória JIT que pediu, então o SideInstaller o soltou. O JIT fica ativo até o app fechar.",
+    "%@ of JIT memory prepared": "%@ de memória JIT preparada",
+    "%d app can use JIT": "%d app pode usar JIT",
+    "%d apps can use JIT": "%d apps podem usar JIT",
+    "Attach and detach": "Anexar e desanexar",
+    "Attaching the debugger": "Anexando o depurador",
+    "Auto: %@": "Automático: %@",
+    "Connecting to this iPhone's debugger": "Conectando ao depurador deste iPhone",
+    "Couldn't open %@ under the debugger: %@": "Não foi possível abrir %@ com o depurador: %@",
+    "Couldn't reach the debugger on this iPhone: %@":
+        "Não foi possível acessar o depurador deste iPhone: %@",
+    "Enable JIT": "Ativar JIT",
+    "JIT is on for %@ until it quits.": "O JIT está ativo para %@ até ele fechar.",
+    "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
+        "O JIT está ativo. O SideInstaller fica anexado enquanto %@ roda: deixe o SideInstaller em segundo plano, porque fechá-lo encerra o JIT.",
+    "JIT needs Developer Mode. Turn it on under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "O JIT precisa do Modo de Desenvolvedor. Ative-o em Ajustes › Privacidade e Segurança › Modo de Desenvolvedor e confirme depois de reiniciar.",
+    "JIT on for %@": "JIT ativo para %@",
+    "Legacy": "Legado",
+    "No app on this iPhone is signed for development, which a debugger needs. Install the app with SideStore or SideInstaller, which sign apps that way, then load the apps again.":
+        "Nenhum app neste iPhone está assinado para desenvolvimento, que é o que um depurador precisa. Instale o app com o SideStore ou o SideInstaller, que assinam os apps assim, e carregue os apps de novo.",
+    "No apps can use JIT": "Nenhum app pode usar JIT",
+    "Opening %@": "Abrindo %@",
+    "Quit %@": "Fechar %@",
+    "The debugger couldn't attach to %@ (%@). Install it again with SideStore or SideInstaller, which sign apps so a debugger can attach.":
+        "O depurador não conseguiu se anexar a %@ (%@). Instale-o de novo com o SideStore ou o SideInstaller, que assinam os apps para que um depurador possa se anexar.",
+    "The debugger lost %@ (%@). Open it with JIT again.":
+        "O depurador perdeu %@ (%@). Abra-o com JIT de novo.",
+    "Universal": "Universal",
 ]

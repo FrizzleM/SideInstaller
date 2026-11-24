@@ -1385,4 +1385,35 @@ let japaneseStrings: [String: String] = [
         "このバージョンは最新より古いものです。この iPhone のアプリに上書きでインストールされ、新しいバージョンが保存したデータを開けない場合があります。",
     "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
         "このバージョンは、この iPhone にあるもの（%@）より古いものです。上書きでインストールすると、新しいバージョンが保存したデータを開けない場合があります。",
+
+    // MARK: - JIT
+
+    "%@ has the JIT memory it asked for, so SideInstaller let go of it. JIT stays on until it quits.":
+        "%@ は要求した JIT メモリを受け取ったため、SideInstaller はデタッチしました。アプリを終了するまで JIT は有効なままです。",
+    "%@ of JIT memory prepared": "JIT メモリ %@ を準備済み",
+    "%d app can use JIT": "JIT を使えるアプリ %d 個",
+    "%d apps can use JIT": "JIT を使えるアプリ %d 個",
+    "Attach and detach": "アタッチしてデタッチ",
+    "Attaching the debugger": "デバッガをアタッチ中",
+    "Auto: %@": "自動: %@",
+    "Connecting to this iPhone's debugger": "この iPhone のデバッガに接続中",
+    "Couldn't open %@ under the debugger: %@": "%@ をデバッガで開けませんでした: %@",
+    "Couldn't reach the debugger on this iPhone: %@": "この iPhone のデバッガに接続できませんでした: %@",
+    "Enable JIT": "JIT を有効にする",
+    "JIT is on for %@ until it quits.": "%@ の JIT は終了するまで有効です。",
+    "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
+        "JIT は有効です。%@ の実行中は SideInstaller がアタッチしたままになります。SideInstaller を閉じると JIT が終わるため、バックグラウンドに残しておいてください。",
+    "JIT needs Developer Mode. Turn it on under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "JIT にはデベロッパモードが必要です。「設定 › プライバシーとセキュリティ › デベロッパモード」でオンにし、再起動後に確認します。",
+    "JIT on for %@": "%@ の JIT は有効",
+    "Legacy": "レガシー",
+    "No app on this iPhone is signed for development, which a debugger needs. Install the app with SideStore or SideInstaller, which sign apps that way, then load the apps again.":
+        "この iPhone には開発用に署名されたアプリがありません。デバッガにはそれが必要です。その方法で署名する SideStore か SideInstaller でアプリをインストールしてから、もう一度アプリを読み込んでください。",
+    "No apps can use JIT": "JIT を使えるアプリはありません",
+    "Opening %@": "%@ を開いています",
+    "Quit %@": "%@ を終了",
+    "The debugger couldn't attach to %@ (%@). Install it again with SideStore or SideInstaller, which sign apps so a debugger can attach.":
+        "デバッガは %@ にアタッチできませんでした（%@）。デバッガがアタッチできるように署名する SideStore か SideInstaller で再インストールしてください。",
+    "The debugger lost %@ (%@). Open it with JIT again.": "デバッガが %@ を見失いました（%@）。もう一度 JIT で開いてください。",
+    "Universal": "ユニバーサル",
 ]

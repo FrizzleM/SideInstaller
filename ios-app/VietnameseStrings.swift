@@ -1417,4 +1417,37 @@ let vietnameseStrings: [String: String] = [
         "Phiên bản này cũ hơn bản mới nhất. Nó được cài đè lên bản trên iPhone này và có thể không mở được dữ liệu mà phiên bản mới hơn đã lưu.",
     "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
         "Phiên bản này cũ hơn bản trên iPhone này (%@). Khi cài đè lên, nó có thể không mở được dữ liệu mà phiên bản mới hơn đã lưu.",
+
+    // MARK: - JIT
+
+    "%@ has the JIT memory it asked for, so SideInstaller let go of it. JIT stays on until it quits.":
+        "%@ đã có bộ nhớ JIT mà nó yêu cầu, nên SideInstaller đã tách khỏi nó. JIT vẫn bật cho đến khi ứng dụng thoát.",
+    "%@ of JIT memory prepared": "Đã chuẩn bị %@ bộ nhớ JIT",
+    "%d app can use JIT": "%d ứng dụng có thể dùng JIT",
+    "%d apps can use JIT": "%d ứng dụng có thể dùng JIT",
+    "Attach and detach": "Gắn rồi tách",
+    "Attaching the debugger": "Đang gắn trình gỡ lỗi",
+    "Auto: %@": "Tự động: %@",
+    "Connecting to this iPhone's debugger": "Đang kết nối tới trình gỡ lỗi của iPhone này",
+    "Couldn't open %@ under the debugger: %@": "Không thể mở %@ dưới trình gỡ lỗi: %@",
+    "Couldn't reach the debugger on this iPhone: %@":
+        "Không thể kết nối tới trình gỡ lỗi trên iPhone này: %@",
+    "Enable JIT": "Bật JIT",
+    "JIT is on for %@ until it quits.": "JIT đã bật cho %@ cho đến khi ứng dụng thoát.",
+    "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
+        "JIT đã bật. SideInstaller vẫn gắn vào trong khi %@ chạy: hãy để SideInstaller chạy nền, vì đóng nó sẽ kết thúc JIT.",
+    "JIT needs Developer Mode. Turn it on under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "JIT cần Chế độ nhà phát triển. Hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển, và xác nhận sau khi khởi động lại.",
+    "JIT on for %@": "JIT đang bật cho %@",
+    "Legacy": "Cũ",
+    "No app on this iPhone is signed for development, which a debugger needs. Install the app with SideStore or SideInstaller, which sign apps that way, then load the apps again.":
+        "Không có ứng dụng nào trên iPhone này được ký để phát triển, điều mà trình gỡ lỗi cần. Hãy cài ứng dụng bằng SideStore hoặc SideInstaller, vốn ký ứng dụng theo cách đó, rồi tải lại danh sách ứng dụng.",
+    "No apps can use JIT": "Không có ứng dụng nào dùng được JIT",
+    "Opening %@": "Đang mở %@",
+    "Quit %@": "Thoát %@",
+    "The debugger couldn't attach to %@ (%@). Install it again with SideStore or SideInstaller, which sign apps so a debugger can attach.":
+        "Trình gỡ lỗi không gắn được vào %@ (%@). Hãy cài lại nó bằng SideStore hoặc SideInstaller, vốn ký ứng dụng để trình gỡ lỗi gắn vào được.",
+    "The debugger lost %@ (%@). Open it with JIT again.":
+        "Trình gỡ lỗi đã mất kết nối với %@ (%@). Hãy mở lại nó bằng JIT.",
+    "Universal": "Phổ quát",
 ]

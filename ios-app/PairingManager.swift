@@ -3,8 +3,15 @@ import Foundation
 /// Drives the Pairing tab: generate the pairing file, export it, and write it
 /// into a chosen installed app. Only UI state lives here — the shared `Engine`
 /// owns the device connection and serializes the work.
+///
+/// One for the app, so the JIT page generates a missing pairing file with the
+/// same popups as this page (`generateForPage`).
 @MainActor
 final class PairingManager: ObservableObject {
+
+    static let shared = PairingManager()
+
+    private init() {}
 
     // Pairing file state, for the status pill and the Export button.
     @Published private(set) var pairingFileExists = false
@@ -66,12 +73,7 @@ final class PairingManager: ObservableObject {
         isGenerating = true
         Task {
             do {
-                _ = try await PairingController.shared.startAndWait()
-                engine.connection.disconnect()
-                targets = []
-                hasScanned = false
-                // Allow an auto-scan again for the new pairing file.
-                didAutoScan = false
+                try await pairThisDevice()
                 lastSuccess = L("Pairing file ready. You can export it or install it into an app below.")
             } catch is CancellationError {
                 // User backed out — no error banner.
@@ -81,6 +83,34 @@ final class PairingManager: ObservableObject {
             refresh()
             isGenerating = false
         }
+    }
+
+    /// Generates the pairing file for another page that can't go on without
+    /// one (JIT), with the same popups as Generate. That page reports how it
+    /// went. Throws `CancellationError` when the popups are closed.
+    func generateForPage() async throws {
+        // A new pairing drops the device link, which an install may be using.
+        guard !engine.isRunning else {
+            throw EngineError.message(ErrorHelp.explained(L("An install is already running. Wait for it to finish, then try again.")))
+        }
+        guard !isBusy else { throw PairingController.PairingError.busy }
+        isGenerating = true
+        defer {
+            refresh()
+            isGenerating = false
+        }
+        try await pairThisDevice()
+    }
+
+    /// Pairs this iPhone with itself while `isGenerating` holds up the code and
+    /// the steps for Settings.
+    private func pairThisDevice() async throws {
+        _ = try await PairingController.shared.startAndWait()
+        engine.connection.disconnect()
+        targets = []
+        hasScanned = false
+        // Allow an auto-scan again for the new pairing file.
+        didAutoScan = false
     }
 
     // MARK: - Popups

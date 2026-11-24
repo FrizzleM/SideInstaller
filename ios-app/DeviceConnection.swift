@@ -14,8 +14,12 @@ final class DeviceConnection {
     private var handshake: OpaquePointer?
     /// Answers lockdownd's heartbeat while a CoreDeviceProxy tunnel is open,
     /// which iOS closes without it (`LockdownHeartbeat`). Nil on the RPPairing
-    /// route, which doesn't go through lockdownd.
+    /// route, which doesn't go through lockdownd. Shared with any other
+    /// connection to the same iPhone (`acquireHeartbeat`).
     private var heartbeat: LockdownHeartbeat?
+    /// Answers the heartbeat over the RSD tunnel while a debugger stays
+    /// attached to an app over this connection (`startDebugHeartbeat`).
+    private var debugHeartbeat: LockdownHeartbeat?
     /// The port this iPhone's remote-pairing listener was found on when it
     /// wasn't `rsdPort`: the one it advertised, or the one that answered a
     /// knock. The next connect dials it first, so the search runs once in a
@@ -662,11 +666,16 @@ final class DeviceConnection {
                                             hostname: hostname)
         defer { idevice_provider_free(provider) }
 
-        // iOS keeps one heartbeat per pairing, so the new one ends the old one,
-        // and the old tunnel with it. Stopped first, its thread doesn't report
-        // that as a failure.
-        heartbeat?.stop()
-        let newHeartbeat = startHeartbeat(provider, deviceIP: deviceIP)
+        // iOS keeps one heartbeat per pairing, so a new one ends the old one,
+        // and the tunnels opened under it. This connection's own is let go
+        // first: stopped, so its thread doesn't report that as a failure,
+        // unless another connection's tunnel is open under it, which the new
+        // tunnel then opens under too (`acquireHeartbeat`).
+        if let previous = heartbeat {
+            heartbeat = nil
+            Self.releaseHeartbeat(previous)
+        }
+        let newHeartbeat = acquireHeartbeat(provider, deviceIP: deviceIP)
         var newAdapter: OpaquePointer?
         var newHandshake: OpaquePointer?
         do {
@@ -676,7 +685,7 @@ final class DeviceConnection {
                 throw fail("tunnel created without valid handles")
             }
         } catch {
-            newHeartbeat?.stop()
+            if let newHeartbeat { Self.releaseHeartbeat(newHeartbeat) }
             throw error
         }
         disconnect()
@@ -703,6 +712,64 @@ final class DeviceConnection {
             Engine.shared.log("Lockdown heartbeat: no Marco from the iPhone within 5 s. Trying anyway …")
         }
         return started
+    }
+
+    // MARK: Lockdown heartbeat, shared between connections
+
+    /// The lockdown heartbeat answering each iPhone, by device IP, and how many
+    /// connections' tunnels are open under it. A new heartbeat closes the
+    /// tunnels opened under the one before (`LockdownHeartbeat`), so a second
+    /// connection to the same iPhone, such as a JIT session's (`JITSession`),
+    /// opens its tunnel under the heartbeat already answering instead of
+    /// starting its own, and the heartbeat stops with the last of them. With
+    /// one connection, every connect still starts a fresh one.
+    private static let heartbeatLock = NSLock()
+    private static var sharedHeartbeats: [String: (heartbeat: LockdownHeartbeat, users: Int)] = [:]
+
+    /// The heartbeat a new tunnel to `deviceIP` opens under: the one another
+    /// connection's tunnel is open under, while it's answering, or a new one.
+    /// Held locked throughout, so two connections never start one each.
+    private func acquireHeartbeat(_ provider: OpaquePointer, deviceIP: String) -> LockdownHeartbeat? {
+        Self.heartbeatLock.lock()
+        defer { Self.heartbeatLock.unlock() }
+        if let shared = Self.sharedHeartbeats[deviceIP], shared.heartbeat.isAnswering {
+            Self.sharedHeartbeats[deviceIP] = (shared.heartbeat, shared.users + 1)
+            Engine.shared.log("Lockdown heartbeat: opening this tunnel under the one already answering this iPhone.")
+            return shared.heartbeat
+        }
+        // One that stopped answering has nothing left open under it.
+        Self.sharedHeartbeats.removeValue(forKey: deviceIP)?.heartbeat.stop()
+        guard let started = startHeartbeat(provider, deviceIP: deviceIP) else { return nil }
+        Self.sharedHeartbeats[deviceIP] = (started, 1)
+        return started
+    }
+
+    /// Lets go of a heartbeat from `acquireHeartbeat`, and stops it unless
+    /// another connection's tunnel is still open under it.
+    private static func releaseHeartbeat(_ heartbeat: LockdownHeartbeat) {
+        heartbeatLock.lock()
+        guard let shared = sharedHeartbeats[heartbeat.deviceIP], shared.heartbeat === heartbeat else {
+            // Already replaced: nothing else holds it.
+            heartbeatLock.unlock()
+            heartbeat.stop()
+            return
+        }
+        if shared.users > 1 {
+            sharedHeartbeats[heartbeat.deviceIP] = (heartbeat, shared.users - 1)
+            heartbeatLock.unlock()
+            return
+        }
+        sharedHeartbeats.removeValue(forKey: heartbeat.deviceIP)
+        heartbeatLock.unlock()
+        heartbeat.stop()
+    }
+
+    /// True while a connection's tunnel to `deviceIP` is open under a
+    /// heartbeat that's answering.
+    private static func heartbeatAnswers(at deviceIP: String) -> Bool {
+        heartbeatLock.lock()
+        defer { heartbeatLock.unlock() }
+        return sharedHeartbeats[deviceIP]?.heartbeat.isAnswering ?? false
     }
 
     /// A provider that reaches lockdownd at `deviceIP` with the classic pair
@@ -862,11 +929,16 @@ final class DeviceConnection {
     func disconnect() {
         // End location simulation first; its handles use the tunnel.
         endLocationSimulation()
+        debugHeartbeat?.stop()
+        debugHeartbeat = nil
         if let handshake { rsd_handshake_free(handshake); self.handshake = nil }
         if let adapter { adapter_free(adapter); self.adapter = nil }
-        // Last, since iOS closes the tunnel once its heartbeat stops.
-        heartbeat?.stop()
-        heartbeat = nil
+        // Last, since iOS closes the tunnel once its heartbeat stops, which
+        // it does here unless another connection's tunnel is open under it.
+        if let heartbeat {
+            self.heartbeat = nil
+            Self.releaseHeartbeat(heartbeat)
+        }
     }
 
     // MARK: RSD handshake summary
@@ -1948,10 +2020,11 @@ final class DeviceConnection {
                                             hostname: hostname)
         defer { idevice_provider_free(provider) }
         // iOS closes AMFI without a heartbeat, like any other service. A new
-        // one would end this connection's own and close its tunnel, so that
-        // one is used while it's still answering this iPhone.
-        let ownAnswering = heartbeat.map { $0.isAnswering && $0.deviceIP == deviceIP } ?? false
-        let requestHeartbeat = ownAnswering ? nil : startHeartbeat(provider, deviceIP: deviceIP)
+        // one would end the one a connection's tunnel is open under, and close
+        // that tunnel, so that one is used while it's still answering this
+        // iPhone.
+        let requestHeartbeat = Self.heartbeatAnswers(at: deviceIP)
+            ? nil : startHeartbeat(provider, deviceIP: deviceIP)
         defer { requestHeartbeat?.stop() }
         var client: OpaquePointer?
         try check(amfi_connect(provider, &client), "amfi_connect failed")
@@ -2072,6 +2145,62 @@ final class DeviceConnection {
         if let remoteServer { remote_server_free(remoteServer); self.remoteServer = nil }
     }
 
+    // MARK: Debugging (debugserver and DVT over RSD, for JIT)
+
+    /// Opens what enabling JIT needs over this connection's tunnel: DVT's
+    /// process control, to launch the app suspended, and debugserver, to
+    /// attach to it. Both come with the developer disk image, so without one
+    /// mounted the first of them is what fails. StikDebug opens the same two.
+    func openDebugSession() throws -> DebugServerSession {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var server: OpaquePointer?
+        try check(remote_server_connect_rsd(adapter, handshake, &server),
+                  "remote_server_connect_rsd failed (is the developer disk image mounted?)")
+        guard let server else { throw fail("remote server handle was null") }
+        var control: OpaquePointer?
+        if let error = ffiError(process_control_new(server, &control), "process_control_new failed") {
+            remote_server_free(server)
+            throw error
+        }
+        guard let control else {
+            remote_server_free(server)
+            throw fail("process control handle was null")
+        }
+        var proxy: OpaquePointer?
+        if let error = ffiError(debug_proxy_connect_rsd(adapter, handshake, &proxy),
+                                "debug_proxy_connect_rsd failed (is the developer disk image mounted?)") {
+            process_control_free(control)
+            remote_server_free(server)
+            throw error
+        }
+        guard let proxy else {
+            process_control_free(control)
+            remote_server_free(server)
+            throw fail("debug proxy handle was null")
+        }
+        return DebugServerSession(remoteServer: server, processControl: control, debugProxy: proxy)
+    }
+
+    /// Answers the heartbeat over the RSD tunnel
+    /// (`com.apple.mobile.heartbeat.shim.remote`) until this connection
+    /// closes, as StikDebug does while its debugger stays attached to an app.
+    /// Not on the lockdown route, where `heartbeat` answers already and a
+    /// second one would end it. When it doesn't start, the reason is logged
+    /// and the session goes on without it, as StikDebug's does.
+    func startDebugHeartbeat(deviceIP: String) {
+        guard heartbeat == nil, debugHeartbeat == nil, let adapter, let handshake else { return }
+        var client: OpaquePointer?
+        if let error = ffiError(heartbeat_connect_rsd(adapter, handshake, &client),
+                                "heartbeat_connect_rsd failed") {
+            Engine.shared.log("Debugger heartbeat didn't start (\(error)). Going on without it …")
+            return
+        }
+        guard let client else { return }
+        debugHeartbeat = LockdownHeartbeat(
+            client: client, deviceIP: deviceIP, label: "Debugger heartbeat",
+            endedAdvice: "The debugger stays attached without it, as long as the tunnel stays up.")
+    }
+
     // MARK: plist helpers
 
     private func plistString(_ dict: plist_t?, _ key: String) -> String? {
@@ -2136,6 +2265,10 @@ private final class LockdownHeartbeat {
     let deviceIP: String
     /// Owned by the thread, which frees it on the way out.
     private let client: OpaquePointer
+    /// What the log calls it.
+    private let label: String
+    /// What the log says after it ends.
+    private let endedAdvice: String
     private let condition = NSCondition()
     private var answered = 0
     private var ended = false
@@ -2146,10 +2279,15 @@ private final class LockdownHeartbeat {
     private static let heartbeatErrorCode: Int32 = 100
     private static let sleepyTimeSubCode: Int32 = 1
 
-    /// Takes `client`, from `heartbeat_connect`, and starts answering it.
-    init(client: OpaquePointer, deviceIP: String) {
+    /// Takes `client`, from `heartbeat_connect` (or `heartbeat_connect_rsd`,
+    /// for a debugger's, logged under another `label`), and starts answering it.
+    init(client: OpaquePointer, deviceIP: String,
+         label: String = "Lockdown heartbeat",
+         endedAdvice: String = "iOS closes the tunnel within seconds without it. Another app with this pairing file (SideStore, StikDebug, Feather) starting its own heartbeat ends this one.") {
         self.client = client
         self.deviceIP = deviceIP
+        self.label = label
+        self.endedAdvice = endedAdvice
         let thread = Thread { [self] in run() }
         thread.name = "sideinstaller.heartbeat"
         // A Polo that goes out too late closes the tunnel, mid-install too.
@@ -2207,17 +2345,17 @@ private final class LockdownHeartbeat {
                 // heartbeat. The connection closing does.
                 if error.code == Self.heartbeatErrorCode {
                     if error.subCode == Self.sleepyTimeSubCode {
-                        Engine.shared.log("Lockdown heartbeat: the iPhone is going to sleep.")
+                        Engine.shared.log("\(label): the iPhone is going to sleep.")
                     }
                     continue
                 }
-                Engine.shared.log("Lockdown heartbeat ended (\(error)). iOS closes the tunnel within seconds without it. Another app with this pairing file (SideStore, StikDebug, Feather) starting its own heartbeat ends this one.")
+                Engine.shared.log("\(label) ended (\(error)). \(endedAdvice)")
                 return
             }
             if isStopped { return }
             if let error = DeviceConnection.takeFFIError(heartbeat_send_polo(client),
                                                          "heartbeat_send_polo failed") {
-                Engine.shared.log("Lockdown heartbeat ended: the answer didn't go out (\(error)).")
+                Engine.shared.log("\(label) ended: the answer didn't go out (\(error)).")
                 return
             }
             wait = interval + 5
@@ -2227,8 +2365,124 @@ private final class LockdownHeartbeat {
             condition.broadcast()
             condition.unlock()
             if first {
-                Engine.shared.log("Lockdown heartbeat answered. iOS asks every \(interval) s.")
+                Engine.shared.log("\(label) answered. iOS asks every \(interval) s.")
             }
         }
+    }
+}
+
+// MARK: - Debugging session
+
+/// debugserver attached over one tunnel, with the DVT process control that
+/// launched its app: what enabling JIT runs on (`JITSession`). From
+/// `DeviceConnection.openDebugSession`.
+///
+/// Blocking, like the rest of the FFI. One thread drives debugserver: GDB's
+/// remote protocol is a question and its answer, so packets from two threads
+/// would take each other's answers. `kill` goes through DVT instead, so
+/// another thread may call it while that one waits for the app to stop.
+final class DebugServerSession {
+    private var remoteServer: OpaquePointer?
+    private var processControl: OpaquePointer?
+    private var debugProxy: OpaquePointer?
+    /// Keeps `close` from freeing DVT's handles under a `kill`.
+    private let dvtLock = NSLock()
+
+    fileprivate init(remoteServer: OpaquePointer, processControl: OpaquePointer,
+                     debugProxy: OpaquePointer) {
+        self.remoteServer = remoteServer
+        self.processControl = processControl
+        self.debugProxy = debugProxy
+    }
+
+    deinit { close() }
+
+    private func check(_ err: UnsafeMutablePointer<IdeviceFfiError>?, _ fallback: String) throws {
+        if let error = DeviceConnection.takeFFIError(err, fallback) { throw error }
+    }
+
+    private static let closed = DeviceConnection.FFIError(code: -1, subCode: 0,
+                                                          message: "the debugging session is closed")
+
+    /// Launches `bundleID` suspended and returns its PID. A copy already
+    /// running is quit first, so the app starts afresh under the debugger,
+    /// which is when JIT apps look for it.
+    func launchSuspended(bundleID: String) throws -> UInt64 {
+        dvtLock.lock()
+        defer { dvtLock.unlock() }
+        guard let processControl else { throw Self.closed }
+        var pid: UInt64 = 0
+        try check(bundleID.withCString { id in
+            process_control_launch_app(processControl, id, nil, 0, nil, 0, true, true, &pid)
+        }, "process_control_launch_app(\(bundleID)) failed")
+        return pid
+    }
+
+    /// Quits the app with `pid`. Safe from any thread.
+    func kill(pid: UInt64) throws {
+        dvtLock.lock()
+        defer { dvtLock.unlock() }
+        guard let processControl else { throw Self.closed }
+        try check(process_control_kill_app(processControl, pid), "process_control_kill_app failed")
+    }
+
+    /// Sends one packet's content (idevice frames it and adds the checksum)
+    /// and returns debugserver's answer, nil when none came.
+    func send(_ packet: String) throws -> String? {
+        guard let debugProxy else { throw Self.closed }
+        guard let command = debugserver_command_new(packet, nil, 0) else {
+            throw DeviceConnection.FFIError(code: -1, subCode: 0,
+                                            message: "couldn't make the debugserver packet \(packet.prefix(24))")
+        }
+        defer { debugserver_command_free(command) }
+        var response: UnsafeMutablePointer<CChar>?
+        let err = debug_proxy_send_command(debugProxy, command, &response)
+        defer { if let response { idevice_string_free(response) } }
+        try check(err, "debugserver didn't answer \(packet.prefix(24))")
+        return response.map { String(cString: $0) }
+    }
+
+    /// Sends bytes as they are, such as several framed packets at once, whose
+    /// answers `readResponse` then takes in order.
+    func sendRaw(_ bytes: [UInt8]) throws {
+        guard let debugProxy else { throw Self.closed }
+        try bytes.withUnsafeBufferPointer { buffer in
+            try check(debug_proxy_send_raw(debugProxy, buffer.baseAddress, UInt(buffer.count)),
+                      "debug_proxy_send_raw failed")
+        }
+    }
+
+    /// The next answer debugserver sends, nil when what came wasn't one.
+    func readResponse() throws -> String? {
+        guard let debugProxy else { throw Self.closed }
+        var response: UnsafeMutablePointer<CChar>?
+        let err = debug_proxy_read_response(debugProxy, &response)
+        defer { if let response { idevice_string_free(response) } }
+        try check(err, "debug_proxy_read_response failed")
+        return response.map { String(cString: $0) }
+    }
+
+    /// Acknowledges what debugserver sent, while acknowledgements are on.
+    func sendAck() throws {
+        guard let debugProxy else { throw Self.closed }
+        try check(debug_proxy_send_ack(debugProxy), "debug_proxy_send_ack failed")
+    }
+
+    /// Whether idevice expects and sends acknowledgements. Off after
+    /// `QStartNoAckMode`, which turns them off at debugserver's end.
+    func setAcknowledgements(_ on: Bool) {
+        guard let debugProxy else { return }
+        debug_proxy_set_ack_mode(debugProxy, on ? 1 : 0)
+    }
+
+    /// Closes debugserver, then DVT. Detach (`D`) first: what debugserver does
+    /// with an app it's still attached to when its connection goes isn't
+    /// something to count on.
+    func close() {
+        if let debugProxy { debug_proxy_free(debugProxy); self.debugProxy = nil }
+        dvtLock.lock()
+        if let processControl { process_control_free(processControl); self.processControl = nil }
+        if let remoteServer { remote_server_free(remoteServer); self.remoteServer = nil }
+        dvtLock.unlock()
     }
 }
