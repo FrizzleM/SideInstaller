@@ -1386,4 +1386,6 @@ let vietnameseStrings: [String: String] = [
     "This file is being renewed. Wait until it finishes.": "Tệp này đang được gia hạn. Hãy chờ cho đến khi xong.",
     "empty account config": "Cấu hình tài khoản trống",
     "%d files, first %@: %@": "%d tệp, tệp đầu tiên %@ : %@",
+    "%@ isn't listed": "%@ không có trong danh sách",
+    "the data couldn't be read": "Không thể đọc dữ liệu",
 ]

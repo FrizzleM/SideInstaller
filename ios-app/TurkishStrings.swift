@@ -1304,4 +1304,6 @@ let turkishStrings: [String: String] = [
     "This file is being renewed. Wait until it finishes.": "Bu dosya yenileniyor. Bitene kadar bekleyin.",
     "empty account config": "Hesap yapılandırması boş",
     "%d files, first %@: %@": "%d dosya, ilki %@ : %@",
+    "%@ isn't listed": "%@ listede yok",
+    "the data couldn't be read": "Veriler okunamadı",
 ]

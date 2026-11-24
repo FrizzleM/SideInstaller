@@ -1356,4 +1356,6 @@ let japaneseStrings: [String: String] = [
     "This file is being renewed. Wait until it finishes.": "このファイルは更新中です。終わるまで待ってください。",
     "empty account config": "アカウント設定が空です",
     "%d files, first %@: %@": "%d 個のファイル、最初は %@：%@",
+    "%@ isn't listed": "%@ は一覧にありません",
+    "the data couldn't be read": "データを読み取れませんでした",
 ]

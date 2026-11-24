@@ -1369,4 +1369,6 @@ let chineseStrings: [String: String] = [
     "This file is being renewed. Wait until it finishes.": "正在续签这个文件，等续签结束再操作。",
     "empty account config": "账号配置为空",
     "%d files, first %@: %@": "%d 个文件，首个 %@：%@",
+    "%@ isn't listed": "%@ 未列出",
+    "the data couldn't be read": "数据无法读取",
 ]

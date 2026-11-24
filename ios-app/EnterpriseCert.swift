@@ -1481,6 +1481,10 @@ struct CertSignLogEntry: Codable, Identifiable {
 
 /// 签名日志清单：存 Application Support，最新在前，最多留 100 条。
 enum CertSignLogStore {
+    // B-40-B1: append / clear 是无锁 RMW——签名路 append 跑在
+    // 非主线程 Task 里，安装完成路 append 跑在主线程，清空在主线程；
+    // 两边各自 load 同一份清单再 save，后写者盖掉先写者的一条。
+    private static let logLock = NSLock()
     private static var fileURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
@@ -1501,13 +1505,19 @@ enum CertSignLogStore {
     }
 
     static func append(_ entry: CertSignLogEntry) {
+        logLock.lock()
+        defer { logLock.unlock() }
         var entries = load()
         entries.insert(entry, at: 0)
         if entries.count > 100 { entries = Array(entries.prefix(100)) }
         save(entries)
     }
 
-    static func clear() { save([]) }
+    static func clear() {
+        logLock.lock()
+        defer { logLock.unlock() }
+        save([])
+    }
 }
 
 // MARK: - 续签源

@@ -1077,7 +1077,7 @@ enum SideStoreDownloader {
             release = try JSONDecoder().decode(GHRelease.self, from: data)
         } catch {
             // The status was 2xx, so this is a real decode failure.
-            throw DownloadError.badRelease(String(describing: error))
+            throw DownloadError.badRelease(L("the data couldn't be read"))
         }
         log("\(channel.displayName) \(source.displayName) release: \(release.tag_name) with \(release.assets.count) assets")
 
@@ -1166,7 +1166,7 @@ enum SideStoreDownloader {
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            throw DownloadError.badRelease(String(describing: error))
+            throw DownloadError.badRelease(L("the data couldn't be read"))
         }
     }
 
@@ -1212,10 +1212,10 @@ enum SideStoreDownloader {
         do {
             listing = try JSONDecoder().decode(AltSourceListing.self, from: data)
         } catch {
-            throw DownloadError.badSource(feed.name, String(describing: error))
+            throw DownloadError.badSource(feed.name, L("the data couldn't be read"))
         }
         guard let app = listing.apps.first(where: { $0.bundleIdentifier == feed.bundleID }) else {
-            throw DownloadError.badSource(feed.name, "\(feed.bundleID) isn't listed")
+            throw DownloadError.badSource(feed.name, L("%@ isn't listed", feed.bundleID))
         }
         return (app.versions ?? []).compactMap { listed -> ReleaseVersion? in
             // Only over HTTPS, and only what this iOS can run.

@@ -1357,4 +1357,6 @@ let koreanStrings: [String: String] = [
     "This file is being renewed. Wait until it finishes.": "이 파일은 갱신 중입니다. 끝날 때까지 기다리세요.",
     "empty account config": "계정 구성이 비어 있습니다",
     "%d files, first %@: %@": "%d개의 파일, 첫 번째 %@: %@",
+    "%@ isn't listed": "%@가 목록에 없습니다",
+    "the data couldn't be read": "데이터를 읽을 수 없습니다",
 ]

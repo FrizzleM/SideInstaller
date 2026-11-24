@@ -1518,12 +1518,27 @@ struct FilesTabView: View {
         return "\(size)  \(fileTimeText(modified))"
     }
 
+    /// A-40-1：文件行时间文案静态缓存——照抄 SIDE-39 A-39-2 的
+    /// DownloadsListView.dateTextCache 模式；每行每 body 求值现建
+    /// Date.FormatStyle 太贵。key 必须带今天（值本身依赖今天：
+    /// isDateInToday 分支，今天显时间、明天显日期）。调用方全在
+    /// 主线程 body 里，不另加锁。
+    private static var fileTimeTextCache: [String: String] = [:]
+
     /// 今天显示时间（14:38:19），以前的显示日期（2026/10/27），轻松签同款。
     private func fileTimeText(_ date: Date) -> String {
+        let today = Calendar.current.startOfDay(for: Date())
+        let key = "\(date.timeIntervalSince1970)#\(Localizer.locale.identifier)#\(today.timeIntervalSince1970)"
+        if let cached = Self.fileTimeTextCache[key] { return cached }
+        let text: String
         if Calendar.current.isDateInToday(date) {
-            return date.formatted(date: .omitted, time: .standard)
+            text = date.formatted(date: .omitted, time: .standard)
+        } else {
+            text = date.formatted(date: .numeric, time: .omitted)
         }
-        return date.formatted(date: .numeric, time: .omitted)
+        if Self.fileTimeTextCache.count > 512 { Self.fileTimeTextCache.removeAll() }
+        Self.fileTimeTextCache[key] = text
+        return text
     }
 
     /// 文件行图标：IPA 真图 / 文件夹蓝标 / 其他灰标，三路不同

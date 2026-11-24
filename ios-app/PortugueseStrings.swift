@@ -1379,4 +1379,6 @@ let portugueseStrings: [String: String] = [
     "This file is being renewed. Wait until it finishes.": "Este arquivo está sendo renovado. Aguarde terminar.",
     "empty account config": "Configuração da conta vazia",
     "%d files, first %@: %@": "%d arquivos, o primeiro %@ : %@",
+    "%@ isn't listed": "%@ não está listado",
+    "the data couldn't be read": "Não foi possível ler os dados",
 ]

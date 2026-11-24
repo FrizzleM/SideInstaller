@@ -1394,4 +1394,6 @@ let frenchStrings: [String: String] = [
     "This file is being renewed. Wait until it finishes.": "Ce fichier est en cours de renouvellement. Attendez qu'il se termine.",
     "empty account config": "Configuration du compte vide",
     "%d files, first %@: %@": "%d fichiers, le premier %@ : %@",
+    "%@ isn't listed": "%@ n'est pas répertorié",
+    "the data couldn't be read": "Les données n'ont pas pu être lues",
 ]
