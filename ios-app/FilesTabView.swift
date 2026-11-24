@@ -2166,7 +2166,8 @@ struct FilesTabView: View {
             opBusy = false
             refreshFiles()
             if let error {
-                opMessage = error
+                LogStore.shared.append("压缩失败：\(error)")
+                opMessage = friendlyRustError(error)
                 opFailed = true
             } else {
                 opMessage = L("已压缩到 %@", out.lastPathComponent)
@@ -2189,7 +2190,8 @@ struct FilesTabView: View {
             opBusy = false
             refreshFiles()
             if let error {
-                opMessage = error
+                LogStore.shared.append("解压失败：\(error)")
+                opMessage = friendlyRustError(error)
                 opFailed = true
             } else {
                 opMessage = L("已解压到 %@", dest.lastPathComponent)

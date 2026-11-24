@@ -586,7 +586,7 @@ private struct ValhallaError: LocalizedError {
             return L("That route is too long for the route server. Make it shorter, or split it up.")
         default:
             if status == 429 { return L("The route server is busy. Try again in a minute.") }
-            return L("The route server couldn't plan this route (%@).", message ?? "HTTP \(status)")
+            return L("The route server couldn't plan this route.")
         }
     }
 }

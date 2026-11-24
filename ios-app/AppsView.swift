@@ -657,6 +657,10 @@ final class SideloadedAppsManager: ObservableObject {
             tunnelAcquired = true
             do {
                 try await engine.prepareRefresh()
+            } catch is CancellationError {
+                engine.log("Refresh all: cancelled during sign-in.")
+                jobs = []
+                return
             } catch {
                 let message = userFacingErrorMessage(error)
                 let raw = String(describing: error)

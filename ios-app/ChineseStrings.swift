@@ -412,7 +412,6 @@ let chineseStrings: [String: String] = [
     "That route is too long for the route server. Make it shorter, or split it up.":
         "这条路线对路线服务器来说太长了。请缩短或分段。",
     "The route server is busy. Try again in a minute.": "路线服务器繁忙。请一分钟后重试。",
-    "The route server couldn't plan this route (%@).": "路线服务器无法规划这条路线（%@）。",
 
     // MARK: - Entitlements tab
 
@@ -1344,15 +1343,11 @@ let chineseStrings: [String: String] = [
     "Folders can't be deleted": "文件夹不能删除",
     // SIDE-36 (0.9.125): new keys.
     "Couldn't read this source": "无法读取这个源",
-    "Couldn't read the certificate list: %@": "无法读取证书列表：%@",
     "Listing certificates failed: %@": "列出证书失败：%@",
     "Revoke failed: %@": "吊销失败：%@",
-    "Couldn't read what the import did: %@": "无法读取导入结果：%@",
     "Couldn't parse p12 export result.": "无法解析 p12 导出结果。",
     "Export failed: %@": "导出失败：%@",
-    "Couldn't read the App ID list: %@": "无法读取 App ID 列表：%@",
     "Listing App IDs failed: %@": "列出 App ID 失败：%@",
-    "Couldn't read Apple's reply: %@": "无法读取 Apple 的回复：%@",
     "Enabling entitlements failed: %@": "启用权限失败：%@",
     "Waiting for this install to finish…": "正在等本次安装收尾…",
     "This file is being installed. Wait until it finishes.": "正在安装这个文件，等安装结束再操作。",
@@ -1373,4 +1368,29 @@ let chineseStrings: [String: String] = [
     "the data couldn't be read": "数据无法读取",
     "Couldn't reach this iPhone. Check the connection and try again.": "连不上这台 iPhone，检查连接后重试。",
     "the connection to this iPhone failed": "与这台 iPhone 的连接失败了。",
+
+    // MARK: - SIDE-43+44 (0.9.132)
+    "This Apple ID has no development team. Sign in at developer.apple.com once to create one, then try again.": "该 Apple ID 下没有开发团队。先到 developer.apple.com 登录一次创建团队，再试一次。",
+    "That certificate belongs to another Apple ID, or it was revoked.": "该证书属于另一个 Apple ID，或已被吊销。",
+    "That App ID is no longer on this team.": "该 App ID 已不在这个团队下了。",
+    "That file isn't a certificate archive (.p12). Check the file and try again.": "该文件不是证书存档（.p12）。检查文件后重试。",
+    "There's no signing certificate on this Apple ID yet. Install an app first — that's what creates it.": "这个 Apple ID 下还没有签名证书。先安装一个 App——安装时会创建证书。",
+    "Check the network connection and try again.": "检查网络连接后重试。",
+    "Apple didn't accept the sign-in. Check the Apple ID and password, then try again.": "Apple 未接受此次登录。检查 Apple ID 和密码后重试。",
+    "Sign-ins are being limited right now. Wait a few minutes and try again.": "登录目前被限流。等几分钟再试。",
+    "Apple's service didn't answer. Try again in a bit.": "Apple 服务暂时没有响应。过一会儿再试。",
+    "This iPhone is out of storage space. Free some space and try again.": "这台 iPhone 存储空间已满。清理一些空间后重试。",
+    "A file this step needed is missing. Check the file library and try again.": "这一步需要的文件找不到了。检查文件库后重试。",
+    "Something went wrong. Check the activity log and try again.": "出了点问题。查看活动日志后重试。",
+    "Couldn't read the certificate list.": "无法读取证书列表。",
+    "Couldn't read what the import did.": "无法读取导入结果。",
+    "Couldn't read the App ID list.": "无法读取 App ID 列表。",
+    "Couldn't read Apple's reply.": "无法读取 Apple 的回复。",
+    "瘦身改包解压失败。": "瘦身改包解压失败。",
+    "瘦身改包压包失败。": "瘦身改包压包失败。",
+    "Pairing file for another iPhone": "配对文件属于另一台 iPhone",
+    "This pairing file belongs to another iPhone (UDID %@). The iPhone connected now is %@.": "该配对文件属于另一台 iPhone（UDID %@）。当前连接的 iPhone 是 %@。",
+    "The route server couldn't plan this route.": "路线服务器规划不出这条路线。",
+    "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "对方 iPhone 连上了，但一直没弹出配对码。重新配对一次。",
+    "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "配对码没在规定时间内输入。重新配对，看到码就尽快输入。",
 ]

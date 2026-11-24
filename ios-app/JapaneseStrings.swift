@@ -412,7 +412,6 @@ let japaneseStrings: [String: String] = [
     "That route is too long for the route server. Make it shorter, or split it up.":
         "このルートはルートサーバには長すぎます。短くするか、分割してください。",
     "The route server is busy. Try again in a minute.": "ルートサーバが混み合っています。1 分ほどしてからもう一度お試しください。",
-    "The route server couldn't plan this route (%@).": "ルートサーバがこのルートを計画できませんでした（%@）。",
 
     // MARK: - Entitlements tab
 
@@ -1331,15 +1330,11 @@ let japaneseStrings: [String: String] = [
     "Folders can't be deleted": "フォルダは削除できません",
     // SIDE-36 (0.9.125): new keys.
     "Couldn't read this source": "このソースを読み取れませんでした",
-    "Couldn't read the certificate list: %@": "証明書の一覧を読み取れませんでした：%@",
     "Listing certificates failed: %@": "証明書の一覧の取得に失敗しました：%@",
     "Revoke failed: %@": "失効に失敗しました：%@",
-    "Couldn't read what the import did: %@": "インポート結果を読み取れませんでした：%@",
     "Couldn't parse p12 export result.": "p12 書き出し結果を解析できませんでした。",
     "Export failed: %@": "書き出しに失敗しました：%@",
-    "Couldn't read the App ID list: %@": "App ID の一覧を読み取れませんでした：%@",
     "Listing App IDs failed: %@": "App ID の一覧の取得に失敗しました：%@",
-    "Couldn't read Apple's reply: %@": "Apple の返信を読み取れませんでした：%@",
     "Enabling entitlements failed: %@": "エンタイトルメントの有効化に失敗しました：%@",
     "Waiting for this install to finish…": "このインストールの終了を待っています…",
     "This file is being installed. Wait until it finishes.": "このファイルはインストール中です。終わるまで待ってください。",
@@ -1360,4 +1355,29 @@ let japaneseStrings: [String: String] = [
     "the data couldn't be read": "データを読み取れませんでした",
     "Couldn't reach this iPhone. Check the connection and try again.": "この iPhone に接続できません。接続を確認してから、もう一度お試しください。",
     "the connection to this iPhone failed": "この iPhone への接続に失敗しました。",
+
+    // MARK: - SIDE-43+44 (0.9.132)
+    "This Apple ID has no development team. Sign in at developer.apple.com once to create one, then try again.": "この Apple ID には開発チームがありません。developer.apple.com に一度サインインしてチームを作成してから、もう一度お試しください。",
+    "That certificate belongs to another Apple ID, or it was revoked.": "その証明書は別の Apple ID のものか、失効しています。",
+    "That App ID is no longer on this team.": "その App ID はこのチームにありません。",
+    "That file isn't a certificate archive (.p12). Check the file and try again.": "そのファイルは証明書アーカイブ（.p12）ではありません。ファイルを確認してからもう一度お試しください。",
+    "There's no signing certificate on this Apple ID yet. Install an app first — that's what creates it.": "この Apple ID にはまだ署名証明書がありません。まず App をインストールしてください。インストール時に作成されます。",
+    "Check the network connection and try again.": "ネットワーク接続を確認してからもう一度お試しください。",
+    "Apple didn't accept the sign-in. Check the Apple ID and password, then try again.": "Apple がサインインを受け付けませんでした。Apple ID とパスワードを確認してからもう一度お試しください。",
+    "Sign-ins are being limited right now. Wait a few minutes and try again.": "現在サインインが制限されています。数分待ってからもう一度お試しください。",
+    "Apple's service didn't answer. Try again in a bit.": "Apple のサービスが応答しませんでした。しばらくしてからもう一度お試しください。",
+    "This iPhone is out of storage space. Free some space and try again.": "この iPhone の空き容量がありません。空き容量を確保してからもう一度お試しください。",
+    "A file this step needed is missing. Check the file library and try again.": "この手順に必要なファイルが見つかりません。ファイルライブラリを確認してからもう一度お試しください。",
+    "Something went wrong. Check the activity log and try again.": "問題が発生しました。アクティビティログを確認してからもう一度お試しください。",
+    "Couldn't read the certificate list.": "証明書リストを読み取れませんでした。",
+    "Couldn't read what the import did.": "インポート結果を読み取れませんでした。",
+    "Couldn't read the App ID list.": "App ID リストを読み取れませんでした。",
+    "Couldn't read Apple's reply.": "Apple からの応答を読み取れませんでした。",
+    "瘦身改包解压失败。": "スリム化のための解凍に失敗しました。",
+    "瘦身改包压包失败。": "スリム化のための圧縮に失敗しました。",
+    "Pairing file for another iPhone": "別の iPhone のペアリングファイル",
+    "This pairing file belongs to another iPhone (UDID %@). The iPhone connected now is %@.": "このペアリングファイルは別の iPhone のものです（UDID %@）。現在接続中の iPhone は %@ です。",
+    "The route server couldn't plan this route.": "ルートサーバーがこのルートを計画できませんでした。",
+    "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "相手の iPhone は接続されましたが、コードを求める前に応答しなくなりました。もう一度ペアリングしてください。",
+    "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "ペアリングコードが時間内に入力されませんでした。もう一度ペアリングし、コードが表示されたら入力してください。",
 ]

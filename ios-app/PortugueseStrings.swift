@@ -424,8 +424,6 @@ let portugueseStrings: [String: String] = [
         "Essa rota é longa demais para o servidor de rotas. Encurte-a ou divida-a.",
     "The route server is busy. Try again in a minute.":
         "O servidor de rotas está ocupado. Tente de novo em um minuto.",
-    "The route server couldn't plan this route (%@).":
-        "O servidor de rotas não conseguiu planejar esta rota (%@).",
 
     // MARK: - Entitlements tab
 
@@ -1354,15 +1352,11 @@ let portugueseStrings: [String: String] = [
     "Folders can't be deleted": "As pastas não podem ser excluídas",
     // SIDE-36 (0.9.125): new keys.
     "Couldn't read this source": "Não foi possível ler esta fonte",
-    "Couldn't read the certificate list: %@": "Não foi possível ler a lista de certificados: %@",
     "Listing certificates failed: %@": "Falha ao listar os certificados: %@",
     "Revoke failed: %@": "Falha ao revogar: %@",
-    "Couldn't read what the import did: %@": "Não foi possível ler o resultado da importação: %@",
     "Couldn't parse p12 export result.": "Não foi possível analisar o resultado da exportação p12.",
     "Export failed: %@": "Falha na exportação: %@",
-    "Couldn't read the App ID list: %@": "Não foi possível ler a lista de IDs de app: %@",
     "Listing App IDs failed: %@": "Falha ao listar os IDs de app: %@",
-    "Couldn't read Apple's reply: %@": "Não foi possível ler a resposta da Apple: %@",
     "Enabling entitlements failed: %@": "Falha ao ativar os direitos: %@",
     "Waiting for this install to finish…": "Aguardando esta instalação terminar…",
     "This file is being installed. Wait until it finishes.": "Este arquivo está sendo instalado. Aguarde terminar.",
@@ -1383,4 +1377,29 @@ let portugueseStrings: [String: String] = [
     "the data couldn't be read": "Não foi possível ler os dados",
     "Couldn't reach this iPhone. Check the connection and try again.": "Não foi possível conectar a este iPhone. Verifique a conexão e tente novamente.",
     "the connection to this iPhone failed": "a conexão com este iPhone falhou.",
+
+    // MARK: - SIDE-43+44 (0.9.132)
+    "This Apple ID has no development team. Sign in at developer.apple.com once to create one, then try again.": "Este ID Apple não tem uma equipe de desenvolvimento. Entre em developer.apple.com uma vez para criar uma e tente novamente.",
+    "That certificate belongs to another Apple ID, or it was revoked.": "Esse certificado pertence a outro ID Apple ou foi revogado.",
+    "That App ID is no longer on this team.": "Esse ID de app não está mais nesta equipe.",
+    "That file isn't a certificate archive (.p12). Check the file and try again.": "Esse arquivo não é um pacote de certificados (.p12). Verifique o arquivo e tente novamente.",
+    "There's no signing certificate on this Apple ID yet. Install an app first — that's what creates it.": "Ainda não há certificado de assinatura neste ID Apple. Instale um app primeiro — é a instalação que o cria.",
+    "Check the network connection and try again.": "Verifique a conexão de rede e tente novamente.",
+    "Apple didn't accept the sign-in. Check the Apple ID and password, then try again.": "A Apple não aceitou o início de sessão. Verifique o ID Apple e a senha e tente novamente.",
+    "Sign-ins are being limited right now. Wait a few minutes and try again.": "Os inícios de sessão estão limitados no momento. Aguarde alguns minutos e tente novamente.",
+    "Apple's service didn't answer. Try again in a bit.": "O serviço da Apple não respondeu. Tente novamente em instantes.",
+    "This iPhone is out of storage space. Free some space and try again.": "Este iPhone está sem espaço de armazenamento. Libere espaço e tente novamente.",
+    "A file this step needed is missing. Check the file library and try again.": "Falta um arquivo necessário para esta etapa. Verifique a biblioteca de arquivos e tente novamente.",
+    "Something went wrong. Check the activity log and try again.": "Algo deu errado. Verifique o registro de atividades e tente novamente.",
+    "Couldn't read the certificate list.": "Não foi possível ler a lista de certificados.",
+    "Couldn't read what the import did.": "Não foi possível ler o resultado da importação.",
+    "Couldn't read the App ID list.": "Não foi possível ler a lista de IDs de app.",
+    "Couldn't read Apple's reply.": "Não foi possível ler a resposta da Apple.",
+    "瘦身改包解压失败。": "Falha ao descompactar para redução do pacote.",
+    "瘦身改包压包失败。": "Falha ao compactar para redução do pacote.",
+    "Pairing file for another iPhone": "Arquivo de pareamento de outro iPhone",
+    "This pairing file belongs to another iPhone (UDID %@). The iPhone connected now is %@.": "Este arquivo de pareamento pertence a outro iPhone (UDID %@). O iPhone conectado agora é %@.",
+    "The route server couldn't plan this route.": "O servidor de rotas não conseguiu planejar esta rota.",
+    "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "O iPhone deles conectou, mas parou de responder antes de pedir um código. Tente parear novamente.",
+    "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "O código de pareamento não foi digitado a tempo. Pareie novamente e digite o código quando ele aparecer.",
 ]

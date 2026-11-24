@@ -1093,7 +1093,7 @@ final class SideBySideManager: ObservableObject {
         } catch PairingController.PairingError.busy {
             throw EngineError.message(L("SideInstaller is already waiting for an iPhone to pair with it, from the Install tab, the Pairing page, or an earlier attempt here. Finish that pairing, or close and reopen SideInstaller, then try again."))
         } catch let PairingController.PairingError.failed(message) {
-            throw EngineError.message(L("Pairing with their iPhone didn't finish: %@", message))
+            throw EngineError.message(L("Pairing with their iPhone didn't finish: %@", friendlyRustError(message)))
         }
     }
 
@@ -1551,9 +1551,9 @@ final class SideBySideManager: ObservableObject {
             if Engine.isUnderageError(message) { throw Self.explained(.underage) }
             if Engine.isEmailUnverifiedError(message) { throw Self.explained(.emailUnverified) }
             if Engine.isDeviceRegistrationError(message) {
-                throw EngineError.message(L("Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@", message))
+                throw EngineError.message(L("Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@", friendlyRustError(message)))
             }
-            throw EngineError.message(L("Signing failed: %@", message))
+            throw EngineError.message(L("Signing failed: %@", friendlyRustError(message)))
         }
     }
 

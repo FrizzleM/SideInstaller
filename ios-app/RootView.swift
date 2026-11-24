@@ -323,7 +323,7 @@ struct RootView: View {
             engine.isRunning ? .attention : nil
         // Waiting on the user: a code to type, steps to follow, a go-ahead.
         case .install(.pairingCode), .install(.liveContainerImport), .install(.appIDCost),
-             .install(.link), .pairing(.pairingCode), .pairing(.pairInSettings):
+             .install(.pairingImportMismatch), .install(.link), .pairing(.pairingCode), .pairing(.pairInSettings):
             .attention
         }
     }
@@ -380,7 +380,7 @@ struct RootView: View {
         case .install(.success), .install(.liveContainerImport):
             .installFinished
         // Up on its own, waiting for the go-ahead to sign, or to act on a link.
-        case .install(.appIDCost), .install(.link):
+        case .install(.appIDCost), .install(.pairingImportMismatch), .install(.link):
             nil
         case .pairing(.pairingCode), .pairing(.pairInSettings):
             .pairingPage

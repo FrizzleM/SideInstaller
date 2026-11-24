@@ -86,7 +86,7 @@ enum EngineError: LocalizedError {
         case let .deviceRegistration(udid, raw):
             let tail = udid.isEmpty ? "" : L(" (UDID %@)", udid)
             return L("Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.",
-                     tail, raw)
+                     tail, friendlyRustError(raw))
         }
     }
 }
@@ -131,6 +131,23 @@ final class Engine {
     private(set) var appIDCost: AppIDCost?
     /// Resumed with the answer to `appIDCost`: true to sign and install.
     private var appIDCostReply: CheckedContinuation<Bool, Never>?
+    /// A pairing file whose UDID differs from the connected iPhone, waiting for
+    /// the user to confirm the switch.
+    struct PairingImportMismatch: Hashable {
+        let fileUDID: String
+        let deviceUDID: String
+    }
+    private(set) var pairingImportMismatch: PairingImportMismatch?
+    private var pairingImportMismatchReply: CheckedContinuation<Bool, Never>?
+
+    /// Answer the pairing-file mismatch popup: true replaces the pairing file.
+    @MainActor
+    func answerPairingImportMismatch(_ proceed: Bool) {
+        guard let reply = pairingImportMismatchReply else { return }
+        pairingImportMismatchReply = nil
+        reply.resume(returning: proceed)
+        pairingImportMismatch = nil
+    }
     /// The `sideinstaller://` link waiting for the go-ahead.
     private(set) var pendingLink: DeepLink?
     /// When SideStore was last asked for its pairing file, so the file it sends
@@ -893,6 +910,8 @@ final class Engine {
         case liveContainerImport
         /// What signing an imported IPA costs in App IDs, before it's signed.
         case appIDCost(AppIDCost)
+        /// A pairing file for another iPhone, asking before it replaces the one in use.
+        case pairingImportMismatch(PairingImportMismatch)
         /// A `sideinstaller://` link, asking before it's acted on.
         case link(DeepLink)
     }
@@ -913,6 +932,7 @@ final class Engine {
         }
         if finished { return finishedPopups }
         var shown: [Popup] = []
+        if let mismatch = pairingImportMismatch { shown.append(.pairingImportMismatch(mismatch)) }
         if let link = pendingLink { shown.append(.link(link)) }
         if certConflict { shown.append(.certConflict) }
         if let guide { shown.append(.guide(guide)) }
@@ -963,6 +983,7 @@ final class Engine {
         case .success:             successClosed = true
         case .liveContainerImport: liveContainerImportClosed = true
         case .appIDCost:             appIDCost = nil
+        case .pairingImportMismatch: answerPairingImportMismatch(false)
         case .link:                  pendingLink = nil
         }
     }
@@ -1490,7 +1511,9 @@ final class Engine {
         let tried = servers.count == 1
             ? L("the anisette server")
             : L("all %d anisette servers", servers.count)
-        throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, lastError))
+        let detail = (lastError == L("No anisette servers are configured."))
+            ? lastError : friendlyRustError(lastError)
+        throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, detail))
     }
 
     /// One sign-in attempt against a specific anisette server.
@@ -2249,6 +2272,22 @@ final class Engine {
         // 现在只记账不等待，直接进签名安装。
     }
 
+    /// Asks whether to replace the pairing file in use with one made for
+    /// another iPhone. Suspends until the user answers the popup.
+    @MainActor
+    private func confirmPairingImportMismatch(_ mismatch: PairingImportMismatch) async -> Bool {
+        pairingImportMismatch = mismatch
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { cont in
+                pairingImportMismatchReply = cont
+            }
+        } onCancel: {
+            // onCancel 是非隔离同步上下文：直接调 @MainActor 的 answer 只在 Swift 5 模式下
+            // 报警告、且不跳回主线程（真竞态，见 AGENTS.md L413 教训）。必须经 Task 跳过去。
+            Task { @MainActor in answerPairingImportMismatch(false) }
+        }
+    }
+
     private func performAppIDQuota(session: OpaquePointer, bundleID: String) throws -> AppIDCost {
         struct Quota: Decodable {
             let new_ids: [String]
@@ -2362,7 +2401,7 @@ final class Engine {
             if Self.isDeviceRegistrationError(msg) {
                 throw EngineError.deviceRegistration(udid: udid, raw: msg)
             }
-            throw EngineError.message(L("Signing failed: %@", msg))
+            throw EngineError.message(L("Signing failed: %@", friendlyRustError(msg)))
         }
     }
 
@@ -2541,7 +2580,8 @@ final class Engine {
         }
         let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
         error.map { si_string_free($0) }
-        throw EngineError.message(L("企业证书签名失败：%@", msg))
+        log("Enterprise cert sign FAILED: \(msg)")
+        throw EngineError.message(L("企业证书签名失败：%@", friendlyRustError(msg)))
     }
 
     /// 已签名页入口：解包一个已签好的 IPA 直接安装（不再签一次）。
@@ -2671,7 +2711,8 @@ final class Engine {
         }
         let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
         error.map { si_string_free($0) }
-        throw EngineError.message(L("IPA 解包失败：%@", msg))
+        log("Extract IPA FAILED: \(msg)")
+        throw EngineError.message(L("IPA 解包失败：%@", friendlyRustError(msg)))
     }
 
     /// True when the IPA at `ipaPath` is Madeira, whichever way it got here: the
@@ -3718,6 +3759,13 @@ final class Engine {
                               url.lastPathComponent)
                 log("⛔️ Pairing import: \(lastError ?? "")")
                 return
+            }
+            if let fileUDID = kind.udid, let currentUDID = deviceUDID, fileUDID != currentUDID {
+                let mismatch = PairingImportMismatch(fileUDID: fileUDID, deviceUDID: currentUDID)
+                guard await confirmPairingImportMismatch(mismatch) else {
+                    log("Pairing import: kept the current pairing file (UDID mismatch).")
+                    return
+                }
             }
             try data.write(to: PrivateStore.pairingFile, options: .atomic)
             // Drop the cached merged file; it was built from the old record.
@@ -5288,7 +5336,7 @@ extension Engine {
     /// Settings, the only one tried, it names that server and points to Auto,
     /// which would have tried the others.
     func anisetteSignInFailure(_ failures: AnisetteServer.SignInFailures) -> String {
-        let error = failures.shown?.error ?? L("No anisette servers are configured.")
+        let error = failures.shown.map { friendlyRustError($0.error) } ?? L("No anisette servers are configured.")
         guard anisetteAuto else {
             return L("Apple ID sign-in failed on %@. Error: %@", anisetteName(for: anisetteURL), error)
                 + " " + L("Only the server picked in Settings › Anisette Server was tried. Choose Auto there to let SideInstaller try the others when one fails.")
@@ -5299,7 +5347,7 @@ extension Engine {
         let servers = failures.skipped == 0
             ? L("all %d anisette servers", failures.tried)
             : L("%d anisette servers (%d skipped)", failures.tried, failures.skipped)
-        return L("Apple ID sign-in failed on %@. Error via %@: %@", servers, anisetteName(for: shown.server), shown.error)
+        return L("Apple ID sign-in failed on %@. Error via %@: %@", servers, anisetteName(for: shown.server), friendlyRustError(shown.error))
     }
 
     func deviceCrashLogs() async throws -> [DeviceCrashLog] {

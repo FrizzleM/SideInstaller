@@ -835,6 +835,7 @@ final class LocationManager: ObservableObject {
             } catch {
                 // Changing the stops or the mode cancels a plan on its way.
                 guard !Task.isCancelled else { return }
+                engine.log("Route plan failed: \(error)")
                 lastError = message(error)
             }
             isPlanningRoute = false
@@ -864,6 +865,9 @@ final class LocationManager: ObservableObject {
     }
 
     private func message(_ error: Error) -> String {
+        if error is DeviceConnection.FFIError {
+            return L("Couldn't reach this iPhone. Check the connection and try again.")
+        }
         if let engineError = error as? EngineError { return engineError.localizedDescription }
         return error.localizedDescription
     }

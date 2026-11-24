@@ -1460,6 +1460,28 @@ struct InstallPopup: View {
             guidePopup(Guides.liveContainerImport)
         case .appIDCost(let cost):
             appIDCostPopup(cost)
+        case .pairingImportMismatch(let mismatch):
+            PopupCard(title: L("Pairing file for another iPhone"), systemImage: "lock.iphone",
+                      tint: Theme.accent, onClose: close) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(L("This pairing file belongs to another iPhone (UDID %@). The iPhone connected now is %@.",
+                           mismatch.fileUDID, mismatch.deviceUDID))
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 12) {
+                        Button { engine.answerPairingImportMismatch(true) } label: {
+                            Text(L("Replace"))
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        Button(role: .cancel) { engine.answerPairingImportMismatch(false) } label: {
+                            Text(L("Cancel"))
+                                .font(.subheadline.weight(.medium))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    }
+                }
+            }
         case .link(let link):
             linkPopup(link)
         }

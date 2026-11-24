@@ -424,8 +424,6 @@ let vietnameseStrings: [String: String] = [
         "Lộ trình này quá dài cho máy chủ lộ trình. Hãy rút ngắn hoặc chia nhỏ nó.",
     "The route server is busy. Try again in a minute.":
         "Máy chủ lộ trình đang bận. Hãy thử lại sau một phút.",
-    "The route server couldn't plan this route (%@).":
-        "Máy chủ lộ trình không lập được lộ trình này (%@).",
 
     // MARK: - Entitlements tab
 
@@ -1361,15 +1359,11 @@ let vietnameseStrings: [String: String] = [
     "Folders can't be deleted": "Không thể xóa thư mục",
     // SIDE-36 (0.9.125): new keys.
     "Couldn't read this source": "Không đọc được nguồn này",
-    "Couldn't read the certificate list: %@": "Không đọc được danh sách chứng chỉ: %@",
     "Listing certificates failed: %@": "Liệt kê chứng chỉ thất bại: %@",
     "Revoke failed: %@": "Thu hồi thất bại: %@",
-    "Couldn't read what the import did: %@": "Không đọc được kết quả nhập: %@",
     "Couldn't parse p12 export result.": "Không phân tích được kết quả xuất p12.",
     "Export failed: %@": "Xuất thất bại: %@",
-    "Couldn't read the App ID list: %@": "Không đọc được danh sách App ID: %@",
     "Listing App IDs failed: %@": "Liệt kê App ID thất bại: %@",
-    "Couldn't read Apple's reply: %@": "Không đọc được phản hồi của Apple: %@",
     "Enabling entitlements failed: %@": "Bật quyền thất bại: %@",
     "Waiting for this install to finish…": "Đang chờ lần cài đặt này hoàn tất…",
     "This file is being installed. Wait until it finishes.": "Tệp này đang được cài đặt. Hãy chờ cho đến khi xong.",
@@ -1390,4 +1384,29 @@ let vietnameseStrings: [String: String] = [
     "the data couldn't be read": "Không thể đọc dữ liệu",
     "Couldn't reach this iPhone. Check the connection and try again.": "Không thể kết nối tới iPhone này. Kiểm tra kết nối rồi thử lại.",
     "the connection to this iPhone failed": "kết nối tới iPhone này đã thất bại.",
+
+    // MARK: - SIDE-43+44 (0.9.132)
+    "This Apple ID has no development team. Sign in at developer.apple.com once to create one, then try again.": "ID Apple này không có nhóm phát triển. Đăng nhập developer.apple.com một lần để tạo nhóm, rồi thử lại.",
+    "That certificate belongs to another Apple ID, or it was revoked.": "Chứng chỉ đó thuộc về một ID Apple khác, hoặc đã bị thu hồi.",
+    "That App ID is no longer on this team.": "ID ứng dụng đó không còn trong nhóm này.",
+    "That file isn't a certificate archive (.p12). Check the file and try again.": "Tệp đó không phải là tệp lưu trữ chứng chỉ (.p12). Kiểm tra lại tệp rồi thử lại.",
+    "There's no signing certificate on this Apple ID yet. Install an app first — that's what creates it.": "ID Apple này chưa có chứng chỉ ký. Hãy cài đặt một ứng dụng trước — quá trình cài đặt sẽ tạo chứng chỉ.",
+    "Check the network connection and try again.": "Kiểm tra kết nối mạng rồi thử lại.",
+    "Apple didn't accept the sign-in. Check the Apple ID and password, then try again.": "Apple không chấp nhận lần đăng nhập này. Kiểm tra ID Apple và mật khẩu rồi thử lại.",
+    "Sign-ins are being limited right now. Wait a few minutes and try again.": "Đăng nhập đang bị giới hạn. Đợi vài phút rồi thử lại.",
+    "Apple's service didn't answer. Try again in a bit.": "Dịch vụ của Apple không phản hồi. Thử lại sau một lát.",
+    "This iPhone is out of storage space. Free some space and try again.": "iPhone này đã hết dung lượng lưu trữ. Giải phóng dung lượng rồi thử lại.",
+    "A file this step needed is missing. Check the file library and try again.": "Thiếu một tệp cần cho bước này. Kiểm tra thư viện tệp rồi thử lại.",
+    "Something went wrong. Check the activity log and try again.": "Đã xảy ra lỗi. Kiểm tra nhật ký hoạt động rồi thử lại.",
+    "Couldn't read the certificate list.": "Không đọc được danh sách chứng chỉ.",
+    "Couldn't read what the import did.": "Không đọc được kết quả nhập.",
+    "Couldn't read the App ID list.": "Không đọc được danh sách ID ứng dụng.",
+    "Couldn't read Apple's reply.": "Không đọc được phản hồi của Apple.",
+    "瘦身改包解压失败。": "Giải nén để thu gọn gói không thành công.",
+    "瘦身改包压包失败。": "Nén để thu gọn gói không thành công.",
+    "Pairing file for another iPhone": "Tệp ghép nối của một iPhone khác",
+    "This pairing file belongs to another iPhone (UDID %@). The iPhone connected now is %@.": "Tệp ghép nối này thuộc về một iPhone khác (UDID %@). iPhone đang kết nối là %@.",
+    "The route server couldn't plan this route.": "Máy chủ tuyến đường không thể lập tuyến đường này.",
+    "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "iPhone của họ đã kết nối nhưng ngừng phản hồi trước khi yêu cầu mã. Hãy ghép nối lại.",
+    "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "Mã ghép nối chưa được nhập kịp thời. Hãy ghép nối lại và nhập mã ngay khi mã xuất hiện.",
 ]

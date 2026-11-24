@@ -369,6 +369,7 @@ final class EntitlementsManager: ObservableObject {
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
+            engine.log("Entitlements: sign-in failed: \(msg)")
             throw EngineError.message(msg)
         }
     }
@@ -386,14 +387,16 @@ final class EntitlementsManager: ObservableObject {
             do {
                 return try JSONDecoder().decode([AppIdentifier].self, from: Data(s.utf8))
             } catch {
-                // C-5：App ID 列表读失败的原串进 L()，给翻译表留位置；
-                // error 原文作 %@ 参数，不改写。
-                throw EngineError.message(L("Couldn't read the App ID list: %@", "\(error)"))
+                // C-5：App ID 列表读失败只显示友好文案，不嵌 error 原串；
+                // error 原文进活动日志，不进用户面。
+                engine.log("Entitlements: couldn't read the App ID list: \(error)")
+                throw EngineError.message(L("Couldn't read the App ID list."))
             }
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message(L("Listing App IDs failed: %@", msg))
+            engine.log("Entitlements: list failed: \(msg)")
+            throw EngineError.message(L("Listing App IDs failed: %@", friendlyRustError(msg)))
         }
     }
 
@@ -408,13 +411,15 @@ final class EntitlementsManager: ObservableObject {
             do {
                 return try JSONDecoder().decode([EntitlementOutcome].self, from: Data(s.utf8))
             } catch {
-                // C-5：同上。
-                throw EngineError.message(L("Couldn't read Apple's reply: %@", "\(error)"))
+                // C-5：同上——只显示友好文案，error 原文进活动日志。
+                engine.log("Entitlements: couldn't read Apple's reply: \(error)")
+                throw EngineError.message(L("Couldn't read Apple's reply."))
             }
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message(L("Enabling entitlements failed: %@", msg))
+            engine.log("Entitlements: enable failed: \(msg)")
+            throw EngineError.message(L("Enabling entitlements failed: %@", friendlyRustError(msg)))
         }
     }
 

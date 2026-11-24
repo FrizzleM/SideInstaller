@@ -495,7 +495,9 @@ final class CertManager: ObservableObject {
         let tried = servers.count == 1
             ? L("the anisette server")
             : L("all %d anisette servers", servers.count)
-        throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, lastError))
+        let detail = (lastError == L("No anisette servers are configured."))
+            ? lastError : friendlyRustError(lastError)
+        throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, detail))
     }
 
     /// One sign-in attempt against a specific anisette server.
@@ -517,6 +519,7 @@ final class CertManager: ObservableObject {
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
+            engine.log("Certificates: sign-in failed: \(msg)")
             throw EngineError.message(msg)
         }
     }
@@ -534,14 +537,16 @@ final class CertManager: ObservableObject {
             do {
                 return try JSONDecoder().decode([DevCert].self, from: Data(s.utf8))
             } catch {
-                // C-5：证书列表读失败的原串进 L()，给翻译表留位置；
-                // error 原文作 %@ 参数，不改写。
-                throw EngineError.message(L("Couldn't read the certificate list: %@", "\(error)"))
+                // C-5：证书列表读失败只显示友好文案，不嵌 error 原串；
+                // error 原文进活动日志，不进用户面。
+                engine.log("Certificates: couldn't read the certificate list: \(error)")
+                throw EngineError.message(L("Couldn't read the certificate list."))
             }
         } else {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message(L("Listing certificates failed: %@", msg))
+            engine.log("Certificates: list failed: \(msg)")
+            throw EngineError.message(L("Listing certificates failed: %@", friendlyRustError(msg)))
         }
     }
 
@@ -552,7 +557,8 @@ final class CertManager: ObservableObject {
         if rc != 0 {
             let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
             error.map { si_string_free($0) }
-            throw EngineError.message(L("Revoke failed: %@", msg))
+            engine.log("Certificates: revoke failed: \(msg)")
+            throw EngineError.message(L("Revoke failed: %@", friendlyRustError(msg)))
         }
     }
 
@@ -576,15 +582,16 @@ final class CertManager: ObservableObject {
             do {
                 return try JSONDecoder().decode(CertImportResult.self, from: Data(s.utf8))
             } catch {
-                // C-5：同上。
-                throw EngineError.message(L("Couldn't read what the import did: %@", "\(error)"))
+                // C-5：同上——只显示友好文案，error 原文进活动日志。
+                engine.log("Certificates: couldn't read the import result: \(error)")
+                throw EngineError.message(L("Couldn't read what the import did."))
             }
         }
         let msg = error.map { String(cString: $0) } ?? "rc=\(rc)"
         error.map { si_string_free($0) }
         engine.log("Certificate import: \(msg)")
         if rc == Self.importNotOnTeam { throw ImportNotOnTeam() }
-        throw EngineError.message(L("Couldn't use that certificate: %@", msg))
+        throw EngineError.message(L("Couldn't use that certificate: %@", friendlyRustError(msg)))
     }
 
     /// Makes sure there is a live Apple sign-in session, signing in first
@@ -631,7 +638,8 @@ final class CertManager: ObservableObject {
         } else {
             let msg = outError.map { String(cString: $0) } ?? "rc=\(rc)"
             outError.map { si_string_free($0) }
-            throw EngineError.message(L("Export failed: %@", msg))
+            engine.log("Certificates: export failed: \(msg)")
+            throw EngineError.message(L("Export failed: %@", friendlyRustError(msg)))
         }
     }
 

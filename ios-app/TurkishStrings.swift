@@ -387,7 +387,6 @@ let turkishStrings: [String: String] = [
     "That route is too long for the route server. Make it shorter, or split it up.":
         "Bu rota rota sunucusu için çok uzun. Kısalt veya böl.",
     "The route server is busy. Try again in a minute.": "Rota sunucusu meşgul. Bir dakika sonra yeniden dene.",
-    "The route server couldn't plan this route (%@).": "Rota sunucusu bu rotayı planlayamadı (%@).",
 
     // MARK: - Entitlements tab
 
@@ -1279,15 +1278,11 @@ let turkishStrings: [String: String] = [
     "Folders can't be deleted": "Klasörler silinemez",
     // SIDE-36 (0.9.125): new keys.
     "Couldn't read this source": "Bu kaynak okunamadı",
-    "Couldn't read the certificate list: %@": "Sertifika listesi okunamadı: %@",
     "Listing certificates failed: %@": "Sertifikalar listelenemedi: %@",
     "Revoke failed: %@": "İptal başarısız oldu: %@",
-    "Couldn't read what the import did: %@": "İçe aktarma sonucu okunamadı: %@",
     "Couldn't parse p12 export result.": "p12 dışa aktarma sonucu ayrıştırılamadı.",
     "Export failed: %@": "Dışa aktarma başarısız oldu: %@",
-    "Couldn't read the App ID list: %@": "App ID listesi okunamadı: %@",
     "Listing App IDs failed: %@": "App ID'leri listelenemedi: %@",
-    "Couldn't read Apple's reply: %@": "Apple'ın yanıtı okunamadı: %@",
     "Enabling entitlements failed: %@": "Yetkiler etkinleştirilemedi: %@",
     "Waiting for this install to finish…": "Bu yüklemenin bitmesi bekleniyor…",
     "This file is being installed. Wait until it finishes.": "Bu dosya yükleniyor. Bitene kadar bekleyin.",
@@ -1308,4 +1303,29 @@ let turkishStrings: [String: String] = [
     "the data couldn't be read": "Veriler okunamadı",
     "Couldn't reach this iPhone. Check the connection and try again.": "Bu iPhone'a ulaşılamıyor. Bağlantıyı kontrol edip yeniden deneyin.",
     "the connection to this iPhone failed": "bu iPhone'a bağlantı kurulamadı.",
+
+    // MARK: - SIDE-43+44 (0.9.132)
+    "This Apple ID has no development team. Sign in at developer.apple.com once to create one, then try again.": "Bu Apple Kimliğinin geliştirme ekibi yok. Bir ekip oluşturmak için developer.apple.com adresine bir kez giriş yapın, sonra yeniden deneyin.",
+    "That certificate belongs to another Apple ID, or it was revoked.": "Bu sertifika başka bir Apple Kimliğine ait veya iptal edilmiş.",
+    "That App ID is no longer on this team.": "Bu App ID artık bu ekipte değil.",
+    "That file isn't a certificate archive (.p12). Check the file and try again.": "Bu dosya bir sertifika arşivi (.p12) değil. Dosyayı denetleyip yeniden deneyin.",
+    "There's no signing certificate on this Apple ID yet. Install an app first — that's what creates it.": "Bu Apple Kimliğinde henüz bir imzalama sertifikası yok. Önce bir uygulama yükleyin — sertifika yükleme sırasında oluşturulur.",
+    "Check the network connection and try again.": "Ağ bağlantısını denetleyip yeniden deneyin.",
+    "Apple didn't accept the sign-in. Check the Apple ID and password, then try again.": "Apple oturum açmayı kabul etmedi. Apple Kimliğini ve parolayı denetleyip yeniden deneyin.",
+    "Sign-ins are being limited right now. Wait a few minutes and try again.": "Oturum açmalar şu anda sınırlandırılıyor. Birkaç dakika bekleyip yeniden deneyin.",
+    "Apple's service didn't answer. Try again in a bit.": "Apple hizmeti yanıt vermedi. Biraz sonra yeniden deneyin.",
+    "This iPhone is out of storage space. Free some space and try again.": "Bu iPhone'da depolama alanı kalmadı. Yer açıp yeniden deneyin.",
+    "A file this step needed is missing. Check the file library and try again.": "Bu adım için gereken bir dosya bulunamadı. Dosya kitaplığını denetleyip yeniden deneyin.",
+    "Something went wrong. Check the activity log and try again.": "Bir şeyler ters gitti. Etkinlik günlüğünü denetleyip yeniden deneyin.",
+    "Couldn't read the certificate list.": "Sertifika listesi okunamadı.",
+    "Couldn't read what the import did.": "İçe aktarma sonucu okunamadı.",
+    "Couldn't read the App ID list.": "App ID listesi okunamadı.",
+    "Couldn't read Apple's reply.": "Apple yanıtı okunamadı.",
+    "瘦身改包解压失败。": "Paketi hafifletmek için açma başarısız oldu.",
+    "瘦身改包压包失败。": "Paketi hafifletmek için sıkıştırma başarısız oldu.",
+    "Pairing file for another iPhone": "Başka bir iPhone'un eşleştirme dosyası",
+    "This pairing file belongs to another iPhone (UDID %@). The iPhone connected now is %@.": "Bu eşleştirme dosyası başka bir iPhone'a aittir (UDID %@). Şu anda bağlı olan iPhone %@.",
+    "The route server couldn't plan this route.": "Rota sunucusu bu rotayı planlayamadı.",
+    "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "Karşı tarafın iPhone'u bağlandı ama kod istemeden yanıt vermeyi kesti. Yeniden eşleştirmeyi deneyin.",
+    "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "Eşleştirme kodu zamanında girilmedi. Yeniden eşleştirin ve kod göründüğünde girin.",
 ]

@@ -413,7 +413,6 @@ let koreanStrings: [String: String] = [
     "That route is too long for the route server. Make it shorter, or split it up.":
         "경로 서버에서 처리하기에 경로가 너무 깁니다. 경로를 줄이거나 나누어 주세요.",
     "The route server is busy. Try again in a minute.": "경로 서버가 바쁩니다. 잠시 후 다시 시도하세요.",
-    "The route server couldn't plan this route (%@).": "경로 서버가 이 경로를 계획하지 못했습니다(%@).",
 
     // MARK: - Entitlements tab
 
@@ -1332,15 +1331,11 @@ let koreanStrings: [String: String] = [
     "Folders can't be deleted": "폴더는 삭제할 수 없습니다",
     // SIDE-36 (0.9.125): new keys.
     "Couldn't read this source": "이 소스를 읽지 못했습니다",
-    "Couldn't read the certificate list: %@": "인증서 목록을 읽지 못했습니다: %@",
     "Listing certificates failed: %@": "인증서 목록을 가져오지 못했습니다: %@",
     "Revoke failed: %@": "해지에 실패했습니다: %@",
-    "Couldn't read what the import did: %@": "가져오기 결과를 읽지 못했습니다: %@",
     "Couldn't parse p12 export result.": "p12 내보내기 결과를 분석하지 못했습니다.",
     "Export failed: %@": "내보내기에 실패했습니다: %@",
-    "Couldn't read the App ID list: %@": "App ID 목록을 읽지 못했습니다: %@",
     "Listing App IDs failed: %@": "App ID 목록을 가져오지 못했습니다: %@",
-    "Couldn't read Apple's reply: %@": "Apple의 응답을 읽지 못했습니다: %@",
     "Enabling entitlements failed: %@": "권한을 활성화하지 못했습니다: %@",
     "Waiting for this install to finish…": "이번 설치가 끝나기를 기다리는 중…",
     "This file is being installed. Wait until it finishes.": "이 파일은 설치 중입니다. 끝날 때까지 기다리세요.",
@@ -1361,4 +1356,29 @@ let koreanStrings: [String: String] = [
     "the data couldn't be read": "데이터를 읽을 수 없습니다",
     "Couldn't reach this iPhone. Check the connection and try again.": "이 iPhone에 연결할 수 없습니다. 연결을 확인한 후 다시 시도하세요.",
     "the connection to this iPhone failed": "이 iPhone에 대한 연결에 실패했습니다.",
+
+    // MARK: - SIDE-43+44 (0.9.132)
+    "This Apple ID has no development team. Sign in at developer.apple.com once to create one, then try again.": "이 Apple ID에는 개발 팀이 없습니다. developer.apple.com에 한 번 로그인하여 팀을 만든 뒤 다시 시도하세요.",
+    "That certificate belongs to another Apple ID, or it was revoked.": "해당 인증서는 다른 Apple ID의 것이거나 해지되었습니다.",
+    "That App ID is no longer on this team.": "해당 App ID는 이 팀에 더 이상 없습니다.",
+    "That file isn't a certificate archive (.p12). Check the file and try again.": "해당 파일은 인증서 보관 파일(.p12)이 아닙니다. 파일을 확인한 뒤 다시 시도하세요.",
+    "There's no signing certificate on this Apple ID yet. Install an app first — that's what creates it.": "이 Apple ID에는 아직 서명 인증서가 없습니다. 먼저 앱을 설치하세요. 설치할 때 인증서가 만들어집니다.",
+    "Check the network connection and try again.": "네트워크 연결을 확인한 뒤 다시 시도하세요.",
+    "Apple didn't accept the sign-in. Check the Apple ID and password, then try again.": "Apple에서 로그인을 수락하지 않았습니다. Apple ID와 암호를 확인한 뒤 다시 시도하세요.",
+    "Sign-ins are being limited right now. Wait a few minutes and try again.": "현재 로그인이 제한되고 있습니다. 몇 분 기다린 뒤 다시 시도하세요.",
+    "Apple's service didn't answer. Try again in a bit.": "Apple 서비스가 응답하지 않았습니다. 잠시 뒤 다시 시도하세요.",
+    "This iPhone is out of storage space. Free some space and try again.": "이 iPhone의 저장 공간이 부족합니다. 공간을 확보한 뒤 다시 시도하세요.",
+    "A file this step needed is missing. Check the file library and try again.": "이 단계에 필요한 파일을 찾을 수 없습니다. 파일 보관함을 확인한 뒤 다시 시도하세요.",
+    "Something went wrong. Check the activity log and try again.": "문제가 발생했습니다. 활동 로그를 확인한 뒤 다시 시도하세요.",
+    "Couldn't read the certificate list.": "인증서 목록을 읽을 수 없습니다.",
+    "Couldn't read what the import did.": "가져오기 결과를 읽을 수 없습니다.",
+    "Couldn't read the App ID list.": "App ID 목록을 읽을 수 없습니다.",
+    "Couldn't read Apple's reply.": "Apple의 응답을 읽을 수 없습니다.",
+    "瘦身改包解压失败。": "슬림화를 위한 압축 해제에 실패했습니다.",
+    "瘦身改包压包失败。": "슬림화를 위한 압축에 실패했습니다.",
+    "Pairing file for another iPhone": "다른 iPhone의 페어링 파일",
+    "This pairing file belongs to another iPhone (UDID %@). The iPhone connected now is %@.": "이 페어링 파일은 다른 iPhone의 것입니다(UDID %@). 현재 연결된 iPhone은 %@입니다.",
+    "The route server couldn't plan this route.": "경로 서버가 이 경로를 계획하지 못했습니다.",
+    "Their iPhone connected but stopped responding before asking for a code. Try pairing again.": "상대방 iPhone은 연결되었지만 코드를 요청하기 전에 응답을 멈췄습니다. 다시 페어링하세요.",
+    "The pairing code wasn't entered in time. Pair again and enter the code when it appears.": "페어링 코드가 제시간에 입력되지 않았습니다. 다시 페어링하고 코드가 나타나면 입력하세요.",
 ]

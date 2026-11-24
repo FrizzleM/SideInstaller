@@ -1696,7 +1696,8 @@ enum CertSigner {
         let work = tmp.appendingPathComponent("slim", isDirectory: true)
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
         if let error = FileZipTool.unzip(archive: ipa, to: work) {
-            throw EngineError.message(L("瘦身改包解压失败：%@", error))
+            LogStore.shared.append("瘦身改包解压失败：\(error)")
+            throw EngineError.message(L("瘦身改包解压失败。"))
         }
         let payload = work.appendingPathComponent("Payload", isDirectory: true)
         let apps = (try? fm.contentsOfDirectory(at: payload, includingPropertiesForKeys: nil))
@@ -1755,7 +1756,8 @@ enum CertSigner {
         for url in junk { try? fm.removeItem(at: url) }
         let out = tmp.appendingPathComponent("slimmed.ipa")
         if let error = FileZipTool.zip(paths: [payload], to: out) {
-            throw EngineError.message(L("瘦身改包压包失败：%@", error))
+            LogStore.shared.append("瘦身改包压包失败：\(error)")
+            throw EngineError.message(L("瘦身改包压包失败。"))
         }
         return out
     }
@@ -1813,7 +1815,8 @@ enum CertSigner {
                 // C22-3：签名失败也留 `_extracted`——清掉再往上抛。
                 // 用 signIPA.path：瘦身开关开着时解的是 slimmed.ipa。
                 Engine.discardExtraction(forIPA: signIPA.path)
-                throw EngineError.message(L("企业证书签名失败：%@", msg))
+                LogStore.shared.append("企业证书签名失败：\(msg)")
+                throw EngineError.message(L("企业证书签名失败：%@", friendlyRustError(msg)))
             }
             signed.map { si_string_free($0) }
             let info = IPALibrary.appInfo(at: signIPA)
