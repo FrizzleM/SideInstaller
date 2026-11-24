@@ -457,6 +457,8 @@ let vietnameseStrings: [String: String] = [
         "Đang có một lượt cài đặt chạy. Hãy đợi xong rồi gia hạn.",
     "A refresh is already running. Wait for it to finish, then try again.":
         "Đã có một lần gia hạn đang chạy. Hãy đợi nó hoàn tất rồi thử lại.",
+    "A signing is already running. Wait for it to finish, then try again.":
+        "Đang ký rồi. Hãy đợi ký xong rồi thử lại.",
     "Still reading the device. Try again in a moment.":
         "Vẫn đang đọc thiết bị. Hãy thử lại sau giây lát.",
     "Load failed. Showing the last loaded list.":

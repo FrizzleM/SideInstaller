@@ -445,6 +445,8 @@ let japaneseStrings: [String: String] = [
         "インストールがすでに実行中です。終わるまで待ってから更新してください。",
     "A refresh is already running. Wait for it to finish, then try again.":
         "更新がすでに実行中です。完了するまで待ってから、もう一度お試しください。",
+    "A signing is already running. Wait for it to finish, then try again.":
+        "署名がすでに実行中です。終わるまで待ってから、もう一度お試しください。",
     "Still reading the device. Try again in a moment.":
         "デバイスを読み取り中です。しばらくしてからもう一度お試しください。",
     "Load failed. Showing the last loaded list.":

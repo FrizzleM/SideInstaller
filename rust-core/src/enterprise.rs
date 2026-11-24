@@ -280,6 +280,18 @@ fn sign_with_cert(
     )
 }
 
+// B-50-B1: the extraction dir lives past Application::new (the signed
+// bundle is zipped from it), so a failure here must remove it —
+// Swift can no longer derive it from the IPA name.
+fn remove_extraction_dir(bundle_dir: &std::path::Path) {
+    let extraction = bundle_dir.parent().and_then(|p| p.parent());
+    let Some(extraction) = extraction else { return };
+    let name = extraction.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    if !name.ends_with("_extracted") { return; }
+    if extraction.parent() != Some(std::env::temp_dir().as_path()) { return; }
+    let _ = std::fs::remove_dir_all(extraction);
+}
+
 fn sign_with_cert_mods(
     ipa_path: &str,
     cert_der_path: &str,
@@ -345,18 +357,27 @@ fn sign_with_cert_mods(
     };
 
     let mut app = Application::new(PathBuf::from(ipa_path)).map_err(|e| report_text(&e))?;
-    apply_mods(&mut app, mods)?;
-    if !mods.plugins.is_empty() {
-        inject_plugins(&app, &mods.plugins)?;
-    }
-    sign::sign(&mut app, &identity, &profile, &None, &team).map_err(|e| report_text(&e))?;
-    if let Some(out_ipa) = &mods.out_ipa {
-        if let Some(parent) = PathBuf::from(out_ipa).parent() {
-            let _ = std::fs::create_dir_all(parent);
+    let result: Result<String, String> = (|| {
+        apply_mods(&mut app, mods)?;
+        if !mods.plugins.is_empty() {
+            inject_plugins(&app, &mods.plugins)?;
         }
-        zip_bundle(&app.bundle.bundle_dir, out_ipa)?;
+        sign::sign(&mut app, &identity, &profile, &None, &team).map_err(|e| report_text(&e))?;
+        if let Some(out_ipa) = &mods.out_ipa {
+            if let Some(parent) = PathBuf::from(out_ipa).parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            zip_bundle(&app.bundle.bundle_dir, out_ipa)?;
+        }
+        Ok(app.bundle.bundle_dir.to_string_lossy().to_string())
+    })();
+    match result {
+        Ok(path) => Ok(path),
+        Err(e) => {
+            remove_extraction_dir(&app.bundle.bundle_dir);
+            Err(e)
+        }
     }
-    Ok(app.bundle.bundle_dir.to_string_lossy().to_string())
 }
 
 /// Extract an .ipa and return its .app bundle directory (in the

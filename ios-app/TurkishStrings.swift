@@ -420,6 +420,8 @@ let turkishStrings: [String: String] = [
         "Bir yükleme zaten sürüyor. Bitmesini bekle, sonra yenile.",
     "A refresh is already running. Wait for it to finish, then try again.":
         "Bir yenileme zaten çalışıyor. Bitmesini bekleyip yeniden deneyin.",
+    "A signing is already running. Wait for it to finish, then try again.":
+        "İmzalama zaten devam ediyor. Bitmesini bekleyip tekrar deneyin.",
     "Still reading the device. Try again in a moment.":
         "Cihaz hâlâ okunuyor. Birazdan yeniden deneyin.",
     "Load failed. Showing the last loaded list.":

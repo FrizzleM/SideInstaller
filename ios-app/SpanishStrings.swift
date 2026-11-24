@@ -459,6 +459,8 @@ let spanishStrings: [String: String] = [
         "Ya hay una instalación en curso. Espera a que termine y renueva después.",
     "A refresh is already running. Wait for it to finish, then try again.":
         "Ya hay una renovación en curso. Espera a que termine y vuelve a intentarlo.",
+    "A signing is already running. Wait for it to finish, then try again.":
+        "Ya hay una firma en curso. Espera a que termine y vuelve a intentarlo.",
     "Still reading the device. Try again in a moment.":
         "Todavía estoy leyendo el dispositivo. Vuelve a intentarlo en un momento.",
     "Load failed. Showing the last loaded list.":

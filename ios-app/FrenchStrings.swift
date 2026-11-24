@@ -461,6 +461,8 @@ let frenchStrings: [String: String] = [
         "Une installation est déjà en cours. Attendez qu'elle se termine, puis renouvelez.",
     "A refresh is already running. Wait for it to finish, then try again.":
         "Un renouvellement est déjà en cours. Attendez qu'il se termine, puis réessayez.",
+    "A signing is already running. Wait for it to finish, then try again.":
+        "Une signature est déjà en cours. Attendez qu'elle se termine, puis réessayez.",
     "Still reading the device. Try again in a moment.":
         "Lecture de l'appareil toujours en cours. Réessayez dans un instant.",
     "Load failed. Showing the last loaded list.":

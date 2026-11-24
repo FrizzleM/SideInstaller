@@ -445,6 +445,8 @@ let chineseStrings: [String: String] = [
         "已有安装正在进行。请等它完成后再续签。",
     "A refresh is already running. Wait for it to finish, then try again.":
         "续签正在进行，等它跑完再试。",
+    "A signing is already running. Wait for it to finish, then try again.":
+        "正在签名，等它跑完再试。",
     "Still reading the device. Try again in a moment.":
         "正在读取设备，稍后再试。",
     "Load failed. Showing the last loaded list.":

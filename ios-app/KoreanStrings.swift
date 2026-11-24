@@ -446,6 +446,8 @@ let koreanStrings: [String: String] = [
         "이미 설치가 진행 중입니다. 끝날 때까지 기다린 뒤 다시 갱신하세요.",
     "A refresh is already running. Wait for it to finish, then try again.":
         "갱신이 이미 진행 중입니다. 완료될 때까지 기다렸다가 다시 시도하세요.",
+    "A signing is already running. Wait for it to finish, then try again.":
+        "서명이 이미 진행 중입니다. 완료될 때까지 기다렸다가 다시 시도하세요.",
     "Still reading the device. Try again in a moment.":
         "기기를 아직 읽는 중입니다. 잠시 후 다시 시도하세요.",
     "Load failed. Showing the last loaded list.":

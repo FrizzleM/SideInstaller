@@ -1812,11 +1812,17 @@ enum CertSigner {
                 if !outExistedBefore {
                     try? fm.removeItem(at: outURL)
                 }
-                // C22-3：签名失败也留 `_extracted`——清掉再往上抛。
+                // C22-3：签名失败的解包目录由 Rust 自清；这里只扫 24 小时以上的陈旧目录。
                 // 用 signIPA.path：瘦身开关开着时解的是 slimmed.ipa。
                 Engine.discardExtraction(forIPA: signIPA.path)
                 LogStore.shared.append("企业证书签名失败：\(msg)")
                 throw EngineError.message(L("企业证书签名失败：%@", friendlyRustError(msg)))
+            }
+            // B-50-B1: the signed IPA is already zipped to outURL; the extraction
+            // dir is dead weight now. (It used to be reused by the next same-name
+            // signing — with unique dirs it would accumulate one per signing.)
+            if let signedPath = signed.map({ String(cString: $0) }) {
+                Engine.discardSignedBundle(at: signedPath)
             }
             signed.map { si_string_free($0) }
             let info = IPALibrary.appInfo(at: signIPA)

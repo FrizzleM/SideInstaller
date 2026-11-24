@@ -108,7 +108,11 @@ final class PairingController {
             case .zeroBytes:
                 return L("Pairing produced an empty file. Make sure you approved the pairing request, then try again.")
             case let .failed(message):
-                return message
+                // C-49-1: Rust's own words go through the mapper — the pairing
+                // page and the install pipelines show this description verbatim.
+                // The raw text stays in the log (finish() logs `message`, and
+                // runOneClick logs String(describing:)).
+                return friendlyRustError(message)
             }
         }
     }

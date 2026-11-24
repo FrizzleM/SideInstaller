@@ -2051,12 +2051,22 @@ enum IPALibrary {
         try copy(url, to: staged)
         guard looksLikeIPA(staged) else { throw ImportError.notAnIPA }
 
-        // One import at a time, so "the custom IPA" stays unambiguous.
-        try? fm.removeItem(at: customDir)
+        // B-50-B2: only the previous import goes. Custom/ also holds other
+        // renewal-source IPAs and user files (installable() treats every
+        // .ipa in here as a renewal source) — wiping the whole dir deleted
+        // them with no log and no warning.
+        if let old = customImport() {
+            try? fm.removeItem(at: old.url)
+        }
         try fm.createDirectory(at: customDir, withIntermediateDirectories: true)
         let dest = customDir.appendingPathComponent(name).appendingPathExtension("ipa")
         // Same volume as the staging dir, so this is a rename, not a second copy.
         try fm.moveItem(at: staged, to: dest)
+        // B-50-B2: say so when other files stay behind.
+        let remaining = (try? fm.contentsOfDirectory(atPath: customDir.path)) ?? []
+        if remaining.count > 1 {
+            Engine.shared.log("Custom import replaced; kept \(remaining.count - 1) other file(s) in Custom/.")
+        }
         return dest
     }
 

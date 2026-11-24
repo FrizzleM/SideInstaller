@@ -864,8 +864,8 @@ final class Engine {
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
-            // C20：签好的包解在 tmp/<名>_extracted，收尾删掉它再置 nil；
-            // 删失败静默（helper 内 try?），下次重装同名目录会先清旧的。
+            // C20：签好的包解在 tmp/<名>_<uuid>_extracted，收尾删掉它再置 nil；
+            // 删失败静默（helper 内 try?）；目录名带唯一 UUID，下次签同名也不会复用它。
             if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
             signedAppPath = nil
             // B2：收尾注销配对窗口期的源路径登记（与起跑登记配对）。
@@ -2046,6 +2046,15 @@ final class Engine {
             Self.discardInboxCopy(url)
             return false
         }
+        // B-50-B3: the import would delete the current custom import —
+        // refuse while it's being signed (batch signing re-extracts it
+        // per file, so the whole rest of the batch would fail).
+        if let old = IPALibrary.customImport(), isSigningSource(path: old.url.path) {
+            lastError = L("A signing is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            Self.discardInboxCopy(url)
+            return false
+        }
         isImportingIPA = true
         // Delete the picker's temporary copy once the import is done.
         defer { isImportingIPA = false; Self.discardInboxCopy(url) }
@@ -2095,6 +2104,13 @@ final class Engine {
         }
         guard !isImportingIPA else {
             lastError = L("An import is already running. Wait for it to finish, then try again.")
+            log("⛔️ Import: \(lastError ?? "")")
+            return false
+        }
+        // B-50-B3: same as from: — check before downloading, so a refused
+        // import doesn't waste a download.
+        if let old = IPALibrary.customImport(), isSigningSource(path: old.url.path) {
+            lastError = L("A signing is already running. Wait for it to finish, then try again.")
             log("⛔️ Import: \(lastError ?? "")")
             return false
         }
@@ -2338,7 +2354,7 @@ final class Engine {
             signedDisplayName = signedAppName()
             setStep(.sign, .done)
         } catch {
-            // A21-2：签名失败也留 `_extracted`——清掉再往上抛。
+            // A21-2：签名失败的解包目录由 Rust 自清；这里只扫 24 小时以上的陈旧目录。
             Self.discardExtraction(forIPA: ipa)
             // User-fixable failures get an explanatory card. A certificate that
             // already exists offers revoke-and-retry, never revoked automatically.
@@ -2518,8 +2534,8 @@ final class Engine {
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
-            // C20：签好的包解在 tmp/<名>_extracted，收尾删掉它再置 nil；
-            // 删失败静默（helper 内 try?），下次重装同名目录会先清旧的。
+            // C20：签好的包解在 tmp/<名>_<uuid>_extracted，收尾删掉它再置 nil；
+            // 删失败静默（helper 内 try?）；目录名带唯一 UUID，下次签同名也不会复用它。
             if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
             signedAppPath = nil
             // B2：收尾注销配对窗口期的源路径登记（与起跑登记配对）。
@@ -2537,7 +2553,7 @@ final class Engine {
         do {
             path = try await onSignQueue { try self.performCertSign(ipa: ipa, mods: mods) }
         } catch {
-            // A21-2：企业签名失败也留 `_extracted`——清掉再往上抛。
+            // A21-2：企业签名失败的解包目录由 Rust 自清；这里只扫 24 小时以上的陈旧目录。
             Self.discardExtraction(forIPA: ipa)
             throw error
         }
@@ -2652,7 +2668,7 @@ final class Engine {
                 do {
                     bundle = try await onSignQueue { try self.performExtract(ipa: ipaURL.path) }
                 } catch {
-                    // A21-2：解包失败也留 `_extracted`——清掉再往上抛。
+                    // A21-2：解包失败的解包目录由 Rust 自清；这里只扫 24 小时以上的陈旧目录。
                     Self.discardExtraction(forIPA: ipaURL.path)
                     throw error
                 }
@@ -2687,8 +2703,8 @@ final class Engine {
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
             stopBackgroundWork()
-            // C20：签好的包解在 tmp/<名>_extracted，收尾删掉它再置 nil；
-            // 删失败静默（helper 内 try?），下次重装同名目录会先清旧的。
+            // C20：签好的包解在 tmp/<名>_<uuid>_extracted，收尾删掉它再置 nil；
+            // 删失败静默（helper 内 try?）；目录名带唯一 UUID，下次签同名也不会复用它。
             if let signed = signedAppPath { Self.discardSignedBundle(at: signed) }
             signedAppPath = nil
             // B2：收尾注销配对窗口期的源路径登记（与起跑登记配对）。
@@ -4195,8 +4211,8 @@ final class Engine {
         log("=== Refreshing \(name) from \((ipaPath as NSString).lastPathComponent) ===")
         let path = pairingFilePath ?? PairingController.pairingFilePath()
         // A21-2：defer 登记在 performSign 之前——签名失败时 defer 已登记、
-        // signedPath 仍是 nil 不删；成功时才删。失败的解包目录另由 catch
-        // 里的 discardExtraction(forIPA:) 清（此时还没有 bundle 路径）。
+        // signedPath 仍是 nil 不删；成功时才删。失败的解包目录由 Rust 自清；
+        // catch 里的 discardExtraction(forIPA:) 只扫 24 小时以上的陈旧目录（此时还没有 bundle 路径）。
         var signedPath: String?
         defer { if let signedPath { Self.discardSignedBundle(at: signedPath) } }
         let signed: String
@@ -4246,18 +4262,28 @@ final class Engine {
         try? FileManager.default.removeItem(at: extraction)
     }
 
-    /// Deletes the `_extracted` directory a signing attempt would have left
-    /// for `ipaPath`, even when signing failed before returning a bundle
-    /// path. Same naming as Rust `Application::new`: tmp/<ipa file name>_extracted.
-    /// No-op when nothing was extracted (or the path escapes tmp).
+    /// Removes extraction dirs a signing attempt left behind, but only
+    /// stale ones: a signing never lives 24 hours, so anything older
+    /// cannot belong to a live signing. Fresh dirs are left alone —
+    /// with unique names (B-50-B1) Swift can no longer tell which fresh
+    /// dir belongs to the failed attempt, and deleting it could kill a
+    /// concurrent live signing of the same-named IPA.
     static func discardExtraction(forIPA ipaPath: String) {
         let temp = URL(fileURLWithPath: NSTemporaryDirectory()).standardizedFileURL
         let name = URL(fileURLWithPath: ipaPath).lastPathComponent
         guard !name.isEmpty else { return }
-        let extraction = temp.appendingPathComponent(name + "_extracted").standardizedFileURL
-        guard extraction.deletingLastPathComponent().path == temp.path,
-              extraction.lastPathComponent.hasSuffix("_extracted") else { return }
-        try? FileManager.default.removeItem(at: extraction)
+        let fm = FileManager.default
+        let entries = (try? fm.contentsOfDirectory(
+            at: temp, includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey])) ?? []
+        for entry in entries {
+            guard entry.lastPathComponent.hasPrefix(name + "_"),
+                  entry.lastPathComponent.hasSuffix("_extracted") else { continue }
+            guard let values = try? entry.resourceValues(forKeys: [.isDirectoryKey, .contentModificationDateKey]),
+                  values.isDirectory == true,
+                  let mtime = values.contentModificationDate,
+                  Date().timeIntervalSince(mtime) > 24 * 3600 else { continue }
+            try? fm.removeItem(at: entry)
+        }
     }
 
     // MARK: - Location tab

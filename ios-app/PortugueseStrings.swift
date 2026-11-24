@@ -458,6 +458,8 @@ let portugueseStrings: [String: String] = [
         "Já tem uma instalação em andamento. Espere ela terminar e renove depois.",
     "A refresh is already running. Wait for it to finish, then try again.":
         "Uma renovação já está em andamento. Aguarde a conclusão e tente novamente.",
+    "A signing is already running. Wait for it to finish, then try again.":
+        "Uma assinatura já está em andamento. Aguarde a conclusão e tente novamente.",
     "Still reading the device. Try again in a moment.":
         "Ainda lendo o dispositivo. Tente novamente em instantes.",
     "Load failed. Showing the last loaded list.":

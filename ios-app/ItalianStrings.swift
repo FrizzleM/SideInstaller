@@ -456,6 +456,8 @@ let italianStrings: [String: String] = [
         "C'è già un'installazione in corso. Aspetta che finisca, poi rinnova.",
     "A refresh is already running. Wait for it to finish, then try again.":
         "Un rinnovo è già in corso. Attendi che finisca, poi riprova.",
+    "A signing is already running. Wait for it to finish, then try again.":
+        "Una firma è già in corso. Attendi che finisca, poi riprova.",
     "Still reading the device. Try again in a moment.":
         "Lettura del dispositivo ancora in corso. Riprova tra un momento.",
     "Load failed. Showing the last loaded list.":
