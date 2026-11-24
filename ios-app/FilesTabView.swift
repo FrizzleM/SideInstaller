@@ -2402,7 +2402,7 @@ struct FilesTabView: View {
                         } label: {
                             Text(L("签名选中（%d）", selectedUnsignedIDs.count)).font(.footnote)
                         }
-                        .disabled(selectedUnsignedIDs.isEmpty || workspace.batchBusy)
+                        .disabled(selectedUnsignedIDs.isEmpty || workspace.batchBusy || engine.isImportingIPA)
                         .alert(L("签名提醒"), isPresented: $showingBatchWarningAlert) {
                             Button(L("继续签名")) {
                                 runBatchSign(targets: pendingBatchTargets, mods: pendingBatchMods)
@@ -2533,6 +2533,12 @@ struct FilesTabView: View {
             batchFailed = true
             return
         }
+        // B-51-B3：导入进行中不批量签——下载完 copyImport 会删掉旧导入文件。
+        if engine.isImportingIPA {
+            batchMessage = L("An import is already running. Wait for it to finish, then try again.")
+            batchFailed = true
+            return
+        }
         let targets = unsignedIPAs.filter { selectedUnsignedIDs.contains($0.id) }
         guard !targets.isEmpty else { return }
         workspace.batchBusy = true
@@ -2599,6 +2605,14 @@ struct FilesTabView: View {
     ///（多开只对单签的「仅签名」生效，见 multiOpenSection 注释，
     /// batchSign 本来就不走 multiCount，这里也不新开行为）。
     private func runBatchSign(targets: [LocalFileItem], mods: CertSignMods) {
+        // B-51-B3：批量警告框"继续签名"直接调这里，绕过 batchSign——入口再拦
+        // 一道。batchSign 在警告预检前已把 batchBusy 立起来，拒掉时这里放掉。
+        guard !engine.isImportingIPA else {
+            workspace.batchBusy = false
+            batchMessage = L("An import is already running. Wait for it to finish, then try again.")
+            batchFailed = true
+            return
+        }
         workspace.batchBusy = true
         // B1：批量签名在跑时把目标路径登记进 Engine，文件页/LAN/WebDAV
         // 的删/移/改名入口会拒掉这些源；收尾 MainActor.run 里注销。

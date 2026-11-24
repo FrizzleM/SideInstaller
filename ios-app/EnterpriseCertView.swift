@@ -1804,6 +1804,12 @@ struct EnterpriseCertView: View {
             signBlockedMessage = L("Engine 正在运行，等它跑完再签。")
             return
         }
+        // B-51-B3：导入进行中不签——下载完 copyImport 会删掉旧导入文件，
+        // 正签着它就撞上 Application path does not exist。
+        if engine.isImportingIPA {
+            signBlockedMessage = L("An import is already running. Wait for it to finish, then try again.")
+            return
+        }
         if !certReady {
             signBlockedMessage = L("证书还没备齐：点上方证书组，把 .p12、描述文件和密码补齐。")
             certGroupExpanded = true
@@ -1908,6 +1914,13 @@ struct EnterpriseCertView: View {
         guard FileManager.default.fileExists(atPath: url.path) else {
             workspace.signBusy = false
             signBlockedMessage = L("要签的源文件已不在，请从文件库重新选择后再签。")
+            return
+        }
+        // B-51-B3：导入进行中不签（与上面同款：警告框"继续签名"也走这里，
+        // 一处拦住两条路）。下载完 copyImport 会删掉旧导入文件。
+        guard !engine.isImportingIPA else {
+            workspace.signBusy = false
+            signBlockedMessage = L("An import is already running. Wait for it to finish, then try again.")
             return
         }
         workspace.signBusy = true

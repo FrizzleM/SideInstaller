@@ -90,8 +90,8 @@ struct SettingsView: View {
                    isPresented: Binding(get: { pendingRemove != nil },
                                         set: { if !$0 { pendingRemove = nil } })) {
                 Button(L("Remove"), role: .destructive) {
-                    // B6：安装进行中不删账号（同上，revision bump 会掉 session）。
-                    if let account = pendingRemove, !engine.isRunning { accounts.remove(account) }
+                    // B6：安装/续签进行中不删账号（同上，revision bump 会掉 session）。
+                    if let account = pendingRemove, !engine.isRunning, !appsManager.isRefreshing { accounts.remove(account) }
                     pendingRemove = nil
                 }
                 Button(L("Cancel"), role: .cancel) { pendingRemove = nil }
