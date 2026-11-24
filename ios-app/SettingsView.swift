@@ -565,7 +565,7 @@ struct SettingsView: View {
                 SoundEffects.play(.success)
             } catch {
                 developerModeNote = DeveloperModeNote(
-                    text: (error as? LocalizedError)?.errorDescription ?? String(describing: error),
+                    text: userFacingErrorMessage(error),
                     failed: true)
                 SoundEffects.play(.error)
             }

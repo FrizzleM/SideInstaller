@@ -818,6 +818,9 @@ enum SideStoreDownloader {
         }
         // A file of that name the user put there isn't replaced.
         if FileManager.default.fileExists(atPath: dest.path), !DownloadLedger.isManaged(dest) {
+            guard IPALibrary.looksLikeIPA(dest) else {
+                throw DownloadError.repoUnavailable(repo)
+            }
             log("Using your own \(dest.lastPathComponent) instead — skipping the download.")
             return dest.path
         }

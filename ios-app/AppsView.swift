@@ -739,6 +739,12 @@ final class SideloadedAppsManager: ObservableObject {
                     await engine.dropSignSession()
                     do {
                         try await engine.signInForRefresh()
+                    } catch is CancellationError {
+                        for index in jobs.indices where jobs[index].teamID == team {
+                            jobs[index].state = .failed(L("Skipped: refresh stopped."))
+                        }
+                        engine.log("Refresh group \(team): sign-in cancelled — skipped.")
+                        continue
                     } catch {
                         let message = Self.text(for: error)
                         for index in jobs.indices where jobs[index].teamID == team {
@@ -789,6 +795,11 @@ final class SideloadedAppsManager: ObservableObject {
                         refreshed += 1
                         // 记一笔续签源：删文件时凭它提示“这是某 App 续签用的文件”。
                         RenewalSourceStore.record(bundleID: job.bundleID, appName: job.name, ipaURL: job.ipa)
+                    } catch is CancellationError {
+                        jobs[index].state = .failed(L("Skipped: refresh stopped."))
+                        engine.renewingSourcePaths.remove(job.ipa.path)
+                        engine.log("Refresh \(job.name): cancelled.")
+                        continue
                     } catch {
                         let message = userFacingErrorMessage(error)
                         let raw = String(describing: error)

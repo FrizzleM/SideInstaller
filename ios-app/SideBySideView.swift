@@ -583,7 +583,7 @@ final class SideBySideManager: ObservableObject {
                 downloadProgress = 0
                 go(to: .ready)
             } catch {
-                let message = short(error)
+                let message = userFacingErrorMessage(error)
                 lastError = message
                 engine.log("⛔️ Side by Side stopped: \(message)")
                 failActiveStep(to: .failed)
@@ -1634,7 +1634,7 @@ final class SideBySideManager: ObservableObject {
             }
         } catch {
             throw EngineError.message(L("%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.",
-                                        app.displayName, short(error), app.homeScreenName))
+                                        app.displayName, error is DeviceConnection.FFIError ? L("the connection to this iPhone failed") : short(error), app.homeScreenName))
         }
         setStep(.setUp, .done)
     }
