@@ -600,7 +600,7 @@ final class SideBySideManager: ObservableObject {
                 // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
                 InstallHistoryStore.recordFailure(appName: installedAppName ?? runName,
                                                   version: installedAppVersion,
-                                                  identity: credentials?.id ?? "",
+                                                  identity: credentials.id,
                                                   reason: message)
             }
             pairingInSettings = false

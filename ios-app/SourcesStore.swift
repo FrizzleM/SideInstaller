@@ -461,6 +461,11 @@ private final class IPADownloadProgressThrottler: @unchecked Sendable {
     private let lock = NSLock()
     private var lastPublished: Double?
     private var lastPublishedAt: Date?
+    /// B1 (0.9.155): last byte count let through by `publishBytes`, so
+    /// unknown-total reports stay throttled to 256KB steps. Lives here,
+    /// not on the @MainActor downloader, because the delegate callback
+    /// that reports bytes is nonisolated and may not touch MainActor state.
+    private var lastBytes: Int64?
 
     /// Gates `fraction` through `send`; the last chunk always goes through.
     func publish(_ fraction: Double, send: (Double) -> Void) {
@@ -475,12 +480,24 @@ private final class IPADownloadProgressThrottler: @unchecked Sendable {
         send(fraction)
     }
 
+    /// Gates a byte count through `send` for a transfer with no total:
+    /// the first report and then every 256KB step go through.
+    func publishBytes(_ bytes: Int64, send: (Int64) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard bytes > 0 else { return }
+        if let last = lastBytes, bytes - last < 256 * 1024 { return }
+        lastBytes = bytes
+        send(bytes)
+    }
+
     /// Forget the previous download's last publish, for the next download.
     func reset() {
         lock.lock()
         defer { lock.unlock() }
         lastPublished = nil
         lastPublishedAt = nil
+        lastBytes = nil
     }
 }
 
@@ -536,9 +553,6 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// re-tap of the same link resumes instead of restarting.
     private var resumeData: Data?
     private var resumeURL: URL?
-    /// B1: last byte count reported while the total was unknown, so the
-    /// unknown-total reports stay throttled to 256KB steps.
-    private var lastReportedBytes: Int64 = 0
 
     /// A-1（SIDE-32）：本下载的进度节流器（delegate 队列是串行的，锁只是兜底）。
     private let progressThrottler = IPADownloadProgressThrottler()
@@ -553,7 +567,6 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         bytesWritten = 0
         totalBytesExpected = -1
         isPaused = false
-        lastReportedBytes = 0
         progressThrottler.reset()
         let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
         self.session = session
@@ -676,11 +689,16 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
                     self.totalBytesExpected = totalBytesExpectedToWrite
                 }
             }
-        } else if totalBytesWritten - lastReportedBytes >= 256 * 1024 || lastReportedBytes == 0 {
-            lastReportedBytes = totalBytesWritten
-            Task { @MainActor in
-                self.bytesWritten = totalBytesWritten
-                self.totalBytesExpected = -1
+        } else {
+            // Unknown total: no fraction to publish — report the bytes
+            // through the throttler (which owns the 256KB gate on its own
+            // locked state, as the nonisolated callback may not touch the
+            // downloader's MainActor properties directly).
+            progressThrottler.publishBytes(totalBytesWritten) { bytes in
+                Task { @MainActor in
+                    self.bytesWritten = bytes
+                    self.totalBytesExpected = -1
+                }
             }
         }
     }
