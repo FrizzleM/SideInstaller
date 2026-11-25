@@ -83,6 +83,9 @@ struct SettingsView: View {
                 logSection
                 aboutSection
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(AppBackground())
             .sheet(item: $editorTarget) { AccountEditor(target: $0) }
             // Attached to the Form, apart from the download alert below, so the
             // two alerts don't conflict.
@@ -308,7 +311,7 @@ struct SettingsView: View {
                                 .font(.system(size: 22, weight: .semibold))
                                 .foregroundStyle(.white)
                         }
-                        .frame(width: 46, height: 46)
+                        .frame(width: 44, height: 44)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(L("WebDAV file service"))
@@ -334,7 +337,8 @@ struct SettingsView: View {
                                 Text(L("Copy"))
                                     .font(.subheadline.weight(.semibold))
                             }
-                            .buttonStyle(.bordered, sound: .tap)
+                            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                            .controlSize(.small)
                         }
                     } else {
                         Text(L("Wi-Fi not connected"))
@@ -738,8 +742,8 @@ private struct LogConsole: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(log.lines) { line in
-                        Text("\(line.stamp)  \(line.text)")
-                            .font(.system(.caption2, design: .monospaced))
+                        Text(line.stamp + "  " + line.text)
+                            .font(.system(.caption, design: .monospaced))
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .id(line.id)
@@ -782,7 +786,7 @@ private struct ToolRow: View {
         PanelCard {
             HStack(spacing: 14) {
                 glyph
-                    .frame(width: 46, height: 46)
+                    .frame(width: 44, height: 44)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 Text(title)
                     .font(.headline)
@@ -790,7 +794,7 @@ private struct ToolRow: View {
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.muted.opacity(0.6))
             }
         }
     }

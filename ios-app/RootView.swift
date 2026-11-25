@@ -93,12 +93,13 @@ struct RootView: View {
         // gearshape 见旧 Tools 行，folder.fill 见旧文件 tab）。
         TabView(selection: tabSelection) {
             FilesTabView()
-                .tabItem { Label(L("File"), systemImage: "folder.fill") }
+                .tabItem { Label(L("File"), systemImage: "folder") }
                 .tag(Page.files)
             NavigationStack { AppsView(manager: appsManager) }
                 .blueTopBar()
                 .tabItem { Label(L("Apps"), systemImage: "square.grid.2x2") }
                 .tag(Page.apps)
+                .badge(appsManager.expiringSoon > 0 ? Text("\(appsManager.expiringSoon)") : nil)
             NavigationStack { SourcesView() }
                 .tabItem { Label(L("Sources"), systemImage: "storefront") }
                 .tag(Page.sources)
@@ -201,7 +202,7 @@ struct RootView: View {
             entitlementsManager.signOut()
             sideBySideManager.signOut()
         }
-        .tint(Theme.accent)
+        .tint(Theme.topBarFill)
         // 外观只听 App 入口的 SIDAppearance 档（SideInstallerApp 的
         // .preferredColorScheme），这里不再硬编码 .dark，否则主界面
         // 永远深色、设置页却跟浅色档走，两边割裂。

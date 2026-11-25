@@ -12,20 +12,13 @@ struct WelcomeView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            AppBackground()
 
             VStack(spacing: 0) {
-                VStack(spacing: 10) {
-                    Text("SideInstaller")
-                        .font(.system(size: 40, weight: .bold))
-                        .foregroundStyle(.white)
-                        .welcomeItem(0)
-                    Text(L("an app by Frizzle"))
-                        .font(.headline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .welcomeItem(1)
-                }
-                .padding(.top, 72)
+                BrandHeader(icon: "app.dashed", image: "AppLogo", title: "SideInstaller",
+                            subtitle: L("an app by Frizzle")) { EmptyView() }
+                    .welcomeItem(0)
+                    .padding(.top, 72)
 
                 Spacer()
 
@@ -41,7 +34,6 @@ struct WelcomeView: View {
                     Button(L("Start")) { hasAcceptedTOS = true }
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(!accepted)
-                        .opacity(accepted ? 1 : 0.35)
                         .animation(.snappy(duration: 0.25), value: accepted)
                         .welcomeItem(Engine.deviceCanSelfPair ? 3 : 4)
                 }
@@ -50,7 +42,6 @@ struct WelcomeView: View {
                 .padding(.bottom, 28)
             }
         }
-        .preferredColorScheme(.dark)
         // An iPhone that can update to iOS 27 is told so once the page has
         // come in: there it pairs with itself, with no computer involved.
         .task {
@@ -75,19 +66,19 @@ struct WelcomeView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(L("You'll need a pairing file"))
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                 Text(L("This iPhone runs iOS %@. Only iOS %@ can pair with itself, so you'll have to make a pairing file on a computer — with jitterbugpair or pymobiledevice3 — and import it in the app. SideInstaller walks you through it.",
                        Engine.shared.osVersionText, Engine.minimumOSText))
                     .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
             .fill(Color.orange.opacity(0.12)))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
             .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1))
     }
 
@@ -99,10 +90,10 @@ struct WelcomeView: View {
             } label: {
                 HStack(spacing: 12) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(accepted ? AnyShapeStyle(Theme.brand) : AnyShapeStyle(.white.opacity(0.06)))
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .strokeBorder(.white.opacity(accepted ? 0 : 0.25), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(accepted ? AnyShapeStyle(Theme.brand) : AnyShapeStyle(Theme.control))
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Theme.hairline.opacity(accepted ? 0 : 1), lineWidth: 1)
                         Image(systemName: "checkmark")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.white)
@@ -112,7 +103,7 @@ struct WelcomeView: View {
                     .frame(width: 24, height: 24)
                     Text(L("I have accepted the"))
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(.primary.opacity(0.9))
                 }
             }
             .buttonStyle(.plain, sound: accepted ? .fall : .rise)

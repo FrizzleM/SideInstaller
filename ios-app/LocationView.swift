@@ -1001,12 +1001,12 @@ struct LocationView: View {
     }
 
     private var vpnNote: some View {
-        PanelCard {
-            HStack(alignment: .top, spacing: 8) {
+        CalloutCard(tint: Theme.negative) {
+            HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "shield.lefthalf.filled")
                     .foregroundStyle(Theme.negative)
                 Text(L("Connect LocalDevVPN. Spoofing runs over its tunnel, like everything else here."))
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1054,13 +1054,11 @@ struct LocationView: View {
                         .allowsHitTesting(false)
                 }
                 .frame(height: 280)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-                // Icons only where the coordinate and both labels don't fit.
-                ViewThatFits(in: .horizontal) {
-                    pinActions(labelled: true)
-                    pinActions(labelled: false)
-                }
+                // Always the labelled row: the coordinate and both labels fit
+                // at this width, and the row no longer swaps layouts.
+                pinActions(labelled: true)
 
                 // On first use, the spinner also covers disk image setup.
                 Button { manager.simulate(target) } label: {
@@ -1084,7 +1082,6 @@ struct LocationView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-                    .controlSize(.regular)
                     .disabled(manager.isBusy)
                 }
             }
@@ -1250,7 +1247,7 @@ struct LocationView: View {
                     Text(L("Routes from OpenStreetMap, © OpenStreetMap contributors"))
                         .multilineTextAlignment(.leading)
                 }
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(Theme.muted)
             }
         }
@@ -1572,7 +1569,6 @@ struct LocationView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-                    .controlSize(.regular)
                     .disabled(manager.isImportingRoute)
                 }
             }
@@ -1660,7 +1656,6 @@ struct LocationView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-            .controlSize(.regular)
         } else {
             Button { manager.playRoute() } label: {
                 HStack(spacing: 8) {

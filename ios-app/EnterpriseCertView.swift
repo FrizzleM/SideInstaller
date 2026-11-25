@@ -282,7 +282,7 @@ struct EnterpriseCertView: View {
                     HStack(spacing: 8) {
                         if editingProfileID == profile.id {
                             TextField("", text: $editingProfileName)
-                                .textFieldStyle(.roundedBorder)
+                                .textFieldStyle(.plain).fieldBackground()
                                 .onSubmit {
                                     EnterpriseCertStore.renameProfile(profile, to: editingProfileName)
                                     editingProfileID = nil
@@ -327,7 +327,8 @@ struct EnterpriseCertView: View {
                             Text(editingProfileID == profile.id ? L("Done") : L("改名"))
                                 .font(.footnote)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                        .controlSize(.small)
                         Button(role: .destructive) {
                             deletingProfile = profile
                             showingDeleteProfileAlert = true
@@ -335,7 +336,8 @@ struct EnterpriseCertView: View {
                             Image(systemName: "trash")
                                 .font(.footnote)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                        .controlSize(.small)
                     }
                 }
                 Button {
@@ -343,7 +345,7 @@ struct EnterpriseCertView: View {
                 } label: {
                     Text(L("导入新证书"))
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                 Text(L("点一行切换当前证书；新证书导入后要填一次它的密码。"))
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
@@ -447,7 +449,8 @@ struct EnterpriseCertView: View {
                             Text(revocationChecking ? L("检查中…") : L("检查吊销状态"))
                                 .font(.footnote)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                        .controlSize(.small)
                         .disabled(revocationChecking || !hasP12)
                     }
                     if revocationStatus == .revoked {
@@ -476,7 +479,7 @@ struct EnterpriseCertView: View {
                             Text(hasProvision ? L("描述文件已导入 ✓") : L("导入描述文件"))
                         }
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     // 轻松签式“导入证书库”：一次选 .p12 + 描述文件两个，
                     // 配对才进；缺描述文件按轻松签原文报错（单导 p12 走上面）。
                     HStack(spacing: 10) {
@@ -486,7 +489,7 @@ struct EnterpriseCertView: View {
                             Text(L("导入证书库"))
                         }
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     Text(L("证书库一次选 .p12 和描述文件两个，配不上会报错；单导 p12 走上面那个按钮。"))
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
@@ -526,7 +529,7 @@ struct EnterpriseCertView: View {
             }
             signGroup(title: L("证书密码")) {
                 SecureField(L("证书密码"), text: $password)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain).fieldBackground()
                     .onChange(of: password) { _, newValue in
                         EnterpriseCertStore.password = newValue
                     }
@@ -917,7 +920,8 @@ struct EnterpriseCertView: View {
     private func signGroup<Content: View>(title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.footnote)
+                .font(.caption.weight(.semibold))
+                .textCase(.uppercase)
                 .foregroundStyle(Theme.muted)
             PanelCard {
                 content()
@@ -1032,25 +1036,25 @@ struct EnterpriseCertView: View {
                 }
                 signGroup(title: L("App 名字")) {
                     TextField(selectedInfo?.name ?? "", text: $mods.name)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain).fieldBackground()
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
                 signGroup(title: L("Bundle Identifier")) {
                     TextField(selectedInfo?.bundleID ?? "", text: $mods.bundleID)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain).fieldBackground()
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
                 signGroup(title: L("版本号")) {
                     TextField(selectedInfo?.version ?? "", text: $mods.version)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain).fieldBackground()
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
                 signGroup(title: L("最低系统版本")) {
                     TextField(L("如 15.0"), text: $mods.minOS)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain).fieldBackground()
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
@@ -1077,7 +1081,7 @@ struct EnterpriseCertView: View {
                                 .lineLimit(1)
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .foregroundStyle(Theme.muted)
+                                .foregroundStyle(Theme.muted.opacity(0.6))
                                 .font(.footnote)
                         }
                     }
@@ -1086,7 +1090,7 @@ struct EnterpriseCertView: View {
                 signGroup(title: L("打包文件名")) {
                     VStack(alignment: .leading, spacing: 4) {
                         TextField(predictedOutputName, text: $mods.outputName)
-                            .textFieldStyle(.roundedBorder)
+                            .textFieldStyle(.plain).fieldBackground()
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
                         Text(L("将保存为：%@；重名自动加序号", effectiveOutputName))
@@ -1122,7 +1126,7 @@ struct EnterpriseCertView: View {
                             .font(.headline)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 54)
+                    .frame(height: 52)
                     .background(Theme.negative)
                     .foregroundStyle(.white)
                     .cornerRadius(16)
@@ -1175,7 +1179,7 @@ struct EnterpriseCertView: View {
                             .font(.footnote)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 54)
+                    .frame(height: 44)
                     .background(Theme.accent.opacity(0.12))
                     .foregroundStyle(Theme.accent)
                     .cornerRadius(16)
@@ -1202,7 +1206,7 @@ struct EnterpriseCertView: View {
                                 }
                                 .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                             .opacity(workspace.signBusy || engine.isRunning || !certReady ? 0.5 : 1)
                             if let signBlockedMessage {
                                 Text(signBlockedMessage)
@@ -1234,7 +1238,7 @@ struct EnterpriseCertView: View {
                                 Text(L("从文件库选择"))
                             }
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     }
                 }
             }
@@ -1294,17 +1298,17 @@ struct EnterpriseCertView: View {
                     .font(.footnote)
                 TextField("1", text: $multiCountText)
                     .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain).fieldBackground()
                     .font(.footnote)
-                    .frame(width: 52)
+                    .frame(width: 84)
                     .disabled(workspace.signBusy)
                 Text(L("起始序号"))
                     .font(.footnote)
                 TextField("1", text: $multiStartText)
                     .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain).fieldBackground()
                     .font(.footnote)
-                    .frame(width: 52)
+                    .frame(width: 84)
                     .disabled(workspace.signBusy)
                 Spacer()
             }
@@ -1366,7 +1370,7 @@ struct EnterpriseCertView: View {
                     .font(.footnote)
                     .frame(width: 92, alignment: .leading)
                 TextField(L("新预设名称"), text: $presetNameText)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain).fieldBackground()
                     .font(.footnote)
                 Button(L("Save")) { saveCurrentPreset() }
                     .font(.footnote)
@@ -1501,9 +1505,9 @@ struct EnterpriseCertView: View {
             Image(uiImage: image)
                 .resizable()
                 .frame(width: 60, height: 60)
-                .cornerRadius(13)
+                .cornerRadius(14)
         } else {
-            RoundedRectangle(cornerRadius: 13)
+            RoundedRectangle(cornerRadius: 14)
                 .fill(Color.secondary.opacity(0.15))
                 .frame(width: 60, height: 60)
         }
@@ -1635,7 +1639,7 @@ struct EnterpriseCertView: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: 40, height: 40)
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 Button {
                     mods.icon = nil
                     iconItem = nil
@@ -1664,7 +1668,7 @@ struct EnterpriseCertView: View {
                 }
             } else {
                 // B12-6：解码中——占位，不闪回“从相册选择”。
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color.secondary.opacity(0.15))
                     .frame(width: 40, height: 40)
                 Button {
@@ -2453,19 +2457,10 @@ private struct LibraryIPAPicker: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // 应用库同款浅灰搜索框：按文件名/App 名/Bundle ID 过滤。
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(Theme.muted)
-                    TextField(L("搜索"), text: $query)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-                .padding(8)
-                .background(Color.secondary.opacity(0.12))
-                .cornerRadius(8)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+                // 应用库搜索框：按文件名/App 名/Bundle ID 过滤。
+                SearchBar(text: $query, placeholder: L("搜索"))
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
                 List(filtered) { item in
                     Button {
                         onPick(item.url)
@@ -2474,7 +2469,10 @@ private struct LibraryIPAPicker: View {
                     }
                     // plain 才能压住 List 里 Button 默认的蓝色字。
                     .buttonStyle(.plain)
+                    .listRowBackground(Color.clear)
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle(L("选择 IPA"))
             .navigationBarTitleDisplayMode(.inline)

@@ -102,7 +102,6 @@ struct PairingView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(SecondaryButtonStyle())
-                    .controlSize(.regular)
                     .disabled(manager.isBusy)
                 }
             }
@@ -141,19 +140,16 @@ struct PairingView: View {
     }
 
     private var vpnNote: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "shield.lefthalf.filled")
-                .foregroundStyle(Theme.negative)
-            Text(L("Connect LocalDevVPN to scan and install. The write runs over its tunnel."))
-                .font(.caption)
-                .foregroundStyle(Theme.muted)
-                .fixedSize(horizontal: false, vertical: true)
+        CalloutCard(tint: Theme.negative) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "shield.lefthalf.filled")
+                    .foregroundStyle(Theme.negative)
+                Text(L("Connect LocalDevVPN to scan and install. The write runs over its tunnel."))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous).fill(Theme.control))
-        .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-            .strokeBorder(Theme.hairline, lineWidth: 1))
     }
 
     // MARK: Scanned targets
@@ -199,7 +195,6 @@ struct PairingView: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-        .controlSize(.regular)
         .disabled(manager.isBusy || engine.isRunning)
     }
 
@@ -255,7 +250,6 @@ struct PairingView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-                .controlSize(.regular)
                 .disabled(manager.isBusy || engine.isRunning)
             }
         }

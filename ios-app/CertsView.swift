@@ -158,8 +158,7 @@ struct CertsView: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered, sound: .tap)
-                .tint(Theme.accent)
+                .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                 if let pwd = exportPassword {
                     VStack(spacing: 4) {
                         Text(L("Certificate password:"))
@@ -170,7 +169,7 @@ struct CertsView: View {
                             .textSelection(.enabled)
                             .padding(8)
                             .background(Color.secondary.opacity(0.1))
-                            .cornerRadius(8)
+                            .cornerRadius(12)
                     }
                 }
             } else {
@@ -301,19 +300,10 @@ struct CertsView: View {
 
     private var emptyState: some View {
         PanelCard {
-            VStack(spacing: 8) {
-                Image(systemName: "checkmark.seal")
-                    .font(.largeTitle)
-                    .foregroundStyle(Theme.muted)
-                Text(L("No certificates"))
-                    .font(.headline)
-                Text(L("This Apple ID has no development certificates to revoke."))
-                    .font(.footnote)
-                    .foregroundStyle(Theme.muted)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            EmptyState(title: L("No certificates"),
+                       message: L("This Apple ID has no development certificates to revoke."),
+                       systemImage: "checkmark.seal")
+                .padding(.vertical, 8)
         }
     }
 
@@ -342,6 +332,26 @@ struct CertsView: View {
                             .font(.caption.weight(.medium))
                             .foregroundStyle(Theme.warning)
                     }
+                    // Revoke lives at the card's top right as a small text
+                    // button, so the card's foot isn't a full-width button.
+                    Button(role: .destructive) {
+                        pendingRevoke = cert
+                    } label: {
+                        HStack(spacing: 4) {
+                            if revoking {
+                                ProgressView().controlSize(.small)
+                                Text(L("Revoking"))
+                            } else {
+                                Image(systemName: "trash")
+                                Text(L("Revoke"))
+                            }
+                        }
+                        .font(.footnote.weight(.medium))
+                    }
+                    .buttonStyle(.plain, sound: .tap)
+                    .foregroundStyle(Theme.negative)
+                    .disabled(revoking || manager.isWorking || manager.revokingID != nil)
+                    .opacity(revoking || manager.isWorking || manager.revokingID != nil ? 0.4 : 1)
                 }
 
                 if cert.expiresAt != nil || !cert.serialNumber.isEmpty {
@@ -362,25 +372,6 @@ struct CertsView: View {
                     .foregroundStyle(Theme.muted)
                 }
 
-                Button(role: .destructive) {
-                    pendingRevoke = cert
-                } label: {
-                    HStack(spacing: 6) {
-                        if revoking {
-                            ProgressView().controlSize(.small)
-                            Text(L("Revoking"))
-                        } else {
-                            Image(systemName: "trash")
-                            Text(L("Revoke"))
-                        }
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(Theme.negative)
-                .controlSize(.regular)
-                .disabled(revoking || manager.isWorking || manager.revokingID != nil)
             }
         }
     }

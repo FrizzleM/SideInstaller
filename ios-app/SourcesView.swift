@@ -31,40 +31,45 @@ struct SourcesView: View {
     @State private var sourceSearchText = ""
 
     var body: some View {
-        List {
-            if store.sources.contains(where: \.isLoading) {
-                Text(L("正在刷新数据中…"))
-                    .font(.footnote)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .center)
-            } else if let last = store.sources.compactMap(\.fetchedAt).max() {
-                Text(L("最后更新：%@", last.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localizer.locale))))
-                    .font(.footnote)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .center)
-            }
+        VStack(spacing: 12) {
             searchBar
-            if store.sources.isEmpty {
-                Text(L("No sources yet. Tap + to add one."))
-                    .foregroundStyle(Theme.muted)
-            }
-            ForEach(displayedSources) { source in
-                NavigationLink {
-                    SourceAppsView(store: store, sourceURL: source.url)
-                } label: {
-                    sourceRow(source)
+                .padding(.horizontal, 20)
+            List {
+                if store.sources.contains(where: \.isLoading) {
+                    Text(L("正在刷新数据中…"))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else if let last = store.sources.compactMap(\.fetchedAt).max() {
+                    Text(L("最后更新：%@", last.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localizer.locale))))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
-            }
-            .onDelete { offsets in
-                for offset in offsets {
-                    let item = displayedSources[offset]
-                    if let idx = store.sources.firstIndex(where: { $0.url == item.url }) {
-                        store.removeSource(at: IndexSet(integer: idx))
+                if store.sources.isEmpty {
+                    Text(L("No sources yet. Tap + to add one."))
+                        .foregroundStyle(Theme.muted)
+                }
+                ForEach(displayedSources) { source in
+                    NavigationLink {
+                        SourceAppsView(store: store, sourceURL: source.url)
+                    } label: {
+                        sourceRow(source)
+                    }
+                }
+                .onDelete { offsets in
+                    for offset in offsets {
+                        let item = displayedSources[offset]
+                        if let idx = store.sources.firstIndex(where: { $0.url == item.url }) {
+                            store.removeSource(at: IndexSet(integer: idx))
+                        }
                     }
                 }
             }
+            .listStyle(.plain)
+            .refreshable { await store.fetchAll(force: true) }
+            .task { await store.fetchAll() }
         }
-        .listStyle(.plain)
         .blueTopBar()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -114,8 +119,6 @@ struct SourcesView: View {
         .alert(L("That isn't a usable source link."), isPresented: $addFailed) {
             Button(L("OK"), role: .cancel) { }
         }
-        .refreshable { await store.fetchAll(force: true) }
-        .task { await store.fetchAll() }
     }
 
     /// U-UI：搜索过滤 + 排序后的源（onDelete 按 url 回映射到 store.sources，
@@ -138,18 +141,9 @@ struct SourcesView: View {
         }
     }
 
-    /// U-UI：搜索框（照抄 FilesTabView 的 fileSearchBar 灰底样式）。
+    /// U-UI：搜索框。
     private var searchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(Theme.muted)
-            TextField(L("搜索"), text: $sourceSearchText)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-        }
-        .padding(8)
-        .background(Color.secondary.opacity(0.12))
-        .cornerRadius(8)
+        SearchBar(text: $sourceSearchText, placeholder: L("搜索"))
     }
 
     /// One source: its icon and name, with the app count, a spinner while it
@@ -159,6 +153,7 @@ struct SourcesView: View {
             sourceIcon(source.model?.iconLink)
             VStack(alignment: .leading, spacing: 2) {
                 Text(source.displayName)
+                    .font(.headline)
                     .lineLimit(1)
                 if let subtitle = source.model?.subtitle, !subtitle.isEmpty {
                     Text(subtitle)
@@ -177,7 +172,7 @@ struct SourcesView: View {
                     .lineLimit(2)
             } else if source.model != nil {
                 Text(L("%d apps", source.apps.count))
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(Theme.muted)
             }
         }
@@ -194,7 +189,7 @@ struct SourcesView: View {
         }
         .frame(width: 44, height: 44)
         .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -243,25 +238,32 @@ struct SourceAppsView: View {
     }
 
     var body: some View {
-        List {
-            if let source {
-                if source.isLoading && source.model == nil {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                        Text(L("Loading…"))
-                            .foregroundStyle(Theme.muted)
-                    }
+        VStack(spacing: 12) {
+            if source != nil {
+                searchBar
+                    .padding(.horizontal, 20)
+            }
+            List {
+                if let source {
+                    if source.isLoading && source.model == nil {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text(L("Loading…"))
+                                .foregroundStyle(Theme.muted)
+                        }
                 } else if let error = source.errorMessage, source.model == nil {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(Theme.negative)
                 }
-                searchBar
                 ForEach(displayedApps, id: \.id) { app in
                     appRow(app)
                 }
             }
         }
         .listStyle(.plain)
+        .refreshable { await store.fetch(sourceURL, force: true) }
+        .task { await store.fetch(sourceURL) }
+        }
         .blueTopBar()
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
@@ -295,8 +297,6 @@ struct SourceAppsView: View {
                 }
             }
         }
-        .refreshable { await store.fetch(sourceURL, force: true) }
-        .task { await store.fetch(sourceURL) }
         .onDisappear {
             downloadTask?.cancel()
             downloader.cancel()
@@ -318,7 +318,7 @@ struct SourceAppsView: View {
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                     Text(metaLine(for: app))
-                        .font(.subheadline)
+                        .font(.caption)
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                 }
@@ -327,7 +327,7 @@ struct SourceAppsView: View {
             }
             if let description = appDescription(app), !description.isEmpty {
                 Text(description)
-                    .font(.subheadline)
+                    .font(.footnote)
                     .lineLimit(4)
             }
         }
@@ -378,18 +378,9 @@ struct SourceAppsView: View {
         }
     }
 
-    /// U-UI：搜索框（照抄 FilesTabView 的 fileSearchBar 灰底样式）。
+    /// U-UI：搜索框。
     private var searchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(Theme.muted)
-            TextField(L("搜索"), text: $appSearchText)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-        }
-        .padding(8)
-        .background(Color.secondary.opacity(0.12))
-        .cornerRadius(8)
+        SearchBar(text: $appSearchText, placeholder: L("搜索"))
     }
 
     /// The row's trailing control: Install, the download progress with its
@@ -402,7 +393,7 @@ struct SourceAppsView: View {
                 ProgressView(value: downloader.progress)
                     .frame(width: 72)
                 Text(L("Downloading… %d%%", Int(downloader.progress * 100)))
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(Theme.muted)
             }
         case .failed(let message):
@@ -416,11 +407,11 @@ struct SourceAppsView: View {
                         startInstall(app)
                     }
                 }
+                .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                .controlSize(.small)
                 .disabled(activeID != nil)
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
                 Text(message)
-                    .font(.caption2)
+                    .font(.footnote)
                     .foregroundStyle(Theme.negative)
                     .lineLimit(2)
                     .multilineTextAlignment(.trailing)
@@ -440,26 +431,12 @@ struct SourceAppsView: View {
                         Label(L("企业证书签名安装"), systemImage: "checkmark.seal")
                     }
                 } label: {
-                    HStack {
-                        Text(L("Download"))
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(Theme.topBarFill))
+                    DownloadPill()
                 }
                 .disabled(activeID != nil || engine.isRunning)
             } else {
                 Button { startInstall(app) } label: {
-                    HStack {
-                        Text(L("Download"))
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(Theme.topBarFill))
+                    DownloadPill()
                 }
                 .buttonStyle(.plain)
                 .disabled(activeID != nil || engine.isRunning)
@@ -583,5 +560,18 @@ struct SourceAppsView: View {
                 certFailedIDs.insert(app.id)
             }
         }
+    }
+}
+
+/// The blue Download capsule on a source app's row, shared by the
+/// Apple-ID install button and the install-menu label.
+private struct DownloadPill: View {
+    var body: some View {
+        Text(L("Download"))
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+            .background(Capsule().fill(Theme.topBarFill))
     }
 }

@@ -1173,7 +1173,7 @@ struct AppsView: View {
             .animation(.smooth(duration: 0.35), value: manager.jobs)
             .animation(.smooth(duration: 0.35), value: manager.refreshable)
         }
-        .background(Color(.systemBackground))
+        .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .onAppear { manager.autoLoad() }
@@ -1285,14 +1285,12 @@ struct AppsView: View {
                 Text(L("Cancel")).frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-            .controlSize(.large)
             .cascadeItem(2)
         } else if manager.hasLoaded && !manager.refreshable.isEmpty {
             Button { manager.load() } label: {
                 loadLabel(spinner: Theme.accent).frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-            .controlSize(.large)
             .disabled(manager.isWorking || manager.isRefreshing)
             .cascadeItem(2)
         } else if manager.hasLoaded {
@@ -1300,7 +1298,6 @@ struct AppsView: View {
                 loadLabel(spinner: Theme.accent).frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-            .controlSize(.large)
             .disabled(manager.isWorking || manager.isRefreshing)
             .cascadeItem(2)
         } else {
@@ -1334,8 +1331,7 @@ struct AppsView: View {
             PanelCard {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(L("Refresh all"))
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Theme.muted)
+                        .font(.headline)
                     // Enumerated so rows redraw on a language change.
                     ForEach(Array(manager.jobs.enumerated()), id: \.element.id) { _, job in
                         jobRow(job)
@@ -1358,15 +1354,15 @@ struct AppsView: View {
             HStack(spacing: 8) {
                 jobIcon(job.state)
                 Text(job.name)
-                    .font(.caption.weight(.medium))
+                    .font(.subheadline.weight(.medium))
                 Spacer(minLength: 6)
                 Text(Self.stateText(job.state))
-                    .font(.caption2.weight(.medium))
+                    .font(.footnote.weight(.medium))
                     .foregroundStyle(Self.stateColor(job.state))
             }
             if case let .failed(message) = job.state {
                 Text(message)
-                    .font(.caption2)
+                    .font(.footnote)
                     .foregroundStyle(Theme.negative)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1406,26 +1402,30 @@ struct AppsView: View {
     @ViewBuilder
     private var refreshNote: some View {
         if manager.hasLoaded && manager.teamExcluded > 0 {
-            Text(manager.teamExcluded == 1
-                 ? L("%d app here is signed under a team that matches no saved Apple ID, so it is left out. Switch to the Apple ID that signed it and sign in once, then reload, and it will join the list. Enterprise-signed apps stay excluded.", manager.teamExcluded)
-                 : L("%d apps here are signed under teams that match no saved Apple ID, so they are left out. Switch to the Apple ID that signed them and sign in once, then reload, and they will join the list. Enterprise-signed apps stay excluded.", manager.teamExcluded))
-                .font(.caption)
-                .foregroundStyle(Theme.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .cascadeItem(2)
+            CalloutCard(tint: Theme.accent) {
+                Text(manager.teamExcluded == 1
+                     ? L("%d app here is signed under a team that matches no saved Apple ID, so it is left out. Switch to the Apple ID that signed it and sign in once, then reload, and it will join the list. Enterprise-signed apps stay excluded.", manager.teamExcluded)
+                     : L("%d apps here are signed under teams that match no saved Apple ID, so they are left out. Switch to the Apple ID that signed them and sign in once, then reload, and they will join the list. Enterprise-signed apps stay excluded.", manager.teamExcluded))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .cascadeItem(2)
         }
         if manager.hasLoaded && manager.unrefreshable > 0 && !manager.entries.isEmpty {
-            Text(manager.unrefreshable == 1
-                 ? L("%d app here has no IPA in SideInstaller, so it can't be refreshed from this page. Refresh it in whatever installed it, or import its .ipa first.",
-                     manager.unrefreshable)
-                 : L("%d apps here have no IPA in SideInstaller, so they can't be refreshed from this page. Refresh them in whatever installed them, or import their .ipa first.",
-                     manager.unrefreshable))
-                .font(.caption)
-                .foregroundStyle(Theme.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .cascadeItem(2)
+            CalloutCard(tint: Theme.accent) {
+                Text(manager.unrefreshable == 1
+                     ? L("%d app here has no IPA in SideInstaller, so it can't be refreshed from this page. Refresh it in whatever installed it, or import its .ipa first.",
+                         manager.unrefreshable)
+                     : L("%d apps here have no IPA in SideInstaller, so they can't be refreshed from this page. Refresh them in whatever installed them, or import their .ipa first.",
+                         manager.unrefreshable))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .cascadeItem(2)
         }
     }
 
@@ -1436,7 +1436,7 @@ struct AppsView: View {
         if manager.hasLoaded && manager.entries.isEmpty && !manager.isWorking {
             emptyState.transition(.cardAppear)
         } else if !manager.entries.isEmpty {
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 // A-38-A4：一次建成 bundleID → RefreshJob 字典，行图标三处
                 // 查表代替 refreshable.first 线性查找（每行每 body 求值 3 次）。
                 // 必须用 uniquingKeysWith——uniqueKeysWithValues 遇重复
@@ -1462,20 +1462,24 @@ struct AppsView: View {
                 // 到期天数可能已经变了，标出来，别让用户当成新的看。
                 // 成功加载会清掉 lastLoadFailed，小字随之消失。
                 if manager.lastLoadFailed != nil {
-                    Text(L("Load failed. Showing the last loaded list."))
-                        .font(.caption)
-                        .foregroundStyle(Theme.negative)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    CalloutCard(tint: Theme.negative) {
+                        Text(L("Load failed. Showing the last loaded list."))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.negative)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
                 // C11：上次后台续签没全续完、通知又没发出去时，留底在
                 // 这里显示——前台刚跑完的 summary 优先（refreshSummary
                 // 非空时不显示，避免新旧两条结果并列）。
                 if manager.refreshSummary == nil, !manager.isRefreshing,
                    let background = manager.lastBackgroundRefreshResult {
-                    Text(L("Last refresh (its notification couldn't be delivered): %@", background))
-                        .font(.caption)
-                        .foregroundStyle(Theme.muted)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    CalloutCard(tint: Theme.accent) {
+                        Text(L("Last refresh (its notification couldn't be delivered): %@", background))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
                 ForEach(Array(manager.entries.enumerated()), id: \.element.id) { idx, status in
                     NavigationLink {
@@ -1558,7 +1562,7 @@ struct AppsView: View {
                 .resizable()
                 .scaledToFill()
                 .frame(width: 44, height: 44)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
         } else {
             Image(systemName: "app.dashed")
                 .font(.title3)
@@ -1570,7 +1574,7 @@ struct AppsView: View {
     private func appRow(_ status: SideloadedAppStatus, jobsByID: [String: RefreshJob]) -> some View {
         let profile = status.current
         let urgency = ExpiryUrgency.of(profile)
-        return PanelCard {
+        return PanelCard(padding: 16) {
             HStack(alignment: .top, spacing: 12) {
                 rowIcon(for: status, jobsByID: jobsByID)
                 VStack(alignment: .leading, spacing: 4) {
@@ -1589,7 +1593,7 @@ struct AppsView: View {
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.muted.opacity(0.6))
             }
         }
     }
@@ -1603,24 +1607,14 @@ struct AppsView: View {
         }
         .font(.caption.weight(.medium))
         .foregroundStyle(urgency.color)
-        .padding(.top, 1)
     }
 
     private var emptyState: some View {
         PanelCard {
-            VStack(spacing: 8) {
-                Image(systemName: "questionmark.app.dashed")
-                    .font(.largeTitle)
-                    .foregroundStyle(Theme.muted)
-                Text(L("No sideloaded apps"))
-                    .font(.headline)
-                Text(L("Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here."))
-                    .font(.footnote)
-                    .foregroundStyle(Theme.muted)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            EmptyState(title: L("No sideloaded apps"),
+                       message: L("Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here."),
+                       systemImage: "questionmark.app.dashed")
+                .padding(.vertical, 8)
         }
     }
 
@@ -1634,7 +1628,8 @@ struct AppsView: View {
             VStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(L("Unused profiles"))
-                        .font(.subheadline.weight(.medium))
+                        .font(.caption.weight(.semibold))
+                        .textCase(.uppercase)
                         .foregroundStyle(Theme.muted)
                     Text(L("Issued to App IDs no installed app is running on."))
                         .font(.caption)
@@ -1644,7 +1639,7 @@ struct AppsView: View {
                 // Enumerated so rows redraw on a language change (a plain
                 // `ForEach` over an `Equatable` array may skip re-rendering).
                 ForEach(Array(manager.unmatched.enumerated()), id: \.element.id) { idx, profile in
-                    PanelCard {
+                    PanelCard(padding: 16) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(profile.appIDName.isEmpty ? profile.bundleIdentifier : profile.appIDName)
                                 .font(.subheadline.weight(.medium))
@@ -1718,7 +1713,7 @@ private struct AppProfileDetail: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 Text(status.app.name)
-                    .font(.title3.weight(.semibold))
+                    .font(.headline)
                 field(L("Bundle Identifier"), status.app.bundleID)
                 if let identifier = status.app.applicationIdentifier ?? status.current?.applicationIdentifier {
                     field(L("App ID"), identifier)
@@ -1739,8 +1734,7 @@ private struct AppProfileDetail: View {
                             .font(.subheadline.weight(.semibold))
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(Theme.accent)
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     if let pwd = exportPassword {
                         VStack(spacing: 4) {
                             Text(L("Certificate password:"))
@@ -1751,7 +1745,7 @@ private struct AppProfileDetail: View {
                                 .textSelection(.enabled)
                                 .padding(8)
                                 .background(Color.secondary.opacity(0.1))
-                                .cornerRadius(8)
+                                .cornerRadius(12)
                         }
                     }
                     // Direct import into the app on this page (no password input needed):
@@ -1767,8 +1761,7 @@ private struct AppProfileDetail: View {
                                 .font(.subheadline.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.accent)
+                        .buttonStyle(PrimaryButtonStyle())
                     }
                 } else {
                     Button {
@@ -1786,8 +1779,7 @@ private struct AppProfileDetail: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
+                    .buttonStyle(PrimaryButtonStyle())
                     .disabled(isExporting)
                     if let err = exportError {
                         Text(err)
@@ -1923,7 +1915,7 @@ private struct AppProfileDetail: View {
                     .foregroundStyle(Theme.muted)
                 ForEach(keys, id: \.self) { key in
                     Text(key)
-                        .font(.caption2.monospaced())
+                        .font(.caption.monospaced())
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)

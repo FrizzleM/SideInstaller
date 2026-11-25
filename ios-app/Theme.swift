@@ -42,10 +42,21 @@ enum Theme {
     /// The pale blue that controls and edges are drawn in, faintly, so they
     /// stay in the ramp's hue instead of greying it.
     static let ice = Color(red: 185 / 255, green: 211 / 255, blue: 249 / 255)
-    /// A control's fill, a step up from whatever it sits on.
-    static let control = ice.opacity(0.07)
-    /// The edge of a card or control.
-    static let hairline = ice.opacity(0.1)
+    /// A control's fill, a step up from whatever it sits on. Dark keeps the
+    /// pale-blue wash; light uses black at 5%, so a control stays a step up
+    /// from the card without tinting it blue.
+    static let control = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 185 / 255, green: 211 / 255, blue: 249 / 255, alpha: 0.07)
+            : UIColor(white: 0, alpha: 0.05)
+    })
+    /// The edge of a card or control. Dark keeps the pale-blue hairline;
+    /// light uses black at 12%.
+    static let hairline = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 185 / 255, green: 211 / 255, blue: 249 / 255, alpha: 0.1)
+            : UIColor(white: 0, alpha: 0.12)
+    })
     /// Captions, meta and quiet icons: a slate blue. Dark keeps the old
     /// value (at least 4.5:1 on a popup, more on a card); light uses a
     /// deeper slate (#5A6678, 5.82:1 on white, 5.22:1 on a card) — the
@@ -76,7 +87,7 @@ enum Theme {
     static let accent2 = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(red: 0.30, green: 0.68, blue: 1.0, alpha: 1)
-            : UIColor(red: 31 / 255, green: 91 / 255, blue: 208 / 255, alpha: 1)
+            : UIColor(red: 77 / 255, green: 141 / 255, blue: 255 / 255, alpha: 1) // 浅色 #4D8DFF，与 accent 拉开一档
     })
     /// Deep-navy halo behind each header icon, matching the icon art (#011A5C).
     static let glow = Color(red: 1/255, green: 26/255, blue: 92/255)
@@ -125,7 +136,7 @@ enum Theme {
     /// Corner radius of a card.
     static let cardRadius: CGFloat = 20
     /// Corner radius of a popup.
-    static let popupRadius: CGFloat = 24
+    static let popupRadius: CGFloat = 20
 
     /// The widest a page's column grows, its padding included. A phone is
     /// narrower than this; a wider window, such as an open iPhone Duo (about
@@ -276,12 +287,14 @@ struct AppBackground: View {
 
 /// The container every section sits in.
 struct PanelCard<Content: View>: View {
+    /// Inner padding: 20 by default; tight list rows use 16.
+    var padding: CGFloat = 20
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(20)
+            .padding(padding)
             .cardSurface(in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
 }
@@ -294,13 +307,13 @@ struct CalloutCard<Content: View>: View {
     var body: some View {
         content()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(18)
+            .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(tint.opacity(0.12))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .strokeBorder(tint.opacity(0.35), lineWidth: 1)
             )
     }
@@ -523,18 +536,86 @@ private struct PopupCloseButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Theme.muted)
-                .frame(width: 28, height: 28)
-                .background(Circle().fill(Theme.control))
-                .padding(8)
-                .contentShape(Rectangle())
-        }
         // The card plays the sound, which depends on whether it asks first.
-        .buttonStyle(.plain)
-        .accessibilityLabel(L("Close"))
+        IconCircleButton(systemImage: "xmark", sound: nil, action: action)
+            .accessibilityLabel(L("Close"))
+    }
+}
+
+// MARK: - Shared components (0.9.137)
+
+/// The shared search field: a magnifier on a control fill, used wherever a
+/// list is filtered by name. Replaces the four hand-copied grey search boxes
+/// (Files, Sources ×2, Enterprise library picker).
+struct SearchBar: View {
+    @Binding var text: String
+    var placeholder: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(Theme.muted)
+            TextField(placeholder, text: $text)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .textFieldStyle(.plain)
+        }
+        .padding(8)
+        .background(Theme.control)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+/// A page's empty state: a 40pt icon, a headline and a muted footnote.
+struct EmptyState: View {
+    var title: String
+    var message: String
+    var systemImage: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 40))
+                .foregroundStyle(Theme.muted)
+            Text(title)
+                .font(.headline)
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// A small round icon button: a 32pt circle with a 44pt hit target, for the
+/// close, chevron and info buttons on cards and headers.
+struct IconCircleButton: View {
+    var systemImage: String
+    /// Nil plays no sound (the popup card plays its own on close).
+    var sound: UISound? = .tap
+    var action: () -> Void
+
+    var body: some View {
+        Group {
+            if let sound {
+                Button(action: action) { label }
+                    .buttonStyle(.plain, sound: sound)
+            } else {
+                Button(action: action) { label }
+                    .buttonStyle(.plain)
+            }
+        }
+        .frame(width: 44, height: 44)
+    }
+
+    private var label: some View {
+        Image(systemName: systemImage)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(Theme.muted)
+            .frame(width: 32, height: 32)
+            .background(Circle().fill(Theme.control))
+            .contentShape(Rectangle())
     }
 }
 
@@ -754,6 +835,7 @@ struct NumberedSteps: View {
                         .font(.subheadline)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(minHeight: 44, alignment: .top)
             }
         }
     }
@@ -779,7 +861,7 @@ struct PairingCodeDigits: View {
     }
 
     private var key: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
     }
 }
 
@@ -817,7 +899,8 @@ struct SectionTitle: View {
     var body: some View {
         Label {
             Text(title)
-                .font(.subheadline.weight(.medium))
+                .font(.caption.weight(.semibold))
+                .textCase(.uppercase)
                 .foregroundStyle(Theme.muted)
         } icon: {
             Image(systemName: systemImage)
@@ -886,7 +969,7 @@ struct BetaBadge: View {
             .foregroundStyle(Theme.accent)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(Theme.accent.opacity(0.35), lineWidth: 1))
             .fixedSize()
     }

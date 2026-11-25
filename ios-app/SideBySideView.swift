@@ -2025,7 +2025,7 @@ struct SideBySideView: View {
     var body: some View {
         ScrollViewReader { scroller in
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(spacing: 16) {
                     Color.clear.frame(height: 0).id(Self.top)
                     // Pages overlap while one gives way to the next.
                     ZStack(alignment: .top) {
@@ -2872,14 +2872,10 @@ struct SideBySideView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) { retryButtons }
-                    VStack(spacing: 12) { retryButtons }
-                }
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) { reportButtons(message) }
-                    VStack(alignment: .leading, spacing: 12) { reportButtons(message) }
-                }
+                // The button groups stay vertical: no swapping between a
+                // row and a column when the width changes.
+                VStack(spacing: 12) { retryButtons }
+                VStack(alignment: .leading, spacing: 12) { reportButtons(message) }
             }
         }
     }
@@ -2895,7 +2891,6 @@ struct SideBySideView: View {
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-        .controlSize(.large)
     }
 
     /// Report this problem, and Copy logs unless the message says how to fix it.
@@ -2917,7 +2912,7 @@ struct SideBySideView: View {
         VStack(spacing: 16) {
             VStack(spacing: 16) {
                 Image(systemName: "checkmark.seal")
-                    .font(.system(size: 48))
+                    .font(.system(size: 40))
                     .foregroundStyle(Theme.positive)
                     .frame(height: 72)
                 Text(L("%@ is on their iPhone", manager.installedAppName ?? manager.runName))
@@ -3141,7 +3136,7 @@ private struct OptionRow: View {
                     .font(.system(size: 17))
                     .foregroundStyle(Theme.muted)
                     .frame(width: 36, height: 36)
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.control))
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.control))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.subheadline.weight(.medium))

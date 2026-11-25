@@ -51,7 +51,6 @@ struct AccountSetupView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .preferredColorScheme(.dark)
         // Focus only once the welcome page has zoomed away and the card has
         // faded in. AutoFill pairs the username field with a *visible* password
         // field when it gains focus; focusing during the entrance (card still
@@ -66,12 +65,12 @@ struct AccountSetupView: View {
     private var header: some View {
         VStack(spacing: 10) {
             Image(systemName: "person.crop.circle.fill.badge.checkmark")
-                .font(.system(size: 52, weight: .semibold))
+                .font(.largeTitle)
                 .foregroundStyle(Theme.brand)
                 .shadow(color: Theme.glow, radius: 20, x: 0, y: 12)
                 .padding(.bottom, 4)
             Text(L("Sign in with your Apple ID"))
-                .font(.title.weight(.bold))
+                .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
             Text(L("Don't worry, these are stored locally"))
                 .font(.subheadline)
@@ -112,7 +111,6 @@ struct AccountSetupView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(!canSave)
-            .opacity(canSave ? 1 : 0.35)
             .animation(.snappy(duration: 0.25), value: canSave)
 
             Button(L("Set this up later")) { hasCompletedAccountSetup = true }
@@ -160,7 +158,7 @@ struct OfficialSourceQuestion: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.shield")
-                .font(.system(size: 48))
+                .font(.largeTitle)
                 .foregroundStyle(Theme.muted)
                 .padding(.bottom, 4)
                 .cascadeItem(0)
@@ -195,7 +193,6 @@ struct OfficialSourceAnswers: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle(), sound: .press)
-            .controlSize(.large)
             .cascadeItem(4)
         }
     }
@@ -206,22 +203,21 @@ struct OfficialSourceWarning: View {
     @EnvironmentObject private var loc: Localizer
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.title3)
-                .foregroundStyle(Theme.warning)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L("Don't sign in with this copy"))
-                    .font(.headline)
-                Text(L("Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there."))
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+        PanelCard {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.title3)
+                    .foregroundStyle(Theme.warning)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L("Don't sign in with this copy"))
+                        .font(.headline)
+                    Text(L("Copies from anywhere other than sideinstaller.net are unofficial and may have been changed to steal your Apple ID. Delete this one and install SideInstaller from sideinstaller.net, then sign in there."))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardSurface(in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
 }
 

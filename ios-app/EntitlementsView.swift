@@ -565,14 +565,14 @@ struct EntitlementsView: View {
                         .truncationMode(.middle)
                     if let results = manager.outcomes[app.id] {
                         Text(L("%d of %d enabled", results.filter(\.ok).count, results.count))
-                            .font(.caption2.weight(.medium))
+                            .font(.caption.weight(.medium))
                             .foregroundStyle(results.contains(where: \.ok) ? Theme.positive : Theme.warning)
                     }
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.muted.opacity(0.6))
             }
         }
     }
@@ -692,7 +692,7 @@ private struct EntitlementPicker: View {
                         .lineLimit(1)
                         .foregroundStyle(.primary)
                     Text(entitlement.id)
-                        .font(.caption2.monospaced())
+                        .font(.caption.monospaced())
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -725,7 +725,8 @@ private struct EntitlementPicker: View {
         // The button keeps the page's width; the bar under it spans the window.
         .pageColumn()
         .padding(.bottom, 12)
-        .background(.ultraThinMaterial)
+        .background(Theme.card)
+        .overlay(alignment: .top) { Divider() }
     }
 }
 
@@ -775,7 +776,7 @@ struct EntitlementsPopup: View {
                         Text(outcome.name)
                             .font(.caption.weight(.medium))
                         Text(outcome.error)
-                            .font(.caption2)
+                            .font(.footnote)
                             .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }

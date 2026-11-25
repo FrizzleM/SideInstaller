@@ -81,6 +81,7 @@ struct MachOView: View {
                             Text(opError)
                                 .font(.footnote)
                                 .foregroundStyle(Theme.negative)
+                                .listRowBackground(Color.clear)
                         }
                         ForEach(info.slices) { slice in
                             Section {
@@ -94,11 +95,13 @@ struct MachOView: View {
                                             .font(.footnote.monospaced())
                                             .lineLimit(2)
                                     }
+                                    .listRowBackground(Color.clear)
                                 }
                                 if slice.deps.isEmpty && slice.rpaths.isEmpty {
                                     Text(L("没有 dylib 依赖"))
                                         .font(.footnote)
                                         .foregroundStyle(Theme.muted)
+                                        .listRowBackground(Color.clear)
                                 }
                             } header: {
                                 Text(slice.arch)
@@ -108,8 +111,11 @@ struct MachOView: View {
                             Text(L("删掉或改名后，这个文件的签名会失效：拿去注入签名时会被重新签，没问题；直接当插件用的话要先重签。装进 App 的依赖一般别乱删，删了 App 可能打不开。"))
                                 .font(.footnote)
                                 .foregroundStyle(Theme.muted)
+                                .listRowBackground(Color.clear)
                         }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 } else if let loadError {
                     VStack(spacing: 10) {
                         Image(systemName: "exclamationmark.triangle")
@@ -188,6 +194,7 @@ struct MachOView: View {
             .tint(Theme.blue)
             .disabled(editBusy)
         }
+        .listRowBackground(Color.clear)
     }
 
     private func kindLabel(_ kind: String) -> String {

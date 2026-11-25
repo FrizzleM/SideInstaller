@@ -444,19 +444,13 @@ struct ContentView: View {
     /// "or" divider between the file picker and the link field.
     private var orDivider: some View {
         HStack(spacing: 12) {
-            hairline
+            Divider()
             Text(L("or"))
                 .font(.caption)
                 .foregroundStyle(Theme.muted)
-            hairline
+            Divider()
         }
         .padding(.vertical, 4)
-    }
-
-    private var hairline: some View {
-        Rectangle()
-            .fill(Theme.hairline)
-            .frame(height: 1)
     }
 
     /// Import button showing the loaded file's name, or progress while importing.
@@ -561,10 +555,11 @@ struct ContentView: View {
     /// The Install button and the progress card it turns into, as one surface:
     /// starting a run reshapes the button instead of swapping it for a card.
     /// Only the two sets of content cross-fade; the surface itself changes
-    /// size and corners, and the button's blue gives way to the card's fill.
+    /// size, and the button's blue gives way to the card's fill.
     private var installSurface: some View {
-        let shape = RoundedRectangle(cornerRadius: showProgress ? Theme.cardRadius : Theme.controlRadius,
-                                     style: .continuous)
+        // Fixed at 16 in both states (button and progress card share the
+        // shape), so the surface never jumps between radii.
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         return ZStack(alignment: .top) {
             if showProgress {
                 progressContent
@@ -689,25 +684,42 @@ struct ContentView: View {
 
     // MARK: iOS version requirement
 
-    /// Shown when iOS is below the minimum supported version.
-    private var osRequirement: some View {
+    /// The three requirement cards share one template: an icon, a headline,
+    /// a footnote, and an optional action under the text.
+    private func requirementCard(systemImage: String, tint: Color,
+                                 title: String, message: String) -> some View {
+        requirementCard(systemImage: systemImage, tint: tint,
+                        title: title, message: message) { EmptyView() }
+    }
+
+    private func requirementCard<Extra: View>(systemImage: String, tint: Color,
+                                              title: String, message: String,
+                                              @ViewBuilder extra: () -> Extra) -> some View {
         PanelCard {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "iphone.gen3.slash")
+                Image(systemName: systemImage)
                     .font(.title3)
-                    .foregroundStyle(Theme.negative)
+                    .foregroundStyle(tint)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(L("iOS %@ required", Engine.minimumTunnelOSText))
-                        .font(.subheadline.weight(.medium))
-                    Text(L("This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.",
-                           engine.osVersionText, Engine.minimumTunnelOSText))
+                    Text(title)
+                        .font(.headline)
+                    Text(message)
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
+                    extra()
                 }
             }
         }
+    }
+
+    /// Shown when iOS is below the minimum supported version.
+    private var osRequirement: some View {
+        requirementCard(systemImage: "iphone.gen3.slash", tint: Theme.negative,
+                        title: L("iOS %@ required", Engine.minimumTunnelOSText),
+                        message: L("This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.",
+                                   engine.osVersionText, Engine.minimumTunnelOSText))
     }
 
     // MARK: Pairing file
@@ -825,38 +837,37 @@ struct ContentView: View {
     /// tapped. Holds the build's version and, from iOS 27, the optional
     /// pairing-file import.
     private var advancedSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Button { advancedExpanded.toggle() } label: {
-                HStack(spacing: 8) {
-                    sectionTitle(L("Advanced"), systemImage: "slider.horizontal.3")
-                    Spacer(minLength: 4)
-                    // Collapsed, this is the only sign an imported file is in use.
-                    if engine.canSelfPair, engine.importedPairingName != nil {
-                        Image(systemName: "checkmark.circle")
-                            .foregroundStyle(Theme.positive)
-                            .transition(.opacity)
+        PanelCard {
+            VStack(alignment: .leading, spacing: 16) {
+                Button { advancedExpanded.toggle() } label: {
+                    HStack(spacing: 8) {
+                        sectionTitle(L("Advanced"), systemImage: "slider.horizontal.3")
+                        Spacer(minLength: 4)
+                        // Collapsed, this is the only sign an imported file is in use.
+                        if engine.canSelfPair, engine.importedPairingName != nil {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundStyle(Theme.positive)
+                                .transition(.opacity)
+                        }
+                        disclosureChevron(expanded: advancedExpanded)
                     }
-                    disclosureChevron(expanded: advancedExpanded)
+                    .contentShape(Rectangle())
                 }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain, sound: .tick)
+                .buttonStyle(.plain, sound: .tick)
 
-            if advancedExpanded {
-                VStack(alignment: .leading, spacing: 24) {
-                    if engine.installSource != .custom {
-                        versionOption
+                if advancedExpanded {
+                    VStack(alignment: .leading, spacing: 20) {
+                        if engine.installSource != .custom {
+                            versionOption
+                        }
+                        if engine.canSelfPair {
+                            pairingFileOption
+                        }
                     }
-                    if engine.canSelfPair {
-                        pairingFileOption
-                    }
+                    .transition(.opacity.combined(with: .offset(y: -6)))
                 }
-                .transition(.opacity.combined(with: .offset(y: -6)))
             }
         }
-        // No card behind it; inset to line up with the card contents above.
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
     }
 
     /// Which release of the selected build to install. The list follows the
@@ -945,22 +956,9 @@ struct ContentView: View {
 
     /// Shown while Wi-Fi is off, which pairing needs.
     private var wifiRequirement: some View {
-        PanelCard {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "wifi.slash")
-                    .font(.title3)
-                    .foregroundStyle(Theme.negative)
-                    .frame(width: 28)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Wi-Fi required"))
-                        .font(.subheadline.weight(.medium))
-                    Text(L("Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network."))
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
+        requirementCard(systemImage: "wifi.slash", tint: Theme.negative,
+                        title: L("Wi-Fi required"),
+                        message: L("Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network."))
     }
 
     // MARK: Loopback-VPN requirement
@@ -968,39 +966,26 @@ struct ContentView: View {
     /// Shown while the tunnel is off. Names LocalDevVPN, though any loopback VPN
     /// works.
     private var vpnRequirement: some View {
-        PanelCard {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "shield.lefthalf.filled")
-                    .font(.title3)
-                    .foregroundStyle(Theme.negative)
-                    .frame(width: 28)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("LocalDevVPN required"))
-                        .font(.subheadline.weight(.medium))
-                    Text(L("Install LocalDevVPN and connect it. The install runs over its tunnel."))
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if engine.localDevVPNInstalled {
-                        // 装了就直接打开 LocalDevVPN 连接并自动跳回，不再去 App Store 获取
-                        Button { engine.startLocalDevVPN() } label: {
-                            Label(L("打开 LocalDevVPN"), systemImage: "arrow.up.right")
-                                .font(.footnote.weight(.semibold))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .tint(Theme.accent)
-                        .padding(.top, 2)
-                    } else if let label = Guides.vpn.actionLabel, let url = Guides.vpn.actionURL {
-                        Button { openURL(url) } label: {
-                            Label(label, systemImage: "arrow.up.right")
-                                .font(.footnote.weight(.medium))
-                        }
-                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-                        .controlSize(.small)
-                        .padding(.top, 8)
-                    }
+        requirementCard(systemImage: "shield.lefthalf.filled", tint: Theme.negative,
+                        title: L("LocalDevVPN required"),
+                        message: L("Install LocalDevVPN and connect it. The install runs over its tunnel.")) {
+            if engine.localDevVPNInstalled {
+                // 装了就直接打开 LocalDevVPN 连接并自动跳回，不再去 App Store 获取
+                Button { engine.startLocalDevVPN() } label: {
+                    Label(L("打开 LocalDevVPN"), systemImage: "arrow.up.right")
+                        .font(.footnote.weight(.semibold))
                 }
+                .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                .controlSize(.small)
+                .padding(.top, 2)
+            } else if let label = Guides.vpn.actionLabel, let url = Guides.vpn.actionURL {
+                Button { openURL(url) } label: {
+                    Label(label, systemImage: "arrow.up.right")
+                        .font(.footnote.weight(.medium))
+                }
+                .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                .controlSize(.small)
+                .padding(.top, 8)
             }
         }
     }
@@ -1060,19 +1045,10 @@ struct ContentView: View {
     /// The X in the card's corner, which stops the run after asking. It dims
     /// once the run is stopping, which waits for the step in flight.
     private var cancelButton: some View {
-        Button {
+        IconCircleButton(systemImage: "xmark") {
             CZFHaptics.impact()
             confirmingCancel = true
-        } label: {
-            Image(systemName: "xmark")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Theme.muted)
-                .frame(width: 28, height: 28)
-                .background(Circle().fill(Theme.control))
-                .padding(8)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain, sound: .tap)
         .disabled(engine.isCancelling)
         .opacity(engine.isCancelling ? 0.4 : 1)
         .accessibilityLabel(L("Cancel"))
@@ -1242,8 +1218,7 @@ private struct PrecheckSheet: View {
                         }
                         .buttonStyle(PrimaryButtonStyle())
                         Button(L("Cancel")) { CZFHaptics.impact(); dismiss() }
-                            .buttonStyle(.bordered, sound: .tap)
-                            .tint(Theme.muted)
+                            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     }
                     .padding(.top, 4)
                 }
@@ -1398,7 +1373,8 @@ private func precheckRow(title: String, state: PrecheckState, detail: String,
             if let fixTitle, let fix {
                 Button(fixTitle) { CZFHaptics.impact(); fix() }
                     .font(.footnote.weight(.semibold))
-                    .buttonStyle(.bordered, sound: .tap)
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    .controlSize(.small)
             }
         }
     }
@@ -1611,8 +1587,7 @@ struct InstallPopup: View {
                         Label(label, systemImage: "arrow.up.right")
                             .font(.subheadline.weight(.semibold))
                     }
-                    .buttonStyle(.bordered)
-                    .tint(Theme.accent)
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                 }
             }
         }
@@ -1922,6 +1897,7 @@ private struct StepRow: View {
                 if !isLast { Spacer(minLength: 12) }
             }
         }
+        .frame(minHeight: 44, alignment: .top)
         .animation(.smooth(duration: 0.3), value: state)
     }
 

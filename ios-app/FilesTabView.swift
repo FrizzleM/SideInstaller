@@ -850,7 +850,7 @@ struct FilesTabView: View {
                                            uniquingKeysWith: { first, _ in first })
         NavigationStack {
             ScrollView {
-                VStack(spacing: 18) {
+                VStack(spacing: 16) {
                     // U-UI：文件页顶部分段——文件列表 / 应用文件夹库（证书页搬来的库）。
                     Picker("", selection: $fileView) {
                         Text(L("File")).tag(FileViewTab.files)
@@ -893,7 +893,7 @@ struct FilesTabView: View {
                     fileMenu
                 }
             }
-            .background(Color(.systemBackground))
+            .background(AppBackground())
         }
         .onAppear {
             refreshFiles()
@@ -1039,7 +1039,7 @@ struct FilesTabView: View {
             Text(L("未签名 (%d)", partition.unsigned)).tag(FileListTab.unsigned)
             Text(L("已签名 (%d)", partition.signed)).tag(FileListTab.signed)
         }
-        .pickerStyle(.segmented)
+        .pickerStyle(.menu)
         // 切栏触感：点切栏、或菜单"查看文件位置"切栏变化时
         // 各震一次 .light；后者菜单按钮本身不另震，免得一次点按震两次。
         .onChange(of: fileTab) { _, _ in
@@ -1132,6 +1132,7 @@ struct FilesTabView: View {
     private func bodyFooter(partition: FilePartition) -> some View {
         fileInstallStatus
         importCard.cascadeItem(5)
+        lanCard.cascadeItem(6)
         Text(L("%d 个文件 · %@", files.count,
                ByteCountFormatter.string(fromByteCount: Int64(partition.totalSize), countStyle: .file)))
             .font(.footnote)
@@ -1300,14 +1301,14 @@ struct FilesTabView: View {
                             Text(L("压缩成 ZIP"))
                         }
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     .disabled(selection.isEmpty || opBusy)
                     Button(role: .destructive) {
                         pendingDeleteSelection = true
                     } label: {
                         Text(L("删除所选"))
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     .disabled(selection.isEmpty || opBusy)
                 }
             }
@@ -1332,7 +1333,7 @@ struct FilesTabView: View {
                     Text(L("导入文件"))
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                 if let importError {
                     Text(importError)
                         .font(.footnote)
@@ -1350,9 +1351,14 @@ struct FilesTabView: View {
                         .font(.footnote)
                         .foregroundStyle(opFailed ? Theme.negative : Theme.positive)
                 }
-                Divider()
-                lanSection
             }
+        }
+    }
+
+    /// 局域网传输卡：原来 importCard 下半截，拆出来单成一卡。
+    private var lanCard: some View {
+        PanelCard {
+            lanSection
         }
     }
 
@@ -1425,19 +1431,9 @@ struct FilesTabView: View {
         }
     }
 
-    /// 文件页顶部搜索条（轻松签文件列表同款浅灰搜索框）：
-    /// 按名字过滤当前视图（根目录各组、或当前文件夹内）。
+    /// 文件页顶部搜索条：按名字过滤当前视图（根目录各组、或当前文件夹内）。
     private var fileSearchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(Theme.muted)
-            TextField(L("搜索"), text: $fileSearchText)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-        }
-        .padding(8)
-        .background(Color.secondary.opacity(0.12))
-        .cornerRadius(8)
+        SearchBar(text: $fileSearchText, placeholder: L("搜索"))
     }
 
     /// 当前文件夹返回条：点回上级（根目录就回文件组）。
@@ -1545,7 +1541,7 @@ struct FilesTabView: View {
 
     /// 文件行图标：IPA 真图 / 文件夹蓝标 / 其他灰标，三路不同
     /// View 类型，函数前必须加 @ViewBuilder（AGENTS.md 血泪）。
-    /// 真图 52×52 圆角填满；系统标放 52×52 框里居中，行高对齐。
+    /// 真图 60×60 圆角填满；系统标放 60×60 框里居中，行高对齐。
     @ViewBuilder
     private func fileIcon(for item: LocalFileItem) -> some View {
         // A-37-3：读 iconEpoch 建立依赖——图标本体在共享缓存里，
@@ -1592,7 +1588,7 @@ struct FilesTabView: View {
                 // 轻松签文件列表式：IPA 有真实图标就显示真图（应用库
                 // 同款解析，见 loadFileIcon），没取到就中性占位；
                 // 文件夹蓝色、其他文件灰色文档图标。图标区统一
-                // 52×52 框，行高对齐，不晃。
+                // 60×60 框，行高对齐，不晃。
                 fileIcon(for: item)
                 if item.isIPA {
                     // IPA 行三行格式（轻松签文件列表同款）：解析出的
@@ -1609,7 +1605,7 @@ struct FilesTabView: View {
                             .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                         Text(item.name)
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundStyle(Theme.muted)
                             .lineLimit(1)
                     }
@@ -2243,18 +2239,9 @@ struct FilesTabView: View {
                 Text(L("未签名")).tag(CertLibraryTab.unsigned)
                 Text(L("已签名")).tag(CertLibraryTab.signed)
             }
-            .pickerStyle(.segmented)
-            // 轻松签应用页同款浅灰搜索框，两个切栏都按名字过滤。
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(Theme.muted)
-                TextField(L("搜索"), text: $librarySearchText)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-            }
-            .padding(8)
-            .background(Color.secondary.opacity(0.12))
-            .cornerRadius(8)
+            .pickerStyle(.menu)
+            // 轻松签应用页同款搜索框，两个切栏都按名字过滤。
+            SearchBar(text: $librarySearchText, placeholder: L("搜索"))
             libraryContent
             // 记录段不在切栏里了，页尾留一行入口（切到记录段后本行隐藏，点切栏回未签名/已签名）。
             if libraryTab != .log {
@@ -2848,9 +2835,9 @@ struct FilesTabView: View {
             Image(uiImage: image)
                 .resizable()
                 .frame(width: 60, height: 60)
-                .cornerRadius(13)
+                .cornerRadius(14)
         } else {
-            RoundedRectangle(cornerRadius: 13)
+            RoundedRectangle(cornerRadius: 14)
                 .fill(Color.secondary.opacity(0.15))
                 .frame(width: 60, height: 60)
         }
@@ -3171,7 +3158,7 @@ private struct FileDetailSheet: View {
                           ? L("%d 项", item.childCount)
                           : ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file))
                 detailRow(L("修改时间"), item.modified?.formatted(date: .abbreviated, time: .standard) ?? L("unknown"))
-                detailRow(L("路径"), item.url.path)
+                detailRow(L("路径"), item.url.path, middleTruncation: true)
                 if let renewalAppName {
                     detailRow(L("续签用的应用"), renewalAppName)
                 }
@@ -3205,6 +3192,7 @@ private struct FileDetailSheet: View {
             }
             .navigationTitle(L("详情"))
             .navigationBarTitleDisplayMode(.inline)
+            .blueTopBar()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(L("Done")) { dismiss() }
@@ -3213,13 +3201,15 @@ private struct FileDetailSheet: View {
         }
     }
 
-    private func detailRow(_ label: String, _ value: String) -> some View {
+    private func detailRow(_ label: String, _ value: String, middleTruncation: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(Theme.muted)
             Text(value)
                 .font(.subheadline)
+                .lineLimit(2)
+                .truncationMode(middleTruncation ? .middle : .tail)
         }
     }
 }
