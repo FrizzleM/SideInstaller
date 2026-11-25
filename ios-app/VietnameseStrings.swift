@@ -8,16 +8,30 @@ let vietnameseStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Apple ID":
+        "Apple ID",
     "Cancel": "Hủy",
     "Copy": "Sao chép",
     "Copy logs": "Sao chép nhật ký",
     "Email": "Email",
+    "No unsigned IPA in the library.":
+        "Không có IPA chưa ký nào trong thư viện.",
+    "Once the install starts, tap the Install button at the bottom to see progress.":
+        "Sau khi quá trình cài đặt bắt đầu, chạm vào nút Cài ứng dụng ở phía dưới để xem tiến độ.",
     "Password": "Mật khẩu",
     "Install": "Cài ứng dụng",
     // U-UI (0.9.102): new tab bar / source + file list redesign.
     "Apps": "Ứng dụng",
+    "Pick an IPA to install with your Apple ID.":
+        "Chọn một IPA để cài đặt bằng ID Apple của bạn.",
+    "Signing method":
+        "Phương thức ký",
     "Sources": "Nguồn",
     "AppStore": "AppStore",
+    "企业证书":
+        "Chứng chỉ doanh nghiệp",
+    "用 Apple ID 安装":
+        "Cài đặt bằng ID Apple",
     "软件源": "Nguồn phần mềm",
     "文件列表": "Danh sách tệp",
     "筛选": "Lọc",

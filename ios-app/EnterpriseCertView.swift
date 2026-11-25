@@ -69,6 +69,8 @@ struct EnterpriseCertView: View {
     @State private var revocationCheckedAt: Date?
     // 待签 IPA 与修改项
     @State private var selectedIPA: URL?
+    /// SIDE-53：签名方式，默认企业证书（现有行为一字不动）。
+    @State private var signIdentity: CZFSignIdentity = .enterprise
     @State private var mods = CertSignMods()
     @State private var showIPAPicker = false
     @State private var showLibraryPicker = false
@@ -967,12 +969,13 @@ struct EnterpriseCertView: View {
     }
 
     /// 签名段：轻松签签名页式分组列表（v68 UI）。分组标题 + 行：
-    /// App 名字 / Bundle Identifier / 版本号 / 最低系统版本 /
+    /// 签名方式 / App 名字 / Bundle Identifier / 版本号 / 最低系统版本 /
     /// 新图标 / 签名后立即安装（开关行）/ 选择证书 / 打包文件名；
     /// 底部两个通栏大按钮：大红“立即签名”、大蓝“更多设置”。
     /// 功能一个不少，只是换版式：框里还是原值、改了才生效；
     /// 预设/插件注入/多开/仅签名收进“更多设置”里，点蓝按钮展开。
     /// 步骤进度/诊断日志/安装状态/提示文案位置跟原来一样，在按钮下面。
+    /// SIDE-53：签名方式切 Apple ID 时，企业专属分组（改名/证书/打包名/更多设置）隐藏，只留选应用 + 安装按钮。
     private func signCard(_ proxy: ScrollViewProxy) -> some View {
         VStack(alignment: .leading, spacing: 20) {
             // 证书组（原证书段整体搬进签名段顶部）：未就绪默认展开、
@@ -1030,115 +1033,160 @@ struct EnterpriseCertView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.negative)
             }
+            // SIDE-53：签名方式——企业证书走现有签名表单，Apple ID
+            // 走一键安装（importCustomIPA + runOneClick）；切方式
+            // 时清掉旧拦阻提示，免得企业那边的文案留在 ID 按钮下。
+            signGroup(title: L("Signing method")) {
+                Picker(L("Signing method"), selection: $signIdentity) {
+                    Text(L("企业证书")).tag(CZFSignIdentity.enterprise)
+                    Text(L("Apple ID")).tag(CZFSignIdentity.appleID)
+                }
+                .pickerStyle(.segmented)
+            }
+            .onChange(of: signIdentity) { _, _ in signBlockedMessage = nil }
             if let url = selectedIPA {
                 PanelCard {
                     selectedIPASummary(url)
                 }
-                signGroup(title: L("App 名字")) {
-                    TextField(selectedInfo?.name ?? "", text: $mods.name)
-                        .textFieldStyle(.plain).fieldBackground()
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-                signGroup(title: L("Bundle Identifier")) {
-                    TextField(selectedInfo?.bundleID ?? "", text: $mods.bundleID)
-                        .textFieldStyle(.plain).fieldBackground()
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-                signGroup(title: L("版本号")) {
-                    TextField(selectedInfo?.version ?? "", text: $mods.version)
-                        .textFieldStyle(.plain).fieldBackground()
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-                signGroup(title: L("最低系统版本")) {
-                    TextField(L("如 15.0"), text: $mods.minOS)
-                        .textFieldStyle(.plain).fieldBackground()
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-                signGroup(title: L("新图标")) {
-                    iconRow
-                }
-                signGroup(title: L("签名后立即安装")) {
-                    // 开 = 签完直接走配对安装，关 = 只签存已签名；
-                    // 跟原来 Toggle 同例，只是挪进分组行里。
-                    // 组标题已显示，Toggle 标签只留无障碍，不再上下重复。
-                    Toggle(L("签名后立即安装"), isOn: $installWhenSign).labelsHidden()
-                }
-                signGroup(title: L("选择证书")) {
-                    Button {
-                        certGroupExpanded = true
-                        // 证书组在表单顶部，滚下去点这行时展开发生在
-                        // 视口外、看着像没反应：直接滚回组顶。
-                        Task { @MainActor in
-                            withAnimation { proxy.scrollTo("certGroup", anchor: .top) }
-                        }
-                    } label: {
-                        HStack {
-                            Text(certRowText)
-                                .lineLimit(1)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(Theme.muted.opacity(0.6))
-                                .font(.footnote)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-                signGroup(title: L("打包文件名")) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        TextField(predictedOutputName, text: $mods.outputName)
+                if signIdentity == .enterprise {
+                    signGroup(title: L("App 名字")) {
+                        TextField(selectedInfo?.name ?? "", text: $mods.name)
                             .textFieldStyle(.plain).fieldBackground()
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
-                        Text(L("将保存为：%@；重名自动加序号", effectiveOutputName))
-                            .font(.caption)
-                            .foregroundStyle(Theme.muted)
+                    }
+                    signGroup(title: L("Bundle Identifier")) {
+                        TextField(selectedInfo?.bundleID ?? "", text: $mods.bundleID)
+                            .textFieldStyle(.plain).fieldBackground()
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+                    signGroup(title: L("版本号")) {
+                        TextField(selectedInfo?.version ?? "", text: $mods.version)
+                            .textFieldStyle(.plain).fieldBackground()
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+                    signGroup(title: L("最低系统版本")) {
+                        TextField(L("如 15.0"), text: $mods.minOS)
+                            .textFieldStyle(.plain).fieldBackground()
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+                    signGroup(title: L("新图标")) {
+                        iconRow
+                    }
+                    signGroup(title: L("签名后立即安装")) {
+                        // 开 = 签完直接走配对安装，关 = 只签存已签名；
+                        // 跟原来 Toggle 同例，只是挪进分组行里。
+                        // 组标题已显示，Toggle 标签只留无障碍，不再上下重复。
+                        Toggle(L("签名后立即安装"), isOn: $installWhenSign).labelsHidden()
+                    }
+                    signGroup(title: L("选择证书")) {
+                        Button {
+                            certGroupExpanded = true
+                            // 证书组在表单顶部，滚下去点这行时展开发生在
+                            // 视口外、看着像没反应：直接滚回组顶。
+                            Task { @MainActor in
+                                withAnimation { proxy.scrollTo("certGroup", anchor: .top) }
+                            }
+                        } label: {
+                            HStack {
+                                Text(certRowText)
+                                    .lineLimit(1)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(Theme.muted.opacity(0.6))
+                                    .font(.footnote)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    signGroup(title: L("打包文件名")) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            TextField(predictedOutputName, text: $mods.outputName)
+                                .textFieldStyle(.plain).fieldBackground()
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                            Text(L("将保存为：%@；重名自动加序号", effectiveOutputName))
+                                .font(.caption)
+                                .foregroundStyle(Theme.muted)
+                        }
+                    }
+                    // 轻松签式脱壳提示：选好 IPA 就预检，加密的直接在
+                    // 表单上提示（签时 startSign 还会再算一次 gate）。
+                    // 多 .app 时逐个报名字（见 SS2）；名字还没算出来
+                    // 时退回固定文案，不空着。
+                    if let cryptid = selectedCryptid, cryptid != 0 {
+                        Text(selectedUndumpedApps.isEmpty
+                             ? L("程序未脱壳，签名后可能无法安装，建议重新脱壳签名。")
+                             : L("以下程序未脱壳，签名后可能无法安装，建议重新脱壳签名：%@", selectedUndumpedApps.joined(separator: "、")))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.warning)
                     }
                 }
-                // 轻松签式脱壳提示：选好 IPA 就预检，加密的直接在
-                // 表单上提示（签时 startSign 还会再算一次 gate）。
-                // 多 .app 时逐个报名字（见 SS2）；名字还没算出来
-                // 时退回固定文案，不空着。
-                if let cryptid = selectedCryptid, cryptid != 0 {
-                    Text(selectedUndumpedApps.isEmpty
-                         ? L("程序未脱壳，签名后可能无法安装，建议重新脱壳签名。")
-                         : L("以下程序未脱壳，签名后可能无法安装，建议重新脱壳签名：%@", selectedUndumpedApps.joined(separator: "、")))
-                        .font(.footnote)
-                        .foregroundStyle(Theme.warning)
-                }
                 // 底部两个通栏大按钮（轻松签签名页同款层级）：主按钮
-                // 大红实心（走开关：开 = 签名并安装，关 = 仅签名），
-                // 次按钮蓝色浅底（展开预设/插件/多开/瘦身/仅签名）。
+                // 大红实心（走开关：开 = 签名并安装，关 = 仅签名）；Apple ID
+                // 时主按钮变蓝“用 Apple ID 安装”，走一键安装。
+                // 次按钮蓝色浅底（展开预设/插件/多开/瘦身/仅签名，企业专用）。
                 // 按压态走 CZFPressButtonStyle（plain 样式按着没反馈，
                 // 看着像没点）；前置条件不满足时按钮不直接禁用——点
                 // 了必在正下方红字明说原因（批量签名同例），绝不静默。
                 // 半透明只是“现在签不了”的视觉提示，不是禁用。
-                Button {
-                    CZFHaptics.impact(.medium)
-                    signFromMainButton(kind: installWhenSign ? .signAndInstall : .signOnly, proxy: proxy)
-                } label: {
-                    HStack {
-                        if workspace.signBusy { ProgressView().tint(.white) }
-                        Text(L("立即签名"))
-                            .font(.headline)
+                if signIdentity == .appleID {
+                    Button {
+                        CZFHaptics.impact(.medium)
+                        signWithAppleID()
+                    } label: {
+                        HStack {
+                            if engine.isRunning { ProgressView().tint(.white) }
+                            Text(L("用 Apple ID 安装"))
+                                .font(.headline)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(Theme.accent)
+                        .foregroundStyle(.white)
+                        .cornerRadius(16)
+                        .shadow(color: Theme.accent.opacity(0.25), radius: 8, y: 4)
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(Theme.negative)
-                    .foregroundStyle(.white)
-                    .cornerRadius(16)
-                    .shadow(color: Theme.negative.opacity(0.25), radius: 8, y: 4)
+                    .buttonStyle(CZFPressButtonStyle())
+                    .opacity(engine.isRunning ? 0.5 : 1)
+                } else {
+                    Button {
+                        CZFHaptics.impact(.medium)
+                        signFromMainButton(kind: installWhenSign ? .signAndInstall : .signOnly, proxy: proxy)
+                    } label: {
+                        HStack {
+                            if workspace.signBusy { ProgressView().tint(.white) }
+                            Text(L("立即签名"))
+                                .font(.headline)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(Theme.negative)
+                        .foregroundStyle(.white)
+                        .cornerRadius(16)
+                        .shadow(color: Theme.negative.opacity(0.25), radius: 8, y: 4)
+                    }
+                    .buttonStyle(CZFPressButtonStyle())
+                    .opacity(workspace.signBusy || engine.isRunning || !certReady ? 0.5 : 1)
                 }
-                .buttonStyle(CZFPressButtonStyle())
-                .opacity(workspace.signBusy || engine.isRunning || !certReady ? 0.5 : 1)
                 // 按钮正下方的实时状态行（轻松签式一眼看全，优先级
                 // 从高到低）：点按被拦的原因 > 正在签名 > 正在安装
                 // 的阶段 > 安装失败原因 > 签名结果。原来结果/缺件
                 // 提示在诊断日志下面、要翻到底才看见，现挪到这里。
-                if let signBlockedMessage {
+                if signIdentity == .appleID {
+                    if let signBlockedMessage {
+                        Text(signBlockedMessage)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.negative)
+                    } else {
+                        Text(L("Once the install starts, tap the Install button at the bottom to see progress."))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                    }
+                } else if let signBlockedMessage {
                     Text(signBlockedMessage)
                         .font(.footnote)
                         .foregroundStyle(Theme.negative)
@@ -1163,59 +1211,61 @@ struct EnterpriseCertView: View {
                 // 开着“签名后立即安装”时红按钮只签装 1 个——这句以前
                 // 只藏在默认收起的更多设置里，红按钮处直接说明，
                 // 免得在按钮上踩坑。只加提示，不改签名行为。
-                if installWhenSign && multiCount > 1 {
-                    Text(L("已开“签名后立即安装”，这次只签装 1 个，多开数量不生效；要签多个请关掉安装开关或用“仅签名”。"))
-                        .font(.footnote)
-                        .foregroundStyle(Theme.warning)
-                }
-                Button {
-                    CZFHaptics.impact(.light)
-                    showMoreSettings.toggle()
-                } label: {
-                    HStack {
-                        Text(L("更多设置"))
-                            .font(.headline)
-                        Image(systemName: showMoreSettings ? "chevron.up" : "chevron.down")
+                if signIdentity == .enterprise {
+                    if installWhenSign && multiCount > 1 {
+                        Text(L("已开“签名后立即安装”，这次只签装 1 个，多开数量不生效；要签多个请关掉安装开关或用“仅签名”。"))
                             .font(.footnote)
+                            .foregroundStyle(Theme.warning)
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(Theme.accent.opacity(0.12))
-                    .foregroundStyle(Theme.accent)
-                    .cornerRadius(16)
-                }
-                .buttonStyle(CZFPressButtonStyle())
-                if showMoreSettings {
-                    PanelCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            presetSection
-                            Divider()
-                            pluginSection
-                            Divider()
-                            multiOpenSection
-                            Divider()
-                            slimSection
-                            Divider()
-                            Button {
-                                CZFHaptics.impact(.medium)
-                                signFromMainButton(kind: .signOnly, proxy: proxy)
-                            } label: {
-                                HStack {
-                                    if workspace.signBusy { ProgressView() }
-                                    Text(L("仅签名（存到已签名）"))
+                    Button {
+                        CZFHaptics.impact(.light)
+                        showMoreSettings.toggle()
+                    } label: {
+                        HStack {
+                            Text(L("更多设置"))
+                                .font(.headline)
+                            Image(systemName: showMoreSettings ? "chevron.up" : "chevron.down")
+                                .font(.footnote)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(Theme.accent.opacity(0.12))
+                        .foregroundStyle(Theme.accent)
+                        .cornerRadius(16)
+                    }
+                    .buttonStyle(CZFPressButtonStyle())
+                    if showMoreSettings {
+                        PanelCard {
+                            VStack(alignment: .leading, spacing: 12) {
+                                presetSection
+                                Divider()
+                                pluginSection
+                                Divider()
+                                multiOpenSection
+                                Divider()
+                                slimSection
+                                Divider()
+                                Button {
+                                    CZFHaptics.impact(.medium)
+                                    signFromMainButton(kind: .signOnly, proxy: proxy)
+                                } label: {
+                                    HStack {
+                                        if workspace.signBusy { ProgressView() }
+                                        Text(L("仅签名（存到已签名）"))
+                                    }
+                                    .frame(maxWidth: .infinity)
                                 }
-                                .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-                            .opacity(workspace.signBusy || engine.isRunning || !certReady ? 0.5 : 1)
-                            if let signBlockedMessage {
-                                Text(signBlockedMessage)
-                                    .font(.footnote)
-                                    .foregroundStyle(Theme.negative)
+                                .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                                .opacity(workspace.signBusy || engine.isRunning || !certReady ? 0.5 : 1)
+                                if let signBlockedMessage {
+                                    Text(signBlockedMessage)
+                                        .font(.footnote)
+                                        .foregroundStyle(Theme.negative)
+                                }
                             }
                         }
+                        .id("moreSettingsPanel")
                     }
-                    .id("moreSettingsPanel")
                 }
                 enterpriseInstallStatus
                 enterpriseStepProgress
@@ -1223,7 +1273,9 @@ struct EnterpriseCertView: View {
             } else {
                 PanelCard {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text(L("选一个 IPA，可以先改名称、Bundle ID、版本、最低系统版本和图标，再用企业证书签名。"))
+                        Text(signIdentity == .appleID
+                            ? L("Pick an IPA to install with your Apple ID.")
+                            : L("选一个 IPA，可以先改名称、Bundle ID、版本、最低系统版本和图标，再用企业证书签名。"))
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                         HStack(spacing: 10) {
@@ -1579,7 +1631,7 @@ struct EnterpriseCertView: View {
             // 缓存桶 + loadLibraryIcon（signed: false），与未签名
             // 库行同一套；行 .task(id: 路径#指纹) 触发，换文件重取、
             // 同文件不重复解包、取失败不死循环。行布局/文字/
-            // 更换按钮/签名逻辑一律不动。
+            // 更换按钮直接开文件库选择器（SIDE-53，点选即切换）；行布局/文字/签名逻辑不动。
             libraryIcon(for: url.path, signed: false)
             VStack(alignment: .leading, spacing: 2) {
                 // 名字 + 版本放同一行（轻松签式一眼认出是哪个包、
@@ -1598,7 +1650,12 @@ struct EnterpriseCertView: View {
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
                     .lineLimit(1)
-                if certReady {
+                if signIdentity == .appleID {
+                    Text(L("用 Apple ID 安装"))
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                } else if certReady {
                     Text(L("用证书：%@", certRowText))
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
@@ -1612,13 +1669,9 @@ struct EnterpriseCertView: View {
             }
             Spacer()
             Button {
-                selectedIPA = nil
-                selectedIPAFingerprint = ""
-                selectedInfo = nil
-                signError = nil
-                resetMods()
-                signOnlyMessage = nil
-                signBlockedMessage = nil
+                // SIDE-53：更换直接开文件库选择器，点选即切换，
+                // 不再先清掉再回空态重选。
+                showLibraryPicker = true
             } label: {
                 Text(L("Replace"))
                     .font(.footnote)
@@ -1824,6 +1877,39 @@ struct EnterpriseCertView: View {
         }
         signBlockedMessage = nil
         startSign(kind: kind)
+    }
+
+    /// SIDE-53：Apple ID 安装——把选中的应用导进 custom 槽，
+    /// installSource = .custom，然后走 engine.runOneClick()。
+    /// 缺 Apple ID / 配对 / 隧道的指引由 runOneClick 自己的门禁
+    /// 出（guide 卡会弹到当前页上）；进度在安装页，底部 Install
+    /// pill 可打开（按钮下的文案已写明）。正在装 / 正在导时不重复进。
+    private func signWithAppleID() {
+        guard let url = selectedIPA else { return }
+        if engine.isRunning {
+            signBlockedMessage = L("An install is already running. Wait for it to finish, then try again.")
+            return
+        }
+        if engine.isImportingIPA {
+            signBlockedMessage = L("An import is already running. Wait for it to finish, then try again.")
+            return
+        }
+        signBlockedMessage = nil
+        Task { @MainActor in
+            guard await engine.importCustomIPA(from: url) else {
+                signBlockedMessage = engine.lastError ?? L("Import failed")
+                return
+            }
+            let previousError = engine.lastError
+            engine.installSource = .custom
+            engine.runOneClick()
+            // runOneClick 的门禁多半走 guide 卡；只写 lastError 的那路
+            //（如最低系统版本不够）没有卡，就把新冒出来的错写在按钮下，
+            // 免得点了没反应；旧错不重复报。
+            if !engine.isRunning, let error = engine.lastError, error != previousError {
+                signBlockedMessage = error
+            }
+        }
     }
 
     /// 签名入口：先在后台做签前警告检查（脱壳要解压，耗时），
@@ -2415,6 +2501,12 @@ struct EnterpriseCertView: View {
 }
 
 /// 签名流程两种去向：仅签名存已签名，或签名后走配对安装。
+/// SIDE-53：签名方式——企业证书（现有行为）或 Apple ID（一键安装）。
+private enum CZFSignIdentity: String {
+    case enterprise
+    case appleID
+}
+
 private enum CertSignKind {
     case signOnly
     case signAndInstall
@@ -2461,6 +2553,13 @@ private struct LibraryIPAPicker: View {
                 SearchBar(text: $query, placeholder: L("搜索"))
                     .padding(.horizontal)
                     .padding(.vertical, 8)
+                if filtered.isEmpty {
+                    Text(L("No unsigned IPA in the library."))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 24)
+                }
                 List(filtered) { item in
                     Button {
                         onPick(item.url)
@@ -2484,8 +2583,9 @@ private struct LibraryIPAPicker: View {
             .task {
                 // 3.8.900（SIDE-4/S2）：进 picker 只扫一次；扫盘放
                 // Task.detached，扫完回主线程写 ipas（照抄 loadFileIcon 写法）。
+                // SIDE-53：只列未签名——已签过的去「已签名」里装，不进签名表单。
                 let scanned = await Task.detached {
-                    AppFileLibrary.scan().filter { $0.isIPA }
+                    AppFileLibrary.scan().filter { $0.isIPA && !$0.isInSignedDir }
                 }.value
                 await MainActor.run { ipas = scanned }
             }

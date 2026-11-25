@@ -8,16 +8,30 @@ let japaneseStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Apple ID":
+        "Apple ID",
     "Cancel": "キャンセル",
     "Copy": "コピー",
     "Copy logs": "ログをコピー",
     "Email": "メールアドレス",
+    "No unsigned IPA in the library.":
+        "ライブラリに未署名の IPA がありません。",
+    "Once the install starts, tap the Install button at the bottom to see progress.":
+        "インストールが始まったら、下部に表示される「インストール」ボタンをタップして進捗を確認できます。",
     "Password": "パスワード",
     "Install": "インストール",
     // U-UI (0.9.102): new tab bar / source + file list redesign.
     "Apps": "アプリ",
+    "Pick an IPA to install with your Apple ID.":
+        "Apple ID でインストールする IPA を選択してください。",
+    "Signing method":
+        "署名方法",
     "Sources": "ソース",
     "AppStore": "AppStore",
+    "企业证书":
+        "企業証明書",
+    "用 Apple ID 安装":
+        "Apple ID でインストール",
     "软件源": "ソフトウェアソース",
     "文件列表": "ファイル一覧",
     "筛选": "絞り込む",

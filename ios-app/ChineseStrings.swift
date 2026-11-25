@@ -8,16 +8,30 @@ let chineseStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Apple ID":
+        "Apple ID",
     "Cancel": "取消",
     "Copy": "复制",
     "Copy logs": "复制日志",
     "Email": "电子邮件",
+    "No unsigned IPA in the library.":
+        "文件库里没有未签名 IPA。",
+    "Once the install starts, tap the Install button at the bottom to see progress.":
+        "安装开始后，点底部出现的“安装”按钮看进度。",
     "Password": "密码",
     "Install": "安装",
     // U-UI (0.9.102): new tab bar / source + file list redesign.
     "Apps": "应用",
+    "Pick an IPA to install with your Apple ID.":
+        "选一个 IPA，用 Apple ID 安装。",
+    "Signing method":
+        "签名方式",
     "Sources": "源",
     "AppStore": "AppStore",
+    "企业证书":
+        "企业证书",
+    "用 Apple ID 安装":
+        "用 Apple ID 安装",
     "软件源": "软件源",
     "文件列表": "文件列表",
     "筛选": "筛选",

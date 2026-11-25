@@ -6,16 +6,30 @@ let italianStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Apple ID":
+        "Apple ID",
     "Cancel": "Annulla",
     "Copy": "Copia",
     "Copy logs": "Copia log",
     "Email": "Email",
+    "No unsigned IPA in the library.":
+        "Nessun IPA non firmato nella libreria.",
+    "Once the install starts, tap the Install button at the bottom to see progress.":
+        "Una volta avviata l'installazione, tocca il pulsante Installa in basso per vedere l'avanzamento.",
     "Password": "Password",
     "Install": "Installa",
     // U-UI (0.9.102): new tab bar / source + file list redesign.
     "Apps": "App",
+    "Pick an IPA to install with your Apple ID.":
+        "Scegli un IPA da installare con il tuo ID Apple.",
+    "Signing method":
+        "Metodo di firma",
     "Sources": "Sorgenti",
     "AppStore": "AppStore",
+    "企业证书":
+        "Certificato aziendale",
+    "用 Apple ID 安装":
+        "Installa con il tuo ID Apple",
     "软件源": "Sorgenti software",
     "文件列表": "Elenco file",
     "筛选": "Filtra",

@@ -9,16 +9,30 @@ let koreanStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Apple ID":
+        "Apple ID",
     "Cancel": "취소",
     "Copy": "복사",
     "Copy logs": "로그 복사",
     "Email": "이메일",
+    "No unsigned IPA in the library.":
+        "보관함에 서명되지 않은 IPA가 없습니다.",
+    "Once the install starts, tap the Install button at the bottom to see progress.":
+        "설치가 시작되면 하단에 나타나는 설치 버튼을 눌러 진행 상황을 확인하세요.",
     "Password": "암호",
     "Install": "설치",
     // U-UI (0.9.102): new tab bar / source + file list redesign.
     "Apps": "앱",
+    "Pick an IPA to install with your Apple ID.":
+        "Apple ID로 설치할 IPA를 선택하세요.",
+    "Signing method":
+        "서명 방식",
     "Sources": "소스",
     "AppStore": "AppStore",
+    "企业证书":
+        "기업 인증서",
+    "用 Apple ID 安装":
+        "Apple ID로 설치",
     "软件源": "소프트웨어 소스",
     "文件列表": "파일 목록",
     "筛选": "필터",

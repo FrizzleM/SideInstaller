@@ -8,16 +8,30 @@ let turkishStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Apple ID":
+        "Apple ID",
     "Cancel": "İptal",
     "Copy": "Kopyala",
     "Copy logs": "Günlükleri kopyala",
     "Email": "E-posta",
+    "No unsigned IPA in the library.":
+        "Kitaplıkta imzalanmamış IPA yok.",
+    "Once the install starts, tap the Install button at the bottom to see progress.":
+        "Yükleme başladıktan sonra ilerlemeyi görmek için alttaki Yükle düğmesine dokunun.",
     "Password": "Parola",
     "Install": "Yükle",
     // U-UI (0.9.102): new tab bar / source + file list redesign.
     "Apps": "Uygulamalar",
+    "Pick an IPA to install with your Apple ID.":
+        "Apple ID ile yüklemek için bir IPA seçin.",
+    "Signing method":
+        "İmzalama yöntemi",
     "Sources": "Kaynaklar",
     "AppStore": "AppStore",
+    "企业证书":
+        "Kurumsal sertifika",
+    "用 Apple ID 安装":
+        "Apple ID ile yükle",
     "软件源": "Yazılım kaynakları",
     "文件列表": "Dosya listesi",
     "筛选": "Filtrele",
