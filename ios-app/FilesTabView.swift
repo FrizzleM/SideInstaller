@@ -140,6 +140,14 @@ struct FilesTabView: View {
     @State private var opBusy = false
     @State private var opMessage: String?
     @State private var opFailed = false
+    /// F2 (0.9.151): batch install — the running Task is the cancel
+    /// handle; the index/name of the item now installing is the batch
+    /// progress (the per-install progress itself is engine.installProgress,
+    /// Install pill 同款，不另起一套）.
+    @State private var batchInstallTask: Task<Void, Never>?
+    @State private var batchInstallIndex = 0
+    @State private var batchInstallTotal = 0
+    @State private var batchInstallCurrent: String?
     // Mach-O 查看 / 局域网传输
     @State private var machoItem: LocalFileItem?
     /// ⓘ 详情 sheet 正在看的行。
@@ -1293,7 +1301,14 @@ struct FilesTabView: View {
     /// 文件页顶栏：只留标题 + 切栏 + 搜索（轻松签文件列表式紧凑顶栏）；
     /// 原来的大标题计数、导入卡、安装状态、操作行都移到页尾或 ••• 菜单里。
 
-    /// 多选时的操作条：压缩成一个 zip / 批量删除。
+    /// F2 (0.9.151): the selected IPAs — any tab, since the unsigned and
+    /// signed lists share this selection; folders and non-IPA files never
+    /// install, and are counted as skipped by installSelection.
+    private var selectionIPAs: [LocalFileItem] {
+        files.filter { selection.contains($0.id) && $0.isIPA && !$0.isDirectory }
+    }
+
+    /// 多选时的操作条：压缩成一个 zip / 批量安装 / 批量删除。
     private var selectionBar: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 10) {
@@ -1309,14 +1324,43 @@ struct FilesTabView: View {
                         }
                     }
                     .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-                    .disabled(selection.isEmpty || opBusy)
+                    .disabled(selection.isEmpty || opBusy || batchInstallTask != nil)
+                    Button {
+                        installSelection()
+                    } label: {
+                        HStack {
+                            if batchInstallTask != nil { ProgressView() }
+                            Text(L("安装所选"))
+                        }
+                    }
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    .disabled(selectionIPAs.isEmpty || opBusy || batchInstallTask != nil)
                     Button(role: .destructive) {
                         pendingDeleteSelection = true
                     } label: {
                         Text(L("删除所选"))
                     }
                     .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-                    .disabled(selection.isEmpty || opBusy)
+                    .disabled(selection.isEmpty || opBusy || batchInstallTask != nil)
+                }
+                // F2：批量安装进行中——第几个/共几个 + 当次安装进度 +
+                // 取消（取消同时停掉批量 Task 与当次安装，见
+                // cancelBatchInstall；Install pill 同款进度也在跑）。
+                if let current = batchInstallCurrent {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text(L("正在安装第 %d/%d 个：%@", batchInstallIndex, batchInstallTotal, current))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                        if engine.installProgress > 0 {
+                            Text("(\(Int(engine.installProgress * 100))%)")
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                        }
+                        Spacer()
+                        Button(L("取消安装")) { cancelBatchInstall() }
+                            .font(.footnote)
+                    }
                 }
             }
         }
@@ -2177,6 +2221,103 @@ struct FilesTabView: View {
                 opFailed = false
             }
         }
+    }
+
+    /// F2 (0.9.151): install every selected IPA, one after another, each
+    /// through the single-install path (`Engine.installOneCustomIPA`:
+    /// import + sign + install). Refusals mirror batchSign's: a run
+    /// already going, a signing run, or an import in flight all refuse
+    /// up front instead of failing item by item. The targets are captured
+    /// at tap time; progress is the batch row in selectionBar, cancellation
+    /// is the batch Task + engine.cancelOneClick (the row's Cancel button).
+    /// The summary names every failure with its reason (past 5, only the
+    /// count is kept); non-IPA selections are skipped and counted, never
+    /// installed. A stopped outcome (the run never started, or a cancel)
+    /// ends the batch — the items after it are listed with the same reason,
+    /// not silently dropped.
+    private func installSelection() {
+        guard batchInstallTask == nil else { return }
+        let targets = selectionIPAs
+        guard !targets.isEmpty else { return }
+        if engine.isRunning {
+            opMessage = L("已有安装在进行，先等当前安装完成再批量安装。")
+            opFailed = true
+            return
+        }
+        if workspace.batchBusy || workspace.signBusy {
+            opMessage = L("正在签名，等它跑完再批量安装。")
+            opFailed = true
+            return
+        }
+        if engine.isImportingIPA {
+            opMessage = L("An import is already running. Wait for it to finish, then try again.")
+            opFailed = true
+            return
+        }
+        let skipped = selection.count - targets.count
+        // 批量签名的 batchBusy 也是批量安装的互斥锁：入口立起来，批量
+        // 签名在批量安装跑着时进不来（batchSign 入口认它）。
+        workspace.batchBusy = true
+        batchInstallTotal = targets.count
+        batchInstallIndex = 0
+        batchInstallCurrent = nil
+        opMessage = nil
+        batchInstallTask = Task { @MainActor in
+            var outcomes: [Engine.BatchInstallOutcome] = []
+            var stopped = false
+            for (offset, item) in targets.enumerated() {
+                if Task.isCancelled || stopped { break }
+                batchInstallIndex = offset + 1
+                batchInstallCurrent = (item.name as NSString).deletingPathExtension
+                let outcome = await engine.installOneCustomIPA(item.url)
+                outcomes.append(outcome)
+                stopped = outcome.stopped
+            }
+            // 没跑到的各项：停批的原因同样记一条，不静默丢掉。
+            if outcomes.count < targets.count {
+                let reason = outcomes.last?.error ?? L("Install stopped")
+                for item in targets[outcomes.count...] {
+                    outcomes.append(Engine.BatchInstallOutcome(
+                        name: (item.name as NSString).deletingPathExtension,
+                        error: reason, stopped: true))
+                }
+            }
+            batchInstallTask = nil
+            batchInstallCurrent = nil
+            batchInstallTotal = 0
+            batchInstallIndex = 0
+            workspace.batchBusy = false
+            selection = []
+            selecting = false
+            let ok = outcomes.filter { $0.error == nil }.count
+            let failed = outcomes.filter { $0.error != nil }
+            var message: String
+            if failed.isEmpty {
+                message = L("批量安装完成：%d 个已安装。", ok)
+            } else {
+                let shown = failed.prefix(5).map { outcome in
+                    "\(outcome.name)：\(outcome.error ?? "")"
+                }
+                var list = shown.joined(separator: "、")
+                if failed.count > 5 {
+                    list += "、" + L("等 %d 个", failed.count - 5)
+                }
+                message = L("批量安装完成：成功 %d 个，失败 %d 个。失败：%@", ok, failed.count, list)
+            }
+            if skipped > 0 {
+                message += " " + L("其中 %d 个不是 IPA，已跳过。", skipped)
+            }
+            opMessage = message
+            opFailed = !failed.isEmpty
+        }
+    }
+
+    /// F2: stop the batch install — cancel the batch Task (the loop stops
+    /// after the current item) and the running install itself (the row's
+    /// Cancel button 同款：engine.cancelOneClick).
+    private func cancelBatchInstall() {
+        batchInstallTask?.cancel()
+        engine.cancelOneClick()
     }
 
     private func unzip(_ item: LocalFileItem) {

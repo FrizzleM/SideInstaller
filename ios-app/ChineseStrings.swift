@@ -1593,4 +1593,17 @@ let chineseStrings: [String: String] = [
         "调试器无法附加到 %@（%@）。请用 SideStore 或 SideInstaller 重新安装它，它们签名的应用可以被调试器附加。",
     "The debugger lost %@ (%@). Open it with JIT again.": "调试器与 %@ 断开了（%@）。请再次用 JIT 打开它。",
     "Universal": "通用",
+
+    // MARK: - Batch install, history empty state & clear-downloads failures (0.9.151)
+
+    "安装所选": "安装所选",
+    "正在安装第 %d/%d 个：%@": "正在安装第 %d/%d 个：%@",
+    "批量安装完成：%d 个已安装。": "批量安装完成：%d 个已安装。",
+    "批量安装完成：成功 %d 个，失败 %d 个。失败：%@": "批量安装完成：成功 %d 个，失败 %d 个。失败：%@",
+    "等 %d 个": "等 %d 个",
+    "其中 %d 个不是 IPA，已跳过。": "其中 %d 个不是 IPA，已跳过。",
+    "已有安装在进行，先等当前安装完成再批量安装。": "已有安装在进行，先等当前安装完成再批量安装。",
+    "正在签名，等它跑完再批量安装。": "正在签名，等它跑完再批量安装。",
+    "Installed apps will be listed here.": "装好的 App 会记在这里。",
+    "以下 %d 个删除失败：%@": "以下 %d 个删除失败：%@",
 ]

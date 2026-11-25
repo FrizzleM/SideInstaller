@@ -1623,4 +1623,17 @@ let frenchStrings: [String: String] = [
     "The debugger lost %@ (%@). Open it with JIT again.":
         "Le débogueur a perdu %@ (%@). Rouvrez-la avec le JIT.",
     "Universal": "Universel",
+
+    // MARK: - Batch install, history empty state & clear-downloads failures (0.9.151)
+
+    "安装所选": "Installer la sélection",
+    "正在安装第 %d/%d 个：%@": "Installation %d/%d : %@",
+    "批量安装完成：%d 个已安装。": "Installation par lots terminée : %d installées.",
+    "批量安装完成：成功 %d 个，失败 %d 个。失败：%@": "Installation par lots terminée : %d réussies, %d échouées. Échouées : %@",
+    "等 %d 个": "et %d autres",
+    "其中 %d 个不是 IPA，已跳过。": "%d n’étaient pas des IPA, ils ont été ignorés.",
+    "已有安装在进行，先等当前安装完成再批量安装。": "Une installation est déjà en cours. Attendez qu’elle se termine avant l’installation par lots.",
+    "正在签名，等它跑完再批量安装。": "Signature en cours. Attendez qu’elle se termine avant l’installation par lots.",
+    "Installed apps will be listed here.": "Les apps installées seront listées ici.",
+    "以下 %d 个删除失败：%@": "Impossible de supprimer %d fichiers : %@",
 ]

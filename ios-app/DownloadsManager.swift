@@ -140,6 +140,10 @@ final class DownloadsManager: ObservableObject {
         lastError = nil
         var deletedIDs: [String] = []
         var failed = 0
+        /// U3 (0.9.151): the names that failed to delete — the old code
+        /// overwrote `lastError` per failure, then the count line at the
+        /// end wiped even that, so no single filename survived.
+        var failedNames: [String] = []
         var skippedInstalling = 0
         var skippedSigning = 0
         var skippedRenewing = 0
@@ -162,6 +166,7 @@ final class DownloadsManager: ObservableObject {
                 deletedIDs.append(item.id)
             } catch {
                 failed += 1
+                failedNames.append(item.fileName)
                 lastError = L("Couldn't delete %@: %@", item.fileName, error.localizedDescription)
                 engine.log("⛔️ Downloads: \(lastError ?? "delete failed")")
             }
@@ -175,7 +180,13 @@ final class DownloadsManager: ObservableObject {
             SideloadedAppsManager.shared.refreshRefreshableOnly()
         }
         if failed > 0 {
-            lastError = L("有 %d 个文件删除失败", failed)
+            // U3：末尾报失败文件名，不只报个数；超过 5 个只列前 5 个，
+            // 余下的计总数（行太长也看不清，全列反而把原因淹没）。
+            var list = failedNames.prefix(5).joined(separator: "、")
+            if failedNames.count > 5 {
+                list += "、" + L("等 %d 个", failedNames.count - 5)
+            }
+            lastError = L("以下 %d 个删除失败：%@", failed, list)
         } else if skippedInstalling > 0 {
             lastError = L("This file is being installed. Wait until it finishes.")
         } else if skippedSigning > 0 {

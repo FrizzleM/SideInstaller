@@ -1615,4 +1615,17 @@ let vietnameseStrings: [String: String] = [
     "The debugger lost %@ (%@). Open it with JIT again.":
         "Trình gỡ lỗi đã mất kết nối với %@ (%@). Hãy mở lại nó bằng JIT.",
     "Universal": "Phổ quát",
+
+    // MARK: - Batch install, history empty state & clear-downloads failures (0.9.151)
+
+    "安装所选": "Cài đặt mục đã chọn",
+    "正在安装第 %d/%d 个：%@": "Đang cài đặt %d/%d: %@",
+    "批量安装完成：%d 个已安装。": "Cài đặt hàng loạt xong: đã cài %d.",
+    "批量安装完成：成功 %d 个，失败 %d 个。失败：%@": "Cài đặt hàng loạt xong: thành công %d, thất bại %d. Thất bại: %@",
+    "等 %d 个": "và %d mục nữa",
+    "其中 %d 个不是 IPA，已跳过。": "%d mục không phải IPA nên đã bỏ qua.",
+    "已有安装在进行，先等当前安装完成再批量安装。": "Đã có một lượt cài đặt đang chạy. Hãy đợi xong rồi mới cài đặt hàng loạt.",
+    "正在签名，等它跑完再批量安装。": "Đang ký. Hãy đợi xong rồi mới cài đặt hàng loạt.",
+    "Installed apps will be listed here.": "Các app đã cài sẽ được liệt kê ở đây.",
+    "以下 %d 个删除失败：%@": "Không xóa được %d tệp: %@",
 ]

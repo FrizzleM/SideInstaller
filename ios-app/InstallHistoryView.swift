@@ -20,8 +20,21 @@ struct InstallHistoryView: View {
     var body: some View {
         List {
             if entries.isEmpty {
-                Text(L("No installs yet."))
-                    .foregroundStyle(Theme.muted)
+                // U2 (0.9.151): the empty state used to be one bare line;
+                // Downloads page empty state 同款：图标 + 主文案 + 一行
+                // 引导，告诉用户装好的会记在这里。
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.title2)
+                        .foregroundStyle(Theme.muted)
+                    Text(L("No installs yet."))
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.muted)
+                    Text(L("Installed apps will be listed here."))
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.muted)
+                }
+                .padding(.vertical, 8)
             }
             ForEach(entries) { entry in
                 Button { reinstall(entry) } label: {

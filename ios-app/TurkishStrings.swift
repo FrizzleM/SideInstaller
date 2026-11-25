@@ -1535,4 +1535,17 @@ let turkishStrings: [String: String] = [
     "The debugger lost %@ (%@). Open it with JIT again.":
         "Hata ayıklayıcı %@ ile bağlantıyı kaybetti (%@). Onu yeniden JIT ile aç.",
     "Universal": "Evrensel",
+
+    // MARK: - Batch install, history empty state & clear-downloads failures (0.9.151)
+
+    "安装所选": "Seçilenleri yükle",
+    "正在安装第 %d/%d 个：%@": "%d/%d yükleniyor: %@",
+    "批量安装完成：%d 个已安装。": "Toplu yükleme tamamlandı: %d yüklendi.",
+    "批量安装完成：成功 %d 个，失败 %d 个。失败：%@": "Toplu yükleme tamamlandı: %d başarılı, %d başarısız. Başarısız: %@",
+    "等 %d 个": "ve %d tane daha",
+    "其中 %d 个不是 IPA，已跳过。": "%d tanesi IPA değildi, atlandı.",
+    "已有安装在进行，先等当前安装完成再批量安装。": "Zaten bir yükleme sürüyor. Toplu yüklemeden önce bitmesini bekleyin.",
+    "正在签名，等它跑完再批量安装。": "İmzalama sürüyor. Toplu yüklemeden önce bitmesini bekleyin.",
+    "Installed apps will be listed here.": "Yüklenen uygulamalar burada listelenir.",
+    "以下 %d 个删除失败：%@": "Şu %d dosya silinemedi: %@",
 ]

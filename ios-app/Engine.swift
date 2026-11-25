@@ -2120,6 +2120,97 @@ final class Engine {
         return nil
     }
 
+    /// One item of a batch install (`installOneCustomIPA`): `error` is nil
+    /// when the IPA installed, otherwise the user-facing reason it didn't.
+    /// `stopped` is true when the batch must not continue: the run never
+    /// started (a systemic cause — account, pairing, tunnel — that would
+    /// hit every remaining item the same way) or the run was stopped with
+    /// no error (a cancel). A failed import or a failed run leaves
+    /// `stopped` false: the batch skips that item and moves on.
+    struct BatchInstallOutcome {
+        let name: String
+        let error: String?
+        let stopped: Bool
+    }
+
+    /// F2 (0.9.151): install one IPA through the single-install path
+    /// (`importCustomIPA` + `installSource = .custom` + `runOneClick`,
+    /// B-39-B2 同款：源只在导入成功后切）. The waits copy
+    /// `Shortcuts.install` / AboutView's self-update: up to 3 s for the
+    /// run to start, then until `isRunning` falls; `finished` decides
+    /// success, `lastError` (or the changed guide) the reason. The
+    /// batch's own Task is the cancel handle: cancelling it stops the
+    /// wait after the current item (the run itself keeps going —
+    /// Shortcuts.install 同款，停掉等待不等停掉安装）; cancelling the
+    /// run as well (the view's Cancel button does both) stops it now.
+    /// Renewal untouched: this only installs, never refreshes.
+    @MainActor
+    func installOneCustomIPA(_ url: URL) async -> BatchInstallOutcome {
+        let name = url.deletingPathExtension().lastPathComponent
+        if Task.isCancelled {
+            return BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        guard await importCustomIPA(from: url) else {
+            return BatchInstallOutcome(name: name, error: lastError ?? L("Install stopped"), stopped: false)
+        }
+        // 取消可能正落在 import 的等待里：import 本身不停，跑完才
+        // 在这里刹住，不然取消后还会新起一跑。另一路安装也可能在
+        // import 期间起跑：这时 runOneClick 会因 isRunning 直接返回，
+        // 而下面的等待循环会把别人的跑当成自己的等完、再拿它的成败
+        // 当这一项的成败——起跑前先拦一道。两道检查到 runOneClick
+        // 之间没有 suspension 点，主 actor 上是原子的，拦完不可能
+        // 再有人插进来。
+        if Task.isCancelled {
+            return BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        guard !isRunning else {
+            return BatchInstallOutcome(name: name, error: L("An install is already running. Wait for it to finish, then try again."), stopped: true)
+        }
+        installSource = .custom
+        let guideBefore = guide
+        runOneClick()
+        // Shortcuts.install 同款：等管线起跑（全隧道探针最多拖半秒），
+        // 3 秒还不起跑就是起跑守卫拦住了，不是起跑慢。
+        var waited = 0.0
+        while !isRunning, !Task.isCancelled, waited < 3.0 {
+            try? await Task.sleep(for: .milliseconds(100))
+            waited += 0.1
+        }
+        if Task.isCancelled {
+            return BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        guard isRunning else {
+            // 没起跑：守卫原因（账号/配对/隧道/向导）对剩下每项都一样，
+            // 逐个重跑只会重复同一失败，整批到此为止。向导优先于
+            // lastError——没起跑的路不经过 resetRun，lastError 可能
+            // 还是上一跑剩下的旧值。
+            let reason: String
+            if let guide, guide != guideBefore {
+                reason = ([guide.title] + guide.steps).joined(separator: "\n")
+            } else if let lastError {
+                reason = lastError
+            } else {
+                reason = L("The install didn't start. Open SideInstaller to see why.")
+            }
+            return BatchInstallOutcome(name: name, error: reason, stopped: true)
+        }
+        while isRunning, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        if Task.isCancelled {
+            return BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        if finished {
+            return BatchInstallOutcome(name: name, error: nil, stopped: false)
+        }
+        if let error = lastError {
+            return BatchInstallOutcome(name: name, error: error, stopped: false)
+        }
+        // 跑完了、没成功、没留错：只有取消走这条路（取消分支只记
+        // 日志不置 lastError）——用户停了这跑，剩下的别再起。
+        return BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+    }
+
     /// Starts a link import as a task the link row can cancel, instead of
     /// the fire-and-forget `Task` the view used to own (B1, 0.9.147).
     /// Returns immediately; the import itself runs in `importCustomIPA`.

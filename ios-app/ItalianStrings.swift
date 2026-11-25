@@ -1617,4 +1617,17 @@ let italianStrings: [String: String] = [
     "The debugger lost %@ (%@). Open it with JIT again.":
         "Il debugger ha perso %@ (%@). Riaprila con il JIT.",
     "Universal": "Universale",
+
+    // MARK: - Batch install, history empty state & clear-downloads failures (0.9.151)
+
+    "安装所选": "Installa selezionati",
+    "正在安装第 %d/%d 个：%@": "Installazione %d/%d: %@",
+    "批量安装完成：%d 个已安装。": "Installazione batch completata: %d installate.",
+    "批量安装完成：成功 %d 个，失败 %d 个。失败：%@": "Installazione batch completata: %d riuscite, %d non riuscite. Non riuscite: %@",
+    "等 %d 个": "e altri %d",
+    "其中 %d 个不是 IPA，已跳过。": "%d non erano IPA e sono stati ignorati.",
+    "已有安装在进行，先等当前安装完成再批量安装。": "Un’installazione è già in corso. Attendi che finisca prima di installare in batch.",
+    "正在签名，等它跑完再批量安装。": "Firma in corso. Attendi che finisca prima di installare in batch.",
+    "Installed apps will be listed here.": "Le app installate saranno elencate qui.",
+    "以下 %d 个删除失败：%@": "Impossibile eliminare %d file: %@",
 ]
