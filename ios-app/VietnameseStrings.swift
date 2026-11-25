@@ -729,6 +729,7 @@ let vietnameseStrings: [String: String] = [
     "Advanced": "Nâng cao",
     "Clear": "Xóa hết",
     "Activity Log (%d)": "Nhật ký hoạt động (%d)",
+    "没有匹配的日志。": "Không có nhật ký phù hợp.",
     "Verbose logging": "Nhật ký chi tiết",
     "Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log.":
         "Thêm các thông điệp trao đổi với iOS vào nhật ký, để tìm ra sự cố kết nối. Những lúc khác hãy để tắt, vì chúng nhanh chóng làm đầy nhật ký.",
@@ -1079,6 +1080,7 @@ let vietnameseStrings: [String: String] = [
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller cài SideStore và LiveContainer thẳng vào iPhone của bạn, không cần đến máy tính.",
     "Checking for updates…": "Đang kiểm tra cập nhật…",
+    "Checking for updates… Tap again to cancel.": "Đang kiểm tra cập nhật… Chạm lại để hủy.",
     "You're up to date.": "Bạn đang dùng phiên bản mới nhất.",
     "Couldn't check for updates. Check your connection and try again.":
         "Không thể kiểm tra cập nhật. Hãy kiểm tra kết nối và thử lại.",

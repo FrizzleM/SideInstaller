@@ -730,6 +730,7 @@ let chineseStrings: [String: String] = [
     "Advanced": "高级",
     "Clear": "清除",
     "Activity Log (%d)": "活动日志（%d）",
+    "没有匹配的日志。": "没有匹配的日志。",
     "Verbose logging": "详细日志",
     "Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log.":
         "将与 iOS 往来的消息写入日志，用于排查连接问题。其他时候请保持关闭，因为这些消息很快就会占满日志。",
@@ -1064,6 +1065,7 @@ let chineseStrings: [String: String] = [
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller 直接把 SideStore 和 LiveContainer 装到你的 iPhone 上，全程不需要电脑。",
     "Checking for updates…": "正在检查更新…",
+    "Checking for updates… Tap again to cancel.": "正在检查更新…再点一次取消。",
     "You're up to date.": "已是最新版本。",
     "Couldn't check for updates. Check your connection and try again.": "无法检查更新。请检查网络连接后重试。",
 

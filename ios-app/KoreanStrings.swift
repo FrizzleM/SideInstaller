@@ -649,6 +649,7 @@ let koreanStrings: [String: String] = [
     "Advanced": "고급",
     "Clear": "지우기",
     "Activity Log (%d)": "활동 로그 (%d)",
+    "没有匹配的日志。": "일치하는 로그가 없습니다.",
     "Verbose logging": "상세 로그",
     "Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log.":
         "iOS와 주고받는 메시지를 로그에 추가해 연결 문제를 찾을 수 있게 합니다. 로그가 금방 가득 차므로 그 밖에는 꺼 두세요.",
@@ -1058,6 +1059,7 @@ let koreanStrings: [String: String] = [
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller는 PC 없이 SideStore와 LiveContainer를 iPhone에 바로 설치해 줍니다.",
     "Checking for updates…": "업데이트 확인 중…",
+    "Checking for updates… Tap again to cancel.": "업데이트 확인 중… 다시 탭하면 취소됩니다.",
     "You're up to date.": "최신 버전입니다.",
     "Couldn't check for updates. Check your connection and try again.": "업데이트를 확인할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
 

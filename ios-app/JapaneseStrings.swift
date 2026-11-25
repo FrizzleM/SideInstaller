@@ -648,6 +648,7 @@ let japaneseStrings: [String: String] = [
     "Advanced": "詳細設定",
     "Clear": "消去",
     "Activity Log (%d)": "アクティビティログ（%d）",
+    "没有匹配的日志。": "一致するログがありません。",
     "Verbose logging": "詳細ログ",
     "Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log.":
         "iOS とやり取りするメッセージをログに追加し、接続の問題を調べられるようにします。すぐにログがいっぱいになるため、それ以外のときはオフにしておいてください。",
@@ -1057,6 +1058,7 @@ let japaneseStrings: [String: String] = [
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller は、パソコンを使わずに SideStore と LiveContainer を iPhone に直接インストールします。",
     "Checking for updates…": "アップデートを確認中…",
+    "Checking for updates… Tap again to cancel.": "アップデートを確認中…もう一度タップするとキャンセルします。",
     "You're up to date.": "最新バージョンです。",
     "Couldn't check for updates. Check your connection and try again.":
         "アップデートを確認できませんでした。接続を確認して、もう一度お試しください。",

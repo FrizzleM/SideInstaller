@@ -65,6 +65,15 @@ final class LogStore {
         lines.map { "\($0.stamp)  \($0.text)" }.joined(separator: "\n")
     }
 
+    /// F4 (0.9.146): the lines whose text matches `query`, oldest first;
+    /// the whole log when the query is blank. Case-insensitive, so
+    /// "error" also finds "Error".
+    func filteredLines(matching query: String) -> [Entry] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return lines }
+        return lines.filter { $0.text.localizedCaseInsensitiveContains(needle) }
+    }
+
     // MARK: Private
 
     private func prepare(_ raw: String, loggedAt date: Date) {

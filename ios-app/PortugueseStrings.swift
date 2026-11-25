@@ -728,6 +728,7 @@ let portugueseStrings: [String: String] = [
     "Advanced": "Avançado",
     "Clear": "Limpar",
     "Activity Log (%d)": "Registro de atividade (%d)",
+    "没有匹配的日志。": "Nenhum registro correspondente.",
     "Verbose logging": "Registro detalhado",
     "Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log.":
         "Adiciona ao registro as mensagens trocadas com o iOS, para encontrar um problema de conexão. Fora isso, deixe desligado, pois elas enchem o registro rapidamente.",
@@ -1074,6 +1075,7 @@ let portugueseStrings: [String: String] = [
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "O SideInstaller instala o SideStore e o LiveContainer direto no seu iPhone, sem precisar de computador.",
     "Checking for updates…": "Verificando atualizações…",
+    "Checking for updates… Tap again to cancel.": "Verificando atualizações… Toque novamente para cancelar.",
     "You're up to date.": "Você está atualizado.",
     "Couldn't check for updates. Check your connection and try again.":
         "Não foi possível verificar atualizações. Verifique sua conexão e tente novamente.",

@@ -309,11 +309,11 @@ struct CalloutCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                     .fill(tint.opacity(0.12))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                     .strokeBorder(tint.opacity(0.35), lineWidth: 1)
             )
     }
@@ -562,7 +562,7 @@ struct SearchBar: View {
         }
         .padding(8)
         .background(Theme.control)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
     }
 }
 
@@ -861,7 +861,7 @@ struct PairingCodeDigits: View {
     }
 
     private var key: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
+        RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
     }
 }
 

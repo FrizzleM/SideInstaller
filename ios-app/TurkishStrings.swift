@@ -695,6 +695,7 @@ let turkishStrings: [String: String] = [
     "Advanced": "Gelişmiş",
     "Clear": "Temizle",
     "Activity Log (%d)": "Etkinlik günlüğü (%d)",
+    "没有匹配的日志。": "Eşleşen günlük yok.",
     "Verbose logging": "Ayrıntılı günlük",
     "Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log.":
         "Bir bağlantı sorununu bulmak için iOS ile alınıp verilen mesajları günlüğe ekler. Günlüğü hızla doldurdukları için diğer zamanlarda kapalı bırak.",
@@ -1018,6 +1019,7 @@ let turkishStrings: [String: String] = [
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller, bilgisayar olmadan SideStore ve LiveContainer'ı doğrudan iPhone'una yükler.",
     "Checking for updates…": "Güncellemeler denetleniyor…",
+    "Checking for updates… Tap again to cancel.": "Güncellemeler denetleniyor… İptal etmek için tekrar dokunun.",
     "You're up to date.": "Güncel durumdasınız.",
     "Couldn't check for updates. Check your connection and try again.":
         "Güncellemeler denetlenemedi. Bağlantınızı kontrol edip yeniden deneyin.",

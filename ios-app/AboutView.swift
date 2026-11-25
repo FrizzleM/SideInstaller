@@ -14,6 +14,8 @@ struct AboutView: View {
     @State private var showReport = false
     /// True while a manual update check is in flight.
     @State private var isCheckingUpdate = false
+    /// The in-flight manual check, so a second tap can cancel it.
+    @State private var checkTask: Task<Void, Never>?
     /// What the last manual update check found; nil until one runs.
     @State private var updateCheckStatus: UpdateChecker.CheckResult?
 
@@ -72,7 +74,7 @@ struct AboutView: View {
 
     /// The detail line under "Check for updates": nothing until a check runs.
     private var updateCheckDetail: String? {
-        if isCheckingUpdate { return L("Checking for updates…") }
+        if isCheckingUpdate { return L("Checking for updates… Tap again to cancel.") }
         switch updateCheckStatus {
         case nil, .skipped: return nil
         case .upToDate: return L("You're up to date.")
@@ -84,16 +86,23 @@ struct AboutView: View {
         }
     }
 
-    /// Run a check that ignores the 24-hour stamp; a second tap while one
-    /// is in flight is ignored.
+    /// Run a check that ignores the 24-hour stamp. B5 (0.9.146): a second
+    /// tap while one is in flight cancels it, and the detail line goes back
+    /// to whatever the last check found — a cancelled check writes no
+    /// outcome, so "Checking…" can't stick around after the tap.
     private func runUpdateCheck() {
-        guard !isCheckingUpdate else { return }
+        if isCheckingUpdate {
+            checkTask?.cancel()
+            return
+        }
         isCheckingUpdate = true
-        updateCheckStatus = nil
-        Task {
+        checkTask = Task {
             let result = await updateChecker.check(force: true)
-            updateCheckStatus = result
+            if !Task.isCancelled {
+                updateCheckStatus = result
+            }
             isCheckingUpdate = false
+            checkTask = nil
         }
     }
 

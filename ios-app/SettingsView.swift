@@ -783,28 +783,52 @@ struct SettingsView: View {
     }
 }
 
-/// The activity log's lines, following the newest.
+/// The activity log's lines, following the newest. F4 (0.9.146): a search
+/// field above the list filters the rows by keyword.
 private struct LogConsole: View {
     private var log: LogStore { .shared }
+    /// The console's filter text; blank shows the whole log.
+    @State private var searchText = ""
+
+    /// The lines shown: the whole log, or only the rows matching the
+    /// search text (the app list's `filteredEntries` 同款取法).
+    private var lines: [LogStore.Entry] {
+        log.filteredLines(matching: searchText)
+    }
+
+    /// True when a search is running and nothing matched it.
+    private var hasNoMatch: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && lines.isEmpty
+    }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(log.lines) { line in
-                        Text(line.stamp + "  " + line.text)
-                            .font(.system(.caption, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .id(line.id)
+        VStack(alignment: .leading, spacing: 8) {
+            SearchBar(text: $searchText, placeholder: L("搜索"))
+            if hasNoMatch {
+                Text(L("没有匹配的日志。"))
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, minHeight: 240, alignment: .center)
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 2) {
+                            ForEach(lines) { line in
+                                Text(line.stamp + "  " + line.text)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .id(line.id)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .frame(height: 240)
+                    // The last line, not the count, which stops changing once the log is full.
+                    .onChange(of: lines.last?.id) { _, last in
+                        if let last { proxy.scrollTo(last, anchor: .bottom) }
                     }
                 }
-                .padding(.vertical, 4)
-            }
-            .frame(height: 240)
-            // The last line, not the count, which stops changing once the log is full.
-            .onChange(of: log.lines.last?.id) { _, last in
-                if let last { proxy.scrollTo(last, anchor: .bottom) }
             }
         }
     }

@@ -53,6 +53,10 @@ final class UpdateChecker: ObservableObject {
         guard let url = URL(string: Self.versionFileURL) else { return .failed }
         var req = URLRequest(url: url)
         req.cachePolicy = .reloadIgnoringLocalCacheData
+        // B5 (0.9.146): 15 seconds, not URLSession's 60-second default, so a
+        // manual check on a weak network fails fast instead of sitting on
+        // "Checking for updates…" for a minute.
+        req.timeoutInterval = 15
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
 
         guard let (data, response) = try? await URLSession.shared.data(for: req),
