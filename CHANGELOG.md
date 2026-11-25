@@ -2,6 +2,119 @@
 
 All notable changes to SideInstaller are documented here.
 
+## 2.2.0
+
+### Added
+- **JIT.** A new page under Tools turns JIT on for apps signed for development, which is how
+  SideStore and SideInstaller sign them, the way StikDebug does: SideInstaller opens the app under
+  the debugger over LocalDevVPN, after setting up the developer disk image the first time. On iOS 27
+  it pairs this iPhone with itself first when there's no pairing file yet, as Tools › Pairing does. Up to
+  iOS 18, and on iPhones without TXM, it lets go at once and JIT stays on until the app quits. From
+  iOS 26 on A15 and later, and on iOS 27, it stays attached while the app runs and prepares the
+  memory the app asks for, answering the same requests as StikDebug's universal, legacy and Geode
+  scripts; SideInstaller picks each known app's way by name, and the menu under an app changes it.
+  Keep SideInstaller in the background meanwhile, and Quit ends the session.
+- **Shortcuts actions.** SideInstaller's tools can now run from the Shortcuts app, automations, the
+  Action button and Siri: 24 actions, each waiting for its result and handing it on. Location
+  spoofing has them all: set the location to a place, coordinates or a saved place, reset it, read
+  where it's set, play a GPX file, travel to a place along a route planned over OpenStreetMap, stop
+  a route, and save or delete places. Get Sideloaded Apps lists each app with its expiry, and
+  Refresh All Apps and Refresh App renew them; Install App, Install IPA and Install IPA from URL
+  install as the Install tab does. The pairing file can be fetched, imported and installed into
+  apps, Developer Mode shown in Settings, LocalDevVPN checked and connected, and the activity log
+  read. Everything but installing runs in the background over LocalDevVPN; when its tunnel is down
+  and “Start LocalDevVPN when needed” is on, the action asks to continue in SideInstaller, which
+  connects it. A spoofed location stays set until it's reset, as one set in the app does. Siri
+  takes “Spoof my location to *saved place* with SideInstaller”, “Reset my location with
+  SideInstaller” and “Refresh my apps with SideInstaller”.
+- **The pairing file goes into ARMSX3.** The Pairing page lists ARMSX3 next to the other apps and
+  writes the pairing file's remote pairing record, the only kind its JIT reads, into its Documents
+  folder as `pairingFile.plist`, where ARMSX3 takes it in the next time it opens. A pairing file
+  without a remote pairing record isn't written.
+- **Sources.** A new page under Tools, like SideStore's: add an AltStore-format source (its
+  https link, an `altstore://` or `sidestore://` source link, or a .json source file) and its apps
+  are listed with their icons and versions. An app's page has its release notes, its description
+  and every earlier version, and Install downloads the IPA from the source and goes through the
+  same "Install from a link?" question as a `sideinstaller://install` link, so it's signed and
+  installed like a custom .ipa. FrizzleM's source is built in; SideStore's, AltStore's and
+  LiveContainer + SideStore's own sources are suggested under Add a source, one tap each. Your
+  sources lists each one under its developer, with their GitHub picture (or the app's icon when
+  there's none).
+- **Updates for the apps from sources.** With LocalDevVPN on, SideInstaller reads which apps are
+  installed, as Sideloaded apps does, and an app a source has a newer version of gets an Update tag,
+  with the count on the Sources tile. The sources are checked once when SideInstaller opens, as
+  SideInstaller checks for its own updates; pull down on Sources, or tap Check for updates, to
+  check again.
+
+### Changed
+- **The Location spoofing page opens on the spoofed location**, which a shortcut may have set while
+  the page was closed, rather than always on the same spot.
+
+### Fixed
+- **Sign-in reports a current Mac again.** 2.1.1 got past Apple's HTTP 503s by signing in as a Mac
+  on macOS 10.15.7, taken for the newest Mac that still calls its system “Mac OS X”. Apple's own
+  Macs spell it that way on every version, and iLoader's and SideStore's users found Apple answering
+  a Mac that old as it answered SideInstaller in October: with a code by text message that it then
+  won't send, or with -22410 or -23782, where a current Mac spelled “Mac OS X” gets the code on the
+  trusted devices. SideInstaller now signs in as the Mac it used from 1.6.1 to 2.1.0, on macOS 26.6,
+  spelled “Mac OS X”. Apple answers -22410 to an anisette identity made for another Mac, so a
+  sign-in with the password makes a new one for it, and Apple may ask for a code once more.
+- **SideStore gets client info Apple lets through.** SideStore's default client info calls its
+  system “macOS”, which Apple has answered with HTTP 503 since 20 November (SideStore #1745). After
+  installing SideStore, SideInstaller now sets it to the same Mac spelled “Mac OS X”, unless SideStore
+  already has a Mac spelled that way on macOS 10.13 or later. If SideStore's sign-in then fails with
+  -22410, its Settings › User Customizations › Reset adi.pb, with “Keep header customizations”
+  ticked, makes it a new identity for that Mac.
+
+## 2.1.1
+
+### Changed
+- **lillq is the first anisette server.** anisette.lillq.me, a pool of anisette servers that checks
+  every hour which clients Apple lets through and hands out one that passes, is now on the list in
+  Settings › Anisette Server, and a first sign-in starts there. With Auto on, it comes right after
+  the server that signed in last and the others that share its anisette identity, since those keep
+  the saved sign-in: lillq's identities work on no other server, and theirs not on lillq. A sign-in
+  that moves between lillq and another server makes that server an identity of its own instead of
+  stopping at the one it can't use.
+
+### Fixed
+- **Signing in to Apple works again.** Since 20 November Apple has answered sign-ins through every
+  Mac anisette server with HTTP 503, “Service Temporarily Unavailable” (#146–#161): it now turns
+  away any client that calls its system “macOS”, and SideInstaller signed in as a Mac on macOS 26.6.
+  It now signs in as a Mac on macOS 10.15.7, the newest that still calls its system “Mac OS X”,
+  which Apple lets through and which is new enough for the accounts Apple asks for macOS 10.13 or
+  later (#89). The anisette identities made since 1.6.1 work with it as they are.
+- **The device link finds the pairing port when it isn't 49152.** iOS gives this iPhone's remote
+  pairing listener whatever port is free when it starts, so it isn't always on 49152, and the
+  device link was refused there with Developer Mode and LocalDevVPN both on. When 49152 refuses
+  and the port the iPhone advertises doesn't answer either, or it advertises none, SideInstaller
+  now knocks on the iPhone's other ports, 32 at a time, and opens the link on the one that
+  answers as its pairing listener, the way siboot 0.19.1 finds it. A closed port refuses at once,
+  so that takes seconds, and the port found is tried first until SideInstaller is closed. Side by
+  Side doesn't knock: the iPhone it reaches isn't this one.
+- **The device link no longer waits for ever on a port something else holds.** When the pairing
+  listener starts late, another of the iPhone's services can get 49152 first. If it took the
+  connection and never answered, the device link waited for its answer for ever; if it answered
+  something else, the link failed as if the pairing file were wrong. SideInstaller now asks each
+  port for the pairing handshake before using it, with 8 s to connect and 10 s to answer, as
+  siboot does, and passes over one that doesn't answer as the pairing listener, as it does a
+  refused one, so the advertised port and the knock look for the listener elsewhere. If it's on
+  no port, SideInstaller says so, and what to check. An address that
+  neither takes nor refuses the connection is reported unreachable after 8 s, where the link
+  waited for iOS to give up on it. Side by Side is unchanged.
+
+## 2.1.0
+
+### Added
+- **Pick the developer team that signs.** An Apple Account on more than one developer team, a
+  paid Apple Developer Program membership or a company's team besides the free one every account
+  has, is asked once which team signs, each marked Free or Paid: a free team's apps last 7 days,
+  a paid team's a year. The question starts on the team that signed SideInstaller itself, so a
+  copy siboot installed with another team than Apple's first now refreshes itself in place. The
+  pick is remembered for the Apple ID and used for installs, refreshes, Certificates and
+  Entitlements. Settings › Account shows it under each Apple ID; swipe the Apple ID and tap Team
+  to pick again. Until now the first team Apple lists always signed.
+
 ## 2.0.1
 
 ### Changed

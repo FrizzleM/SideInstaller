@@ -171,7 +171,7 @@ fn is_account_refusal(error: &str) -> bool {
     e.contains("developer error 1102") || e.contains("developer error 2160")
 }
 
-fn first_line(text: &str) -> &str {
+pub(crate) fn first_line(text: &str) -> &str {
     text.lines()
         .map(|line| line.trim_start_matches([' ', '●']).trim())
         .find(|line| !line.is_empty())
@@ -282,8 +282,9 @@ where
         return Err(ANDROID_ADI_SKIP.to_string());
     }
     // A sign-in that reports a current Mac does it with an identity
-    // provisioned as one, as SideStore's "Reset adi.pb" after its client info
-    // has changed; an identity from before is left for its saved token.
+    // provisioned as that same Mac (Apple answers another with -22410), as
+    // SideStore's "Reset adi.pb" after its client info has changed; an
+    // identity from before is left for its saved token.
     account.anisette_generator.require_current_mac_identity().await;
 
     tracing::info!("{label}: logging in");

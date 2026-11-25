@@ -383,6 +383,9 @@ struct RefreshJob: Identifiable, Equatable {
 
 /// Drives the Sideloaded apps page: loads installed apps and profiles from the
 /// device, matches them, and runs "Refresh all" through the install pipeline.
+///
+/// One for the app, so the Shortcuts actions (AppsShortcuts.swift) see and
+/// refresh the same apps as the page.
 @MainActor
 final class SideloadedAppsManager: ObservableObject {
     /// 界面和快捷指令共用同一个实例，这样后台触发的续签状态界面也能看到，
@@ -399,6 +402,15 @@ final class SideloadedAppsManager: ObservableObject {
     static let pendingRefreshAtKey = "SIDPendingRefreshAllAt"
     /// 待续签标记的有效期。
     private static let pendingRefreshTTL: TimeInterval = 24 * 3600
+
+    /// How a refresh run went.
+    struct RefreshOutcome {
+        /// Why the run couldn't start (no device link, or no sign-in).
+        var failure: String?
+        /// The apps it went through, each `done` or `failed`.
+        var jobs: [RefreshJob] = []
+        var refreshed: Int { jobs.filter { $0.state == .done }.count }
+    }
 
     @Published private(set) var entries: [SideloadedAppStatus] = []
     /// Profiles belonging to no installed app — deleted apps' leftovers.
@@ -462,7 +474,7 @@ final class SideloadedAppsManager: ObservableObject {
     private var didAutoLoad = false
 
     /// The refresh in flight, kept so it can be called off between apps.
-    private var refreshTask: Task<Void, Never>?
+    private var refreshTask: Task<RefreshOutcome, Never>?
 
     /// The load in flight, kept so a caller that arrived after it started
     /// can await it instead of polling `isWorking` (A-5, SIDE-32).
@@ -551,6 +563,23 @@ final class SideloadedAppsManager: ObservableObject {
         return task
     }
 
+    /// Reads the device's apps and profiles and matches them. The caller holds
+    /// `isWorking`.
+    private func performLoad() async throws {
+        let inventory = try await engine.sideloadedAppInventory()
+        let apps = inventory.apps.compactMap(SideloadedApp.init(plist:))
+        // TestFlight apps' profiles would otherwise show as unused.
+        let profiles = inventory.profiles.compactMap(ProvisioningProfile.init(data:))
+            .filter { !$0.isAppStoreDistribution }
+        let matched = ProfileMatcher.match(apps: apps, profiles: profiles)
+        entries = matched.entries
+        unmatched = matched.unmatched
+        await rebuildRefreshable()
+        hasLoaded = true
+        lastRefreshed = Date()
+        engine.log("Sideloaded apps: \(apps.count) sideloaded, \(profiles.count) profile(s) decoded.")
+    }
+
     // MARK: - Refresh all
 
     /// Re-signs and reinstalls every refreshable app, one at a time (they share
@@ -619,7 +648,14 @@ final class SideloadedAppsManager: ObservableObject {
             engine.log("⛔️ Refresh all: LocalDevVPN isn't installed.")
             return
         }
-        jobs = candidates
+        refreshTask = startRefresh(candidates, showsFailure: onlyBundleIDs == nil, onlyBundleIDs: onlyBundleIDs)
+    }
+
+    /// Refreshes `selected` in the background, as the page lists them. A run
+    /// that can't start says why in a popup when `showsFailure` is set.
+    @discardableResult
+    private func startRefresh(_ selected: [RefreshJob], showsFailure: Bool, onlyBundleIDs: Set<String>? = nil) -> Task<RefreshOutcome, Never> {
+        jobs = selected
         isRefreshing = true
         lastError = nil
         refreshSummary = nil
@@ -628,8 +664,7 @@ final class SideloadedAppsManager: ObservableObject {
         // 续签全程开无声保活，息屏/切后台也不会被系统挂起
         keepAlive.startAudio()
 
-        // B-3：同上——defer 里的 @Published 写也要在主线程上。
-        refreshTask = Task { @MainActor in
+        let task = Task { @MainActor () -> RefreshOutcome in
             // 原账号：全程结束（正常、失败、取消）都要切回来。activate
             // 是同步的，放 defer 里保证任何出口都执行；defer 不能
             // await，所以内存 session 的重登放在正文末尾尽力做。
@@ -649,10 +684,10 @@ final class SideloadedAppsManager: ObservableObject {
                 let message = BuiltinTunnel.useBuiltinDirectly
                     ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
                     : L("LocalDevVPN isn't connected. Connect it, then try again.")
-                lastError = message
+                if showsFailure { lastError = message }
                 engine.log("⛔️ Refresh all: \(message)")
                 jobs = []
-                return
+                return RefreshOutcome(failure: message)
             }
             tunnelAcquired = true
             do {
@@ -660,14 +695,14 @@ final class SideloadedAppsManager: ObservableObject {
             } catch is CancellationError {
                 engine.log("Refresh all: cancelled during sign-in.")
                 jobs = []
-                return
+                return RefreshOutcome(jobs: jobs)
             } catch {
                 let message = userFacingErrorMessage(error)
                 let raw = String(describing: error)
-                lastError = message
+                if showsFailure { lastError = message }
                 engine.log("⛔️ Refresh all: \(raw)")
                 jobs = []
-                return
+                return RefreshOutcome(failure: message)
             }
 
             // prepareRefresh 刚登完当前账号、记下了它的团队映射；但
@@ -862,6 +897,7 @@ final class SideloadedAppsManager: ObservableObject {
                     setBackgroundRefreshResult(refreshSummary ?? L("Refreshed %d of %d apps.", refreshed, jobs.count))
                 }
             }
+            let outcome = RefreshOutcome(jobs: jobs)
             // Read the device again, so the days on screen are the new ones.
             if refreshed > 0 {
                 isRefreshing = false        // `load` won't run while a refresh holds the link
@@ -873,6 +909,66 @@ final class SideloadedAppsManager: ObservableObject {
                 UserDefaults.standard.removeObject(forKey: Self.pendingRefreshKey)
                 UserDefaults.standard.removeObject(forKey: Self.pendingRefreshAtKey)
             }
+            return outcome
+        }
+        refreshTask = task
+        return task
+    }
+
+    // MARK: - Shortcuts
+
+    /// Reads the device afresh for a Shortcuts action, once the page's own
+    /// load or refresh is done.
+    func loadForShortcut() async throws {
+        try await waitUntilIdle()
+        isWorking = true
+        defer { isWorking = false }
+        lastError = nil
+        try await performLoad()
+    }
+
+    /// Reads the device afresh, then refreshes the refreshable apps whose
+    /// bundle ids are in `bundleIDs`, or all of them when it's nil, as Refresh
+    /// all does. Returns once the last one is done.
+    func refreshForShortcut(_ bundleIDs: Set<String>? = nil) async throws -> RefreshOutcome {
+        try await loadForShortcut()
+        guard !engine.isRunning else {
+            throw EngineError.message(L("An install is already running. Wait for it to finish, then refresh."))
+        }
+        let selected = bundleIDs.map { ids in refreshable.filter { ids.contains($0.bundleID) } }
+            ?? refreshable
+        guard !selected.isEmpty else {
+            if entries.isEmpty {
+                throw EngineError.message(L("Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here."))
+            }
+            let names = entries.filter { bundleIDs?.contains($0.app.bundleID) ?? true }.map(\.app.name)
+            // An app picked in a shortcut may be gone since: its bundle ID, then.
+            let named = names.isEmpty ? (bundleIDs ?? []).sorted() : names
+            throw EngineError.message(L("%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.",
+                                        named.joined(separator: ", ")))
+        }
+        // A load from the page may have started meanwhile.
+        try await waitUntilIdle()
+        // Signing in, signing and installing each app outlast the time iOS
+        // gives an action in the background.
+        keepAlive.startAudio()
+        defer { keepAlive.stopAudio() }
+        let run = startRefresh(selected, showsFailure: false, onlyBundleIDs: bundleIDs)
+        // Stopping the shortcut stops the run after the app being refreshed,
+        // as the page's Stop does.
+        let outcome = await withTaskCancellationHandler {
+            await run.value
+        } onCancel: {
+            run.cancel()
+        }
+        if let failure = outcome.failure { throw EngineError.message(failure) }
+        return outcome
+    }
+
+    /// Returns once the page isn't loading or refreshing.
+    private func waitUntilIdle() async throws {
+        while isWorking || isRefreshing {
+            try await Task.sleep(for: .milliseconds(250))
         }
     }
 

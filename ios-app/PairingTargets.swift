@@ -23,8 +23,10 @@ struct PairingTargetApp: Identifiable, Equatable {
     }
 
     /// True for an app that is handed the RPPairing record alone and nothing
-    /// else; see `MadeiraPairingHandoff`.
-    var takesRemoteRecordOnly: Bool { name == MadeiraPairingHandoff.appName }
+    /// else; see `MadeiraPairingHandoff` and `ARMSX3PairingHandoff`.
+    var takesRemoteRecordOnly: Bool {
+        name == MadeiraPairingHandoff.appName || name == ARMSX3PairingHandoff.appName
+    }
 
     /// The supported apps, in display order. `StikDebug (Sideloaded)` is
     /// reached only through the bundle-id check in `PairingTargets.match`.
@@ -70,6 +72,9 @@ struct PairingTargetApp: Identifiable, Equatable {
               bundleIDContains: nil),
         .init(name: MadeiraPairingHandoff.appName,
               remoteRelativePath: MadeiraPairingHandoff.remoteRelativePath,
+              bundleIDContains: nil),
+        .init(name: ARMSX3PairingHandoff.appName,
+              remoteRelativePath: ARMSX3PairingHandoff.remoteRelativePath,
               bundleIDContains: nil),
     ]
 }
@@ -331,6 +336,38 @@ enum MadeiraPairingHandoff {
     /// none that Madeira would accept.
     static func record(from pairingFile: Data) -> Data? {
         // The same test Madeira runs: both keys 32 bytes, and an identifier.
+        guard PairingFileKind.of(data: pairingFile).hasRemotePairing else { return nil }
+        return (try? SideStorePairingHandoff.split(pairingFile, udid: nil))?.remote
+    }
+}
+
+/// The pairing hand-off ARMSX3 reads.
+///
+/// ARMSX3's JIT keeps this iPhone's RPPairing file in its Library, at
+/// `Application Support/StikJIT/pairingFile.plist`, which house_arrest can't
+/// reach. Every time it opens, before `main()`, it moves in a
+/// `pairingFile.plist` it finds at the top of its Documents, replacing the one
+/// it had, and deletes that copy (`Armsx3TakeDocumentsDrop` in ARMSX3's
+/// `ios/jit-enabler/StikJITExtensionLauncher.m`). That is the folder ARMSX3
+/// tells its users to drop the file in from Files, and house_arrest reaches it.
+///
+/// ARMSX3 takes the file only if it is an RPPairing record (its JIT reaches
+/// lockdownd through the RSD tunnel, never with a lockdown record), and leaves
+/// anything else lying in Documents. So, as for Madeira, a pairing file without
+/// one isn't written at all, and one that also holds a lockdown record is cut
+/// down to the RPPairing keys.
+enum ARMSX3PairingHandoff {
+
+    /// ARMSX3's home-screen name, as installation_proxy reports it.
+    static let appName = "ARMSX3"
+    /// Where the record goes, relative to ARMSX3's Documents.
+    static let remoteRelativePath = "pairingFile.plist"
+
+    /// The RPPairing record in `pairingFile` on its own, or nil if it holds
+    /// none that ARMSX3 would accept.
+    static func record(from pairingFile: Data) -> Data? {
+        // The same test ARMSX3 runs (`armsx3_pairing_shape_of`): both keys 32
+        // bytes, and an identifier.
         guard PairingFileKind.of(data: pairingFile).hasRemotePairing else { return nil }
         return (try? SideStorePairingHandoff.split(pairingFile, udid: nil))?.remote
     }
@@ -762,17 +799,24 @@ enum SideStoreAnisetteHandoff {
     /// as the list has it: SideStore starts on the first server when the one
     /// picked isn't on it.
     static let server = "https://new.ani.sidestore.io"
-    /// SideStore's default headers (AnisetteKit's `defaultClientInfo` and
-    /// `defaultUserAgent`): a current Mac, which SideInstaller reports through
-    /// the macOS-ADI servers too.
-    static let clientInfo = "<MacBookPro18,3> <macOS;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+    /// The Mac SideInstaller reports through the macOS-ADI servers (isideload's
+    /// `CURRENT_MAC_CLIENT_INFO`): SideStore's default (AnisetteKit's
+    /// `defaultClientInfo`, `<MacBookPro18,3> <macOS;26.6;25F84>`) with its
+    /// system spelled `Mac OS X`. Since 2026-11-20 Apple's edge answers a
+    /// client that says `macOS` with HTTP 503, so SideStore's default no
+    /// longer signs in (SideStore #1745), and its users get past that by
+    /// changing the spelling. The user agent is AnisetteKit's
+    /// `defaultUserAgent`.
+    static let clientInfo = "<MacBookPro18,3> <Mac OS X;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
     static let userAgent = "AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)"
 
     /// Sets SideStore's settings (`prefs`, its preferences plist) to sign in
-    /// that way, and returns what changed, for the log. A macOS-ADI server
-    /// already picked is kept, and so is client info saved for a Mac; client
-    /// info saved for a Windows PC or an Android phone (as guides for -80045
-    /// had people do) goes back to SideStore's default Mac.
+    /// that way, and returns what changed, for the log. A macOS-ADI server or
+    /// lillq (which tells SideStore's users how to add it) already picked is
+    /// kept, and so is client info saved for a Mac that `keepsClientInfo`.
+    /// Anything else (none saved, so SideStore's default; a Windows PC or an
+    /// Android phone, as guides for -80045 had people save; a Mac spelled
+    /// `macOS`, or older than macOS 10.13) becomes `clientInfo`.
     static func applySettings(to prefs: inout [String: Any]) -> [String] {
         var changes: [String] = []
         if prefs["useOnDeviceAnisette"] as? Bool != false {
@@ -785,16 +829,29 @@ enum SideStoreAnisetteHandoff {
         }
         let picked = (prefs["menuAnisetteURL"] as? String) ?? ""
         let pickedHost = URL(string: picked)?.host?.lowercased() ?? ""
-        if !AnisetteServer.macADIHosts.contains(pickedHost) {
+        if !AnisetteServer.macADIHosts.contains(pickedHost),
+           !AnisetteServer.poolHosts.contains(pickedHost) {
             prefs["menuAnisetteURL"] = server
             changes.append("server “SideStore (New)”")
         }
-        if let saved = prefs["customAnisetteClientInfo"] as? String, !saved.isEmpty,
-           !saved.contains("<macOS;"), !saved.contains("<Mac OS X;") {
+        if !keepsClientInfo(prefs["customAnisetteClientInfo"] as? String ?? "") {
             prefs["customAnisetteClientInfo"] = clientInfo
             prefs["customAnisetteUserAgent"] = userAgent
-            changes.append("client info back to SideStore's default Mac")
+            changes.append("client info macOS 26.6, spelled “Mac OS X”")
         }
         return changes
+    }
+
+    /// Whether client info SideStore has saved signs in as it is: a Mac
+    /// spelled `Mac OS X`, which Apple's edge lets through, on macOS 10.13 or
+    /// later. Older Macs, as the servers name, get -23782 for some accounts and
+    /// a text message Apple then won't send for others (iLoader #1205).
+    static func keepsClientInfo(_ saved: String) -> Bool {
+        guard let marker = saved.range(of: "<Mac OS X;") else { return false }
+        let version = saved[marker.upperBound...].prefix { $0 != ";" && $0 != ">" }
+        let parts = version.split(separator: ".").map { Int($0.trimmingCharacters(in: .whitespaces)) }
+        guard let major = parts.first ?? nil else { return false }
+        let minor = parts.count > 1 ? (parts[1] ?? 0) : 0
+        return (major, minor) >= (10, 13)
     }
 }

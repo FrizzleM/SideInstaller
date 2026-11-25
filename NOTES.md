@@ -769,6 +769,35 @@ SideStore registers each week doesn't get the capability on a free team
 signed with. Madeira passes 1 (required), Side by Side 0. See the vendored
 isideload README, change 13.
 
+**Which developer team signs:** an Apple Account is on the free team every
+account has, and on a paid Apple Developer Program membership too when there is
+one, its own or a company's. Until this change the first team Apple lists
+signed. Now `si_apple_signin` and `si_cert_signin` take the team ID remembered
+for the Apple ID (`AccountStore.team(for:)`, by email in lower case) and a
+`SITeamCb`: the remembered team signs when the account is still on it, its only
+team when it has one, and otherwise Rust asks the callback, which shows the team
+sheet (`SigningTeams.swift`) in the sheet the 2FA prompt uses, takes it over once
+the code has gone through, and blocks like a 2FA request. The pick is remembered
+for an Apple ID saved in Settings › Account (swiping one there and tapping Team
+forgets it, so the next sign-in asks again); Side by Side with someone else's
+Apple ID keeps nothing. Closing the sheet stops the sign-in without trying other
+anisette servers (`AppleSignInTicket.teamQuestionWasCancelled`).
+- Free or paid is siboot's rule (`minis/src/team.rs` in FrizzleM/siboot), which
+  is AltSign's, so AltStore and SideStore read teams the same way: a
+  "Company/Organization" team is paid; an "Individual" one is free when its only
+  membership's name contains "free", and paid with any other memberships;
+  anything else is unknown and listed without a mark (`rust-core/src/team.rs`).
+  isideload's `DeveloperTeam` drops `memberships`, so listTeams is asked once
+  more for them, only when there's a question to ask. No two-team account has
+  been seen yet, so the real membership names are unconfirmed.
+- The sheet starts on the team that signed this SideInstaller, read from its own
+  `embedded.mobileprovision` (`InstalledSigner`), when it's one of the account's
+  teams, and otherwise on Apple's first. siboot asks the same question since
+  0.19.0, and SideInstaller's bundle ID ends in the signing team's ID, so a copy
+  siboot installed with another team keeps refreshing itself in place.
+- Certificates and Entitlements sign in on the same team, so they show the
+  certificates and App IDs of the team that signs.
+
 **idevice version coexistence:** isideload pulls idevice **0.1.61** (crates.io,
 behind its `install` feature, which is required because its feature-gating is
 incomplete) while the rest of the app uses idevice **0.1.63** (git). The two
@@ -1233,6 +1262,100 @@ Mode text (the simulator reads the Mac's sysctl, 1) all behaved. Never run on an
 iPhone: whether its own advert is seen from inside the app, whether the sysctl
 can be read there, and whether either report's iPhone had moved its port.
 
+**Knocking for the listener (2026-11-18).** That day siboot users with Developer
+Mode on and LocalDevVPN connected were refused at 10.7.0.1:49152, while another
+iPhone on the same Wi-Fi advertised `_remotepairing._tcp` on 55021. iOS hands
+TCP ports out in order from 49152, not at random (`net.inet.tcp.randomize_ports`
+is 0, as on a Mac), so remotepairingd's listener gets 49152 only when it binds
+first; started later, it gets the next free one. siboot 0.19.1 knocks on the
+other dynamic ports for it, and SideInstaller now does the same when 49152
+refuses and the advert gives no port, or its port refuses too:
+`DeviceConnection.knockForListener` calls `si_find_pairing_port`
+(`rust-core/src/pairing_port.rs`, siboot's `reach`/`search`/`knock` from
+`minis/src/preflight.rs`). In Rust rather than Swift because the answer that
+counts is RPPairing's handshake, which idevice already speaks, and because the
+search can be tested against loopback stand-ins there.
+
+- It knocks on 49152–65535 except lockdownd's 62078 and the ports already
+  refused, in order, 32 connections at a time: 2 s to connect, then 3 s for the
+  answer to RPPairing's first message (`attemptPairVerify`, which only the
+  listener answers). The first port that answers is dialled with
+  `tunnel_create_rppairing_multihost`, as before.
+- It stops after 64 connections in a row that neither refuse nor connect
+  (LocalDevVPN went), once more than 48 ports take the connection without
+  answering (another VPN or a proxy answers for the address), and after running
+  out of descriptors or buffers 256 times. Each of those (EMFILE, ENFILE,
+  ENOBUFS, EADDRNOTAVAIL, EAGAIN) halves the width, down to 4, and the port is
+  knocked on again later.
+- From a Mac over Wi-Fi, iOS refused all 16,382 closed ports in 24 s at 32
+  wide, with no rate limiting (siboot's measurement).
+- The port found, by the advert or the knock, is remembered
+  (`movedListenerPort`) for the next connect in the same run of the app, which
+  dials it first and falls back to 49152 when it refuses; an install connects at
+  least twice. A restart, which moves the listener, ends the run too.
+- Side by Side never knocks (`findsMovedPort` is false there): its listener is
+  another iPhone's.
+- The log gets a line when the knock starts, one at each quarter of the ports,
+  and the result, like the advert lookup's:
+
+      Knocking on this iPhone's other ports: found on port 55021 (RPPairing, wire protocol 26) after 5869 of 16381 ports, in 9.2 s.
+
+  A search that finds nothing ends on the same refusal advice as before, for
+  49152 or the advertised port.
+
+Tested in rust-core: a fake listener that answers the handshake as the iPhone
+does, one that takes the connection and says nothing, one that answers HTTP, and
+closed ports, plus scripted knocks for each stop and the narrower retry. The
+simulator build compiles the Swift side. Never run on an iPhone: how fast
+LocalDevVPN carries 32 knocks at once, and whether the app's descriptor limit is
+ever reached, are unmeasured.
+
+**Probing before the dial (2026-11-18).** Only a refusal started the search,
+and `tunnel_create_rppairing_multihost` has no time limit. So when something
+else held 49152 and took the connection without a word, as the iPhone's other
+listeners do, the dial waited for its handshake answer for ever; when it
+answered something else, the dial failed as `TunnelFailurePairVerify`, whose
+advice is to pair again, and Engine paired again once for nothing when the
+pairing file was a reused one. Now, on this
+iPhone (`findsMovedPort`), `connectRemotePairing` probes each port before it
+dials it: `probeListener` calls `si_probe_pairing_port`, the knock with siboot's
+first-dial limits, 8 s to connect and 10 s for the answer to `attemptPairVerify`
+(the message the dial sends first: `RemotePairingClient::connect` starts with
+it).
+
+- Answered: dialled. Refused, or failed at once some other way (no route,
+  EPERM, out of descriptors): dialled too, since the dial gets the same answer
+  at once and its error says why, so the refusal handling and its advice stay
+  as they were.
+- Took the connection without answering as the listener, by saying nothing
+  within 10 s or something else: not dialled, and passed over like a refused
+  port. The remembered port falls back to 49152, 49152 goes on to the advert
+  and the knock, and the knock skips it. When the listener is on no port, the
+  error is `RsdUnreachable`, so nothing pairs again, with advice of its own:
+  something at the address took the connection but didn't answer as the
+  pairing port; check that LocalDevVPN is the VPN that's on and that Developer
+  Mode is on, then restart the iPhone. A new string, in all nine tables.
+- Neither took nor refused the connection within 8 s: not dialled, and nothing
+  else is tried. The error is the unreachable one (“Couldn't reach the device
+  at … at all”), after 8 s where the dial waited for the OS to give up on the
+  connect (`net.inet.tcp.keepinit`, 75 s on a Mac).
+- A probe is logged only when the port doesn't answer, as in
+
+      Port 49152 took the connection but didn't answer the RPPairing handshake within 10 s. This iPhone's remote pairing advertisement: …
+
+  On the usual path it costs one more connection and round trip through
+  LocalDevVPN before the dial: milliseconds.
+- Side by Side isn't probed (`findsMovedPort` is false), so its dial still has
+  no time limit.
+
+Tested in rust-core with the same stand-ins: the probe's result and log line
+for the RPPairing one, a closed port, the silent one and the HTTP one, the first
+and second through the C call too, and the silence and failures from scripted
+knocks. Never run on an iPhone. The dial comes milliseconds after the probe's
+connection closes; siboot has probed before pairing since its first Open Minis
+version (2026-11-10), and its 0.18.0 paired an iPhone, but its next connection
+comes later.
+
 ## Resuming downloads
 
 Every IPA download from GitHub — SideStore, LiveContainer + SideStore, the
@@ -1459,6 +1582,82 @@ the second run skipped; a wrong SHA-256 refused with nothing kept; the IPA
 recognized as AltStore; the record split), and the simulator (picker, version
 list, Side by Side choice). Not verified, since it needs the iPhone and an Apple
 ID: signing and installing AltStore, and AltStore picking up the file.
+
+## JIT
+
+Tools › JIT (2026-11-23) turns JIT on the way StikDebug does, written from
+StikDebug's source (`JITEnableContext.swift`, its scripts) in Swift on the
+idevice FFI the app already links (`JIT.swift`, `JITView.swift`, the debugging
+section of `DeviceConnection.swift`): no Rust change, every symbol was already
+in the xcframework. Its tile sits between Pairing and Certificates.
+
+**Pairing file.** With none on disk, Load apps and Enable JIT generate it on
+iOS 27 before going on (`JITManager.ensurePairingFile`), through the Pairing
+page's own manager (`PairingManager.shared.generateForPage`), so the same code
+and Settings steps come up and closing them stops quietly. Developer Mode and
+the tunnel are checked first, since JIT can't go on without them; opening the
+page never pairs (its quiet load waits for a pairing file). Below iOS 27 the
+connect reports the missing file, as on every Tools page.
+
+**The recipe.** The page lists the apps whose entitlements have
+`get-task-allow` (`JITApp`), which every development profile grants, so
+whatever SideStore or SideInstaller signed. Enable JIT checks Developer Mode,
+runs `ensurePairingConnection` and mounts the personalized disk image
+(`Engine.prepareDeveloperDiskImage`, split out of location setup), then a
+`JITSession` opens DVT (`remote_server_connect_rsd`, `process_control_new`) and
+debugserver (`debug_proxy_connect_rsd`, `com.apple.internal.dt.remote.debugproxy`),
+launches the app suspended (`process_control_launch_app`, KillExisting on, where
+StikDebug passes false: an app checks for JIT as it starts, so a running copy
+is restarted), acks twice, `QStartNoAckMode`, `vAttach;<pid>`. Up to iOS 18,
+and from iOS 26 without TXM, `D` follows at once and JIT stays on until the app
+quits.
+
+**TXM.** From iOS 26 on A15/M2 and later (from iOS 27 everything but the A12Z
+iPad Pros, as StikDebug's `hasTXM` has it; StikDebug's decimal model formula
+also leaves out iPad14,1–14,4, A15 and M2, which `JITDevice` doesn't), a
+debugged app still can't map writable and executable memory: it stops on a
+breakpoint and the debugger prepares the region by writing a byte to each
+16 KB page (`$M<addr>,1:69`, 128 written before their answers are read). The
+debugger stays attached answering, in the ways StikDebug's scripts do, here in
+Swift rather than JavaScriptCore (`JITProtocol`): universal (`brk #0xf00d`,
+`x16` 0 detach, 1 prepare at `x0` or allocate with `_M<size>,rx`, address
+back in `x0`; `#0x69` answered 0xE0000069 as universal.js does), legacy
+(`brk #0x69` regions, then detach: 1 for UTM/DolphiniOS/Flycast/ARMSX2, 3 for
+maciOS) and Geode (`#0x69`, `#0x70` copy ≤ 4 MB, `#0x71`). Auto picks by app
+name from StikDebug's list (`JITApps`), the universal calls for any other app
+on TXM; the menu under an app overrides it (`jitModes` in UserDefaults).
+Differences from the scripts: a stop that isn't a known request passes its
+signal on with `vCont;S<sig>:<tid>` and takes that reply as the next stop
+(universal.js sends another `c` after it, dropping the stop), SIGINT/SIGSTOP
+aren't passed, an unknown `brk` gets SIGTRAP passed so the app crashes as it
+would without a debugger (the scripts loop on it), `#0x71` steps past the
+breakpoint before detaching, and apps' own scripts (`x16 = 2`, `brk #0x68`)
+aren't run, only logged.
+
+**Its own tunnel.** A session runs on its own thread over a second
+`DeviceConnection`, as StikDebug opens a fresh tunnel per session: the shared
+connection reconnects for every page action, which would end a session lasting
+as long as the app runs. On the RPPairing route the session answers the RSD
+heartbeat (`heartbeat_connect_rsd`, as StikDebug does while attached). On the
+lockdown route the two connections share one lockdown heartbeat
+(`acquireHeartbeat`/`releaseHeartbeat`, keyed by device IP, counted), since a
+second heartbeat would close the tunnels opened under the first; with one
+connection every connect still starts a fresh heartbeat, as before. Silent audio
+(`KeepAlive`) keeps SideInstaller running while the app is in front: an app
+waits at each request until the debugger answers. Quit ends a session with
+`process_control_kill_app` from another thread, the one call that doesn't need
+debugserver, which a thread waiting on `c` owns.
+
+Verified 2026-11-23: the simulator build, unit tests for the packet parsing,
+TXM detection and modes (`JITTests.swift`, run by `check-ios.sh`), and the page
+in the simulator with a staged app list and a staged running session (a
+`SIMHOOK_JIT` hook in a scratch snapshot, never committed). 2026-11-24, in the
+iOS 27.2 simulator with the hook counting the tunnel as up: Load apps with no
+pairing file put up the Pairing page's steps and started its pairing run
+(the Live Activity came up), and closing them ended it with no error. Not
+verified, since it needs an iPhone: a pairing that completes and goes on to
+load the apps, everything that talks to debugserver or DVT, the TXM answers,
+and the shared lockdown heartbeat.
 
 ## Running on a device (what you do)
 

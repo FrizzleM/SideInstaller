@@ -608,6 +608,8 @@ let japaneseStrings: [String: String] = [
         "%@:%d で接続が拒否されました。トンネルは通っていますが、デベロッパモードがオフのため、この iPhone がペアリング用のポートで待ち受けていません。「設定 › プライバシーとセキュリティ › デベロッパモード」でオンにしてから（iPhone が再起動します）、もう一度お試しください。",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
         "%@:%d で接続が拒否されました。トンネルは通っていますが、デベロッパモードがオンなのに、この iPhone がペアリング用のポートで待ち受けていません。「ペアリングファイル」からこの iPhone をペアリングし直してから、もう一度お試しください。それでも失敗する場合は、iPhone を再起動してください。",
+    "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
+        "%@:%d で接続は受け付けられましたが、この iPhone のペアリング用のポートとして応答せず、ほかのポートにも応答するものはありませんでした。オンになっている VPN が LocalDevVPN であることと、デベロッパモードがオンであること（設定 › プライバシーとセキュリティ › デベロッパモード）を確認してから、もう一度お試しください。それでも失敗する場合は、iPhone を再起動してください。",
     "Start LocalDevVPN when needed": "必要なときに LocalDevVPN を開始",
     "Start LocalDevVPN now": "今すぐ LocalDevVPN を開始",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -1411,4 +1413,141 @@ let japaneseStrings: [String: String] = [
         "その方法は利用できません。別の方法を選んでください。",
     "That didn't work. Try another way.":
         "うまくいきませんでした。別の方法をお試しください。",
+    // MARK: - Developer team
+
+    "Free · %@": "無料 · %@",
+    "Paid · %@": "有料 · %@",
+    "This Apple Account is on %d developer teams. Pick the one that signs.":
+        "この Apple アカウントは %d 個の開発者チームに所属しています。署名に使うチームを選んでください。",
+    "Which Team?": "どのチーム？",
+    "Signed this copy of SideInstaller": "この SideInstaller に署名したチーム",
+    "A free team's apps last 7 days; a paid team's last a year.": "無料チームで署名したアプリは7日間、有料チームで署名したアプリは1年間使えます。",
+    "An app installed with another team isn't replaced: signing it with this one installs a second copy.":
+        "別のチームでインストールしたアプリは置き換えられません。このチームで署名すると、2つ目のコピーがインストールされます。",
+    "SideInstaller remembers the pick for this Apple ID. To pick again, open Settings › Account, swipe the Apple ID left and tap Team.":
+        "SideInstaller はこの Apple ID で選んだチームを記憶します。選び直すには、「設定 › アカウント」を開いて、その Apple ID を左にスワイプし、「チーム」をタップしてください。",
+    "No developer team was picked, so the sign-in stopped.": "開発者チームが選ばれなかったため、サインインを中止しました。",
+    "Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs.":
+        "Apple アカウントが複数の開発者チームに所属しています。SideInstaller を開いて、署名に使うチームを選んでください。",
+    "Pick the team again?": "チームを選び直しますか？",
+    "Pick Again": "選び直す",
+    "The next sign-in with “%@” asks which developer team signs.": "次回「%@」でサインインするときに、署名に使う開発者チームを確認します。",
+    // Shortcuts actions (ShortcutsSupport.swift and the *Shortcuts.swift files).
+    "%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.":
+        "%@ を更新できません。SideInstaller に署名し直すための IPA がありません。インストール元のアプリで更新するか、先にその .ipa を SideInstaller に読み込んでください。",
+    "%@ is installed.":
+        "%@ をインストールしました。",
+    "Apple is asking you to finish signing in. Continue in SideInstaller to answer it.":
+        "Apple がサインインの完了を求めています。SideInstaller で続けて応答してください。",
+    "LocalDevVPN is connected.":
+        "LocalDevVPN は接続されています。",
+    "LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.":
+        "LocalDevVPN が接続されていません。このアクションの実行前に接続してください。ショートカットの VPN アクションで接続できます。または、SideInstaller の設定で「必要なときに LocalDevVPN を開始」をオンにしてください。",
+    "LocalDevVPN isn't connected. Continue in SideInstaller to connect it.":
+        "LocalDevVPN が接続されていません。接続するには SideInstaller で続けてください。",
+    "No route is playing.":
+        "再生中のルートはありません。",
+    "Open SideInstaller and accept its terms first.":
+        "先に SideInstaller を開いて、利用規約に同意してください。",
+    "Pick where the route starts, or set a location first.":
+        "ルートの出発地点を選ぶか、先に位置情報を設定してください。",
+    "Route started: %@, about %@.":
+        "ルートを開始しました: %@、約 %@。",
+    "That place has no coordinates. Pick it on the map, or type its address.":
+        "その場所には座標がありません。地図で選ぶか、住所を入力してください。",
+    "The install didn't start. Open SideInstaller to see why.":
+        "インストールが開始されませんでした。SideInstaller を開いて理由を確認してください。",
+
+    // MARK: - Sources
+
+    "Suggested":
+        "おすすめ",
+
+    "Paste the link of a SideStore or AltStore source, or of a .json source file. Its apps, their updates and release notes show here.":
+        "SideStore または AltStore のソース、または .json ソースファイルのリンクを貼り付けてください。アプリ、アップデート、リリースノートがここに表示されます。",
+    "Add a source":
+        "ソースを追加",
+    "Updates":
+        "アップデート",
+    "Update":
+        "アップデート",
+    "Your sources":
+        "追加したソース",
+    "Check for updates":
+        "アップデートを確認",
+    "Copy link":
+        "リンクをコピー",
+    "Source options":
+        "ソースのオプション",
+    "What's new":
+        "新機能",
+    "Version history":
+        "バージョン履歴",
+    "This version has no release notes.":
+        "このバージョンにはリリースノートがありません。",
+    "%d update":
+        "%d 件のアップデート",
+    "%d updates":
+        "%d 件のアップデート",
+    "%d source":
+        "%d 件のソース",
+    "%d sources":
+        "%d 件のソース",
+    "Update to %@":
+        "%@ にアップデート",
+    "Install %@ %@?":
+        "%@ %@ をインストールしますか？",
+    "Version %@ · from %@":
+        "バージョン %@ · %@ から",
+    "%@ installed · %@ available":
+        "%@ をインストール済み · %@ が利用可能",
+    "%@ installed · up to date":
+        "%@ をインストール済み · 最新",
+    "That source is already added.":
+        "そのソースは追加済みです。",
+    "The source answered with HTTP %d.":
+        "ソースが HTTP %d を返しました。",
+    "Couldn't reach the source: %@":
+        "ソースに接続できませんでした：%@",
+    "That isn't a source link. Paste the whole https:// address of the source.":
+        "ソースのリンクではありません。ソースの https:// アドレスを丸ごと貼り付けてください。",
+    "That link didn't return a source. It has to be the source's JSON file itself.":
+        "そのリンクはソースを返しませんでした。ソースの JSON ファイルそのものを指定してください。",
+    "Downloads the IPA from the source, then signs it with your Apple ID and installs it, as a custom .ipa would be.":
+        "ソースから IPA をダウンロードし、あなたの Apple ID で署名してインストールします。カスタム .ipa と同じです。",
+    "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
+        "このバージョンは最新より古いものです。この iPhone のアプリに上書きでインストールされ、新しいバージョンが保存したデータを開けない場合があります。",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "このバージョンは、この iPhone にあるもの（%@）より古いものです。上書きでインストールすると、新しいバージョンが保存したデータを開けない場合があります。",
+
+    // MARK: - JIT
+
+    "%@ has the JIT memory it asked for, so SideInstaller let go of it. JIT stays on until it quits.":
+        "%@ は要求した JIT メモリを受け取ったため、SideInstaller はデタッチしました。アプリを終了するまで JIT は有効なままです。",
+    "%@ of JIT memory prepared": "JIT メモリ %@ を準備済み",
+    "%d app can use JIT": "JIT を使えるアプリ %d 個",
+    "%d apps can use JIT": "JIT を使えるアプリ %d 個",
+    "Attach and detach": "アタッチしてデタッチ",
+    "Attaching the debugger": "デバッガをアタッチ中",
+    "Auto: %@": "自動: %@",
+    "Connecting to this iPhone's debugger": "この iPhone のデバッガに接続中",
+    "Couldn't open %@ under the debugger: %@": "%@ をデバッガで開けませんでした: %@",
+    "Couldn't reach the debugger on this iPhone: %@": "この iPhone のデバッガに接続できませんでした: %@",
+    "Enable JIT": "JIT を有効にする",
+    "JIT is on for %@ until it quits.": "%@ の JIT は終了するまで有効です。",
+    "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
+        "JIT は有効です。%@ の実行中は SideInstaller がアタッチしたままになります。SideInstaller を閉じると JIT が終わるため、バックグラウンドに残しておいてください。",
+    "JIT needs Developer Mode. Turn it on under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "JIT にはデベロッパモードが必要です。「設定 › プライバシーとセキュリティ › デベロッパモード」でオンにし、再起動後に確認します。",
+    "JIT on for %@": "%@ の JIT は有効",
+    "Legacy": "レガシー",
+    "No app on this iPhone is signed for development, which a debugger needs. Install the app with SideStore or SideInstaller, which sign apps that way, then load the apps again.":
+        "この iPhone には開発用に署名されたアプリがありません。デバッガにはそれが必要です。その方法で署名する SideStore か SideInstaller でアプリをインストールしてから、もう一度アプリを読み込んでください。",
+    "No apps can use JIT": "JIT を使えるアプリはありません",
+    "Opening %@": "%@ を開いています",
+    "Quit %@": "%@ を終了",
+    "The debugger couldn't attach to %@ (%@). Install it again with SideStore or SideInstaller, which sign apps so a debugger can attach.":
+        "デバッガは %@ にアタッチできませんでした（%@）。デバッガがアタッチできるように署名する SideStore か SideInstaller で再インストールしてください。",
+    "The debugger lost %@ (%@). Open it with JIT again.": "デバッガが %@ を見失いました（%@）。もう一度 JIT で開いてください。",
+    "Universal": "ユニバーサル",
 ]

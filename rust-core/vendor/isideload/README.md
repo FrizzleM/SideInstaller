@@ -388,6 +388,80 @@ the client and falls back to the Mac only for an incomplete bag. Not ported:
 that starts naming a current one is taken as it is. All six macOS servers
 still named the Sierra Mac on 2026-10-28.
 
+From 2026-11-20 (about 02:20 UTC) Apple's edge answers GsService2 with HTTP
+503 for every client that names its OS `macOS`, and lets `Mac OS X` through:
+SideInstaller 2.1.0 and siboot 0.20.0 failed every sign-in through every
+macOS server (SideInstaller #146–#161, siboot's #153), and anisette.lillq.me's
+hourly probes list all its `macOS;…` clients as "edge-blocked 503" and the
+Sierra Mac as passing. Measured 2026-11-21 with made-up accounts, through
+anisette.lillq.me, new.ani.sidestore.io and mac-ani.jkcoxson.com alike:
+`<MacBookPro18,3> <macOS;26.6;25F84>` gets 503 at `init`; the Sierra Mac,
+`<MacBookPro15,1> <Mac OS X;10.15.7;19H2>` and `… <Mac OS X;10.13.6;17G14042>`
+get -20970 (or -1 for an example.com address), also on an identity provisioned
+while reporting macOS 26.6. iLoader's fixed `<Mac15,7> <macOS;27.0;26A5378j>`
+is a `macOS` client too.
+
+- `CURRENT_MAC_CLIENT_INFO` is now
+  `<MacBookPro16,1> <Mac OS X;10.15.7;19H2> <com.apple.AuthKit/1 (com.apple.akd/1.0)>`
+  with Catalina akd's user agent, `akd/1.0 CFNetwork/1128.0.1 Darwin/19.6.0`:
+  Catalina is the newest macOS that still sends `Mac OS X` (Big Sur renamed
+  it), and over the 10.13 floor. It still counts as a current Mac for
+  `Slots::fits`, so the identities provisioned as macOS 26.6 are kept.
+- `grandslam.rs`'s `MAC_CLIENT_INFO` (the bare-403 and incomplete-bag
+  fallback) is the same Mac, where it was `<Mac15,7> <macOS;27.0;26A5378j>`.
+- anisette.lillq.me is a pool that switches between Apple's macOS and Android
+  libraries by what passes its probes (mac → android on 2026-11-20 02:21,
+  pinned back to mac at 23:11), and its identities fit no other server: its
+  `adi_pb` is 10,240 bytes where the macOS servers' is 671, they answer it
+  `{"result":"GetHeadersError","message":"adi_pb too large"}` (HTTP 200), and
+  it answers theirs -45061. `fetch_headers_for` now takes "adi_pb too large"
+  as not provisioned too, so `provision` passes over the identity instead of
+  failing the attempt with "Failed to check a stored anisette identity", which
+  would have failed every other server after one sign-in through lillq.
+
+Tests: `cargo test -p isideload --lib anisette` (17, one new: a stored lillq
+identity offered first is passed over). A throwaway test ran the app's
+`apple_session::open` with a made-up account through anisette.lillq.me, then
+new.ani.sidestore.io, then lillq again on one storage directory: each `init`
+answered -20970, new.ani.sidestore.io provisioned an identity of its own after
+lillq's, and lillq took its own back. **Not verified:** a real account (the
+second factor, `/auth` as this Mac, the token).
+
+Catalina was the wrong pick, from the iLoader 2.4.2 follow-ups (compared
+2026-11-24). iLoader 2.4.2 (`7364ae6`, 2026-11-20, isideload still 0.5.2) only
+moved its override back to the servers' Sierra Mac with
+`akd/1.0 CFNetwork/811.5.4 Darwin/16.7.0`. Its users then reported what this
+crate saw through the macOS servers on 2026-10-16: `secondaryAuth`, then 403s
+from the trusted-number and text-message pages, or -22410 and -23782 before
+the password proof (iLoader #1203, #1205; SideStore #1745). Apple's own
+frameworks send `Mac OS X` on every macOS version; AltServer on macOS 15.8.1
+signed in once its `macOS` became `Mac OS X` (AltStore #1875). A current Mac
+spelled that way (`<Mac OS X;27.3;26C5035r>`, `<Mac OS X;27.2.1;26B131>`,
+`<Mac OS X;26.6;25F84>`) got the code on the trusted devices and signed in,
+for accounts with a free team and with Advanced Data Protection. In #1304 one
+change of client info, with the anisette state kept from 10.12.6, gave -22410;
+after "Reset Anisette State" the same account signed in.
+None of them tried Catalina with a real account, and neither did this crate.
+
+- `CURRENT_MAC_CLIENT_INFO` is
+  `<MacBookPro18,3> <Mac OS X;26.6;25F84> <com.apple.AuthKit/1 (com.apple.akd/1.0)>`
+  with `AuthKit/1 (Macintosh; OS X 26.6) (com.apple.akd/1.0)`: 1.6.1's Mac
+  (SideStore's default) and user agent, with the `Mac OS X` spelling.
+- `Slots::fits`: a full sign-in reporting a current Mac takes only an identity
+  `provisioned_as` that exact client, no longer any current Mac, so identities
+  made as macOS 26.6 spelled `macOS` (1.6.1 to 2.1.0) or as Catalina (2.1.1)
+  stay assigned for their saved tokens, and the next password sign-in
+  provisions a new one, which may cost one more second factor.
+
+Tests: `cargo test -p isideload --lib remote_v3` (16; `fits` and the mock
+server cover a Catalina identity being passed over). A throwaway test ran the
+app's `apple_session::open` with a made-up account, twice through each of
+anisette.lillq.me, new.ani.sidestore.io, mac-ani.jkcoxson.com, ani.iloader.app
+and ani3.stikstore.app on a fresh storage directory: no 503, every `init`
+answered -20970 until the tenth (-20209, the made-up address locked), lillq
+and the macOS servers each provisioned an identity as this Mac. **Not
+verified:** a real account.
+
 **3. `src/auth/apple_account.rs`, `builder.rs`, `grandslam.rs` — let the user
 choose how the 2FA code arrives.**
 

@@ -125,6 +125,43 @@ void si_pairing_cancel(const SIPairCancel *cancel);
 void si_pairing_cancel_free(SIPairCancel *cancel);
 
 // ---------------------------------------------------------------------------
+// Pairing port — this iPhone's RPPairing listener when it isn't on 49152
+// ---------------------------------------------------------------------------
+
+// Knock on `device_ip`'s dynamic ports (49152–65535), except lockdownd's 62078
+// and the `tried_count` ports in `tried`, 32 at a time, in order, until one
+// answers the RPPairing handshake: the listener tunnel_create_rppairing_multihost
+// dials, which takes whatever port is free when it starts. BLOCKS for seconds
+// (a closed port refuses at once) — run it off the main thread. Stops early
+// after 64 connections in a row that neither refuse nor connect (the VPN went),
+// once more than 48 ports take the connection without answering (another VPN
+// or a proxy answers there), and after running out of descriptors 256 times.
+// Returns 0 with the port in `*out_port` when one answered, 1 when none did,
+// 2 when knocking had to stop, and -1 when `device_ip` isn't an IP address.
+// `*out_summary` (NULL to skip) says what happened, for the log; free it with
+// si_string_free(). `tried` may be NULL.
+int32_t si_find_pairing_port(const char *device_ip,
+                             const uint16_t *tried,
+                             size_t tried_count,
+                             uint16_t *out_port,
+                             char **out_summary);
+
+// Ask device_ip:port for the RPPairing handshake (attemptPairVerify), as
+// tunnel_create_rppairing_multihost does first, but with 8 s to connect and
+// 10 s to answer: the dial has no time limit, so a port that takes the
+// connection and never answers would hold it for ever. BLOCKS for up to 18 s —
+// run it off the main thread. Returns 0 when the port answered as the pairing
+// service, 1 when it refused the connection, 2 when something took the
+// connection and didn't answer as the service (nothing within 10 s, or
+// something else), 3 when nothing took or refused it within 8 s, 4 when the
+// connection failed some other way, and -1 when `device_ip` isn't an IP
+// address. `*out_summary` (NULL to skip) says what the port did, for the log
+// after "Port N"; free it with si_string_free().
+int32_t si_probe_pairing_port(const char *device_ip,
+                              uint16_t port,
+                              char **out_summary);
+
+// ---------------------------------------------------------------------------
 // Account — Apple ID sign-in + on-device signing (STEP 3)
 // ---------------------------------------------------------------------------
 
@@ -146,21 +183,42 @@ typedef struct SignSession SignSession;
 typedef int32_t (*SITwoFactorCb)(void *ctx, const char *request_json,
                                  char *out_buf, size_t buf_len);
 
+// Invoked when a sign-in has to ask which developer team signs: the account is
+// on more than one (the free team every Apple Account has, and a paid Apple
+// Developer Program membership or a company's team) and the `team_id` passed
+// in isn't one of them. Called on the same thread and with the same `ctx` as
+// the 2FA callback, after any 2FA. `teams_json` lists the teams in Apple's
+// order:
+//   [{"teamId": "ABCDE12345", "name": "…", "kind": "free" | "paid" | "unknown"}]
+// "name" is "" when Apple gave none. "kind" goes by listTeams' membership names
+// as AltSign reads them; "unknown" when they don't tell, or couldn't be read.
+// Write the picked team's ID, NUL-terminated, into `out_buf` (capacity
+// `buf_len`) and return 1, or return 0 to stop the sign-in, which then fails
+// with "No developer team picked.". An ID that isn't listed fails it too.
+typedef int32_t (*SITeamCb)(void *ctx, const char *teams_json,
+                            char *out_buf, size_t buf_len);
+
 // Open a developer session + build the signer. BLOCKS — call off the main
 // thread. With `remember_session` non-zero, the developer session an earlier
 // sign-in of this Apple ID saved in `storage_dir` is reused while Apple still
 // accepts it — no password, no 2FA, no GrandSlam sign-in — and a fresh
 // sign-in's session is saved. Pass 0 for an Apple ID that isn't this iPhone
-// owner's (Side by Side): nothing is read or kept. Returns 0 on success
-// (*out_session + *out_summary set), non-zero on error (*out_error set). Free
-// strings with si_string_free, the session with si_sign_session_free.
+// owner's (Side by Side): nothing is read or kept. `team_id` is the team that
+// signs, as remembered for this Apple ID, or NULL/"" for none: when the account
+// isn't on it, its only team signs, or with more than one, `team_cb` is asked
+// which (a NULL `team_cb` takes Apple's first). Returns 0 on success
+// (*out_session + *out_summary set, the summary naming the team as
+// "team: <name> (<team ID>)"), non-zero on error (*out_error set). Free strings
+// with si_string_free, the session with si_sign_session_free.
 int32_t si_apple_signin(const char *apple_id,
                         const char *password,
                         const char *anisette_url,
                         const char *machine_name,
                         const char *storage_dir,
                         int32_t remember_session,
+                        const char *team_id,
                         SITwoFactorCb twofa_cb,
+                        SITeamCb team_cb,
                         void *ctx,
                         SignSession **out_session,
                         char **out_summary,
@@ -295,17 +353,20 @@ int32_t si_forget_apple_session(const char *storage_dir, const char *apple_id);
 // Opaque certificate-session handle.
 typedef struct CertSession CertSession;
 
-// Log in + open developer session + select the first team, for certificate
-// management. BLOCKS — call off the main thread. Independent of the install
-// pipeline (no device/pairing/VPN needed). Returns 0 on success (*out_session +
-// *out_summary set), non-zero on error (*out_error set). Free strings with
-// si_string_free, the session with si_cert_session_free.
+// Log in + open developer session + select the team that signs, for
+// certificate management: `team_id` and `team_cb` pick it as they do for
+// si_apple_signin. BLOCKS — call off the main thread. Independent of the
+// install pipeline (no device/pairing/VPN needed). Returns 0 on success
+// (*out_session + *out_summary set), non-zero on error (*out_error set). Free
+// strings with si_string_free, the session with si_cert_session_free.
 int32_t si_cert_signin(const char *apple_id,
                        const char *password,
                        const char *anisette_url,
                        const char *machine_name,
                        const char *storage_dir,
+                       const char *team_id,
                        SITwoFactorCb twofa_cb,
+                       SITeamCb team_cb,
                        void *ctx,
                        CertSession **out_session,
                        char **out_summary,

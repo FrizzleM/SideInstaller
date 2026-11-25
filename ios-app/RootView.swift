@@ -3,8 +3,8 @@ import UIKit
 
 /// Tab container (Files, Apps, Sources, Downloads, Settings). Each page draws its own
 /// `AppBackground`, since `TabView` would hide a shared one; they stay in sync
-/// because the background animates off the clock. Also hosts the 2FA sheet and
-/// the pages' popups, so they show over any tab.
+/// because the background animates off the clock. Also hosts the sign-in sheet
+/// (2FA, and which team signs) and the pages' popups, so they show over any tab.
 struct RootView: View {
     /// The tabs. The selection is tracked so a tab switch can tick, and a
     /// link can bring the install sheet forward.
@@ -24,6 +24,12 @@ struct RootView: View {
         }
     }
 
+    /// What the sign-in sheet shows: a 2FA prompt, or which team signs.
+    private enum SignInSheet: Equatable {
+        case twoFactor(TwoFactorPhase)
+        case team(TeamQuestion)
+    }
+
     /// One popup, tagged with the page that raised it.
     private enum PopupItem: Hashable {
         case install(Engine.Popup)
@@ -32,6 +38,7 @@ struct RootView: View {
         case entitlements(EntitlementsManager.Popup)
         case location(ToolPopup)
         case apps(ToolPopup)
+        case jit(ToolPopup)
     }
 
     /// Popups that always come up together, so they share one card.
@@ -65,17 +72,17 @@ struct RootView: View {
     @EnvironmentObject private var accounts: AccountStore
     /// Owned here so they survive tab switches and share the one `Engine`.
     @StateObject private var certManager = CertManager()
-    @StateObject private var pairingManager = PairingManager()
-    @StateObject private var locationManager = LocationManager()
+    /// The app's own, shared with the JIT page, which generates a missing
+    /// pairing file with it.
+    @ObservedObject private var pairingManager = PairingManager.shared
+    /// The app's own, shared with the Shortcuts actions.
+    @ObservedObject private var locationManager = LocationManager.shared
     @StateObject private var entitlementsManager = EntitlementsManager()
     /// 与快捷指令共用同一个实例（SideloadedAppsManager.shared），后台续签状态界面可见。
     @ObservedObject private var appsManager = SideloadedAppsManager.shared
     @StateObject private var sideBySideManager = SideBySideManager()
     /// 证书页与文件页之间传递待签 IPA。
     @StateObject private var certWorkspace = CertWorkspace()
-    /// The last two-factor prompt shown, so the sheet keeps its content while it
-    /// slides away after the sign-in clears it.
-    @State private var shownTwoFactor: TwoFactorPhase?
     @State private var page: Page = .sources
     /// U-UI：安装页改全屏 sheet 后的开关（浮动 pill 与链接/分享入口共用）。
     @State private var showInstallSheet = false
@@ -84,6 +91,11 @@ struct RootView: View {
     /// U-UI：文件页/源页“签名”动作要求打开设置里的企业证书页时置位；
     /// SettingsView 的企业区 NavigationLink 认它，打开后自己清掉。
     @State private var settingsEnterpriseRequest = false
+    @StateObject private var sourcesManager = SourcesManager()
+    @StateObject private var jitManager = JITManager()
+    /// What the sign-in sheet showed last, so it keeps its content while it
+    /// slides away after the sign-in clears it.
+    @State private var shownSignInSheet: SignInSheet?
 
     var body: some View {
         // `.tabItem`/`.tag` rather than iOS 18's `Tab`, to keep iOS 17.
@@ -206,17 +218,31 @@ struct RootView: View {
         // 外观只听 App 入口的 SIDAppearance 档（SideInstallerApp 的
         // .preferredColorScheme），这里不再硬编码 .dark，否则主界面
         // 永远深色、设置页却跟浅色档走，两边割裂。
+        // The sources are checked for updates once when SideInstaller opens,
+        // as SideInstallerApp checks SideInstaller itself, so the Sources tile
+        // can show how many there are.
+        .task { await sourcesManager.checkAtLaunch(apps: appsManager) }
         // A swipe down is a cancel; the sign-in closing it is not.
         .sheet(isPresented: Binding(
-            get: { engine.twoFactor != nil },
-            set: { if !$0, let phase = engine.twoFactor { engine.cancelTwoFactor(phase) } }
+            get: { signInSheet != nil },
+            set: { if !$0 { cancel(signInSheet) } }
         )) {
-            if let phase = engine.twoFactor ?? shownTwoFactor {
-                TwoFactorSheet(phase: phase)
+            switch signInSheet ?? shownSignInSheet {
+            case .twoFactor(let phase): TwoFactorSheet(phase: phase)
+            case .team(let question):   TeamSheet(question: question)
+            case nil:                   EmptyView()
+            }
+        }
+        .onChange(of: signInSheet) { _, sheet in
+            if let sheet { shownSignInSheet = sheet }
+        }
+        // Which team signs is asked once per Apple ID.
+        .onChange(of: engine.teamQuestion) { old, question in
+            if let question, old?.request != question.request {
+                SoundEffects.play(.attention)
             }
         }
         .onChange(of: engine.twoFactor) { old, phase in
-            if let phase { shownTwoFactor = phase }
             // C31：2FA 来了先落安装页（全屏 sheet 盖住 TabView 时 2FA sheet
             // 会被 UIKit 静默丢弃）；2FA 清掉后把暂缓的安装页补开。
             if phase != nil {
@@ -247,6 +273,22 @@ struct RootView: View {
         }
     }
 
+    /// The sign-in sheet's content now. The team question comes once the code
+    /// has gone through, so it takes the sheet over.
+    private var signInSheet: SignInSheet? {
+        if let question = engine.teamQuestion { return .team(question) }
+        return engine.twoFactor.map(SignInSheet.twoFactor)
+    }
+
+    /// Stops the sign-in the sheet asks for, as a swipe down does.
+    private func cancel(_ sheet: SignInSheet?) {
+        switch sheet {
+        case .twoFactor(let phase): engine.cancelTwoFactor(phase)
+        case .team(let question):   engine.cancelTeamQuestion(question)
+        case nil:                   break
+        }
+    }
+
     /// The tab selection, ticking as the user changes tab.
     private var tabSelection: Binding<Page> {
         Binding(get: { page },
@@ -267,7 +309,8 @@ struct RootView: View {
                      certManager.popups.map(PopupItem.certificates),
                      entitlementsManager.popups.map(PopupItem.entitlements),
                      locationManager.popups.map(PopupItem.location),
-                     appsManager.popups.map(PopupItem.apps)]
+                     appsManager.popups.map(PopupItem.apps),
+                     jitManager.popups.map(PopupItem.jit)]
         let waiting = pages.filter { $0.contains(where: blocks) }
         let others = pages.filter { !$0.contains(where: blocks) }
         return Array((waiting + others).joined())
@@ -310,10 +353,11 @@ struct RootView: View {
     private func sound(for item: PopupItem) -> UISound? {
         switch item {
         case .install(.error), .install(.certConflict), .pairing(.error),
-             .certificates(.error), .entitlements(.error), .location(.error), .apps(.error):
+             .certificates(.error), .entitlements(.error), .location(.error), .apps(.error),
+             .jit(.error):
             .error
         case .install(.success), .pairing(.success),
-             .certificates(.success), .location(.success), .apps(.success):
+             .certificates(.success), .location(.success), .apps(.success), .jit(.success):
             .success
         // Apple granting nothing it was asked for is a failure.
         case .entitlements(.results(_, let outcomes)):
@@ -335,7 +379,7 @@ struct RootView: View {
         case .install(let popup):    engine.blocks(popup)
         case .pairing(let popup):    pairingManager.blocks(popup)
         // The Tools pages only report; nothing waits on their popups.
-        case .certificates, .entitlements, .location, .apps: false
+        case .certificates, .entitlements, .location, .apps, .jit: false
         }
     }
 
@@ -385,7 +429,7 @@ struct RootView: View {
             nil
         case .pairing(.pairingCode), .pairing(.pairInSettings):
             .pairingPage
-        case .pairing, .certificates, .entitlements, .location, .apps:
+        case .pairing, .certificates, .entitlements, .location, .apps, .jit:
             nil
         }
     }
@@ -423,6 +467,7 @@ struct RootView: View {
         case .entitlements(let popup): entitlementsManager.closePopup(popup)
         case .location(let popup):     locationManager.closePopup(popup)
         case .apps(let popup):         appsManager.closePopup(popup)
+        case .jit(let popup):          jitManager.closePopup(popup)
         }
     }
 
@@ -462,6 +507,8 @@ struct RootView: View {
             toolPopup(popup, successTitle: L("Location spoofing")) { locationManager.closePopup(popup) }
         case .apps(let popup):
             toolPopup(popup, successTitle: L("Sideloaded apps")) { appsManager.closePopup(popup) }
+        case .jit(let popup):
+            toolPopup(popup, successTitle: L("JIT")) { jitManager.closePopup(popup) }
         }
     }
 
@@ -641,3 +688,181 @@ enum ToolPopup: Hashable {
 
 /// The Tools tab: a menu of utility pages. Owns the `NavigationStack` they're
 /// pushed onto, so those pages don't declare their own.
+struct ToolsView: View {
+    /// Observed so labels redraw when the language changes.
+    @EnvironmentObject private var loc: Localizer
+    /// Passed in (owned by `RootView`) so pages keep their state across tabs.
+    @ObservedObject var pairingManager: PairingManager
+    @ObservedObject var certManager: CertManager
+    @ObservedObject var locationManager: LocationManager
+    @ObservedObject var entitlementsManager: EntitlementsManager
+    @ObservedObject var appsManager: SideloadedAppsManager
+    @ObservedObject var sideBySideManager: SideBySideManager
+    @ObservedObject var sourcesManager: SourcesManager
+    @ObservedObject var jitManager: JITManager
+
+    @State private var showSettings = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    header.cascadeItem(0)
+                    LazyVGrid(columns: Self.columns, spacing: 12) {
+                        NavigationLink {
+                            SideBySideView(manager: sideBySideManager)
+                        } label: {
+                            ToolTile(image: "SideBySideLogo", title: L("Side by Side"))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(1)
+                        // The Pairing page generates a pairing file on-device, which
+                        // needs iOS 27+. Older iOS imports it on the Install screen.
+                        if Engine.deviceCanSelfPair {
+                            NavigationLink {
+                                PairingView(manager: pairingManager)
+                            } label: {
+                                ToolTile(image: "PairingLogo", title: L("Pairing"))
+                            }
+                            .buttonStyle(.plain, sound: .tick)
+                            .cascadeItem(2)
+                        }
+                        NavigationLink {
+                            JITView(manager: jitManager)
+                        } label: {
+                            ToolTile(image: "JITLogo", title: L("JIT"))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(rowIndex(2))
+                        NavigationLink {
+                            CertsView(manager: certManager)
+                        } label: {
+                            ToolTile(image: "CertsLogo", title: L("Certificates"))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(rowIndex(3))
+                        NavigationLink {
+                            EntitlementsView(manager: entitlementsManager)
+                        } label: {
+                            ToolTile(image: "EntitlementsLogo", title: L("Entitlements"))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(rowIndex(4))
+                        NavigationLink {
+                            LocationView(manager: locationManager)
+                        } label: {
+                            ToolTile(image: "LocationLogo", title: L("Location spoofing"))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(rowIndex(5))
+                        NavigationLink {
+                            AppsView(manager: appsManager)
+                        } label: {
+                            ToolTile(image: "AppsLogo", title: L("Sideloaded apps"))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(rowIndex(6))
+                        NavigationLink {
+                            AppSourcesView(manager: sourcesManager, appsManager: appsManager)
+                        } label: {
+                            ToolTile(image: "SourcesLogo", title: L("Sources"),
+                                     count: sourcesManager.updateCount(installed: appsManager.entries))
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(rowIndex(7))
+                    }
+                }
+                // No bottom padding: the tab bar's inset already clears the last
+                // row of tiles, and the extra 20pt would make a page that fits scroll.
+                .padding([.horizontal, .top], 20)
+                .pageColumn()
+            }
+            // Still unless the tiles don't all fit on the screen.
+            .scrollBounceBehavior(.basedOnSize)
+            .background(AppBackground())
+            .toolbar { settingsToolbarItem(isPresented: $showSettings) }
+            .sheet(isPresented: $showSettings) { SettingsView() }
+        }
+    }
+
+    /// Two square tiles to a row.
+    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
+
+    /// Cascade index for rows below Pairing, shifted by one when that row is shown.
+    private func rowIndex(_ position: Int) -> Int {
+        Engine.deviceCanSelfPair ? position + 1 : position
+    }
+
+    /// Just the title: the tiles below carry the iconography on this page.
+    private var header: some View {
+        Text(L("Tools"))
+            .font(.largeTitle.weight(.medium))
+            .frame(maxWidth: .infinity)
+            .padding(.top, 8)
+    }
+}
+
+/// One Tools menu tile: a square with the logo above the name. Pages without
+/// logo art pass an SF Symbol, drawn on a plain tile at the same size.
+private struct ToolTile: View {
+    var image: String? = nil
+    var icon: String? = nil
+    var title: String
+    /// Shows a Beta badge in the top corner.
+    var beta: Bool = false
+    /// A count in the top corner, such as the updates Sources found. 0 hides it.
+    var count: Int = 0
+
+    var body: some View {
+        let logo = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        let tile = RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+        return VStack(spacing: 12) {
+            glyph
+                .frame(width: 64, height: 64)
+                .clipShape(logo)
+                // The art's black tile would melt into the card without it.
+                .overlay(logo.strokeBorder(Theme.hairline, lineWidth: 1))
+            Text(title)
+                .font(.body.weight(.medium))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .aspectRatio(1, contentMode: .fit)
+        .overlay(alignment: .topTrailing) {
+            if beta {
+                BetaBadge()
+                    .padding(12)
+            }
+            if count > 0 {
+                Text("\(count)")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(minWidth: 24, minHeight: 24)
+                    .padding(.horizontal, count > 9 ? 4 : 0)
+                    .background(Capsule().fill(Theme.warning))
+                    .padding(12)
+                    .accessibilityLabel(count == 1 ? L("%d update", count) : L("%d updates", count))
+            }
+        }
+        .cardSurface(in: tile)
+        .contentShape(tile)
+    }
+
+    @ViewBuilder
+    private var glyph: some View {
+        if let image {
+            Image(image)
+                .logoArt()
+        } else {
+            ZStack {
+                Rectangle().fill(Theme.raised)
+                Image(systemName: icon ?? "questionmark")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}

@@ -260,6 +260,9 @@ final class EntitlementsManager: ObservableObject {
         let generation = signInGeneration
         let ticket = try await engine.appleSignIns.waitForTurn(.entitlements, appleID: id)
         defer { engine.appleSignIns.finished(ticket) }
+        // The team picked for this Apple ID, so the page shows the App IDs of
+        // the team that signs.
+        let team = AccountStore.shared.team(for: id)?.teamId
 
         let servers = anisetteCandidates()
         let dir = storageDir
@@ -277,7 +280,7 @@ final class EntitlementsManager: ObservableObject {
             }
             do {
                 let summary = try await onQueue {
-                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, ticket: ticket)
+                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, team: team, ticket: ticket)
                 }
                 // A2：切账号后完成的旧登录作废——刚登好的会话在队列上放掉再报取消。
                 guard generation == signInGeneration else {
@@ -288,6 +291,7 @@ final class EntitlementsManager: ObservableObject {
                     throw CancellationError()
                 }
                 engine.anisetteSignedIn(ani)
+                AccountStore.shared.signedIn(id, withTeam: Engine.teamID(inSummary: summary))
                 teamSummary = summary
                 engine.log("Entitlements: signed in (\(summary)).")
                 return
@@ -297,6 +301,9 @@ final class EntitlementsManager: ObservableObject {
                 let failure = error.errorDescription ?? L("Sign-in failed.")
                 if ticket.twoFactorWasCancelled {
                     throw EngineError.message(L("Two-factor verification was cancelled."))
+                }
+                if ticket.teamQuestionWasCancelled {
+                    throw EngineError.message(Engine.noTeamPickedMessage)
                 }
                 if Engine.isAccountLocked(failure) {
                     throw EngineError.accountLocked
@@ -359,14 +366,15 @@ final class EntitlementsManager: ObservableObject {
         throw EngineError.message(engine.anisetteSignInFailure(failures))
     }
 
+    /// One sign-in attempt, on `team` when one was picked for this Apple ID.
     private func performSignIn(id: String, pw: String, ani: String, dir: String,
-                               ticket: AppleSignInTicket) throws -> String {
-        defer { engine.endTwoFactor(for: ticket) }
+                               team: String?, ticket: AppleSignInTicket) throws -> String {
+        defer { engine.endSignInQuestions(for: ticket) }
         var newSession: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        let rc = si_cert_signin(id, pw, ani, "SideInstaller", dir,
-                                appleSignInTwoFactorCallback, ticket.context,
+        let rc = si_cert_signin(id, pw, ani, "SideInstaller", dir, team ?? "",
+                                appleSignInTwoFactorCallback, appleSignInTeamCallback, ticket.context,
                                 &newSession, &summary, &error)
         if rc == 0 {
             if let old = self.session { si_cert_session_free(old) }

@@ -433,6 +433,9 @@ final class CertManager: ObservableObject {
         defer { engine.appleSignIns.finished(ticket) }
         // A load and an import can both have been waiting; the first signed in.
         if session != nil { return }
+        // The team picked for this Apple ID, so the page shows the
+        // certificates of the team that signs.
+        let team = AccountStore.shared.team(for: id)?.teamId
 
         // Try each anisette server (only the one picked in Settings with Auto
         // off); a credential or 2FA error stops the loop.
@@ -451,7 +454,7 @@ final class CertManager: ObservableObject {
             }
             do {
                 let summary = try await onQueue {
-                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, ticket: ticket)
+                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, team: team, ticket: ticket)
                 }
                 // A2：切账号后完成的旧登录作废——刚登好的会话在队列上放掉再报取消。
                 guard generation == signInGeneration else {
@@ -462,6 +465,8 @@ final class CertManager: ObservableObject {
                     throw CancellationError()
                 }
                 engine.anisetteURL = ani               // stick with what worked
+                engine.anisetteSignedIn(ani)
+                AccountStore.shared.signedIn(id, withTeam: Engine.teamID(inSummary: summary))
                 teamSummary = summary
                 isSignedIn = true
                 engine.log("Certificates: signed in (\(summary)).")
@@ -474,7 +479,11 @@ final class CertManager: ObservableObject {
                     engine.log("Two-factor verification cancelled — stopping.")
                     throw EngineError.message(L("Two-factor verification was cancelled."))
                 }
-                if Engine.isAccountLocked(lastError) {
+                if ticket.teamQuestionWasCancelled {
+                    engine.log("No developer team picked — stopping.")
+                    throw EngineError.message(Engine.noTeamPickedMessage)
+                }
+                                if Engine.isAccountLocked(lastError) {
                     engine.log("Apple has locked this Apple Account: \(lastError)")
                     throw EngineError.accountLocked
                 }
@@ -521,15 +530,16 @@ final class CertManager: ObservableObject {
         throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, detail))
     }
 
-    /// One sign-in attempt against a specific anisette server.
+    /// One sign-in attempt against a specific anisette server, on `team` when
+    /// one was picked for this Apple ID (see `Engine.answerTeam`).
     private func performSignIn(id: String, pw: String, ani: String, dir: String,
-                               ticket: AppleSignInTicket) throws -> String {
-        defer { engine.endTwoFactor(for: ticket) }
+                               team: String?, ticket: AppleSignInTicket) throws -> String {
+        defer { engine.endSignInQuestions(for: ticket) }
         var newSession: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        let rc = si_cert_signin(id, pw, ani, "SideInstaller", dir,
-                                appleSignInTwoFactorCallback, ticket.context,
+        let rc = si_cert_signin(id, pw, ani, "SideInstaller", dir, team ?? "",
+                                appleSignInTwoFactorCallback, appleSignInTeamCallback, ticket.context,
                                 &newSession, &summary, &error)
         if rc == 0 {
             if let old = self.session { si_cert_session_free(old) }

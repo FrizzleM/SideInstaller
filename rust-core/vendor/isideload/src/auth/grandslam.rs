@@ -32,8 +32,12 @@ const URL_BAG: &str = "https://gsa.apple.com/grandslam/GsService2/lookup";
 ///   one client for a whole sign-in is what Apple's own clients send, and a
 ///   Mac on those pages alone is a mix Apple can close. `AppleAccount` falls
 ///   back to the Mac on a bare 403.
-const MAC_CLIENT_INFO: &str =
-    "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>";
+///
+/// It's the Mac the macOS-ADI servers' sign-ins report: since 2026-11-20
+/// Apple's edge answers a client that names its OS `macOS` with HTTP 503,
+/// which the `<Mac15,7> <macOS;27.0;26A5378j>` used until then does (see
+/// `CURRENT_MAC_CLIENT_INFO`).
+const MAC_CLIENT_INFO: &str = crate::anisette::remote_v3::CURRENT_MAC_CLIENT_INFO;
 
 /// The URL-bag entries this crate uses.
 const BAG_KEYS: [&str; 5] = [

@@ -23,8 +23,8 @@ enum AppleSignInPurpose {
 }
 
 /// One Apple ID sign-in, from when it joins `AppleSignInQueue` until its turn
-/// ends. It goes to Rust as the 2FA callback's context, so each 2FA request,
-/// and the code typed for it, belongs to the sign-in that made it.
+/// ends. It goes to Rust as the context of the 2FA and team callbacks, so each
+/// question, and the answer to it, belongs to the sign-in that asked it.
 final class AppleSignInTicket: @unchecked Sendable {
     let id: Int
     let purpose: AppleSignInPurpose
@@ -35,6 +35,7 @@ final class AppleSignInTicket: @unchecked Sendable {
 
     private let lock = NSLock()
     private var cancelled = false
+    private var teamCancelled = false
 
     init(id: Int, purpose: AppleSignInPurpose, appleID: String, run: Int?) {
         self.id = id
@@ -53,13 +54,24 @@ final class AppleSignInTicket: @unchecked Sendable {
         lock.withLock { cancelled = true }
     }
 
-    /// This ticket as the 2FA callback's context. Unretained: the queue holds
-    /// the ticket until its turn ends, after every call it's handed to.
+    /// True once the question of which developer team signs ended without an
+    /// answer, so the sign-in stops instead of trying the next anisette server.
+    var teamQuestionWasCancelled: Bool {
+        lock.withLock { teamCancelled }
+    }
+
+    func markTeamQuestionCancelled() {
+        lock.withLock { teamCancelled = true }
+    }
+
+    /// This ticket as the 2FA and team callbacks' context. Unretained: the
+    /// queue holds the ticket until its turn ends, after every call it's
+    /// handed to.
     var context: UnsafeMutableRawPointer {
         Unmanaged.passUnretained(self).toOpaque()
     }
 
-    /// The ticket a 2FA callback's context carries.
+    /// The ticket a 2FA or team callback's context carries.
     static func from(context: UnsafeMutableRawPointer?) -> AppleSignInTicket? {
         context.map { Unmanaged<AppleSignInTicket>.fromOpaque($0).takeUnretainedValue() }
     }
@@ -137,8 +149,15 @@ final class AppleSignInQueue {
     }
 }
 
-/// Hands the 2FA request a sign-in is blocked on to the sheet, and the sheet's
-/// answer back to that request alone.
+/// A sign-in's 2FA requests, answered from the two-factor sheet.
+typealias TwoFactorRequests = SignInRequests<TwoFactorAnswer>
+
+/// A sign-in's question of which developer team signs, answered with a team ID
+/// from the team sheet.
+typealias TeamRequests = SignInRequests<String>
+
+/// Hands the request a sign-in is blocked on, a 2FA code or which team signs,
+/// to the sheet, and the sheet's answer back to that request alone.
 ///
 /// Each request has a number, which the sheet hands back with its answer, and
 /// a semaphore of its own, so an answer can't reach a later request or another
@@ -146,14 +165,14 @@ final class AppleSignInQueue {
 /// one request waits at a time; one made while another waits is turned down
 /// (`open` returns nil) rather than left with no sheet to answer it.
 /// Thread-safe.
-final class TwoFactorRequests: @unchecked Sendable {
+final class SignInRequests<Answer>: @unchecked Sendable {
     /// A request a sign-in is blocked on.
     final class Request: @unchecked Sendable {
         let id: Int
         let ticket: AppleSignInTicket
         fileprivate let reply = DispatchSemaphore(value: 0)
         /// Guarded by the owner's lock.
-        fileprivate var answer: TwoFactorAnswer?
+        fileprivate var answer: Answer?
 
         fileprivate init(id: Int, ticket: AppleSignInTicket) {
             self.id = id
@@ -165,6 +184,13 @@ final class TwoFactorRequests: @unchecked Sendable {
     private var nextID = 1
     /// The request waiting for the sheet, if any.
     private var waiting: Request?
+    /// Marks the sign-in whose request was cancelled, so it stops instead of
+    /// trying the next anisette server.
+    private let markCancelled: (AppleSignInTicket) -> Void
+
+    init(markingCancelled markCancelled: @escaping (AppleSignInTicket) -> Void) {
+        self.markCancelled = markCancelled
+    }
 
     /// Opens a request for `ticket`'s sign-in, or returns nil while another
     /// request waits.
@@ -185,7 +211,7 @@ final class TwoFactorRequests: @unchecked Sendable {
 
     /// Blocks until `request` is answered or cancelled, and returns the answer,
     /// or nil when it was cancelled. Never on the main thread, which answers.
-    func wait(_ request: Request) -> TwoFactorAnswer? {
+    func wait(_ request: Request) -> Answer? {
         request.reply.wait()
         return lock.withLock { request.answer }
     }
@@ -193,7 +219,7 @@ final class TwoFactorRequests: @unchecked Sendable {
     /// Hands `answer` to request `id`. Returns false, doing nothing, once it
     /// isn't waiting: answered, cancelled, or another request's number.
     @discardableResult
-    func answer(_ id: Int, with answer: TwoFactorAnswer) -> Bool {
+    func answer(_ id: Int, with answer: Answer) -> Bool {
         let request: Request? = lock.withLock {
             guard let request = waiting, request.id == id else { return nil }
             waiting = nil
@@ -215,7 +241,7 @@ final class TwoFactorRequests: @unchecked Sendable {
             return request
         }
         guard let request else { return false }
-        request.ticket.markTwoFactorCancelled()
+        markCancelled(request.ticket)
         request.reply.signal()
         return true
     }

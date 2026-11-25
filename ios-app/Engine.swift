@@ -592,7 +592,12 @@ final class Engine {
     // request.
     /// What the two-factor sheet shows; nil while no sign-in is asking.
     private(set) var twoFactor: TwoFactorPhase?
-    private let twoFactorRequests = TwoFactorRequests()
+    private let twoFactorRequests = TwoFactorRequests(markingCancelled: { $0.markTwoFactorCancelled() })
+    // Team bridge: likewise for which developer team signs, when the Apple ID
+    // is on more than one and none of them was picked yet.
+    /// What the team sheet shows; nil while no sign-in is asking.
+    private(set) var teamQuestion: TeamQuestion?
+    private let teamRequests = TeamRequests(markingCancelled: { $0.markTeamQuestionCancelled() })
 
     private init() {
         installLogging()
@@ -988,59 +993,6 @@ final class Engine {
         }
     }
 
-    /// A `sideinstaller://` link opened from a web page, a chat or another
-    /// app. Nothing acts on it until the user says yes to its popup:
-    /// parsing only sets `pendingLink`, which RootView shows over the
-    /// Install tab. Invalid links become `lastError` instead of a popup.
-    @MainActor
-    func receiveLink(_ url: URL) {
-        switch DeepLink.parse(url, answersSideStore: false) {
-        case .link(let link):
-            pendingLink = link
-            log("Link: \(link.logDescription)")
-        case .invalid(let message):
-            lastError = message
-            log("⛔️ Link: \(message)")
-        case .ignored:
-            break
-        }
-    }
-
-    /// The answer to a link's confirmation popup. Declining just clears it;
-    /// confirming runs what the link asked for, through the same paths as
-    /// a manual import (so the same guards, App ID check and errors apply).
-    @MainActor
-    func answerLink(_ proceed: Bool) {
-        guard let link = pendingLink else { return }
-        pendingLink = nil
-        guard proceed else { return }
-        switch link {
-        case .install(let url):
-            Task {
-                // C12：只凭这次导入的返回值起管线——进行中被跳过时
-                // importCustomIPA 已置 lastError，旧 IPA 不会再被
-                // 当成新导入的装掉。
-                if await importCustomIPA(fromLink: url.absoluteString),
-                   IPALibrary.customImport() != nil {
-                    // B-39-B2：源赋值移到导入成功之后——导入被拒时
-                    // 在途管线读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
-                    installSource = .custom
-                    runOneClick()
-                }
-            }
-        case .pairingFile(let file):
-            let tmpURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent(file.displayName)
-            do {
-                try file.data.write(to: tmpURL, options: .atomic)
-                Task { await importPairingFile(from: tmpURL) }
-            } catch {
-                lastError = L("Couldn't import %@: %@", file.displayName, error.localizedDescription)
-            }
-        case .certificate(let cert):
-            certificateToImport = CertificateImport(certificate: cert, retryInstall: false)
-        }
-    }
 
     /// Cancel whatever the run started early and never got to use.
     @MainActor
@@ -1313,7 +1265,7 @@ final class Engine {
                 self.signingTeamID = nil
                 UserDefaults.standard.removeObject(forKey: Self.savedTeamKey)
             }
-            self.log("Apple ID changed — signed out of the previous account.")
+            self.log("Apple ID or its team changed — signed out of the previous sign-in.")
         }
     }
 
@@ -1392,6 +1344,8 @@ final class Engine {
             if updatingChecklist { setStep(.signIn, .done) }
             return
         }
+        // Read once its turn has come, since the one ahead may have picked it.
+        let team = AccountStore.shared.team(for: id)?.teamId
 
         // Anisette servers go down often, so with Auto on try each one before
         // giving up. A server picked in Settings is the only one tried.
@@ -1417,7 +1371,7 @@ final class Engine {
             }
             do {
                 let summary = try await onSignQueue {
-                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, ticket: ticket)
+                    try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir, team: team, ticket: ticket)
                 }
                 // A21-1：切账号后完成的旧登录作废——刚登好的会话放掉、清掉
                 // performSignIn 已写回的旧团队，再报取消。
@@ -1434,6 +1388,8 @@ final class Engine {
                 }
                 // Stick with the server that worked.
                 anisetteURL = ani
+                anisetteSignedIn(ani)
+                AccountStore.shared.signedIn(id, withTeam: Self.teamID(inSummary: summary))
                 signInStatus = "signed in (\(summary))"
                 if updatingChecklist { setStep(.signIn, .done) }
                 return
@@ -1447,6 +1403,12 @@ final class Engine {
                     log("Two-factor verification cancelled — stopping.")
                     signInStatus = "signed out"
                     throw EngineError.message(L("Two-factor verification was cancelled."))
+                }
+                // Nor is a team question closed unanswered.
+                if ticket.teamQuestionWasCancelled {
+                    log("No developer team picked — stopping.")
+                    signInStatus = "signed out"
+                    throw EngineError.message(Self.noTeamPickedMessage)
                 }
                 // A locked account fails everywhere, and retrying keeps it locked.
                 if Self.isAccountLocked(lastError) {
@@ -1516,18 +1478,21 @@ final class Engine {
         throw EngineError.message(L("Apple ID sign-in failed on %@. Last error: %@", tried, detail))
     }
 
-    /// One sign-in attempt against a specific anisette server.
+    /// One sign-in attempt against a specific anisette server. `team` is the
+    /// team picked for this Apple ID, if one was; without it, or when the
+    /// account is no longer on it, Rust asks (`answerTeam`) when there's more
+    /// than one.
     private func performSignIn(id: String, pw: String, ani: String, dir: String,
-                               ticket: AppleSignInTicket) throws -> String {
-        defer { endTwoFactor(for: ticket) }
+                               team: String?, ticket: AppleSignInTicket) throws -> String {
+        defer { endSignInQuestions(for: ticket) }
         log("Apple ID sign-in for \(LogRedactor.maskAppleID(id)) via anisette \(Self.oneLine(ani)) …")
         var session: OpaquePointer?
         var summary: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
         // 1 = save and reuse the developer session, so repeat sign-ins skip
         // Apple authentication until the token expires.
-        let rc = si_apple_signin(id, pw, ani, "SideInstaller", dir, 1,
-                                 appleSignInTwoFactorCallback, ticket.context,
+        let rc = si_apple_signin(id, pw, ani, "SideInstaller", dir, 1, team ?? "",
+                                 appleSignInTwoFactorCallback, appleSignInTeamCallback, ticket.context,
                                  &session, &summary, &error)
         if rc == 0 {
             if let old = self.signSession { si_sign_session_free(old) }
@@ -3088,6 +3053,22 @@ final class Engine {
         return true
     }
 
+    /// Gives ARMSX3 the RPPairing record on its own (see
+    /// `ARMSX3PairingHandoff`). Returns false, writing nothing, when the
+    /// pairing file has none. Runs on `deviceQueue`.
+    private func handOffARMSX3Pairing(placementPath: String, bundleID: String) throws -> Bool {
+        let file = try Data(contentsOf: URL(fileURLWithPath: placementPath))
+        guard let record = ARMSX3PairingHandoff.record(from: file) else {
+            log("⚠️ This pairing file has no RPPairing record, the only kind ARMSX3's JIT reads, so nothing was written. Import a remote pairing file (from idevice_pair or iLoader) here, or generate one on iOS 27, then try again.")
+            return false
+        }
+        let rel = ARMSX3PairingHandoff.remoteRelativePath
+        log("Writing the RPPairing record into \(bundleID) /Documents/\(rel) …")
+        let written = try connection.writeFile(intoBundleID: bundleID, remoteRelativePath: rel, data: record)
+        log("Pairing file written into ARMSX3 and read-back VERIFIED (\(written) bytes). ARMSX3 takes it in the next time it opens; if it's open now, close it in the app switcher first.")
+        return true
+    }
+
     /// Gives Madeira the sign-in it renews its own signing with (see
     /// `MadeiraSigningHandoff`), as `madeiraSigningAccountJSON` built it. Returns
     /// whether it's there; failures only log. Runs on `deviceQueue`.
@@ -3806,6 +3787,147 @@ final class Engine {
         }
     }
 
+    /// Imports a pairing file a Shortcuts action was handed, as the picker's
+    /// import does, throwing what the picker would show.
+    @MainActor
+    func importPairingFile(data: Data, name: String) throws {
+        guard !isRunning else {
+            throw EngineError.message(L("An install is already running. Wait for it to finish, then try again."))
+        }
+        let kind = PairingFileKind.of(data: data)
+        guard data.count <= 1 << 20, kind.isUsable else {
+            throw EngineError.message(ErrorHelp.explained(L("%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.",
+                                                            name)))
+        }
+        log("Importing pairing file \(name) from Shortcuts …")
+        try adoptPairingFile(data, kind: kind, name: name)
+    }
+
+    /// Makes a checked pairing file the one in use, replacing the one on disk,
+    /// and shows it under `name` as the imported file.
+    @MainActor
+    private func adoptPairingFile(_ data: Data, kind: PairingFileKind, name: String) throws {
+        try data.write(to: PrivateStore.pairingFile, options: .atomic)
+        // Drop the cached merged file; it was built from the old record.
+        CompositePairingFile.invalidateMerged()
+        pairingFilePath = PrivateStore.pairingFile.path
+        importedPairingName = name
+        UserDefaults.standard.set(name, forKey: Engine.importedPairingNameKey)
+        connection.disconnect()
+        deviceSummary = nil
+        pairingStatus = L("imported pairing file")
+        setGuide(nil)
+        let records = [kind.hasLockdown ? "lockdown" : nil,
+                       kind.hasRemotePairing ? "remote-pairing" : nil]
+            .compactMap { $0 }.joined(separator: " + ")
+        log("Imported \(name) (\(data.count) bytes, \(records) record\(records.contains("+") ? "s" : "")\(kind.udid.map { ", UDID \($0)" } ?? "")).")
+        if Self.lockdownWorksOverLoopback {
+            if !kind.hasLockdown {
+                log("⚠️ No lockdown record in that file — SideStore and Feather can't read it, though the install itself will work.")
+            }
+        } else if !kind.hasRemotePairing {
+            // Nothing stops the import: the connect explains it with advice.
+            log(Self.deviceCanSelfPair
+                ? "⚠️ That file holds only a lockdown record, and from iOS 26.4 on lockdownd hangs up on those through LocalDevVPN. Install pairs this iPhone with itself instead."
+                : "⚠️ That file holds only a lockdown record, and from iOS 26.4 on lockdownd hangs up on those through LocalDevVPN, so it won't connect. Make a remote pairing file instead: idevice_pair › Remote pairing › Create › Save to file…, or iLoader's exported file.")
+        }
+    }
+
+    // MARK: - Links
+    //
+    // `sideinstaller://install?url=`, `sideinstaller://pairingFile?data=` and
+    // `sideinstaller://certificate?data=` (see `DeepLink`). Each puts up a popup
+    // first; only its yes acts. SideStore's certificate, sent back because
+    // SideInstaller asked for it, is the exception: SideStore has just asked
+    // whether to export it.
+
+    /// How long after asking SideStore a pairing file counts as its reply.
+    private static let sideStoreReplyWindow: TimeInterval = 5 * 60
+
+    /// Reads a `sideinstaller://` link and puts up its popup. Nothing is
+    /// downloaded or imported yet.
+    @MainActor
+    func receiveLink(_ url: URL) {
+        let answersSideStore = sideStorePairingRequestedAt
+            .map { Date().timeIntervalSince($0) < Self.sideStoreReplyWindow } ?? false
+        let answersCertificateRequest = sideStoreCertificateRequest
+            .map { Date().timeIntervalSince($0.at) < Self.sideStoreReplyWindow } ?? false
+        switch DeepLink.parse(url, answersSideStore: answersSideStore,
+                              answersCertificateRequest: answersCertificateRequest) {
+        case .ignored(let action):
+            // LocalDevVPN comes back with a bare `sideinstaller://`.
+            if let action { log("Ignored a sideinstaller://\(action) link: this version has no such action.") }
+        case .invalid(let message):
+            log("⛔️ Link: \(message)")
+            // A run's own popups come first; the log keeps the reason.
+            if !isRunning { lastError = message }
+        case .link(let link):
+            if case .pairingFile = link { sideStorePairingRequestedAt = nil }
+            if case .certificate(let cert) = link, cert.fromSideStore {
+                let retryInstall = sideStoreCertificateRequest?.retryInstall ?? false
+                sideStoreCertificateRequest = nil
+                log("Link: \(link.logDescription).")
+                certificateToImport = CertificateImport(certificate: cert, retryInstall: retryInstall)
+                return
+            }
+            pendingLink = link
+            log("Link: \(link.logDescription). \(isRunning ? "It asks once this install ends." : "Waiting for the go-ahead.")")
+        }
+    }
+
+    /// Answers the link popup: true downloads and installs the IPA, or imports
+    /// the pairing file; false drops the link.
+    @MainActor
+    func answerLink(_ accept: Bool) {
+        guard let link = pendingLink else { return }
+        pendingLink = nil
+        guard accept else {
+            log("Link dismissed.")
+            return
+        }
+        lastError = nil
+        switch link {
+        case .install(let url):
+            Task {
+                // C12：只凭这次导入的返回值起管线——进行中被跳过时
+                // importCustomIPA 已置 lastError，旧 IPA 不会再被
+                // 当成新导入的装掉。
+                if await importCustomIPA(fromLink: url.absoluteString),
+                   IPALibrary.customImport() != nil {
+                    // B-39-B2：源赋值移到导入成功之后——导入被拒时
+                    // 在途管线读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
+                    installSource = .custom
+                    runOneClick()
+                }
+            }
+        case .pairingFile(let file):
+            do {
+                try adoptPairingFile(file.data, kind: file.kind, name: file.displayName)
+            } catch {
+                lastError = L("Couldn't import %@: %@", file.displayName, error.localizedDescription)
+                log("⛔️ Pairing import: \(lastError ?? "")")
+            }
+        case .certificate(let cert):
+            certificateToImport = CertificateImport(certificate: cert, retryInstall: false)
+        }
+    }
+
+    /// Downloads the IPA at `url` as the custom build, then installs it signed
+    /// with the Apple ID's certificate. Used by `sideinstaller://install` links
+    /// and the update banner.
+    @MainActor
+    func installLinkedIPA(_ url: URL) {
+        guard !isRunning, !isImportingIPA else { return }
+        lastError = nil
+        installSource = .custom
+        Task { @MainActor in
+            // Installs only what the link brought: a failed download leaves
+            // its error up instead of installing the previous import.
+            guard await self.importCustomIPA(fromLink: url.absoluteString) else { return }
+            self.runOneClick()
+        }
+    }
+
     // MARK: - App presence & SideStore pairing helpers
 
     /// True unless SideStore is known to be missing (see `appPresence`).
@@ -4087,7 +4209,10 @@ final class Engine {
         guard connection.isConnected else { throw EngineError.message(L("Device link dropped — reconnect.")) }
         let bundleID = target.bundleID
         if target.app.takesRemoteRecordOnly {
-            guard try handOffMadeiraPairing(placementPath: placementPath, bundleID: bundleID) else {
+            let handed = try target.name == ARMSX3PairingHandoff.appName
+                ? handOffARMSX3Pairing(placementPath: placementPath, bundleID: bundleID)
+                : handOffMadeiraPairing(placementPath: placementPath, bundleID: bundleID)
+            guard handed else {
                 throw EngineError.message(L("This pairing file has no RPPairing record, the only kind %@ reads.", target.name))
             }
             return
@@ -4143,6 +4268,26 @@ final class Engine {
                 self.handOffNotice = [self.handOffNotice, L("The pairing wasn't handed over in the newer format. SideStore may ask for the pairing file.")].compactMap { $0 }.joined(separator: "\n")
             }
             log("⚠️ Couldn't hand \(appName) its pairing in the newer format (\(short(error))). SideStore nightlies from 20 September 2026 on may ask for the pairing file; older builds are set.")
+        }
+    }
+
+    /// Sets SideStore up to sign in the way its users got past Apple's -80046
+    /// and HTTP 503s (`SideStoreAnisetteHandoff`). After the install, as
+    /// `handOffSplitPairing`; failures only log. Runs on `deviceQueue`.
+    private func handOffSideStoreAnisette(bundleID: String, appName: String, home: SideStoreHome) {
+        let prefsPath = home.preferencesPath(hostBundleID: bundleID)
+        do {
+            var changes: [String] = []
+            try connection.updatePlist(inBundleID: bundleID, containerPath: prefsPath) { prefs in
+                changes = SideStoreAnisetteHandoff.applySettings(to: &prefs)
+            }
+            guard !changes.isEmpty else { return }
+            log("Set \(appName)'s anisette the way SideStore's users get past Apple's -80046 and HTTP 503s: \(changes.joined(separator: ", ")) (/\(prefsPath)).")
+            // -22410 after a change of client info, until the identity is made
+            // again; unticking would put back the default, which gets 503s.
+            log("If \(appName)'s own sign-in still fails (-22410, -45061), use its Settings › User Customizations › Reset adi.pb, with “Keep header customizations” ticked, then sign in again.")
+        } catch {
+            log("⚠️ Couldn't set \(appName)'s anisette settings (\(short(error))). If its sign-in fails with -80046 or HTTP 503, turn off On-device Anisette and Auto Rotation in its settings, pick “SideStore (New)”, and set its client info to say “Mac OS X” where it says “macOS”.")
         }
     }
 
@@ -4292,8 +4437,9 @@ final class Engine {
     // image and a session kept open while the location is simulated. Same
     // approach as StikDebug, over the RPPairing tunnel.
 
-    /// Connect, and mount the developer disk image unless the device already has
-    /// one. Returns true when a mount actually ran, so the UI can say so.
+    /// Connect, mount the developer disk image unless the device already has
+    /// one, and open the location session. Returns true when a mount actually
+    /// ran, so the UI can say so.
     @MainActor
     @discardableResult
     func prepareLocationSimulation(imagePath: String,
@@ -4309,28 +4455,43 @@ final class Engine {
         }
         tunnelLocationHold = true
         do {
-            try await ensurePairingConnection()
-            let mounted = try await onDeviceQueue { try self.connection.mountedDeveloperImageCount() }
-            if mounted > 0 {
-                log("Developer disk image already mounted (\(mounted) image(s)).")
-                try await onDeviceQueue { try self.connection.beginLocationSimulation() }
-                return false
-            }
-            log("No developer disk image mounted — mounting the personalized one…")
-            try await onDeviceQueue {
-                try self.connection.mountPersonalizedDeveloperImage(imagePath: imagePath,
-                                                                   trustcachePath: trustcachePath,
-                                                                   manifestPath: manifestPath,
-                                                                   progress: progress)
-            }
-            log("Developer disk image mounted.")
+            let mounted = try await prepareDeveloperDiskImage(imagePath: imagePath,
+                                                          trustcachePath: trustcachePath,
+                                                          manifestPath: manifestPath,
+                                                          progress: progress)
             try await onDeviceQueue { try self.connection.beginLocationSimulation() }
-            return true
+            return mounted
         } catch {
             tunnelLocationHold = false
             releaseTunnel()
             throw error
         }
+    }
+
+    /// Connect, and mount the developer disk image unless the device already
+    /// has one. Location simulation and JIT both need it: DVT and debugserver
+    /// come with it. Returns true when a mount actually ran.
+    @MainActor
+    @discardableResult
+    func prepareDeveloperDiskImage(imagePath: String,
+                                   trustcachePath: String,
+                                   manifestPath: String,
+                                   progress: @escaping (Double) -> Void) async throws -> Bool {
+        try await ensurePairingConnection()
+        let mounted = try await onDeviceQueue { try self.connection.mountedDeveloperImageCount() }
+        if mounted > 0 {
+            log("Developer disk image already mounted (\(mounted) image(s)).")
+            return false
+        }
+        log("No developer disk image mounted — mounting the personalized one…")
+        try await onDeviceQueue {
+            try self.connection.mountPersonalizedDeveloperImage(imagePath: imagePath,
+                                                               trustcachePath: trustcachePath,
+                                                               manifestPath: manifestPath,
+                                                               progress: progress)
+        }
+        log("Developer disk image mounted.")
+        return true
     }
 
     /// Push a coordinate to the device. The caller repeats this on a timer —
@@ -4372,6 +4533,21 @@ final class Engine {
         }
         log("Simulated location cleared.")
     }
+
+    // MARK: - JIT tab
+    //
+    // A JIT session runs over a tunnel of its own (`JITSession`), so only the
+    // checks and the app list go through the shared connection.
+
+    /// Every app installed on the device, as installation_proxy reports them
+    /// (the JIT page keeps those that can be debugged). Opens the device link
+    /// first.
+    @MainActor
+    func installedAppPlists() async throws -> [[String: Any]] {
+        try await ensurePairingConnection()
+        return try await onDeviceQueue { try self.connection.installedAppPlists() }
+    }
+
 
     // MARK: - Developer Mode (Settings)
     //
@@ -4613,11 +4789,95 @@ final class Engine {
     }
 
     /// Close the sheet once a sign-in attempt returns, however it went, if it
-    /// shows that sign-in's request. Safe from any thread.
-    func endTwoFactor(for ticket: AppleSignInTicket) {
+    /// shows that sign-in's 2FA request or team question. Safe from any thread.
+    func endSignInQuestions(for ticket: AppleSignInTicket) {
         setMain {
             if self.twoFactor?.signIn == ticket.id { self.twoFactor = nil }
+            if self.teamQuestion?.signIn == ticket.id { self.teamQuestion = nil }
         }
+    }
+
+    // MARK: Team bridge
+
+    /// What a sign-in stopped with when its team question was closed unanswered.
+    static var noTeamPickedMessage: String {
+        L("No developer team was picked, so the sign-in stopped.")
+    }
+
+    /// Called from a Rust worker thread with the Apple Account's teams as JSON,
+    /// when it's on more than one and none was picked for it; blocks until the
+    /// sheet answers. Writes the picked team's ID into `outBuf` and returns 1,
+    /// or returns 0 to stop the sign-in.
+    ///
+    /// Like a 2FA request, it waits while a Trust prompt has the user's
+    /// attention, and a question from an install's background sign-in whose
+    /// run has ended is declined.
+    func answerTeam(request json: UnsafePointer<CChar>?, outBuf: UnsafeMutablePointer<CChar>?, len: Int,
+                    for ticket: AppleSignInTicket) -> Int32 {
+        guard let outBuf, len > 1 else { return 0 }
+        guard let teams = json.flatMap({ DeveloperTeam.list(json: String(cString: $0)) }),
+              let suggested = DeveloperTeam.suggested(in: teams) else {
+            ticket.markTeamQuestionCancelled()
+            log("⚠️ \(ticket.purpose.name): couldn't read the developer teams Apple listed — stopping.")
+            return 0
+        }
+        // Don't cover a Trust prompt; the wait blocks, so never on main.
+        if !Thread.isMainThread { attention.waitUntilFree() }
+        guard let request = teamRequests.open(for: ticket) else {
+            // The queue lets one sign-in ask at a time, so this shouldn't happen.
+            ticket.markTeamQuestionCancelled()
+            log("⚠️ \(ticket.purpose.name): asked which team signs while another sign-in waits for an answer — declined.")
+            return 0
+        }
+        setMain {
+            // A cancel can land between opening the request and this block running.
+            guard self.teamRequests.isWaiting(request.id) else { return }
+            // Checked here, on main, where a stopping run has already counted
+            // itself finished by the time this block runs.
+            if let run = ticket.run, run < self.finishedRuns {
+                self.log("The sign-in of an install that already stopped asked which team signs — declined.")
+                self.teamRequests.cancel(request.id)   // no answer, so the sign-in stops
+                return
+            }
+            // The account got past two-factor, so the question takes the
+            // sheet over from it.
+            if self.twoFactor?.signIn == ticket.id { self.twoFactor = nil }
+            self.teamQuestion = TeamQuestion(request: request.id, signIn: ticket.id,
+                                             appleID: ticket.appleID, teams: teams,
+                                             suggested: suggested,
+                                             remembers: AccountStore.shared.isSaved(ticket.appleID))
+            let kinds = teams.map(\.kind.rawValue).joined(separator: ", ")
+            self.log("\(ticket.purpose.name): this Apple Account is on \(teams.count) developer teams (\(kinds)) — asking which signs.")
+        }
+        guard let answer = teamRequests.wait(request) else { return 0 }
+        let bytes = Array(answer.utf8)
+        guard bytes.count < len else { return 0 }
+        outBuf.withMemoryRebound(to: UInt8.self, capacity: len) { dst in
+            for (i, b) in bytes.enumerated() { dst[i] = b }
+            dst[bytes.count] = 0
+        }
+        return 1
+    }
+
+    /// Hand the sheet's pick to the question it shows, and remember it for the
+    /// Apple ID when the question says to.
+    func answerTeamQuestion(_ team: DeveloperTeam, to question: TeamQuestion) {
+        // Not waiting anymore: answered already, or cancelled.
+        guard teamRequests.answer(question.request, with: team.teamId) else { return }
+        if teamQuestion?.request == question.request { teamQuestion = nil }
+        if question.remembers {
+            AccountStore.shared.remember(team, for: question.appleID)
+        }
+        let kind = team.kind == .unknown ? "" : "\(team.kind.rawValue) "
+        log("Signing with the \(kind)team \(team.named)\(question.remembers ? ", from now on for this Apple ID" : "").")
+    }
+
+    /// Close the team sheet showing `question`, which stops its sign-in.
+    func cancelTeamQuestion(_ question: TeamQuestion) {
+        // Already closed because the sign-in returned: nothing to cancel.
+        guard teamQuestion?.request == question.request else { return }
+        teamQuestion = nil
+        teamRequests.cancel(question.request)
     }
     // MARK: - Storage
 

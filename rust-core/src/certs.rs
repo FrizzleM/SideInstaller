@@ -1,8 +1,11 @@
 //! Lists and revokes iOS development certificates via `isideload`'s
 //! `DeveloperSession` (developer portal only, no device). `si_cert_signin` opens
-//! a session on the first team, `si_cert_list` returns its certificates as JSON,
-//! and `si_cert_revoke` revokes one by serial number, and `si_cert_import`
-//! signs with a PKCS#12 archive's key.
+//! a session on the team that signs (`team.rs`), `si_cert_list` returns its
+//! certificates as JSON, `si_cert_revoke` revokes one by serial number,
+//! `si_cert_import` signs with a PKCS#12 archive's key, and
+//! `si_cert_export_p12` exports the signing certificate as a base64 PKCS#12
+//! archive (for LiveContainer import). Upstream's file-export `si_cert_export`
+//! is not merged: the fork already exports the same certificate as p12.
 
 use std::ffi::{c_char, c_void};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -25,10 +28,11 @@ use rsa::{
     RsaPrivateKey,
 };
 
-use crate::account::{make_2fa, TwoFactorCb, TwoFaCtx};
+use crate::account::{ask_team, make_2fa, TeamCb, TwoFactorCb, TwoFaCtx};
 use crate::apple_session;
 use crate::error_text::report_text;
 use crate::ffi_util::{cstr, opt_str};
+use crate::team;
 
 /// Opaque handle owning the runtime, developer session and selected team.
 pub struct CertSession {
@@ -91,7 +95,9 @@ impl CertInfo {
     }
 }
 
-/// Log in, open a developer session, and select the first team. Returns 0 on
+/// Log in, open a developer session, and select the team that signs: `team_id`
+/// when the account is on it, as `si_apple_signin` picks it, asking `team_cb`
+/// when it's on more than one and none of them is `team_id`. Returns 0 on
 /// success; free the session with `si_cert_session_free`.
 ///
 /// # Safety
@@ -105,7 +111,9 @@ pub unsafe fn cert_signin(
     // Unused; matches `si_apple_signin`'s signature.
     _machine_name: *const c_char,
     storage_dir: *const c_char,
+    team_id: *const c_char,
     twofa_cb: TwoFactorCb,
+    team_cb: TeamCb,
     ctx: *mut c_void,
     out_session: *mut *mut CertSession,
     out_summary: *mut *mut c_char,
@@ -115,7 +123,9 @@ pub unsafe fn cert_signin(
     let password = opt_str(password, "");
     let anisette_url = opt_str(anisette_url, "https://ani.sidestore.io");
     let storage_dir = opt_str(storage_dir, ".");
+    let wanted = opt_str(team_id, "").trim().to_string();
     let twofa = make_2fa(twofa_cb, TwoFaCtx(ctx));
+    let team_ctx = TwoFaCtx(ctx);
 
     let result = catch_unwind(AssertUnwindSafe(|| {
         let rt = tokio::runtime::Builder::new_multi_thread()
@@ -125,7 +135,7 @@ pub unsafe fn cert_signin(
 
         let (dev, team, summary) = rt.block_on(async {
             // Always the active account, so the session is saved and reused.
-            let (dev, teams) = apple_session::open(
+            let (mut dev, teams) = apple_session::open(
                 &apple_id,
                 &password,
                 &anisette_url,
@@ -135,17 +145,17 @@ pub unsafe fn cert_signin(
                 "Certs",
             )
             .await?;
-            let team = teams
-                .into_iter()
-                .next()
-                .ok_or_else(|| "no development teams on this Apple ID".to_string())?;
+            let team = team::pick(
+                &mut dev,
+                teams,
+                Some(wanted.as_str()).filter(|id| !id.is_empty()),
+                |choices| ask_team(team_cb, &team_ctx, choices),
+                "Certs",
+            )
+            .await?;
             tracing::info!("Certs: using team {}", team.team_id);
 
-            let summary = format!(
-                "team: {} ({})",
-                team.name.as_deref().unwrap_or("<unnamed>"),
-                team.team_id
-            );
+            let summary = team::summary(&team);
             Ok::<_, String>((dev, team, summary))
         })?;
 

@@ -692,6 +692,8 @@ let chineseStrings: [String: String] = [
         "%@:%d 上有东西拒绝了连接，说明隧道是通的，但这台 iPhone 没有在配对端口上监听：开发者模式已关闭。请在 设置 › 隐私与安全性 › 开发者模式 中打开它（iPhone 会重启），然后重试。",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
         "%@:%d 上有东西拒绝了连接，说明隧道是通的，但尽管开发者模式已打开，这台 iPhone 仍没有在配对端口上监听。请在“配对文件”中重新配对这台 iPhone，然后重试。如果仍然失败，请重启 iPhone。",
+    "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
+        "%@:%d 上有东西接受了连接，但没有像这台 iPhone 的配对端口那样应答，其他端口也没有。请确认当前打开的 VPN 是 LocalDevVPN，并且开发者模式已打开（设置 › 隐私与安全性 › 开发者模式），然后重试。如果仍然失败，请重启 iPhone。",
     "Start LocalDevVPN when needed": "需要时打开 LocalDevVPN",
     "Start LocalDevVPN now": "立即启动 LocalDevVPN",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -1424,4 +1426,141 @@ let chineseStrings: [String: String] = [
         "这个方式不可用，换个方式。",
     "That didn't work. Try another way.":
         "没成，换个方式试试。",
+    // MARK: - Developer team
+
+    "Free · %@": "免费 · %@",
+    "Paid · %@": "付费 · %@",
+    "This Apple Account is on %d developer teams. Pick the one that signs.":
+        "此 Apple 账户属于 %d 个开发团队。请选择用来签名的团队。",
+    "Which Team?": "哪个团队？",
+    "Signed this copy of SideInstaller": "签名了这份 SideInstaller",
+    "A free team's apps last 7 days; a paid team's last a year.": "免费团队签名的应用可用 7 天；付费团队签名的可用一年。",
+    "An app installed with another team isn't replaced: signing it with this one installs a second copy.":
+        "用其他团队安装的应用不会被替换：用此团队签名会另外安装一个副本。",
+    "SideInstaller remembers the pick for this Apple ID. To pick again, open Settings › Account, swipe the Apple ID left and tap Team.":
+        "SideInstaller 会为此 Apple ID 记住这个选择。如需重新选择，请打开“设置 › 账户”，在该 Apple ID 上向左轻扫，然后轻点“团队”。",
+    "No developer team was picked, so the sign-in stopped.": "未选择开发团队，因此登录已停止。",
+    "Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs.":
+        "你的 Apple 账户属于多个开发团队。请打开 SideInstaller，选择用来签名的团队。",
+    "Pick the team again?": "重新选择团队？",
+    "Pick Again": "重新选择",
+    "The next sign-in with “%@” asks which developer team signs.": "下次用“%@”登录时，会询问用哪个开发团队签名。",
+    // Shortcuts actions (ShortcutsSupport.swift and the *Shortcuts.swift files).
+    "%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.":
+        "无法续签 %@：SideInstaller 没有可用来重新签名的 IPA。请在安装它的应用里续签，或先将它的 .ipa 导入 SideInstaller。",
+    "%@ is installed.":
+        "%@ 已安装。",
+    "Apple is asking you to finish signing in. Continue in SideInstaller to answer it.":
+        "Apple 要求你完成登录。请在 SideInstaller 中继续操作。",
+    "LocalDevVPN is connected.":
+        "LocalDevVPN 已连接。",
+    "LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.":
+        "LocalDevVPN 未连接。请在此操作运行前连接它：“快捷指令”的 VPN 操作可以做到；也可以在 SideInstaller 的设置中打开“需要时打开 LocalDevVPN”。",
+    "LocalDevVPN isn't connected. Continue in SideInstaller to connect it.":
+        "LocalDevVPN 未连接。请在 SideInstaller 中继续以连接它。",
+    "No route is playing.":
+        "没有正在播放的路线。",
+    "Open SideInstaller and accept its terms first.":
+        "请先打开 SideInstaller 并接受其条款。",
+    "Pick where the route starts, or set a location first.":
+        "请选择路线的起点，或先设置一个位置。",
+    "Route started: %@, about %@.":
+        "路线已开始：%@，约 %@。",
+    "That place has no coordinates. Pick it on the map, or type its address.":
+        "该地点没有坐标。请在地图上选择，或输入它的地址。",
+    "The install didn't start. Open SideInstaller to see why.":
+        "安装没有开始。请打开 SideInstaller 查看原因。",
+
+    // MARK: - Sources
+
+    "Suggested":
+        "推荐",
+
+    "Paste the link of a SideStore or AltStore source, or of a .json source file. Its apps, their updates and release notes show here.":
+        "粘贴 SideStore 或 AltStore 源的链接，或 .json 源文件的链接。它的应用、更新和发布说明会显示在这里。",
+    "Add a source":
+        "添加源",
+    "Updates":
+        "更新",
+    "Update":
+        "更新",
+    "Your sources":
+        "你的源",
+    "Check for updates":
+        "检查更新",
+    "Copy link":
+        "拷贝链接",
+    "Source options":
+        "源选项",
+    "What's new":
+        "新功能",
+    "Version history":
+        "版本历史",
+    "This version has no release notes.":
+        "此版本没有发布说明。",
+    "%d update":
+        "%d 个更新",
+    "%d updates":
+        "%d 个更新",
+    "%d source":
+        "%d 个源",
+    "%d sources":
+        "%d 个源",
+    "Update to %@":
+        "更新到 %@",
+    "Install %@ %@?":
+        "安装 %@ %@？",
+    "Version %@ · from %@":
+        "版本 %@ · 来自 %@",
+    "%@ installed · %@ available":
+        "已安装 %@ · 可用 %@",
+    "%@ installed · up to date":
+        "已安装 %@ · 已是最新",
+    "That source is already added.":
+        "该源已添加。",
+    "The source answered with HTTP %d.":
+        "源返回了 HTTP %d。",
+    "Couldn't reach the source: %@":
+        "无法访问该源：%@",
+    "That isn't a source link. Paste the whole https:// address of the source.":
+        "这不是源链接。请粘贴源的完整 https:// 地址。",
+    "That link didn't return a source. It has to be the source's JSON file itself.":
+        "该链接未返回源。它必须是源的 JSON 文件本身。",
+    "Downloads the IPA from the source, then signs it with your Apple ID and installs it, as a custom .ipa would be.":
+        "从源下载 IPA，然后用你的 Apple 账户签名并安装，与自定义 .ipa 相同。",
+    "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
+        "此版本比最新版本旧。它会覆盖安装在此 iPhone 上的副本，可能无法打开较新版本保存的数据。",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "此版本比此 iPhone 上的版本（%@）旧。覆盖安装后，它可能无法打开较新版本保存的数据。",
+
+    // MARK: - JIT
+
+    "%@ has the JIT memory it asked for, so SideInstaller let go of it. JIT stays on until it quits.":
+        "%@ 已拿到所需的 JIT 内存，因此 SideInstaller 已与它分离。JIT 会保持开启，直到它退出。",
+    "%@ of JIT memory prepared": "已准备 %@ JIT 内存",
+    "%d app can use JIT": "%d 个应用可使用 JIT",
+    "%d apps can use JIT": "%d 个应用可使用 JIT",
+    "Attach and detach": "附加后分离",
+    "Attaching the debugger": "正在附加调试器",
+    "Auto: %@": "自动：%@",
+    "Connecting to this iPhone's debugger": "正在连接此 iPhone 的调试器",
+    "Couldn't open %@ under the debugger: %@": "无法在调试器下打开 %@：%@",
+    "Couldn't reach the debugger on this iPhone: %@": "无法连接此 iPhone 的调试器：%@",
+    "Enable JIT": "启用 JIT",
+    "JIT is on for %@ until it quits.": "%@ 的 JIT 已开启，直到它退出。",
+    "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
+        "JIT 已开启。%@ 运行期间，SideInstaller 会保持附加：请让 SideInstaller 留在后台，关闭它会结束 JIT。",
+    "JIT needs Developer Mode. Turn it on under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "JIT 需要开发者模式。在 设置 › 隐私与安全性 › 开发者模式 中打开它，并在重启后确认。",
+    "JIT on for %@": "%@ 的 JIT 已开启",
+    "Legacy": "旧版",
+    "No app on this iPhone is signed for development, which a debugger needs. Install the app with SideStore or SideInstaller, which sign apps that way, then load the apps again.":
+        "此 iPhone 上没有以开发方式签名的应用，而调试器需要这种签名。请用 SideStore 或 SideInstaller 安装该应用（它们都这样签名），然后重新加载应用。",
+    "No apps can use JIT": "没有可使用 JIT 的应用",
+    "Opening %@": "正在打开 %@",
+    "Quit %@": "退出 %@",
+    "The debugger couldn't attach to %@ (%@). Install it again with SideStore or SideInstaller, which sign apps so a debugger can attach.":
+        "调试器无法附加到 %@（%@）。请用 SideStore 或 SideInstaller 重新安装它，它们签名的应用可以被调试器附加。",
+    "The debugger lost %@ (%@). Open it with JIT again.": "调试器与 %@ 断开了（%@）。请再次用 JIT 打开它。",
+    "Universal": "通用",
 ]

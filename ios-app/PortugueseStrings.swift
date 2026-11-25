@@ -688,6 +688,8 @@ let portugueseStrings: [String: String] = [
         "Algo em %@:%d recusou a conexão, então o túnel está funcionando, mas este iPhone não está escutando na porta de pareamento: o Modo de Desenvolvedor está desligado. Ative em Ajustes › Privacidade e Segurança › Modo de Desenvolvedor (o iPhone reinicia) e tente outra vez.",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
         "Algo em %@:%d recusou a conexão, então o túnel está funcionando, mas este iPhone não está escutando na porta de pareamento, embora o Modo de Desenvolvedor esteja ligado. Pareie este iPhone de novo em “Arquivo de pareamento” e tente outra vez. Se ainda falhar, reinicie o iPhone.",
+    "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
+        "Algo em %@:%d aceitou a conexão, mas não respondeu como a porta de pareamento deste iPhone, e nenhuma outra porta respondeu como ela. Verifique se a VPN ligada é a LocalDevVPN e se o Modo de Desenvolvedor está ligado (Ajustes › Privacidade e Segurança › Modo de Desenvolvedor) e tente outra vez. Se ainda falhar, reinicie o iPhone.",
     "Start LocalDevVPN when needed": "Iniciar o LocalDevVPN quando for preciso",
     "Start LocalDevVPN now": "Iniciar o LocalDevVPN agora",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -1433,4 +1435,146 @@ let portugueseStrings: [String: String] = [
         "Esse método não está disponível. Escolha outro.",
     "That didn't work. Try another way.":
         "Não funcionou. Tente outro método.",
+    // MARK: - Developer team
+
+    "Free · %@": "Gratuita · %@",
+    "Paid · %@": "Paga · %@",
+    "This Apple Account is on %d developer teams. Pick the one that signs.":
+        "Esta conta Apple está em %d equipes de desenvolvimento. Escolha a que assina.",
+    "Which Team?": "Qual equipe?",
+    "Signed this copy of SideInstaller": "Assinou esta cópia do SideInstaller",
+    "A free team's apps last 7 days; a paid team's last a year.":
+        "Os apps de uma equipe gratuita duram 7 dias; os de uma equipe paga, um ano.",
+    "An app installed with another team isn't replaced: signing it with this one installs a second copy.":
+        "Um app instalado com outra equipe não é substituído: assiná-lo com esta instala uma segunda cópia.",
+    "SideInstaller remembers the pick for this Apple ID. To pick again, open Settings › Account, swipe the Apple ID left and tap Team.":
+        "O SideInstaller lembra a escolha para este Apple ID. Para escolher de novo, abra Ajustes › Conta, deslize o Apple ID para a esquerda e toque em Equipe.",
+    "No developer team was picked, so the sign-in stopped.":
+        "Nenhuma equipe de desenvolvimento foi escolhida, então o login parou.",
+    "Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs.":
+        "Sua conta Apple está em mais de uma equipe de desenvolvimento. Abra o SideInstaller e escolha a que assina.",
+    "Pick the team again?": "Escolher a equipe de novo?",
+    "Pick Again": "Escolher de novo",
+    "The next sign-in with “%@” asks which developer team signs.":
+        "O próximo login com “%@” vai perguntar qual equipe de desenvolvimento assina.",
+    // Shortcuts actions (ShortcutsSupport.swift and the *Shortcuts.swift files).
+    "%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.":
+        "Não dá para renovar o %@: o SideInstaller não tem o IPA para assiná-lo de novo. Renove-o no app que o instalou, ou importe antes o .ipa dele no SideInstaller.",
+    "%@ is installed.":
+        "O %@ está instalado.",
+    "Apple is asking you to finish signing in. Continue in SideInstaller to answer it.":
+        "A Apple está pedindo para você terminar o login. Continue no SideInstaller para responder.",
+    "LocalDevVPN is connected.":
+        "O LocalDevVPN está conectado.",
+    "LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.":
+        "O LocalDevVPN não está conectado. Conecte-o antes de esta ação rodar: a ação de VPN do Atalhos consegue fazer isso. Ou ative “Iniciar o LocalDevVPN quando for preciso” nos Ajustes do SideInstaller.",
+    "LocalDevVPN isn't connected. Continue in SideInstaller to connect it.":
+        "O LocalDevVPN não está conectado. Continue no SideInstaller para conectá-lo.",
+    "No route is playing.":
+        "Nenhuma rota está sendo reproduzida.",
+    "Open SideInstaller and accept its terms first.":
+        "Abra o SideInstaller e aceite os termos dele primeiro.",
+    "Pick where the route starts, or set a location first.":
+        "Escolha onde a rota começa, ou defina uma localização primeiro.",
+    "Route started: %@, about %@.":
+        "Rota iniciada: %@, cerca de %@.",
+    "That place has no coordinates. Pick it on the map, or type its address.":
+        "Esse lugar não tem coordenadas. Escolha-o no mapa ou digite o endereço.",
+    "The install didn't start. Open SideInstaller to see why.":
+        "A instalação não começou. Abra o SideInstaller para ver o motivo.",
+
+    // MARK: - Sources
+
+    "Suggested":
+        "Sugeridas",
+
+    "Paste the link of a SideStore or AltStore source, or of a .json source file. Its apps, their updates and release notes show here.":
+        "Cole o link de uma fonte do SideStore ou AltStore, ou de um arquivo de fonte .json. Os apps, as atualizações e as notas de versão aparecem aqui.",
+    "Add a source":
+        "Adicionar uma fonte",
+    "Updates":
+        "Atualizações",
+    "Update":
+        "Atualizar",
+    "Your sources":
+        "Suas fontes",
+    "Check for updates":
+        "Verificar atualizações",
+    "Copy link":
+        "Copiar link",
+    "Source options":
+        "Opções da fonte",
+    "What's new":
+        "Novidades",
+    "Version history":
+        "Histórico de versões",
+    "This version has no release notes.":
+        "Esta versão não tem notas de versão.",
+    "%d update":
+        "%d atualização",
+    "%d updates":
+        "%d atualizações",
+    "%d source":
+        "%d fonte",
+    "%d sources":
+        "%d fontes",
+    "Update to %@":
+        "Atualizar para %@",
+    "Install %@ %@?":
+        "Instalar %@ %@?",
+    "Version %@ · from %@":
+        "Versão %@ · de %@",
+    "%@ installed · %@ available":
+        "%@ instalada · %@ disponível",
+    "%@ installed · up to date":
+        "%@ instalada · atualizada",
+    "That source is already added.":
+        "Essa fonte já foi adicionada.",
+    "The source answered with HTTP %d.":
+        "A fonte respondeu com HTTP %d.",
+    "Couldn't reach the source: %@":
+        "Não foi possível acessar a fonte: %@",
+    "That isn't a source link. Paste the whole https:// address of the source.":
+        "Isso não é um link de fonte. Cole o endereço https:// completo da fonte.",
+    "That link didn't return a source. It has to be the source's JSON file itself.":
+        "Esse link não retornou uma fonte. Ele precisa ser o próprio arquivo JSON da fonte.",
+    "Downloads the IPA from the source, then signs it with your Apple ID and installs it, as a custom .ipa would be.":
+        "Baixa o IPA da fonte, depois o assina com seu Apple ID e o instala, como um .ipa personalizado.",
+    "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
+        "Esta versão é mais antiga que a mais recente. Ela é instalada sobre a cópia deste iPhone, que pode não abrir dados salvos por uma versão mais nova.",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "Esta versão é mais antiga que a deste iPhone (%@). Instalada por cima, ela pode não abrir dados salvos pela versão mais nova.",
+
+    // MARK: - JIT
+
+    "%@ has the JIT memory it asked for, so SideInstaller let go of it. JIT stays on until it quits.":
+        "%@ já tem a memória JIT que pediu, então o SideInstaller o soltou. O JIT fica ativo até o app fechar.",
+    "%@ of JIT memory prepared": "%@ de memória JIT preparada",
+    "%d app can use JIT": "%d app pode usar JIT",
+    "%d apps can use JIT": "%d apps podem usar JIT",
+    "Attach and detach": "Anexar e desanexar",
+    "Attaching the debugger": "Anexando o depurador",
+    "Auto: %@": "Automático: %@",
+    "Connecting to this iPhone's debugger": "Conectando ao depurador deste iPhone",
+    "Couldn't open %@ under the debugger: %@": "Não foi possível abrir %@ com o depurador: %@",
+    "Couldn't reach the debugger on this iPhone: %@":
+        "Não foi possível acessar o depurador deste iPhone: %@",
+    "Enable JIT": "Ativar JIT",
+    "JIT is on for %@ until it quits.": "O JIT está ativo para %@ até ele fechar.",
+    "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
+        "O JIT está ativo. O SideInstaller fica anexado enquanto %@ roda: deixe o SideInstaller em segundo plano, porque fechá-lo encerra o JIT.",
+    "JIT needs Developer Mode. Turn it on under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "O JIT precisa do Modo de Desenvolvedor. Ative-o em Ajustes › Privacidade e Segurança › Modo de Desenvolvedor e confirme depois de reiniciar.",
+    "JIT on for %@": "JIT ativo para %@",
+    "Legacy": "Legado",
+    "No app on this iPhone is signed for development, which a debugger needs. Install the app with SideStore or SideInstaller, which sign apps that way, then load the apps again.":
+        "Nenhum app neste iPhone está assinado para desenvolvimento, que é o que um depurador precisa. Instale o app com o SideStore ou o SideInstaller, que assinam os apps assim, e carregue os apps de novo.",
+    "No apps can use JIT": "Nenhum app pode usar JIT",
+    "Opening %@": "Abrindo %@",
+    "Quit %@": "Fechar %@",
+    "The debugger couldn't attach to %@ (%@). Install it again with SideStore or SideInstaller, which sign apps so a debugger can attach.":
+        "O depurador não conseguiu se anexar a %@ (%@). Instale-o de novo com o SideStore ou o SideInstaller, que assinam os apps para que um depurador possa se anexar.",
+    "The debugger lost %@ (%@). Open it with JIT again.":
+        "O depurador perdeu %@ (%@). Abra-o com JIT de novo.",
+    "Universal": "Universal",
 ]

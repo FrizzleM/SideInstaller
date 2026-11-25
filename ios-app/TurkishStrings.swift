@@ -656,6 +656,8 @@ let turkishStrings: [String: String] = [
         "%@:%d adresindeki bir şey bağlantıyı reddetti; yani tünel trafik taşıyor, ama bu iPhone eşleme bağlantı noktasını dinlemiyor: Geliştirici Modu kapalı. Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'ndan aç (iPhone yeniden başlar), sonra yeniden dene.",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
         "%@:%d adresindeki bir şey bağlantıyı reddetti; yani tünel trafik taşıyor, ama Geliştirici Modu açık olduğu hâlde bu iPhone eşleme bağlantı noktasını dinlemiyor. “Eşleme dosyası” altında bu iPhone'u yeniden eşle, sonra yeniden dene. Yine olmazsa iPhone'u yeniden başlat.",
+    "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
+        "%@:%d adresindeki bir şey bağlantıyı kabul etti ama bu iPhone'un eşleme bağlantı noktası gibi yanıt vermedi, başka hiçbir bağlantı noktası da öyle yanıt vermedi. Açık olan VPN'in LocalDevVPN olduğunu ve Geliştirici Modu'nun açık olduğunu (Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu) denetle, sonra yeniden dene. Yine olmazsa iPhone'u yeniden başlat.",
     "Start LocalDevVPN when needed": "Gerektiğinde LocalDevVPN'i başlat",
     "Start LocalDevVPN now": "LocalDevVPN'i şimdi başlat",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -1360,4 +1362,146 @@ let turkishStrings: [String: String] = [
         "Bu yöntem kullanılamıyor. Başka bir yöntem seçin.",
     "That didn't work. Try another way.":
         "Olmadı. Başka bir yöntem deneyin.",
+    // MARK: - Developer team
+
+    "Free · %@": "Ücretsiz · %@",
+    "Paid · %@": "Ücretli · %@",
+    "This Apple Account is on %d developer teams. Pick the one that signs.":
+        "Bu Apple Hesabı %d geliştirici ekibinde. İmzalayacak ekibi seç.",
+    "Which Team?": "Hangi ekip?",
+    "Signed this copy of SideInstaller": "Bu SideInstaller kopyasını imzaladı",
+    "A free team's apps last 7 days; a paid team's last a year.":
+        "Ücretsiz bir ekibin uygulamaları 7 gün, ücretli bir ekibinkiler bir yıl geçerlidir.",
+    "An app installed with another team isn't replaced: signing it with this one installs a second copy.":
+        "Başka bir ekiple yüklenen uygulama değiştirilmez: onu bu ekiple imzalamak ikinci bir kopya yükler.",
+    "SideInstaller remembers the pick for this Apple ID. To pick again, open Settings › Account, swipe the Apple ID left and tap Team.":
+        "SideInstaller bu Apple kimliği için seçimi hatırlar. Yeniden seçmek için Ayarlar › Hesap'ı aç, Apple kimliğinde sola kaydır ve Ekip'e dokun.",
+    "No developer team was picked, so the sign-in stopped.":
+        "Hiçbir geliştirici ekibi seçilmedi, bu yüzden oturum açma durduruldu.",
+    "Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs.":
+        "Apple Hesabın birden fazla geliştirici ekibinde. SideInstaller'ı aç ve imzalayacak ekibi seç.",
+    "Pick the team again?": "Ekip yeniden seçilsin mi?",
+    "Pick Again": "Yeniden seç",
+    "The next sign-in with “%@” asks which developer team signs.":
+        "“%@” ile bir sonraki oturum açmada hangi geliştirici ekibinin imzalayacağı sorulur.",
+    // Shortcuts actions (ShortcutsSupport.swift and the *Shortcuts.swift files).
+    "%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.":
+        "%@ yenilenemiyor: SideInstaller'da onu yeniden imzalayacak IPA yok. Onu yükleyen uygulamada yenile ya da önce .ipa dosyasını SideInstaller'a aktar.",
+    "%@ is installed.":
+        "%@ yüklendi.",
+    "Apple is asking you to finish signing in. Continue in SideInstaller to answer it.":
+        "Apple oturum açmayı bitirmeni istiyor. Yanıtlamak için SideInstaller'da devam et.",
+    "LocalDevVPN is connected.":
+        "LocalDevVPN bağlı.",
+    "LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.":
+        "LocalDevVPN bağlı değil. Bu eylem çalışmadan önce bağla: Kestirmeler'deki VPN eylemi bunu yapabilir. Ya da SideInstaller'ın Ayarlar'ında “Gerektiğinde LocalDevVPN'i başlat”ı aç.",
+    "LocalDevVPN isn't connected. Continue in SideInstaller to connect it.":
+        "LocalDevVPN bağlı değil. Bağlamak için SideInstaller'da devam et.",
+    "No route is playing.":
+        "Oynatılan bir rota yok.",
+    "Open SideInstaller and accept its terms first.":
+        "Önce SideInstaller'ı aç ve koşullarını kabul et.",
+    "Pick where the route starts, or set a location first.":
+        "Rotanın nereden başlayacağını seç ya da önce bir konum ayarla.",
+    "Route started: %@, about %@.":
+        "Rota başladı: %@, yaklaşık %@.",
+    "That place has no coordinates. Pick it on the map, or type its address.":
+        "Bu yerin koordinatları yok. Haritada seç ya da adresini yaz.",
+    "The install didn't start. Open SideInstaller to see why.":
+        "Yükleme başlamadı. Nedenini görmek için SideInstaller'ı aç.",
+
+    // MARK: - Sources
+
+    "Suggested":
+        "Önerilen",
+
+    "Paste the link of a SideStore or AltStore source, or of a .json source file. Its apps, their updates and release notes show here.":
+        "Bir SideStore veya AltStore kaynağının ya da bir .json kaynak dosyasının bağlantısını yapıştırın. Uygulamaları, güncellemeleri ve sürüm notları burada görünür.",
+    "Add a source":
+        "Kaynak ekle",
+    "Updates":
+        "Güncellemeler",
+    "Update":
+        "Güncelle",
+    "Your sources":
+        "Kaynaklarınız",
+    "Check for updates":
+        "Güncellemeleri denetle",
+    "Copy link":
+        "Bağlantıyı kopyala",
+    "Source options":
+        "Kaynak seçenekleri",
+    "What's new":
+        "Yenilikler",
+    "Version history":
+        "Sürüm geçmişi",
+    "This version has no release notes.":
+        "Bu sürümün sürüm notu yok.",
+    "%d update":
+        "%d güncelleme",
+    "%d updates":
+        "%d güncelleme",
+    "%d source":
+        "%d kaynak",
+    "%d sources":
+        "%d kaynak",
+    "Update to %@":
+        "%@ sürümüne güncelle",
+    "Install %@ %@?":
+        "%@ %@ yüklensin mi?",
+    "Version %@ · from %@":
+        "Sürüm %@ · kaynak: %@",
+    "%@ installed · %@ available":
+        "%@ yüklü · %@ mevcut",
+    "%@ installed · up to date":
+        "%@ yüklü · güncel",
+    "That source is already added.":
+        "Bu kaynak zaten eklendi.",
+    "The source answered with HTTP %d.":
+        "Kaynak HTTP %d ile yanıt verdi.",
+    "Couldn't reach the source: %@":
+        "Kaynağa ulaşılamadı: %@",
+    "That isn't a source link. Paste the whole https:// address of the source.":
+        "Bu bir kaynak bağlantısı değil. Kaynağın https:// adresinin tamamını yapıştırın.",
+    "That link didn't return a source. It has to be the source's JSON file itself.":
+        "Bu bağlantı bir kaynak döndürmedi. Kaynağın JSON dosyasının kendisi olmalı.",
+    "Downloads the IPA from the source, then signs it with your Apple ID and installs it, as a custom .ipa would be.":
+        "IPA'yı kaynaktan indirir, ardından Apple Kimliğinizle imzalayıp yükler; özel bir .ipa gibi.",
+    "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
+        "Bu sürüm en yenisinden daha eski. Bu iPhone'daki kopyanın üzerine yüklenir ve daha yeni bir sürümün kaydettiği verileri açamayabilir.",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "Bu sürüm, bu iPhone'daki sürümden (%@) daha eski. Üzerine yüklendiğinde, daha yeni sürümün kaydettiği verileri açamayabilir.",
+
+    // MARK: - JIT
+
+    "%@ has the JIT memory it asked for, so SideInstaller let go of it. JIT stays on until it quits.":
+        "%@ istediği JIT belleğini aldı, bu yüzden SideInstaller ondan ayrıldı. JIT, uygulama kapanana kadar açık kalır.",
+    "%@ of JIT memory prepared": "%@ JIT belleği hazırlandı",
+    "%d app can use JIT": "%d uygulama JIT kullanabilir",
+    "%d apps can use JIT": "%d uygulama JIT kullanabilir",
+    "Attach and detach": "Bağlan ve ayrıl",
+    "Attaching the debugger": "Hata ayıklayıcı bağlanıyor",
+    "Auto: %@": "Otomatik: %@",
+    "Connecting to this iPhone's debugger": "Bu iPhone'un hata ayıklayıcısına bağlanılıyor",
+    "Couldn't open %@ under the debugger: %@": "%@ hata ayıklayıcıyla açılamadı: %@",
+    "Couldn't reach the debugger on this iPhone: %@":
+        "Bu iPhone'un hata ayıklayıcısına ulaşılamadı: %@",
+    "Enable JIT": "JIT'i etkinleştir",
+    "JIT is on for %@ until it quits.": "%@ için JIT, uygulama kapanana kadar açık.",
+    "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
+        "JIT açık. %@ çalışırken SideInstaller bağlı kalır: SideInstaller'ı arka planda bırak, çünkü kapatmak JIT'i sonlandırır.",
+    "JIT needs Developer Mode. Turn it on under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "JIT için Geliştirici Modu gerekir. Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'ndan aç ve yeniden başlatmadan sonra onayla.",
+    "JIT on for %@": "%@ için JIT açık",
+    "Legacy": "Eski",
+    "No app on this iPhone is signed for development, which a debugger needs. Install the app with SideStore or SideInstaller, which sign apps that way, then load the apps again.":
+        "Bu iPhone'da geliştirme için imzalanmış bir uygulama yok, oysa hata ayıklayıcı buna ihtiyaç duyar. Uygulamayı bu şekilde imzalayan SideStore veya SideInstaller ile yükle, ardından uygulamaları yeniden yükle.",
+    "No apps can use JIT": "JIT kullanabilen uygulama yok",
+    "Opening %@": "%@ açılıyor",
+    "Quit %@": "%@ uygulamasından çık",
+    "The debugger couldn't attach to %@ (%@). Install it again with SideStore or SideInstaller, which sign apps so a debugger can attach.":
+        "Hata ayıklayıcı %@ uygulamasına bağlanamadı (%@). Uygulamaları hata ayıklayıcının bağlanabileceği şekilde imzalayan SideStore veya SideInstaller ile onu yeniden yükle.",
+    "The debugger lost %@ (%@). Open it with JIT again.":
+        "Hata ayıklayıcı %@ ile bağlantıyı kaybetti (%@). Onu yeniden JIT ile aç.",
+    "Universal": "Evrensel",
 ]

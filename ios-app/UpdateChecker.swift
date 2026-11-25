@@ -55,10 +55,15 @@ final class UpdateChecker: ObservableObject {
     /// Close the banner for this launch.
     func dismiss() { showBanner = false }
 
-    /// Compare dotted versions numerically, so "0.10.0" > "0.9.0".
-    static func isNewer(_ lhs: String, than rhs: String) -> Bool {
-        let a = lhs.split(separator: ".").map { Int($0) ?? 0 }
-        let b = rhs.split(separator: ".").map { Int($0) ?? 0 }
+    /// Compare dotted versions numerically, so "0.10.0" > "0.9.0". Anything
+    /// after a "-" (e.g. "-beta.1") is ignored.
+    nonisolated static func isNewer(_ lhs: String, than rhs: String) -> Bool {
+        func parts(_ v: String) -> [Int] {
+            let core = v.split(separator: "-", maxSplits: 1).first ?? ""
+            return core.split(separator: ".").map { Int($0) ?? 0 }
+        }
+        let a = parts(lhs)
+        let b = parts(rhs)
         for i in 0..<max(a.count, b.count) {
             let l = i < a.count ? a[i] : 0
             let r = i < b.count ? b[i] : 0

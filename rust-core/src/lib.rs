@@ -17,6 +17,8 @@ mod ffi_util;
 mod logging;
 mod p12;
 mod pairing;
+mod pairing_port;
+mod team;
 
 use std::ffi::{c_char, c_void};
 
@@ -25,7 +27,7 @@ use isideload::sideload::sideloader::MemoryLimit;
 use ffi_util::cstr;
 
 // Re-export FFI types so the generated header / Swift see them.
-pub use account::{SignSession, TwoFactorCb};
+pub use account::{SignSession, TeamCb, TwoFactorCb};
 pub use certs::CertSession;
 pub use pairing::{PairCancel, PairResult, PinCb, ReadyCb};
 
@@ -156,6 +158,60 @@ pub unsafe extern "C" fn si_pairing_result_free(r: *mut PairResult) {
     pairing::result_free(r)
 }
 
+// ---------------------------------------------------------------------------
+// Pairing port — this iPhone's RPPairing listener when it isn't on 49152
+// ---------------------------------------------------------------------------
+
+/// Knock on `device_ip`'s dynamic ports (49152–65535), except lockdownd's
+/// 62078 and the `tried_count` ports in `tried`, 32 at a time, in order, until
+/// one answers the RPPairing handshake (`attemptPairVerify`). For the
+/// listener `tunnel_create_rppairing_multihost` dials when it isn't where it
+/// was looked for (see `pairing_port`). Blocks for seconds, so run it off the
+/// main thread.
+///
+/// Returns 0 with the port in `*out_port` when one answered, 1 when none did,
+/// 2 when knocking had to stop (the route went, too many ports took the
+/// connection, or the app ran out of descriptors), and -1 for an address that
+/// isn't one. `*out_summary` says what happened, for the log; free it with
+/// `si_string_free`.
+///
+/// # Safety
+/// See `pairing_port::find_ffi`.
+#[no_mangle]
+pub unsafe extern "C" fn si_find_pairing_port(
+    device_ip: *const c_char,
+    tried: *const u16,
+    tried_count: usize,
+    out_port: *mut u16,
+    out_summary: *mut *mut c_char,
+) -> i32 {
+    pairing_port::find_ffi(device_ip, tried, tried_count, out_port, out_summary)
+}
+
+/// Ask `device_ip:port` for the RPPairing handshake (`attemptPairVerify`), as
+/// `tunnel_create_rppairing_multihost` does first, but with 8 s to connect and
+/// 10 s to answer. The dial has no time limit, so a port that takes the
+/// connection and never answers would hold it for ever. Blocks for up to 18 s,
+/// so run it off the main thread.
+///
+/// Returns 0 when the port answered as the pairing service, 1 when it refused
+/// the connection, 2 when something took the connection and didn't answer as
+/// the service (nothing within 10 s, or something else), 3 when nothing took or
+/// refused it within 8 s, 4 when the connection failed some other way, and -1
+/// for an address that isn't one. `*out_summary` says what the port did, for
+/// the log after "Port N"; free it with `si_string_free`.
+///
+/// # Safety
+/// See `pairing_port::probe_ffi`.
+#[no_mangle]
+pub unsafe extern "C" fn si_probe_pairing_port(
+    device_ip: *const c_char,
+    port: u16,
+    out_summary: *mut *mut c_char,
+) -> i32 {
+    pairing_port::probe_ffi(device_ip, port, out_summary)
+}
+
 
 // ---------------------------------------------------------------------------
 // Account — Apple ID sign-in and signing
@@ -164,7 +220,8 @@ pub unsafe extern "C" fn si_pairing_result_free(r: *mut PairResult) {
 /// Sign in, open a developer session and build a signer. Blocks; `twofa_cb` is
 /// called when a 2FA code is needed. If `remember_session` is non-zero, a saved
 /// developer session is reused while valid and new ones are saved (see
-/// `apple_session`).
+/// `apple_session`). `team_id` names the team that signs; `team_cb` is asked
+/// which when the account isn't on it and is on more than one (see `team`).
 ///
 /// # Safety
 /// See `account::apple_signin`.
@@ -177,15 +234,17 @@ pub unsafe extern "C" fn si_apple_signin(
     machine_name: *const c_char,
     storage_dir: *const c_char,
     remember_session: i32,
+    team_id: *const c_char,
     twofa_cb: TwoFactorCb,
+    team_cb: TeamCb,
     ctx: *mut c_void,
     out_session: *mut *mut SignSession,
     out_summary: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
     account::apple_signin(
-        apple_id, password, anisette_url, machine_name, storage_dir, remember_session, twofa_cb,
-        ctx, out_session, out_summary, out_error,
+        apple_id, password, anisette_url, machine_name, storage_dir, remember_session, team_id,
+        twofa_cb, team_cb, ctx, out_session, out_summary, out_error,
     )
 }
 
@@ -430,8 +489,9 @@ pub unsafe extern "C" fn si_forget_apple_session(
 // Certificates — list and revoke
 // ---------------------------------------------------------------------------
 
-/// Open a developer session on the first team for certificate management.
-/// Blocks, and needs no device.
+/// Open a developer session on the team that signs, for certificate
+/// management: `team_id`, or the one `team_cb` picks, as `si_apple_signin`
+/// does. Blocks, and needs no device.
 ///
 /// # Safety
 /// See `certs::cert_signin`.
@@ -443,15 +503,17 @@ pub unsafe extern "C" fn si_cert_signin(
     anisette_url: *const c_char,
     machine_name: *const c_char,
     storage_dir: *const c_char,
+    team_id: *const c_char,
     twofa_cb: TwoFactorCb,
+    team_cb: TeamCb,
     ctx: *mut c_void,
     out_session: *mut *mut CertSession,
     out_summary: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
     certs::cert_signin(
-        apple_id, password, anisette_url, machine_name, storage_dir, twofa_cb, ctx,
-        out_session, out_summary, out_error,
+        apple_id, password, anisette_url, machine_name, storage_dir, team_id, twofa_cb, team_cb,
+        ctx, out_session, out_summary, out_error,
     )
 }
 

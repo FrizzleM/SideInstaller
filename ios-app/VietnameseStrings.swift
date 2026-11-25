@@ -689,6 +689,8 @@ let vietnameseStrings: [String: String] = [
         "Có thứ gì đó ở %@:%d đã từ chối kết nối, nghĩa là đường hầm vẫn thông, nhưng iPhone này không lắng nghe trên cổng ghép nối: Chế độ nhà phát triển đang tắt. Hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển (iPhone sẽ khởi động lại) rồi thử lại.",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic, but this iPhone isn't listening on its pairing port, although Developer Mode is on. Pair this iPhone again under “Pairing file”, then try again. If it still fails, restart the iPhone.":
         "Có thứ gì đó ở %@:%d đã từ chối kết nối, nghĩa là đường hầm vẫn thông, nhưng iPhone này không lắng nghe trên cổng ghép nối dù Chế độ nhà phát triển đang bật. Hãy ghép nối lại iPhone này trong “Tệp ghép nối” rồi thử lại. Nếu vẫn lỗi, hãy khởi động lại iPhone.",
+    "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
+        "Có thứ gì đó ở %@:%d đã nhận kết nối nhưng không trả lời như cổng ghép nối của iPhone này, và cũng không có cổng nào khác trả lời như vậy. Hãy kiểm tra rằng VPN đang bật là LocalDevVPN và Chế độ nhà phát triển đang bật (Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển) rồi thử lại. Nếu vẫn lỗi, hãy khởi động lại iPhone.",
     "Start LocalDevVPN when needed": "Khởi động LocalDevVPN khi cần",
     "Start LocalDevVPN now": "Khởi động LocalDevVPN ngay",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -1440,4 +1442,146 @@ let vietnameseStrings: [String: String] = [
         "Cách đó không khả dụng. Chọn cách khác.",
     "That didn't work. Try another way.":
         "Không được. Thử cách khác.",
+    // MARK: - Developer team
+
+    "Free · %@": "Miễn phí · %@",
+    "Paid · %@": "Trả phí · %@",
+    "This Apple Account is on %d developer teams. Pick the one that signs.":
+        "Apple Account này thuộc %d nhóm nhà phát triển. Hãy chọn nhóm dùng để ký.",
+    "Which Team?": "Nhóm nào?",
+    "Signed this copy of SideInstaller": "Đã ký bản SideInstaller này",
+    "A free team's apps last 7 days; a paid team's last a year.":
+        "Ứng dụng do nhóm miễn phí ký dùng được 7 ngày; do nhóm trả phí ký dùng được một năm.",
+    "An app installed with another team isn't replaced: signing it with this one installs a second copy.":
+        "Ứng dụng đã cài bằng nhóm khác sẽ không bị thay thế: ký bằng nhóm này sẽ cài thêm một bản thứ hai.",
+    "SideInstaller remembers the pick for this Apple ID. To pick again, open Settings › Account, swipe the Apple ID left and tap Team.":
+        "SideInstaller sẽ nhớ lựa chọn này cho Apple ID. Để chọn lại, mở Cài đặt › Tài khoản, vuốt sang trái trên Apple ID đó rồi chạm vào Nhóm.",
+    "No developer team was picked, so the sign-in stopped.":
+        "Chưa chọn nhóm nhà phát triển nào nên đã dừng đăng nhập.",
+    "Your Apple Account is on more than one developer team. Open SideInstaller and pick the one that signs.":
+        "Apple Account của bạn thuộc nhiều nhóm nhà phát triển. Hãy mở SideInstaller và chọn nhóm dùng để ký.",
+    "Pick the team again?": "Chọn lại nhóm?",
+    "Pick Again": "Chọn lại",
+    "The next sign-in with “%@” asks which developer team signs.":
+        "Lần đăng nhập tiếp theo bằng “%@” sẽ hỏi ký bằng nhóm nhà phát triển nào.",
+    // Shortcuts actions (ShortcutsSupport.swift and the *Shortcuts.swift files).
+    "%@ can't be refreshed: SideInstaller has no IPA to sign it again from. Refresh it in whatever installed it, or import its .ipa into SideInstaller first.":
+        "Không thể gia hạn %@: SideInstaller không có tệp IPA để ký lại. Hãy gia hạn trong ứng dụng đã cài nó, hoặc nhập tệp .ipa của nó vào SideInstaller trước.",
+    "%@ is installed.":
+        "%@ đã được cài đặt.",
+    "Apple is asking you to finish signing in. Continue in SideInstaller to answer it.":
+        "Apple đang yêu cầu bạn hoàn tất đăng nhập. Hãy tiếp tục trong SideInstaller để trả lời.",
+    "LocalDevVPN is connected.":
+        "LocalDevVPN đã được kết nối.",
+    "LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.":
+        "LocalDevVPN chưa được kết nối. Hãy kết nối trước khi tác vụ này chạy: tác vụ VPN trong Phím tắt làm được việc đó. Hoặc bật “Khởi động LocalDevVPN khi cần” trong Cài đặt của SideInstaller.",
+    "LocalDevVPN isn't connected. Continue in SideInstaller to connect it.":
+        "LocalDevVPN chưa được kết nối. Hãy tiếp tục trong SideInstaller để kết nối.",
+    "No route is playing.":
+        "Không có lộ trình nào đang phát.",
+    "Open SideInstaller and accept its terms first.":
+        "Hãy mở SideInstaller và chấp nhận điều khoản của ứng dụng trước.",
+    "Pick where the route starts, or set a location first.":
+        "Hãy chọn nơi lộ trình bắt đầu, hoặc đặt một vị trí trước.",
+    "Route started: %@, about %@.":
+        "Đã bắt đầu lộ trình: %@, khoảng %@.",
+    "That place has no coordinates. Pick it on the map, or type its address.":
+        "Địa điểm đó không có tọa độ. Hãy chọn trên bản đồ hoặc nhập địa chỉ.",
+    "The install didn't start. Open SideInstaller to see why.":
+        "Việc cài đặt chưa bắt đầu. Hãy mở SideInstaller để xem lý do.",
+
+    // MARK: - Sources
+
+    "Suggested":
+        "Gợi ý",
+
+    "Paste the link of a SideStore or AltStore source, or of a .json source file. Its apps, their updates and release notes show here.":
+        "Dán liên kết của một nguồn SideStore hoặc AltStore, hoặc của một tệp nguồn .json. Ứng dụng, bản cập nhật và ghi chú phát hành của nguồn sẽ hiện ở đây.",
+    "Add a source":
+        "Thêm nguồn",
+    "Updates":
+        "Cập nhật",
+    "Update":
+        "Cập nhật",
+    "Your sources":
+        "Nguồn của bạn",
+    "Check for updates":
+        "Kiểm tra cập nhật",
+    "Copy link":
+        "Sao chép liên kết",
+    "Source options":
+        "Tùy chọn nguồn",
+    "What's new":
+        "Có gì mới",
+    "Version history":
+        "Lịch sử phiên bản",
+    "This version has no release notes.":
+        "Phiên bản này không có ghi chú phát hành.",
+    "%d update":
+        "%d bản cập nhật",
+    "%d updates":
+        "%d bản cập nhật",
+    "%d source":
+        "%d nguồn",
+    "%d sources":
+        "%d nguồn",
+    "Update to %@":
+        "Cập nhật lên %@",
+    "Install %@ %@?":
+        "Cài %@ %@?",
+    "Version %@ · from %@":
+        "Phiên bản %@ · từ %@",
+    "%@ installed · %@ available":
+        "Đã cài %@ · có %@",
+    "%@ installed · up to date":
+        "Đã cài %@ · mới nhất",
+    "That source is already added.":
+        "Nguồn đó đã được thêm.",
+    "The source answered with HTTP %d.":
+        "Nguồn trả về HTTP %d.",
+    "Couldn't reach the source: %@":
+        "Không thể kết nối tới nguồn: %@",
+    "That isn't a source link. Paste the whole https:// address of the source.":
+        "Đó không phải liên kết nguồn. Hãy dán toàn bộ địa chỉ https:// của nguồn.",
+    "That link didn't return a source. It has to be the source's JSON file itself.":
+        "Liên kết đó không trả về nguồn. Nó phải là chính tệp JSON của nguồn.",
+    "Downloads the IPA from the source, then signs it with your Apple ID and installs it, as a custom .ipa would be.":
+        "Tải IPA từ nguồn, rồi ký bằng Apple ID của bạn và cài đặt, giống như một .ipa tùy chỉnh.",
+    "This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved.":
+        "Phiên bản này cũ hơn bản mới nhất. Nó được cài đè lên bản trên iPhone này và có thể không mở được dữ liệu mà phiên bản mới hơn đã lưu.",
+    "This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.":
+        "Phiên bản này cũ hơn bản trên iPhone này (%@). Khi cài đè lên, nó có thể không mở được dữ liệu mà phiên bản mới hơn đã lưu.",
+
+    // MARK: - JIT
+
+    "%@ has the JIT memory it asked for, so SideInstaller let go of it. JIT stays on until it quits.":
+        "%@ đã có bộ nhớ JIT mà nó yêu cầu, nên SideInstaller đã tách khỏi nó. JIT vẫn bật cho đến khi ứng dụng thoát.",
+    "%@ of JIT memory prepared": "Đã chuẩn bị %@ bộ nhớ JIT",
+    "%d app can use JIT": "%d ứng dụng có thể dùng JIT",
+    "%d apps can use JIT": "%d ứng dụng có thể dùng JIT",
+    "Attach and detach": "Gắn rồi tách",
+    "Attaching the debugger": "Đang gắn trình gỡ lỗi",
+    "Auto: %@": "Tự động: %@",
+    "Connecting to this iPhone's debugger": "Đang kết nối tới trình gỡ lỗi của iPhone này",
+    "Couldn't open %@ under the debugger: %@": "Không thể mở %@ dưới trình gỡ lỗi: %@",
+    "Couldn't reach the debugger on this iPhone: %@":
+        "Không thể kết nối tới trình gỡ lỗi trên iPhone này: %@",
+    "Enable JIT": "Bật JIT",
+    "JIT is on for %@ until it quits.": "JIT đã bật cho %@ cho đến khi ứng dụng thoát.",
+    "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
+        "JIT đã bật. SideInstaller vẫn gắn vào trong khi %@ chạy: hãy để SideInstaller chạy nền, vì đóng nó sẽ kết thúc JIT.",
+    "JIT needs Developer Mode. Turn it on under Settings › Privacy & Security › Developer Mode, and confirm it after the restart.":
+        "JIT cần Chế độ nhà phát triển. Hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển, và xác nhận sau khi khởi động lại.",
+    "JIT on for %@": "JIT đang bật cho %@",
+    "Legacy": "Cũ",
+    "No app on this iPhone is signed for development, which a debugger needs. Install the app with SideStore or SideInstaller, which sign apps that way, then load the apps again.":
+        "Không có ứng dụng nào trên iPhone này được ký để phát triển, điều mà trình gỡ lỗi cần. Hãy cài ứng dụng bằng SideStore hoặc SideInstaller, vốn ký ứng dụng theo cách đó, rồi tải lại danh sách ứng dụng.",
+    "No apps can use JIT": "Không có ứng dụng nào dùng được JIT",
+    "Opening %@": "Đang mở %@",
+    "Quit %@": "Thoát %@",
+    "The debugger couldn't attach to %@ (%@). Install it again with SideStore or SideInstaller, which sign apps so a debugger can attach.":
+        "Trình gỡ lỗi không gắn được vào %@ (%@). Hãy cài lại nó bằng SideStore hoặc SideInstaller, vốn ký ứng dụng để trình gỡ lỗi gắn vào được.",
+    "The debugger lost %@ (%@). Open it with JIT again.":
+        "Trình gỡ lỗi đã mất kết nối với %@ (%@). Hãy mở lại nó bằng JIT.",
+    "Universal": "Phổ quát",
 ]
