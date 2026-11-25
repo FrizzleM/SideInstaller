@@ -762,7 +762,9 @@ struct SettingsView: View {
                 // F5 (0.9.154): share the log as a .txt file (see
                 // LogExportFile — the file is written only when the share
                 // actually happens, so this never reads the log in body).
-                ShareLink(item: LogExportFile()) {
+                // preview 是必填的：自定义 Transferable 作 item 时没有
+                // 默认预览，只有 URL/String 两路自带（两轮红字同因）。
+                ShareLink(item: LogExportFile(), preview: SharePreview(L("导出日志"), image: Image(systemName: "doc.text"))) {
                     Label(L("导出日志"), systemImage: "square.and.arrow.up")
                 }
                 Spacer()
@@ -799,10 +801,11 @@ struct SettingsView: View {
 /// see logSection). The tmp file is overwritten on every export.
 private struct LogExportFile: Transferable {
     static var transferRepresentation: some TransferRepresentation {
-        // 修法（checks 首轮红：ShareLink 找不到通用 Transferable 初始化）：
-        // 闭包参数写 `_` 丢弃时编译器推不出 FileRepresentation 的 Item，
-        // conformance 不成立、通用 ShareLink 初始化直接落选；具名参数 +
-        // 显式特化把 Item 钉死（Movie/PDFDocument 同款写法）。
+        // 修法（checks 两轮红：ShareLink 找不到通用 Transferable 初始化）：
+        // 自定义 Transferable 作 item 时 preview 是必填的，只有 URL/String
+        // 两路自带默认预览——第一轮“具名参数 + 显式特化钉 Item”的修法
+        // 没动红字，与 FileRepresentation 的写法无关；传了 preview 才
+        // 命中通用初始化（Apple 的 Photo/BlogPost 同款写法）。
         FileRepresentation<LogExportFile>(exportedContentType: .plainText) { file in
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("SideInstaller-log.txt")
