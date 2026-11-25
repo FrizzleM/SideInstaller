@@ -12,6 +12,9 @@ struct CertsView: View {
     @State private var pendingRevoke: DevCert?
     /// Exported p12 file URL for ShareLink.
     @State private var exportURL: URL?
+    /// Exported password txt URL for ShareLink: written next to the p12 in
+    /// `doExport`, shared together with it (0.9.140).
+    @State private var exportPasswordURL: URL?
     @State private var exportPassword: String?
     @State private var isExporting = false
     @State private var exportError: String?
@@ -150,10 +153,13 @@ struct CertsView: View {
     }
 
     /// Export certificate as p12 for LiveContainer import.
+    /// The share sheet offers the .p12 together with its password txt
+    /// (0.9.140): the txt was already written to tmp, only the .p12 was
+    /// shared, so the password had to be retyped by hand on the other end.
     private var exportButton: some View {
         VStack(spacing: 10) {
-            if let url = exportURL {
-                ShareLink(item: url) {
+            if exportURL != nil {
+                ShareLink(items: exportItems) {
                     Label(L("Export certificate (p12)"), systemImage: "square.and.arrow.up")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
@@ -193,6 +199,12 @@ struct CertsView: View {
                 Text(err).font(.caption).foregroundColor(Theme.negative)
             }
         }
+    }
+
+    /// The files the share sheet offers: the .p12, and its password txt
+    /// when one was written (always, from `doExport`).
+    private var exportItems: [URL] {
+        [exportURL, exportPasswordURL].compactMap { $0 }
     }
 
     // MARK: SideStore's certificate
@@ -243,6 +255,7 @@ struct CertsView: View {
         isExporting = true
         exportError = nil
         exportURL = nil
+        exportPasswordURL = nil
         Self.deleteExportTempFiles()
         Task {
             do {
@@ -261,6 +274,7 @@ struct CertsView: View {
                 await MainActor.run {
                     isExporting = false
                     exportURL = tempURL
+                    exportPasswordURL = pwdURL
                     exportPassword = password
                 }
             } catch is CancellationError {

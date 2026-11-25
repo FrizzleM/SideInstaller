@@ -524,6 +524,8 @@ let koreanStrings: [String: String] = [
     "No sideloaded apps": "사이드로드한 앱 없음",
     "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
         "이 기기에서 프로비저닝 프로파일로 설치된 앱이 없습니다. App Store 앱은 만료되지 않으므로 여기에 표시되지 않습니다.",
+    "No apps were read. Tap Reload to read this iPhone again; pair it and turn on Developer Mode first if nothing shows.":
+        "앱을 읽어오지 못했습니다. 다시 불러오기를 눌러 이 iPhone을 다시 읽어오세요. 그래도 아무것도 표시되지 않으면 먼저 iPhone을 페어링하고 개발자 모드를 켜세요.",
     "No matching profile": "일치하는 프로파일 없음",
     "Expires today": "오늘 만료",
     "Expires tomorrow": "내일 만료",

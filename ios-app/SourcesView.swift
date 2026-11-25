@@ -208,6 +208,11 @@ struct SourceAppsView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var store: SourceStore
     let sourceURL: URL
+    /// 0.9.140: what is installed comes from the Sideloaded apps page's
+    /// device read (RootView injects it at the tab level), so this list can
+    /// tell which of the source's apps have an update — same match as
+    /// `SourcesManager.installedVersion`, only over `AltApp`.
+    @EnvironmentObject private var appsManager: SideloadedAppsManager
 
     @StateObject private var downloader = IPADownloader()
     /// Row states by app id; an absent entry is idle.
@@ -255,6 +260,17 @@ struct SourceAppsView: View {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(Theme.negative)
                 }
+                // P2: the Updates section first, mirroring the upstream Sources
+                // page — an app both sections list is listed under each.
+                if !updateApps.isEmpty {
+                    Section {
+                        ForEach(updateApps, id: \.id) { app in
+                            appRow(app)
+                        }
+                    } header: {
+                        Text(L("Updates"))
+                    }
+                }
                 ForEach(displayedApps, id: \.id) { app in
                     appRow(app)
                 }
@@ -263,6 +279,9 @@ struct SourceAppsView: View {
         .listStyle(.plain)
         .refreshable { await store.fetch(sourceURL, force: true) }
         .task { await store.fetch(sourceURL) }
+        // P2: read the device once, so the update check below has installed
+        // versions to compare against (same as the upstream Sources page).
+        .task { appsManager.autoLoad() }
         }
         .blueTopBar()
         .navigationBarTitleDisplayMode(.inline)
@@ -305,6 +324,8 @@ struct SourceAppsView: View {
 
     /// U-UI：截图式应用行——60pt 图标 / 名字 / “应用 - 源名（副标题）” /
     /// V版本 | 大小 | 日期 / 多行描述 / 右侧蓝色下载 pill。
+    /// P2：已装时多一行已装版本与更新状态（上游 `statusText` 同款文案），
+    /// 行尾多一枚 Update/Installed 角标；描述走上游的 ReleaseNotesText。
     private func appRow(_ app: AltApp) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 12) {
@@ -321,13 +342,25 @@ struct SourceAppsView: View {
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
+                    if let installed = installedVersion(for: app) {
+                        Text(hasUpdate(for: app)
+                             ? L("%@ installed · %@ available", installed, app.version ?? "")
+                             : L("%@ installed · up to date", installed))
+                            .font(.caption)
+                            .foregroundStyle(hasUpdate(for: app) ? Theme.warning : Theme.muted)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer()
+                if hasUpdate(for: app) {
+                    Tag(text: L("Update"), color: Theme.warning)
+                } else if installedVersion(for: app) != nil {
+                    Tag(text: L("Installed"), color: Theme.positive)
+                }
                 installControl(app)
             }
             if let description = appDescription(app), !description.isEmpty {
-                Text(description)
-                    .font(.footnote)
+                ReleaseNotesText(text: description)
                     .lineLimit(4)
             }
         }
@@ -376,6 +409,29 @@ struct SourceAppsView: View {
         case .newest:
             return list.sorted { ($0.versionDate ?? "") > ($1.versionDate ?? "") }
         }
+    }
+
+    /// The shown apps with a newer version available, first in their own
+    /// section above. (P2, upstream Sources page's Updates section.)
+    private var updateApps: [AltApp] { displayedApps.filter { hasUpdate(for: $0) } }
+
+    /// The version of `app` on this iPhone, from the Sideloaded apps page's
+    /// device read. Same match as `SourcesManager.installedVersion`:
+    /// SideInstaller signs an app as `<bundle id>.<team id>`, so that counts
+    /// as the same app. (P2, upstream `installedVersion`.)
+    private func installedVersion(for app: AltApp) -> String? {
+        guard let bundleID = app.bundleIdentifier, !bundleID.isEmpty else { return nil }
+        return appsManager.entries.first {
+            ProfileMatcher.installed($0.app.bundleID, isBuiltFrom: bundleID, teamID: nil)
+        }?.app.version
+    }
+
+    /// True when the source offers a newer version than the installed one.
+    /// (P2, upstream `SourceListing.hasUpdate`.)
+    private func hasUpdate(for app: AltApp) -> Bool {
+        guard let installed = installedVersion(for: app),
+              let latest = app.version, !latest.isEmpty else { return false }
+        return UpdateChecker.isNewer(latest, than: installed)
     }
 
     /// U-UI：搜索框。

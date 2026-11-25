@@ -1707,10 +1707,18 @@ struct AppsView: View {
 
     private var emptyState: some View {
         PanelCard {
-            EmptyState(title: L("No sideloaded apps"),
-                       message: L("Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here."),
-                       systemImage: "questionmark.app.dashed")
-                .padding(.vertical, 8)
+            VStack(spacing: 8) {
+                EmptyState(title: L("No sideloaded apps"),
+                           message: L("Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here."),
+                           systemImage: "questionmark.app.dashed")
+                    .padding(.vertical, 8)
+                // U2 (0.9.140): what to do when the read came back empty —
+                // the page otherwise leaves only the Load/Reload button.
+                Text(L("No apps were read. Tap Reload to read this iPhone again; pair it and turn on Developer Mode first if nothing shows."))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .multilineTextAlignment(.center)
+            }
         }
     }
 

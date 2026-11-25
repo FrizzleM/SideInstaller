@@ -523,6 +523,8 @@ let japaneseStrings: [String: String] = [
     "No sideloaded apps": "サイドロード済みアプリがありません",
     "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
         "このデバイスにはプロビジョニングプロファイルでインストールされたアプリがありません。App Store のアプリは期限切れにならないため、ここには表示されません。",
+    "No apps were read. Tap Reload to read this iPhone again; pair it and turn on Developer Mode first if nothing shows.":
+        "アプリを読み取れませんでした。「再読み込み」をタップしてこの iPhone をもう一度読み込んでください。何も表示されない場合は、先にこの iPhone をペアリングしてデベロッパモードをオンにしてください。",
     "No matching profile": "一致するプロファイルがありません",
     "Expires today": "本日期限切れ",
     "Expires tomorrow": "明日期限切れ",

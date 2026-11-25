@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The JIT page: the apps a debugger can attach to, each opened with JIT on in
-/// a tap, and the session while one runs. Pushed from Tools (relies on its
+/// a tap, and the session while one runs. Pushed from Settings (relies on its
 /// `NavigationStack`).
 struct JITView: View {
     /// Observed so labels redraw when the language changes.

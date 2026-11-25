@@ -132,7 +132,7 @@ final class DownloadsManager: ObservableObject {
 }
 
 /// 下载列表独立页（工具 tab 固定入口，复用 DownloadsManager）：
-/// 设置页下载区同款内容（行样式照 SettingsView.downloadRow），
+/// 设置页下载区同款内容（行样式照本页的下载行），
 /// 不再只藏在设置 sheet 里；删文件前先弹确认，不直接删。
 struct DownloadsListView: View {
     @StateObject private var manager = DownloadsManager()

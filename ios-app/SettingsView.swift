@@ -20,6 +20,10 @@ struct SettingsView: View {
     @EnvironmentObject private var locationManager: LocationManager
     @EnvironmentObject private var entitlementsManager: EntitlementsManager
     @EnvironmentObject private var sideBySideManager: SideBySideManager
+    /// 0.9.140: the JIT and Sources pages moved here from the dead Tools tab
+    /// (RootView injects both, next to the other tool managers above).
+    @EnvironmentObject private var sourcesManager: SourcesManager
+    @EnvironmentObject private var jitManager: JITManager
     /// B-48-B2：续签进行中时账号区禁用，读这个 live flag。
     @EnvironmentObject private var appsManager: SideloadedAppsManager
     @Environment(\.dismiss) private var dismiss
@@ -260,8 +264,9 @@ struct SettingsView: View {
         return exp.timeIntervalSinceNow < 30 * 24 * 3600
     }
 
-    /// U-UI：工具区（ToolsView 的 9 行里剩下的 5 行；Sideloaded apps →
-    /// 应用 tab，下载 → 下载 tab，设置 → 本页，3 行去掉）。
+    /// U-UI：工具区（旧 ToolsView 的行，0.9.140 起 JIT 与 Sources 也回
+    /// 到这里；Sideloaded apps → 应用 tab，下载 → 下载 tab，设置 →
+    /// 本页，3 行去掉）。
     private var toolsSection: some View {
         Group {
             Section {
@@ -273,6 +278,9 @@ struct SettingsView: View {
                         ToolRow(icon: "link", color: Theme.tileTeal, title: L("Pairing"))
                     }
                 }
+                NavigationLink { JITView(manager: jitManager) } label: {
+                    ToolRow(icon: "bolt.fill", color: Theme.badgeWarning, title: L("JIT"))
+                }
                 NavigationLink { CertsView(manager: certManager) } label: {
                     ToolRow(icon: "checkmark.seal", color: Theme.blue, title: L("Apple ID 证书"))
                 }
@@ -281,6 +289,10 @@ struct SettingsView: View {
                 }
                 NavigationLink { LocationView(manager: locationManager) } label: {
                     ToolRow(icon: "location.fill", color: Theme.badgePositive, title: L("Location spoofing"))
+                }
+                NavigationLink { AppSourcesView(manager: sourcesManager, appsManager: appsManager) } label: {
+                    ToolRow(icon: "square.stack.3d.down.right", color: Theme.tileTeal, title: L("Sources"),
+                            count: sourcesManager.updateCount(installed: appsManager.entries))
                 }
             } header: {
                 Text(L("Tools"))
@@ -816,6 +828,9 @@ private struct ToolRow: View {
     var title: String
     /// Shows a Beta badge.
     var beta: Bool = false
+    /// A count in a capsule before the chevron, such as the updates Sources
+    /// found. 0 hides it. (0.9.140: the Sources row's badge, ex-Tools tile.)
+    var count: Int = 0
 
     var body: some View {
         PanelCard {
@@ -827,6 +842,15 @@ private struct ToolRow: View {
                     .font(.headline)
                 if beta { BetaBadge() }
                 Spacer(minLength: 8)
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 24, minHeight: 24)
+                        .padding(.horizontal, count > 9 ? 4 : 0)
+                        .background(Capsule().fill(Theme.warning))
+                        .accessibilityLabel(count == 1 ? L("%d update", count) : L("%d updates", count))
+                }
                 Image(systemName: "chevron.right")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.muted.opacity(0.6))

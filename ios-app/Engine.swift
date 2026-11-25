@@ -785,9 +785,10 @@ final class Engine {
             return
         }
         // A tunnel pointed at this iPhone's own address can never connect.
-        if NetworkStatus.isOwnAddress(deviceHost) {
+        // 0.9.140: a stale own-address falls back to the default first
+        // (`deviceIPIsUsable` logs the same line below when it can't).
+        if !deviceIPIsUsable() {
             setGuide(Guides.deviceIPMismatch)
-            log("⛔️ Device IP \(deviceHost) is an address this iPhone already holds — that's the tunnel's own end, not the one to connect to. Check Settings › Advanced › Device IP (the default is 10.7.0.1).")
             return
         }
         resetRun()
@@ -1036,7 +1037,9 @@ final class Engine {
             if wifiSatisfied && vpn {
                 // Install checks this too, but only while a tunnel is up, and
                 // this run may have started it.
-                if NetworkStatus.isOwnAddress(deviceHost) {
+                // 0.9.140: a stale own-address falls back to the default first
+                // (`deviceIPIsUsable` logs the same line below when it can't).
+                if !deviceIPIsUsable() {
                     setGuide(Guides.deviceIPMismatch)
                     throw EngineError.message(L("Wrong device IP"))
                 }
@@ -2434,9 +2437,10 @@ final class Engine {
             }
             return
         }
-        if NetworkStatus.isOwnAddress(deviceHost) {
+        // 0.9.140: a stale own-address falls back to the default first
+        // (`deviceIPIsUsable` logs the same line below when it can't).
+        if !deviceIPIsUsable() {
             setGuide(Guides.deviceIPMismatch)
-            log("⛔️ Device IP \(deviceHost) is an address this iPhone already holds — that's the tunnel's own end, not the one to connect to. Check Settings › Advanced › Device IP (the default is 10.7.0.1).")
             return
         }
         resetRun()
@@ -2592,9 +2596,10 @@ final class Engine {
             }
             return
         }
-        if NetworkStatus.isOwnAddress(deviceHost) {
+        // 0.9.140: a stale own-address falls back to the default first
+        // (`deviceIPIsUsable` logs the same line below when it can't).
+        if !deviceIPIsUsable() {
             setGuide(Guides.deviceIPMismatch)
-            log("⛔️ Device IP \(deviceHost) is an address this iPhone already holds — that's the tunnel's own end, not the one to connect to. Check Settings › Advanced › Device IP (the default is 10.7.0.1).")
             return
         }
         resetRun()
@@ -3543,6 +3548,32 @@ final class Engine {
         guard tunnelLocationHold else { return }
         tunnelLocationHold = false
         releaseTunnel()
+    }
+
+    /// False when Device IP is one of this iPhone's own addresses, which iOS
+    /// won't let an app connect to (EPERM). LocalDevVPN shows one on its main
+    /// screen: “Connected to 10.7.1.1/32” is its own end of the tunnel, while
+    /// the address to connect to is the 10.7.0.1 under its Settings › Device
+    /// IP. When the tunnel carries the default address, Device IP goes back to
+    /// it instead. Only tells anything while the tunnel is up.
+    /// (Upstream 2.2.0 `deviceIPIsUsable`, restored 0.9.140: the four
+    /// Device-IP checkpoints call it first, so a stale own-address
+    /// silently falls back to the default instead of blocking the run.
+    /// Plain, not @MainActor: `Engine` here is @Observable with
+    /// non-isolated `log`/`deviceIP`, and two of the four call sites are
+    /// non-isolated too — all four run on the main thread from UI actions.)
+    func deviceIPIsUsable() -> Bool {
+        let host = deviceHost
+        guard NetworkStatus.isOwnAddress(host) else { return true }
+        let fallback = Self.defaultDeviceIP
+        if host != fallback, !NetworkStatus.isOwnAddress(fallback),
+           NetworkStatus.loopbackTunnelUp(deviceIP: fallback) {
+            log("Device IP \(host) is one of this iPhone's own addresses (LocalDevVPN's “Connected to” address is its own end of the tunnel), and iOS won't let an app connect to those. Using \(fallback), the address the tunnel carries.")
+            deviceIP = fallback
+            return true
+        }
+        log("⛔️ Device IP \(host) is an address this iPhone already holds — that's the tunnel's own end, not the one to connect to. Check Settings › Advanced › Device IP (the default is \(fallback)).")
+        return false
     }
 
     /// Makes sure the tunnel is up for something about to use it. Starts

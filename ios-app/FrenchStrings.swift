@@ -540,6 +540,8 @@ let frenchStrings: [String: String] = [
     "No sideloaded apps": "Aucune app sideloadée",
     "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
         "Rien sur cet appareil n'a été installé avec un profil de provisionnement. Les apps de l'App Store n'expirent pas, elles ne figurent donc pas ici.",
+    "No apps were read. Tap Reload to read this iPhone again; pair it and turn on Developer Mode first if nothing shows.":
+        "Aucune app lue. Touchez Recharger pour relire cet iPhone ; s'il ne s'affiche toujours rien, associez-le d'abord et activez le mode développeur.",
     "No matching profile": "Aucun profil correspondant",
     "Expires today": "Expire aujourd'hui",
     "Expires tomorrow": "Expire demain",

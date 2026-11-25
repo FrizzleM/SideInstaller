@@ -543,6 +543,8 @@ let chineseStrings: [String: String] = [
     "No sideloaded apps": "没有侧载应用",
     "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
         "这台设备上没有任何应用是用描述文件安装的。App Store 的应用不会过期，因此不会列在这里。",
+    "No apps were read. Tap Reload to read this iPhone again; pair it and turn on Developer Mode first if nothing shows.":
+        "未读到已装 App。点“重新读取”再读一次；如果一直为空，请先配对本机并开启开发者模式。",
     "No matching profile": "没有匹配的描述文件",
     "Expires today": "今天过期",
     "Expires tomorrow": "明天过期",

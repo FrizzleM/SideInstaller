@@ -536,6 +536,8 @@ let vietnameseStrings: [String: String] = [
     "No sideloaded apps": "Không có ứng dụng sideload nào",
     "Nothing on this device was installed with a provisioning profile. App Store apps don't expire, so they aren't listed here.":
         "Không có gì trên thiết bị này được cài bằng hồ sơ cấp phép. Ứng dụng từ App Store không hết hạn nên không xuất hiện ở đây.",
+    "No apps were read. Tap Reload to read this iPhone again; pair it and turn on Developer Mode first if nothing shows.":
+        "Không đọc được ứng dụng nào. Chạm vào Tải lại để đọc lại iPhone này; nếu vẫn không có gì, hãy ghép nối iPhone và bật Chế độ nhà phát triển trước.",
     "No matching profile": "Không có hồ sơ nào khớp",
     "Expires today": "Hết hạn hôm nay",
     "Expires tomorrow": "Hết hạn ngày mai",
