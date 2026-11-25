@@ -1066,6 +1066,10 @@ let vietnameseStrings: [String: String] = [
     "Version %@ (%@)": "Phiên bản %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller cài SideStore và LiveContainer thẳng vào iPhone của bạn, không cần đến máy tính.",
+    "Checking for updates…": "Đang kiểm tra cập nhật…",
+    "You're up to date.": "Bạn đang dùng phiên bản mới nhất.",
+    "Couldn't check for updates. Check your connection and try again.":
+        "Không thể kiểm tra cập nhật. Hãy kiểm tra kết nối và thử lại.",
 
     "Links": "Liên kết",
     "Source code": "Mã nguồn",

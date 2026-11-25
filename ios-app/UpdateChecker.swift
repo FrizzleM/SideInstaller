@@ -29,27 +29,42 @@ final class UpdateChecker: ObservableObject {
     /// every few days at most, so one check a day is enough (S6).
     private static let lastCheckKey = "SIDUpdateCheckerLastCheck"
 
+    /// What a check found. `.skipped` means the daily gate held and no
+    /// request went out (only when `force` is false).
+    enum CheckResult: Equatable {
+        case skipped
+        case upToDate
+        case newer(String)
+        case failed
+    }
+
     /// Fetch the remote version and reveal the banner if it's newer.
-    func check() async {
-        // One check a day: skip when the last check was recent, even if it
-        // failed — failures are silent and the banner can wait a day.
+    /// B2 (0.9.142): the stamp is only set once a version was really fetched.
+    /// A failed check used to stamp too, so a launch with no network on the
+    /// day a new version shipped silenced the banner for the next 24 hours.
+    @discardableResult
+    func check(force: Bool = false) async -> CheckResult {
+        // One check a day: skip when the last successful check was recent.
+        // A failed check stamps nothing, so the next launch tries again.
         let now = Date()
-        if let last = UserDefaults.standard.object(forKey: Self.lastCheckKey) as? Date,
-           now.timeIntervalSince(last) < 24 * 3600 { return }
-        UserDefaults.standard.set(now, forKey: Self.lastCheckKey)
-        guard let url = URL(string: Self.versionFileURL) else { return }
+        if !force,
+           let last = UserDefaults.standard.object(forKey: Self.lastCheckKey) as? Date,
+           now.timeIntervalSince(last) < 24 * 3600 { return .skipped }
+        guard let url = URL(string: Self.versionFileURL) else { return .failed }
         var req = URLRequest(url: url)
         req.cachePolicy = .reloadIgnoringLocalCacheData
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
 
         guard let (data, response) = try? await URLSession.shared.data(for: req),
               (response as? HTTPURLResponse)?.statusCode == 200,
-              let body = String(data: data, encoding: .utf8) else { return }
+              let body = String(data: data, encoding: .utf8) else { return .failed }
 
         let latest = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !latest.isEmpty else { return }
+        guard !latest.isEmpty else { return .failed }
+        UserDefaults.standard.set(now, forKey: Self.lastCheckKey)
         latestVersion = latest
         showBanner = Self.isNewer(latest, than: currentVersion)
+        return showBanner ? .newer(latest) : .upToDate
     }
 
     /// Close the banner for this launch.

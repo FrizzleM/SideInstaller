@@ -7,20 +7,26 @@ import CoreImage.CIFilterBuiltins
 struct AboutView: View {
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
+    @EnvironmentObject private var updateChecker: UpdateChecker
 
     @State private var showSettings = false
     @State private var showCrypto = false
     @State private var showReport = false
+    /// True while a manual update check is in flight.
+    @State private var isCheckingUpdate = false
+    /// What the last manual update check found; nil until one runs.
+    @State private var updateCheckStatus: UpdateChecker.CheckResult?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     header.cascadeItem(0)
-                    summary.cascadeItem(1)
-                    links.cascadeItem(2)
-                    thanks.cascadeItem(3)
-                    builtWith.cascadeItem(4)
+                    updateCheck.cascadeItem(1)
+                    summary.cascadeItem(2)
+                    links.cascadeItem(3)
+                    thanks.cascadeItem(4)
+                    builtWith.cascadeItem(5)
                 }
                 .padding(20)
                 .pageColumn()
@@ -47,6 +53,48 @@ struct AboutView: View {
         let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
         return L("Version %@ (%@)", short, build)
+    }
+
+    // MARK: Check for updates
+
+    /// Manual update check, under the version line: the launch check only
+    /// runs once a day, so this is how to ask right now. The row's detail
+    /// line reports the outcome; a newer version also lights the Install
+    /// tab's banner, which carries the download link.
+    private var updateCheck: some View {
+        PanelCard {
+            AboutRow(systemImage: "arrow.down.circle",
+                     title: L("Check for updates"),
+                     detail: updateCheckDetail,
+                     action: { runUpdateCheck() })
+        }
+    }
+
+    /// The detail line under "Check for updates": nothing until a check runs.
+    private var updateCheckDetail: String? {
+        if isCheckingUpdate { return L("Checking for updates…") }
+        switch updateCheckStatus {
+        case nil, .skipped: return nil
+        case .upToDate: return L("You're up to date.")
+        case .newer(let latest):
+            return L("SideInstaller %@ is available — you're on %@.",
+                     latest, updateChecker.currentVersion)
+        case .failed:
+            return L("Couldn't check for updates. Check your connection and try again.")
+        }
+    }
+
+    /// Run a check that ignores the 24-hour stamp; a second tap while one
+    /// is in flight is ignored.
+    private func runUpdateCheck() {
+        guard !isCheckingUpdate else { return }
+        isCheckingUpdate = true
+        updateCheckStatus = nil
+        Task {
+            let result = await updateChecker.check(force: true)
+            updateCheckStatus = result
+            isCheckingUpdate = false
+        }
     }
 
     // MARK: What it is

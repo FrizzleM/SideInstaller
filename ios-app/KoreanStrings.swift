@@ -1045,6 +1045,9 @@ let koreanStrings: [String: String] = [
     "Version %@ (%@)": "버전 %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller는 PC 없이 SideStore와 LiveContainer를 iPhone에 바로 설치해 줍니다.",
+    "Checking for updates…": "업데이트 확인 중…",
+    "You're up to date.": "최신 버전입니다.",
+    "Couldn't check for updates. Check your connection and try again.": "업데이트를 확인할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
 
     "Links": "링크",
     "Source code": "소스 코드",

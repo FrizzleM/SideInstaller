@@ -135,8 +135,11 @@ final class DownloadsManager: ObservableObject {
 /// 设置页下载区同款内容（行样式照本页的下载行），
 /// 不再只藏在设置 sheet 里；删文件前先弹确认，不直接删。
 struct DownloadsListView: View {
+    @Environment(Engine.self) private var engine
     @StateObject private var manager = DownloadsManager()
     @State private var pendingDelete: DownloadedIPA?
+    /// `id` of the IPA being moved into the Install tab's custom slot, if any.
+    @State private var installingID: String?
 
     /// A-39-2：下载行日期文案静态缓存——照抄 SIDE-38 A4 的
     /// ExpiryUrgency.textCache 模式；每行每 body 求值现建
@@ -177,29 +180,33 @@ struct DownloadsListView: View {
                     .foregroundStyle(Theme.muted)
             } else {
                 ForEach(manager.downloads) { item in
-                    HStack(spacing: 12) {
-                        Image(systemName: "shippingbox.fill")
-                            .font(.title3)
-                            .foregroundStyle(Theme.brand)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.displayName)
-                                .font(.subheadline.weight(.medium))
-                                .lineLimit(1)
-                            if let modified = item.modified {
-                                let when = Self.dateText(for: modified)
-                                Text(item.isImported ? L("Added %@", when) : L("Downloaded %@", when))
-                                    .font(.caption)
-                                    .foregroundStyle(Theme.muted)
+                    Button { install(item) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "shippingbox.fill")
+                                .font(.title3)
+                                .foregroundStyle(Theme.brand)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.displayName)
+                                    .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                                if let modified = item.modified {
+                                    let when = Self.dateText(for: modified)
+                                    Text(item.isImported ? L("Added %@", when) : L("Downloaded %@", when))
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.muted)
+                                }
                             }
+                            Spacer()
+                            Text(item.sizeText)
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Theme.accent2)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(Theme.accent.opacity(0.16)))
                         }
-                        Spacer()
-                        Text(item.sizeText)
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(Theme.accent2)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(Theme.accent.opacity(0.16)))
                     }
+                    .buttonStyle(.plain)
+                    .disabled(installingID != nil)
                     .swipeActions {
                         Button(role: .destructive) {
                             pendingDelete = item
@@ -226,6 +233,25 @@ struct DownloadsListView: View {
             Button(L("Cancel"), role: .cancel) { pendingDelete = nil }
         } message: {
             Text(L("只删文件，不影响已装的 App。"))
+        }
+    }
+
+    /// Tap a row to install that IPA: copy it into the Install tab's custom
+    /// import slot, then raise the Install sheet on it — RootView jumps on
+    /// `sharedIPAReady`, the share path's flag. A refused import (an install
+    /// or refresh already running) leaves the reason on this page instead of
+    /// opening the sheet.
+    private func install(_ item: DownloadedIPA) {
+        guard installingID == nil else { return }
+        installingID = item.id
+        Task {
+            let ok = await engine.importCustomIPA(from: item.url)
+            if ok {
+                engine.sharedIPAReady = true
+            } else if let error = engine.lastError {
+                manager.lastError = error
+            }
+            installingID = nil
         }
     }
 }

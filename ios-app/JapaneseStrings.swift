@@ -1044,6 +1044,10 @@ let japaneseStrings: [String: String] = [
     "Version %@ (%@)": "バージョン %@（%@）",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller は、パソコンを使わずに SideStore と LiveContainer を iPhone に直接インストールします。",
+    "Checking for updates…": "アップデートを確認中…",
+    "You're up to date.": "最新バージョンです。",
+    "Couldn't check for updates. Check your connection and try again.":
+        "アップデートを確認できませんでした。接続を確認して、もう一度お試しください。",
 
     "Links": "リンク",
     "Source code": "ソースコード",

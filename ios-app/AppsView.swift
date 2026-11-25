@@ -1394,13 +1394,6 @@ struct AppsView: View {
             }
             .buttonStyle(SecondaryButtonStyle(), sound: .tap)
             .cascadeItem(2)
-        } else if manager.hasLoaded && !manager.refreshable.isEmpty {
-            Button { manager.load() } label: {
-                loadLabel(spinner: Theme.accent).frame(maxWidth: .infinity)
-            }
-            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-            .disabled(manager.isWorking || manager.isRefreshing)
-            .cascadeItem(2)
         } else if manager.hasLoaded {
             Button { manager.load() } label: {
                 loadLabel(spinner: Theme.accent).frame(maxWidth: .infinity)

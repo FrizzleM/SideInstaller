@@ -1005,6 +1005,10 @@ let turkishStrings: [String: String] = [
     "Version %@ (%@)": "Sürüm %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller, bilgisayar olmadan SideStore ve LiveContainer'ı doğrudan iPhone'una yükler.",
+    "Checking for updates…": "Güncellemeler denetleniyor…",
+    "You're up to date.": "Güncel durumdasınız.",
+    "Couldn't check for updates. Check your connection and try again.":
+        "Güncellemeler denetlenemedi. Bağlantınızı kontrol edip yeniden deneyin.",
     "Links": "Bağlantılar",
     "Source code": "Kaynak kodu",
     "Support the project": "Projeyi destekle",

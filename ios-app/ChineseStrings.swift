@@ -1051,6 +1051,9 @@ let chineseStrings: [String: String] = [
     "Version %@ (%@)": "版本 %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller 直接把 SideStore 和 LiveContainer 装到你的 iPhone 上，全程不需要电脑。",
+    "Checking for updates…": "正在检查更新…",
+    "You're up to date.": "已是最新版本。",
+    "Couldn't check for updates. Check your connection and try again.": "无法检查更新。请检查网络连接后重试。",
 
     "Links": "链接",
     "Source code": "源代码",

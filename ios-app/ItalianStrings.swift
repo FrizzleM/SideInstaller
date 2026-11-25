@@ -1068,6 +1068,10 @@ let italianStrings: [String: String] = [
     "Version %@ (%@)": "Versione %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
         "SideInstaller installa SideStore e LiveContainer direttamente sul tuo iPhone, senza bisogno di un PC.",
+    "Checking for updates…": "Controllo aggiornamenti…",
+    "You're up to date.": "Sei aggiornato.",
+    "Couldn't check for updates. Check your connection and try again.":
+        "Impossibile verificare gli aggiornamenti. Controlla la connessione e riprova.",
 
     "Links": "Link",
     "Source code": "Codice sorgente",
