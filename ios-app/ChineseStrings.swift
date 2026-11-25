@@ -46,6 +46,8 @@ let chineseStrings: [String: String] = [
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。",
     "Installing": "正在安装",
     "Installed": "已安装",
+    "Install history": "安装历史",
+    "No installs yet.": "暂无安装记录。",
     "Something went wrong": "出了点问题",
     "an app by Frizzle": "由 Frizzle 打造的应用",
     "device": "设备",

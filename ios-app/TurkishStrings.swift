@@ -46,6 +46,8 @@ let turkishStrings: [String: String] = [
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "Henüz imzalanmış IPA yok. Ayarlar'daki kurumsal sertifika sayfasında «Yalnızca imzala» ile imzalayın; burada saklanır, istediğiniz zaman yükleyip paylaşabilirsiniz.",
     "Installing": "Yükleniyor",
     "Installed": "Yüklendi",
+    "Install history": "Yükleme geçmişi",
+    "No installs yet.": "Henüz yükleme yok.",
     "Something went wrong": "Bir şeyler ters gitti",
     "an app by Frizzle": "Frizzle tarafından bir uygulama",
     "device": "cihaz",

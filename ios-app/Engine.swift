@@ -3245,6 +3245,11 @@ final class Engine {
     @MainActor
     private func finishSuccess() {
         finished = true
+        // F5 (0.9.143): one line in the install history — successes only;
+        // a failed run never reaches here, so it leaves no entry.
+        InstallHistoryStore.record(appName: installedAppName,
+                                   version: signedAppVersion() ?? downloadedVersion,
+                                   identity: normalizedAppleID)
         let source = installedBuild
         if signedAppIsMadeira(source) {
             setGuide(Guides.trustMadeira(holding: madeiraHandoff))
@@ -3732,6 +3737,13 @@ final class Engine {
     private func signedAppName() -> String? {
         guard let plist = signedAppPlist() else { return nil }
         return (plist["CFBundleDisplayName"] as? String) ?? (plist["CFBundleName"] as? String)
+    }
+
+    /// The signed app's own version, for the install history; nil when the
+    /// signed app has no readable plist or no version in it.
+    private func signedAppVersion() -> String? {
+        guard let plist = signedAppPlist() else { return nil }
+        return plist["CFBundleShortVersionString"] as? String
     }
 
     private func signedAppPlist() -> [String: Any]? {

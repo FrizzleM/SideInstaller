@@ -98,6 +98,85 @@ private struct CachedSource: Codable {
     let fetched: Date
 }
 
+/// The one source-URL list both source pages read: the fork's Sources tab
+/// (`SourceStore`, key `CZFAppSourceURLs`, default xiaofang-source) and the
+/// upstream Sources page (`SourcesManager`, key `sources.urls`, built-in
+/// frizzlem.json) used to keep separate lists, so a source added on one page
+/// never showed on the other. Both stores now load and save this list; the
+/// documents each store fetches stay its own, so add / remove / refresh
+/// behaviour on either page is unchanged.
+///
+/// Migration runs once, at first launch: the two old lists are merged in
+/// order (fork list first, then upstream-only URLs), de-duplicated by URL
+/// string, with the built-in source leading. Nothing is dropped — a source
+/// the user deleted before the migration stays deleted (only a never-set
+/// fork list seeds its default). The old keys are left in place, so an
+/// older build still reads its own list if the user goes back.
+enum UnifiedSourceList {
+
+    /// The single persisted list.
+    static let key = "CZFUnifiedSourceURLs"
+    /// Set once the one-time migration below has run.
+    static let migratedKey = "CZFSourceListMigrated"
+    /// The fork list's key (see `SourceStore.urlsKey`).
+    static let legacyForkKey = "CZFAppSourceURLs"
+    /// The upstream page's key (was `SourcesManager.storeKey`).
+    static let legacyUpstreamKey = "sources.urls"
+    /// The fork's default source.
+    static let forkDefaultURL = "https://xiaofang-source.pages.dev/source.json"
+    /// FrizzleM's source: first in every list, and it can't be removed
+    /// (both stores guard it, as `SourcesManager` always did).
+    static let builtInURL = URL(string: "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/frizzlem.json")!
+
+    /// Posted whenever the list is saved, so the page that isn't on screen
+    /// re-reads it when it appears (and while it is open).
+    static let didChange = Notification.Name("CZFUnifiedSourceListDidChange")
+
+    /// Merge the two old lists into the one list, once.
+    static func migrateIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: migratedKey) else { return }
+        var merged: [String] = []
+        func append(_ strings: [String]?) {
+            for string in strings ?? [] where !merged.contains(string) {
+                merged.append(string)
+            }
+        }
+        // The fork list: nil means first run, so the fork default seeds it;
+        // a list that exists is taken as-is, even when the user deleted the
+        // default from it.
+        let forkStored = UserDefaults.standard.stringArray(forKey: legacyForkKey)
+        if forkStored == nil { merged.append(forkDefaultURL) }
+        append(forkStored)
+        append(UserDefaults.standard.stringArray(forKey: legacyUpstreamKey))
+        // The built-in source was never persisted by either list, and it
+        // can't be removed: it always leads the unified list.
+        merged.removeAll { $0 == builtInURL.absoluteString }
+        merged.insert(builtInURL.absoluteString, at: 0)
+        UserDefaults.standard.set(merged, forKey: key)
+        UserDefaults.standard.set(true, forKey: migratedKey)
+    }
+
+    /// The unified list, migrated first. The built-in source is always
+    /// first; a list that somehow lost its place gets it back at the front.
+    static func load() -> [URL] {
+        migrateIfNeeded()
+        var strings = UserDefaults.standard.stringArray(forKey: key) ?? []
+        if strings.first != builtInURL.absoluteString {
+            strings.removeAll { $0 == builtInURL.absoluteString }
+            strings.insert(builtInURL.absoluteString, at: 0)
+            UserDefaults.standard.set(strings, forKey: key)
+        }
+        return strings.compactMap(URL.init(string:))
+    }
+
+    /// Persist the list and tell the other page.
+    static func save(_ urls: [URL]) {
+        migrateIfNeeded()
+        UserDefaults.standard.set(urls.map(\.absoluteString), forKey: key)
+        NotificationCenter.default.post(name: didChange, object: nil)
+    }
+}
+
 // MARK: - Store
 
 /// The user's app sources: the list is kept in UserDefaults, the documents
@@ -107,11 +186,13 @@ final class SourceStore: ObservableObject {
 
     @Published var sources: [LoadedSource] = []
 
-    /// UserDefaults key for the source URL strings.
+    /// UserDefaults key for the source URL strings. Legacy since 0.9.143:
+    /// the list now lives under `UnifiedSourceList.key`; this key is only
+    /// read once, by the migration, and left in place for older builds.
     static let urlsKey = "CZFAppSourceURLs"
 
     /// Preset on first run, when the user has never had a source list.
-    static let defaultSourceURL = "https://xiaofang-source.pages.dev/source.json"
+    static let defaultSourceURL = UnifiedSourceList.forkDefaultURL
 
     /// C-6：源 JSON 专用 session——不用 shared：30 秒空闲 + 120 秒总时长
     /// 双上限（shared 默认空闲 60 秒、总时长 7 天，一个 trickle 源能挂一行 7 天）。
@@ -125,13 +206,17 @@ final class SourceStore: ObservableObject {
     private static let sourceBodyCap = 10 * 1024 * 1024
 
     init() {
-        var stored = UserDefaults.standard.stringArray(forKey: Self.urlsKey)
-        if stored == nil {
-            stored = [Self.defaultSourceURL]
-            UserDefaults.standard.set(stored, forKey: Self.urlsKey)
-        }
-        sources = (stored ?? []).compactMap { URL(string: $0) }
-            .map { LoadedSource(url: $0) }
+        sources = UnifiedSourceList.load().map { LoadedSource(url: $0) }
+    }
+
+    /// Re-read the unified list (the other page saved it): keep the loaded
+    /// documents of sources still listed, add new ones unloaded, drop
+    /// removed ones. Called when the page appears and when the list changes.
+    func syncURLs() {
+        let urls = UnifiedSourceList.load()
+        var kept: [URL: LoadedSource] = [:]
+        for source in sources { kept[source.url] = source }
+        sources = urls.map { kept[$0] ?? LoadedSource(url: $0) }
     }
 
     /// Add a source by its address text: validated like a pasted IPA link,
@@ -149,10 +234,14 @@ final class SourceStore: ObservableObject {
     }
 
     /// Remove the sources at `offsets` (a list swipe) and save the list.
+    /// The built-in source can't be removed: its offsets are skipped, so a
+    /// swipe on its row does nothing (the row is also delete-disabled).
     func removeSource(at offsets: IndexSet) {
         // N3(A)：删源时顺带清掉它的磁盘缓存条目，不然删掉的源还占着缓存。
-        let removed = offsets.map { sources[$0].url.absoluteString }
-        sources.remove(atOffsets: offsets)
+        let kept = offsets.filter { sources[$0].url != UnifiedSourceList.builtInURL }
+        guard !kept.isEmpty else { return }
+        let removed = kept.map { sources[$0].url.absoluteString }
+        sources.remove(atOffsets: IndexSet(kept))
         persist()
         Self.removeFromSourceCache(keys: removed)
     }
@@ -319,7 +408,7 @@ final class SourceStore: ObservableObject {
     }
 
     private func persist() {
-        UserDefaults.standard.set(sources.map(\.url.absoluteString), forKey: Self.urlsKey)
+        UnifiedSourceList.save(sources.map(\.url))
     }
 }
 

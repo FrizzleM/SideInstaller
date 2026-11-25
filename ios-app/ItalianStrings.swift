@@ -44,6 +44,8 @@ let italianStrings: [String: String] = [
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "Ancora nessun IPA firmato. Firmane uno con «Solo firma» nella pagina dei certificati aziendali in Impostazioni: verrà salvato qui, pronto da installare e condividere.",
     "Installing": "Installazione in corso",
     "Installed": "Installato",
+    "Install history": "Cronologia installazioni",
+    "No installs yet.": "Ancora nessuna installazione.",
     "Something went wrong": "Qualcosa è andato storto",
     "an app by Frizzle": "un'app di Frizzle",
     "device": "dispositivo",

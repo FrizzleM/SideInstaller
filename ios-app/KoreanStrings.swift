@@ -47,6 +47,8 @@ let koreanStrings: [String: String] = [
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "서명된 IPA가 아직 없습니다. 설정의 기업 인증서 페이지에서 ‘서명만’을 사용해 서명하면 여기에 저장되어 언제든지 설치하고 공유할 수 있습니다.",
     "Installing": "설치 중",
     "Installed": "설치됨",
+    "Install history": "설치 기록",
+    "No installs yet.": "아직 설치한 항목이 없습니다.",
     "Something went wrong": "문제가 발생했습니다",
     "an app by Frizzle": "by Frizzle",
     "device": "기기",

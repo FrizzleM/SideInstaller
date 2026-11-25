@@ -46,6 +46,8 @@ let vietnameseStrings: [String: String] = [
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "Chưa có IPA nào đã ký. Hãy ký một IPA bằng «Chỉ ký» trên trang chứng chỉ doanh nghiệp trong Cài đặt: nó sẽ được lưu tại đây, sẵn sàng cài đặt và chia sẻ.",
     "Installing": "Đang cài đặt",
     "Installed": "Đã cài đặt",
+    "Install history": "Lịch sử cài đặt",
+    "No installs yet.": "Chưa có lượt cài đặt nào.",
     "Something went wrong": "Đã xảy ra lỗi",
     "an app by Frizzle": "một ứng dụng của Frizzle",
     "device": "thiết bị",

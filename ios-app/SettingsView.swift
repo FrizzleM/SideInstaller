@@ -294,6 +294,9 @@ struct SettingsView: View {
                     ToolRow(icon: "square.stack.3d.down.right", color: Theme.tileTeal, title: L("Sources"),
                             count: sourcesManager.updateCount(installed: appsManager.entries))
                 }
+                NavigationLink { InstallHistoryView() } label: {
+                    ToolRow(icon: "clock.arrow.circlepath", color: Theme.tileTeal, title: L("Install history"))
+                }
             } header: {
                 Text(L("Tools"))
             }

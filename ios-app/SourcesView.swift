@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// U-UI：源/应用列表排序（照抄 FilesTabView 的 FileSort 形状；源列表只用
@@ -56,6 +57,7 @@ struct SourcesView: View {
                     } label: {
                         sourceRow(source)
                     }
+                    .deleteDisabled(source.url == UnifiedSourceList.builtInURL)
                 }
                 .onDelete { offsets in
                     for offset in offsets {
@@ -68,7 +70,10 @@ struct SourcesView: View {
             }
             .listStyle(.plain)
             .refreshable { await store.fetchAll(force: true) }
-            .task { await store.fetchAll() }
+            .task { store.syncURLs(); await store.fetchAll() }
+            .onReceive(NotificationCenter.default.publisher(for: UnifiedSourceList.didChange)) { _ in
+                Task { @MainActor in store.syncURLs() }
+            }
         }
         .blueTopBar()
         .navigationBarTitleDisplayMode(.inline)
@@ -849,19 +854,22 @@ final class SourcesManager: ObservableObject {
     /// Why the last add failed, shown under the field.
     @Published var addError: String?
 
-    private static let storeKey = "sources.urls"
-
     /// Sources every copy of SideInstaller starts with, listed first. They
     /// can't be removed: FrizzleM's own, with SideInstaller in it, kept up to
-    /// date with each release by the update-altsource workflow.
-    static let builtIn: [URL] = [
-        URL(string: "https://raw.githubusercontent.com/FrizzleM/SideInstaller/main/frizzlem.json")!,
-    ]
+    /// date with each release by the update-altsource workflow. The URL lives
+    /// in `UnifiedSourceList`, the one list both source pages share.
+    static let builtIn: [URL] = [UnifiedSourceList.builtInURL]
 
     init() {
-        let saved = (UserDefaults.standard.stringArray(forKey: Self.storeKey) ?? [])
-            .compactMap(URL.init(string:))
-        urls = Self.builtIn + saved.filter { !Self.builtIn.contains($0) }
+        urls = UnifiedSourceList.load()
+    }
+
+    /// Re-read the unified list (the other page saved it): keep the fetch
+    /// states of sources still listed, drop the rest. Called when the page
+    /// appears and when the list changes.
+    func syncURLs() {
+        urls = UnifiedSourceList.load()
+        states = states.filter { urls.contains($0.key) }
     }
 
     func isBuiltIn(_ url: URL) -> Bool { Self.builtIn.contains(url) }
@@ -1008,8 +1016,7 @@ final class SourcesManager: ObservableObject {
     }
 
     private func save() {
-        UserDefaults.standard.set(urls.filter { !isBuiltIn($0) }.map(\.absoluteString),
-                                  forKey: Self.storeKey)
+        UnifiedSourceList.save(urls)
     }
 
     /// The source a pasted link points at.
@@ -1162,8 +1169,12 @@ struct AppSourcesView: View {
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .task {
+            manager.syncURLs()
             appsManager.autoLoad()
             await manager.refreshMissing()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UnifiedSourceList.didChange)) { _ in
+            Task { @MainActor in manager.syncURLs() }
         }
     }
 

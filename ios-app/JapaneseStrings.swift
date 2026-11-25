@@ -46,6 +46,8 @@ let japaneseStrings: [String: String] = [
     "还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。": "署名済みの IPA はまだありません。設定のエンタープライズ証明書ページで「署名のみ」を使って署名するとここに保存され、いつでもインストール・共有できます。",
     "Installing": "インストール中",
     "Installed": "インストール済み",
+    "Install history": "インストール履歴",
+    "No installs yet.": "まだインストールがありません。",
     "Something went wrong": "問題が発生しました",
     "an app by Frizzle": "Frizzle 制作のアプリ",
     "device": "デバイス",
