@@ -305,6 +305,9 @@ final class SideBySideManager: ObservableObject {
     @Published private(set) var handOffNotice: String?
     /// Home-screen name of what landed on their iPhone.
     @Published private(set) var installedAppName: String?
+    /// The signed app's own version (CFBundleShortVersionString), for the
+    /// install history; nil when the signed app carries none.
+    @Published private(set) var installedAppVersion: String?
     /// True while their iPhone has to pair from its own Settings, which it
     /// never prompts for by itself.
     @Published private(set) var pairingInSettings = false
@@ -712,6 +715,7 @@ final class SideBySideManager: ObservableObject {
         targetSummary = nil
         targetOSVersion = nil
         installedAppName = nil
+        installedAppVersion = nil
     }
 
     @MainActor
@@ -731,6 +735,12 @@ final class SideBySideManager: ObservableObject {
     private func finishSuccess() {
         finished = true
         let name = installedAppName ?? runName
+        // F5 (0.9.143) 一键路同款：成功才记一条安装历史（App 名、版本、
+        // Apple ID、时间），上限 100 条；记在 signOut() 之前，用的还是
+        // 本次运行的 Apple ID。
+        InstallHistoryStore.record(appName: name,
+                                   version: installedAppVersion,
+                                   identity: credentials?.id ?? "")
         engine.log("✅ Side by Side done: \(name) is on their iPhone. One trust step left, on their side.")
         // Theirs pairs itself and signs itself in, or SideStore now holds the
         // record and signs in itself: this iPhone has no more use for the
@@ -1542,6 +1552,7 @@ final class SideBySideManager: ObservableObject {
         let info = Self.bundleInfo(at: path)
         signedBundleID = info?.id
         installedAppName = info?.name ?? (app == .custom ? runName : app.homeScreenName)
+        installedAppVersion = info?.version
         setStep(.sign, .done)
     }
 
@@ -1585,16 +1596,17 @@ final class SideBySideManager: ObservableObject {
         .message(ErrorHelp.explained(error.errorDescription ?? String(describing: error)))
     }
 
-    /// The bundle id and Home Screen name (display name, else bundle name) of
-    /// the signed `.app`.
-    private static func bundleInfo(at path: String) -> (id: String?, name: String?)? {
+    /// The bundle id, Home Screen name (display name, else bundle name) and
+    /// version of the signed `.app`.
+    private static func bundleInfo(at path: String) -> (id: String?, name: String?, version: String?)? {
         let plist = (path as NSString).appendingPathComponent("Info.plist")
         guard let data = FileManager.default.contents(atPath: plist),
               let dict = (try? PropertyListSerialization.propertyList(from: data, options: [],
                                                                       format: nil)) as? [String: Any]
         else { return nil }
         let name = (dict["CFBundleDisplayName"] as? String) ?? (dict["CFBundleName"] as? String)
-        return (dict["CFBundleIdentifier"] as? String, name?.isEmpty == false ? name : nil)
+        return (dict["CFBundleIdentifier"] as? String, name?.isEmpty == false ? name : nil,
+                dict["CFBundleShortVersionString"] as? String)
     }
 
     // MARK: - Step 5: install over AFC + installation_proxy
@@ -1982,21 +1994,39 @@ final class SideBySideManager: ObservableObject {
 
     /// Bridge a blocking device call to async, serialized on this tool's queue.
     private func onDeviceQueue<T>(_ work: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { cont in
-            deviceQueue.async {
-                do { cont.resume(returning: try work()) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<T>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                deviceQueue.async {
+                    do { box.resume(returning: try work()) }
+                    catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 
     /// The same, on the signing queue: isideload's session isn't thread-safe.
     private func onSignQueue<T>(_ work: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { cont in
-            signQueue.async {
-                do { cont.resume(returning: try work()) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<T>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                signQueue.async {
+                    do { box.resume(returning: try work()) }
+                    catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 }

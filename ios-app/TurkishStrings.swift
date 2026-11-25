@@ -40,6 +40,9 @@ let turkishStrings: [String: String] = [
     "应用文件夹库": "Uygulama klasörü arşivi",
     "应用 - %@": "Uygulama - %@",
     "No downloaded IPAs. Ones you install from a source or a file are cached here.": "İndirilmiş IPA yok. Kaynak veya dosyadan yüklenenler burada önbelleğe alınır.",
+    "%d 个 IPA · %@": "%d IPA · %@",
+    "清空全部": "Tümünü sil",
+    "清空全部 %d 个下载？": "%d indirme tamamen silinsin mi?",
     "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "Henüz dosya yok. IPA eklemek için yukarıdaki «Dosya içe aktar»a dokunun veya kaynak sayfasından indirin.",
     "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "Arşivde henüz imzalanmamış IPA yok. Dosya sayfasından içe aktarın veya Ayarlar'daki kurumsal sertifika sayfasında «Dosyadan içe aktar»a dokunun.",
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Önce Ayarlar'daki kurumsal sertifika sayfasında sertifika, profil ve parolayı hazırlayın.",
@@ -238,6 +241,8 @@ let turkishStrings: [String: String] = [
     "Pairing file missing — import it first.": "Eşleme dosyası eksik — önce içe aktar.",
     "%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.":
         "%@ bir eşleme dosyası değil. Bilgisayarının oluşturduğu dosyayı seç — bu iPhone'un eşleme kaydını tutan .mobiledevicepairing veya .plist.",
+    "%@ isn't installed on this iPhone, so there's nowhere to import the certificate.":
+        "%@ bu iPhone'da yüklü değil, bu yüzden sertifika içe aktarılamıyor.",
     "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
         "iOS %@ kendi eşleme dosyasını oluşturamaz — bunun için iOS %@ gerekir. “Eşleme dosyası” altında bilgisayarda yapılmış birini içe aktar, sonra yeniden dene.",
 
@@ -333,6 +338,7 @@ let turkishStrings: [String: String] = [
     "Location session closed — set it up again.": "Konum oturumu kapandı — yeniden ayarla.",
     "Downloading %@ failed (HTTP %d).": "%@ indirme başarısız (HTTP %d).",
     "Couldn't build the download URL for %@.": "%@ için indirme adresi oluşturulamadı.",
+    "Couldn't build the certificate link.": "Sertifika bağlantısı oluşturulamadı.",
     // Location › saved places and GPX routes.
 
     "Saved places": "Kayıtlı yerler",

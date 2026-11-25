@@ -40,6 +40,9 @@ let spanishStrings: [String: String] = [
     "应用文件夹库": "Biblioteca de carpetas de apps",
     "应用 - %@": "App - %@",
     "No downloaded IPAs. Ones you install from a source or a file are cached here.": "No hay IPA descargados. Los instalados desde una fuente o un archivo quedan en caché aquí.",
+    "%d 个 IPA · %@": "%d IPA · %@",
+    "清空全部": "Borrar todo",
+    "清空全部 %d 个下载？": "¿Borrar las %d descargas?",
     "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "Aún no hay archivos. Toca «Importar archivo» arriba para añadir un IPA, o descarga uno desde la página de fuentes.",
     "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "Aún no hay IPA sin firmar en la biblioteca. Importa uno desde la página Archivos o toca «Importar archivo» en la página de certificados empresariales en Ajustes.",
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Primero prepara el certificado, el perfil y la contraseña en el grupo de certificados de la página de certificados empresariales en Ajustes.",
@@ -271,6 +274,8 @@ let spanishStrings: [String: String] = [
     "Pairing file missing — import it first.": "Falta el archivo de emparejamiento: impórtalo primero.",
     "%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.":
         "%@ no es un archivo de emparejamiento. Elige el archivo que creó tu ordenador — un .mobiledevicepairing o .plist con el registro de emparejamiento de este iPhone.",
+    "%@ isn't installed on this iPhone, so there's nowhere to import the certificate.":
+        "%@ no está instalado en este iPhone, así que no hay dónde importar el certificado.",
     "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
         "iOS %@ no puede crear su propio archivo de emparejamiento: eso necesita iOS %@. Importa uno creado en un ordenador en “Archivo de emparejamiento” y vuelve a intentarlo.",
 
@@ -369,6 +374,7 @@ let spanishStrings: [String: String] = [
     "Downloading %@ failed (HTTP %d).": "La descarga de %@ ha fallado (HTTP %d).",
     "Couldn't build the download URL for %@.":
         "No se ha podido construir la URL de descarga de %@.",
+    "Couldn't build the certificate link.": "No se pudo crear el enlace del certificado.",
 
     // Location › saved places and GPX routes.
     "Saved places": "Lugares guardados",

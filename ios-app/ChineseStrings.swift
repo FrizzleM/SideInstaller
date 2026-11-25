@@ -40,6 +40,9 @@ let chineseStrings: [String: String] = [
     "应用文件夹库": "应用文件夹库",
     "应用 - %@": "应用 - %@",
     "No downloaded IPAs. Ones you install from a source or a file are cached here.": "还没有下载的 IPA。从源或文件安装的会缓存在这里。",
+    "%d 个 IPA · %@": "%d 个 IPA · %@",
+    "清空全部": "清空全部",
+    "清空全部 %d 个下载？": "清空全部 %d 个下载？",
     "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。",
     "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。",
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "先去设置里的企业证书页，把证书、描述文件和密码备齐。",
@@ -266,6 +269,8 @@ let chineseStrings: [String: String] = [
     "Pairing file missing — import it first.": "缺少配对文件 — 请先导入。",
     "%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.":
         "%@ 不是配对文件。请选择电脑生成的文件 — 包含本机配对记录的 .mobiledevicepairing 或 .plist。",
+    "%@ isn't installed on this iPhone, so there's nowhere to import the certificate.":
+        "%@ 未安装在这台 iPhone 上，证书无法导入。",
     "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
         "iOS %@ 无法自行生成配对文件，那需要 iOS %@。请在“配对文件”中导入一个在电脑上生成的文件，然后重试。",
 
@@ -361,6 +366,7 @@ let chineseStrings: [String: String] = [
     "Location session closed — set it up again.": "位置会话已关闭 — 请重新设置。",
     "Downloading %@ failed (HTTP %d).": "下载 %@ 失败（HTTP %d）。",
     "Couldn't build the download URL for %@.": "无法为 %@ 构建下载链接。",
+    "Couldn't build the certificate link.": "无法构建证书链接。",
 
     // Location › saved places and GPX routes.
     "Saved places": "已存储的地点",

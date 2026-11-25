@@ -453,11 +453,20 @@ final class EntitlementsManager: ObservableObject {
     }
 
     private func onQueue<T>(_ work: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { cont in
-            queue.async {
-                do { cont.resume(returning: try work()) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<T>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                queue.async {
+                    do { box.resume(returning: try work()) }
+                    catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 }

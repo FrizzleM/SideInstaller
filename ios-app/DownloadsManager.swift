@@ -129,6 +129,62 @@ final class DownloadsManager: ObservableObject {
         deletingID = nil
         refresh()
     }
+
+    /// Delete every downloaded IPA, skipping ones an install, signing or
+    /// renewal run is reading (FilesTabView.deleteSelection 同款：同三道
+    /// 拦、同跳过计数、同失败口径）；续签源提示在清空确认框里，不在这
+    /// 里——确认框弹起时读 RenewalSourceStore，见 DownloadsListView。
+    @MainActor
+    func deleteAll() {
+        guard deletingID == nil else { return }
+        lastError = nil
+        var deletedIDs: [String] = []
+        var failed = 0
+        var skippedInstalling = 0
+        var skippedSigning = 0
+        var skippedRenewing = 0
+        var hadIPA = false
+        for item in downloads {
+            // B-8 / B1+B5：与 delete(_:) 同拦——在用的文件跳过不删，
+            // 记数后统一报，不在管线读文件的途中删它。
+            if engine.isInstallingSource(path: item.url.path) { skippedInstalling += 1; continue }
+            if engine.isSigningSource(path: item.url.path) { skippedSigning += 1; continue }
+            if engine.isRenewingSource(path: item.url.path) { skippedRenewing += 1; continue }
+            hadIPA = true
+            do {
+                try FileManager.default.removeItem(at: item.url)
+                DownloadLedger.forget(item.url)
+                if engine.downloadedIPAPath == item.url.path {
+                    engine.downloadedIPAPath = nil
+                }
+                if item.source == .custom { engine.refreshCustomIPA() }
+                engine.log("Downloads: deleted \(item.fileName) (\(item.sizeText)).")
+                deletedIDs.append(item.id)
+            } catch {
+                failed += 1
+                lastError = L("Couldn't delete %@: %@", item.fileName, error.localizedDescription)
+                engine.log("⛔️ Downloads: \(lastError ?? "delete failed")")
+            }
+        }
+        // A-6：本地先去掉已删行，列表立即正确；末尾 refresh() 的
+        // 后台重扫随后确认真相（delete(_:) 同款）。
+        downloads.removeAll { deletedIDs.contains($0.id) }
+        // C8：删掉的 IPA 可能是某 App 的续签源——应用页的“可续签”
+        // 数字只在 load/续签时重算，不联动这里就会一直显示旧数。
+        if hadIPA {
+            SideloadedAppsManager.shared.refreshRefreshableOnly()
+        }
+        if failed > 0 {
+            lastError = L("有 %d 个文件删除失败", failed)
+        } else if skippedInstalling > 0 {
+            lastError = L("This file is being installed. Wait until it finishes.")
+        } else if skippedSigning > 0 {
+            lastError = L("This file is being signed. Wait until it finishes.")
+        } else if skippedRenewing > 0 {
+            lastError = L("This file is being renewed. Wait until it finishes.")
+        }
+        refresh()
+    }
 }
 
 /// 下载列表独立页（工具 tab 固定入口，复用 DownloadsManager）：
@@ -140,6 +196,11 @@ struct DownloadsListView: View {
     @State private var pendingDelete: DownloadedIPA?
     /// `id` of the IPA being moved into the Install tab's custom slot, if any.
     @State private var installingID: String?
+    /// Clear-all confirmation: true while the alert stands, with the
+    /// renewal-source app names it must warn about (read when the button
+    /// is tapped, not on every body pass).
+    @State private var confirmingClearAll = false
+    @State private var clearAllRenewalNames: [String] = []
 
     /// A-39-2：下载行日期文案静态缓存——照抄 SIDE-38 A4 的
     /// ExpiryUrgency.textCache 模式；每行每 body 求值现建
@@ -179,6 +240,22 @@ struct DownloadsListView: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
             } else {
+                // F2：页顶合计行（文件页合计行同款文案 + 样式）与清空全部。
+                HStack(spacing: 8) {
+                    Text(L("%d 个 IPA · %@", manager.downloads.count, manager.totalSizeText))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                    Spacer()
+                    Button(L("清空全部")) {
+                        clearAllRenewalNames = manager.downloads.compactMap {
+                            RenewalSourceStore.source(forFileURL: $0.url, bundleID: nil)?.appName
+                        }
+                        confirmingClearAll = true
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.negative)
+                    .disabled(manager.deletingID != nil)
+                }
                 ForEach(manager.downloads) { item in
                     Button { install(item) } label: {
                         HStack(spacing: 12) {
@@ -233,6 +310,21 @@ struct DownloadsListView: View {
             Button(L("Cancel"), role: .cancel) { pendingDelete = nil }
         } message: {
             Text(L("只删文件，不影响已装的 App。"))
+        }
+        // F2：清空全部确认（文件页批量删同款：带数量的标题，续签源
+        // 有名字就列出来、否则只说删后无法恢复）。
+        .alert(L("清空全部 %d 个下载？", manager.downloads.count), isPresented: $confirmingClearAll) {
+            Button(L("Delete"), role: .destructive) {
+                confirmingClearAll = false
+                manager.deleteAll()
+            }
+            Button(L("Cancel"), role: .cancel) { confirmingClearAll = false }
+        } message: {
+            if !clearAllRenewalNames.isEmpty {
+                Text(L("其中 %@ 是续签用的文件，删了它们下次就续不了，要重新导入 IPA 才能续。删除后无法恢复", clearAllRenewalNames.joined(separator: "、")))
+            } else {
+                Text(L("删除后无法恢复"))
+            }
         }
     }
 

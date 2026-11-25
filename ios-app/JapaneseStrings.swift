@@ -40,6 +40,9 @@ let japaneseStrings: [String: String] = [
     "应用文件夹库": "アプリフォルダライブラリ",
     "应用 - %@": "アプリ - %@",
     "No downloaded IPAs. Ones you install from a source or a file are cached here.": "ダウンロード済みの IPA はありません。ソースやファイルからインストールしたものはここにキャッシュされます。",
+    "%d 个 IPA · %@": "%d 個の IPA · %@",
+    "清空全部": "すべて削除",
+    "清空全部 %d 个下载？": "%d 件のダウンロードをすべて削除しますか？",
     "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "ファイルはまだありません。上の「ファイルを読み込む」から IPA を入れるか、ソースページからダウンロードするとここに表示されます。",
     "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "ライブラリに未署名の IPA はまだありません。ファイルページから読み込むか、設定のエンタープライズ証明書ページで「ファイルから読み込む」をタップしてください。",
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "まず設定のエンタープライズ証明書ページで、証明書・プロファイル・パスワードをそろえてください。",
@@ -265,6 +268,8 @@ let japaneseStrings: [String: String] = [
     "Pairing file missing — import it first.": "ペアリングファイルがありません。先にインポートしてください。",
     "%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.":
         "%@ はペアリングファイルではありません。パソコンで作成した、この iPhone のペアリング情報を含む .mobiledevicepairing または .plist ファイルを選択してください。",
+    "%@ isn't installed on this iPhone, so there's nowhere to import the certificate.":
+        "%@ はこの iPhone にインストールされていないため、証明書をインポートできません。",
     "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
         "iOS %@ は自分自身のペアリングファイルを作成できません。それには iOS %@ 以降が必要です。「ペアリングファイル」からパソコンで作成したファイルをインポートしてから、再度お試しください。",
 
@@ -360,6 +365,7 @@ let japaneseStrings: [String: String] = [
     "Location session closed — set it up again.": "位置情報のセッションが終了しました。もう一度設定してください。",
     "Downloading %@ failed (HTTP %d).": "%@ のダウンロードに失敗しました（HTTP %d）。",
     "Couldn't build the download URL for %@.": "%@ のダウンロード URL を作成できませんでした。",
+    "Couldn't build the certificate link.": "証明書のリンクを作成できませんでした。",
 
     // Location › saved places and GPX routes.
     "Saved places": "保存した場所",

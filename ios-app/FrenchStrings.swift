@@ -39,6 +39,9 @@ let frenchStrings: [String: String] = [
     "应用文件夹库": "Bibliothèque d'apps",
     "应用 - %@": "App - %@",
     "No downloaded IPAs. Ones you install from a source or a file are cached here.": "Aucun IPA téléchargé. Ceux installés depuis une source ou un fichier sont mis en cache ici.",
+    "%d 个 IPA · %@": "%d IPA · %@",
+    "清空全部": "Tout effacer",
+    "清空全部 %d 个下载？": "Effacer les %d téléchargements ?",
     "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "Aucun fichier. Touchez « Importer » ci-dessus pour ajouter un IPA, ou téléchargez-en un depuis la page des sources.",
     "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "Aucun IPA non signé dans la bibliothèque. Importez-en un depuis la page Fichiers, ou touchez « Importer un fichier » sur la page des certificats d'entreprise dans Réglages.",
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Préparez d'abord le certificat, le profil et le mot de passe dans le groupe de certificats de la page des certificats d'entreprise dans Réglages.",
@@ -270,6 +273,8 @@ let frenchStrings: [String: String] = [
     "Pairing file missing — import it first.": "Fichier de jumelage manquant : importez-le d'abord.",
     "%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.":
         "%@ n'est pas un fichier de jumelage. Choisissez le fichier créé par votre ordinateur — un .mobiledevicepairing ou .plist contenant l'enregistrement de jumelage de cet iPhone.",
+    "%@ isn't installed on this iPhone, so there's nowhere to import the certificate.":
+        "%@ n'est pas installé sur cet iPhone : le certificat ne peut pas y être importé.",
     "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
         "iOS %@ ne peut pas créer son propre fichier de jumelage : cela demande iOS %@. Importez-en un créé sur un ordinateur dans « Fichier de jumelage », puis réessayez.",
 
@@ -368,6 +373,7 @@ let frenchStrings: [String: String] = [
     "Downloading %@ failed (HTTP %d).": "Le téléchargement de %@ a échoué (HTTP %d).",
     "Couldn't build the download URL for %@.":
         "Impossible de construire l'URL de téléchargement pour %@.",
+    "Couldn't build the certificate link.": "Impossible de construire le lien du certificat.",
 
     // Location › saved places and GPX routes.
     "Saved places": "Lieux enregistrés",

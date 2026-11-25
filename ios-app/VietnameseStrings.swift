@@ -40,6 +40,9 @@ let vietnameseStrings: [String: String] = [
     "应用文件夹库": "Thư viện thư mục ứng dụng",
     "应用 - %@": "Ứng dụng - %@",
     "No downloaded IPAs. Ones you install from a source or a file are cached here.": "Chưa có IPA nào được tải xuống. Các IPA cài từ nguồn hoặc tệp sẽ được lưu đệm tại đây.",
+    "%d 个 IPA · %@": "%d IPA · %@",
+    "清空全部": "Xóa tất cả",
+    "清空全部 %d 个下载？": "Xóa tất cả %d lượt tải xuống?",
     "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "Chưa có tệp nào. Nhấn «Nhập tệp» ở trên để thêm IPA, hoặc tải xuống từ trang nguồn.",
     "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "Thư viện chưa có IPA nào chưa ký. Hãy nhập một IPA từ trang Tệp, hoặc nhấn «Nhập từ tệp» trên trang chứng chỉ doanh nghiệp trong Cài đặt.",
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Trước tiên, hãy chuẩn bị chứng chỉ, hồ sơ và mật khẩu trên trang chứng chỉ doanh nghiệp trong Cài đặt.",
@@ -270,6 +273,8 @@ let vietnameseStrings: [String: String] = [
     "Pairing file missing — import it first.": "Thiếu tệp ghép nối — hãy nhập trước.",
     "%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.":
         "%@ không phải tệp ghép nối. Hãy chọn tệp máy tính đã tạo — một .mobiledevicepairing hoặc .plist chứa bản ghi ghép nối của iPhone này.",
+    "%@ isn't installed on this iPhone, so there's nowhere to import the certificate.":
+        "%@ chưa được cài trên iPhone này nên không thể nhập chứng chỉ.",
     "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
         "iOS %@ không thể tự tạo tệp ghép nối — việc đó cần iOS %@. Hãy nhập một tệp tạo trên máy tính trong mục “Tệp ghép nối” rồi thử lại.",
 
@@ -366,6 +371,7 @@ let vietnameseStrings: [String: String] = [
     "Location session closed — set it up again.": "Phiên vị trí đã đóng — hãy thiết lập lại.",
     "Downloading %@ failed (HTTP %d).": "Tải %@ thất bại (HTTP %d).",
     "Couldn't build the download URL for %@.": "Không thể tạo URL tải cho %@.",
+    "Couldn't build the certificate link.": "Không thể tạo liên kết chứng chỉ.",
 
     // Location › saved places and GPX routes.
     "Saved places": "Địa điểm đã lưu",

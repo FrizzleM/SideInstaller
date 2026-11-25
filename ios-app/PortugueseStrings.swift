@@ -42,6 +42,9 @@ let portugueseStrings: [String: String] = [
     "应用文件夹库": "Biblioteca de pastas de apps",
     "应用 - %@": "App - %@",
     "No downloaded IPAs. Ones you install from a source or a file are cached here.": "Nenhum IPA baixado. Os instalados a partir de uma fonte ou arquivo ficam em cache aqui.",
+    "%d 个 IPA · %@": "%d IPA · %@",
+    "清空全部": "Apagar tudo",
+    "清空全部 %d 个下载？": "Apagar os %d downloads?",
     "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "Ainda não há arquivos. Toque em «Importar arquivo» acima para adicionar um IPA, ou baixe um na página de fontes.",
     "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "Ainda não há IPA não assinado na biblioteca. Importe um na página Arquivos ou toque em «Importar arquivo» na página de certificados empresariais em Ajustes.",
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "Primeiro, prepare o certificado, o perfil e a senha no grupo de certificados da página de certificados empresariais em Ajustes.",
@@ -269,6 +272,8 @@ let portugueseStrings: [String: String] = [
         "Arquivo de pareamento ausente — importe-o primeiro.",
     "%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.":
         "%@ não é um arquivo de pareamento. Escolha o arquivo que seu computador criou — um .mobiledevicepairing ou .plist com o registro de pareamento deste iPhone.",
+    "%@ isn't installed on this iPhone, so there's nowhere to import the certificate.":
+        "%@ não está instalado neste iPhone, por isso não há onde importar o certificado.",
     "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
         "O iOS %@ não consegue criar o próprio arquivo de pareamento — isso exige o iOS %@. Importe um feito num computador em “Arquivo de pareamento” e tente de novo.",
 
@@ -367,6 +372,7 @@ let portugueseStrings: [String: String] = [
     "Downloading %@ failed (HTTP %d).": "Falha ao baixar %@ (HTTP %d).",
     "Couldn't build the download URL for %@.":
         "Não foi possível montar o endereço de download de %@.",
+    "Couldn't build the certificate link.": "Não foi possível criar o link do certificado.",
 
     // Location › saved places and GPX routes.
     "Saved places": "Lugares salvos",

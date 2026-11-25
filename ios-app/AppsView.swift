@@ -1895,13 +1895,18 @@ private struct AppProfileDetail: View {
                     if exportP12Data != nil, exportPassword != nil {
                         let target = certificateImportTarget
                         Button {
-                            importCertificate(to: target.scheme)
+                            importCertificate(to: target)
                         } label: {
                             Label(L("Import to %@", target.name), systemImage: "arrow.right.circle")
                                 .font(.subheadline.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(PrimaryButtonStyle())
+                        if let err = exportError {
+                            Text(err)
+                                .font(.caption)
+                                .foregroundColor(Theme.negative)
+                        }
                     }
                 } else {
                     Button {
@@ -1990,15 +1995,32 @@ private struct AppProfileDetail: View {
     }
 
     /// Open the target container app with the certificate via URL scheme (no password input needed).
-    private func importCertificate(to scheme: String) {
+    /// Silent no longer: a missing target, an unbuildable link, or a refused
+    /// open all leave the reason under the button, instead of the tap doing
+    /// nothing (e.g. this iPhone has no LiveContainer, or only a renamed
+    /// twin whose scheme doesn't match). `appPresence` can only answer for
+    /// schemes in LSApplicationQueriesSchemes, so a `.unknown` answer is not
+    /// proof of anything — the open's own Bool is the verdict.
+    private func importCertificate(to target: (scheme: String, name: String)) {
+        exportError = nil
         guard let p12Data = exportP12Data, let password = exportPassword else { return }
         let b64 = p12Data.base64EncodedString()
         guard let b64Enc = b64.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let pwdEnc = password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "\(scheme)://certificate?cert=\(b64Enc)&password=\(pwdEnc)") else {
+              let url = URL(string: "\(target.scheme)://certificate?cert=\(b64Enc)&password=\(pwdEnc)") else {
+            exportError = L("Couldn't build the certificate link.")
             return
         }
-        UIApplication.shared.open(url)
+        if Engine.appPresence(scheme: target.scheme) == .missing {
+            exportError = L("%@ isn't installed on this iPhone, so there's nowhere to import the certificate.", target.name)
+            return
+        }
+        UIApplication.shared.open(url) { opened in
+            Task { @MainActor in
+                guard !opened else { return }
+                self.exportError = L("%@ isn't installed on this iPhone, so there's nowhere to import the certificate.", target.name)
+            }
+        }
     }
 
     private func profileCard(_ profile: ProvisioningProfile, isCurrent: Bool) -> some View {

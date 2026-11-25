@@ -2170,13 +2170,22 @@ final class Engine {
 
     /// Copies a picked IPA into the custom import slot on a background queue.
     private static func copyImport(from url: URL) async throws -> URL {
-        try await withCheckedThrowingContinuation { cont in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let scoped = url.startAccessingSecurityScopedResource()
-                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                do { cont.resume(returning: try IPALibrary.replaceCustomImport(with: url)) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<URL>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let scoped = url.startAccessingSecurityScopedResource()
+                    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                    do { box.resume(returning: try IPALibrary.replaceCustomImport(with: url)) }
+                    catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 
@@ -4945,21 +4954,39 @@ final class Engine {
 
     /// Bridge a blocking deviceQueue body to async.
     private func onDeviceQueue<T>(_ work: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { cont in
-            deviceQueue.async {
-                do { cont.resume(returning: try work()) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<T>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                deviceQueue.async {
+                    do { box.resume(returning: try work()) }
+                    catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 
     /// Bridge a blocking signQueue body to async.
     private func onSignQueue<T>(_ work: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { cont in
-            signQueue.async {
-                do { cont.resume(returning: try work()) }
-                catch { cont.resume(throwing: error) }
+        let box = CZFContinuationBox<T>()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                box.store(cont)
+                // Cancelled before the block was queued: don't start work
+                // the caller has already abandoned.
+                guard !Task.isCancelled else { return }
+                signQueue.async {
+                    do { box.resume(returning: try work()) }
+                    catch { box.resume(throwing: error) }
+                }
             }
+        } onCancel: {
+            box.resume(throwing: CancellationError())
         }
     }
 
@@ -4972,6 +4999,43 @@ final class Engine {
     /// Run a closure on the main queue (for observed state changed off-thread).
     func setMain(_ work: @escaping () -> Void) {
         if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
+    }
+}
+
+/// One-shot holder for a checked continuation, so a queue bridge can be
+/// cancelled while its block is still queued or running: the queued block
+/// resumes it with its result, `withTaskCancellationHandler`'s onCancel
+/// resumes it with `CancellationError` — whichever runs first wins, the
+/// other finds nothing (AutoRefreshService.SingleResume / BuiltinTunnel
+/// TunnelWaitState 同款：NSLock + 恰好一次）。A resume that lands
+/// before the continuation is stored is replayed to it on `store`, so a
+/// task cancelled before the bridge was entered still throws at once
+/// instead of waiting for work it never needed. File scope, so the
+/// SideBySide and Entitlements queue bridges share it.
+final class CZFContinuationBox<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<T, Error>?
+    private var pending: Result<T, Error>?
+
+    func store(_ continuation: CheckedContinuation<T, Error>) {
+        lock.lock()
+        let pending = self.pending
+        self.pending = nil
+        if pending == nil { self.continuation = continuation }
+        lock.unlock()
+        if let pending { continuation.resume(with: pending) }
+    }
+
+    func resume(returning value: T) { resume(with: .success(value)) }
+    func resume(throwing error: Error) { resume(with: .failure(error)) }
+
+    private func resume(with result: Result<T, Error>) {
+        lock.lock()
+        let continuation = self.continuation
+        self.continuation = nil
+        if continuation == nil { pending = result }
+        lock.unlock()
+        continuation?.resume(with: result)
     }
 }
 

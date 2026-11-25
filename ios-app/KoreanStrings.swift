@@ -41,6 +41,9 @@ let koreanStrings: [String: String] = [
     "应用文件夹库": "앱 폴더 라이브러리",
     "应用 - %@": "앱 - %@",
     "No downloaded IPAs. Ones you install from a source or a file are cached here.": "다운로드한 IPA가 없습니다. 소스나 파일에서 설치한 항목은 여기에 캐시됩니다.",
+    "%d 个 IPA · %@": "IPA %d개 · %@",
+    "清空全部": "모두 삭제",
+    "清空全部 %d 个下载？": "다운로드 %d개를 모두 삭제할까요?",
     "还没有文件。点上面「导入文件」放 IPA 进来，或在源页面下载后这里会出现。": "파일이 아직 없습니다. 위의 ‘파일 가져오기’로 IPA를 넣거나 소스 페이지에서 다운로드하면 여기에 표시됩니다.",
     "文件库里还没有没签过的 IPA。去文件页导入一个，或者去设置里的企业证书页点「从文件导入」。": "라이브러리에 서명되지 않은 IPA가 아직 없습니다. 파일 페이지에서 가져오거나 설정의 기업 인증서 페이지에서 ‘파일에서 가져오기’를 탭하세요.",
     "先去设置里的企业证书页，把证书、描述文件和密码备齐。": "먼저 설정의 기업 인증서 페이지에서 인증서, 프로파일, 비밀번호를 준비하세요.",
@@ -266,6 +269,8 @@ let koreanStrings: [String: String] = [
     "Pairing file missing — import it first.": "페어링 파일이 없습니다. 먼저 가져오세요.",
     "%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.":
         "%@ 파일은 페어링 파일이 아닙니다. 컴퓨터에서 만든 파일, 즉 이 iPhone의 페어 레코드가 들어 있는 .mobiledevicepairing 또는 .plist 파일을 선택하세요.",
+    "%@ isn't installed on this iPhone, so there's nowhere to import the certificate.":
+        "%@이(가) 이 iPhone에 설치되어 있지 않아 인증서를 가져올 수 없습니다.",
     "iOS %@ can't create its own pairing file — that needs iOS %@. Import one made on a computer under “Pairing file”, then try again.":
         "iOS %@에서는 자체 페어링 파일을 만들 수 없습니다. iOS %@ 이상이 필요합니다. “페어링 파일”에서 컴퓨터로 만든 파일을 가져온 뒤 다시 시도하세요.",
 
@@ -361,6 +366,7 @@ let koreanStrings: [String: String] = [
     "Location session closed — set it up again.": "위치 세션이 종료되었습니다. 다시 설정하세요.",
     "Downloading %@ failed (HTTP %d).": "%@ 다운로드에 실패했습니다(HTTP %d).",
     "Couldn't build the download URL for %@.": "%@의 다운로드 URL을 만들지 못했습니다.",
+    "Couldn't build the certificate link.": "인증서 링크를 만들지 못했습니다.",
 
     // Location › saved places and GPX routes.
     "Saved places": "저장된 장소",
