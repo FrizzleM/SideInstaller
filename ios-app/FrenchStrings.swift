@@ -880,6 +880,8 @@ let frenchStrings: [String: String] = [
         "%@ n'est pas un IPA. Choisissez le fichier .ipa lui-même ; s'il semble correct, le téléchargement a peut-être enregistré une page d'erreur, ou s'est arrêté en route.",
     "No IPA imported yet. Tap “Import .ipa” and pick one.":
         "Aucun IPA importé pour l'instant. Touchez « Importer un .ipa » et choisissez-en un.",
+    "No IPA on this iPhone":
+        "Aucun IPA correspondant sur cet iPhone",
     "Couldn't import %@: %@": "Impossible d'importer %@ : %@",
     "That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.":
         "SideInstaller ne peut pas télécharger ce lien. Collez l'adresse https:// complète depuis laquelle le .ipa se télécharge.",

@@ -859,6 +859,8 @@ let chineseStrings: [String: String] = [
         "%@ 不是 IPA。请选择 .ipa 文件本身；如果看起来没错，可能是下载时保存的是错误页面，或者中途中断了。",
     "No IPA imported yet. Tap “Import .ipa” and pick one.":
         "还没有导入任何 IPA。请轻点“导入 .ipa”并选择一个文件。",
+    "No IPA on this iPhone":
+        "这台 iPhone 上没有对应的 IPA",
     "Couldn't import %@: %@": "无法导入 %@：%@",
     "That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.":
         "SideInstaller 无法下载该链接。请粘贴 .ipa 的完整 https:// 下载地址。",

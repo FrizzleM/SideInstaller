@@ -870,6 +870,8 @@ let portugueseStrings: [String: String] = [
         "%@ não é um IPA. Escolha o próprio arquivo .ipa — se ele parece correto, o download pode ter salvado uma página de erro no lugar, ou parado no meio.",
     "No IPA imported yet. Tap “Import .ipa” and pick one.":
         "Nenhum IPA importado ainda. Toque em “Importar .ipa” e escolha um.",
+    "No IPA on this iPhone":
+        "Nenhum IPA correspondente neste iPhone",
     "Couldn't import %@: %@": "Não foi possível importar %@: %@",
     "That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.":
         "Esse não é um link que o SideInstaller consiga baixar. Cole o endereço https:// completo de onde o .ipa é baixado.",

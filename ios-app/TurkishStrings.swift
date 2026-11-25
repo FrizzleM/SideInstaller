@@ -829,6 +829,8 @@ let turkishStrings: [String: String] = [
         "%@ bir IPA değil. .ipa dosyasının kendisini seç — doğru görünüyorsa indirme hata sayfası kaydetmiş veya yarıda kalmış olabilir.",
     "No IPA imported yet. Tap “Import .ipa” and pick one.":
         "Henüz IPA içe aktarılmadı. “.ipa içe aktar”a dokun ve bir tane seç.",
+    "No IPA on this iPhone":
+        "Bu iPhone'da karşılık gelen bir IPA yok",
     "Couldn't import %@: %@": "%@ içe aktarılamadı: %@",
     "That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.":
         "Bu, SideInstaller'ın indirebileceği bir bağlantı değil. .ipa'nın indirildiği tam https:// adresini yapıştır.",

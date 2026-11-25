@@ -873,6 +873,8 @@ let vietnameseStrings: [String: String] = [
         "%@ không phải là IPA. Hãy chọn đúng tệp .ipa — nếu trông vẫn đúng thì có thể lượt tải đã lưu một trang lỗi, hoặc dừng giữa chừng.",
     "No IPA imported yet. Tap “Import .ipa” and pick one.":
         "Chưa nhập IPA nào. Hãy chạm “Nhập .ipa” và chọn một tệp.",
+    "No IPA on this iPhone":
+        "Không có IPA tương ứng trên iPhone này",
     "Couldn't import %@: %@": "Không thể nhập %@: %@",
     "That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.":
         "SideInstaller không tải được liên kết đó. Hãy dán đầy đủ địa chỉ https:// mà tệp .ipa được tải về.",

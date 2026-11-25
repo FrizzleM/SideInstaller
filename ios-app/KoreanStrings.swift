@@ -793,6 +793,8 @@ let koreanStrings: [String: String] = [
         "%@ 파일은 IPA가 아닙니다. .ipa 파일 자체를 선택하세요. 올바른 파일 같다면 다운로드가 오류 페이지를 저장했거나 중간에 멈췄을 수 있습니다.",
     "No IPA imported yet. Tap “Import .ipa” and pick one.":
         "가져온 IPA가 아직 없습니다. “.ipa 가져오기”를 탭하고 파일을 선택하세요.",
+    "No IPA on this iPhone":
+        "이 iPhone에 해당하는 IPA가 없습니다",
     "Couldn't import %@: %@": "%@ 파일을 가져오지 못했습니다: %@",
     "That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.":
         "SideInstaller가 다운로드할 수 있는 링크가 아닙니다. .ipa를 내려받는 https:// 주소 전체를 붙여넣으세요.",

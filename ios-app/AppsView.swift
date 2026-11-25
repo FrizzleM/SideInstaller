@@ -438,6 +438,13 @@ final class SideloadedAppsManager: ObservableObject {
     /// (an enterprise certificate, someone else's ID): refreshing re-signs
     /// with the signed-in Apple ID, so it only ever applies to that ID's apps.
     @Published private(set) var teamExcluded = 0
+    /// Bundle IDs of listed apps that have an IPA on disk, before the team
+    /// filter (0.9.150): `refreshable` drops team-excluded apps, so it
+    /// can't tell "has an IPA but another team signed it" from "no IPA at
+    /// all" — the per-row marker needs this set. Set alongside
+    /// `refreshable` / `teamExcluded` / `unrefreshable` in
+    /// `rebuildRefreshable`, so it is never newer or older than the count.
+    @Published private(set) var pairedBundleIDs: Set<String> = []
     /// The run in progress, or the last one's results until another starts.
     @Published private(set) var jobs: [RefreshJob] = []
     @Published private(set) var isRefreshing = false
@@ -1184,6 +1191,7 @@ final class SideloadedAppsManager: ObservableObject {
         }
         let excluded = paired.count - kept.count
         refreshable = kept
+        pairedBundleIDs = Set(paired.map { $0.bundleID })
         teamExcluded = excluded
         unrefreshable = max(0, entries.count - paired.count)
         engine.log("Sideloaded apps: \(kept.count) of \(entries.count) can be refreshed from an IPA on disk.\(excluded > 0 ? " \(excluded) left out (signed by another team)." : "")")
@@ -1768,6 +1776,19 @@ struct AppsView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                     expiryLabel(profile, urgency: urgency)
+                    // 0.9.150: per-row missing-IPA marker — the top note
+                    // only gives a count, and a row with no IPA looked
+                    // exactly like a refreshable one. Team-excluded apps
+                    // have an IPA (they are in pairedBundleIDs), so they
+                    // get no marker; the top team note already explains them.
+                    if !manager.pairedBundleIDs.contains(status.app.bundleID) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle")
+                            Text(L("No IPA on this iPhone"))
+                        }
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Theme.muted)
+                    }
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")

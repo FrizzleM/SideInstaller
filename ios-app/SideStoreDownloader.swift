@@ -2166,6 +2166,61 @@ enum IPALibrary {
         return dest
     }
 
+    /// Keeps a library copy of an imported IPA in Documents, so it survives
+    /// the next import: replaceCustomImport evicts the previous custom
+    /// import, so an IPA installed from a link lived only in the Custom/
+    /// slot until the next import deleted it — and the apps page could no
+    /// longer pair it with the installed app (0.9.150: the 18-app
+    /// screenshot, every row "no matching IPA"). The library copy is found
+    /// by installable()'s Documents + Custom/ scan, so the next load pairs
+    /// it again. A file of the same name that is already the same bytes is
+    /// left alone; one that differs is never overwritten — a user's file,
+    /// or one of the app's own managed downloads — and the copy lands under
+    /// "<stem> (imported).ipa" instead, replaced on re-import since it is
+    /// ours. Never throws: failure only logs, and the import that just
+    /// succeeded stays successful. Blocking; the caller runs it on the
+    /// import's background queue, while isImportingIPA still bars the next
+    /// import from evicting the source.
+    static func archiveImportedIPA(_ url: URL) {
+        let fm = FileManager.default
+        let name = url.lastPathComponent
+        guard name.lowercased().hasSuffix(".ipa") else { return }
+        let dest = documentsDir.appendingPathComponent(name)
+        if isSameIPA(url, dest) {
+            Engine.shared.log("Library copy: \(name) is already in Documents.")
+            return
+        }
+        var target = dest
+        if fm.fileExists(atPath: dest.path) {
+            // A different file of that name is already there — never
+            // overwrite a user's file or a managed download.
+            let stem = url.deletingPathExtension().lastPathComponent
+            target = documentsDir.appendingPathComponent(stem + " (imported).ipa")
+            if isSameIPA(url, target) {
+                Engine.shared.log("Library copy: \(target.lastPathComponent) is already in Documents.")
+                return
+            }
+        }
+        do {
+            if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
+            try copy(url, to: target)
+            Engine.shared.log("Library copy: kept \(target.lastPathComponent) in Documents for refresh.")
+        } catch {
+            Engine.shared.log("Library copy: couldn't keep \(name) in Documents (\(error.localizedDescription)) — refresh will still work until the next import replaces it.")
+        }
+    }
+
+    /// True when both paths hold the same bytes: same size first (cheap),
+    /// then SHA-256 (exact). A missing or unreadable file is never the same.
+    private static func isSameIPA(_ a: URL, _ b: URL) -> Bool {
+        let fm = FileManager.default
+        guard let aSize = (try? fm.attributesOfItem(atPath: a.path)[.size]) as? Int,
+              let bSize = (try? fm.attributesOfItem(atPath: b.path)[.size]) as? Int,
+              aSize == bSize else { return false }
+        guard let aHash = sha256(of: a), let bHash = sha256(of: b) else { return false }
+        return aHash == bHash
+    }
+
     /// Copy `src` to `dest` under a file coordinator, which waits for an iCloud
     /// placeholder to download instead of failing on it.
     private static func copy(_ src: URL, to dest: URL) throws {

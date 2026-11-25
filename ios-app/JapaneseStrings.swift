@@ -792,6 +792,8 @@ let japaneseStrings: [String: String] = [
         "%@ は IPA ではありません。.ipa ファイル自体を選択してください。問題なさそうに見える場合は、ダウンロード時にエラーページが保存されたか、途中で中断された可能性があります。",
     "No IPA imported yet. Tap “Import .ipa” and pick one.":
         "まだ IPA がインポートされていません。「.ipa をインポート」をタップして選択してください。",
+    "No IPA on this iPhone":
+        "この iPhone に対応する IPA がありません",
     "Couldn't import %@: %@": "%@ をインポートできませんでした：%@",
     "That isn't a link SideInstaller can download. Paste the whole https:// address the .ipa downloads from.":
         "SideInstaller がダウンロードできるリンクではありません。.ipa のダウンロード元となる https:// で始まる完全なアドレスを貼り付けてください。",

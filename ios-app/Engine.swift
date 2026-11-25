@@ -2266,8 +2266,18 @@ final class Engine {
                 DispatchQueue.global(qos: .userInitiated).async {
                     let scoped = url.startAccessingSecurityScopedResource()
                     defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                    do { box.resume(returning: try IPALibrary.replaceCustomImport(with: url)) }
-                    catch { box.resume(throwing: error) }
+                    do {
+                        let dest = try IPALibrary.replaceCustomImport(with: url)
+                        // 0.9.150: keep a library copy of the import in
+                        // Documents, so the next import — which evicts this
+                        // Custom/ slot — doesn't take the app's renewal
+                        // source with it. Runs here, on the import's own
+                        // background queue while isImportingIPA still bars
+                        // the next import, so the source can't vanish
+                        // mid-copy; it never fails the import.
+                        IPALibrary.archiveImportedIPA(dest)
+                        box.resume(returning: dest)
+                    } catch { box.resume(throwing: error) }
                 }
             }
         } onCancel: {
