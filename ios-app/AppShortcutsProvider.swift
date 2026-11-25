@@ -9,6 +9,11 @@ import AppIntents
 /// 上游 2.2.0 的 Siri/Spotlight 条目也合进来（位置、装应用、
 /// 连 LocalDevVPN）；上游的 Refresh All Apps 报告版改名
 /// RefreshAllAppsReportIntent，免得与 fork 的全部续签重名。
+/// 注意：上游短语里的参数位 \(\\.$place)/\(\\.$app) 在 fork 模块里
+/// 编不过（checks 三轮：单斜杠报 AppShortcutPhraseToken 无 $place 成员，
+/// 双斜杠报 key path 缺路径；同字节上游能过、Summary 里同款也能过，
+/// 根因未明）。先去掉参数位、只留应用名，Siri 改为运行时问值；
+/// intent 本身不动，快捷指令 App 里照常能用。
 struct SideInstallerShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -24,8 +29,8 @@ struct SideInstallerShortcuts: AppShortcutsProvider {
             systemImageName: "checkmark.seal.fill"
         )
         AppShortcut(intent: SetSavedPlaceIntent(),
-                    phrases: ["Spoof my location to \(\\.$place) with \(.applicationName)",
-                              "Set my \(.applicationName) location to \(\\.$place)",
+                    phrases: ["Spoof my location to a saved place with \(.applicationName)",
+                              "Set my \(.applicationName) location to a saved place",
                               "Spoof my location with \(.applicationName)"],
                     shortTitle: "Spoof Location",
                     systemImageName: "location.fill")
@@ -48,7 +53,7 @@ struct SideInstallerShortcuts: AppShortcutsProvider {
                     shortTitle: "Refresh All Apps",
                     systemImageName: "arrow.clockwise")
         AppShortcut(intent: InstallAppIntent(),
-                    phrases: ["Install \(\\.$app) with \(.applicationName)"],
+                    phrases: ["Install an app with \(.applicationName)"],
                     shortTitle: "Install App",
                     systemImageName: "square.and.arrow.down")
         AppShortcut(intent: ConnectLocalDevVPNIntent(),
