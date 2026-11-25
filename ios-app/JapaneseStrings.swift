@@ -517,6 +517,7 @@ let japaneseStrings: [String: String] = [
     "Refreshed %d of %d apps.": "%d／%d 個のアプリを更新しました。",
     "Refresh all apps?": "すべてのアプリを更新しますか？",
     "Refresh all": "すべて更新",
+    "Renew this app": "このアプリを更新",
     "%d app can be signed again from an IPA already on this iPhone.":
         "この iPhone にある IPA から %d 個のアプリを署名し直せます。",
     "%d apps can be signed again from IPAs already on this iPhone.":
@@ -1324,6 +1325,8 @@ let japaneseStrings: [String: String] = [
     "Couldn't parse the upload": "アップロードを解析できませんでした",
     "No such page": "そのページはありません",
     "Download": "ダウンロード",
+    "Download complete": "ダウンロード完了",
+    "%@ downloaded. You can install it from the Downloads page.": "%@ をダウンロードしました。ダウンロードページからインストールできます。",
     "Delete this file?": "このファイルを削除しますか？",
     "This directory is empty": "（ディレクトリは空です）",
     "SideInstaller LAN Transfer": "SideInstaller ローカル転送",

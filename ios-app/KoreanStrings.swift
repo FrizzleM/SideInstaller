@@ -518,6 +518,7 @@ let koreanStrings: [String: String] = [
     "Refreshed %d of %d apps.": "앱 %d개를 갱신했습니다(전체 %d개).",
     "Refresh all apps?": "모든 앱을 갱신하시겠습니까?",
     "Refresh all": "모두 갱신",
+    "Renew this app": "이 앱 갱신",
     "%d app can be signed again from an IPA already on this iPhone.":
         "앱 %d개를 이 iPhone에 이미 있는 IPA로 다시 서명할 수 있습니다.",
     "%d apps can be signed again from IPAs already on this iPhone.":
@@ -1324,6 +1325,8 @@ let koreanStrings: [String: String] = [
     "Couldn't parse the upload": "업로드를 분석할 수 없습니다",
     "No such page": "해당 페이지가 없습니다",
     "Download": "다운로드",
+    "Download complete": "다운로드 완료",
+    "%@ downloaded. You can install it from the Downloads page.": "%@ 다운로드가 완료되었습니다. 다운로드 페이지에서 설치할 수 있습니다.",
     "Delete this file?": "이 파일을 삭제할까요?",
     "This directory is empty": "(디렉터리가 비어 있습니다)",
     "SideInstaller LAN Transfer": "SideInstaller LAN 전송",

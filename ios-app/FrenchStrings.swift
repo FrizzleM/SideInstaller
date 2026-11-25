@@ -534,6 +534,7 @@ let frenchStrings: [String: String] = [
     "Refreshed %d of %d apps.": "%d app sur %d renouvelées.",
     "Refresh all apps?": "Renouveler toutes les apps ?",
     "Refresh all": "Tout renouveler",
+    "Renew this app": "Renouveler cette app",
     "%d app can be signed again from an IPA already on this iPhone.":
         "%d app peut être signée à nouveau depuis un IPA déjà présent sur cet iPhone.",
     "%d apps can be signed again from IPAs already on this iPhone.":
@@ -1361,6 +1362,8 @@ let frenchStrings: [String: String] = [
     "Couldn't parse the upload": "Impossible de traiter le fichier envoyé",
     "No such page": "Cette page n'existe pas",
     "Download": "Télécharger",
+    "Download complete": "Téléchargement terminé",
+    "%@ downloaded. You can install it from the Downloads page.": "%@ téléchargé. Vous pouvez l'installer depuis la page Téléchargements.",
     "Delete this file?": "Supprimer ce fichier ?",
     "This directory is empty": "(Ce répertoire est vide)",
     "SideInstaller LAN Transfer": "Transfert LAN SideInstaller",

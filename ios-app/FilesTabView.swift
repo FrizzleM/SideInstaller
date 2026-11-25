@@ -1861,7 +1861,15 @@ struct FilesTabView: View {
     /// 新建文件夹同款）：重名就拒，不覆盖。
     private func createFolder() {
         let name = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, !name.contains("/"), !name.hasPrefix(".") else { return }
+        // B4 (0.9.153): illegal names used to return silently — the alert
+        // just closed and nothing happened. Say why, on the same
+        // opMessage/opFailed road as the duplicate-name refusal below
+        // (UI-2(b) lifts it into the top alert).
+        guard !name.isEmpty, !name.contains("/"), !name.hasPrefix(".") else {
+            opMessage = L("Names can't be empty, contain /, or start with .")
+            opFailed = true
+            return
+        }
         let root = IPALibrary.documentsDir
         let parent = currentDir.isEmpty ? root : root.appendingPathComponent(currentDir)
         let dest = parent.appendingPathComponent(name)
@@ -2142,8 +2150,15 @@ struct FilesTabView: View {
         }
         var newName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard newName != item.name else { return }
+        // B4 (0.9.153): same as createFolder — an illegal name used to
+        // close the alert and do nothing. Say why instead. (An unchanged
+        // name above stays a silent no-op: it isn't illegal.)
         guard let validated = Self.validatedRenameName(renameText, isDirectory: item.isDirectory,
-                                                       isIPA: item.url.pathExtension.lowercased() == "ipa") else { return }
+                                                       isIPA: item.url.pathExtension.lowercased() == "ipa") else {
+            opMessage = L("Names can't be empty, contain /, or start with .")
+            opFailed = true
+            return
+        }
         newName = validated
         // 补后缀后跟原名相同（“X.ipa”改“X”）就是没改，直接返回。
         guard newName != item.name else { return }

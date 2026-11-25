@@ -1,5 +1,6 @@
 import Combine
 import SwiftUI
+import UserNotifications
 
 /// U-UI：源/应用列表排序（照抄 FilesTabView 的 FileSort 形状；源列表只用
 /// 默认/名称/最新，应用列表四项全用）。
@@ -227,7 +228,7 @@ struct SourceAppsView: View {
     /// `SourcesManager.installedVersion`, only over `AltApp`.
     @EnvironmentObject private var appsManager: SideloadedAppsManager
 
-    @StateObject private var downloader = IPADownloader()
+    @StateObject private var downloader = IPADownloader.shared
     /// Row states by app id; an absent entry is idle.
     @State private var states: [String: RowState] = [:]
     /// 企业路径失败过的 app id（仅 startCertInstall 的 catch 写，
@@ -329,10 +330,10 @@ struct SourceAppsView: View {
                 }
             }
         }
-        .onDisappear {
-            downloadTask?.cancel()
-            downloader.cancel()
-        }
+        // F2 (0.9.153): leaving the page no longer cancels the download —
+        // the shared downloader keeps it running, and the completion
+        // notification (see startInstall/startCertInstall) says when it
+        // lands. Only the row's Cancel button stops it.
     }
 
     /// U-UI：截图式应用行——60pt 图标 / 名字 / “应用 - 源名（副标题）” /
@@ -464,6 +465,15 @@ struct SourceAppsView: View {
                 Text(L("Downloading… %d%%", Int(downloader.progress * 100)))
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
+                // F2 (0.9.153): leaving the page no longer cancels, so the
+                // row keeps the only stop button — an explicit user cancel.
+                Button(L("Cancel")) {
+                    downloadTask?.cancel()
+                    downloader.cancel()
+                    activeID = nil
+                    states[app.id] = nil
+                }
+                .font(.caption)
             }
         case .failed(let message):
             VStack(alignment: .trailing, spacing: 4) {
@@ -525,6 +535,28 @@ struct SourceAppsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    /// F2 (0.9.153): the download outlives the page, so a finished download
+    /// says so even when the user has moved on. Permission follows the
+    /// existing launch-time request (SideInstallerApp); if it was refused,
+    /// `add` throws and the failure is only logged, like the resign
+    /// notifications — the imported file is in Downloads either way.
+    private func postDownloadNotification(appName: String) {
+        let content = UNMutableNotificationContent()
+        content.title = L("Download complete")
+        content.body = L("%@ downloaded. You can install it from the Downloads page.", appName)
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "source-download-\(Int(Date().timeIntervalSince1970))",
+            content: content, trigger: nil)
+        Task {
+            do {
+                try await UNUserNotificationCenter.current().add(request)
+            } catch {
+                Engine.shared.log("Sources: download notification failed to send (\(error.localizedDescription)).")
+            }
+        }
+    }
+
     /// Download the app's IPA, import it as the custom IPA, then start the
     /// one-click install and pop back to the main screen to watch it run.
     private func startInstall(_ app: AltApp) {
@@ -550,6 +582,7 @@ struct SourceAppsView: View {
                     states[app.id] = nil
                     return
                 }
+                postDownloadNotification(appName: app.name ?? expectedName)
                 engine.installSource = .custom
                 // Drop any earlier run's cached path, so the pipeline reads
                 // the import from disk (its own check would skip it anyway:
@@ -561,9 +594,12 @@ struct SourceAppsView: View {
                 engine.runOneClick()
                 dismiss()
             } catch {
-                // B-C2：离开源页取消下载时不记失败行——成功路的
+                // B-C2：取消下载时不记失败行——成功路的
                 // Task.isCancelled 守卫同款，catch 里也要有。
-                if Task.isCancelled {
+                // F2 (0.9.153)：共享下载器上，另一路下载开始会先取消
+                // 这一路的 continuation（URLError .cancelled，Task 本身
+                // 没取消）——同样静默，不记失败行。
+                if Task.isCancelled || (error as? URLError)?.code == .cancelled {
                     activeID = nil
                     states[app.id] = nil
                     return
@@ -584,8 +620,8 @@ struct SourceAppsView: View {
     /// 企业页 onChange 接住 → select() → 签名表单预填该 App，
     /// 用户点“开始签名”走企业页自己的本地安装（进度在企业页）。
     /// dismiss 前的 Task.isCancelled 守卫：用户若已在下载完成前
-    /// 手动离开（onDisappear 已取消任务），不 dismiss——否则会
-    /// 多 pop 一层（次要竞态，顺手堵上）。
+    /// 取消（行内取消按钮；F2 前是离开页面取消，F2 后离开不再
+    /// 取消），不 dismiss——否则会多 pop 一层（次要竞态，顺手堵上）。
     private func startCertInstall(_ app: AltApp) {
         guard activeID == nil, let url = app.downloadLink else { return }
         activeID = app.id
@@ -609,6 +645,9 @@ struct SourceAppsView: View {
                     states[app.id] = nil
                     return
                 }
+                // F2 (0.9.153): the download outlived the page, so say it
+                // landed — the enterprise form it hands to is on another tab.
+                postDownloadNotification(appName: app.name ?? expectedName)
                 certWorkspace.selectedIPA = entry.url
                 // U-UI：企业页已搬进设置——交完 IPA 还要举手让 RootView
                 // 切到设置 tab 并打开企业证书页，否则用户留在源页看不到表单。
@@ -618,7 +657,9 @@ struct SourceAppsView: View {
                 dismiss()
             } catch {
                 // B-C2：同上；取消也不污染重试分流（certFailedIDs）。
-                if Task.isCancelled {
+                // F2 (0.9.153)：共享下载器被另一路下载取消时是
+                // URLError .cancelled，Task 本身没取消——同样静默。
+                if Task.isCancelled || (error as? URLError)?.code == .cancelled {
                     activeID = nil
                     states[app.id] = nil
                     certFailedIDs.remove(app.id)
@@ -1101,7 +1142,13 @@ final class SourcesManager: ObservableObject {
     enum FetchError: Error {
         case status(Int)
         case notASource
+        case tooLarge
     }
+
+    /// B3 (0.9.153): same 10MB body cap as `SourceStore.fetchSourceDocument`
+    /// (C-6) — a declared length over the cap, or a body that arrives over
+    /// it, is refused before decoding.
+    private static let sourceBodyCap = 10 * 1024 * 1024
 
     nonisolated static func fetch(_ url: URL) async throws -> AppSource {
         var request = URLRequest(url: url)
@@ -1111,6 +1158,12 @@ final class SourcesManager: ObservableObject {
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw FetchError.status(http.statusCode)
+        }
+        if response.expectedContentLength > Int64(Self.sourceBodyCap) {
+            throw FetchError.tooLarge
+        }
+        if data.count > Self.sourceBodyCap {
+            throw FetchError.tooLarge
         }
         guard let source = try? JSONDecoder().decode(AppSource.self, from: data),
               !source.apps.isEmpty || !source.name.isEmpty else {
@@ -1125,6 +1178,8 @@ final class SourcesManager: ObservableObject {
             return L("The source answered with HTTP %d.", code)
         case FetchError.notASource:
             return L("That link didn't return a source. It has to be the source's JSON file itself.")
+        case FetchError.tooLarge:
+            return L("Source is too large")
         default:
             return L("Couldn't reach the source: %@", error.localizedDescription)
         }

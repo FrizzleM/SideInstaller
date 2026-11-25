@@ -51,6 +51,23 @@ struct DevCert: Identifiable, Decodable, Equatable {
     }
 }
 
+/// F4 (0.9.153): soonest-expiring first, so the certificate that needs
+/// attention is at the top; one with no expiry date sinks to the
+/// bottom. Display order only — revoke/export never see this.
+/// `DevCert.expiresAt` is a pure parse of `expiration`.
+extension CertManager {
+    static func sortedByExpiry(_ list: [DevCert]) -> [DevCert] {
+        list.sorted {
+            switch ($0.expiresAt, $1.expiresAt) {
+            case let (a?, b?): return a < b
+            case (_?, nil): return true
+            case (nil, _?): return false
+            case (nil, nil): return false
+            }
+        }
+    }
+}
+
 /// What `si_cert_import` reports: the team's certificate SideInstaller now signs
 /// with, and whether that took a new key.
 private struct CertImportResult: Decodable {
@@ -157,7 +174,7 @@ final class CertManager: ObservableObject {
                 guard generation == signInGeneration else { throw CancellationError() }
                 let list = try await onQueue { try self.performList() }
                 guard generation == signInGeneration else { throw CancellationError() }
-                certs = list
+                certs = Self.sortedByExpiry(list)
                 hasLoaded = true
                 engine.log("Certificates: \(list.count) iOS development certificate(s).")
                 isWorking = false
@@ -214,7 +231,7 @@ final class CertManager: ObservableObject {
                 do {
                     let list = try await onQueue { try self.performList() }
                     guard generation == signInGeneration else { throw CancellationError() }
-                    certs = list
+                    certs = Self.sortedByExpiry(list)
                 } catch {
                     // C9：吊销成功了，只是列表没刷出来——先把这张从
                     // 列表里拿掉，别让用户再点一次吊销；再告诉他
@@ -334,7 +351,7 @@ final class CertManager: ObservableObject {
                 do {
                     let list = try await onQueue { try self.performList() }
                     guard generation == signInGeneration else { throw CancellationError() }
-                    certs = list
+                    certs = Self.sortedByExpiry(list)
                     hasLoaded = true
                 } catch {
                     // C17：导入成功了，只是列表没刷出来——告诉他

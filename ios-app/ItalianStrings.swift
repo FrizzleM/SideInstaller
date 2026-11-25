@@ -529,6 +529,7 @@ let italianStrings: [String: String] = [
     "Refreshed %d of %d apps.": "Rinnovate %d app su %d.",
     "Refresh all apps?": "Rinnovare tutte le app?",
     "Refresh all": "Rinnova tutte",
+    "Renew this app": "Rinnova questa app",
     "%d app can be signed again from an IPA already on this iPhone.":
         "%d app può essere firmata di nuovo da un IPA già presente su questo iPhone.",
     "%d apps can be signed again from IPAs already on this iPhone.":
@@ -1354,6 +1355,8 @@ let italianStrings: [String: String] = [
     "Couldn't parse the upload": "Impossibile elaborare il caricamento",
     "No such page": "Questa pagina non esiste",
     "Download": "Scarica",
+    "Download complete": "Download completato",
+    "%@ downloaded. You can install it from the Downloads page.": "%@ scaricato. Puoi installarlo dalla pagina Download.",
     "Delete this file?": "Eliminare questo file?",
     "This directory is empty": "(Questa directory è vuota)",
     "SideInstaller LAN Transfer": "Trasferimento LAN di SideInstaller",

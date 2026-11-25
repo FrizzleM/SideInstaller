@@ -557,6 +557,7 @@ let turkishStrings: [String: String] = [
     "Refreshed %d of %d apps.": "%d / %d uygulama yenilendi.",
     "Refresh all apps?": "Tüm uygulamalar yenilensin mi?",
     "Refresh all": "Tümünü yenile",
+    "Renew this app": "Bu uygulamayı yenile",
     "%d app can be signed again from an IPA already on this iPhone.":
         "%d uygulama, bu iPhone'da zaten bulunan bir IPA'dan yeniden imzalanabilir.",
     "%d apps can be signed again from IPAs already on this iPhone.":
@@ -1273,6 +1274,8 @@ let turkishStrings: [String: String] = [
     "Couldn't parse the upload": "Yükleme işlenemedi",
     "No such page": "Böyle bir sayfa yok",
     "Download": "İndir",
+    "Download complete": "İndirme tamamlandı",
+    "%@ downloaded. You can install it from the Downloads page.": "%@ indirildi. İndirilenler sayfasından yükleyebilirsiniz.",
     "Delete this file?": "Bu dosya silinsin mi?",
     "This directory is empty": "(Bu dizin boş)",
     "SideInstaller LAN Transfer": "SideInstaller LAN Aktarımı",

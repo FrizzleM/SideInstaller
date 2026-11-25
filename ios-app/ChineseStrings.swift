@@ -537,6 +537,7 @@ let chineseStrings: [String: String] = [
     "Refreshed %d of %d apps.": "已续签 %d 个应用，共 %d 个。",
     "Refresh all apps?": "续签所有应用？",
     "Refresh all": "全部续签",
+    "Renew this app": "续签此应用",
     "%d app can be signed again from an IPA already on this iPhone.":
         "有 %d 个应用可以用这台 iPhone 上已有的 IPA 重新签名。",
     "%d apps can be signed again from IPAs already on this iPhone.":
@@ -1371,6 +1372,8 @@ let chineseStrings: [String: String] = [
     "Couldn't parse the upload": "上传解析失败",
     "No such page": "没有这个页面",
     "Download": "下载",
+    "Download complete": "下载完成",
+    "%@ downloaded. You can install it from the Downloads page.": "%@ 已下载完成，可在下载页安装。",
     "Delete this file?": "删掉这个文件？",
     "This directory is empty": "（目录是空的）",
     "SideInstaller LAN Transfer": "SideInstaller 局域网传输",

@@ -592,39 +592,45 @@ final class SideloadedAppsManager: ObservableObject {
     /// Re-signs and reinstalls every refreshable app, one at a time (they share
     /// one device link and signing queue, and Apple's API is rate-limited).
     /// `onlyBundleIDs` 给定时，自动巡检只续到期的那几个；界面和快捷指令不传，
-    /// 照旧全续。
-    func refreshAll(onlyBundleIDs: Set<String>? = nil) {
+    /// 照旧全续。`fromUI` 给单 App 续签入口（行滑动 / 详情页按钮）用：它也
+    /// 只续指定 bundleID，但它是界面入口，守卫拦下时要像全量续签一样
+    /// 置 lastError 弹原因，而不是像自动巡检那样只写日志。
+    /// F1 (0.9.153): single-app refresh — same guards, same team filter,
+    /// only the entry point is new.
+    func refreshAll(onlyBundleIDs: Set<String>? = nil, fromUI: Bool = false) {
         let candidates = onlyBundleIDs.map { ids in
             refreshable.filter { ids.contains($0.bundleID) }
         } ?? refreshable
         // C3：三个守卫别再静默 return——调用方要知道本轮为什么没跑。
-        // 只有自动巡检入口（onlyBundleIDs != nil）只写日志、不置
-        // lastError：它没有界面可弹，后台一轮也不该弹前台弹窗。
+        // 只有自动巡检入口（onlyBundleIDs != nil 且非界面入口）只写日志、
+        // 不置 lastError：它没有界面可弹，后台一轮也不该弹前台弹窗。
+        let showsFailure = onlyBundleIDs == nil || fromUI
         if isRefreshing {
-            if onlyBundleIDs == nil {
+            if showsFailure {
                 lastError = L("A refresh is already running. Wait for it to finish, then try again.")
             }
             engine.log("Refresh all: already refreshing.")
             return
         }
         if isWorking {
-            if onlyBundleIDs == nil {
+            if showsFailure {
                 lastError = L("Still reading the device. Try again in a moment.")
             }
             engine.log("Refresh all: device inventory in progress.")
             return
         }
         if candidates.isEmpty {
-            if onlyBundleIDs == nil {
+            if showsFailure {
                 lastError = L("没有需要续签的应用。")
             }
             engine.log("Refresh all: nothing to refresh.")
             return
         }
         guard !engine.isRunning else {
-            // C27：照 C3 其余三道守卫——只有界面入口（onlyBundleIDs == nil）
-            // 才置 lastError；快捷指令/自动巡检入口只写日志，不留过期弹窗。
-            if onlyBundleIDs == nil {
+            // C27：照 C3 其余三道守卫——只有界面入口（onlyBundleIDs == nil
+            // 或 fromUI 单 App 入口）才置 lastError；快捷指令/自动巡检
+            // 入口只写日志，不留过期弹窗。
+            if showsFailure {
                 lastError = L("An install is already running. Wait for it to finish, then refresh.")
             }
             engine.log("Refresh all: install already running.")
@@ -634,7 +640,7 @@ final class SideloadedAppsManager: ObservableObject {
         // 可能读到正在被 replaceCustomImport 清空的 Custom/。分流照 C3/C27：
         // 界面入口置 lastError，快捷指令/自动巡检入口只写日志。
         guard !engine.isImportingIPA && !engine.isImportingPairing else {
-            if onlyBundleIDs == nil {
+            if showsFailure {
                 lastError = L("An import is already running. Wait for it to finish, then try again.")
             }
             engine.log("Refresh all: import already running.")
@@ -655,7 +661,7 @@ final class SideloadedAppsManager: ObservableObject {
             engine.log("⛔️ Refresh all: LocalDevVPN isn't installed.")
             return
         }
-        refreshTask = startRefresh(candidates, showsFailure: onlyBundleIDs == nil, onlyBundleIDs: onlyBundleIDs)
+        refreshTask = startRefresh(candidates, showsFailure: showsFailure, onlyBundleIDs: onlyBundleIDs)
     }
 
     /// Refreshes `selected` in the background, as the page lists them. A run
@@ -1674,6 +1680,19 @@ struct AppsView: View {
                             appRow(status, jobsByID: jobsByID)
                         }
                         .buttonStyle(.plain, sound: .tick)
+                        // F1 (0.9.153): single-app refresh — only rows with a
+                        // paired IPA offer it; the guard and team filter
+                        // inside refreshAll are unchanged.
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            if jobsByID[status.app.bundleID] != nil {
+                                Button {
+                                    manager.refreshAll(onlyBundleIDs: [status.app.bundleID], fromUI: true)
+                                } label: {
+                                    Label(L("Renew this app"), systemImage: "arrow.clockwise")
+                                }
+                                .tint(Theme.accent)
+                            }
+                        }
                         .cascadeItem(6 + idx)
                         .task(id: rowIconKey(for: status, jobsByID: jobsByID)) {
                             loadRowIcon(for: status, jobsByID: jobsByID)
@@ -1879,6 +1898,10 @@ private struct AppProfileDetail: View {
 
     @EnvironmentObject private var loc: Localizer
     @EnvironmentObject private var certManager: CertManager
+    /// F1 (0.9.153): single-app refresh from the detail page — the same
+    /// shared instance the list observes (RootView injects it), so the
+    /// row's refresh state and lastError stay in sync.
+    @EnvironmentObject private var appsManager: SideloadedAppsManager
 
     @State private var exportURL: URL?
     @State private var exportPassword: String?
@@ -1890,11 +1913,12 @@ private struct AppProfileDetail: View {
         ScrollView {
             VStack(spacing: 16) {
                 appCard.cascadeItem(0)
-                exportCertCard.cascadeItem(1)
+                renewCard.cascadeItem(1)
+                exportCertCard.cascadeItem(2)
                 if let current = status.current {
-                    profileCard(current, isCurrent: true).cascadeItem(2)
+                    profileCard(current, isCurrent: true).cascadeItem(3)
                 } else {
-                    noProfileCard.cascadeItem(2)
+                    noProfileCard.cascadeItem(3)
                 }
                 if !status.superseded.isEmpty {
                     HStack {
@@ -1903,9 +1927,9 @@ private struct AppProfileDetail: View {
                             .foregroundStyle(Theme.muted)
                         Spacer()
                     }
-                    .cascadeItem(2)
+                    .cascadeItem(3)
                     ForEach(Array(status.superseded.enumerated()), id: \.element.id) { idx, profile in
-                        profileCard(profile, isCurrent: false).cascadeItem(3 + idx)
+                        profileCard(profile, isCurrent: false).cascadeItem(4 + idx)
                     }
                 }
             }
@@ -1915,6 +1939,30 @@ private struct AppProfileDetail: View {
         .navigationTitle(status.app.name)
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear { Self.deleteExportTempFiles() }
+    }
+
+    /// F1 (0.9.153): renew just this app — same `refreshAll` the list's
+    /// Refresh-all button runs, with only this bundle ID. Only shown when
+    /// a paired IPA exists; otherwise there is nothing to re-sign from.
+    /// While a refresh runs, the button is disabled (the manager's guard
+    /// would refuse it anyway, and this keeps the tap from looking dead).
+    @ViewBuilder
+    private var renewCard: some View {
+        if appsManager.refreshable.contains(where: { $0.bundleID == status.app.bundleID }) {
+            PanelCard {
+                VStack(spacing: 10) {
+                    Button {
+                        appsManager.refreshAll(onlyBundleIDs: [status.app.bundleID], fromUI: true)
+                    } label: {
+                        Label(L("Renew this app"), systemImage: "arrow.clockwise")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(appsManager.isRefreshing)
+                }
+            }
+        }
     }
 
     private var appCard: some View {

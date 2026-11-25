@@ -493,6 +493,15 @@ private final class IPADownloadProgressThrottler: @unchecked Sendable {
 @MainActor
 final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
+    /// F2 (0.9.153): the one downloader for the whole app. SourceAppsView
+    /// used to own a private one and cancelled it in `.onDisappear`, so
+    /// leaving the source page killed the download with no trace. The
+    /// shared instance keeps running when the page goes away; only an
+    /// explicit Cancel (the row's button, or starting another download)
+    /// stops it. One download at a time: `download` cancels any in-flight
+    /// one first, as before.
+    static let shared = IPADownloader()
+
     @Published private(set) var progress: Double = 0
 
     /// C-6：源下载的 IPA 上限 8GB——与解压总量上限（enterprise.rs）同数。

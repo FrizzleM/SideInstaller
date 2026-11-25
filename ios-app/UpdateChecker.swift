@@ -83,14 +83,21 @@ final class UpdateChecker: ObservableObject {
 
         let latest = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !latest.isEmpty else { return .failed }
-        UserDefaults.standard.set(now, forKey: Self.lastCheckKey)
         latestVersion = latest
         showBanner = Self.isNewer(latest, than: currentVersion)
         // The release gate only runs when there is something newer: a
         // second request on every launch would be pure cost. A failed
         // gate leaves the banner as it is — the banner only opens a web
         // page — but the About row stays static.
-        updateAssetVerified = showBanner ? await verifyReleaseAsset(for: latest) : false
+        // B5 (0.9.153): the daily stamp is only set once the gate has
+        // passed — or there is nothing newer to gate. A failed gate used
+        // to stamp too, so the About row stayed static for the next 24
+        // hours even though the release never verified. The "up to date"
+        // stamp is unchanged: no gate runs, nothing to fail.
+        let verified = showBanner ? await verifyReleaseAsset(for: latest) : true
+        updateAssetVerified = showBanner ? verified : false
+        guard verified else { return .newer(latest) }
+        UserDefaults.standard.set(now, forKey: Self.lastCheckKey)
         return showBanner ? .newer(latest) : .upToDate
     }
 

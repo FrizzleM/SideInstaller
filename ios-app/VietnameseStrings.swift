@@ -530,6 +530,7 @@ let vietnameseStrings: [String: String] = [
     "Refreshed %d of %d apps.": "Đã gia hạn %d trong %d ứng dụng.",
     "Refresh all apps?": "Gia hạn tất cả ứng dụng?",
     "Refresh all": "Gia hạn tất cả",
+    "Renew this app": "Gia hạn ứng dụng này",
     "%d app can be signed again from an IPA already on this iPhone.":
         "%d ứng dụng có thể được ký lại từ một tệp IPA đã có trên iPhone này.",
     "%d apps can be signed again from IPAs already on this iPhone.":
@@ -1352,6 +1353,8 @@ let vietnameseStrings: [String: String] = [
     "Couldn't parse the upload": "Không thể xử lý tệp tải lên",
     "No such page": "Không có trang này",
     "Download": "Tải xuống",
+    "Download complete": "Đã tải xuống xong",
+    "%@ downloaded. You can install it from the Downloads page.": "Đã tải xuống %@. Bạn có thể cài đặt từ trang Tải xuống.",
     "Delete this file?": "Xóa tệp này?",
     "This directory is empty": "(Thư mục này trống)",
     "SideInstaller LAN Transfer": "Truyền tệp LAN SideInstaller",
