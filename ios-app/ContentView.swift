@@ -694,7 +694,7 @@ struct ContentView: View {
 
     private func requirementCard<Extra: View>(systemImage: String, tint: Color,
                                               title: String, message: String,
-                                              @ViewBuilder extra: () -> Extra) -> some View {
+                                              @ViewBuilder extra: @escaping () -> Extra) -> some View {
         PanelCard {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: systemImage)
