@@ -2891,7 +2891,7 @@ final class Engine {
               let url = IPALibrary.customImport()?.url,
               let info = IPALibrary.appInfo(at: url),
               let ipaVersion = info.version, !ipaVersion.isEmpty,
-              let installed = SideloadedAppsManager.shared.entries.first({
+              let installed = SideloadedAppsManager.shared.entries.first(where: {
                   ProfileMatcher.installed($0.app.bundleID, isBuiltFrom: info.bundleID, teamID: nil)
               })?.app.version,
               UpdateChecker.isNewer(installed, than: ipaVersion) else { return nil }
