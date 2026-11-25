@@ -24,8 +24,8 @@ struct SideInstallerShortcuts: AppShortcutsProvider {
             systemImageName: "checkmark.seal.fill"
         )
         AppShortcut(intent: SetSavedPlaceIntent(),
-                    phrases: ["Spoof my location to \(.$place) with \(.applicationName)",
-                              "Set my \(.applicationName) location to \(.$place)",
+                    phrases: ["Spoof my location to \(\\.$place) with \(.applicationName)",
+                              "Set my \(.applicationName) location to \(\\.$place)",
                               "Spoof my location with \(.applicationName)"],
                     shortTitle: "Spoof Location",
                     systemImageName: "location.fill")
@@ -48,7 +48,7 @@ struct SideInstallerShortcuts: AppShortcutsProvider {
                     shortTitle: "Refresh All Apps",
                     systemImageName: "arrow.clockwise")
         AppShortcut(intent: InstallAppIntent(),
-                    phrases: ["Install \(.$app) with \(.applicationName)"],
+                    phrases: ["Install \(\\.$app) with \(.applicationName)"],
                     shortTitle: "Install App",
                     systemImageName: "square.and.arrow.down")
         AppShortcut(intent: ConnectLocalDevVPNIntent(),
