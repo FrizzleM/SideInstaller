@@ -799,7 +799,11 @@ struct SettingsView: View {
 /// see logSection). The tmp file is overwritten on every export.
 private struct LogExportFile: Transferable {
     static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .plainText) { _ in
+        // 修法（checks 首轮红：ShareLink 找不到通用 Transferable 初始化）：
+        // 闭包参数写 `_` 丢弃时编译器推不出 FileRepresentation 的 Item，
+        // conformance 不成立、通用 ShareLink 初始化直接落选；具名参数 +
+        // 显式特化把 Item 钉死（Movie/PDFDocument 同款写法）。
+        FileRepresentation<LogExportFile>(exportedContentType: .plainText) { file in
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("SideInstaller-log.txt")
             try LogStore.shared.text.write(to: url, atomically: true, encoding: .utf8)
