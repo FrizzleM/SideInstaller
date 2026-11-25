@@ -13,6 +13,7 @@ let koreanStrings: [String: String] = [
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "이 iPhone에 이 IPA를 다운로드할 공간이 부족합니다. %@가 필요하지만 %@밖에 남지 않았습니다. 공간을 확보한 뒤 다시 시도하세요.",
+    "Free space: %@": "남은 공간: %@",
     "Apple ID":
         "Apple ID",
     "Cancel": "취소",
@@ -865,6 +866,8 @@ let koreanStrings: [String: String] = [
     // The install's progress outside the app
     "Installing %@": "%@ 설치 중",
     "Paused": "일시 중지됨",
+    "Pause": "일시 정지",
+    "Resume": "계속",
     "Open SideInstaller to finish the install.":
         "SideInstaller를 열어 설치를 마치세요.",
     "Check the App IDs it needs, then tap Install.":
@@ -1026,6 +1029,7 @@ let koreanStrings: [String: String] = [
     "Start the install": "설치 시작",
     "Install on their iPhone": "상대방 iPhone에 설치",
     "%d%% downloaded": "%d%% 다운로드됨",
+    "%@ downloaded": "%@ 다운로드됨",
     "%d%% uploaded": "%d%% 업로드됨",
     "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
         "Apple이 상대방 iPhone을 이 Apple ID의 개발자 팀에 등록해 주지 않아서 프로비저닝 프로파일을 발급하지 않습니다. %@",

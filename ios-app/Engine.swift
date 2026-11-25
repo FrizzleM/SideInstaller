@@ -399,6 +399,12 @@ final class Engine {
     /// step is running; mirrors SideBySideView's own downloadProgress.
     var downloadProgress: Double = 0
 
+    /// B1 (0.9.155): bytes arrived so far on a download whose total the
+    /// server never stated — non-nil only then, so the progress card can
+    /// switch to an indeterminate bar plus this byte count instead of a
+    /// 0% that never moves. Reset with the run and at each download start.
+    var downloadBytesWritten: Int64?
+
     /// The pairing PIN to display prominently, when one has been issued.
     var pairingPIN: String?
 
@@ -587,6 +593,11 @@ final class Engine {
     private(set) var isImportingIPA = false
     /// Download progress of a link import (0…1); nil for file imports.
     private(set) var importProgress: Double?
+    /// B1 (0.9.155): bytes arrived so far on a link import whose total the
+    /// server never stated — set only then (with `importProgress` cleared,
+    /// so the link row goes indeterminate), so the row can show the byte
+    /// count instead of a stuck 0%.
+    private(set) var importBytes: Int?
     /// The link import's task, so the link row can cancel a download in
     /// progress (B1, 0.9.147). The file-copy import has no such task: it
     /// finishes too fast to need one.
@@ -694,6 +705,7 @@ final class Engine {
             for s in Step.allCases { self.stepStates[s] = .pending }
             self.installProgress = 0
             self.downloadProgress = 0
+            self.downloadBytesWritten = nil
             self.downloadFallbackNotice = nil
             self.handOffNotice = nil
             self.pairingPIN = nil
@@ -875,6 +887,14 @@ final class Engine {
                 lastError = msg
                 log("⛔️ Stopped: \(raw)")
                 failActiveStep(to: .failed)
+                // F-A (0.9.155): a failed run leaves a history entry too,
+                // with the reason it stopped — the success path's
+                // `finishSuccess` is the only other writer, so one run
+                // writes exactly one entry, success or failure.
+                InstallHistoryStore.recordFailure(appName: installedAppName,
+                                                  version: signedAppVersion() ?? downloadedVersion,
+                                                  identity: normalizedAppleID,
+                                                  reason: msg)
             }
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
@@ -1812,6 +1832,13 @@ final class Engine {
         let report: @Sendable (Double) -> Void = { [weak self] fraction in
             Task { @MainActor in self?.downloadProgress = fraction }
         }
+        // B1 (0.9.155): the byte count for a transfer whose total the
+        // server never stated — the downloader only calls this then, so a
+        // non-nil value is itself the "total unknown" signal.
+        downloadBytesWritten = nil
+        let bytesReport: @Sendable (Int) -> Void = { [weak self] bytes in
+            Task { @MainActor in self?.downloadBytesWritten = Int64(bytes) }
+        }
         guard let version else {
             // A5：开过版本选择器、内存目录新鲜时，直接取目录里“最新”那一项，
             // 不再为同一份目录多拉一次 feed JSON / artifacts 列表。只复用与
@@ -1822,15 +1849,21 @@ final class Engine {
                let latest = catalog.latest[channel],
                source.feed != nil || source.actionsBuild(channel) != nil {
                 return try await SideStoreDownloader.$reportProgress.withValue(report) {
-                    try await SideStoreDownloader.download(latest, source: source, channel: channel, log: log)
+                    try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
+                        try await SideStoreDownloader.download(latest, source: source, channel: channel, log: log)
+                    }
                 }
             }
             return try await SideStoreDownloader.$reportProgress.withValue(report) {
-                try await SideStoreDownloader.downloadLatest(source: source, channel: channel, log: log)
+                try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
+                    try await SideStoreDownloader.downloadLatest(source: source, channel: channel, log: log)
+                }
             }
         }
         return try await SideStoreDownloader.$reportProgress.withValue(report) {
-            try await SideStoreDownloader.download(version, source: source, channel: channel, log: log)
+            try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
+                try await SideStoreDownloader.download(version, source: source, channel: channel, log: log)
+            }
         }
     }
 
@@ -2283,12 +2316,22 @@ final class Engine {
         }
         isImportingIPA = true
         importProgress = 0
-        defer { isImportingIPA = false; importProgress = nil }
+        importBytes = nil
+        defer { isImportingIPA = false; importProgress = nil; importBytes = nil }
         lastError = nil
         log("Downloading \(url.absoluteString) …")
         do {
             let downloaded = try await SideStoreDownloader.fetchDirect(
-                url, named: Self.importFileName(for: url)) { fraction in
+                url, named: Self.importFileName(for: url),
+                // B1 (0.9.155): total unknown — the byte count arrives here
+                // instead of a fraction, and the fraction is cleared so the
+                // link row goes indeterminate instead of sitting at 0%.
+                onBytes: { bytes in
+                    Task { @MainActor in
+                        self.importBytes = bytes
+                        self.importProgress = nil
+                    }
+                }) { fraction in
                     Task { @MainActor in self.importProgress = fraction }
                 }
             // The download lives in its own staging directory; remove all of it.
@@ -2712,6 +2755,12 @@ final class Engine {
                 lastError = msg
                 log("⛔️ Stopped: \(raw)")
                 failActiveStep(to: .failed)
+                // F-A (0.9.155): 同 runOneClick——失败也记一条历史
+                // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
+                InstallHistoryStore.recordFailure(appName: installedAppName,
+                                                  version: signedAppVersion() ?? downloadedVersion,
+                                                  identity: normalizedAppleID,
+                                                  reason: msg)
             }
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
@@ -2882,6 +2931,12 @@ final class Engine {
                 lastError = msg
                 log("⛔️ Stopped: \(raw)")
                 failActiveStep(to: .failed)
+                // F-A (0.9.155): 同 runOneClick——失败也记一条历史
+                // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
+                InstallHistoryStore.recordFailure(appName: installedAppName,
+                                                  version: signedAppVersion() ?? downloadedVersion,
+                                                  identity: normalizedAppleID,
+                                                  reason: msg)
             }
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }

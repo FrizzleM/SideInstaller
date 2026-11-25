@@ -504,13 +504,41 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
 
     @Published private(set) var progress: Double = 0
 
+    /// B1 (0.9.155): bytes arrived so far, and the total the server
+    /// promised — -1 while it has promised none (a chunked transfer, where
+    /// `totalBytesExpectedToWrite` is -1 and no fraction exists). The row
+    /// shows a byte count instead of a stuck 0% then.
+    @Published private(set) var bytesWritten: Int64 = 0
+    @Published private(set) var totalBytesExpected: Int64 = -1
+
+    /// F-B (0.9.155): true while the in-flight download is suspended by
+    /// the row's Pause button (`downloadTask.suspend()`).
+    @Published private(set) var isPaused = false
+
     /// C-6：源下载的 IPA 上限 8GB——与解压总量上限（enterprise.rs）同数。
     /// 不要与源 JSON 的 10MB 共用一个常量：IPA 常规就是几十 MB 到 1GB+，
     /// 10MB 会断掉几乎全部源安装。
     private static let ipaDownloadCap: Int64 = 8 * 1024 * 1024 * 1024
 
     private var session: URLSession?
+    /// B2 (0.9.155): the task the current continuation belongs to —
+    /// `finish` only settles for this task, so a stale session's late
+    /// callback can't kill the download that replaced it. Its
+    /// `ObjectIdentifier` is the Sendable copy the delegate callbacks
+    /// carry into their `Task { @MainActor }` hops (the task itself must
+    /// not be captured there).
+    private var currentTask: URLSessionDownloadTask?
+    private var currentTaskID: ObjectIdentifier?
+    /// F-B: the URL the current task is fetching, for resume-data matching.
+    private var currentURL: URL?
     private var continuation: CheckedContinuation<URL, Error>?
+    /// F-B: resume data + its URL, kept when a download is cancelled so a
+    /// re-tap of the same link resumes instead of restarting.
+    private var resumeData: Data?
+    private var resumeURL: URL?
+    /// B1: last byte count reported while the total was unknown, so the
+    /// unknown-total reports stay throttled to 256KB steps.
+    private var lastReportedBytes: Int64 = 0
 
     /// A-1（SIDE-32）：本下载的进度节流器（delegate 队列是串行的，锁只是兜底）。
     private let progressThrottler = IPADownloadProgressThrottler()
@@ -518,14 +546,33 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// Download `url` and return the staged file. Throws on a non-2xx answer
     /// or a transport error.
     func download(from url: URL) async throws -> URL {
-        cancel()
+        // A new download drops the previous run without keeping its resume
+        // data: the slot holds one URL, and this URL is about to replace it.
+        cancel(keepingResumeData: false)
         progress = 0
+        bytesWritten = 0
+        totalBytesExpected = -1
+        isPaused = false
+        lastReportedBytes = 0
         progressThrottler.reset()
         let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
         self.session = session
         var request = URLRequest(url: url)
         request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
-        let task = session.downloadTask(with: request)
+        // F-B: resume where a cancelled run of the same URL stopped, when
+        // the server left resume data behind; any other URL (or none)
+        // starts clean and drops the stale data.
+        let task: URLSessionDownloadTask
+        if resumeURL == url, let data = resumeData {
+            task = session.downloadTask(withResumeData: data)
+        } else {
+            task = session.downloadTask(with: request)
+        }
+        resumeData = nil
+        resumeURL = nil
+        currentTask = task
+        currentTaskID = ObjectIdentifier(task)
+        currentURL = url
         defer { session.finishTasksAndInvalidate() }
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
@@ -533,20 +580,73 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         }
     }
 
+    /// F-B (0.9.155): suspend the in-flight download; the row's Resume
+    /// button picks it back up on the same task. A no-op with nothing
+    /// running, or while already paused.
+    func pause() {
+        guard let task = currentTask, !isPaused else { return }
+        task.suspend()
+        isPaused = true
+    }
+
+    /// F-B (0.9.155): resume a download `pause()` suspended. A no-op
+    /// with nothing running, or while not paused.
+    func resume() {
+        guard let task = currentTask, isPaused else { return }
+        task.resume()
+        isPaused = false
+    }
+
     /// Stop an in-flight download, if any.
-    func cancel() {
+    /// - Parameter keepingResumeData: true for an explicit user cancel
+    ///   (the row's Cancel button), so a re-tap of the same link resumes;
+    ///   false when a new download is about to replace this one.
+    func cancel(keepingResumeData: Bool = true) {
+        // F-B: keep resume data for the URL being stopped, so tapping the
+        // same app again resumes instead of restarting. The callback lands
+        // asynchronously, so it only stores when no newer download has
+        // started since — a stale capture must not overwrite the live run.
+        if keepingResumeData, let task = currentTask, let url = currentURL {
+            task.cancel(byProducingResumeData: { [weak self] data in
+                guard let data else { return }
+                Task { @MainActor in
+                    guard let self, self.currentTask == nil else { return }
+                    self.resumeData = data
+                    self.resumeURL = url
+                }
+            })
+        }
         session?.invalidateAndCancel()
         session = nil
+        currentTask = nil
+        currentTaskID = nil
+        currentURL = nil
+        isPaused = false
         // C-4：当场结算旧 continuation，不等 delegate 回调——旧错随后到时
         // continuation 已是 nil，finish 的守卫让它空操作，不会二次恢复。
-        // 只做 A（同步结算），不做 generation：旧 Task 的泄漏只有 A 能堵。
+        // B2 (0.9.155)：C-4 的推理只在纯取消时成立——新下载立即存入新
+        // continuation 时，旧会话的回调仍会送达并恢复新下载；那一半由
+        // `finish(for:)` 的任务身份核对堵，见该处注释。
         finish(.failure(URLError(.cancelled)))
     }
 
     /// Resume the waiting download exactly once.
-    private func finish(_ result: Result<URL, Error>) {
+    /// - Parameter taskID: the delegate callback's task, as an
+    ///   `ObjectIdentifier`, when this comes from one. B2 (0.9.155): a
+    ///   callback from a task that is no longer the current one is stale —
+    ///   `invalidateAndCancel` still delivers the old session's
+    ///   `didCompleteWithError`, and its hop back to the main actor can
+    ///   only run after a replacement download has stored its own
+    ///   continuation, so an unguarded finish would resume the *new*
+    ///   download with the *old* cancelled error. Stale callbacks drop
+    ///   here; a nil id (the synchronous `cancel()` path) always applies.
+    private func finish(_ result: Result<URL, Error>, for taskID: ObjectIdentifier? = nil) {
+        if let taskID, taskID != currentTaskID { return }
         guard let continuation else { return }
         self.continuation = nil
+        currentTask = nil
+        currentTaskID = nil
+        currentURL = nil
         continuation.resume(with: result)
     }
 
@@ -562,11 +662,26 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
             downloadTask.cancel()
             return
         }
-        guard totalBytesExpectedToWrite > 0 else { return }
-        let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        // A-1（SIDE-32）：每 chunk 先过节流器再发布，不再每次都跳主线程写 @Published。
-        progressThrottler.publish(fraction) { value in
-            Task { @MainActor in self.progress = value }
+        // B1 (0.9.155): the byte counts are published on every path, not
+        // just when a total exists — a chunked transfer reports -1 here,
+        // and the old `guard total > 0 else { return }` left the row at 0%
+        // until the file landed whole.
+        if totalBytesExpectedToWrite > 0 {
+            let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+            // A-1（SIDE-32）：每 chunk 先过节流器再发布，不再每次都跳主线程写 @Published。
+            progressThrottler.publish(fraction) { value in
+                Task { @MainActor in
+                    self.progress = value
+                    self.bytesWritten = totalBytesWritten
+                    self.totalBytesExpected = totalBytesExpectedToWrite
+                }
+            }
+        } else if totalBytesWritten - lastReportedBytes >= 256 * 1024 || lastReportedBytes == 0 {
+            lastReportedBytes = totalBytesWritten
+            Task { @MainActor in
+                self.bytesWritten = totalBytesWritten
+                self.totalBytesExpected = -1
+            }
         }
     }
 
@@ -578,11 +693,11 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
            !(200...299).contains(http.statusCode) {
             let error = NSError(domain: "IPADownloader", code: http.statusCode,
                                 userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"])
-            Task { @MainActor in self.finish(.failure(error)) }
+            Task { @MainActor in self.finish(.failure(error), for: ObjectIdentifier(downloadTask)) }
             return
         }
         guard let source = downloadTask.originalRequest?.url else {
-            Task { @MainActor in self.finish(.failure(URLError(.badURL))) }
+            Task { @MainActor in self.finish(.failure(URLError(.badURL)), for: ObjectIdentifier(downloadTask)) }
             return
         }
         let staging = FileManager.default.temporaryDirectory
@@ -592,14 +707,20 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
             try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
             try FileManager.default.moveItem(at: location, to: dest)
             // A-1（SIDE-32）：成功时强制发 1.0（fraction == 1 一定过节流器）。
+            let received = downloadTask.countOfBytesReceived
+            let expected = downloadTask.countOfBytesExpectedToReceive
             progressThrottler.publish(1.0) { value in
-                Task { @MainActor in self.progress = value }
+                Task { @MainActor in
+                    self.progress = value
+                    self.bytesWritten = received
+                    self.totalBytesExpected = expected
+                }
             }
-            Task { @MainActor in self.finish(.success(dest)) }
+            Task { @MainActor in self.finish(.success(dest), for: ObjectIdentifier(downloadTask)) }
         } catch {
             // N3(C)：建目录/移文件失败也会留一个空 ipa-source-* 目录，顺手删掉。
             try? FileManager.default.removeItem(at: staging)
-            Task { @MainActor in self.finish(.failure(error)) }
+            Task { @MainActor in self.finish(.failure(error), for: ObjectIdentifier(downloadTask)) }
         }
     }
 
@@ -608,6 +729,6 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         // A successful download has already finished in
         // `didFinishDownloadingTo`; this only carries failures and cancels.
         guard let error else { return }
-        Task { @MainActor in self.finish(.failure(error)) }
+        Task { @MainActor in self.finish(.failure(error), for: ObjectIdentifier(task)) }
     }
 }

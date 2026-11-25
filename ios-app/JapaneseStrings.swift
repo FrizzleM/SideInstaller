@@ -12,6 +12,7 @@ let japaneseStrings: [String: String] = [
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "この iPhone の空き容量が足りず、この IPA をダウンロードできません。%@ 必要ですが、空きは %@ しかありません。空き容量を増やしてからもう一度お試しください。",
+    "Free space: %@": "空き容量：%@",
     "Apple ID":
         "Apple ID",
     "Cancel": "キャンセル",
@@ -864,6 +865,8 @@ let japaneseStrings: [String: String] = [
     // The install's progress outside the app
     "Installing %@": "%@ をインストール中",
     "Paused": "一時停止中",
+    "Pause": "一時停止",
+    "Resume": "再開",
     "Open SideInstaller to finish the install.":
         "インストールを完了するには SideInstaller を開いてください。",
     "Check the App IDs it needs, then tap Install.":
@@ -1025,6 +1028,7 @@ let japaneseStrings: [String: String] = [
     "Start the install": "インストールを開始",
     "Install on their iPhone": "相手の iPhone にインストール",
     "%d%% downloaded": "%d%% ダウンロード済み",
+    "%@ downloaded": "%@ ダウンロード済み",
     "%d%% uploaded": "%d%% アップロード済み",
     "Apple wouldn't register their iPhone with this Apple ID's developer team, so it won't issue a provisioning profile. %@":
         "Apple がこの Apple ID の開発者チームに相手の iPhone を登録できなかったため、プロビジョニングプロファイルが発行されません。%@",

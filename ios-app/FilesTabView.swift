@@ -1149,7 +1149,9 @@ struct FilesTabView: View {
             }
     }
 
-    /// A-38-A5：body 拆分——页尾（安装状态、导入卡、文件计数）。
+    /// A-38-A5：body 拆分——页尾（安装状态、导入卡、文件计数）。F6 (0.9.155)：
+    /// 合计行旁常驻显示设备剩余空间——与下载预检同一读数，平时也看得见，
+    /// 不必等下载失败才知道空间不够。
     @ViewBuilder
     private func bodyFooter(partition: FilePartition) -> some View {
         fileInstallStatus
@@ -1160,6 +1162,20 @@ struct FilesTabView: View {
             .font(.footnote)
             .foregroundStyle(Theme.muted)
             .frame(maxWidth: .infinity, alignment: .center)
+        if let free = Self.freeSpaceBytes {
+            Text(L("Free space: %@", ByteCountFormatter.string(fromByteCount: free, countStyle: .file)))
+                .font(.footnote)
+                .foregroundStyle(Theme.muted)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+    }
+
+    /// F6 (0.9.155): device free space — the same
+    /// `volumeAvailableCapacityForImportantUsage` read the downloader's
+    /// pre-flight check uses, on the Documents volume the library lives on.
+    private static var freeSpaceBytes: Int64? {
+        (try? IPALibrary.documentsDir.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))
+            .flatMap(\.volumeAvailableCapacityForImportantUsage)
     }
 
     /// A-38-A5：body 拆分——配对安装跑完的收尾（finished 置位才算成功，

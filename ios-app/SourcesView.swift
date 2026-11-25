@@ -496,20 +496,44 @@ struct SourceAppsView: View {
         switch states[app.id] {
         case .downloading:
             VStack(spacing: 4) {
-                ProgressView(value: downloader.progress)
-                    .frame(width: 72)
-                Text(L("Downloading… %d%%", Int(downloader.progress * 100)))
-                    .font(.caption)
-                    .foregroundStyle(Theme.muted)
+                // B1 (0.9.155): a chunked transfer never states a total, so
+                // `progress` sits at 0 the whole way — show an indeterminate
+                // spinner plus the bytes so far instead of a stuck 0%.
+                if downloader.totalBytesExpected > 0 {
+                    ProgressView(value: downloader.progress)
+                        .frame(width: 72)
+                    Text(L("Downloading… %d%%", Int(downloader.progress * 100)))
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
+                } else {
+                    ProgressView()
+                        .frame(width: 72)
+                    Text(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file)))
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
+                }
                 // F2 (0.9.153): leaving the page no longer cancels, so the
                 // row keeps the only stop button — an explicit user cancel.
-                Button(L("Cancel")) {
-                    downloadTask?.cancel()
-                    downloader.cancel()
-                    activeID = nil
-                    states[app.id] = nil
+                // F-B (0.9.155): Pause suspends the task in place; Resume
+                // picks it up again, and a cancelled-then-retapped download
+                // resumes from its resume data instead of restarting.
+                HStack(spacing: 12) {
+                    Button(downloader.isPaused ? L("Resume") : L("Pause")) {
+                        if downloader.isPaused {
+                            downloader.resume()
+                        } else {
+                            downloader.pause()
+                        }
+                    }
+                    .font(.caption)
+                    Button(L("Cancel")) {
+                        downloadTask?.cancel()
+                        downloader.cancel()
+                        activeID = nil
+                        states[app.id] = nil
+                    }
+                    .font(.caption)
                 }
-                .font(.caption)
             }
         case .failed(let message):
             VStack(alignment: .trailing, spacing: 4) {

@@ -1,9 +1,11 @@
 import Foundation
 
 /// One finished one-click install: what landed, when, and with whose
-/// certificate. Only successes are recorded, at `Engine.finishSuccess`;
-/// a failed run leaves no entry. No password or pairing material is kept —
-/// just the Apple ID (or certificate label) the install was signed with.
+/// certificate. Successes are recorded at `Engine.finishSuccess`;
+/// failures are recorded too (F-A, 0.9.155), at the pipeline's catch, so
+/// the row can say why it failed and offer the same one-tap reinstall.
+/// No password or pairing material is kept — just the Apple ID (or
+/// certificate label) the install was signed with.
 struct InstallHistoryEntry: Codable, Identifiable {
     var id: UUID
     var date: Date
@@ -14,6 +16,13 @@ struct InstallHistoryEntry: Codable, Identifiable {
     var version: String?
     /// Who signed it: the Apple ID for a one-click install.
     var identity: String
+    /// False for a run that failed; `failureReason` then says why. Defaults
+    /// to true so entries written before 0.9.155 (no such key) still decode
+    /// — the synthesized decoder reads a defaulted property with
+    /// `decodeIfPresent`, it doesn't demand the key.
+    var success: Bool = true
+    /// The user-facing reason the run stopped, for failed entries only.
+    var failureReason: String? = nil
 
     /// "SideStore 0.6.2", or just the name when no version is known.
     var title: String {
@@ -67,6 +76,22 @@ enum InstallHistoryStore {
         entries.insert(InstallHistoryEntry(id: UUID(), date: Date(),
                                            appName: appName, version: version,
                                            identity: identity), at: 0)
+        if entries.count > maxEntries { entries = Array(entries.prefix(maxEntries)) }
+        save(entries)
+    }
+
+    /// F-A (0.9.155): record one failed install, with the user-facing
+    /// reason it stopped — the same row the success path writes, so the
+    /// history shows the failure and its one-tap reinstall instead of
+    /// leaving no trace of the run.
+    static func recordFailure(appName: String, version: String?, identity: String, reason: String) {
+        logLock.lock()
+        defer { logLock.unlock() }
+        var entries = load()
+        entries.insert(InstallHistoryEntry(id: UUID(), date: Date(),
+                                           appName: appName, version: version,
+                                           identity: identity, success: false,
+                                           failureReason: reason), at: 0)
         if entries.count > maxEntries { entries = Array(entries.prefix(maxEntries)) }
         save(entries)
     }

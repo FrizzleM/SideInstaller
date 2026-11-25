@@ -12,6 +12,7 @@ let vietnameseStrings: [String: String] = [
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "iPhone này không còn đủ dung lượng trống để tải IPA này — cần %@, nhưng chỉ còn %@. Hãy giải phóng dung lượng rồi thử lại.",
+    "Free space: %@": "Dung lượng trống: %@",
     "Apple ID":
         "Apple ID",
     "Cancel": "Hủy",
@@ -629,6 +630,7 @@ let vietnameseStrings: [String: String] = [
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "Không kết nối được tới iPhone của họ ở %@. Hãy kiểm tra xem hai iPhone có cùng một mạng Wi-Fi không, và Mạng cục bộ đã được bật cho SideInstaller trong Cài đặt của iPhone này chưa. Mạng khách và mạng công cộng thường ngăn các thiết bị kết nối với nhau.",
     "%d%% downloaded": "Đã tải %d%%",
+    "%@ downloaded": "Đã tải %@",
     "%d%% uploaded": "Đã tải lên %d%%",
     "Start the install": "Bắt đầu cài đặt",
     "Clear their details": "Xóa thông tin của họ",
@@ -946,6 +948,8 @@ let vietnameseStrings: [String: String] = [
     // The install's progress outside the app
     "Installing %@": "Đang cài đặt %@",
     "Paused": "Đã tạm dừng",
+    "Pause": "Tạm dừng",
+    "Resume": "Tiếp tục",
     "Open SideInstaller to finish the install.":
         "Mở SideInstaller để hoàn tất cài đặt.",
     "Check the App IDs it needs, then tap Install.":

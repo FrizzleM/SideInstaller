@@ -546,6 +546,13 @@ enum SideStoreDownloader {
     /// Called on the download's own queue.
     @TaskLocal static var reportProgress: (@Sendable (Double) -> Void)?
 
+    /// B1 (0.9.155): the byte count of a release download whose total the
+    /// server never stated — `ResumingDownload` only calls this when there
+    /// is no total to make a fraction from, so a caller that gets bytes
+    /// knows the fraction will stay silent. Same `withValue` shape as
+    /// `reportProgress`, called on the download's own queue.
+    @TaskLocal static var reportProgressBytes: (@Sendable (Int) -> Void)?
+
     struct GHAsset: Decodable {
         let name: String
         let browser_download_url: String
@@ -1055,6 +1062,11 @@ enum SideStoreDownloader {
     /// to the link rather than GitHub.
     static func fetchDirect(_ url: URL,
                             named name: String,
+                            // B1 (0.9.155): told the bytes arrived, only while
+                            // the transfer states no total — the fraction
+                            // stays silent then, so the caller needs this to
+                            // show anything moving at all.
+                            onBytes: ((Int) -> Void)? = nil,
                             progress: @escaping (Double) -> Void) async throws -> URL {
         var req = URLRequest(url: url)
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
@@ -1116,8 +1128,24 @@ enum SideStoreDownloader {
                 settle(.failure(error))
             }
         }
+        // B1 (0.9.155): a chunked transfer never states a total, so
+        // `fractionCompleted` sits at 0 the whole way — report the bytes
+        // instead (256KB steps, lock-guarded like LocationView's
+        // `lastPublished`), and let the caller go indeterminate.
+        var lastBytesReported = 0
+        let bytesLock = NSLock()
         observation = task.progress.observe(\.fractionCompleted) { done, _ in
-            progressThrottler.publish(done.fractionCompleted, send: progress)
+            if done.totalUnitCount > 0 {
+                progressThrottler.publish(done.fractionCompleted, send: progress)
+            } else if let onBytes {
+                let bytes = Int(done.completedUnitCount)
+                bytesLock.lock()
+                let fresh = bytes > 0 && (bytes - lastBytesReported >= 256 * 1024 || lastBytesReported == 0)
+                if fresh { lastBytesReported = bytes }
+                bytesLock.unlock()
+                guard fresh else { return }
+                onBytes(bytes)
+            }
         }
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { cont in
@@ -1644,6 +1672,13 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
     private let idleTimeout: TimeInterval
     /// Told the fraction that has arrived, once the file's size is known.
     private let progress: (@Sendable (Double) -> Void)?
+    /// B1 (0.9.155): told the bytes arrived, only while the file's size is
+    /// unknown — read from the `reportProgressBytes` task-local, like
+    /// `progress` is read from `reportProgress`.
+    private let progressBytes: (@Sendable (Int) -> Void)?
+    /// Last byte count reported through `progressBytes`, so the unknown-total
+    /// reports stay throttled to 256KB steps instead of one per chunk.
+    private var lastReportedBytes = 0
     /// A-2：本下载的进度节流器（delegate 队列是串行的，锁只是兜底）。
     private let progressThrottler = ProgressThrottler()
     private let log: (String) -> Void
@@ -1684,6 +1719,7 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
         self.name = name
         self.idleTimeout = idleTimeout
         self.progress = progress
+        self.progressBytes = SideStoreDownloader.reportProgressBytes
         self.log = log
         file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).download")
     }
@@ -1874,6 +1910,15 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
             written += data.count
             if let progress, let total, total > 0 {
                 progressThrottler.publish(min(1, Double(written) / Double(total))) { progress($0) }
+            } else if let progressBytes {
+                // B1 (0.9.155): no total to make a fraction from — report
+                // the bytes instead, throttled to 256KB steps, so the
+                // progress card can go indeterminate plus a byte count
+                // rather than sitting at 0% until the file lands whole.
+                if written > 0 && (written - lastReportedBytes >= 256 * 1024 || lastReportedBytes == 0) {
+                    lastReportedBytes = written
+                    progressBytes(written)
+                }
             }
         } catch {
             writeError = error

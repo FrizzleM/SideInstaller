@@ -12,6 +12,7 @@ let chineseStrings: [String: String] = [
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "这台 iPhone 剩余空间不足，下载这个 IPA 需要 %@，但只剩 %@。清理一些空间后再试。",
+    "Free space: %@": "剩余空间：%@",
     "Apple ID":
         "Apple ID",
     "Cancel": "取消",
@@ -635,6 +636,7 @@ let chineseStrings: [String: String] = [
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "无法连接到位于 %@ 的对方 iPhone。请确认两台 iPhone 连接的是同一个 Wi-Fi 网络，并确认已在这台 iPhone 的 设置 中为 SideInstaller 打开本地网络。访客网络和公共网络通常会阻止设备之间互相连接。",
     "%d%% downloaded": "已下载 %d%%",
+    "%@ downloaded": "已下载 %@",
     "%d%% uploaded": "已上传 %d%%",
     "Start the install": "开始安装",
     "Clear their details": "清除对方的信息",
@@ -930,6 +932,8 @@ let chineseStrings: [String: String] = [
     // The install's progress outside the app
     "Installing %@": "正在安装 %@",
     "Paused": "已暂停",
+    "Pause": "暂停",
+    "Resume": "继续",
     "Open SideInstaller to finish the install.":
         "打开 SideInstaller 以完成安装。",
     "Check the App IDs it needs, then tap Install.":

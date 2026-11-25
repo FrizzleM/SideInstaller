@@ -42,8 +42,11 @@ enum DeveloperDiskImage {
     }
 
     /// Fetch whichever of the three files are missing, reporting 0…1 across the
-    /// whole set rather than per file.
-    static func downloadMissing(progress: @escaping (Double) -> Void) async throws {
+    /// whole set rather than per file. The fraction is nil while the file in
+    /// flight states no total (a chunked transfer); `bytes` is the bytes
+    /// arrived so far on that file, so the page can show a byte count
+    /// instead of a stuck 0% (B1, 0.9.155).
+    static func downloadMissing(progress: @escaping (Double?, Int64) -> Void) async throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         // B3 (0.9.147): a 0-byte file counts as missing — a truncated
         // download used to satisfy `fileExists` while `isDownloaded`
@@ -54,21 +57,21 @@ enum DeveloperDiskImage {
             let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int ?? 0
             return size <= 0
         }
-        guard !missing.isEmpty else { progress(1); return }
+        guard !missing.isEmpty else { progress(1, 0); return }
 
         for (index, name) in missing.enumerated() {
             try Task.checkCancellation()
-            progress(Double(index) / Double(missing.count))
+            progress(Double(index) / Double(missing.count), 0)
             guard let url = URL(string: "\(baseURL)/\(name)") else {
                 throw EngineError.message(L("Couldn't build the download URL for %@.", name))
             }
             let destination = directory.appendingPathComponent(name)
-            try await downloadOne(from: url, to: destination) { fileFraction in
-                progress((Double(index) + fileFraction) / Double(missing.count))
+            try await downloadOne(from: url, to: destination) { fileFraction, bytes in
+                progress(fileFraction.map { (Double(index) + $0) / Double(missing.count) }, bytes)
             }
             Engine.shared.log("DDI: downloaded \(name).")
         }
-        progress(1)
+        progress(1, 0)
     }
 
     /// Deletes the downloaded files, so a corrupt or truncated copy can be
@@ -81,9 +84,11 @@ enum DeveloperDiskImage {
     /// manual update check's), and cancellation — `URLSession.download(from:)`
     /// reports no progress, so this uses a download task with KVO like
     /// `SideStoreDownloader.fetchDirect`. `progress` is called on an
-    /// arbitrary queue, throttled to whole-percent steps.
+    /// arbitrary queue, throttled to whole-percent steps; its fraction is
+    /// nil while the transfer states no total, with `bytes` carrying the
+    /// bytes arrived so far instead (B1, 0.9.155).
     private static func downloadOne(from url: URL, to destination: URL,
-                                    progress: @escaping (Double) -> Void) async throws {
+                                    progress: @escaping (Double?, Int64) -> Void) async throws {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData,
                                  timeoutInterval: 15)
         request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
@@ -104,6 +109,9 @@ enum DeveloperDiskImage {
         }
         var observation: NSKeyValueObservation?
         var lastPublished = -1
+        /// B1 (0.9.155): last byte count reported while the total was
+        /// unknown, so those reports stay throttled to 256KB steps.
+        var lastPublishedBytes: Int64 = 0
         let task = URLSession.shared.downloadTask(with: request) { file, response, error in
             observation?.invalidate()
             if let error {
@@ -127,13 +135,27 @@ enum DeveloperDiskImage {
             }
         }
         observation = task.progress.observe(\.fractionCompleted) { done, _ in
-            settleLock.lock()
-            let percent = Int(done.fractionCompleted * 100)
-            let fresh = percent > lastPublished
-            if fresh { lastPublished = percent }
-            settleLock.unlock()
-            guard fresh else { return }
-            progress(done.fractionCompleted)
+            // B1 (0.9.155): a chunked transfer never states a total, so
+            // `fractionCompleted` sits at 0 the whole way — report the
+            // bytes instead (256KB steps), with a nil fraction so the page
+            // goes indeterminate instead of showing a stuck 0%.
+            if done.totalUnitCount > 0 {
+                settleLock.lock()
+                let percent = Int(done.fractionCompleted * 100)
+                let fresh = percent > lastPublished
+                if fresh { lastPublished = percent }
+                settleLock.unlock()
+                guard fresh else { return }
+                progress(done.fractionCompleted, done.completedUnitCount)
+            } else {
+                let bytes = done.completedUnitCount
+                settleLock.lock()
+                let fresh = bytes > 0 && (bytes - lastPublishedBytes >= 256 * 1024 || lastPublishedBytes == 0)
+                if fresh { lastPublishedBytes = bytes }
+                settleLock.unlock()
+                guard fresh else { return }
+                progress(nil, bytes)
+            }
         }
         let tmp = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { cont in
@@ -481,8 +503,13 @@ final class LocationManager: ObservableObject {
 
     @Published private(set) var stage: Stage = .notReady
     /// DDI download progress (0…1) while `stage` is `.downloading`; nil
-    /// otherwise (B2, 0.9.147).
+    /// otherwise (B2, 0.9.147) — and nil mid-download while the file in
+    /// flight states no total, when `downloadBytes` carries the count
+    /// instead (B1, 0.9.155).
     @Published private(set) var downloadProgress: Double?
+    /// B1 (0.9.155): bytes arrived so far while the total is unknown;
+    /// nil whenever the total is known (or nothing is downloading).
+    @Published private(set) var downloadBytes: Int64?
     /// The task running setup (`prepareQuietly`, `simulate`, `playRoute`),
     /// so a download in progress can be cancelled (B2, 0.9.147).
     private var readyTask: Task<Void, Never>?
@@ -614,12 +641,17 @@ final class LocationManager: ObservableObject {
         if !DeveloperDiskImage.isDownloaded {
             stage = .downloading
             downloadProgress = 0
+            downloadBytes = nil
             do {
-                try await DeveloperDiskImage.downloadMissing { fraction in
-                    Task { @MainActor in self.downloadProgress = fraction }
+                try await DeveloperDiskImage.downloadMissing { fraction, bytes in
+                    Task { @MainActor in
+                        self.downloadProgress = fraction
+                        self.downloadBytes = fraction == nil ? bytes : nil
+                    }
                 }
             } catch {
                 downloadProgress = nil
+                downloadBytes = nil
                 // Back to not ready, or the page would sit on "downloading"
                 // with nothing running — a cancelled quiet download ends
                 // here, with no other code resetting the stage.
@@ -627,6 +659,7 @@ final class LocationManager: ObservableObject {
                 throw error
             }
             downloadProgress = nil
+            downloadBytes = nil
         }
         if quietly {
             engine.refreshNetworkStatus()
@@ -1418,13 +1451,23 @@ struct LocationView: View {
                 // DDI download progress, with a way out (B2, 0.9.147).
                 if manager.stage == .downloading {
                     HStack(spacing: 8) {
-                        ProgressView(value: manager.downloadProgress ?? 0)
-                            .tint(Theme.accent)
+                        // B1 (0.9.155): no total — indeterminate spinner
+                        // plus the bytes so far, not a 0% that never moves.
                         if let fraction = manager.downloadProgress {
+                            ProgressView(value: fraction)
+                                .tint(Theme.accent)
                             Text(L("Downloading… %d%%", Int(fraction * 100)))
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(Theme.muted)
                                 .contentTransition(.numericText())
+                        } else {
+                            ProgressView()
+                                .tint(Theme.accent)
+                            if let bytes = manager.downloadBytes {
+                                Text(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)))
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(Theme.muted)
+                            }
                         }
                         Spacer(minLength: 8)
                         Button(L("Cancel")) { manager.cancelDownload() }

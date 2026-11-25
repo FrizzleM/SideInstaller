@@ -375,7 +375,10 @@ enum EnterpriseCertStore {
         guard SecPKCS12Import(p12Data as CFData, options as CFDictionary, &items) == errSecSuccess,
               let array = items as? [[String: Any]],
               let rawIdentity = array.first?[kSecImportItemIdentity as String] else { return nil }
-        let identity = rawIdentity as! SecIdentity
+        // B-cand-4 (0.9.155): the import's identity isn't guaranteed to be
+        // a SecIdentity — a forced cast traps on a wrong-typed item, so
+        // take the conditional cast and fail soft, like the nil path.
+        guard let identity = rawIdentity as? SecIdentity else { return nil }
         var certRef: SecCertificate?
         guard SecIdentityCopyCertificate(identity, &certRef) == errSecSuccess, let cert = certRef else { return nil }
         let name = SecCertificateCopySubjectSummary(cert) as String?
@@ -494,7 +497,11 @@ enum EnterpriseCertStore {
               let rawIdentity = first[kSecImportItemIdentity as String] else {
             throw EngineError.message(L("证书解不开——密码不对，或者 .p12 文件有问题。"))
         }
-        let identity = rawIdentity as! SecIdentity
+        // B-cand-4 (0.9.155): 同上——强制转换改条件转换，类型不对时报
+        // 证书解不开，不 trap。
+        guard let identity = rawIdentity as? SecIdentity else {
+            throw EngineError.message(L("证书解不开——密码不对，或者 .p12 文件有问题。"))
+        }
         var certRef: SecCertificate?
         guard SecIdentityCopyCertificate(identity, &certRef) == errSecSuccess, let cert = certRef else {
             throw EngineError.message(L("证书读取失败。"))
@@ -523,7 +530,12 @@ enum EnterpriseCertStore {
               let rawIdentity = first[kSecImportItemIdentity as String] else {
             throw EngineError.message(L("证书解不开——密码不对，或者 .p12 文件有问题。"))
         }
-        return rawIdentity as! SecIdentity
+        // B-cand-4 (0.9.155): 同上——强制转换改条件转换，类型不对时报
+        // 证书解不开，不 trap。
+        guard let identity = rawIdentity as? SecIdentity else {
+            throw EngineError.message(L("证书解不开——密码不对，或者 .p12 文件有问题。"))
+        }
+        return identity
     }
 
     /// 证书本身的信息（名头 + 到期日）：证书卡上要显示。解不开（比如

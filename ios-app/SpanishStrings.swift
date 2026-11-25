@@ -12,6 +12,7 @@ let spanishStrings: [String: String] = [
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "No hay suficiente espacio libre en este iPhone para descargar este IPA: necesita %@, pero solo quedan %@ libres. Libera espacio e inténtalo de nuevo.",
+    "Free space: %@": "Espacio libre: %@",
     "Apple ID":
         "Apple ID",
     "Cancel": "Cancelar",
@@ -632,6 +633,7 @@ let spanishStrings: [String: String] = [
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "No se pudo contactar con su iPhone en %@. Comprueba que ambos iPhone estén en la misma red Wi-Fi y que la red local esté activada para SideInstaller en los Ajustes de este iPhone. Las redes de invitados y las públicas a menudo impiden que los dispositivos se comuniquen entre sí.",
     "%d%% downloaded": "%d%% descargado",
+    "%@ downloaded": "%@ descargados",
     "%d%% uploaded": "%d%% subido",
     "Start the install": "Iniciar la instalación",
     "Clear their details": "Borrar sus datos",
@@ -950,6 +952,8 @@ let spanishStrings: [String: String] = [
     // The install's progress outside the app
     "Installing %@": "Instalando %@",
     "Paused": "En pausa",
+    "Pause": "Pausar",
+    "Resume": "Reanudar",
     "Open SideInstaller to finish the install.":
         "Abre SideInstaller para terminar la instalación.",
     "Check the App IDs it needs, then tap Install.":

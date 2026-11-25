@@ -1047,8 +1047,14 @@ final class JITManager: ObservableObject {
         if !DeveloperDiskImage.isDownloaded {
             ddiDownloadProgress = 0
             do {
-                try await DeveloperDiskImage.downloadMissing { fraction in
-                    Task { @MainActor in self.ddiDownloadProgress = fraction }
+                // B1 (0.9.155): `downloadMissing` also reports the bytes
+                // while the total is unknown (fraction nil then) — JIT's
+                // bar only shows the fraction, so keep the last known value
+                // then instead of clearing it mid-download.
+                try await DeveloperDiskImage.downloadMissing { fraction, _ in
+                    Task { @MainActor in
+                        if let fraction { self.ddiDownloadProgress = fraction }
+                    }
                 }
             } catch {
                 ddiDownloadProgress = nil

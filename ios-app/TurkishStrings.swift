@@ -12,6 +12,7 @@ let turkishStrings: [String: String] = [
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "Bu iPhone'da bu IPA'yı indirmek için yeterli boş alan yok: %@ gerekiyor ama yalnızca %@ boş. Yer açıp yeniden deneyin.",
+    "Free space: %@": "Boş alan: %@",
     "Apple ID":
         "Apple ID",
     "Cancel": "İptal",
@@ -646,6 +647,7 @@ let turkishStrings: [String: String] = [
     "Couldn't reach their iPhone at %@. Check that both iPhones are on the same Wi-Fi network, and that Local Network is on for SideInstaller in this iPhone's Settings. Guest and public networks often keep devices from reaching each other.":
         "Diğer iPhone'a %@ adresinden ulaşılamadı. İki iPhone'un aynı Wi-Fi ağında olduğunu ve bu iPhone'un Ayarlar'ında SideInstaller için Yerel Ağ'ın açık olduğunu kontrol et. Misafir ve genel ağlar cihazların birbirine ulaşmasını sıkça engeller.",
     "%d%% downloaded": "%%%d indirildi",
+    "%@ downloaded": "%@ indirildi",
     "%d%% uploaded": "%%%d yüklendi",
     "Start the install": "Yüklemeyi başlat",
     "Clear their details": "Diğer iPhone'un bilgilerini temizle",
@@ -900,6 +902,8 @@ let turkishStrings: [String: String] = [
 
     "Installing %@": "%@ yükleniyor",
     "Paused": "Duraklatıldı",
+    "Pause": "Duraklat",
+    "Resume": "Devam et",
     "Open SideInstaller to finish the install.": "Yüklemeyi bitirmek için SideInstaller'ı aç.",
     "Check the App IDs it needs, then tap Install.": "İhtiyacı olan App ID'leri kontrol et, sonra Yükle'ye dokun.",
     "Tap Trust": "Güven'e dokun",

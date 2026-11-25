@@ -291,6 +291,11 @@ final class SideBySideManager: ObservableObject {
     @Published private(set) var targetOSVersion: String?
     /// How much of the download has arrived (0…1), while that step is running.
     @Published private(set) var downloadProgress: Double = 0
+    /// B1 (0.9.155): bytes arrived so far on a download whose total the
+    /// server never stated — non-nil only then, so the card and the step
+    /// detail can go indeterminate plus a byte count instead of a 0% that
+    /// never moves. Reset with the run and at each download start.
+    @Published private(set) var downloadBytesWritten: Int64?
     /// What a download that fell back to an older local copy should say:
     /// set in `downloadBuild` when the fetch fails and a copy an earlier
     /// run left behind stands in (C14, C7's pattern on the Install tab).
@@ -584,12 +589,19 @@ final class SideBySideManager: ObservableObject {
                 // Back to the summary it started from, as if it hadn't run.
                 for step in SideBySideStep.allCases { stepStates[step] = .pending }
                 downloadProgress = 0
+                downloadBytesWritten = nil
                 go(to: .ready)
             } catch {
                 let message = userFacingErrorMessage(error)
                 lastError = message
                 engine.log("⛔️ Side by Side stopped: \(message)")
                 failActiveStep(to: .failed)
+                // F-A (0.9.155): 同 Engine 管线——失败也记一条历史
+                // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
+                InstallHistoryStore.recordFailure(appName: installedAppName ?? runName,
+                                                  version: installedAppVersion,
+                                                  identity: credentials?.id ?? "",
+                                                  reason: message)
             }
             pairingInSettings = false
             pairingPIN = nil
@@ -703,6 +715,7 @@ final class SideBySideManager: ObservableObject {
     private func resetRun() {
         for step in SideBySideStep.allCases { stepStates[step] = .pending }
         downloadProgress = 0
+        downloadBytesWritten = nil
         downloadFallbackNotice = nil
         handOffNotice = nil
         lastError = nil
@@ -1399,6 +1412,7 @@ final class SideBySideManager: ObservableObject {
         discardDownload()
         setStep(.download, .active)
         downloadProgress = 0
+        downloadBytesWritten = nil
         let file: URL
         if let source = app.source {
             if source == .liveContainer {
@@ -1427,7 +1441,12 @@ final class SideBySideManager: ObservableObject {
         engine.log("Fetching the latest LiveContainer 🅥 release from \(Self.liveContainerIPA.absoluteString) …")
         do {
             let file = try await SideStoreDownloader.fetchDirect(
-                Self.liveContainerIPA, named: Self.liveContainerFileName) { fraction in
+                Self.liveContainerIPA, named: Self.liveContainerFileName,
+                // B1 (0.9.155): total unknown — the byte count arrives here
+                // instead of a fraction, so the card can go indeterminate.
+                onBytes: { bytes in
+                    Task { @MainActor in self.downloadBytesWritten = Int64(bytes) }
+                }) { fraction in
                     Task { @MainActor in self.downloadProgress = fraction }
                 }
             // Validate now, so an error page or truncated download doesn't fail
@@ -1448,7 +1467,12 @@ final class SideBySideManager: ObservableObject {
         engine.log("Fetching the latest SideInstaller release from \(Self.releaseIPA.absoluteString) …")
         do {
             let file = try await SideStoreDownloader.fetchDirect(
-                Self.releaseIPA, named: Self.ipaFileName) { fraction in
+                Self.releaseIPA, named: Self.ipaFileName,
+                // B1 (0.9.155): total unknown — the byte count arrives here
+                // instead of a fraction, so the card can go indeterminate.
+                onBytes: { bytes in
+                    Task { @MainActor in self.downloadBytesWritten = Int64(bytes) }
+                }) { fraction in
                     Task { @MainActor in self.downloadProgress = fraction }
                 }
             // Validate now, so an error page or truncated download doesn't fail
@@ -1478,14 +1502,21 @@ final class SideBySideManager: ObservableObject {
         let report: @Sendable (Double) -> Void = { [weak self] fraction in
             Task { @MainActor in self?.downloadProgress = fraction }
         }
+        // B1 (0.9.155): the byte count for a transfer whose total the
+        // server never stated — the downloader only calls this then.
+        let bytesReport: @Sendable (Int) -> Void = { [weak self] bytes in
+            Task { @MainActor in self?.downloadBytesWritten = Int64(bytes) }
+        }
         // Their iOS, not this iPhone's, decides which AltStore version goes on.
         let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion)
             ?? ProcessInfo.processInfo.operatingSystemVersion
         do {
             let path = try await SideStoreDownloader.$reportProgress.withValue(report) {
-                try await SideStoreDownloader.downloadLatest(source: source, channel: channel,
-                                                             runningOn: theirOS) { [weak self] line in
-                    self?.engine.log(line)
+                try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
+                    try await SideStoreDownloader.downloadLatest(source: source, channel: channel,
+                                                                 runningOn: theirOS) { [weak self] line in
+                        self?.engine.log(line)
+                    }
                 }
             }
             return URL(fileURLWithPath: path)
@@ -2815,17 +2846,30 @@ struct SideBySideView: View {
                         .font(.headline)
                         .contentTransition(.opacity)
                     Spacer(minLength: 4)
-                    Text("\(Int(manager.overallProgress * 100))%")
-                        .font(.headline.monospacedDigit())
-                        .foregroundStyle(progressTint)
-                        .contentTransition(.numericText(value: manager.overallProgress))
-                        .animation(.smooth(duration: 0.3), value: manager.overallProgress)
+                    // B1 (0.9.155): total unknown — byte count instead of a
+                    // 0% that never moves.
+                    if let bytes = manager.downloadBytesWritten {
+                        Text(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)))
+                            .font(.headline.monospacedDigit())
+                            .foregroundStyle(progressTint)
+                    } else {
+                        Text("\(Int(manager.overallProgress * 100))%")
+                            .font(.headline.monospacedDigit())
+                            .foregroundStyle(progressTint)
+                            .contentTransition(.numericText(value: manager.overallProgress))
+                            .animation(.smooth(duration: 0.3), value: manager.overallProgress)
+                    }
                     if manager.isRunning {
                         cancelButton
                             .transition(.opacity)
                     }
                 }
-                InstallProgressBar(progress: manager.overallProgress, tint: progressTint)
+                if manager.downloadBytesWritten != nil {
+                    ProgressView()
+                        .tint(progressTint)
+                } else {
+                    InstallProgressBar(progress: manager.overallProgress, tint: progressTint)
+                }
                 VStack(spacing: 0) {
                     ForEach(Array(steps.enumerated()), id: \.element) { index, step in
                         SideBySideStepRow(title: step.title(for: manager.runApp),
@@ -2887,6 +2931,10 @@ struct SideBySideView: View {
             if manager.waitingForTrust { return L("Waiting for them to tap Trust…") }
             return L("Looking for their iPhone…")
         case .download:
+            // B1 (0.9.155): total unknown — byte count instead of 0%.
+            if let bytes = manager.downloadBytesWritten {
+                return L("%@ downloaded", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
+            }
             return L("%d%% downloaded", Int(manager.downloadProgress * 100))
         case .install:
             return L("%d%% uploaded", Int(engine.installProgress * 100))

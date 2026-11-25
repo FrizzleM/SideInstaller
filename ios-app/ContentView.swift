@@ -511,7 +511,14 @@ struct ContentView: View {
     private var importLabel: String {
         guard engine.isImportingIPA else { return engine.customIPAName ?? L("Import .ipa") }
         // A file copy reports no fraction; a link download does.
-        guard let fraction = engine.importProgress else { return L("Importing…") }
+        guard let fraction = engine.importProgress else {
+            // B1 (0.9.155): total unknown — byte count instead of a bare
+            // "Importing…" that never says whether anything arrives.
+            if let bytes = engine.importBytes {
+                return L("%@ downloaded", ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))
+            }
+            return L("Importing…")
+        }
         return L("Downloading… %d%%", Int(fraction * 100))
     }
 
@@ -554,6 +561,16 @@ struct ContentView: View {
             if engine.isImportingIPA, let fraction = engine.importProgress {
                 HStack(spacing: 8) {
                     ProgressView(value: fraction)
+                        .tint(Theme.accent)
+                    Button(L("Cancel")) { engine.cancelLinkImport() }
+                        .buttonStyle(.plain, sound: .tap)
+                        .foregroundStyle(Theme.accent)
+                }
+            } else if engine.isImportingIPA, engine.importBytes != nil {
+                // B1 (0.9.155): total unknown — indeterminate bar; the byte
+                // count rides in the button caption (`importLabel`).
+                HStack(spacing: 8) {
+                    ProgressView()
                         .tint(Theme.accent)
                     Button(L("Cancel")) { engine.cancelLinkImport() }
                         .buttonStyle(.plain, sound: .tap)
@@ -1029,11 +1046,19 @@ struct ContentView: View {
                     .font(.headline)
                     .contentTransition(.opacity)
                 Spacer(minLength: 4)
-                Text("\(Int(engine.overallProgress * 100))%")
-                    .font(.headline.monospacedDigit())
-                    .foregroundStyle(progressTint)
-                    .contentTransition(.numericText(value: engine.overallProgress))
-                    .animation(.smooth(duration: 0.3), value: engine.overallProgress)
+                // B1 (0.9.155): total unknown — byte count instead of a
+                // 0% that never moves.
+                if let bytes = engine.downloadBytesWritten {
+                    Text(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)))
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(progressTint)
+                } else {
+                    Text("\(Int(engine.overallProgress * 100))%")
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(progressTint)
+                        .contentTransition(.numericText(value: engine.overallProgress))
+                        .animation(.smooth(duration: 0.3), value: engine.overallProgress)
+                }
                 stepsDisclosure
                 // Only a run in flight can be cancelled.
                 if engine.isRunning {
@@ -1042,7 +1067,12 @@ struct ContentView: View {
                 }
             }
 
-            InstallProgressBar(progress: engine.overallProgress, tint: progressTint)
+            if engine.downloadBytesWritten != nil {
+                ProgressView()
+                    .tint(progressTint)
+            } else {
+                InstallProgressBar(progress: engine.overallProgress, tint: progressTint)
+            }
 
             stepSection
 

@@ -51,6 +51,20 @@ struct InstallHistoryView: View {
                                 .font(.footnote)
                                 .foregroundStyle(Theme.muted)
                                 .lineLimit(1)
+                            // F-A (0.9.155): a failed run says so in red,
+                            // with the reason it stopped — the row still
+                            // reinstalls on tap, same as a success.
+                            if !entry.success {
+                                Text(L("Failed"))
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(Theme.negative)
+                                if let reason = entry.failureReason, !reason.isEmpty {
+                                    Text(verbatim: reason)
+                                        .font(.footnote)
+                                        .foregroundStyle(Theme.negative)
+                                        .lineLimit(2)
+                                }
+                            }
                         }
                         Spacer()
                         if reinstallingID == entry.id {
