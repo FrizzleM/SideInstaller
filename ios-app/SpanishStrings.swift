@@ -1633,4 +1633,13 @@ let spanishStrings: [String: String] = [
     "正在签名，等它跑完再批量安装。": "Firmando. Espera a que termine para instalar por lotes.",
     "Installed apps will be listed here.": "Las apps instaladas aparecerán aquí.",
     "以下 %d 个删除失败：%@": "No se pudieron eliminar %d: %@",
+
+    // MARK: - F1 source toggle, F2 source export/import & F3 download rename (0.9.152)
+
+    "Enabled": "Activa",
+    "Names can't be empty, contain /, or start with .": "Los nombres no pueden estar vacíos, contener / ni empezar por .",
+    "Export sources": "Exportar fuentes",
+    "Import sources": "Importar fuentes",
+    "The clipboard has no source list to import.": "El portapapeles no tiene una lista de fuentes para importar.",
+    "Imported %d, already added %d, failed %d.": "%d importadas, %d ya añadidas, %d fallidas.",
 ]

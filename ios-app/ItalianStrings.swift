@@ -1630,4 +1630,13 @@ let italianStrings: [String: String] = [
     "正在签名，等它跑完再批量安装。": "Firma in corso. Attendi che finisca prima di installare in batch.",
     "Installed apps will be listed here.": "Le app installate saranno elencate qui.",
     "以下 %d 个删除失败：%@": "Impossibile eliminare %d file: %@",
+
+    // MARK: - F1 source toggle, F2 source export/import & F3 download rename (0.9.152)
+
+    "Enabled": "Attiva",
+    "Names can't be empty, contain /, or start with .": "I nomi non possono essere vuoti, contenere / o iniziare con .",
+    "Export sources": "Esporta fonti",
+    "Import sources": "Importa fonti",
+    "The clipboard has no source list to import.": "Negli appunti non c'è un elenco di fonti da importare.",
+    "Imported %d, already added %d, failed %d.": "%d importate, %d già aggiunte, %d non riuscite.",
 ]

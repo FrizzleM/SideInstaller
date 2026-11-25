@@ -1606,4 +1606,13 @@ let chineseStrings: [String: String] = [
     "正在签名，等它跑完再批量安装。": "正在签名，等它跑完再批量安装。",
     "Installed apps will be listed here.": "装好的 App 会记在这里。",
     "以下 %d 个删除失败：%@": "以下 %d 个删除失败：%@",
+
+    // MARK: - F1 source toggle, F2 source export/import & F3 download rename (0.9.152)
+
+    "Enabled": "启用",
+    "Names can't be empty, contain /, or start with .": "名字不能为空，不能包含 /，也不能以 . 开头",
+    "Export sources": "导出源列表",
+    "Import sources": "导入源列表",
+    "The clipboard has no source list to import.": "剪贴板里没有可导入的源列表。",
+    "Imported %d, already added %d, failed %d.": "已导入 %d 个，已添加过 %d 个，失败 %d 个。",
 ]

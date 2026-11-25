@@ -130,6 +130,60 @@ final class DownloadsManager: ObservableObject {
         refresh()
     }
 
+    /// Rename one downloaded IPA (F3, 0.9.152): the Files page's rename
+    /// rules via `FilesTabView.validatedRenameName` — same refusal, same
+    /// `.ipa` suffix. The guards mirror delete(_:): a file an install /
+    /// signing / renewal run is reading can't move under it. After the
+    /// move the pairing is re-matched, so renewal follows the new name
+    /// (FilesTabView.performRename 同款); the row is swapped in place
+    /// and the background rescan confirms it.
+    @MainActor
+    func rename(_ item: DownloadedIPA, to rawName: String) {
+        let trimmed = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed != item.fileName else { return }
+        guard let newName = FilesTabView.validatedRenameName(rawName, isDirectory: false, isIPA: true) else {
+            lastError = L("Names can't be empty, contain /, or start with .")
+            return
+        }
+        guard newName != item.fileName else { return }
+        if engine.isInstallingSource(path: item.url.path) {
+            lastError = L("This file is being installed. Wait until it finishes.")
+            return
+        }
+        if engine.isSigningSource(path: item.url.path) {
+            lastError = L("This file is being signed. Wait until it finishes.")
+            return
+        }
+        if engine.isRenewingSource(path: item.url.path) {
+            lastError = L("This file is being renewed. Wait until it finishes.")
+            return
+        }
+        let dest = item.url.deletingLastPathComponent().appendingPathComponent(newName)
+        guard !FileManager.default.fileExists(atPath: dest.path) else {
+            lastError = L("已有同名文件")
+            return
+        }
+        do {
+            try FileManager.default.moveItem(at: item.url, to: dest)
+            DownloadLedger.forget(item.url)
+            if engine.downloadedIPAPath == item.url.path {
+                engine.downloadedIPAPath = dest.path
+            }
+            if item.source == .custom { engine.refreshCustomIPA() }
+            SideloadedAppsManager.shared.refreshRefreshableOnly()
+            engine.log("Downloads: renamed \(item.fileName) → \(newName).")
+            if let idx = downloads.firstIndex(where: { $0.id == item.id }) {
+                downloads[idx] = DownloadedIPA(source: item.source, channel: item.channel, url: dest,
+                                               size: item.size, modified: item.modified,
+                                               isImported: item.isImported, version: item.version)
+            }
+        } catch {
+            lastError = error.localizedDescription
+            engine.log("⛔️ Downloads: \(lastError ?? "rename failed")")
+        }
+        refresh()
+    }
+
     /// Delete every downloaded IPA, skipping ones an install, signing or
     /// renewal run is reading (FilesTabView.deleteSelection 同款：同三道
     /// 拦、同跳过计数、同失败口径）；续签源提示在清空确认框里，不在这
@@ -205,6 +259,9 @@ struct DownloadsListView: View {
     @Environment(Engine.self) private var engine
     @StateObject private var manager = DownloadsManager()
     @State private var pendingDelete: DownloadedIPA?
+    /// The download being renamed (F3, 0.9.152), with its name in the field.
+    @State private var renameItem: DownloadedIPA?
+    @State private var renameText = ""
     /// `id` of the IPA being moved into the Install tab's custom slot, if any.
     @State private var installingID: String?
     /// Clear-all confirmation: true while the alert stands, with the
@@ -363,6 +420,15 @@ struct DownloadsListView: View {
                         .buttonStyle(.plain)
                         .disabled(installingID == item.id)
                         .swipeActions {
+                            // F3 (0.9.152): rename from here, Files page
+                            // rules (same alert, same validation).
+                            Button {
+                                renameText = item.fileName
+                                renameItem = item
+                            } label: {
+                                Label(L("重命名"), systemImage: "pencil")
+                            }
+                            .tint(Theme.accent)
                             Button(role: .destructive) {
                                 pendingDelete = item
                             } label: {
@@ -389,6 +455,23 @@ struct DownloadsListView: View {
             Button(L("Cancel"), role: .cancel) { pendingDelete = nil }
         } message: {
             Text(L("只删文件，不影响已装的 App。"))
+        }
+        // F3 (0.9.152): rename alert, Files page 同款（标题/字段/保存/
+        // 扩展名提示全复用那边的文案）。
+        .alert(L("重命名"), isPresented: Binding(
+            get: { renameItem != nil },
+            set: { if !$0 { renameItem = nil } }
+        )) {
+            TextField(L("文件名"), text: $renameText)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            Button(L("Cancel"), role: .cancel) { renameItem = nil }
+            Button(L("Save")) {
+                if let item = renameItem { manager.rename(item, to: renameText) }
+                renameItem = nil
+            }
+        } message: {
+            Text(L("扩展名别改错，不然文件可能打不开。"))
         }
         // F2：清空全部确认（文件页批量删同款：带数量的标题，续签源
         // 有名字就列出来、否则只说删后无法恢复）。

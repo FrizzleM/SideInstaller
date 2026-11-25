@@ -1548,4 +1548,13 @@ let turkishStrings: [String: String] = [
     "正在签名，等它跑完再批量安装。": "İmzalama sürüyor. Toplu yüklemeden önce bitmesini bekleyin.",
     "Installed apps will be listed here.": "Yüklenen uygulamalar burada listelenir.",
     "以下 %d 个删除失败：%@": "Şu %d dosya silinemedi: %@",
+
+    // MARK: - F1 source toggle, F2 source export/import & F3 download rename (0.9.152)
+
+    "Enabled": "Etkin",
+    "Names can't be empty, contain /, or start with .": "Adlar boş olamaz, / içeremez ve . ile başlayamaz",
+    "Export sources": "Kaynakları dışa aktar",
+    "Import sources": "Kaynakları içe aktar",
+    "The clipboard has no source list to import.": "Panoda içe aktarılacak kaynak listesi yok.",
+    "Imported %d, already added %d, failed %d.": "%d içe aktarıldı, %d zaten ekli, %d başarısız.",
 ]

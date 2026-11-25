@@ -6,6 +6,9 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @Environment(Engine.self) private var engine
     @EnvironmentObject private var updateChecker: UpdateChecker
+    /// Dismisses this full-screen cover; P0 (0.9.152) uses it for the Back
+    /// button — leaving the page never cancels the run.
+    @Environment(\.dismiss) private var dismiss
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @Environment(\.openURL) private var openURL
@@ -110,7 +113,25 @@ struct ContentView: View {
                 .animation(.smooth(duration: 0.35), value: showsAdvanced)
             }
             .background(AppBackground())
-            .toolbar { settingsToolbarItem(isPresented: $showSettings) }
+            .toolbar {
+                // P0 (0.9.152): this page is a full-screen cover over the tab
+                // bar — the tab bar and its pill are unreachable from here,
+                // and the header's chevron only opens the step list while the
+                // X cancels the run. Without a way out, a run in flight left
+                // the user stuck on this page. Back only hides the page: the
+                // run keeps going, and the pill at the bottom of the tabs
+                // brings the page back with its progress.
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        CZFHaptics.impact(.light)
+                        dismiss()
+                    } label: {
+                        Label(L("Back"), systemImage: "chevron.left")
+                    }
+                    .buttonStyle(.plain, sound: .tick)
+                }
+                settingsToolbarItem(isPresented: $showSettings)
+            }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showImporter) {
                 FileImporterRepresentableView(allowedContentTypes: [.ipa]) { urls in

@@ -1594,4 +1594,13 @@ let japaneseStrings: [String: String] = [
     "正在签名，等它跑完再批量安装。": "署名中です。終わるまで待ってから一括インストールしてください。",
     "Installed apps will be listed here.": "インストールした App はここに表示されます。",
     "以下 %d 个删除失败：%@": "次の %d 個を削除できませんでした：%@",
+
+    // MARK: - F1 source toggle, F2 source export/import & F3 download rename (0.9.152)
+
+    "Enabled": "有効",
+    "Names can't be empty, contain /, or start with .": "名前は空にできず、/ を含めたり . で始めたりできません",
+    "Export sources": "ソースをエクスポート",
+    "Import sources": "ソースをインポート",
+    "The clipboard has no source list to import.": "クリップボードにインポートできるソース一覧がありません。",
+    "Imported %d, already added %d, failed %d.": "%d 件インポート、%d 件は追加済み、%d 件失敗しました。",
 ]

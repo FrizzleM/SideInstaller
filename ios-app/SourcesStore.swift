@@ -175,6 +175,27 @@ enum UnifiedSourceList {
         UserDefaults.standard.set(urls.map(\.absoluteString), forKey: key)
         NotificationCenter.default.post(name: didChange, object: nil)
     }
+
+    /// The disabled sources, by absolute URL string (F1, 0.9.152): a
+    /// disabled source stays listed and keeps its disk cache, but is never
+    /// fetched and never counts toward updates.
+    static let disabledKey = "CZFDisabledSourceURLs"
+
+    static func disabledURLs() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: disabledKey) ?? [])
+    }
+
+    static func isDisabled(_ url: URL) -> Bool {
+        disabledURLs().contains(url.absoluteString)
+    }
+
+    /// Persist one source's disabled state and tell the other page.
+    static func setDisabled(_ url: URL, disabled: Bool) {
+        var set = disabledURLs()
+        if disabled { set.insert(url.absoluteString) } else { set.remove(url.absoluteString) }
+        UserDefaults.standard.set(Array(set), forKey: disabledKey)
+        NotificationCenter.default.post(name: didChange, object: nil)
+    }
 }
 
 // MARK: - Store
@@ -185,6 +206,10 @@ enum UnifiedSourceList {
 final class SourceStore: ObservableObject {
 
     @Published var sources: [LoadedSource] = []
+    /// The disabled sources, by absolute URL string (F1, 0.9.152): kept
+    /// here so rows redraw when one flips; the truth lives in
+    /// `UnifiedSourceList`.
+    @Published private(set) var disabled: Set<String> = UnifiedSourceList.disabledURLs()
 
     /// UserDefaults key for the source URL strings. Legacy since 0.9.143:
     /// the list now lives under `UnifiedSourceList.key`; this key is only
@@ -207,6 +232,7 @@ final class SourceStore: ObservableObject {
 
     init() {
         sources = UnifiedSourceList.load().map { LoadedSource(url: $0) }
+        disabled = UnifiedSourceList.disabledURLs()
     }
 
     /// Re-read the unified list (the other page saved it): keep the loaded
@@ -214,9 +240,19 @@ final class SourceStore: ObservableObject {
     /// removed ones. Called when the page appears and when the list changes.
     func syncURLs() {
         let urls = UnifiedSourceList.load()
+        disabled = UnifiedSourceList.disabledURLs()
         var kept: [URL: LoadedSource] = [:]
         for source in sources { kept[source.url] = source }
         sources = urls.map { kept[$0] ?? LoadedSource(url: $0) }
+    }
+
+    func isDisabled(_ url: URL) -> Bool { disabled.contains(url.absoluteString) }
+
+    /// Flip one source's disabled state (F1, 0.9.152): persisted in
+    /// `UnifiedSourceList`, so the other page picks it up on `didChange`.
+    func setDisabled(_ url: URL, _ disabled: Bool) {
+        UnifiedSourceList.setDisabled(url, disabled: disabled)
+        self.disabled = UnifiedSourceList.disabledURLs()
     }
 
     /// Add a source by its address text: validated like a pasted IPA link,
@@ -306,9 +342,10 @@ final class SourceStore: ObservableObject {
 
     /// Fetch every source, in parallel. `force` (pull-to-refresh) skips the
     /// 15-minute cache; entry and detail `.task` calls use the cache.
+    /// F1 (0.9.152): disabled sources are never fetched.
     func fetchAll(force: Bool = false) async {
         await withTaskGroup(of: Void.self) { group in
-            for source in sources {
+            for source in sources where !isDisabled(source.url) {
                 group.addTask { await self.fetch(source.url, force: force) }
             }
         }
@@ -357,6 +394,8 @@ final class SourceStore: ObservableObject {
     /// skips the cache. Decoding is tolerant: a body that isn't a source
     /// document is reported as the row's error.
     func fetch(_ url: URL, force: Bool = false) async {
+        // F1 (0.9.152): a disabled source is never fetched, even directly.
+        guard !isDisabled(url) else { return }
         guard let index = sources.firstIndex(where: { $0.url == url }) else { return }
         // Memory cache, same 15-minute rule as loadReleaseCatalog.
         if !force, let fetchedAt = sources[index].fetchedAt,

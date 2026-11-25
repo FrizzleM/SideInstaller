@@ -1628,4 +1628,13 @@ let vietnameseStrings: [String: String] = [
     "正在签名，等它跑完再批量安装。": "Đang ký. Hãy đợi xong rồi mới cài đặt hàng loạt.",
     "Installed apps will be listed here.": "Các app đã cài sẽ được liệt kê ở đây.",
     "以下 %d 个删除失败：%@": "Không xóa được %d tệp: %@",
+
+    // MARK: - F1 source toggle, F2 source export/import & F3 download rename (0.9.152)
+
+    "Enabled": "Bật",
+    "Names can't be empty, contain /, or start with .": "Tên không được để trống, chứa / hoặc bắt đầu bằng .",
+    "Export sources": "Xuất danh sách nguồn",
+    "Import sources": "Nhập danh sách nguồn",
+    "The clipboard has no source list to import.": "Bảng tạm không có danh sách nguồn để nhập.",
+    "Imported %d, already added %d, failed %d.": "Đã nhập %d, đã thêm %d, lỗi %d.",
 ]

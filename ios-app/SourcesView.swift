@@ -180,7 +180,15 @@ struct SourcesView: View {
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
             }
+            // F1 (0.9.152): per-source enable switch — off means never
+            // fetched and never counted toward updates, without deleting it.
+            Toggle(L("Enabled"), isOn: Binding(
+                get: { !store.isDisabled(source.url) },
+                set: { store.setDisabled(source.url, !$0) }
+            ))
+            .labelsHidden()
         }
+        .opacity(store.isDisabled(source.url) ? 0.5 : 1)
     }
 
     /// A source or app icon: the remote image, or a box placeholder while it
@@ -850,6 +858,10 @@ final class SourcesManager: ObservableObject {
     /// The sources, in the order they were added.
     @Published private(set) var urls: [URL] = []
     @Published private(set) var states: [URL: SourceState] = [:]
+    /// The disabled sources, by absolute URL string (F1, 0.9.152): kept
+    /// here so rows and listings redraw when one flips; the truth lives
+    /// in `UnifiedSourceList`.
+    @Published private(set) var disabled: Set<String> = UnifiedSourceList.disabledURLs()
     @Published private(set) var isAdding = false
     /// Why the last add failed, shown under the field.
     @Published var addError: String?
@@ -862,6 +874,7 @@ final class SourcesManager: ObservableObject {
 
     init() {
         urls = UnifiedSourceList.load()
+        disabled = UnifiedSourceList.disabledURLs()
     }
 
     /// Re-read the unified list (the other page saved it): keep the fetch
@@ -869,7 +882,17 @@ final class SourcesManager: ObservableObject {
     /// appears and when the list changes.
     func syncURLs() {
         urls = UnifiedSourceList.load()
+        disabled = UnifiedSourceList.disabledURLs()
         states = states.filter { urls.contains($0.key) }
+    }
+
+    func isDisabled(_ url: URL) -> Bool { disabled.contains(url.absoluteString) }
+
+    /// Flip one source's disabled state (F1, 0.9.152): persisted in
+    /// `UnifiedSourceList`, so the other page picks it up on `didChange`.
+    func setDisabled(_ url: URL, _ disabled: Bool) {
+        UnifiedSourceList.setDisabled(url, disabled: disabled)
+        self.disabled = UnifiedSourceList.disabledURLs()
     }
 
     func isBuiltIn(_ url: URL) -> Bool { Self.builtIn.contains(url) }
@@ -906,9 +929,10 @@ final class SourcesManager: ObservableObject {
     var isRefreshing: Bool { states.values.contains(.loading) }
 
     /// Every app of every source that loaded, by name. An app two sources
-    /// both offer is listed under each.
+    /// both offer is listed under each. F1 (0.9.152): disabled sources
+    /// contribute nothing here, so their apps never count toward updates.
     func listings(installed apps: [SideloadedAppStatus]) -> [SourceListing] {
-        urls.flatMap { url -> [SourceListing] in
+        urls.filter { !isDisabled($0) }.flatMap { url -> [SourceListing] in
             guard case .loaded(let source)? = states[url] else { return [] }
             return source.apps.map { app in
                 SourceListing(app: app, sourceURL: url, sourceName: Self.name(of: source, at: url),
@@ -1034,18 +1058,32 @@ final class SourcesManager: ObservableObject {
     // MARK: Fetching
 
     /// Fetches every source again. Called when the page opens and on pull.
+    /// F1 (0.9.152): disabled sources are never fetched — they keep their
+    /// last state and their disk cache, and `listings` skips them.
     func refresh() async {
-        let all = urls
+        let all = urls.filter { !isDisabled($0) }
         guard !all.isEmpty else { return }
+        // B2 (0.9.152): snapshot the states before this refresh marks the
+        // unfetched ones .loading, so a cancelled fetch can put each row
+        // back exactly where it was instead of leaving a fake error.
+        let before = states
         for url in all where states[url] == nil { states[url] = .loading }
-        await withTaskGroup(of: (URL, SourceState).self) { group in
+        await withTaskGroup(of: (URL, SourceState?).self) { group in
             for url in all {
                 group.addTask {
                     do { return (url, .loaded(try await Self.fetch(url))) }
+                    // B2 (0.9.152): a cancelled fetch is not an error
+                    // (SourceStore.fetch 同款): nil means "restore the
+                    // row's pre-refresh state" in the loop below. Both
+                    // shapes of cancel are caught — URLSession throws
+                    // URLError(.cancelled), not CancellationError.
+                    catch is CancellationError { return (url, nil) }
+                    catch let error as URLError where error.code == .cancelled { return (url, nil) }
                     catch { return (url, .failed(await Self.describe(error))) }
                 }
             }
             for await (url, state) in group where urls.contains(url) {
+                guard let state else { states[url] = before[url]; continue }
                 // A source that fetched before keeps its apps if this fetch fails.
                 if case .failed = state, case .loaded? = states[url] { continue }
                 states[url] = state
@@ -1125,6 +1163,8 @@ struct AppSourcesView: View {
     @State private var showAdd = false
     /// The list of sources, opened from its button.
     @State private var showSources = false
+    /// The import result, shown in an alert (F2, 0.9.152).
+    @State private var importSummary: String?
 
     private var listings: [SourceListing] { manager.listings(installed: appsManager.entries) }
 
@@ -1166,8 +1206,38 @@ struct AppSourcesView: View {
         .scrollDismissesKeyboard(.interactively)
         .background(AppBackground())
         .refreshable { await manager.refresh() }
-        .toolbar { settingsToolbarItem(isPresented: $showSettings) }
+        .toolbar {
+            // F2 (0.9.152): export the whole source list as text, and import
+            // the same format back from the clipboard.
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        shareSources()
+                    } label: {
+                        Label(L("Export sources"), systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(manager.urls.isEmpty)
+                    Button {
+                        importFromClipboard()
+                    } label: {
+                        Label(L("Import sources"), systemImage: "square.and.arrow.down")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .accessibilityLabel(L("Source options"))
+            }
+            settingsToolbarItem(isPresented: $showSettings)
+        }
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .alert(L("Import sources"), isPresented: Binding(
+            get: { importSummary != nil },
+            set: { if !$0 { importSummary = nil } }
+        )) {
+            Button(L("OK"), role: .cancel) { importSummary = nil }
+        } message: {
+            if let importSummary { Text(importSummary) }
+        }
         .task {
             manager.syncURLs()
             appsManager.autoLoad()
@@ -1276,6 +1346,48 @@ struct AppSourcesView: View {
                 fieldFocused = false
                 showAdd = false
             }
+        }
+    }
+
+    /// The source list as text, one URL per line — the export format the
+    /// import reads back (F2, 0.9.152).
+    private var exportText: String {
+        manager.urls.map(\.absoluteString).joined(separator: "\n")
+    }
+
+    /// Shares the exported list with the system sheet (FilesTabView.shareFile
+    /// 同款：UIActivityViewController + topViewController, iPad anchor centred).
+    private func shareSources() {
+        DispatchQueue.main.async {
+            let sheet = UIActivityViewController(activityItems: [exportText], applicationActivities: nil)
+            guard let top = UIApplication.shared.topViewController else { return }
+            sheet.popoverPresentationController?.sourceView = top.view
+            sheet.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY,
+                                                                     width: 0, height: 0)
+            top.present(sheet, animated: true)
+        }
+    }
+
+    /// Imports sources from the clipboard, one URL per line (F2, 0.9.152):
+    /// each line goes through the same add path as a pasted link, so a bad
+    /// line or a duplicate is counted, not fatal.
+    private func importFromClipboard() {
+        let lines = (UIPasteboard.general.string ?? "")
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !lines.isEmpty else {
+            importSummary = L("The clipboard has no source list to import.")
+            return
+        }
+        Task { @MainActor in
+            var added = 0, skipped = 0, failed = 0
+            for line in lines {
+                guard let url = SourcesManager.sourceLink(line) else { failed += 1; continue }
+                if manager.urls.contains(url) { skipped += 1; continue }
+                if await manager.add(line) { added += 1 } else { failed += 1 }
+            }
+            importSummary = L("Imported %d, already added %d, failed %d.", added, skipped, failed)
         }
     }
 
@@ -1425,6 +1537,13 @@ struct SourceRowsCard: View {
                     .truncationMode(.middle)
             }
             Spacer(minLength: 8)
+            // F1 (0.9.152): per-source enable switch — off means never
+            // fetched and never counted toward updates, without deleting it.
+            Toggle(L("Enabled"), isOn: Binding(
+                get: { !manager.isDisabled(url) },
+                set: { manager.setDisabled(url, !$0) }
+            ))
+            .labelsHidden()
             Menu {
                 Button { UIPasteboard.general.string = url.absoluteString } label: {
                     Label(L("Copy link"), systemImage: "doc.on.doc")
@@ -1444,6 +1563,7 @@ struct SourceRowsCard: View {
             .accessibilityLabel(L("Source options"))
         }
         .padding(.vertical, 6)
+        .opacity(manager.isDisabled(url) ? 0.5 : 1)
     }
 
     private func sourceName(_ url: URL) -> String {

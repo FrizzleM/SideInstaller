@@ -150,6 +150,10 @@ final class Engine {
     }
     /// The `sideinstaller://` link waiting for the go-ahead.
     private(set) var pendingLink: DeepLink?
+    /// An invalid `sideinstaller://` link that arrived mid-run: the run's own
+    /// popups come first, so it waits here and shows once the run ends
+    /// (B1, 0.9.152) instead of only landing in the log.
+    private(set) var pendingInvalidLinkMessage: String?
     /// When SideStore was last asked for its pairing file, so the file it sends
     /// back can be told from one some other link brought.
     private var sideStorePairingRequestedAt: Date?
@@ -702,6 +706,7 @@ final class Engine {
             //（结束时的比对还要认它），下一跑起跑时自然轮换。
             self.installSessionID = nil
             self.lastError = nil
+            self.pendingInvalidLinkMessage = nil
             self.finished = false
             self.successClosed = false
             self.liveContainerImportClosed = false
@@ -944,6 +949,9 @@ final class Engine {
         var shown: [Popup] = []
         if let mismatch = pairingImportMismatch { shown.append(.pairingImportMismatch(mismatch)) }
         if let link = pendingLink { shown.append(.link(link)) }
+        // B1 (0.9.152): an invalid link that arrived mid-run also shows once
+        // the run ends — on a failed run the finished list never appears.
+        if let invalid = pendingInvalidLinkMessage { shown.append(.error(invalid, stoppedRun: false)) }
         if certConflict { shown.append(.certConflict) }
         if let guide { shown.append(.guide(guide)) }
         if let lastError {
@@ -961,7 +969,16 @@ final class Engine {
             ? .liveContainerImport : nil
         let leads = trust != nil && certificate != nil
         let success: Popup? = successClosed ? nil : .success(installedSourceName, leads: leads)
-        return (leads ? [success, trust, certificate] : [trust, success, certificate])
+        // B1 (0.9.152): a link that arrived mid-run used to sit in
+        // `pendingLink` while `finished` made `popups` return only this
+        // list — it never showed until a later run failed. It joins the
+        // finished popups now, after the success/trust steps; an invalid
+        // link from the same run shows as an error card instead of only
+        // landing in the log.
+        let link: Popup? = pendingLink.map(Popup.link)
+        let invalid: Popup? = pendingInvalidLinkMessage.map { .error($0, stoppedRun: false) }
+        return (leads ? [success, trust, certificate, link, invalid]
+                      : [trust, success, certificate, link, invalid])
             .compactMap { $0 }
     }
 
@@ -989,7 +1006,7 @@ final class Engine {
         case .pairingCode:         pairingPIN = nil; guide = nil
         case .certConflict:        certConflict = false
         case .guide:               guide = nil
-        case .error:               lastError = nil
+        case .error:               lastError = nil; pendingInvalidLinkMessage = nil
         case .success:             successClosed = true
         case .liveContainerImport: liveContainerImportClosed = true
         case .appIDCost:             appIDCost = nil
@@ -4099,7 +4116,14 @@ final class Engine {
         case .invalid(let message):
             log("⛔️ Link: \(message)")
             // A run's own popups come first; the log keeps the reason.
-            if !isRunning { lastError = message }
+            if isRunning {
+                // B1 (0.9.152): parked until the run ends, then shown with
+                // the finished popups — it used to vanish into the log.
+                pendingInvalidLinkMessage = message
+                log("Link: it asks once this install ends.")
+            } else {
+                lastError = message
+            }
         case .link(let link):
             if case .pairingFile = link { sideStorePairingRequestedAt = nil }
             if case .certificate(let cert) = link, cert.fromSideStore {
@@ -4108,6 +4132,11 @@ final class Engine {
                 log("Link: \(link.logDescription).")
                 certificateToImport = CertificateImport(certificate: cert, retryInstall: retryInstall)
                 return
+            }
+            if let old = pendingLink {
+                // B1 (0.9.152): one slot only — a second link used to
+                // silently drop the first; the log now says so.
+                log("Link: \(old.logDescription) was still waiting — superseded by \(link.logDescription).")
             }
             pendingLink = link
             log("Link: \(link.logDescription). \(isRunning ? "It asks once this install ends." : "Waiting for the go-ahead.")")

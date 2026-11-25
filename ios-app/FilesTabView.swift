@@ -2104,6 +2104,21 @@ struct FilesTabView: View {
         return candidate
     }
 
+    /// The rename rules, shared with the Downloads page (F3, 0.9.152):
+    /// empty, `/` and leading `.` are refused; a bare IPA name gets `.ipa`
+    /// back. Returns nil for an illegal name. Callers check "unchanged"
+    /// themselves first — it is a silent no-op, not an error.
+    static func validatedRenameName(_ raw: String, isDirectory: Bool, isIPA: Bool) -> String? {
+        var newName = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !newName.isEmpty, !newName.contains("/"), !newName.hasPrefix(".") else { return nil }
+        // 已签 IPA 改名去后缀后，证书页清单仍留一条幽灵记录
+        // （点安装必失败）：IPA 文件改名没写 .ipa 就补上。
+        if !isDirectory, isIPA, !newName.lowercased().hasSuffix(".ipa") {
+            newName += ".ipa"
+        }
+        return newName
+    }
+
     private func performRename() {
         guard let item = renameItem else { return }
         renameItem = nil
@@ -2126,14 +2141,10 @@ struct FilesTabView: View {
             return
         }
         var newName = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !newName.isEmpty, newName != item.name,
-              !newName.contains("/"), !newName.hasPrefix(".") else { return }
-        // 已签 IPA 改名去后缀后，证书页清单仍留一条幽灵记录
-        // （点安装必失败）：IPA 文件改名没写 .ipa 就补上。
-        if !item.isDirectory, item.url.pathExtension.lowercased() == "ipa",
-           !newName.lowercased().hasSuffix(".ipa") {
-            newName += ".ipa"
-        }
+        guard newName != item.name else { return }
+        guard let validated = Self.validatedRenameName(renameText, isDirectory: item.isDirectory,
+                                                       isIPA: item.url.pathExtension.lowercased() == "ipa") else { return }
+        newName = validated
         // 补后缀后跟原名相同（“X.ipa”改“X”）就是没改，直接返回。
         guard newName != item.name else { return }
         let dest = item.url.deletingLastPathComponent().appendingPathComponent(newName)

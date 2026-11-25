@@ -1636,4 +1636,13 @@ let frenchStrings: [String: String] = [
     "正在签名，等它跑完再批量安装。": "Signature en cours. Attendez qu’elle se termine avant l’installation par lots.",
     "Installed apps will be listed here.": "Les apps installées seront listées ici.",
     "以下 %d 个删除失败：%@": "Impossible de supprimer %d fichiers : %@",
+
+    // MARK: - F1 source toggle, F2 source export/import & F3 download rename (0.9.152)
+
+    "Enabled": "Activée",
+    "Names can't be empty, contain /, or start with .": "Les noms ne peuvent pas être vides, contenir / ni commencer par .",
+    "Export sources": "Exporter les sources",
+    "Import sources": "Importer les sources",
+    "The clipboard has no source list to import.": "Le presse-papiers ne contient aucune liste de sources à importer.",
+    "Imported %d, already added %d, failed %d.": "%d importées, %d déjà ajoutées, %d en échec.",
 ]

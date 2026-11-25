@@ -1595,4 +1595,13 @@ let koreanStrings: [String: String] = [
     "正在签名，等它跑完再批量安装。": "서명 중입니다. 끝날 때까지 기다린 후 일괄 설치하세요.",
     "Installed apps will be listed here.": "설치한 앱이 여기에 표시됩니다.",
     "以下 %d 个删除失败：%@": "다음 %d개를 삭제하지 못했습니다: %@",
+
+    // MARK: - F1 source toggle, F2 source export/import & F3 download rename (0.9.152)
+
+    "Enabled": "활성",
+    "Names can't be empty, contain /, or start with .": "이름은 비워 둘 수 없으며 / 를 포함하거나 . 로 시작할 수 없습니다",
+    "Export sources": "소스 내보내기",
+    "Import sources": "소스 가져오기",
+    "The clipboard has no source list to import.": "클립보드에 가져올 소스 목록이 없습니다.",
+    "Imported %d, already added %d, failed %d.": "%d개를 가져왔고, %d개는 이미 추가됨, %d개 실패.",
 ]

@@ -1621,4 +1621,13 @@ let portugueseStrings: [String: String] = [
     "正在签名，等它跑完再批量安装。": "Assinando. Espere terminar antes da instalação em lote.",
     "Installed apps will be listed here.": "Os apps instalados serão listados aqui.",
     "以下 %d 个删除失败：%@": "Não foi possível excluir %d: %@",
+
+    // MARK: - F1 source toggle, F2 source export/import & F3 download rename (0.9.152)
+
+    "Enabled": "Ativa",
+    "Names can't be empty, contain /, or start with .": "Os nomes não podem estar vazios, conter / nem começar com .",
+    "Export sources": "Exportar fontes",
+    "Import sources": "Importar fontes",
+    "The clipboard has no source list to import.": "A área de transferência não tem uma lista de fontes para importar.",
+    "Imported %d, already added %d, failed %d.": "%d importadas, %d já adicionadas, %d com falha.",
 ]
