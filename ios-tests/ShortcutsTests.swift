@@ -12,7 +12,11 @@ struct ShortcutsTests {
 
     private func job(_ name: String, _ state: RefreshJob.State) -> RefreshJob {
         RefreshJob(bundleID: "com.example.\(name)", name: name,
-                   ipa: URL(fileURLWithPath: "/tmp/\(name).ipa"), teamID: nil, state: state)
+                   ipa: URL(fileURLWithPath: "/tmp/\(name).ipa"),
+                   // Fork's RefreshJob carries the SIDE-33 IPA snapshot
+                   // (size + mtime); the report under test doesn't read it.
+                   ipaSize: 0, ipaModified: 0,
+                   teamID: nil, state: state)
     }
 
     /// The headline is translated, so only its line is counted.
