@@ -1643,4 +1643,14 @@ let koreanStrings: [String: String] = [
     "Enterprise certificate expiring": "기업 인증서 만료 임박",
     "The enterprise certificate expires on %@. Re-import it in time.": "기업 인증서가 %@에 만료됩니다. 제때 다시 가져오세요.",
     "The enterprise provisioning profile expires on %@. Re-import it in time.": "기업 프로비저닝 프로파일이 %@에 만료됩니다. 제때 다시 가져오세요.",
+
+    // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
+
+    "Delete the IPA after installing": "설치 후 IPA 삭제",
+    "Deletes the source IPA after a successful install. Files used for renewal are kept.": "설치가 성공하면 원본 IPA를 삭제합니다. 갱신에 사용되는 파일은 유지됩니다.",
+    "Install an older version?": "이전 버전을 설치하시겠습니까?",
+    "Installed: %@ · This IPA: %@": "설치됨: %@ · 이 IPA: %@",
+    "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "상대방 iPhone의 iOS 버전을 읽을 수 없습니다. 다시 연결한 후 시도하세요. 버전을 모른 채 설치하면 상대방 iPhone에서 실행할 수 없는 앱이 설치될 수 있습니다.",
+    "Development certificate expiring": "개발 인증서 만료 임박",
+    "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "개발 인증서 \"%@\"이(가) %@에 만료됩니다. 제때 갱신하세요. 그렇지 않으면 설치가 실패합니다.",
 ]

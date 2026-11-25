@@ -1654,4 +1654,14 @@ let chineseStrings: [String: String] = [
     "Enterprise certificate expiring": "企业证书即将到期",
     "The enterprise certificate expires on %@. Re-import it in time.": "企业证书将于 %@ 到期，请及时重新导入。",
     "The enterprise provisioning profile expires on %@. Re-import it in time.": "企业描述文件将于 %@ 到期，请及时重新导入。",
+
+    // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
+
+    "Delete the IPA after installing": "安装后删除 IPA",
+    "Deletes the source IPA after a successful install. Files used for renewal are kept.": "安装成功后删除源 IPA。用于续签的文件会保留。",
+    "Install an older version?": "安装旧版本？",
+    "Installed: %@ · This IPA: %@": "已装：%@ · 此 IPA：%@",
+    "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "读取不到对方 iPhone 的 iOS 版本。请重新连接再试——不知道版本就安装，可能会装上对方 iPhone 跑不了的应用。",
+    "Development certificate expiring": "开发证书即将到期",
+    "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "开发证书“%@”将于 %@ 到期。请及时更新，否则安装会失败。",
 ]

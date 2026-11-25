@@ -1589,6 +1589,39 @@ struct InstallPopup: View {
                     }
                 }
             }
+        case .downgrade(let request):
+            // F-2 (0.9.159): the "older than what's installed" prompt — the
+            // two versions, and the same warning the Sources page gives:
+            // the older copy may not open data the newer one saved. Install
+            // goes ahead; Cancel, or the X, stops the run.
+            PopupCard(title: L("Install an older version?"), systemImage: "arrow.down.circle",
+                      tint: Theme.warning, onClose: close) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(request.appName)
+                        .font(.subheadline.weight(.medium))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(L("Installed: %@ · This IPA: %@", request.installedVersion, request.ipaVersion))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(L("This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.", request.installedVersion))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 12) {
+                        Button { engine.answerDowngrade(true) } label: {
+                            Label(L("Install"), systemImage: "arrow.down.app")
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        Button(role: .cancel) { engine.answerDowngrade(false) } label: {
+                            Text(L("Cancel"))
+                                .font(.subheadline.weight(.medium))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    }
+                }
+            }
         case .link(let link):
             linkPopup(link)
         }

@@ -1676,4 +1676,14 @@ let vietnameseStrings: [String: String] = [
     "Enterprise certificate expiring": "Chứng chỉ doanh nghiệp sắp hết hạn",
     "The enterprise certificate expires on %@. Re-import it in time.": "Chứng chỉ doanh nghiệp hết hạn vào %@. Hãy nhập lại kịp thời.",
     "The enterprise provisioning profile expires on %@. Re-import it in time.": "Hồ sơ cấp phép doanh nghiệp hết hạn vào %@. Hãy nhập lại kịp thời.",
+
+    // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
+
+    "Delete the IPA after installing": "Xóa IPA sau khi cài đặt",
+    "Deletes the source IPA after a successful install. Files used for renewal are kept.": "Xóa IPA gốc sau khi cài đặt thành công. Các tệp dùng để gia hạn được giữ lại.",
+    "Install an older version?": "Cài đặt phiên bản cũ hơn?",
+    "Installed: %@ · This IPA: %@": "Đã cài: %@ · IPA này: %@",
+    "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "Không đọc được phiên bản iOS của iPhone bên kia. Hãy kết nối lại rồi thử lại — cài đặt mà không biết phiên bản có thể cài ứng dụng mà iPhone của họ không chạy được.",
+    "Development certificate expiring": "Chứng chỉ phát triển sắp hết hạn",
+    "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "Chứng chỉ phát triển \"%@\" hết hạn vào %@. Hãy gia hạn kịp thời, nếu không quá trình cài đặt sẽ thất bại.",
 ]

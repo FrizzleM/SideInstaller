@@ -1642,4 +1642,14 @@ let japaneseStrings: [String: String] = [
     "Enterprise certificate expiring": "企業証明書の有効期限が近づいています",
     "The enterprise certificate expires on %@. Re-import it in time.": "企業証明書は %@ に期限切れとなります。お早めに再インポートしてください。",
     "The enterprise provisioning profile expires on %@. Re-import it in time.": "企業のプロビジョニングプロファイルは %@ に期限切れとなります。お早めに再インポートしてください。",
+
+    // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
+
+    "Delete the IPA after installing": "インストール後に IPA を削除",
+    "Deletes the source IPA after a successful install. Files used for renewal are kept.": "インストール成功後に元の IPA を削除します。更新に使うファイルは残ります。",
+    "Install an older version?": "古いバージョンをインストールしますか？",
+    "Installed: %@ · This IPA: %@": "インストール済み: %@ · この IPA: %@",
+    "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "相手の iPhone の iOS バージョンを読み取れませんでした。再接続してもう一度お試しください。バージョンが分からないままインストールすると、相手の iPhone で動かないアプリが入るおそれがあります。",
+    "Development certificate expiring": "開発用証明書の有効期限が近づいています",
+    "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "開発用証明書「%@」は %@ に期限切れとなります。早めに更新してください。更新しないとインストールが失敗します。",
 ]

@@ -55,6 +55,11 @@ struct SettingsView: View {
     /// `Engine` so the download paths read the same value.
     @AppStorage(Engine.wifiOnlyDownloadsKey) private var wifiOnlyDownloads = false
 
+    /// F-1 (0.9.159): "Delete the IPA after installing" — with it on, a
+    /// successful install deletes its source IPA. Off by default. The key
+    /// lives on `Engine` so the success path reads the same value.
+    @AppStorage(Engine.deleteAfterInstallKey) private var deleteAfterInstall = false
+
     /// 内置隧道本端地址，与 BuiltinTunnel 共用同一 UserDefaults 键。
     @AppStorage("CZFBuiltinTunnelIfaceIP") private var builtinTunnelIfaceIP = "10.7.1.1/32"
     /// Device IP 填非法时弹一次提示（Tunnel 节和 Advanced 节两处栏共用）。
@@ -683,10 +688,14 @@ struct SettingsView: View {
     private var downloadsSection: some View {
         Section {
             Toggle(L("Wi-Fi only downloads"), isOn: $wifiOnlyDownloads)
+            Toggle(L("Delete the IPA after installing"), isOn: $deleteAfterInstall)
         } header: {
             Text(L("Downloads"))
         } footer: {
-            Text(L("When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data."))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data."))
+                Text(L("Deletes the source IPA after a successful install. Files used for renewal are kept."))
+            }
         }
     }
 

@@ -1147,8 +1147,15 @@ final class SideBySideManager: ObservableObject {
             for (key, value) in info { values[key] = value; engine.log("  \(key) = \(value)") }
         }
         let name = values["DeviceName"] ?? L("device")
-        let version = values["ProductVersion"]
-        let summary = version.map { "\(name) · iOS \($0)" } ?? name
+        // B-1 (0.9.159): lockdownd gave no ProductVersion — stop here instead
+        // of connecting with a nil version and letting the download and
+        // sign steps silently fall back to this iPhone's iOS. Their iPhone
+        // may be older, and a too-new IPA would burn an App ID before the
+        // install fails on their iPhone — the pre-check exists to prevent.
+        guard let version = values["ProductVersion"] else {
+            throw EngineError.message(L("Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it."))
+        }
+        let summary = "\(name) · iOS \(version)"
         return ConnectedTarget(summary: summary,
                                osVersion: version,
                                udid: values["UniqueDeviceID"],
@@ -1166,7 +1173,17 @@ final class SideBySideManager: ObservableObject {
     /// when the record is one it can't use (`handOffToAltStore`).
     @MainActor
     private func checkCompatibility(of app: SideBySideApp) throws {
-        guard app != .altStore, let version = targetOSVersion, let path = pairRecordPath else { return }
+        guard app != .altStore else { return }
+        // B-1 (0.9.159): with no version the iOS 26.4+ lockdown check below
+        // can't run — and a version-less run must not slip past it. Block
+        // when a pairing record exists (the check's subject); with no
+        // record there is nothing for the check to judge. Connect normally
+        // stops earlier, in `describeTarget`, so this is the second gate.
+        guard let version = targetOSVersion else {
+            guard pairRecordPath != nil else { return }
+            throw EngineError.message(L("Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it."))
+        }
+        guard let path = pairRecordPath else { return }
         let kind = PairingFileKind.of(path: path)
         guard kind.hasLockdown, !kind.hasRemotePairing, Self.version(version, isAtLeast: 26, 4) else { return }
         guard app.source != nil else {
@@ -1563,8 +1580,12 @@ final class SideBySideManager: ObservableObject {
             Task { @MainActor in self?.noteDownloadDetail(bytes: bytes, total: total) }
         }
         // Their iOS, not this iPhone's, decides which AltStore version goes on.
-        let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion)
-            ?? ProcessInfo.processInfo.operatingSystemVersion
+        // B-1 (0.9.159): unknown is not this iPhone's version — connect
+        // normally stops earlier, in `describeTarget`, so reaching here
+        // without one is a second gate, not a fallback.
+        guard let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion) else {
+            throw EngineError.message(L("Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it."))
+        }
         do {
             let path = try await SideStoreDownloader.$reportProgress.withValue(report) {
                 try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
@@ -1633,8 +1654,11 @@ final class SideBySideManager: ObservableObject {
         // filtered by `downloadLatest(runningOn:)`; this also covers a
         // fallback copy from Documents and the custom IPA.
         if let info = IPALibrary.appInfo(at: ipa) {
-            let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion)
-                ?? ProcessInfo.processInfo.operatingSystemVersion
+            // B-1 (0.9.159): unknown is not this iPhone's version — same
+            // second gate as the download above.
+            guard let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion) else {
+                throw EngineError.message(L("Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it."))
+            }
             let theirOSText = targetOSVersion ?? engine.osVersionText
             if let reason = Engine.minOSBlockReason(info: info, runningOn: theirOS, osText: theirOSText) {
                 throw EngineError.message(reason)

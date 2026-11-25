@@ -1678,4 +1678,14 @@ let italianStrings: [String: String] = [
     "Enterprise certificate expiring": "Certificato aziendale in scadenza",
     "The enterprise certificate expires on %@. Re-import it in time.": "Il certificato aziendale scade il %@. Reimportalo in tempo.",
     "The enterprise provisioning profile expires on %@. Re-import it in time.": "Il profilo di provisioning aziendale scade il %@. Reimportalo in tempo.",
+
+    // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
+
+    "Delete the IPA after installing": "Elimina l’IPA dopo l’installazione",
+    "Deletes the source IPA after a successful install. Files used for renewal are kept.": "Elimina l’IPA di origine dopo un’installazione riuscita. I file usati per il rinnovo vengono conservati.",
+    "Install an older version?": "Installare una versione precedente?",
+    "Installed: %@ · This IPA: %@": "Installata: %@ · Questo IPA: %@",
+    "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "Non è stato possibile leggere la versione di iOS del loro iPhone. Riconnettiti e riprova: installare senza conoscerla potrebbe installare un’app che il loro iPhone non può eseguire.",
+    "Development certificate expiring": "Certificato di sviluppo in scadenza",
+    "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "Il certificato di sviluppo “%@” scade il %@. Rinnovalo in tempo, altrimenti le installazioni non riusciranno.",
 ]

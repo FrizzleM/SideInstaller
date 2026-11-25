@@ -28,6 +28,10 @@ struct ReportProblemView: View {
     @State private var issueToOpen: ProblemReport.IssueDraft?
     /// True for a moment after “Copy the full log”.
     @State private var copiedLog = false
+    /// B-2 (0.9.159): the task that clears `copiedLog` — a second tap
+    /// cancels the first one's, so its late write can't clear the new
+    /// "Copied" feedback early.
+    @State private var copyLogTask: Task<Void, Never>?
 
     /// An issue with nothing in it can't be acted on (#27, #37, #67), so a few
     /// words are asked for first.
@@ -292,9 +296,14 @@ struct ReportProblemView: View {
         let issue = issueDraft(report)
         UIPasteboard.general.string = issue.pasteText ?? report.fileText(
             description: description, deviceCrashes: pickedDeviceCrashes, ownCrashes: pickedOwnCrashes)
+        // B-2 (0.9.159): a second tap first cancels the first task — without
+        // the handle, the first task's late write clears the feedback the
+        // second tap just showed.
+        copyLogTask?.cancel()
         copiedLog = true
-        Task {
+        copyLogTask = Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
             copiedLog = false
         }
     }

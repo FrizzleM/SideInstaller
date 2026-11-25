@@ -724,9 +724,21 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         currentTaskID = ObjectIdentifier(task)
         currentURL = url
         defer { session.finishTasksAndInvalidate() }
-        return try await withCheckedThrowingContinuation { continuation in
-            self.continuation = continuation
-            task.resume()
+        // S1 (0.9.159): a bare continuation never resumes when only the
+        // waiting task is cancelled — the task would hang forever, `activeID`
+        // would stay set, and every Download button would stay disabled
+        // until Cancel or a new download. The handler settles it through
+        // the same `cancel()` the Cancel button uses. `onCancel` is a
+        // non-isolated synchronous context, so it hops back to the main
+        // actor through a Task first (Engine's `confirmPairingImportMismatch`
+        // shape); `cancel()` no-ops when the continuation is already gone.
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                self.continuation = continuation
+                task.resume()
+            }
+        } onCancel: {
+            Task { @MainActor in self.cancel() }
         }
     }
 

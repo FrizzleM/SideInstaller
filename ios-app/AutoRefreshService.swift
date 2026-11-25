@@ -330,6 +330,72 @@ enum EnterpriseCertExpiryNotifier {
     }
 }
 
+/// F-3 (0.9.159): the iOS development certificate's expiry notice — the
+/// same local-notification shape as `EnterpriseCertExpiryNotifier`, but for
+/// the Apple ID's own certificates, which otherwise only warn inside their
+/// own page: a free certificate lasts 7 days, so it expires more often
+/// than anything else, and with the app closed nobody sees it coming —
+/// then the next install just fails. One notice per certificate, 1 day
+/// before expiry; a certificate already inside its last day gets one an
+/// hour from now, so opening the page still warns in time. Re-scheduling
+/// clears the old ones first, so a re-import moves the notice with the new
+/// date, a revoked certificate leaves no stale notice behind, and signing
+/// out clears them all. Expired certificates get no notice.
+///
+/// Permission is the launch flow's (`SideInstallerApp` asks once at
+/// startup): this only schedules when the system says notifications are
+/// allowed, and never asks by itself. It touches nothing about renewal.
+enum DevCertExpiryNotifier {
+
+    private static let prefix = "dev-cert-expiry-"
+    /// Days before expiry the notice fires.
+    private static let advanceNotice: TimeInterval = 24 * 3600
+
+    static func reschedule(certs: [DevCert]) {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized
+                    || settings.authorizationStatus == .provisional else { return }
+            center.getPendingNotificationRequests { requests in
+                let stale = requests.filter { $0.identifier.hasPrefix(prefix) }.map(\.identifier)
+                if !stale.isEmpty {
+                    center.removePendingNotificationRequests(withIdentifiers: stale)
+                }
+                for cert in certs {
+                    schedule(center: center, cert: cert)
+                }
+            }
+        }
+    }
+
+    private static func schedule(center: UNUserNotificationCenter, cert: DevCert) {
+        guard let expiration = cert.expiresAt else { return }
+        let now = Date()
+        guard expiration > now else { return }
+        // 1 day before expiry; already inside the last day, an hour from
+        // now — the same "too soon to schedule ahead" shape the enterprise
+        // notifier uses.
+        let fireDate = expiration.timeIntervalSince(now) <= advanceNotice
+            ? now.addingTimeInterval(3600)
+            : expiration.addingTimeInterval(-advanceNotice)
+        guard fireDate > now, fireDate < expiration else { return }
+        let content = UNMutableNotificationContent()
+        content.title = L("Development certificate expiring")
+        let dateText = expiration.formatted(
+            Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Localizer.locale))
+        content.body = L("The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.",
+                         cert.displayName, dateText)
+        content.sound = .default
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute], from: fireDate),
+            repeats: false)
+        let request = UNNotificationRequest(
+            identifier: prefix + cert.id, content: content, trigger: trigger)
+        Task { try? await center.add(request) }
+    }
+}
+
 /// 到期通知排期（Seal 的 ExpiryNotificationScheduler，本机本地通知，
 /// 不用服务器）：每轮巡检拿到新清单就重排一次。先清掉旧的
 /// expiry-<bundleID>，再给 3 天内到期的 App 各排一条——到期前

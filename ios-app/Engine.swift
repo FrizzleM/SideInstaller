@@ -159,6 +159,19 @@ final class Engine {
         UserDefaults.standard.bool(forKey: wifiOnlyDownloadsKey)
     }
 
+    /// The Settings switch for F-1 (0.9.159): delete the source IPA after a
+    /// successful install. Off by default. The key lives on `Engine` so the
+    /// success path reads the same value the Settings toggle writes.
+    static let deleteAfterInstallKey = "SIDDeleteAfterInstall"
+    static var deleteAfterInstall: Bool {
+        UserDefaults.standard.bool(forKey: deleteAfterInstallKey)
+    }
+
+    /// A downloaded IPA was deleted by the F-1 post-install cleanup: the
+    /// Downloads and Files lists rescan on it instead of waiting for the
+    /// next time they're opened.
+    static let downloadsChanged = Notification.Name("CZFDownloadsChanged")
+
     /// Answer the pairing-file mismatch popup: true replaces the pairing file.
     @MainActor
     func answerPairingImportMismatch(_ proceed: Bool) {
@@ -768,6 +781,11 @@ final class Engine {
             self.certConflict = false
             self.madeiraHandoff = MadeiraHandoff()
             self.altStoreHoldsPairing = false
+            // F-2 (0.9.159): the last run's downgrade decline goes with it —
+            // a fresh run asks again, and the batch path must not read a
+            // stale decline as this run's.
+            self.downgradeDeclined = false
+            self.downgradeDeclinedMessage = nil
         }
     }
 
@@ -907,6 +925,14 @@ final class Engine {
             var outcome: InstallActivity.Outcome = .stopped
             var tunnelAcquired = false
             do {
+                // F-2 (0.9.159): an older custom IPA asks first, before the
+                // tunnel is taken — a decline stops here with
+                // CancellationError (no failure history), a cancel answers
+                // the prompt the same way.
+                if let downgrade = downgradeCheckForCurrentRun(),
+                   !(await confirmDowngrade(downgrade)) {
+                    throw CancellationError()
+                }
                 // SIDE-2：隧道按需开——管线开始拿租约，收尾统一还；拿不到按
                 // ensurePairingConnection 同款文案报错（入口 tunnelAvailable
                 // 守卫已先拦过一轮，这里是竞态兜底）。
@@ -1031,7 +1057,31 @@ final class Engine {
         case link(DeepLink)
         /// A big download on cellular data, asking before it starts (F-G, 0.9.156).
         case cellularDownload(CellularDownloadRequest)
+        /// A custom IPA older than the copy on this iPhone, asking before it
+        /// installs over it (F-2, 0.9.159).
+        case downgrade(DowngradeRequest)
     }
+
+    /// F-2 (0.9.159): what the downgrade prompt shows — the app, the version
+    /// on this iPhone, and the version in the IPA about to install over it.
+    struct DowngradeRequest: Hashable {
+        let appName: String
+        let installedVersion: String
+        let ipaVersion: String
+    }
+
+    /// F-2 (0.9.159): a custom IPA older than the installed copy, waiting for
+    /// the go-ahead. The pipeline asks before it takes the tunnel, so a
+    /// declined downgrade burns nothing — no App ID, no signing.
+    private(set) var downgradeRequest: DowngradeRequest?
+    private var downgradeReply: CheckedContinuation<Bool, Never>?
+
+    /// F-2 (0.9.159): true when the user declined the downgrade prompt for
+    /// this run (as opposed to the run being cancelled). The batch path reads
+    /// it so one declined item skips instead of stopping the whole batch;
+    /// `downgradeDeclinedMessage` is the reason it reports for that item.
+    private(set) var downgradeDeclined = false
+    private(set) var downgradeDeclinedMessage: String?
 
     /// True while the run is held up on the user — joining Wi-Fi, connecting
     /// the tunnel, or pairing in Settings.
@@ -1047,10 +1097,13 @@ final class Engine {
             // no step is `.waiting` while it asks — the download hasn't
             // started yet — so it joins this list on its own, or the run
             // would hang on an answer the user can't give.
-            guard isWaitingOnUser || cellularDownloadRequest != nil else { return [] }
+            // F-2 (0.9.159): the downgrade prompt is the same shape — asked
+            // before the tunnel is taken, while no step is `.waiting`.
+            guard isWaitingOnUser || cellularDownloadRequest != nil || downgradeRequest != nil else { return [] }
             return [pairingPIN.map(Popup.pairingCode), guide.map(Popup.guide),
                     appIDCost.map(Popup.appIDCost),
-                    cellularDownloadRequest.map(Popup.cellularDownload)].compactMap { $0 }
+                    cellularDownloadRequest.map(Popup.cellularDownload),
+                    downgradeRequest.map(Popup.downgrade)].compactMap { $0 }
         }
         if finished { return finishedPopups }
         var shown: [Popup] = []
@@ -1104,6 +1157,9 @@ final class Engine {
         // F-G (0.9.156): the cellular prompt blocks while a run is in flight
         // (prefetch or the download step); with no run it just declines.
         case .cellularDownload:                return isRunning
+        // F-2 (0.9.159): the downgrade prompt blocks the same way — the run
+        // waits on its answer, and closing it stops the run.
+        case .downgrade:                       return isRunning
         default:                               return false
         }
     }
@@ -1123,6 +1179,10 @@ final class Engine {
             // reaches its `onCancel`. `answerCellularDownload` no-ops when
             // the handler already answered, so this can't resume twice.
             if case .cellularDownload = popup { answerCellularDownload(false) }
+            // F-2 (0.9.159): the downgrade prompt's waiter is always the
+            // pipeline, so its cancel reaches `onCancel` — but answering
+            // here too is the same no-op guard as the cellular one above.
+            if case .downgrade = popup { answerDowngrade(false) }
             return
         }
         switch popup {
@@ -1137,6 +1197,7 @@ final class Engine {
         case .pairingImportMismatch: answerPairingImportMismatch(false)
         case .link:                  pendingLink = nil
         case .cellularDownload:      answerCellularDownload(false)
+        case .downgrade:             answerDowngrade(false)
         }
     }
 
@@ -2321,6 +2382,12 @@ final class Engine {
             lastError = L("Install stopped")
             return false
         }
+        // F-2 (0.9.159): the user declined this entry's downgrade — the run
+        // never started, so say why instead of the generic "didn't start".
+        if downgradeDeclined {
+            lastError = downgradeDeclinedMessage ?? L("Install stopped")
+            return false
+        }
         guard isRunning else {
             // 没起跑：向导优先于 lastError——没起跑的路不经过 resetRun，
             // lastError 可能是上一跑剩下的旧值。
@@ -2435,6 +2502,14 @@ final class Engine {
         }
         if Task.isCancelled {
             return BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        // F-2 (0.9.159): the user declined this item's downgrade — one item
+        // skips, the batch goes on. The run itself ended as a cancel, so
+        // without this the item would read as a systemic stop.
+        if downgradeDeclined {
+            return BatchInstallOutcome(name: name,
+                                       error: downgradeDeclinedMessage ?? L("Install stopped"),
+                                       stopped: false)
         }
         if finished {
             return BatchInstallOutcome(name: name, error: nil, stopped: false)
@@ -2755,6 +2830,72 @@ final class Engine {
         cellularDownloadReply = nil
         reply.resume(returning: proceed)
         cellularDownloadRequest = nil
+    }
+
+    /// F-2 (0.9.159): asks before a custom IPA older than the copy on this
+    /// iPhone installs over it. Returns true to go ahead. No prompt when the
+    /// IPA is newer, the same version, or the app isn't installed; the
+    /// pipeline asks before it takes the tunnel, so a no burns nothing.
+    /// Suspends until the user answers the popup, like
+    /// `confirmCellularDownload`.
+    @MainActor
+    func confirmDowngrade(_ request: DowngradeRequest) async -> Bool {
+        // One prompt at a time: a second run asking while one waits declines
+        // instead of stacking a popup on top of it — the app only ever runs
+        // one install at a time anyway.
+        guard downgradeReply == nil else { return false }
+        log("Downgrade: \\(request.appName) \\(request.ipaVersion) is older than the installed \\(request.installedVersion); asking first.")
+        downgradeRequest = request
+        return await withTaskCancellationHandler {
+            if Task.isCancelled {
+                downgradeRequest = nil
+                return false
+            }
+            return await withCheckedContinuation { cont in
+                downgradeReply = cont
+            }
+        } onCancel: {
+            // onCancel 是非隔离同步上下文，同 confirmPairingImportMismatch：
+            // 必须经 Task 跳回主线程再 answer。
+            Task { @MainActor in answerDowngrade(false) }
+        }
+    }
+
+    /// Answer the downgrade popup: true installs the older version, false
+    /// stops this run. A no is a decline, not a failure — the pipeline
+    /// throws `CancellationError` for it, so no failure history is written;
+    /// the flag lets the batch and history paths tell a decline apart from
+    /// a cancel and skip the item instead of stopping.
+    @MainActor
+    func answerDowngrade(_ proceed: Bool) {
+        guard let reply = downgradeReply else { return }
+        downgradeReply = nil
+        reply.resume(returning: proceed)
+        if !proceed, let request = downgradeRequest {
+            downgradeDeclined = true
+            downgradeDeclinedMessage = L("This version is older than the one on this iPhone (%@). Installed over it, it may not open data the newer version saved.", request.installedVersion)
+        }
+        downgradeRequest = nil
+    }
+
+    /// F-2 (0.9.159): the downgrade prompt for the custom IPA this run is
+    /// about to install, or nil when there is nothing to ask about. The
+    /// installed version comes from the Apps tab's device read, matched the
+    /// Sources page's way (`ProfileMatcher.installed` — SideInstaller signs
+    /// as `<bundle id>.<team id>`, so that counts as the same app).
+    /// Unreadable IPA, missing version, or no installed copy all mean nil:
+    /// nothing known, nothing to ask.
+    @MainActor
+    private func downgradeCheckForCurrentRun() -> DowngradeRequest? {
+        guard installSource == .custom,
+              let url = IPALibrary.customImport()?.url,
+              let info = IPALibrary.appInfo(at: url),
+              let ipaVersion = info.version, !ipaVersion.isEmpty,
+              let installed = SideloadedAppsManager.shared.entries.first({
+                  ProfileMatcher.installed($0.app.bundleID, isBuiltFrom: info.bundleID, teamID: nil)
+              })?.app.version,
+              UpdateChecker.isNewer(installed, than: ipaVersion) else { return nil }
+        return DowngradeRequest(appName: info.name, installedVersion: installed, ipaVersion: ipaVersion)
     }
 
     private func performAppIDQuota(session: OpaquePointer, bundleID: String) throws -> AppIDCost {
@@ -3763,6 +3904,49 @@ final class Engine {
             setGuide(Guides.trust(appName: installedAppName))
         }
         log("✅ Done — \(installedSourceName) is installed. One trust step left (see the card).")
+        // F-1 (0.9.159): with the Settings switch on, the source IPA goes
+        // away now that the install is done — renewal sources never do.
+        deleteInstalledSourceIPAIfEnabled()
+    }
+
+    /// F-1 (0.9.159): deletes the IPA this run installed from, when the
+    /// Settings switch is on. Runs at the end of `finishSuccess`, when
+    /// signing and installing no longer read the file. A renewal source is
+    /// never deleted — losing it would leave the next renewal with nothing
+    /// to re-sign from — so the file is checked against
+    /// `RenewalSourceStore` by path and by bundle ID first, and skipped
+    /// when it matches. The ledger entry goes with the file, the cached
+    /// path is cleared so the next run re-fetches, and the Downloads and
+    /// Files lists rescan on the notification instead of waiting to be
+    /// reopened. A delete that fails only logs; the install already
+    /// succeeded, so it must not turn into a failure.
+    @MainActor
+    private func deleteInstalledSourceIPAIfEnabled() {
+        guard Self.deleteAfterInstall else { return }
+        let url: URL?
+        if let path = downloadedIPAPath {
+            url = URL(fileURLWithPath: path)
+        } else {
+            url = IPALibrary.customImport()?.url
+        }
+        guard let url else { return }
+        let bundleID = IPALibrary.appInfo(at: url)?.bundleID
+        if RenewalSourceStore.source(forFileURL: url, bundleID: bundleID) != nil {
+            log("Keeping \(url.lastPathComponent): it is a renewal source.")
+            return
+        }
+        do {
+            try FileManager.default.removeItem(at: url)
+            DownloadLedger.forget(url)
+            if downloadedIPAPath == url.path {
+                downloadedIPAPath = nil
+            }
+            if installSource == .custom { refreshCustomIPA() }
+            log("Deleted \(url.lastPathComponent) after installing (Settings › Delete the IPA after installing).")
+            NotificationCenter.default.post(name: Self.downloadsChanged, object: nil)
+        } catch {
+            log("⚠️ Couldn't delete \(url.lastPathComponent) after installing: \(short(error))")
+        }
     }
 
     // MARK: - FFI liveness check

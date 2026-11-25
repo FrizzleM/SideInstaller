@@ -176,6 +176,8 @@ final class CertManager: ObservableObject {
                 guard generation == signInGeneration else { throw CancellationError() }
                 certs = Self.sortedByExpiry(list)
                 hasLoaded = true
+                // F-3 (0.9.159): the expiry notice follows the fresh list.
+                DevCertExpiryNotifier.reschedule(certs: list)
                 engine.log("Certificates: \(list.count) iOS development certificate(s).")
                 isWorking = false
                 then?()
@@ -254,6 +256,9 @@ final class CertManager: ObservableObject {
                 engine.log("⛔️ Revoke failed: \(lastError ?? "")")
             }
             revokingID = nil
+            // F-3 (0.9.159): the revoked certificate's notice goes with it —
+            // the list is settled by now, refreshed or with the entry dropped.
+            DevCertExpiryNotifier.reschedule(certs: certs)
             // Run `onSuccess` if the revoke succeeded, even if the refresh failed.
             if revoked { onSuccess?() }
         }
@@ -361,6 +366,9 @@ final class CertManager: ObservableObject {
                     lastError = L("Imported, but the certificate list couldn't be refreshed. The list may be out of date until you reload it.")
                     engine.log("⛔️ Certificates: imported \(name), but the list refresh failed: \(short(error))")
                 }
+                // F-3 (0.9.159): the imported certificate's expiry notice
+                // follows the new list — the old date must not linger.
+                DevCertExpiryNotifier.reschedule(certs: certs)
                 if retryInstall {
                     engine.log("Retrying the install with \(name).")
                     engine.runOneClick()
@@ -433,6 +441,9 @@ final class CertManager: ObservableObject {
         isSignedIn = false
         teamSummary = nil
         certs = []
+        // F-3 (0.9.159): the old account's certificates are gone, so their
+        // expiry notices go too — an empty reschedule only clears stale ones.
+        DevCertExpiryNotifier.reschedule(certs: [])
         hasLoaded = false
         didAutoLoad = false
         lastError = nil

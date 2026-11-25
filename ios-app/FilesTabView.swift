@@ -917,6 +917,11 @@ struct FilesTabView: View {
             refreshFiles()
             renewalSources = RenewalSourceStore.load()
         }
+        // F-1 (0.9.159): an install that deleted its source IPA rescans
+        // this list now, instead of waiting for the next time it's opened.
+        .onReceive(NotificationCenter.default.publisher(for: Engine.downloadsChanged)) { _ in
+            refreshFiles()
+        }
         .sheet(isPresented: $showIPAPicker) {
             FileImporterRepresentableView(
                 allowedContentTypes: [UTType(filenameExtension: "ipa") ?? .data]

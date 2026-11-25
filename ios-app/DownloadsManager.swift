@@ -452,6 +452,11 @@ struct DownloadsListView: View {
         .navigationTitle(L("Download"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { manager.refresh() }
+        // F-1 (0.9.159): an install that deleted its source IPA rescans
+        // this list now, instead of waiting for the next time it's opened.
+        .onReceive(NotificationCenter.default.publisher(for: Engine.downloadsChanged)) { _ in
+            manager.refresh()
+        }
         .alert(L("删除这个下载的 IPA？"), isPresented: Binding(
             get: { pendingDelete != nil },
             set: { if !$0 { pendingDelete = nil } }

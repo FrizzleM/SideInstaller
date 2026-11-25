@@ -1596,4 +1596,14 @@ let turkishStrings: [String: String] = [
     "Enterprise certificate expiring": "Kurumsal sertifikanın süresi dolmak üzere",
     "The enterprise certificate expires on %@. Re-import it in time.": "Kurumsal sertifikanın süresi %@ tarihinde doluyor. Zamanında yeniden içe aktarın.",
     "The enterprise provisioning profile expires on %@. Re-import it in time.": "Kurumsal sağlama profilinin süresi %@ tarihinde doluyor. Zamanında yeniden içe aktarın.",
+
+    // MARK: - 0.9.159: delete after install, downgrade check, dev-cert notice
+
+    "Delete the IPA after installing": "Kurulumdan sonra IPA'yı sil",
+    "Deletes the source IPA after a successful install. Files used for renewal are kept.": "Başarılı kurulumdan sonra kaynak IPA'yı siler. Yenileme için kullanılan dosyalar saklanır.",
+    "Install an older version?": "Daha eski bir sürüm yüklensin mi?",
+    "Installed: %@ · This IPA: %@": "Yüklü: %@ · Bu IPA: %@",
+    "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "Karşı tarafın iPhone'unun iOS sürümü okunamadı. Yeniden bağlanıp tekrar deneyin — sürümü bilmeden yüklemek, iPhone'larının çalıştıramayacağı bir uygulamayı yükleyebilir.",
+    "Development certificate expiring": "Geliştirici sertifikasının süresi dolmak üzere",
+    "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "“%@” geliştirici sertifikası %@ tarihinde sona eriyor. Zamanında yenileyin, yoksa kurulumlar başarısız olur.",
 ]

@@ -427,6 +427,7 @@ struct RootView: View {
         // Waiting on the user: a code to type, steps to follow, a go-ahead.
         case .install(.pairingCode), .install(.liveContainerImport), .install(.appIDCost),
              .install(.pairingImportMismatch), .install(.link), .install(.cellularDownload),
+             .install(.downgrade),
              .pairing(.pairingCode), .pairing(.pairInSettings):
             .attention
         }
@@ -485,7 +486,7 @@ struct RootView: View {
             .installFinished
         // Up on its own, waiting for the go-ahead to sign, or to act on a link.
         case .install(.appIDCost), .install(.pairingImportMismatch), .install(.link),
-             .install(.cellularDownload):
+             .install(.cellularDownload), .install(.downgrade):
             nil
         case .pairing(.pairingCode), .pairing(.pairInSettings):
             .pairingPage
