@@ -1657,4 +1657,16 @@ let italianStrings: [String: String] = [
     "已移动 %d 个。": "%d spostati.",
     "已移动 %d 个，失败 %d 个。失败：%@": "%d spostati, %d non riusciti. Non riusciti: %@",
     "导出日志": "Esporta registro",
+
+    // MARK: - F-C download speed/ETA & F-G Wi-Fi only downloads (0.9.156)
+
+    "%@/s": "%@/s",
+    "%@ left": "restano %@",
+    "Download over cellular?": "Scaricare con dati cellulare?",
+    "Size: %@": "Dimensioni: %@",
+    "Size unknown": "Dimensioni sconosciute",
+    "You're on cellular data. This download will use your mobile data.": "Stai usando i dati cellulare. Questo download consumerà i tuoi dati mobili.",
+    "Wi-Fi only downloads": "Download solo su Wi-Fi",
+    "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "Se attivo, un download con dati cellulare chiede prima conferma, così un IPA grande non consuma i tuoi dati mobili.",
+    "Downloads": "Download",
 ]

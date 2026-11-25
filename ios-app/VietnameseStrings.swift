@@ -1655,4 +1655,16 @@ let vietnameseStrings: [String: String] = [
     "已移动 %d 个。": "Đã di chuyển %d.",
     "已移动 %d 个，失败 %d 个。失败：%@": "Đã di chuyển %d, thất bại %d. Thất bại: %@",
     "导出日志": "Xuất nhật ký",
+
+    // MARK: - F-C download speed/ETA & F-G Wi-Fi only downloads (0.9.156)
+
+    "%@/s": "%@/s",
+    "%@ left": "còn %@",
+    "Download over cellular?": "Tải xuống bằng dữ liệu di động?",
+    "Size: %@": "Dung lượng: %@",
+    "Size unknown": "Không rõ dung lượng",
+    "You're on cellular data. This download will use your mobile data.": "Bạn đang dùng dữ liệu di động. Bản tải xuống này sẽ dùng dữ liệu di động của bạn.",
+    "Wi-Fi only downloads": "Chỉ tải xuống qua Wi-Fi",
+    "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "Khi bật, bản tải xuống bằng dữ liệu di động sẽ hỏi trước, để một file IPA lớn không dùng dữ liệu di động của bạn.",
+    "Downloads": "Tải xuống",
 ]

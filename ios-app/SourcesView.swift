@@ -489,6 +489,31 @@ struct SourceAppsView: View {
         SearchBar(text: $appSearchText, placeholder: L("搜索"))
     }
 
+    /// F-C (0.9.156): the download's second line — speed, downloaded of
+    /// total, and time left when the total and a speed are both known.
+    /// Unknown totals show speed and bytes only, never a stuck 0%.
+    private var downloadDetailLine: String {
+        let speed = L("%@/s", ByteCountFormatter.string(fromByteCount: Int64(downloader.downloadSpeed), countStyle: .file))
+        if downloader.totalBytesExpected > 0 {
+            let of = L("%@ of %@",
+                       ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file),
+                       ByteCountFormatter.string(fromByteCount: downloader.totalBytesExpected, countStyle: .file))
+            if let eta = downloader.estimatedTimeRemaining {
+                return "\(speed) • \(of) • \(L("%@ left", Self.etaText(eta)))"
+            }
+            return "\(speed) • \(of)"
+        }
+        return "\(speed) • \(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file)))"
+    }
+
+    /// "3:42", or "1:12:33" past the hour, for a remaining-time estimate.
+    private static func etaText(_ eta: TimeInterval) -> String {
+        let total = Int(eta.rounded())
+        let h = total / 3600, m = (total % 3600) / 60, s = total % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
+        return String(format: "%d:%02d", m, s)
+    }
+
     /// The row's trailing control: Install, the download progress with its
     /// percentage, or a failure with a retry.
     @ViewBuilder
@@ -509,6 +534,14 @@ struct SourceAppsView: View {
                     ProgressView()
                         .frame(width: 72)
                     Text(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file)))
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
+                }
+                // F-C (0.9.156): speed + downloaded/total + time left, once
+                // two samples have measured a speed; unknown totals show
+                // speed and bytes only, never a 0% that never moves.
+                if downloader.downloadSpeed > 0 {
+                    Text(downloadDetailLine)
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
                 }
@@ -626,6 +659,14 @@ struct SourceAppsView: View {
         let expectedName = Engine.importFileName(for: url)
         downloadTask = Task {
             do {
+                // F-G (0.9.156): with "Wi-Fi only downloads" on, a cellular
+                // download asks first — the row's size is what the prompt shows.
+                guard await engine.confirmCellularDownload(size: app.size.map(Int64.init),
+                                                           what: app.name ?? expectedName) else {
+                    activeID = nil
+                    states[app.id] = nil
+                    return
+                }
                 let file = try await downloader.download(from: url)
                 // The staged file already carries `expectedName`: the import
                 // names the custom slot after it.
@@ -689,6 +730,19 @@ struct SourceAppsView: View {
             var succeeded = 0
             var failed: [(name: String, error: String)] = []
             var stopped = false
+            // F-G (0.9.156): one prompt for the whole batch, with the total
+            // size when every app states one — not one prompt per item.
+            let batchSizes = targets.compactMap(\.size)
+            let batchSize: Int64? = batchSizes.count == targets.count
+                ? Int64(batchSizes.reduce(0, +)) : nil
+            guard await engine.confirmCellularDownload(size: batchSize,
+                                                       what: L("%d updates", targets.count)) else {
+                updateAllTask = nil
+                updateAllCurrent = nil
+                updateAllIndex = 0
+                updateAllTotal = 0
+                return
+            }
             for (offset, app) in targets.enumerated() {
                 if Task.isCancelled || stopped { break }
                 updateAllIndex = offset + 1
@@ -780,6 +834,14 @@ struct SourceAppsView: View {
         let expectedName = Engine.importFileName(for: url)
         downloadTask = Task {
             do {
+                // F-G (0.9.156): 同 startInstall——蜂窝下先确认再下载。
+                guard await engine.confirmCellularDownload(size: app.size.map(Int64.init),
+                                                           what: app.name ?? expectedName) else {
+                    activeID = nil
+                    states[app.id] = nil
+                    certFailedIDs.remove(app.id)
+                    return
+                }
                 let file = try await downloader.download(from: url)
                 _ = await engine.importCustomIPA(from: file)
                 guard engine.lastError == nil,
@@ -1056,6 +1118,10 @@ final class SourcesManager: ObservableObject {
     @Published private(set) var isAdding = false
     /// Why the last add failed, shown under the field.
     @Published var addError: String?
+    /// F-D (0.9.156): the Sources tab's badge — how many installed apps
+    /// have an update. The tab reads this; it is recounted after every
+    /// fetch and whenever the installed list changes.
+    @Published private(set) var availableUpdateCount = 0
 
     /// Sources every copy of SideInstaller starts with, listed first. They
     /// can't be removed: FrizzleM's own, with SideInstaller in it, kept up to
@@ -1147,6 +1213,11 @@ final class SourcesManager: ObservableObject {
         listings(installed: apps).filter(\.hasUpdate).count
     }
 
+    /// F-D (0.9.156): recomputes `availableUpdateCount` for `apps`.
+    func recountUpdates(installed apps: [SideloadedAppStatus]) {
+        availableUpdateCount = updateCount(installed: apps)
+    }
+
     /// The GitHub account a source is published from, read from where it is
     /// hosted (`<owner>.github.io`, `raw.githubusercontent.com/<owner>/…`,
     /// `github.com/<owner>/…`) or from its website.
@@ -1184,6 +1255,8 @@ final class SourcesManager: ObservableObject {
         guard !urls.isEmpty else { return }
         apps.autoLoad()
         await refresh()
+        // F-D (0.9.156): the badge follows the launch fetch.
+        recountUpdates(installed: apps.entries)
     }
 
     static func name(of source: AppSource, at url: URL) -> String {
@@ -1410,7 +1483,11 @@ struct AppSourcesView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppBackground())
-        .refreshable { await manager.refresh() }
+        .refreshable {
+            await manager.refresh()
+            // F-D (0.9.156): the badge follows a manual refresh too.
+            manager.recountUpdates(installed: appsManager.entries)
+        }
         .toolbar {
             // F2 (0.9.152): export the whole source list as text, and import
             // the same format back from the clipboard.
@@ -1447,6 +1524,8 @@ struct AppSourcesView: View {
             manager.syncURLs()
             appsManager.autoLoad()
             await manager.refreshMissing()
+            // F-D (0.9.156): the badge follows the page-open fetch.
+            manager.recountUpdates(installed: appsManager.entries)
         }
         .onReceive(NotificationCenter.default.publisher(for: UnifiedSourceList.didChange)) { _ in
             Task { @MainActor in manager.syncURLs() }

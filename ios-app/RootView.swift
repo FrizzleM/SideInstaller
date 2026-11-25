@@ -115,6 +115,9 @@ struct RootView: View {
             NavigationStack { SourcesView() }
                 .tabItem { Label(L("Sources"), systemImage: "storefront") }
                 .tag(Page.sources)
+                // F-D (0.9.156): the Apps tab's expiring-soon badge, but for
+                // updates — 0 shows nothing, like the Apps tab.
+                .badge(sourcesManager.availableUpdateCount > 0 ? Text("\(sourcesManager.availableUpdateCount)") : nil)
             NavigationStack { DownloadsListView() }
                 .blueTopBar()
                 .tabItem { Label(L("Download"), systemImage: "arrow.down.circle") }
@@ -226,6 +229,11 @@ struct RootView: View {
         // as SideInstallerApp checks SideInstaller itself, so the Sources tile
         // can show how many there are.
         .task { await sourcesManager.checkAtLaunch(apps: appsManager) }
+        // F-D (0.9.156): the installed list arrives after the launch fetch
+        // (autoLoad reads the device), so the badge recounts when it lands.
+        .onChange(of: appsManager.entries) { _, entries in
+            sourcesManager.recountUpdates(installed: entries)
+        }
         // A swipe down is a cancel; the sign-in closing it is not.
         .sheet(isPresented: Binding(
             get: { signInSheet != nil },
@@ -372,7 +380,8 @@ struct RootView: View {
             engine.isRunning ? .attention : nil
         // Waiting on the user: a code to type, steps to follow, a go-ahead.
         case .install(.pairingCode), .install(.liveContainerImport), .install(.appIDCost),
-             .install(.pairingImportMismatch), .install(.link), .pairing(.pairingCode), .pairing(.pairInSettings):
+             .install(.pairingImportMismatch), .install(.link), .install(.cellularDownload),
+             .pairing(.pairingCode), .pairing(.pairInSettings):
             .attention
         }
     }
@@ -429,7 +438,8 @@ struct RootView: View {
         case .install(.success), .install(.liveContainerImport):
             .installFinished
         // Up on its own, waiting for the go-ahead to sign, or to act on a link.
-        case .install(.appIDCost), .install(.pairingImportMismatch), .install(.link):
+        case .install(.appIDCost), .install(.pairingImportMismatch), .install(.link),
+             .install(.cellularDownload):
             nil
         case .pairing(.pairingCode), .pairing(.pairInSettings):
             .pairingPage

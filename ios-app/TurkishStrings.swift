@@ -1575,4 +1575,16 @@ let turkishStrings: [String: String] = [
     "已移动 %d 个。": "%d taşındı.",
     "已移动 %d 个，失败 %d 个。失败：%@": "%d taşındı, %d başarısız. Başarısız: %@",
     "导出日志": "Günlüğü dışa aktar",
+
+    // MARK: - F-C download speed/ETA & F-G Wi-Fi only downloads (0.9.156)
+
+    "%@/s": "%@/s",
+    "%@ left": "%@ kaldı",
+    "Download over cellular?": "Hücresel veriyle indirilsin mi?",
+    "Size: %@": "Boyut: %@",
+    "Size unknown": "Boyut bilinmiyor",
+    "You're on cellular data. This download will use your mobile data.": "Hücresel veri kullanıyorsunuz. Bu indirme, mobil verinizi kullanacak.",
+    "Wi-Fi only downloads": "Yalnızca Wi-Fi ile indirme",
+    "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "Açıkken, hücresel veriyle indirme önce sorar; böylece büyük bir IPA mobil verinizi kullanmaz.",
+    "Downloads": "İndirilenler",
 ]

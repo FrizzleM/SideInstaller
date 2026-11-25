@@ -1622,4 +1622,16 @@ let koreanStrings: [String: String] = [
     "已移动 %d 个。": "%d개 이동됨.",
     "已移动 %d 个，失败 %d 个。失败：%@": "%d개 이동, %d개 실패. 실패: %@",
     "导出日志": "로그 내보내기",
+
+    // MARK: - F-C download speed/ETA & F-G Wi-Fi only downloads (0.9.156)
+
+    "%@/s": "%@/s",
+    "%@ left": "%@ 남음",
+    "Download over cellular?": "셀룰러 데이터로 다운로드할까요?",
+    "Size: %@": "크기: %@",
+    "Size unknown": "크기를 알 수 없음",
+    "You're on cellular data. This download will use your mobile data.": "셀룰러 데이터를 사용 중입니다. 이 다운로드는 모바일 데이터를 사용합니다.",
+    "Wi-Fi only downloads": "Wi-Fi에서만 다운로드",
+    "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "켜면 셀룰러 데이터로 다운로드하기 전에 먼저 확인하므로, 큰 IPA가 모바일 데이터를 사용하지 않습니다.",
+    "Downloads": "다운로드",
 ]

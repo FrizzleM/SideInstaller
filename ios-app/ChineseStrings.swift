@@ -1633,4 +1633,16 @@ let chineseStrings: [String: String] = [
     "已移动 %d 个。": "已移动 %d 个。",
     "已移动 %d 个，失败 %d 个。失败：%@": "已移动 %d 个，失败 %d 个。失败：%@",
     "导出日志": "导出日志",
+
+    // MARK: - F-C download speed/ETA & F-G Wi-Fi only downloads (0.9.156)
+
+    "%@/s": "%@/s",
+    "%@ left": "还剩 %@",
+    "Download over cellular?": "用蜂窝数据下载？",
+    "Size: %@": "大小：%@",
+    "Size unknown": "大小未知",
+    "You're on cellular data. This download will use your mobile data.": "你正在使用蜂窝数据，此下载将消耗你的移动流量。",
+    "Wi-Fi only downloads": "仅 Wi-Fi 下载",
+    "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "开启后，蜂窝数据下载会先询问，这样大的 IPA 就不会消耗你的移动流量。",
+    "Downloads": "下载",
 ]

@@ -528,6 +528,16 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     @Published private(set) var bytesWritten: Int64 = 0
     @Published private(set) var totalBytesExpected: Int64 = -1
 
+    /// F-C (0.9.156): the download's speed in bytes per second, and the
+    /// estimated seconds left. Speed is 0 until two samples arrive; the
+    /// estimate is nil while the total is unknown or no speed is known yet.
+    @Published private(set) var downloadSpeed: Double = 0
+    @Published private(set) var estimatedTimeRemaining: TimeInterval?
+
+    /// The last sample `noteProgress` measured speed from.
+    private var lastSpeedBytes: Int64 = 0
+    private var lastSpeedAt: Date?
+
     /// F-B (0.9.155): true while the in-flight download is suspended by
     /// the row's Pause button (`downloadTask.suspend()`).
     @Published private(set) var isPaused = false
@@ -567,6 +577,10 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         bytesWritten = 0
         totalBytesExpected = -1
         isPaused = false
+        downloadSpeed = 0
+        estimatedTimeRemaining = nil
+        lastSpeedBytes = 0
+        lastSpeedAt = nil
         progressThrottler.reset()
         let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
         self.session = session
@@ -660,7 +674,34 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         currentTask = nil
         currentTaskID = nil
         currentURL = nil
+        // F-C (0.9.156): the row goes away with the download — don't leave
+        // a stale speed and estimate for the next one to show first.
+        downloadSpeed = 0
+        estimatedTimeRemaining = nil
+        lastSpeedBytes = 0
+        lastSpeedAt = nil
         continuation.resume(with: result)
+    }
+
+    /// F-C (0.9.156): folds one published sample into the speed and the
+    /// time left. Called on the main actor from the publish hops below, so
+    /// the sample state is never touched from the delegate queue. The speed
+    /// is an exponential moving average over the throttled samples, so one
+    /// fast chunk doesn't swing the estimate; the first sample only sets
+    /// the baseline, it measures nothing yet.
+    private func noteProgress(bytes: Int64, total: Int64) {
+        let now = Date()
+        if let lastAt = lastSpeedAt, now > lastAt {
+            let delta = bytes - lastSpeedBytes
+            if delta >= 0 {
+                let instant = Double(delta) / now.timeIntervalSince(lastAt)
+                downloadSpeed = downloadSpeed > 0 ? 0.7 * downloadSpeed + 0.3 * instant : instant
+            }
+        }
+        lastSpeedBytes = bytes
+        lastSpeedAt = now
+        estimatedTimeRemaining = total > 0 && downloadSpeed > 0
+            ? TimeInterval(max(total - bytes, 0)) / downloadSpeed : nil
     }
 
     // The delegate callbacks arrive on the session's own queue, so each hops
@@ -687,6 +728,7 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
                     self.progress = value
                     self.bytesWritten = totalBytesWritten
                     self.totalBytesExpected = totalBytesExpectedToWrite
+                    self.noteProgress(bytes: totalBytesWritten, total: totalBytesExpectedToWrite)
                 }
             }
         } else {
@@ -698,6 +740,7 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
                 Task { @MainActor in
                     self.bytesWritten = bytes
                     self.totalBytesExpected = -1
+                    self.noteProgress(bytes: bytes, total: -1)
                 }
             }
         }

@@ -1516,6 +1516,40 @@ struct InstallPopup: View {
                     }
                 }
             }
+        case .cellularDownload(let request):
+            // F-G (0.9.156): the "Wi-Fi only downloads" prompt — what it is,
+            // how big (or that the size is unknown), and that it will use
+            // mobile data. Download goes ahead; Cancel, or the X, stops it.
+            PopupCard(title: L("Download over cellular?"), systemImage: "cellularbars",
+                      tint: Theme.warning, onClose: close) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(request.what)
+                        .font(.subheadline.weight(.medium))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(request.size.map {
+                        L("Size: %@", ByteCountFormatter.string(fromByteCount: $0, countStyle: .file))
+                    } ?? L("Size unknown"))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(L("You're on cellular data. This download will use your mobile data."))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 12) {
+                        Button { engine.answerCellularDownload(true) } label: {
+                            Label(L("Download"), systemImage: "arrow.down.app")
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        Button(role: .cancel) { engine.answerCellularDownload(false) } label: {
+                            Text(L("Cancel"))
+                                .font(.subheadline.weight(.medium))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    }
+                }
+            }
         case .link(let link):
             linkPopup(link)
         }

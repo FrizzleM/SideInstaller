@@ -1426,6 +1426,11 @@ final class SideBySideManager: ObservableObject {
         downloadedIPA = file
         downloadedKey = key
         ownsDownload = app.source == nil || app == .liveContainer
+        // B1 (0.9.156): the download is done — clear the byte count here,
+        // at the one place all three download paths return through, so the
+        // progress card stops showing the old count plus a spinner and the
+        // % comes back for the signing/install steps.
+        downloadBytesWritten = nil
         downloadProgress = 1
         engine.log("\(app.displayName) IPA ready at \(file.path) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(file.path)), countStyle: .file))).")
         setStep(.download, .done)
@@ -1521,7 +1526,15 @@ final class SideBySideManager: ObservableObject {
             }
             return URL(fileURLWithPath: path)
         } catch {
-            if Task.isCancelled { throw CancellationError() }
+            // B1 (0.9.156): a failed or cancelled download leaves no byte
+            // count behind — the fallback copy below and the error after it
+            // both return through here.
+            downloadBytesWritten = nil
+            // F-G (0.9.156): a cellular decline arrives as CancellationError
+            // with the task itself not cancelled — rethrow it as a cancel
+            // instead of reporting "Couldn't download …" for a no the user
+            // just said on purpose.
+            if Task.isCancelled || error is CancellationError { throw CancellationError() }
             // Offline or blocked: a copy an earlier run left behind will do.
             if let onDisk {
                 // C14: the run goes on with the older local copy — say so

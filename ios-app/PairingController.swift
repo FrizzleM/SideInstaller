@@ -397,7 +397,12 @@ final class PairingController {
         case let .failure(message):
             // A cancelled run ends with “pairing cancelled”: not a failure.
             engine.log(run.cancelled ? "RPPairing: stopped." : "RPPairing: FAILED — \(message)")
-            engine.pairingStatus = L("failed: %@", message)
+            // B3 (0.9.156): a run the user stopped leaves the pill alone —
+            // writing "failed: …" here made a deliberate cancel look like
+            // pairing broke. A real failure still reports as before.
+            if !run.cancelled {
+                engine.pairingStatus = L("failed: %@", message)
+            }
             overSettings.finish(paired: false)
             resolve(run, .failure(PairingError.failed(message)))
         }

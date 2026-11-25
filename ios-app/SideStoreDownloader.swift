@@ -1011,7 +1011,7 @@ enum SideStoreDownloader {
     private static let minimumFreeSpace = 100_000_000
 
     private static func checkFreeSpace(for url: URL, named name: String,
-                                       log: ((String) -> Void)? = nil) async throws {
+                                       log: ((String) -> Void)? = nil) async throws -> Int? {
         var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
         req.httpMethod = "HEAD"
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
@@ -1021,15 +1021,18 @@ enum SideStoreDownloader {
             expected = Int(response.expectedContentLength)
         }
         try Task.checkCancellation()
+        // F-G (0.9.156): the size is returned now, so the cellular prompt
+        // below can show it — a HEAD that failed leaves it nil ("unknown").
         guard let available = (try? IPALibrary.documentsDir.resourceValues(
             forKeys: [.volumeAvailableCapacityForImportantUsageKey]))
             .flatMap(\.volumeAvailableCapacityForImportantUsage)
-            .map({ Int($0) }) else { return }
+            .map({ Int($0) }) else { return expected }
         let needed = expected ?? minimumFreeSpace
         guard needed <= available else {
             log?("⚠️ Not enough free space for \(name): needs \(ByteCountFormatter.string(fromByteCount: Int64(needed), countStyle: .file)), only \(ByteCountFormatter.string(fromByteCount: Int64(available), countStyle: .file)) free.")
             throw DownloadError.notEnoughSpace(needed: needed, available: available)
         }
+        return expected
     }
 
     /// Download one URL to a temporary file, if the response isn't a refusal.
@@ -1040,7 +1043,15 @@ enum SideStoreDownloader {
                               idleTimeout: TimeInterval = 30,
                               log: @escaping (String) -> Void) async throws -> Fetched {
         log("Downloading \(name) …")
-        try await checkFreeSpace(for: url, named: name, log: log)
+        let size = try await checkFreeSpace(for: url, named: name, log: log)
+        // F-G (0.9.156): every release download funnels through here, after
+        // the reuse checks decided a body really has to move — ask first on
+        // cellular when the switch is on, with the size the HEAD just
+        // learned. A no throws CancellationError, which the callers already
+        // treat as a stop, not a failure.
+        guard await Engine.shared.confirmCellularDownload(size: size.map(Int64.init), what: name) else {
+            throw CancellationError()
+        }
         let download = ResumingDownload(from: url, name: name, idleTimeout: idleTimeout,
                                         progress: reportProgress, log: log)
         do {
@@ -1073,7 +1084,12 @@ enum SideStoreDownloader {
 
         // F1 (0.9.145): same free-space precheck as `fetch` — a pasted link is
         // a big IPA too, and refusing it here beats filling the disk first.
-        try await checkFreeSpace(for: url, named: name)
+        let size = try await checkFreeSpace(for: url, named: name)
+        // F-G (0.9.156): 同 `fetch`——链接导入与 Side by Side 的下载都走
+        // 这里，蜂窝下先确认再开始；拒绝即取消，不记失败。
+        guard await Engine.shared.confirmCellularDownload(size: size.map(Int64.init), what: name) else {
+            throw CancellationError()
+        }
 
         let staging = FileManager.default.temporaryDirectory
             .appendingPathComponent("ipa-link-\(UUID().uuidString)", isDirectory: true)

@@ -1621,4 +1621,16 @@ let japaneseStrings: [String: String] = [
     "已移动 %d 个。": "%d 個移動しました。",
     "已移动 %d 个，失败 %d 个。失败：%@": "%d 個移動、%d 個失敗。失敗：%@",
     "导出日志": "ログを書き出す",
+
+    // MARK: - F-C download speed/ETA & F-G Wi-Fi only downloads (0.9.156)
+
+    "%@/s": "%@/s",
+    "%@ left": "残り %@",
+    "Download over cellular?": "モバイルデータ通信でダウンロードしますか？",
+    "Size: %@": "サイズ：%@",
+    "Size unknown": "サイズ不明",
+    "You're on cellular data. This download will use your mobile data.": "モバイルデータ通信中です。このダウンロードはモバイルデータを使用します。",
+    "Wi-Fi only downloads": "Wi-Fiのみでダウンロード",
+    "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "オンにすると、モバイルデータ通信でのダウンロードは最初に確認を求めるため、大きなIPAがモバイルデータを使用することはありません。",
+    "Downloads": "ダウンロード",
 ]

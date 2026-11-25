@@ -1660,4 +1660,16 @@ let spanishStrings: [String: String] = [
     "已移动 %d 个。": "%d movidos.",
     "已移动 %d 个，失败 %d 个。失败：%@": "%d movidos, %d fallidos. Fallidos: %@",
     "导出日志": "Exportar registro",
+
+    // MARK: - F-C download speed/ETA & F-G Wi-Fi only downloads (0.9.156)
+
+    "%@/s": "%@/s",
+    "%@ left": "quedan %@",
+    "Download over cellular?": "¿Descargar con datos móviles?",
+    "Size: %@": "Tamaño: %@",
+    "Size unknown": "Tamaño desconocido",
+    "You're on cellular data. This download will use your mobile data.": "Estás usando datos móviles. Esta descarga consumirá tus datos móviles.",
+    "Wi-Fi only downloads": "Descargas solo por Wi-Fi",
+    "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "Si está activado, una descarga con datos móviles pregunta primero, para que un IPA grande no consuma tus datos móviles.",
+    "Downloads": "Descargas",
 ]

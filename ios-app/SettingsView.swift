@@ -50,6 +50,11 @@ struct SettingsView: View {
     /// 常驻后台自动续签开关，与 AutoRefreshService 共用同一 UserDefaults 键。
     @AppStorage("SIDAutoRefreshEnabled") private var autoRefreshEnabled = false
 
+    /// F-G (0.9.156): "Wi-Fi only downloads" — with it on, a big download
+    /// over cellular data asks first. Off by default. The key lives on
+    /// `Engine` so the download paths read the same value.
+    @AppStorage(Engine.wifiOnlyDownloadsKey) private var wifiOnlyDownloads = false
+
     /// 内置隧道本端地址，与 BuiltinTunnel 共用同一 UserDefaults 键。
     @AppStorage("CZFBuiltinTunnelIfaceIP") private var builtinTunnelIfaceIP = "10.7.1.1/32"
     /// Device IP 填非法时弹一次提示（Tunnel 节和 Advanced 节两处栏共用）。
@@ -87,6 +92,7 @@ struct SettingsView: View {
                 tunnelSection
                 developerModeSection
                 autoRefreshSection
+                downloadsSection
                 anisetteSection
                 advancedSection
                 logSection
@@ -670,7 +676,19 @@ struct SettingsView: View {
 
     // MARK: Downloaded IPAs
 
-
+    /// F-G (0.9.156): "Wi-Fi only downloads" — off by default, so nothing
+    /// changes until the user turns it on. On, a source install, link
+    /// import or build download over cellular data asks first, showing the
+    /// file's size (or that it's unknown) before it uses mobile data.
+    private var downloadsSection: some View {
+        Section {
+            Toggle(L("Wi-Fi only downloads"), isOn: $wifiOnlyDownloads)
+        } header: {
+            Text(L("Downloads"))
+        } footer: {
+            Text(L("When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data."))
+        }
+    }
 
     // MARK: Anisette server
 

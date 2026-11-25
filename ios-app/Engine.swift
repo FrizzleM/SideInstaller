@@ -140,6 +140,25 @@ final class Engine {
     private(set) var pairingImportMismatch: PairingImportMismatch?
     private var pairingImportMismatchReply: CheckedContinuation<Bool, Never>?
 
+    /// F-G (0.9.156): a download the user asked for on cellular data, waiting
+    /// for the go-ahead. Settings › Downloads › "Wi-Fi only downloads" asks
+    /// first, so a big IPA doesn't eat mobile data unnoticed.
+    struct CellularDownloadRequest: Hashable {
+        /// What is being downloaded — the app or build name.
+        let what: String
+        /// The file's size in bytes, when the server stated one.
+        let size: Int64?
+    }
+    private(set) var cellularDownloadRequest: CellularDownloadRequest?
+    private var cellularDownloadReply: CheckedContinuation<Bool, Never>?
+
+    /// The Settings switch for F-G. Off by default: the app's behaviour on
+    /// cellular doesn't change until the user turns it on.
+    static let wifiOnlyDownloadsKey = "SIDWifiOnlyDownloads"
+    static var wifiOnlyDownloads: Bool {
+        UserDefaults.standard.bool(forKey: wifiOnlyDownloadsKey)
+    }
+
     /// Answer the pairing-file mismatch popup: true replaces the pairing file.
     @MainActor
     func answerPairingImportMismatch(_ proceed: Bool) {
@@ -949,6 +968,8 @@ final class Engine {
         case pairingImportMismatch(PairingImportMismatch)
         /// A `sideinstaller://` link, asking before it's acted on.
         case link(DeepLink)
+        /// A big download on cellular data, asking before it starts (F-G, 0.9.156).
+        case cellularDownload(CellularDownloadRequest)
     }
 
     /// True while the run is held up on the user — joining Wi-Fi, connecting
@@ -961,9 +982,14 @@ final class Engine {
     /// what it's waiting on shows; the rest waits for it to end.
     var popups: [Popup] {
         if isRunning {
-            guard isWaitingOnUser else { return [] }
+            // F-G (0.9.156): the cellular prompt is a waiting popup too, but
+            // no step is `.waiting` while it asks — the download hasn't
+            // started yet — so it joins this list on its own, or the run
+            // would hang on an answer the user can't give.
+            guard isWaitingOnUser || cellularDownloadRequest != nil else { return [] }
             return [pairingPIN.map(Popup.pairingCode), guide.map(Popup.guide),
-                    appIDCost.map(Popup.appIDCost)].compactMap { $0 }
+                    appIDCost.map(Popup.appIDCost),
+                    cellularDownloadRequest.map(Popup.cellularDownload)].compactMap { $0 }
         }
         if finished { return finishedPopups }
         var shown: [Popup] = []
@@ -977,6 +1003,7 @@ final class Engine {
         if let lastError {
             shown.append(.error(lastError, stoppedRun: stepStates.values.contains(.failed)))
         }
+        if let cellular = cellularDownloadRequest { shown.append(.cellularDownload(cellular)) }
         return shown
     }
 
@@ -1006,6 +1033,9 @@ final class Engine {
     func blocks(_ popup: Popup) -> Bool {
         switch popup {
         case .pairingCode, .guide, .appIDCost: return isWaitingOnUser
+        // F-G (0.9.156): the cellular prompt blocks while a run is in flight
+        // (prefetch or the download step); with no run it just declines.
+        case .cellularDownload:                return isRunning
         default:                               return false
         }
     }
@@ -1019,6 +1049,12 @@ final class Engine {
             cancelOneClick()
             pairingPIN = nil
             guide = nil
+            // F-G (0.9.156): answer the cellular prompt directly too — the
+            // waiter isn't always the pipeline (a source download can ask
+            // while a run is in flight), and only the pipeline's cancel
+            // reaches its `onCancel`. `answerCellularDownload` no-ops when
+            // the handler already answered, so this can't resume twice.
+            if case .cellularDownload = popup { answerCellularDownload(false) }
             return
         }
         switch popup {
@@ -1032,6 +1068,7 @@ final class Engine {
         case .appIDCost:             appIDCost = nil
         case .pairingImportMismatch: answerPairingImportMismatch(false)
         case .link:                  pendingLink = nil
+        case .cellularDownload:      answerCellularDownload(false)
         }
     }
 
@@ -1839,31 +1876,45 @@ final class Engine {
         let bytesReport: @Sendable (Int) -> Void = { [weak self] bytes in
             Task { @MainActor in self?.downloadBytesWritten = Int64(bytes) }
         }
-        guard let version else {
-            // A5：开过版本选择器、内存目录新鲜时，直接取目录里“最新”那一项，
-            // 不再为同一份目录多拉一次 feed JSON / artifacts 列表。只复用与
-            // downloadLatest 同口径的两种情形（feed 源、Madeira nightly）；
-            // GitHub 直链源（latestAsset 路）仍走 downloadLatest，不复用。
-            if let catalog = releaseCatalogs[source],
-               Date().timeIntervalSince(catalog.fetched) < 15 * 60,
-               let latest = catalog.latest[channel],
-               source.feed != nil || source.actionsBuild(channel) != nil {
-                return try await SideStoreDownloader.$reportProgress.withValue(report) {
+        // B1 (0.9.156): one exit, so the byte count is cleared on every
+        // way out — the three `return try await …` sites this replaces used
+        // to leave it set, and the progress card reads non-nil as "total
+        // unknown", so signing/install kept showing the old byte count
+        // plus a spinner and the % never came back until the next run.
+        do {
+            let path: String
+            if let version {
+                path = try await SideStoreDownloader.$reportProgress.withValue(report) {
+                    try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
+                        try await SideStoreDownloader.download(version, source: source, channel: channel, log: log)
+                    }
+                }
+            } else if let catalog = releaseCatalogs[source],
+                      Date().timeIntervalSince(catalog.fetched) < 15 * 60,
+                      let latest = catalog.latest[channel],
+                      source.feed != nil || source.actionsBuild(channel) != nil {
+                // A5：开过版本选择器、内存目录新鲜时，直接取目录里“最新”那一项，
+                // 不再为同一份目录多拉一次 feed JSON / artifacts 列表。只复用与
+                // downloadLatest 同口径的两种情形（feed 源、Madeira nightly）；
+                // GitHub 直链源（latestAsset 路）仍走 downloadLatest，不复用。
+                path = try await SideStoreDownloader.$reportProgress.withValue(report) {
                     try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
                         try await SideStoreDownloader.download(latest, source: source, channel: channel, log: log)
                     }
                 }
-            }
-            return try await SideStoreDownloader.$reportProgress.withValue(report) {
-                try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
-                    try await SideStoreDownloader.downloadLatest(source: source, channel: channel, log: log)
+            } else {
+                path = try await SideStoreDownloader.$reportProgress.withValue(report) {
+                    try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
+                        try await SideStoreDownloader.downloadLatest(source: source, channel: channel, log: log)
+                    }
                 }
             }
-        }
-        return try await SideStoreDownloader.$reportProgress.withValue(report) {
-            try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
-                try await SideStoreDownloader.download(version, source: source, channel: channel, log: log)
-            }
+            downloadBytesWritten = nil
+            return path
+        } catch {
+            // A failed or cancelled download leaves no byte count behind either.
+            downloadBytesWritten = nil
+            throw error
         }
     }
 
@@ -2153,7 +2204,31 @@ final class Engine {
         // B-39-B2 同款：源赋值移到导入成功之后——导入被拒时在途管线
         // 读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
         installSource = .custom
+        let guideBefore = guide
         runOneClick()
+        // B2 (0.9.156): installOneCustomIPA 同款——等管线起跑（全隧道探针
+        // 最多拖半秒），3 秒还不起跑就是起跑守卫拦住了（无账号/无配对
+        // 文件/系统版本过低），不是起跑慢。旧代码直接 return true，历史页
+        // 毫无反馈：行内 spinner 停了，指引卡在用户没看的安装页。
+        var waited = 0.0
+        while !isRunning, !Task.isCancelled, waited < 3.0 {
+            try? await Task.sleep(for: .milliseconds(100))
+            waited += 0.1
+        }
+        if Task.isCancelled {
+            lastError = L("Install stopped")
+            return false
+        }
+        guard isRunning else {
+            // 没起跑：向导优先于 lastError——没起跑的路不经过 resetRun，
+            // lastError 可能是上一跑剩下的旧值。
+            if let guide, guide != guideBefore {
+                lastError = ([guide.title] + guide.steps).joined(separator: "\n")
+            } else if lastError == nil {
+                lastError = L("The install didn't start. Open SideInstaller to see why.")
+            }
+            return false
+        }
         return true
     }
 
@@ -2526,6 +2601,49 @@ final class Engine {
             // 报警告、且不跳回主线程（真竞态，见 AGENTS.md L413 教训）。必须经 Task 跳过去。
             Task { @MainActor in answerPairingImportMismatch(false) }
         }
+    }
+
+    /// F-G (0.9.156): asks before a big download runs on cellular data, when
+    /// the "Wi-Fi only downloads" switch is on. Returns true to go ahead.
+    /// No prompt on Wi-Fi, or with the switch off; a download that reuses
+    /// the copy already on disk never reaches here, so no prompt for it.
+    /// Suspends until the user answers the popup, like
+    /// `confirmPairingImportMismatch`.
+    @MainActor
+    func confirmCellularDownload(size: Int64?, what: String) async -> Bool {
+        guard Self.wifiOnlyDownloads else { return true }
+        guard await NetworkStatus.internetPath().isExpensive else { return true }
+        // One prompt at a time: a second download asking while one waits
+        // declines instead of stacking a popup on top of it — the UI only
+        // ever starts one download at a time anyway.
+        guard cellularDownloadReply == nil else { return false }
+        log("Cellular data: \(what) needs confirmation before downloading.")
+        cellularDownloadRequest = CellularDownloadRequest(what: what, size: size)
+        return await withTaskCancellationHandler {
+            // Cancelled between the checks above and here: the handler
+            // already ran with no continuation to resume, so don't suspend
+            // — clear the request and decline instead of hanging.
+            if Task.isCancelled {
+                cellularDownloadRequest = nil
+                return false
+            }
+            return await withCheckedContinuation { cont in
+                cellularDownloadReply = cont
+            }
+        } onCancel: {
+            // onCancel 是非隔离同步上下文，同 confirmPairingImportMismatch：
+            // 必须经 Task 跳回主线程再 answer。
+            Task { @MainActor in answerCellularDownload(false) }
+        }
+    }
+
+    /// Answer the cellular-download popup: true downloads, false stops it.
+    @MainActor
+    func answerCellularDownload(_ proceed: Bool) {
+        guard let reply = cellularDownloadReply else { return }
+        cellularDownloadReply = nil
+        reply.resume(returning: proceed)
+        cellularDownloadRequest = nil
     }
 
     private func performAppIDQuota(session: OpaquePointer, bundleID: String) throws -> AppIDCost {
