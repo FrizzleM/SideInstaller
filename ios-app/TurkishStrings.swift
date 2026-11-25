@@ -8,6 +8,10 @@ let turkishStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Expiry date": "Bitiş tarihi",
+    "Bundle ID": "Bundle ID",
+    "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
+        "Bu iPhone'da bu IPA'yı indirmek için yeterli boş alan yok: %@ gerekiyor ama yalnızca %@ boş. Yer açıp yeniden deneyin.",
     "Apple ID":
         "Apple ID",
     "Cancel": "İptal",

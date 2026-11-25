@@ -8,6 +8,10 @@ let vietnameseStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Expiry date": "Ngày hết hạn",
+    "Bundle ID": "Bundle ID",
+    "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
+        "iPhone này không còn đủ dung lượng trống để tải IPA này — cần %@, nhưng chỉ còn %@. Hãy giải phóng dung lượng rồi thử lại.",
     "Apple ID":
         "Apple ID",
     "Cancel": "Hủy",

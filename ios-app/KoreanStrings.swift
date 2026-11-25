@@ -9,6 +9,10 @@ let koreanStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Expiry date": "만료일",
+    "Bundle ID": "Bundle ID",
+    "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
+        "이 iPhone에 이 IPA를 다운로드할 공간이 부족합니다. %@가 필요하지만 %@밖에 남지 않았습니다. 공간을 확보한 뒤 다시 시도하세요.",
     "Apple ID":
         "Apple ID",
     "Cancel": "취소",

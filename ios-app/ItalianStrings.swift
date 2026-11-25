@@ -6,6 +6,10 @@ let italianStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Expiry date": "Scadenza",
+    "Bundle ID": "Bundle ID",
+    "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
+        "Spazio libero insufficiente su questo iPhone per scaricare questo IPA: servono %@, ma ne restano solo %@. Libera spazio e riprova.",
     "Apple ID":
         "Apple ID",
     "Cancel": "Annulla",

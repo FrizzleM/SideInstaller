@@ -1250,6 +1250,21 @@ struct AppsView: View {
     /// F1 (0.9.141): the app list's search text — the file page's SearchBar
     /// 同款，过滤按名字或 Bundle ID（见 `filteredEntries`）。
     @State private var appSearchText = ""
+    /// F3 (0.9.145): the app list's sort — the file page's FileSort 同款
+    /// （到期日 / 名称 / Bundle ID），@AppStorage 持久化。只改显示顺序，
+    /// 不动匹配与续签；默认到期日就是 ProfileMatcher 的顺序，原样返回。
+    private enum AppSort: String, CaseIterable {
+        case expiry, name, bundleID
+        var label: String {
+            switch self {
+            case .expiry:   return L("Expiry date")
+            case .name:     return L("Name")
+            case .bundleID: return L("Bundle ID")
+            }
+        }
+    }
+    @AppStorage("CZFAppSort") private var appSortRaw = AppSort.expiry.rawValue
+    private var appSort: AppSort { AppSort(rawValue: appSortRaw) ?? .expiry }
     /// A-5(c)：行图标的批量写回（loadRowIcon 同款，懒建）。
     @State private var rowIconBatcher: BatchWriteback<String, UIImage>?
     @Environment(\.openURL) private var openURL
@@ -1544,12 +1559,23 @@ struct AppsView: View {
 
     /// F1 (0.9.141): the list filtered by `appSearchText` — name or Bundle ID
     /// contains the query, case-insensitive (the file page's matching() 同款取法).
+    /// F3 (0.9.145): then sorted by `appSort` — expiry is the matcher's own
+    /// order, returned as-is; name / Bundle ID sort case-insensitively.
     private var filteredEntries: [SideloadedAppStatus] {
-        guard !appSearchText.isEmpty else { return manager.entries }
-        let query = appSearchText.lowercased()
-        return manager.entries.filter {
-            $0.app.name.lowercased().contains(query)
-                || $0.app.bundleID.lowercased().contains(query)
+        let base: [SideloadedAppStatus]
+        if appSearchText.isEmpty {
+            base = manager.entries
+        } else {
+            let query = appSearchText.lowercased()
+            base = manager.entries.filter {
+                $0.app.name.lowercased().contains(query)
+                    || $0.app.bundleID.lowercased().contains(query)
+            }
+        }
+        switch appSort {
+        case .expiry:   return base
+        case .name:     return base.sorted { $0.app.name.localizedCaseInsensitiveCompare($1.app.name) == .orderedAscending }
+        case .bundleID: return base.sorted { $0.app.bundleID.localizedCaseInsensitiveCompare($1.app.bundleID) == .orderedAscending }
         }
     }
 
@@ -1580,6 +1606,27 @@ struct AppsView: View {
                     }
                 }
                 .cascadeItem(5)
+                // F3 (0.9.145): sort switch — the file page's FileSort menu
+                // 同款；只改显示顺序（见 `filteredEntries`）。
+                HStack {
+                    Menu {
+                        ForEach(AppSort.allCases, id: \.self) { option in
+                            Button {
+                                appSortRaw = option.rawValue
+                            } label: {
+                                if appSort == option {
+                                    Label(option.label, systemImage: "checkmark")
+                                } else {
+                                    Text(option.label)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(L("排序：%@", appSort.label), systemImage: "arrow.up.arrow.down")
+                            .font(.footnote.weight(.semibold))
+                    }
+                    Spacer()
+                }
                 // C5：上次读设备失败时，列表是上一次成功加载的旧清单——
                 // 到期天数可能已经变了，标出来，别让用户当成新的看。
                 // 成功加载会清掉 lastLoadFailed，小字随之消失。

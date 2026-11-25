@@ -283,7 +283,7 @@ struct DownloadsListView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .disabled(installingID != nil)
+                    .disabled(installingID == item.id)
                     .swipeActions {
                         Button(role: .destructive) {
                             pendingDelete = item
@@ -334,7 +334,13 @@ struct DownloadsListView: View {
     /// or refresh already running) leaves the reason on this page instead of
     /// opening the sheet.
     private func install(_ item: DownloadedIPA) {
-        guard installingID == nil else { return }
+        guard installingID == nil else {
+            // U2 (0.9.145): the other rows stay tappable while one imports —
+            // say so instead of silently ignoring the tap (the import itself
+            // still refuses while one is running; see importCustomIPA).
+            manager.lastError = L("This file is being installed. Wait until it finishes.")
+            return
+        }
         installingID = item.id
         Task {
             let ok = await engine.importCustomIPA(from: item.url)

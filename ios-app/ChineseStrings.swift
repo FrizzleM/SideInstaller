@@ -8,6 +8,10 @@ let chineseStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Expiry date": "到期日",
+    "Bundle ID": "Bundle ID",
+    "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
+        "这台 iPhone 剩余空间不足，下载这个 IPA 需要 %@，但只剩 %@。清理一些空间后再试。",
     "Apple ID":
         "Apple ID",
     "Cancel": "取消",

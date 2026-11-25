@@ -8,6 +8,10 @@ let japaneseStrings: [String: String] = [
 
     // MARK: - Shared
 
+    "Expiry date": "有効期限",
+    "Bundle ID": "Bundle ID",
+    "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
+        "この iPhone の空き容量が足りず、この IPA をダウンロードできません。%@ 必要ですが、空きは %@ しかありません。空き容量を増やしてからもう一度お試しください。",
     "Apple ID":
         "Apple ID",
     "Cancel": "キャンセル",

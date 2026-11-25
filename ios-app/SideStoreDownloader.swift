@@ -604,6 +604,9 @@ enum SideStoreDownloader {
         /// The source lists no version of the build that runs on the iPhone's
         /// iOS (the build, its host, the iOS version).
         case noListedVersion(String, String, String)
+        /// The iPhone has no room for the download: what it needs, and
+        /// what's free on it.
+        case notEnoughSpace(needed: Int, available: Int)
 
         var description: String {
             switch self {
@@ -659,6 +662,10 @@ enum SideStoreDownloader {
                          source, host)
             case let .noListedVersion(source, host, os):
                 return L("%@ lists no version of %@ that runs on iOS %@.", host, source, os)
+            case let .notEnoughSpace(needed, available):
+                return L("Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.",
+                         ByteCountFormatter.string(fromByteCount: Int64(needed), countStyle: .file),
+                         ByteCountFormatter.string(fromByteCount: Int64(available), countStyle: .file))
             }
         }
 
@@ -670,7 +677,7 @@ enum SideStoreDownloader {
                  .sourceUnreachable, .badSource, .unverifiedListing:
                 return true
             case .noIPAAsset, .noRelease, .badURL, .notDownloadable, .linkStatus, .repoUnavailable,
-                 .noBuild, .sourceStatus, .noListedVersion:
+                 .noBuild, .sourceStatus, .noListedVersion, .notEnoughSpace:
                 return false
             case let .badStatus(_, _, retryAfter):
                 return retryAfter == nil
@@ -704,7 +711,8 @@ enum SideStoreDownloader {
                 return true
             case .badURL, .notDownloadable, .badStatus, .repoUnavailable, .unreachable,
                  .badRelease, .notAnIPA, .linkStatus, .noBuild, .relayFailed, .unverifiedBuild,
-                 .sourceUnreachable, .sourceStatus, .badSource, .unverifiedListing, .noListedVersion:
+                 .sourceUnreachable, .sourceStatus, .badSource, .unverifiedListing, .noListedVersion,
+                 .notEnoughSpace:
                 return false
             }
         }
@@ -984,6 +992,38 @@ enum SideStoreDownloader {
         return file
     }
 
+    /// Refuses a download the iPhone has no room for, before a byte is
+    /// written: a HEAD read gives the file's size, matched against the free
+    /// space for important usage on the volume Documents lives on. When the
+    /// size can't be learned, a big IPA is assumed and at least
+    /// `minimumFreeSpace` must be free (unknown total = bytes already saved,
+    /// here none, + threshold). A HEAD that fails — offline, or a host that
+    /// won't answer one — never blocks the download: only a size known to
+    /// exceed the free space refuses it. A volume whose free space can't be
+    /// read doesn't block it either.
+    private static let minimumFreeSpace = 100_000_000
+
+    private static func checkFreeSpace(for url: URL, named name: String,
+                                       log: ((String) -> Void)? = nil) async throws {
+        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        req.httpMethod = "HEAD"
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        var expected: Int?
+        if let (_, response) = try? await URLSession.shared.data(for: req),
+           let length = response.expectedContentLength, length > 0 {
+            expected = Int(length)
+        }
+        try Task.checkCancellation()
+        guard let available = (try? IPALibrary.documentsDir.resourceValues(
+            forKeys: [.volumeAvailableCapacityForImportantUsageKey]))
+            .flatMap(\.volumeAvailableCapacityForImportantUsage) else { return }
+        let needed = expected ?? minimumFreeSpace
+        guard needed <= available else {
+            log?("⚠️ Not enough free space for \(name): needs \(ByteCountFormatter.string(fromByteCount: Int64(needed), countStyle: .file)), only \(ByteCountFormatter.string(fromByteCount: Int64(available), countStyle: .file)) free.")
+            throw DownloadError.notEnoughSpace(needed: needed, available: available)
+        }
+    }
+
     /// Download one URL to a temporary file, if the response isn't a refusal.
     ///
     /// The IPA is tens or hundreds of megabytes, so a transfer that stalls or
@@ -992,6 +1032,7 @@ enum SideStoreDownloader {
                               idleTimeout: TimeInterval = 30,
                               log: @escaping (String) -> Void) async throws -> Fetched {
         log("Downloading \(name) …")
+        try await checkFreeSpace(for: url, named: name, log: log)
         let download = ResumingDownload(from: url, name: name, idleTimeout: idleTimeout,
                                         progress: reportProgress, log: log)
         do {
@@ -1016,6 +1057,10 @@ enum SideStoreDownloader {
                             progress: @escaping (Double) -> Void) async throws -> URL {
         var req = URLRequest(url: url)
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+
+        // F1 (0.9.145): same free-space precheck as `fetch` — a pasted link is
+        // a big IPA too, and refusing it here beats filling the disk first.
+        try await checkFreeSpace(for: url, named: name)
 
         let staging = FileManager.default.temporaryDirectory
             .appendingPathComponent("ipa-link-\(UUID().uuidString)", isDirectory: true)
