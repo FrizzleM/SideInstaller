@@ -37,7 +37,10 @@ enum Shortcuts {
     /// into the message the app would show for it. Nothing runs before the
     /// terms are accepted, as in the app.
     static func run<T>(_ action: String, _ work: () async throws -> T) async throws -> T {
-        guard UserDefaults.standard.bool(forKey: SetupView.acceptedTermsKey) else {
+        // Fork has no SetupView: its welcome flow writes the same key
+        // directly (SideInstallerApp hasAcceptedTOS). Upstream's
+        // SetupView.acceptedTermsKey is this same "hasAcceptedTOS".
+        guard UserDefaults.standard.bool(forKey: "hasAcceptedTOS") else {
             throw ShortcutError(L("Open SideInstaller and accept its terms first."))
         }
         let engine = Engine.shared
