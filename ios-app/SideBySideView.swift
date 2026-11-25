@@ -296,6 +296,17 @@ final class SideBySideManager: ObservableObject {
     /// detail can go indeterminate plus a byte count instead of a 0% that
     /// never moves. Reset with the run and at each download start.
     @Published private(set) var downloadBytesWritten: Int64?
+    /// F-2 (0.9.157): the download step's speed in bytes per second, and
+    /// the estimated seconds left — the progress card shows them like the
+    /// source rows do (F-C). Speed is 0 until two samples arrive; the
+    /// estimate is nil while the total is unknown or no speed is known
+    /// yet. The total the server promised, -1 while unknown: drives the
+    /// "x of y" in the card's detail line.
+    @Published private(set) var downloadSpeed: Double = 0
+    @Published private(set) var estimatedTimeRemaining: TimeInterval?
+    @Published private(set) var downloadTotalBytes: Int64 = -1
+    /// The last sample `noteDownloadDetail` measured speed from.
+    private var downloadSpeedSampler = DownloadSpeedSampler()
     /// What a download that fell back to an older local copy should say:
     /// set in `downloadBuild` when the fetch fails and a copy an earlier
     /// run left behind stands in (C14, C7's pattern on the Install tab).
@@ -590,6 +601,7 @@ final class SideBySideManager: ObservableObject {
                 for step in SideBySideStep.allCases { stepStates[step] = .pending }
                 downloadProgress = 0
                 downloadBytesWritten = nil
+                clearDownloadSpeed()
                 go(to: .ready)
             } catch {
                 let message = userFacingErrorMessage(error)
@@ -716,6 +728,7 @@ final class SideBySideManager: ObservableObject {
         for step in SideBySideStep.allCases { stepStates[step] = .pending }
         downloadProgress = 0
         downloadBytesWritten = nil
+        clearDownloadSpeed()
         downloadFallbackNotice = nil
         handOffNotice = nil
         lastError = nil
@@ -1413,6 +1426,7 @@ final class SideBySideManager: ObservableObject {
         setStep(.download, .active)
         downloadProgress = 0
         downloadBytesWritten = nil
+        clearDownloadSpeed()
         let file: URL
         if let source = app.source {
             if source == .liveContainer {
@@ -1431,9 +1445,31 @@ final class SideBySideManager: ObservableObject {
         // progress card stops showing the old count plus a spinner and the
         // % comes back for the signing/install steps.
         downloadBytesWritten = nil
+        clearDownloadSpeed()
         downloadProgress = 1
         engine.log("\(app.displayName) IPA ready at \(file.path) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize(file.path)), countStyle: .file))).")
         setStep(.download, .done)
+    }
+
+    /// F-2 (0.9.157): folds one (bytes, total) sample into the speed and
+    /// the time left. Same EMA as `IPADownloader.noteProgress`, via the
+    /// shared sampler.
+    @MainActor
+    private func noteDownloadDetail(bytes: Int, total: Int) {
+        downloadSpeedSampler.note(bytes: Int64(bytes), total: Int64(total))
+        downloadSpeed = downloadSpeedSampler.speed
+        estimatedTimeRemaining = downloadSpeedSampler.estimatedTimeRemaining
+        downloadTotalBytes = Int64(total)
+    }
+
+    /// F-2 (0.9.157): forget the last download's speed, estimate and
+    /// total, for the next one.
+    @MainActor
+    private func clearDownloadSpeed() {
+        downloadSpeedSampler.reset()
+        downloadSpeed = 0
+        estimatedTimeRemaining = nil
+        downloadTotalBytes = -1
     }
 
     /// Our LiveContainer build's latest release, into a staging folder of its
@@ -1451,6 +1487,10 @@ final class SideBySideManager: ObservableObject {
                 // instead of a fraction, so the card can go indeterminate.
                 onBytes: { bytes in
                     Task { @MainActor in self.downloadBytesWritten = Int64(bytes) }
+                },
+                // F-2 (0.9.157): the speed/ETA sample, like the Install tab's.
+                onProgressDetail: { bytes, total in
+                    Task { @MainActor in self.noteDownloadDetail(bytes: bytes, total: total) }
                 }) { fraction in
                     Task { @MainActor in self.downloadProgress = fraction }
                 }
@@ -1477,6 +1517,10 @@ final class SideBySideManager: ObservableObject {
                 // instead of a fraction, so the card can go indeterminate.
                 onBytes: { bytes in
                     Task { @MainActor in self.downloadBytesWritten = Int64(bytes) }
+                },
+                // F-2 (0.9.157): the speed/ETA sample, like the Install tab's.
+                onProgressDetail: { bytes, total in
+                    Task { @MainActor in self.noteDownloadDetail(bytes: bytes, total: total) }
                 }) { fraction in
                     Task { @MainActor in self.downloadProgress = fraction }
                 }
@@ -1512,15 +1556,23 @@ final class SideBySideManager: ObservableObject {
         let bytesReport: @Sendable (Int) -> Void = { [weak self] bytes in
             Task { @MainActor in self?.downloadBytesWritten = Int64(bytes) }
         }
+        // F-2 (0.9.157): the (bytes, total) sample for the speed and the
+        // time left — the fraction has no bytes, the byte count has no
+        // total, so neither report above can sample it.
+        let detailReport: @Sendable (Int, Int) -> Void = { [weak self] bytes, total in
+            Task { @MainActor in self?.noteDownloadDetail(bytes: bytes, total: total) }
+        }
         // Their iOS, not this iPhone's, decides which AltStore version goes on.
         let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion)
             ?? ProcessInfo.processInfo.operatingSystemVersion
         do {
             let path = try await SideStoreDownloader.$reportProgress.withValue(report) {
                 try await SideStoreDownloader.$reportProgressBytes.withValue(bytesReport) {
-                    try await SideStoreDownloader.downloadLatest(source: source, channel: channel,
-                                                                 runningOn: theirOS) { [weak self] line in
-                        self?.engine.log(line)
+                    try await SideStoreDownloader.$reportProgressDetail.withValue(detailReport) {
+                        try await SideStoreDownloader.downloadLatest(source: source, channel: channel,
+                                                                     runningOn: theirOS) { [weak self] line in
+                            self?.engine.log(line)
+                        }
                     }
                 }
             }
@@ -1530,6 +1582,7 @@ final class SideBySideManager: ObservableObject {
             // count behind — the fallback copy below and the error after it
             // both return through here.
             downloadBytesWritten = nil
+            clearDownloadSpeed()
             // F-G (0.9.156): a cellular decline arrives as CancellationError
             // with the task itself not cancelled — rethrow it as a cancel
             // instead of reporting "Couldn't download …" for a no the user
@@ -2944,6 +2997,26 @@ struct SideBySideView: View {
             if manager.waitingForTrust { return L("Waiting for them to tap Trust…") }
             return L("Looking for their iPhone…")
         case .download:
+            // F-2 (0.9.157): the speed and time left ride the step's
+            // detail line, in the source rows' second-line shape; until
+            // two samples arrive it reads as before.
+            if manager.downloadSpeed > 0 {
+                let speed = L("%@/s", ByteCountFormatter.string(fromByteCount: Int64(manager.downloadSpeed), countStyle: .file))
+                if manager.downloadTotalBytes > 0 {
+                    let bytes = Int64(manager.downloadProgress * Double(manager.downloadTotalBytes))
+                    let of = L("%@ of %@",
+                               ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file),
+                               ByteCountFormatter.string(fromByteCount: manager.downloadTotalBytes, countStyle: .file))
+                    if let eta = manager.estimatedTimeRemaining {
+                        return "\(speed) • \(of) • \(L("%@ left", Self.etaText(eta)))"
+                    }
+                    return "\(speed) • \(of)"
+                }
+                if let bytes = manager.downloadBytesWritten {
+                    return "\(speed) • \(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)))"
+                }
+                return speed
+            }
             // B1 (0.9.155): total unknown — byte count instead of 0%.
             if let bytes = manager.downloadBytesWritten {
                 return L("%@ downloaded", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
@@ -2956,6 +3029,15 @@ struct SideBySideView: View {
         case .signIn, .sign:
             return nil
         }
+    }
+
+    /// "3:42", or "1:12:33" past the hour, for a remaining-time estimate —
+    /// the source rows' shape (SourcesView.etaText).
+    private static func etaText(_ eta: TimeInterval) -> String {
+        let total = Int(eta.rounded())
+        let h = total / 3600, m = (total % 3600) / 60, s = total % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
+        return String(format: "%d:%02d", m, s)
     }
 
     /// Why the run stopped, and the ways on: again as it was, or with

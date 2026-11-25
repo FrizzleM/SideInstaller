@@ -183,6 +183,9 @@ final class AutoRefreshService {
         // 到期通知排期：每轮巡检拿到新清单就重排一次（本地通知，
         // 不用服务器）；旧的先清掉，新的按到期日排。
         ExpiryNotificationScheduler.reschedule(for: manager.entries)
+        // F-3 (0.9.157): 企业证书/描述文件的到期通知同款重排 — 巡检
+        // 每 30 分钟跑一次，证书重导后到期日变了也能跟上。
+        EnterpriseCertExpiryNotifier.reschedule()
 
         // 可续签的 App 里，描述文件已过期或 3 天内到期的才算到期。
         let dueIDs = dueBundleIDs()
@@ -257,6 +260,73 @@ private final class SingleResume: @unchecked Sendable {
         guard !resumed else { return false }
         resumed = true
         return true
+    }
+}
+
+/// F-3 (0.9.157): the enterprise certificate / provisioning profile's
+/// expiry notice — the same local-notification shape as
+/// `ExpiryNotificationScheduler`, but for the enterprise materials,
+/// which otherwise only warn inside their own page: without the app open
+/// nobody sees them expire. One notice each, 3 days before expiry; a
+/// material already inside its last 3 days gets one an hour from now, so
+/// opening the page still warns in time. Re-scheduling clears the old
+/// ones first, so a re-import moves the notice with the new date — and a
+/// removed certificate leaves no stale notice behind.
+///
+/// Permission is the launch flow's (`SideInstallerApp` asks once at
+/// startup): this only schedules when the system says notifications are
+/// allowed, and never asks by itself — a background patrol must not pop
+/// a permission prompt. It touches nothing about renewal.
+enum EnterpriseCertExpiryNotifier {
+
+    private static let prefix = "enterprise-cert-expiry-"
+    /// Days before expiry the notice fires.
+    private static let advanceNotice: TimeInterval = 3 * 24 * 3600
+
+    static func reschedule() {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized
+                    || settings.authorizationStatus == .provisional else { return }
+            center.getPendingNotificationRequests { requests in
+                let stale = requests.filter { $0.identifier.hasPrefix(prefix) }.map(\.identifier)
+                if !stale.isEmpty {
+                    center.removePendingNotificationRequests(withIdentifiers: stale)
+                }
+                schedule(center: center, kind: "cert",
+                         expiration: EnterpriseCertStore.certInfo?.expiration)
+                schedule(center: center, kind: "profile",
+                         expiration: EnterpriseCertStore.provisionInfo?.expiration)
+            }
+        }
+    }
+
+    private static func schedule(center: UNUserNotificationCenter, kind: String, expiration: Date?) {
+        guard let expiration else { return }
+        let now = Date()
+        guard expiration > now else { return }
+        // 3 days before expiry; already inside the last 3 days, an hour
+        // from now — the same "too soon to schedule ahead" shape the app
+        // expiry scheduler uses.
+        let fireDate = expiration.timeIntervalSince(now) <= advanceNotice
+            ? now.addingTimeInterval(3600)
+            : expiration.addingTimeInterval(-advanceNotice)
+        guard fireDate > now, fireDate < expiration else { return }
+        let content = UNMutableNotificationContent()
+        content.title = L("Enterprise certificate expiring")
+        let dateText = expiration.formatted(
+            Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Localizer.locale))
+        content.body = kind == "cert"
+            ? L("The enterprise certificate expires on %@. Re-import it in time.", dateText)
+            : L("The enterprise provisioning profile expires on %@. Re-import it in time.", dateText)
+        content.sound = .default
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute], from: fireDate),
+            repeats: false)
+        let request = UNNotificationRequest(
+            identifier: prefix + kind, content: content, trigger: trigger)
+        Task { try? await center.add(request) }
     }
 }
 

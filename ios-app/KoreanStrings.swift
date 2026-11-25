@@ -1634,4 +1634,10 @@ let koreanStrings: [String: String] = [
     "Wi-Fi only downloads": "Wi-Fi에서만 다운로드",
     "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "켜면 셀룰러 데이터로 다운로드하기 전에 먼저 확인하므로, 큰 IPA가 모바일 데이터를 사용하지 않습니다.",
     "Downloads": "다운로드",
+
+    // MARK: - F-3 enterprise certificate expiry notice (0.9.157)
+
+    "Enterprise certificate expiring": "기업 인증서 만료 임박",
+    "The enterprise certificate expires on %@. Re-import it in time.": "기업 인증서가 %@에 만료됩니다. 제때 다시 가져오세요.",
+    "The enterprise provisioning profile expires on %@. Re-import it in time.": "기업 프로비저닝 프로파일이 %@에 만료됩니다. 제때 다시 가져오세요.",
 ]

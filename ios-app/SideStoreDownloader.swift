@@ -553,6 +553,14 @@ enum SideStoreDownloader {
     /// `reportProgress`, called on the download's own queue.
     @TaskLocal static var reportProgressBytes: (@Sendable (Int) -> Void)?
 
+    /// F-2 (0.9.157): (bytes written, total bytes, -1 while the total is
+    /// unknown) — the speed/ETA sample for the Install tab and Side by
+    /// Side. Neither the fraction nor the byte count alone can supply it:
+    /// the fraction has no bytes, the byte count has no total. Same
+    /// `withValue` shape as `reportProgress`, called on the download's
+    /// own queue, throttled like the fraction.
+    @TaskLocal static var reportProgressDetail: (@Sendable (Int, Int) -> Void)?
+
     struct GHAsset: Decodable {
         let name: String
         let browser_download_url: String
@@ -1078,6 +1086,12 @@ enum SideStoreDownloader {
                             // stays silent then, so the caller needs this to
                             // show anything moving at all.
                             onBytes: ((Int) -> Void)? = nil,
+                            // F-2 (0.9.157): told (bytes written, total, -1
+                            // while unknown) on the same cadence as the
+                            // fraction / byte reports, for the caller's
+                            // speed and ETA — the KVO fraction alone has no
+                            // bytes, the byte count alone has no total.
+                            onProgressDetail: ((Int, Int) -> Void)? = nil,
                             progress: @escaping (Double) -> Void) async throws -> URL {
         var req = URLRequest(url: url)
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
@@ -1152,7 +1166,12 @@ enum SideStoreDownloader {
         let bytesLock = NSLock()
         observation = task.progress.observe(\.fractionCompleted) { done, _ in
             if done.totalUnitCount > 0 {
-                progressThrottler.publish(done.fractionCompleted, send: progress)
+                progressThrottler.publish(done.fractionCompleted) { fraction in
+                    progress(fraction)
+                    // F-2 (0.9.157): the speed sample rides the same
+                    // throttled publish as the fraction.
+                    onProgressDetail?(Int(done.completedUnitCount), Int(done.totalUnitCount))
+                }
             } else if let onBytes {
                 let bytes = Int(done.completedUnitCount)
                 bytesLock.lock()
@@ -1161,6 +1180,8 @@ enum SideStoreDownloader {
                 bytesLock.unlock()
                 guard fresh else { return }
                 onBytes(bytes)
+                // F-2 (0.9.157): same 256KB cadence, total unknown.
+                onProgressDetail?(bytes, -1)
             }
         }
         return try await withTaskCancellationHandler {
@@ -1657,6 +1678,43 @@ private final class ProgressThrottler: @unchecked Sendable {
     }
 }
 
+/// F-2 (0.9.157): the speed/ETA sampler `IPADownloader.noteProgress`
+/// already does, shared by the Install tab and Side by Side: an
+/// exponential moving average over the throttled (bytes, total) samples,
+/// so one fast chunk doesn't swing the estimate; the first sample only
+/// sets the baseline. Owned on the main actor by the caller, so no lock.
+struct DownloadSpeedSampler {
+    private var lastBytes: Int64 = 0
+    private var lastAt: Date?
+
+    /// Bytes per second; 0 until two samples arrive.
+    private(set) var speed: Double = 0
+    /// Seconds left; nil while the total is unknown or no speed is known.
+    private(set) var estimatedTimeRemaining: TimeInterval?
+
+    mutating func note(bytes: Int64, total: Int64) {
+        let now = Date()
+        if let lastAt, now > lastAt {
+            let delta = bytes - lastBytes
+            if delta >= 0 {
+                let instant = Double(delta) / now.timeIntervalSince(lastAt)
+                speed = speed > 0 ? 0.7 * speed + 0.3 * instant : instant
+            }
+        }
+        lastBytes = bytes
+        self.lastAt = now
+        estimatedTimeRemaining = total > 0 && speed > 0
+            ? TimeInterval(max(total - bytes, 0)) / speed : nil
+    }
+
+    mutating func reset() {
+        lastBytes = 0
+        lastAt = nil
+        speed = 0
+        estimatedTimeRemaining = nil
+    }
+}
+
 private final class ResumingDownload: NSObject, URLSessionDataDelegate, @unchecked Sendable {
 
     /// The request timeout until something has answered: URLSession's
@@ -1692,6 +1750,9 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
     /// unknown — read from the `reportProgressBytes` task-local, like
     /// `progress` is read from `reportProgress`.
     private let progressBytes: (@Sendable (Int) -> Void)?
+    /// F-2 (0.9.157): told (bytes written, total) on the same cadence as
+    /// the fraction / byte reports above, for the caller's speed and ETA.
+    private let progressDetail: (@Sendable (Int, Int) -> Void)?
     /// Last byte count reported through `progressBytes`, so the unknown-total
     /// reports stay throttled to 256KB steps instead of one per chunk.
     private var lastReportedBytes = 0
@@ -1736,6 +1797,7 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
         self.idleTimeout = idleTimeout
         self.progress = progress
         self.progressBytes = SideStoreDownloader.reportProgressBytes
+        self.progressDetail = SideStoreDownloader.reportProgressDetail
         self.log = log
         file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).download")
     }
@@ -1925,7 +1987,12 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
             try output?.write(contentsOf: data)
             written += data.count
             if let progress, let total, total > 0 {
-                progressThrottler.publish(min(1, Double(written) / Double(total))) { progress($0) }
+                progressThrottler.publish(min(1, Double(written) / Double(total))) { fraction in
+                    progress(fraction)
+                    // F-2 (0.9.157): the speed sample rides the same
+                    // throttled publish as the fraction.
+                    progressDetail?(written, total)
+                }
             } else if let progressBytes {
                 // B1 (0.9.155): no total to make a fraction from — report
                 // the bytes instead, throttled to 256KB steps, so the
@@ -1934,6 +2001,8 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
                 if written > 0 && (written - lastReportedBytes >= 256 * 1024 || lastReportedBytes == 0) {
                     lastReportedBytes = written
                     progressBytes(written)
+                    // F-2 (0.9.157): same 256KB cadence, total unknown.
+                    progressDetail?(written, -1)
                 }
             }
         } catch {

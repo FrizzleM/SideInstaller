@@ -1218,6 +1218,31 @@ final class SourcesManager: ObservableObject {
         availableUpdateCount = updateCount(installed: apps)
     }
 
+    /// B-2 (0.9.157): adopt what the fork store just fetched, for the
+    /// badge. The Sources tab runs on `SourceStore`, not this manager —
+    /// its fetches never touch `states`, so recounting here alone would
+    /// recompute the same stale count. The fork store's disk cache holds
+    /// the same JSON this manager decodes from the network, so a fresh
+    /// (15-minute) cached document is decoded as an `AppSource` and takes
+    /// its row's place; a stale or missing cache leaves the row alone.
+    /// Called from RootView when the fork store posts new content.
+    func adoptCachedSources() {
+        for url in urls where !isDisabled(url) {
+            guard let alt = SourceStore.cachedModel(for: url),
+                  let source = Self.appSource(from: alt) else { continue }
+            states[url] = .loaded(source)
+        }
+    }
+
+    /// The fork store's `AltSource` as this manager's `AppSource`: the
+    /// same AltStore JSON, re-decoded through this manager's tolerant
+    /// decoder (an app that fails to decode is dropped, exactly as on
+    /// the network path).
+    private static func appSource(from alt: AltSource) -> AppSource? {
+        guard let data = try? JSONEncoder().encode(alt) else { return nil }
+        return try? JSONDecoder().decode(AppSource.self, from: data)
+    }
+
     /// The GitHub account a source is published from, read from where it is
     /// hosted (`<owner>.github.io`, `raw.githubusercontent.com/<owner>/…`,
     /// `github.com/<owner>/…`) or from its website.

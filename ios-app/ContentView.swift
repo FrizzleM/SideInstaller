@@ -1067,6 +1067,14 @@ struct ContentView: View {
                 }
             }
 
+            // F-2 (0.9.157): the download's speed and time left, in the
+            // source rows' second-line shape, while the download step runs.
+            if let detail = downloadDetailLine {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+            }
+
             if engine.downloadBytesWritten != nil {
                 ProgressView()
                     .tint(progressTint)
@@ -1098,6 +1106,37 @@ struct ContentView: View {
         // B-5：取消安装不是立刻停——要等设备上正在跑的安装收尾，
         // 文案说清在等，别让用户以为点取消没反应。
         return engine.isCancelling ? L("Waiting for this install to finish…") : L("Installing")
+    }
+
+    /// F-2 (0.9.157): the download step's speed / bytes / time left, in
+    /// the source rows' second-line shape. Nil until two samples arrive,
+    /// or once the download step is over (the speed is cleared then).
+    private var downloadDetailLine: String? {
+        guard engine.downloadSpeed > 0 else { return nil }
+        let speed = L("%@/s", ByteCountFormatter.string(fromByteCount: Int64(engine.downloadSpeed), countStyle: .file))
+        if engine.downloadTotalBytes > 0 {
+            let bytes = Int64(engine.downloadProgress * Double(engine.downloadTotalBytes))
+            let of = L("%@ of %@",
+                       ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file),
+                       ByteCountFormatter.string(fromByteCount: engine.downloadTotalBytes, countStyle: .file))
+            if let eta = engine.estimatedTimeRemaining {
+                return "\(speed) • \(of) • \(L("%@ left", Self.etaText(eta)))"
+            }
+            return "\(speed) • \(of)"
+        }
+        if let bytes = engine.downloadBytesWritten {
+            return "\(speed) • \(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)))"
+        }
+        return speed
+    }
+
+    /// "3:42", or "1:12:33" past the hour, for a remaining-time estimate —
+    /// the source rows' shape (SourcesView.etaText).
+    private static func etaText(_ eta: TimeInterval) -> String {
+        let total = Int(eta.rounded())
+        let h = total / 3600, m = (total % 3600) / 60, s = total % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
+        return String(format: "%d:%02d", m, s)
     }
 
     /// The X in the card's corner, which stops the run after asking. It dims

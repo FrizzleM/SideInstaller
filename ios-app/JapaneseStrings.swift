@@ -1633,4 +1633,10 @@ let japaneseStrings: [String: String] = [
     "Wi-Fi only downloads": "Wi-Fiのみでダウンロード",
     "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "オンにすると、モバイルデータ通信でのダウンロードは最初に確認を求めるため、大きなIPAがモバイルデータを使用することはありません。",
     "Downloads": "ダウンロード",
+
+    // MARK: - F-3 enterprise certificate expiry notice (0.9.157)
+
+    "Enterprise certificate expiring": "企業証明書の有効期限が近づいています",
+    "The enterprise certificate expires on %@. Re-import it in time.": "企業証明書は %@ に期限切れとなります。お早めに再インポートしてください。",
+    "The enterprise provisioning profile expires on %@. Re-import it in time.": "企業のプロビジョニングプロファイルは %@ に期限切れとなります。お早めに再インポートしてください。",
 ]

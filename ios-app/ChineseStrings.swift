@@ -1645,4 +1645,10 @@ let chineseStrings: [String: String] = [
     "Wi-Fi only downloads": "仅 Wi-Fi 下载",
     "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "开启后，蜂窝数据下载会先询问，这样大的 IPA 就不会消耗你的移动流量。",
     "Downloads": "下载",
+
+    // MARK: - F-3 enterprise certificate expiry notice (0.9.157)
+
+    "Enterprise certificate expiring": "企业证书即将到期",
+    "The enterprise certificate expires on %@. Re-import it in time.": "企业证书将于 %@ 到期，请及时重新导入。",
+    "The enterprise provisioning profile expires on %@. Re-import it in time.": "企业描述文件将于 %@ 到期，请及时重新导入。",
 ]

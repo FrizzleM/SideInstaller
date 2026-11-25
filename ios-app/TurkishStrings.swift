@@ -1587,4 +1587,10 @@ let turkishStrings: [String: String] = [
     "Wi-Fi only downloads": "Yalnızca Wi-Fi ile indirme",
     "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "Açıkken, hücresel veriyle indirme önce sorar; böylece büyük bir IPA mobil verinizi kullanmaz.",
     "Downloads": "İndirilenler",
+
+    // MARK: - F-3 enterprise certificate expiry notice (0.9.157)
+
+    "Enterprise certificate expiring": "Kurumsal sertifikanın süresi dolmak üzere",
+    "The enterprise certificate expires on %@. Re-import it in time.": "Kurumsal sertifikanın süresi %@ tarihinde doluyor. Zamanında yeniden içe aktarın.",
+    "The enterprise provisioning profile expires on %@. Re-import it in time.": "Kurumsal sağlama profilinin süresi %@ tarihinde doluyor. Zamanında yeniden içe aktarın.",
 ]

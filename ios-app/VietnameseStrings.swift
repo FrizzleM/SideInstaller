@@ -1667,4 +1667,10 @@ let vietnameseStrings: [String: String] = [
     "Wi-Fi only downloads": "Chỉ tải xuống qua Wi-Fi",
     "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "Khi bật, bản tải xuống bằng dữ liệu di động sẽ hỏi trước, để một file IPA lớn không dùng dữ liệu di động của bạn.",
     "Downloads": "Tải xuống",
+
+    // MARK: - F-3 enterprise certificate expiry notice (0.9.157)
+
+    "Enterprise certificate expiring": "Chứng chỉ doanh nghiệp sắp hết hạn",
+    "The enterprise certificate expires on %@. Re-import it in time.": "Chứng chỉ doanh nghiệp hết hạn vào %@. Hãy nhập lại kịp thời.",
+    "The enterprise provisioning profile expires on %@. Re-import it in time.": "Hồ sơ cấp phép doanh nghiệp hết hạn vào %@. Hãy nhập lại kịp thời.",
 ]

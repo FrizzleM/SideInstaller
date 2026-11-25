@@ -183,6 +183,9 @@ struct EnterpriseCertView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             refreshCertState()
+            // F-3 (0.9.157): 打开证书页就按当前到期日重排到期通知 —
+            // 刚导完证书还没等巡检跑过来时，通知也已经排上了。
+            EnterpriseCertExpiryNotifier.reschedule()
             presets = CertSignPresetStore.load()
             if let shared = workspace.selectedIPA {
                 select(shared)
@@ -865,6 +868,9 @@ struct EnterpriseCertView: View {
                 self.provisionInfo = provision
                 self.certInfo = cert
                 self.profileExpirations = expirations
+                // F-3 (0.9.157): 材料刚解析完、到期日最新时重排通知 —
+                // 重导证书后旧提醒不会赖着不走。
+                EnterpriseCertExpiryNotifier.reschedule()
                 self.certParsedFingerprint = fingerprint
                 self.certParsedPassword = storePassword
                 // 密码错不要等到签名才说：p12 解不开就在密码组下红字明说。

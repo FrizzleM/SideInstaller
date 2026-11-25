@@ -234,6 +234,30 @@ struct RootView: View {
         .onChange(of: appsManager.entries) { _, entries in
             sourcesManager.recountUpdates(installed: entries)
         }
+        // B-2 (0.9.157): the badge counts from this manager's states, so
+        // it recounts whenever they or the disabled set change — not only
+        // at the three call sites that used to recount by hand.
+        .onChange(of: sourcesManager.states) { _, _ in
+            sourcesManager.recountUpdates(installed: appsManager.entries)
+        }
+        .onChange(of: sourcesManager.disabled) { _, _ in
+            sourcesManager.recountUpdates(installed: appsManager.entries)
+        }
+        // B-2 (0.9.157): the Sources tab fetches through the fork store,
+        // not this manager — when it lands a document, adopt it for the
+        // badge; when the list or a disabled flag changes, re-read them.
+        .onReceive(NotificationCenter.default.publisher(for: SourceStore.contentDidChange)) { _ in
+            Task { @MainActor in
+                sourcesManager.adoptCachedSources()
+                sourcesManager.recountUpdates(installed: appsManager.entries)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UnifiedSourceList.didChange)) { _ in
+            Task { @MainActor in
+                sourcesManager.syncURLs()
+                sourcesManager.recountUpdates(installed: appsManager.entries)
+            }
+        }
         // A swipe down is a cancel; the sign-in closing it is not.
         .sheet(isPresented: Binding(
             get: { signInSheet != nil },

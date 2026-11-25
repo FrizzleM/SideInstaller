@@ -1660,4 +1660,10 @@ let portugueseStrings: [String: String] = [
     "Wi-Fi only downloads": "Downloads somente por Wi-Fi",
     "When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data.": "Quando ativado, um download com dados móveis pergunta primeiro, para que um IPA grande não use seus dados móveis.",
     "Downloads": "Downloads",
+
+    // MARK: - F-3 enterprise certificate expiry notice (0.9.157)
+
+    "Enterprise certificate expiring": "Certificado empresarial prestes a expirar",
+    "The enterprise certificate expires on %@. Re-import it in time.": "O certificado empresarial expira em %@. Reimporte-o a tempo.",
+    "The enterprise provisioning profile expires on %@. Re-import it in time.": "O perfil de provisionamento empresarial expira em %@. Reimporte-o a tempo.",
 ]

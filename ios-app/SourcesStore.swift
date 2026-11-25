@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 // MARK: - AltStore source format
@@ -219,6 +220,11 @@ final class SourceStore: ObservableObject {
     /// Preset on first run, when the user has never had a source list.
     static let defaultSourceURL = UnifiedSourceList.forkDefaultURL
 
+    /// B-2 (0.9.157): posted when a fetch lands a new document, so the
+    /// Sources tab badge — which counts from `SourcesManager`'s states,
+    /// not this store's — can adopt it (see `SourcesManager.adoptCachedSources`).
+    static let contentDidChange = Notification.Name("CZFSourceStoreContentDidChange")
+
     /// C-6：源 JSON 专用 session——不用 shared：30 秒空闲 + 120 秒总时长
     /// 双上限（shared 默认空闲 60 秒、总时长 7 天，一个 trickle 源能挂一行 7 天）。
     private static let fetchSession: URLSession = {
@@ -317,6 +323,19 @@ final class SourceStore: ObservableObject {
     /// 读整份磁盘缓存（后台线程上跑，不在主线程）。
     nonisolated private static func loadSourceCache() async -> [String: CachedSource] {
         cacheQueue.sync { loadSourceCacheLocked() }
+    }
+
+    /// B-2 (0.9.157): the disk-cached document for `url`, while it is
+    /// still within the 15-minute fetch TTL — `SourcesManager` adopts it
+    /// for the badge instead of refetching what this store just fetched.
+    /// Sync: the cache queue serializes it, like the async loader above.
+    nonisolated static func cachedModel(for url: URL) -> AltSource? {
+        cacheQueue.sync {
+            guard let cached = loadSourceCacheLocked()[url.absoluteString],
+                  Date().timeIntervalSince(cached.fetched) < 15 * 60
+            else { return nil }
+            return cached.model
+        }
     }
 
     /// 写回整份磁盘缓存（后台线程上跑；读改写在队列内一次完成）。
@@ -429,6 +448,9 @@ final class SourceStore: ObservableObject {
             sources[index].fetchedAt = Date()
             sources[index].isLoading = false
             await Self.saveSourceCache(url: url, model: model)
+            // B-2 (0.9.157): a new document landed — the badge counts from
+            // the other store's states, so tell it to adopt this one.
+            NotificationCenter.default.post(name: Self.contentDidChange, object: nil)
         } catch is CancellationError {
             // 取消不是错误：只把 isLoading 复位，不写 errorMessage——
             // 视图消失导致 .task 取消时，行上不能留一条假错误。
@@ -564,6 +586,64 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     private var resumeData: Data?
     private var resumeURL: URL?
 
+    /// F-1 (0.9.157): a resume point survives a kill or a system reclaim
+    /// only on disk — memory alone loses it, and a big IPA then restarts
+    /// from zero. 7 days: a server that old has forgotten the range, so
+    /// an older point would only fail at once instead of resuming.
+    private static let resumeDataMaxAge: TimeInterval = 7 * 24 * 3600
+
+    /// One resume point on disk: the URL it belongs to, when it was saved,
+    /// and the resume data itself.
+    private struct PersistedResumeData: Codable {
+        let url: String
+        let savedAt: Date
+        let data: Data
+    }
+
+    /// The resume-data folder, in Application Support next to the source
+    /// documents cache. nonisolated: only file I/O, no actor state.
+    nonisolated private static var resumeDataDirectory: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let dir = base.appendingPathComponent("resumeData", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// The file for one URL's resume point: the URL's SHA256 hex, so the
+    /// name is unique per URL, short, and needs no escaping (a base64'd
+    /// URL can pass the 255-character filename limit on a long link).
+    nonisolated private static func resumeDataFileURL(for url: URL) -> URL {
+        let hash = SHA256.hash(data: Data(url.absoluteString.utf8))
+            .map { String(format: "%02x", $0) }.joined()
+        return resumeDataDirectory.appendingPathComponent(hash + ".resume")
+    }
+
+    nonisolated private static func saveResumeDataToDisk(url: URL, data: Data) {
+        let record = PersistedResumeData(url: url.absoluteString, savedAt: Date(), data: data)
+        guard let encoded = try? JSONEncoder().encode(record) else { return }
+        try? encoded.write(to: resumeDataFileURL(for: url), options: .atomic)
+    }
+
+    /// The disk point for `url`, or nil when there is none, it belongs to
+    /// another URL, or it is older than `resumeDataMaxAge` — an expired or
+    /// unreadable file is deleted on the spot, not left to be retried.
+    nonisolated private static func loadResumeDataFromDisk(url: URL) -> Data? {
+        let file = resumeDataFileURL(for: url)
+        guard let encoded = try? Data(contentsOf: file),
+              let record = try? JSONDecoder().decode(PersistedResumeData.self, from: encoded),
+              record.url == url.absoluteString,
+              Date().timeIntervalSince(record.savedAt) < Self.resumeDataMaxAge
+        else {
+            try? FileManager.default.removeItem(at: file)
+            return nil
+        }
+        return record.data
+    }
+
+    nonisolated private static func deleteResumeDataFromDisk(url: URL) {
+        try? FileManager.default.removeItem(at: resumeDataFileURL(for: url))
+    }
+
     /// A-1（SIDE-32）：本下载的进度节流器（delegate 队列是串行的，锁只是兜底）。
     private let progressThrottler = IPADownloadProgressThrottler()
 
@@ -586,6 +666,22 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         self.session = session
         var request = URLRequest(url: url)
         request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        // F-1 (0.9.157): memory is empty after a relaunch, but the disk
+        // point from the last cancel may still be there — load it, and
+        // consume it at once: the data now lives in memory, a cancel
+        // re-saves it, a success clears it, so the file must not outlive
+        // this run and be retried stale. A point for another URL is
+        // dropped with the memory one.
+        if resumeURL == url, resumeData == nil {
+            if let saved = Self.loadResumeDataFromDisk(url: url) {
+                resumeData = saved
+            } else {
+                resumeURL = nil
+            }
+            Self.deleteResumeDataFromDisk(url: url)
+        } else if let old = resumeURL, old != url {
+            Self.deleteResumeDataFromDisk(url: old)
+        }
         // F-B: resume where a cancelled run of the same URL stopped, when
         // the server left resume data behind; any other URL (or none)
         // starts clean and drops the stale data.
@@ -640,6 +736,9 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
                     guard let self, self.currentTask == nil else { return }
                     self.resumeData = data
                     self.resumeURL = url
+                    // F-1 (0.9.157): the same point on disk, so a kill or
+                    // a system reclaim doesn't lose it.
+                    Self.saveResumeDataToDisk(url: url, data: data)
                 }
             })
         }
@@ -778,6 +877,9 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
                 }
             }
             Task { @MainActor in self.finish(.success(dest), for: ObjectIdentifier(downloadTask)) }
+            // F-1 (0.9.157): the file landed whole — its resume point is
+            // done, on disk as in memory.
+            Self.deleteResumeDataFromDisk(url: source)
         } catch {
             // N3(C)：建目录/移文件失败也会留一个空 ipa-source-* 目录，顺手删掉。
             try? FileManager.default.removeItem(at: staging)
@@ -790,6 +892,22 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         // A successful download has already finished in
         // `didFinishDownloadingTo`; this only carries failures and cancels.
         guard let error else { return }
+        // F-1 (0.9.157): a transfer that died mid-way can still carry
+        // resume data in the error — keep it (memory + disk) when this is
+        // still the live task, so the next tap resumes instead of
+        // restarting. A user cancel never reaches here with a live task:
+        // cancel() already settled the continuation, and its
+        // byProducingResumeData callback owns that path — the identity
+        // check below keeps this one from overwriting it.
+        if let data = (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data,
+           let url = task.originalRequest?.url {
+            Task { @MainActor in
+                guard self.currentTaskID == ObjectIdentifier(task) else { return }
+                self.resumeData = data
+                self.resumeURL = url
+                Self.saveResumeDataToDisk(url: url, data: data)
+            }
+        }
         Task { @MainActor in self.finish(.failure(error), for: ObjectIdentifier(task)) }
     }
 }
