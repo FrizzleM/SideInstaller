@@ -15,11 +15,29 @@ final class UpdateChecker: ObservableObject {
         "https://raw.githubusercontent.com/wozofa-ship-it/SideInstaller/main/latest_version.txt"
     /// The install page the banner opens, which carries the OTA links.
     static let installPageURL = "https://github.com/wozofa-ship-it/SideInstaller"
+    /// The latest stable release's download for this app's own IPA.
+    /// The packaging workflow publishes each version as release `v<version>`
+    /// with this asset (0.9.149), so this URL only ever serves the current
+    /// release — never an older one, as long as the release gate below
+    /// confirms the tag names `latestVersion`.
+    static let releaseDownloadURL =
+        "https://github.com/wozofa-ship-it/SideInstaller/releases/latest/download/SideInstaller.ipa"
+    /// The API that names the latest release and its assets.
+    static let latestReleaseAPIURL =
+        "https://api.github.com/repos/wozofa-ship-it/SideInstaller/releases/latest"
+    /// The asset the release must carry for the self-update to light up.
+    static let releaseAssetName = "SideInstaller.ipa"
 
     /// The newest version GitHub advertises, once fetched.
     @Published private(set) var latestVersion: String?
     /// True once a newer version is found, until the banner is dismissed.
     @Published private(set) var showBanner = false
+    /// True only when the latest release's tag names the same version as
+    /// `latestVersion` AND it carries the IPA asset: the safety gate for the
+    /// About page's self-update (0.9.149). A stale or missing release, or
+    /// any fetch failure, leaves this false and the update row stays
+    /// static — never install an older build.
+    @Published private(set) var updateAssetVerified = false
 
     /// This build's marketing version, e.g. "0.5.0".
     let currentVersion =
@@ -68,7 +86,39 @@ final class UpdateChecker: ObservableObject {
         UserDefaults.standard.set(now, forKey: Self.lastCheckKey)
         latestVersion = latest
         showBanner = Self.isNewer(latest, than: currentVersion)
+        // The release gate only runs when there is something newer: a
+        // second request on every launch would be pure cost. A failed
+        // gate leaves the banner as it is — the banner only opens a web
+        // page — but the About row stays static.
+        updateAssetVerified = showBanner ? await verifyReleaseAsset(for: latest) : false
         return showBanner ? .newer(latest) : .upToDate
+    }
+
+    /// Checks the latest release against `latest`: it must be a formal
+    /// release (not a draft or prerelease), its tag must name exactly that
+    /// version, and its assets must include `SideInstaller.ipa`.
+    /// Fails closed — any fetch or parse failure returns false.
+    private func verifyReleaseAsset(for latest: String) async -> Bool {
+        guard let url = URL(string: Self.latestReleaseAPIURL) else { return false }
+        var req = URLRequest(url: url)
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        // Same 15-second bound as the version check (B5, 0.9.146).
+        req.timeoutInterval = 15
+        req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        guard let (data, response) = try? await URLSession.shared.data(for: req),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              (json["draft"] as? Bool) == false,
+              (json["prerelease"] as? Bool) == false,
+              let tag = json["tag_name"] as? String,
+              let assets = json["assets"] as? [[String: Any]] else { return false }
+        // The tag names the version with a "v" in front ("v0.9.149").
+        let tagVersion = tag.hasPrefix("v") || tag.hasPrefix("V") ? String(tag.dropFirst()) : tag
+        // Equal, not just newer: a release for another version — older or
+        // newer than the version file — is not the one to install.
+        guard !Self.isNewer(tagVersion, than: latest), !Self.isNewer(latest, than: tagVersion) else { return false }
+        return assets.contains { ($0["name"] as? String) == Self.releaseAssetName }
     }
 
     /// Close the banner for this launch.

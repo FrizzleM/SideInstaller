@@ -8,6 +8,8 @@ struct AboutView: View {
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @EnvironmentObject private var updateChecker: UpdateChecker
+    /// The install engine, for the version row's self-update (0.9.149).
+    @Environment(Engine.self) private var engine
 
     @State private var showSettings = false
     @State private var showCrypto = false
@@ -18,6 +20,15 @@ struct AboutView: View {
     @State private var checkTask: Task<Void, Never>?
     /// What the last manual update check found; nil until one runs.
     @State private var updateCheckStatus: UpdateChecker.CheckResult?
+    /// The in-flight self-update, so its state survives redraws.
+    @State private var selfUpdateTask: Task<Void, Never>?
+    /// True from the update tap until its run ends (or it fails to start).
+    @State private var isSelfUpdating = false
+    /// Set once this launch's self-update installed: the row goes back to
+    /// static text instead of offering the same version again.
+    @State private var selfUpdateFinished = false
+    /// Why the last self-update didn't start, shown under "Check for updates".
+    @State private var selfUpdateError: String?
 
     var body: some View {
         NavigationStack {
@@ -46,7 +57,137 @@ struct AboutView: View {
     private var header: some View {
         BrandHeader(icon: "info.circle.fill", image: "AppLogo", title: "SideInstaller 🅥",
                     subtitle: L("an app by Frizzle") + "\n解剖自我 🅥 " + L("Modified edition")) {
-            StatusPill(text: versionText, systemImage: "tag.fill", color: Theme.accent2)
+            versionPill
+        }
+    }
+
+    /// The version line: static text when there's nothing to update, a
+    /// button when a verified newer version is waiting (0.9.149). A tap
+    /// with no update known runs a check first; a tap with one waiting
+    /// installs it. It looks the same either way — the pill is the row.
+    private var versionPill: some View {
+        Button { CZFHaptics.impact(); versionRowTapped() } label: {
+            StatusPill(text: versionPillText, systemImage: versionPillIcon, color: versionPillColor)
+        }
+        .buttonStyle(.plain, sound: .tick)
+        .disabled(isSelfUpdating)
+    }
+
+    /// True when a newer version is confirmed AND its release asset is
+    /// verified: the only state in which the version row installs anything.
+    /// Independent of the Install tab's banner — dismissing that must not
+    /// hide the update here. Never true after this launch's self-update
+    /// already installed.
+    private var updateAvailable: Bool {
+        guard !selfUpdateFinished, let latest = updateChecker.latestVersion else { return false }
+        return UpdateChecker.isNewer(latest, than: updateChecker.currentVersion)
+            && updateChecker.updateAssetVerified
+    }
+
+    /// The version line's text: the running version, or what the row is
+    /// doing — checking, offering the new version, downloading it,
+    /// installing it.
+    private var versionPillText: String {
+        if let progress = selfUpdateProgressText { return progress }
+        if updateAvailable, let latest = updateChecker.latestVersion {
+            return L("Update to %@", latest)
+        }
+        if isCheckingUpdate { return L("Checking for updates…") }
+        return versionText
+    }
+
+    private var versionPillIcon: String {
+        updateAvailable || isSelfUpdating ? "arrow.down.circle.fill" : "tag.fill"
+    }
+
+    private var versionPillColor: Color {
+        updateAvailable || isSelfUpdating ? Theme.accent : Theme.accent2
+    }
+
+    /// What the self-update is doing: the download percent, or "Installing"
+    /// once the run starts. Nil when no self-update is running.
+    private var selfUpdateProgressText: String? {
+        guard isSelfUpdating else { return nil }
+        if engine.isRunning { return L("Installing") }
+        return L("Downloading… %d%%", Int((engine.importProgress ?? 0) * 100))
+    }
+
+    /// The version row's tap: install when a verified update is waiting,
+    /// otherwise check first (0.9.142 manual check, 0.9.146 timeout +
+    /// cancel); a newer verified version lights the update state, and the
+    /// next tap installs it. While a self-update runs the row is disabled.
+    private func versionRowTapped() {
+        if isSelfUpdating { return }
+        if updateAvailable { startSelfUpdate(); return }
+        runUpdateCheck()
+    }
+
+    /// Downloads the verified release IPA into the custom slot and runs the
+    /// one-click pipeline on it (reinstallFromHistory 同款，0.9.148):
+    /// no separate self-update path. The Install sheet comes forward
+    /// (F4 同款 sharedIPAReady) so the run's progress is in front of the
+    /// user; a refusal leaves its reason on this page instead of failing
+    /// silently.
+    private func startSelfUpdate() {
+        guard updateAvailable, let latest = updateChecker.latestVersion, !isSelfUpdating else { return }
+        selfUpdateError = nil
+        selfUpdateFinished = false
+        isSelfUpdating = true
+        selfUpdateTask = Task {
+            // Re-check the gate at tap time: still newer, still verified.
+            guard updateChecker.updateAssetVerified,
+                  UpdateChecker.isNewer(latest, than: updateChecker.currentVersion) else {
+                isSelfUpdating = false
+                selfUpdateTask = nil
+                return
+            }
+            let ok = await engine.importCustomIPA(fromLink: UpdateChecker.releaseDownloadURL)
+            if Task.isCancelled {
+                isSelfUpdating = false
+                selfUpdateTask = nil
+                return
+            }
+            guard ok else {
+                selfUpdateError = engine.lastError
+                isSelfUpdating = false
+                selfUpdateTask = nil
+                return
+            }
+            // B-39-B2 同款 (0.9.148): the source is only switched once the
+            // import really landed, so a refused import can't retarget a
+            // pipeline that's already running.
+            engine.installSource = .custom
+            engine.runOneClick()
+            // Shortcuts.install 同款：等管线起跑再认成功；起不来时把原因
+            // 留在检查行里，不静默、不开空的安装页。
+            var waited = 0.0
+            while !engine.isRunning, !Task.isCancelled, waited < 3.0 {
+                try? await Task.sleep(for: .milliseconds(100))
+                waited += 0.1
+            }
+            if Task.isCancelled {
+                isSelfUpdating = false
+                selfUpdateTask = nil
+                return
+            }
+            if engine.isRunning {
+                engine.sharedIPAReady = true
+                // Wait the run out so the row doesn't offer the same update
+                // again while it installs; the floating Install pill carries
+                // the progress meanwhile.
+                while engine.isRunning, !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(1))
+                }
+                if !Task.isCancelled, engine.finished {
+                    selfUpdateFinished = true
+                }
+            } else if let error = engine.lastError {
+                selfUpdateError = error
+            } else if let guide = engine.guide {
+                selfUpdateError = guide.title
+            }
+            isSelfUpdating = false
+            selfUpdateTask = nil
         }
     }
 
@@ -73,7 +214,11 @@ struct AboutView: View {
     }
 
     /// The detail line under "Check for updates": nothing until a check runs.
+    /// A failed self-update reports here too, so the reason stays on this
+    /// page even after the Install sheet is dismissed.
     private var updateCheckDetail: String? {
+        if let selfUpdateError { return selfUpdateError }
+        if let progress = selfUpdateProgressText { return progress }
         if isCheckingUpdate { return L("Checking for updates… Tap again to cancel.") }
         switch updateCheckStatus {
         case nil, .skipped: return nil
@@ -95,6 +240,10 @@ struct AboutView: View {
             checkTask?.cancel()
             return
         }
+        // A fresh check clears the last self-update's outcome: it reports
+        // the new check, not the old install.
+        selfUpdateError = nil
+        selfUpdateFinished = false
         isCheckingUpdate = true
         checkTask = Task {
             let result = await updateChecker.check(force: true)
