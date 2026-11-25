@@ -1314,8 +1314,12 @@ struct AppsView: View {
             let task = await MainActor.run { manager.load() }
             if let task {
                 await task.value
-            } else if let inFlight = await MainActor.run({ manager.inFlightLoadTask }) {
-                await inFlight.value
+            } else {
+                // 修法（checks 三轮红：MainActor.run 的首参是带默认值的
+                // resultType:，闭包只能放尾随位置——写进括号里就被当成
+                // resultType: 实参；同文件上一行就是尾随闭包写法）。
+                let inFlight = await MainActor.run { manager.inFlightLoadTask }
+                await inFlight?.value
             }
         }
         .background(AppBackground())
