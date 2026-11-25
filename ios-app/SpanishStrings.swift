@@ -645,6 +645,7 @@ let spanishStrings: [String: String] = [
 
     "Needs LocalDevVPN on their iPhone": "Necesita LocalDevVPN en su iPhone",
     "Couldn't download %@: %@": "No se pudo descargar %@: %@",
+    "Couldn't find %@ in Downloads. Download it again first.": "No encontré %@ en Descargas. Descárgalo de nuevo primero.",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "Su iPhone ya tiene tres apps firmadas con un Apple ID gratuito, el máximo que permite iOS, contando las caducadas. Tienen que borrar una y luego puedes volver a intentarlo.",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
@@ -732,6 +733,7 @@ let spanishStrings: [String: String] = [
     "Device IP": "IP del dispositivo",
     "Advanced": "Avanzado",
     "Clear": "Borrar",
+    "Clear install history?": "¿Borrar el historial de instalación?",
     "Activity Log (%d)": "Registro de actividad (%d)",
     "没有匹配的日志。": "No hay registros coincidentes.",
     "Verbose logging": "Registro detallado",
@@ -1424,6 +1426,7 @@ let spanishStrings: [String: String] = [
     "This folder can't be renamed or moved.": "Esta carpeta no se puede renombrar ni mover.",
     "This file is being signed. Wait until it finishes.": "Este archivo se está firmando. Espera a que termine.",
     "This file is being renewed. Wait until it finishes.": "Este archivo se está renovando. Espera a que termine.",
+    "This only clears the list. Installed apps are not affected.": "Esto solo borra la lista. Las apps instaladas no se ven afectadas.",
     "empty account config": "La configuración de la cuenta está vacía",
     "%d files, first %@: %@": "%d archivos, el primero %@ : %@",
     "%@ isn't listed": "%@ no está en la lista",

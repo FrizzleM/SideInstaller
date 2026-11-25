@@ -64,4 +64,12 @@ enum InstallHistoryStore {
         if entries.count > maxEntries { entries = Array(entries.prefix(maxEntries)) }
         save(entries)
     }
+
+    /// F3 (0.9.148): empty the history (`LogStore.clear` 同款：只清列表，
+    /// 已装的 App 不受影响）。
+    static func clear() {
+        logLock.lock()
+        defer { logLock.unlock() }
+        save([])
+    }
 }

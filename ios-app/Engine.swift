@@ -2057,6 +2057,69 @@ final class Engine {
         }
     }
 
+    /// F1 (0.9.148): reinstall a history entry — find the newest IPA in the
+    /// Downloads library whose filename names the same app, import it as the
+    /// custom IPA and run the one-click pipeline. Returns false with
+    /// `lastError` set when no IPA matches (the user has to download it
+    /// again first) or the import refuses; a started run returns true.
+    /// The history entry keeps no IPA path, so matching is by name only:
+    /// the filename stem (or the build's display name) against the recorded
+    /// app name, best rank first, newest within a rank. `installSource` is
+    /// set to `.custom` only after the import succeeds (B-39-B2 同款）。
+    @MainActor
+    func reinstallFromHistory(_ entry: InstallHistoryEntry) async -> Bool {
+        let needle = entry.appName.lowercased()
+        guard !needle.isEmpty else {
+            lastError = L("Couldn't find %@ in Downloads. Download it again first.", entry.appName)
+            return false
+        }
+        // Candidates: the library scan (known builds + the custom import)
+        // plus any unrecognized IPA in Documents, whose filename is the
+        // only name a hand-saved custom IPA has.
+        var candidates: [(url: URL, modified: Date, rank: Int)] = []
+        for item in IPALibrary.scan() {
+            if let rank = Self.historyMatchRank(fileStem: item.url.deletingPathExtension().lastPathComponent.lowercased(),
+                                                sourceName: item.source.displayName.lowercased(), needle: needle) {
+                candidates.append((item.url, item.modified ?? .distantPast, rank))
+            }
+        }
+        for name in IPALibrary.unrecognized() {
+            let url = IPALibrary.documentsDir.appendingPathComponent(name)
+            let modified = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) ?? .distantPast
+            if let rank = Self.historyMatchRank(fileStem: url.deletingPathExtension().lastPathComponent.lowercased(),
+                                                sourceName: "", needle: needle) {
+                candidates.append((url, modified, rank))
+            }
+        }
+        guard let match = candidates.sorted(by: { a, b in
+            if a.rank != b.rank { return a.rank < b.rank }
+            return a.modified > b.modified
+        }).first else {
+            lastError = L("Couldn't find %@ in Downloads. Download it again first.", entry.appName)
+            log("⛔️ History reinstall: no IPA for \(entry.appName) in Downloads.")
+            return false
+        }
+        guard await importCustomIPA(from: match.url) else { return false }
+        // B-39-B2 同款：源赋值移到导入成功之后——导入被拒时在途管线
+        // 读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
+        installSource = .custom
+        runOneClick()
+        return true
+    }
+
+    /// How well a library IPA's name matches a history entry's app name:
+    /// exact filename stem, then a stem that starts with it or a build name
+    /// that equals it, then a name that merely contains it. Nil means no
+    /// match at all.
+    private static func historyMatchRank(fileStem: String, sourceName: String, needle: String) -> Int? {
+        if fileStem == needle { return 0 }
+        if fileStem.hasPrefix(needle) { return 1 }
+        if sourceName == needle { return 1 }
+        if fileStem.contains(needle) { return 2 }
+        if !sourceName.isEmpty, sourceName.contains(needle) { return 2 }
+        return nil
+    }
+
     /// Starts a link import as a task the link row can cancel, instead of
     /// the fire-and-forget `Task` the view used to own (B1, 0.9.147).
     /// Returns immediately; the import itself runs in `importCustomIPA`.

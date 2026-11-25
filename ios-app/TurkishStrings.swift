@@ -474,6 +474,7 @@ let turkishStrings: [String: String] = [
         "Onların iPhone'unu bu iPhone ile aynı Wi-Fi ağına bağla.",
     "Couldn't download %@: %@":
         "%@ indirilemedi: %@",
+    "Couldn't find %@ in Downloads. Download it again first.": "İndirilenler'de %@ bulunamadı. Önce yeniden indirin.",
     "Do this on their iPhone, then start.":
         "Bunu onların iPhone'unda yap, sonra başlat.",
     "Finish on their iPhone":
@@ -695,6 +696,7 @@ let turkishStrings: [String: String] = [
     "Device IP": "Cihaz IP",
     "Advanced": "Gelişmiş",
     "Clear": "Temizle",
+    "Clear install history?": "Kurulum geçmişi temizlensin mi?",
     "Activity Log (%d)": "Etkinlik günlüğü (%d)",
     "没有匹配的日志。": "Eşleşen günlük yok.",
     "Verbose logging": "Ayrıntılı günlük",
@@ -1339,6 +1341,7 @@ let turkishStrings: [String: String] = [
     "This folder can't be renamed or moved.": "Bu klasör yeniden adlandırılamaz veya taşınamaz.",
     "This file is being signed. Wait until it finishes.": "Bu dosya imzalanıyor. Bitene kadar bekleyin.",
     "This file is being renewed. Wait until it finishes.": "Bu dosya yenileniyor. Bitene kadar bekleyin.",
+    "This only clears the list. Installed apps are not affected.": "Bu yalnızca listeyi temizler. Kurulu uygulamalar etkilenmez.",
     "empty account config": "Hesap yapılandırması boş",
     "%d files, first %@: %@": "%d dosya, ilki %@ : %@",
     "%@ isn't listed": "%@ listede yok",

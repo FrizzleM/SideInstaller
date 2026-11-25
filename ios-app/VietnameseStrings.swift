@@ -642,6 +642,7 @@ let vietnameseStrings: [String: String] = [
 
     "Needs LocalDevVPN on their iPhone": "Cần LocalDevVPN trên iPhone của họ",
     "Couldn't download %@: %@": "Không tải được %@: %@",
+    "Couldn't find %@ in Downloads. Download it again first.": "Không tìm thấy %@ trong Tải xuống. Hãy tải lại trước.",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "iPhone của họ đã có ba ứng dụng được ký bằng Apple ID miễn phí, mức tối đa iOS cho phép, tính cả ứng dụng đã hết hạn. Họ cần xóa một ứng dụng, rồi bạn có thể thử lại.",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
@@ -729,6 +730,7 @@ let vietnameseStrings: [String: String] = [
     "Device IP": "IP thiết bị",
     "Advanced": "Nâng cao",
     "Clear": "Xóa hết",
+    "Clear install history?": "Xóa lịch sử cài đặt?",
     "Activity Log (%d)": "Nhật ký hoạt động (%d)",
     "没有匹配的日志。": "Không có nhật ký phù hợp.",
     "Verbose logging": "Nhật ký chi tiết",
@@ -1419,6 +1421,7 @@ let vietnameseStrings: [String: String] = [
     "This folder can't be renamed or moved.": "Không thể đổi tên hoặc di chuyển thư mục này.",
     "This file is being signed. Wait until it finishes.": "Tệp này đang được ký. Hãy chờ cho đến khi xong.",
     "This file is being renewed. Wait until it finishes.": "Tệp này đang được gia hạn. Hãy chờ cho đến khi xong.",
+    "This only clears the list. Installed apps are not affected.": "Chỉ xóa danh sách. Các ứng dụng đã cài đặt không bị ảnh hưởng.",
     "empty account config": "Cấu hình tài khoản trống",
     "%d files, first %@: %@": "%d tệp, tệp đầu tiên %@ : %@",
     "%@ isn't listed": "%@ không có trong danh sách",

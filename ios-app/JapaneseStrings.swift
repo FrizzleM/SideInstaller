@@ -565,6 +565,7 @@ let japaneseStrings: [String: String] = [
 
     "Needs LocalDevVPN on their iPhone": "相手の iPhone に LocalDevVPN が必要",
     "Couldn't download %@: %@": "%@ をダウンロードできませんでした：%@",
+    "Couldn't find %@ in Downloads. Download it again first.": "ダウンロードに %@ が見つかりません。まずもう一度ダウンロードしてください。",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "相手の iPhone には、無料 Apple ID で署名されたアプリがすでに 3 つあります（期限切れのものも含む）。これが iOS の上限です。1 つ削除してもらってから、もう一度お試しください。",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
@@ -648,6 +649,7 @@ let japaneseStrings: [String: String] = [
     "Device IP": "デバイス IP",
     "Advanced": "詳細設定",
     "Clear": "消去",
+    "Clear install history?": "インストール履歴を消去しますか？",
     "Activity Log (%d)": "アクティビティログ（%d）",
     "没有匹配的日志。": "一致するログがありません。",
     "Verbose logging": "詳細ログ",
@@ -1390,6 +1392,7 @@ let japaneseStrings: [String: String] = [
     "This folder can't be renamed or moved.": "このフォルダは名前を変更したり移動したりできません。",
     "This file is being signed. Wait until it finishes.": "このファイルは署名中です。終わるまで待ってください。",
     "This file is being renewed. Wait until it finishes.": "このファイルは更新中です。終わるまで待ってください。",
+    "This only clears the list. Installed apps are not affected.": "一覧だけが消去されます。インストール済みの App には影響しません。",
     "empty account config": "アカウント設定が空です",
     "%d files, first %@: %@": "%d 個のファイル、最初は %@：%@",
     "%@ isn't listed": "%@ は一覧にありません",

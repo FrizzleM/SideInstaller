@@ -648,6 +648,7 @@ let chineseStrings: [String: String] = [
 
     "Needs LocalDevVPN on their iPhone": "对方的 iPhone 需要 LocalDevVPN",
     "Couldn't download %@: %@": "无法下载 %@：%@",
+    "Couldn't find %@ in Downloads. Download it again first.": "在“下载”里找不到 %@。请先重新下载它。",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "对方的 iPhone 上已有三个用免费 Apple ID 签名的 App（已过期的也算），这是 iOS 允许的上限。请对方先删除一个，然后再试。",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
@@ -730,6 +731,7 @@ let chineseStrings: [String: String] = [
     "Device IP": "设备 IP",
     "Advanced": "高级",
     "Clear": "清除",
+    "Clear install history?": "清空安装历史？",
     "Activity Log (%d)": "活动日志（%d）",
     "没有匹配的日志。": "没有匹配的日志。",
     "Verbose logging": "详细日志",
@@ -1402,6 +1404,7 @@ let chineseStrings: [String: String] = [
     "This folder can't be renamed or moved.": "这个文件夹不能改名或移动。",
     "This file is being signed. Wait until it finishes.": "正在签名这个文件，等签名结束再操作。",
     "This file is being renewed. Wait until it finishes.": "正在续签这个文件，等续签结束再操作。",
+    "This only clears the list. Installed apps are not affected.": "只清空列表，已安装的 App 不受影响。",
     "empty account config": "账号配置为空",
     "%d files, first %@: %@": "%d 个文件，首个 %@：%@",
     "%@ isn't listed": "%@ 未列出",

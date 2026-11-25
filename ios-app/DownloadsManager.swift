@@ -201,6 +201,44 @@ struct DownloadsListView: View {
     /// is tapped, not on every body pass).
     @State private var confirmingClearAll = false
     @State private var clearAllRenewalNames: [String] = []
+    /// U1 (0.9.148): search text + sort (FilesTabView FileSort 同款，
+    /// 只改显示顺序，不动磁盘顺序）。
+    @State private var searchText = ""
+    @AppStorage("CZFDownloadSort") private var downloadSortRaw = DownloadSort.default.rawValue
+    private var downloadSort: DownloadSort { DownloadSort(rawValue: downloadSortRaw) ?? .default }
+
+    /// Sort order for the download list: default scan order / name /
+    /// size (largest first) / newest (latest modified first).
+    private enum DownloadSort: String, CaseIterable {
+        case `default`, name, size, newest
+        var label: String {
+            switch self {
+            case .default: return L("默认")
+            case .name: return L("Name")
+            case .size: return L("Size")
+            case .newest: return L("Latest")
+            }
+        }
+    }
+
+    /// Search + sort applied to the scanned list: search matches the shown
+    /// name or the filename, case-insensitive; sorting only reorders.
+    private var visibleDownloads: [DownloadedIPA] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        var items = manager.downloads
+        if !query.isEmpty {
+            items = items.filter {
+                $0.displayName.lowercased().contains(query)
+                    || $0.fileName.lowercased().contains(query)
+            }
+        }
+        switch downloadSort {
+        case .default: return items
+        case .name: return items.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        case .size: return items.sorted { $0.size > $1.size }
+        case .newest: return items.sorted { ($0.modified ?? .distantPast) > ($1.modified ?? .distantPast) }
+        }
+    }
 
     /// A-39-2：下载行日期文案静态缓存——照抄 SIDE-38 A4 的
     /// ExpiryUrgency.textCache 模式；每行每 body 求值现建
@@ -221,81 +259,111 @@ struct DownloadsListView: View {
     }
 
     var body: some View {
-        List {
-            if let error = manager.lastError {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(Theme.negative)
+        VStack(spacing: 12) {
+            // U1 (0.9.148): search + sort above the list (SourcesView 同款：
+            // SearchBar 在 List 外，键盘与行重绘互不干扰）。
+            SearchBar(text: $searchText, placeholder: L("搜索"))
+                .padding(.horizontal, 20)
+            HStack {
+                Menu {
+                    ForEach(DownloadSort.allCases, id: \.self) { option in
+                        Button {
+                            downloadSortRaw = option.rawValue
+                        } label: {
+                            if downloadSort == option {
+                                Label(option.label, systemImage: "checkmark")
+                            } else {
+                                Text(option.label)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(L("排序：%@", downloadSort.label), systemImage: "arrow.up.arrow.down")
+                        .font(.footnote.weight(.semibold))
+                }
+                Spacer()
             }
-            // UI-4：没扫完先给加载行，别让列表空白看着像没东西。
-            if !manager.hasLoaded {
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text(L("Loading…"))
+            .padding(.horizontal, 20)
+            List {
+                if let error = manager.lastError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(Theme.negative)
+                }
+                // UI-4：没扫完先给加载行，别让列表空白看着像没东西。
+                if !manager.hasLoaded {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text(L("Loading…"))
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.muted)
+                    }
+                } else if manager.downloads.isEmpty {
+                    Text(L("No downloaded IPAs. Ones you install from a source or a file are cached here."))
                         .font(.subheadline)
                         .foregroundStyle(Theme.muted)
-                }
-            } else if manager.downloads.isEmpty {
-                Text(L("No downloaded IPAs. Ones you install from a source or a file are cached here."))
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.muted)
-            } else {
-                // F2：页顶合计行（文件页合计行同款文案 + 样式）与清空全部。
-                HStack(spacing: 8) {
-                    Text(L("%d 个 IPA · %@", manager.downloads.count, manager.totalSizeText))
-                        .font(.footnote)
+                } else if visibleDownloads.isEmpty {
+                    Text(L("没有匹配的 IPA。"))
+                        .font(.subheadline)
                         .foregroundStyle(Theme.muted)
-                    Spacer()
-                    Button(L("清空全部")) {
-                        clearAllRenewalNames = manager.downloads.compactMap {
-                            RenewalSourceStore.source(forFileURL: $0.url, bundleID: nil)?.appName
-                        }
-                        confirmingClearAll = true
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Theme.negative)
-                    .disabled(manager.deletingID != nil)
-                }
-                ForEach(manager.downloads) { item in
-                    Button { install(item) } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "shippingbox.fill")
-                                .font(.title3)
-                                .foregroundStyle(Theme.brand)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.displayName)
-                                    .font(.subheadline.weight(.medium))
-                                    .lineLimit(1)
-                                if let modified = item.modified {
-                                    let when = Self.dateText(for: modified)
-                                    Text(item.isImported ? L("Added %@", when) : L("Downloaded %@", when))
-                                        .font(.caption)
-                                        .foregroundStyle(Theme.muted)
-                                }
+                } else {
+                    // F2：页顶合计行（文件页合计行同款文案 + 样式）与清空全部。
+                    HStack(spacing: 8) {
+                        Text(L("%d 个 IPA · %@", manager.downloads.count, manager.totalSizeText))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                        Spacer()
+                        Button(L("清空全部")) {
+                            clearAllRenewalNames = manager.downloads.compactMap {
+                                RenewalSourceStore.source(forFileURL: $0.url, bundleID: nil)?.appName
                             }
-                            Spacer()
-                            Text(item.sizeText)
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(Theme.accent2)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 4)
-                                .background(Capsule().fill(Theme.accent.opacity(0.16)))
+                            confirmingClearAll = true
                         }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(installingID == item.id)
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            pendingDelete = item
-                        } label: {
-                            Label(L("Delete"), systemImage: "trash")
-                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Theme.negative)
                         .disabled(manager.deletingID != nil)
+                    }
+                    ForEach(visibleDownloads) { item in
+                        Button { install(item) } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "shippingbox.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(Theme.brand)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.displayName)
+                                        .font(.subheadline.weight(.medium))
+                                        .lineLimit(1)
+                                    if let modified = item.modified {
+                                        let when = Self.dateText(for: modified)
+                                        Text(item.isImported ? L("Added %@", when) : L("Downloaded %@", when))
+                                            .font(.caption)
+                                            .foregroundStyle(Theme.muted)
+                                    }
+                                }
+                                Spacer()
+                                Text(item.sizeText)
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(Theme.accent2)
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 4)
+                                    .background(Capsule().fill(Theme.accent.opacity(0.16)))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(installingID == item.id)
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                pendingDelete = item
+                            } label: {
+                                Label(L("Delete"), systemImage: "trash")
+                            }
+                            .disabled(manager.deletingID != nil)
+                        }
                     }
                 }
             }
+            .listStyle(.plain)
         }
-        .listStyle(.plain)
         .navigationTitle(L("Download"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { manager.refresh() }

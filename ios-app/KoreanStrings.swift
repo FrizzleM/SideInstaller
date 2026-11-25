@@ -566,6 +566,7 @@ let koreanStrings: [String: String] = [
 
     "Needs LocalDevVPN on their iPhone": "상대방 iPhone에 LocalDevVPN 필요",
     "Couldn't download %@: %@": "%@을(를) 다운로드할 수 없습니다: %@",
+    "Couldn't find %@ in Downloads. Download it again first.": "다운로드에서 %@을(를) 찾을 수 없습니다. 먼저 다시 다운로드하세요.",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "상대방 iPhone에는 이미 무료 Apple ID로 서명된 앱이 3개 있습니다. 만료된 앱을 포함해 iOS가 허용하는 최대치입니다. 상대방이 하나를 삭제한 뒤 다시 시도하세요.",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
@@ -649,6 +650,7 @@ let koreanStrings: [String: String] = [
     "Device IP": "기기 IP",
     "Advanced": "고급",
     "Clear": "지우기",
+    "Clear install history?": "설치 기록을 지우겠습니까?",
     "Activity Log (%d)": "활동 로그 (%d)",
     "没有匹配的日志。": "일치하는 로그가 없습니다.",
     "Verbose logging": "상세 로그",
@@ -1390,6 +1392,7 @@ let koreanStrings: [String: String] = [
     "This folder can't be renamed or moved.": "이 폴더는 이름을 바꾸거나 이동할 수 없습니다.",
     "This file is being signed. Wait until it finishes.": "이 파일은 서명 중입니다. 끝날 때까지 기다리세요.",
     "This file is being renewed. Wait until it finishes.": "이 파일은 갱신 중입니다. 끝날 때까지 기다리세요.",
+    "This only clears the list. Installed apps are not affected.": "목록만 지워집니다. 설치된 앱에는 영향이 없습니다.",
     "empty account config": "계정 구성이 비어 있습니다",
     "%d files, first %@: %@": "%d개의 파일, 첫 번째 %@: %@",
     "%@ isn't listed": "%@가 목록에 없습니다",
