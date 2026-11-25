@@ -1010,13 +1010,14 @@ enum SideStoreDownloader {
         req.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
         var expected: Int?
         if let (_, response) = try? await URLSession.shared.data(for: req),
-           let length = response.expectedContentLength, length > 0 {
-            expected = Int(length)
+           response.expectedContentLength > 0 {
+            expected = Int(response.expectedContentLength)
         }
         try Task.checkCancellation()
         guard let available = (try? IPALibrary.documentsDir.resourceValues(
             forKeys: [.volumeAvailableCapacityForImportantUsageKey]))
-            .flatMap(\.volumeAvailableCapacityForImportantUsage) else { return }
+            .flatMap(\.volumeAvailableCapacityForImportantUsage)
+            .map({ Int($0) }) else { return }
         let needed = expected ?? minimumFreeSpace
         guard needed <= available else {
             log?("⚠️ Not enough free space for \(name): needs \(ByteCountFormatter.string(fromByteCount: Int64(needed), countStyle: .file)), only \(ByteCountFormatter.string(fromByteCount: Int64(available), countStyle: .file)) free.")
