@@ -873,6 +873,13 @@ struct FilesTabView: View {
                 .padding(.bottom, 20)
             }
             .scrollBounceBehavior(.basedOnSize)
+            .refreshable {
+                // F2 (0.9.141): pull to rescan the file library. refreshFiles
+                // scans on a detached task and lands on the main actor; the
+                // spinner clears when the call returns and the list updates
+                // as soon as the scan lands.
+                refreshFiles()
+            }
             .blueTopBar()
             .navigationBarTitleDisplayMode(.inline)
             // UI-2(b)：失败统一走顶部 alert——opMessage 一变、且本次是失败
@@ -1559,7 +1566,7 @@ struct FilesTabView: View {
                 .resizable()
                 .scaledToFill()
                 .frame(width: 60, height: 60)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius))
         } else {
             // IPA 还没取到图、取图失败、非 IPA 文件：一律中性占位，
             // 不造假图、不空框（IPA 占位与应用库同款灰色文档标）。
@@ -2835,9 +2842,9 @@ struct FilesTabView: View {
             Image(uiImage: image)
                 .resizable()
                 .frame(width: 60, height: 60)
-                .cornerRadius(14)
+                .cornerRadius(Theme.controlRadius)
         } else {
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: Theme.controlRadius)
                 .fill(Color.secondary.opacity(0.15))
                 .frame(width: 60, height: 60)
         }

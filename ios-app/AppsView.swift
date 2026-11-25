@@ -1247,6 +1247,9 @@ struct AppsView: View {
     /// 重绘由 iconEpoch 触发。
     @State private var rowIconsTried: Set<String> = []
     @State private var iconEpoch = 0
+    /// F1 (0.9.141): the app list's search text — the file page's SearchBar
+    /// 同款，过滤按名字或 Bundle ID（见 `filteredEntries`）。
+    @State private var appSearchText = ""
     /// A-5(c)：行图标的批量写回（loadRowIcon 同款，懒建）。
     @State private var rowIconBatcher: BatchWriteback<String, UIImage>?
     @Environment(\.openURL) private var openURL
@@ -1259,6 +1262,7 @@ struct AppsView: View {
                 refreshNote
                 loadButton
                 refreshRunCard
+                searchBar
                 // Errors show as a popup, which `RootView` lays over the app.
                 appList
                 unmatchedSection
@@ -1268,6 +1272,14 @@ struct AppsView: View {
             .animation(.smooth(duration: 0.3), value: manager.isWorking)
             .animation(.smooth(duration: 0.35), value: manager.jobs)
             .animation(.smooth(duration: 0.35), value: manager.refreshable)
+        }
+        .refreshable {
+            // F2 (0.9.141): pull to reload the device list.
+            // SideloadedAppsManager is @MainActor; load() returns the Task
+            // doing the load (nil when one is already running), so awaiting
+            // its value keeps the spinner up until the fresh list lands.
+            let task = await MainActor.run { manager.load() }
+            await task?.value
         }
         .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
@@ -1527,6 +1539,27 @@ struct AppsView: View {
 
     // MARK: App list
 
+    /// F1 (0.9.141): search field above the list — the file page's SearchBar
+    /// (Theme.swift), shown once the list has loaded.
+    @ViewBuilder
+    private var searchBar: some View {
+        if manager.hasLoaded && !manager.entries.isEmpty {
+            SearchBar(text: $appSearchText, placeholder: L("搜索"))
+                .cascadeItem(4)
+        }
+    }
+
+    /// F1 (0.9.141): the list filtered by `appSearchText` — name or Bundle ID
+    /// contains the query, case-insensitive (the file page's matching() 同款取法).
+    private var filteredEntries: [SideloadedAppStatus] {
+        guard !appSearchText.isEmpty else { return manager.entries }
+        let query = appSearchText.lowercased()
+        return manager.entries.filter {
+            $0.app.name.lowercased().contains(query)
+                || $0.app.bundleID.lowercased().contains(query)
+        }
+    }
+
     @ViewBuilder
     private var appList: some View {
         if manager.hasLoaded && manager.entries.isEmpty && !manager.isWorking {
@@ -1540,9 +1573,9 @@ struct AppsView: View {
                 let jobsByID = Dictionary(manager.refreshable.map { ($0.bundleID, $0) },
                                           uniquingKeysWith: { first, _ in first })
                 HStack {
-                    Text(manager.entries.count == 1
-                         ? L("%d app", manager.entries.count)
-                         : L("%d apps", manager.entries.count))
+                    Text(filteredEntries.count == 1
+                         ? L("%d app", filteredEntries.count)
+                         : L("%d apps", filteredEntries.count))
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(Theme.muted)
                     Spacer()
@@ -1553,7 +1586,7 @@ struct AppsView: View {
                             .foregroundStyle(Theme.muted)
                     }
                 }
-                .cascadeItem(4)
+                .cascadeItem(5)
                 // C5：上次读设备失败时，列表是上一次成功加载的旧清单——
                 // 到期天数可能已经变了，标出来，别让用户当成新的看。
                 // 成功加载会清掉 lastLoadFailed，小字随之消失。
@@ -1577,16 +1610,26 @@ struct AppsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                ForEach(Array(manager.entries.enumerated()), id: \.element.id) { idx, status in
-                    NavigationLink {
-                        AppProfileDetail(status: status)
-                    } label: {
-                        appRow(status, jobsByID: jobsByID)
-                    }
-                    .buttonStyle(.plain, sound: .tick)
-                    .cascadeItem(5 + idx)
-                    .task(id: rowIconKey(for: status, jobsByID: jobsByID)) {
-                        loadRowIcon(for: status, jobsByID: jobsByID)
+                if filteredEntries.isEmpty {
+                    // F1 (0.9.141): a search that matches nothing — the list
+                    // itself is non-empty (see the branch above), so say so
+                    // instead of leaving a bare count header.
+                    Text(L("No matching apps."))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ForEach(Array(filteredEntries.enumerated()), id: \.element.id) { idx, status in
+                        NavigationLink {
+                            AppProfileDetail(status: status)
+                        } label: {
+                            appRow(status, jobsByID: jobsByID)
+                        }
+                        .buttonStyle(.plain, sound: .tick)
+                        .cascadeItem(6 + idx)
+                        .task(id: rowIconKey(for: status, jobsByID: jobsByID)) {
+                            loadRowIcon(for: status, jobsByID: jobsByID)
+                        }
                     }
                 }
             }
@@ -1658,7 +1701,7 @@ struct AppsView: View {
                 .resizable()
                 .scaledToFill()
                 .frame(width: 44, height: 44)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius))
         } else {
             Image(systemName: "app.dashed")
                 .font(.title3)
@@ -1849,7 +1892,7 @@ private struct AppProfileDetail: View {
                                 .textSelection(.enabled)
                                 .padding(8)
                                 .background(Color.secondary.opacity(0.1))
-                                .cornerRadius(12)
+                                .cornerRadius(Theme.controlRadius)
                         }
                     }
                     // Direct import into the app on this page (no password input needed):

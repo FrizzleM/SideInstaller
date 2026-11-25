@@ -1147,7 +1147,7 @@ struct EnterpriseCertView: View {
                         .frame(height: 52)
                         .background(Theme.accent)
                         .foregroundStyle(.white)
-                        .cornerRadius(16)
+                        .cornerRadius(Theme.controlRadius)
                         .shadow(color: Theme.accent.opacity(0.25), radius: 8, y: 4)
                     }
                     .buttonStyle(CZFPressButtonStyle())
@@ -1166,7 +1166,7 @@ struct EnterpriseCertView: View {
                         .frame(height: 52)
                         .background(Theme.negative)
                         .foregroundStyle(.white)
-                        .cornerRadius(16)
+                        .cornerRadius(Theme.controlRadius)
                         .shadow(color: Theme.negative.opacity(0.25), radius: 8, y: 4)
                     }
                     .buttonStyle(CZFPressButtonStyle())
@@ -1231,7 +1231,7 @@ struct EnterpriseCertView: View {
                         .frame(height: 44)
                         .background(Theme.accent.opacity(0.12))
                         .foregroundStyle(Theme.accent)
-                        .cornerRadius(16)
+                        .cornerRadius(Theme.controlRadius)
                     }
                     .buttonStyle(CZFPressButtonStyle())
                     if showMoreSettings {
@@ -1557,9 +1557,9 @@ struct EnterpriseCertView: View {
             Image(uiImage: image)
                 .resizable()
                 .frame(width: 60, height: 60)
-                .cornerRadius(14)
+                .cornerRadius(Theme.controlRadius)
         } else {
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: Theme.controlRadius)
                 .fill(Color.secondary.opacity(0.15))
                 .frame(width: 60, height: 60)
         }
@@ -1692,7 +1692,7 @@ struct EnterpriseCertView: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: 40, height: 40)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
                 Button {
                     mods.icon = nil
                     iconItem = nil
@@ -1721,7 +1721,7 @@ struct EnterpriseCertView: View {
                 }
             } else {
                 // B12-6：解码中——占位，不闪回“从相册选择”。
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
                     .fill(Color.secondary.opacity(0.15))
                     .frame(width: 40, height: 40)
                 Button {
@@ -2360,7 +2360,7 @@ struct EnterpriseCertView: View {
                 }
                 .frame(maxHeight: 200)
                 .background(Color.secondary.opacity(0.08))
-                .cornerRadius(8)
+                .cornerRadius(Theme.controlRadius)
                 Button(L("Copy logs")) {
                     var text = localInstall.diagnosticLog.joined(separator: "\n")
                     let recentEngine = LogStore.shared.lines.suffix(40)
@@ -2628,7 +2628,7 @@ private struct LibraryIPAPicker: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: 52, height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius))
             } else {
                 Image(systemName: "doc")
                     .foregroundStyle(Theme.muted)

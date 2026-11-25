@@ -538,6 +538,7 @@ let vietnameseStrings: [String: String] = [
         "Không có gì trên thiết bị này được cài bằng hồ sơ cấp phép. Ứng dụng từ App Store không hết hạn nên không xuất hiện ở đây.",
     "No apps were read. Tap Reload to read this iPhone again; pair it and turn on Developer Mode first if nothing shows.":
         "Không đọc được ứng dụng nào. Chạm vào Tải lại để đọc lại iPhone này; nếu vẫn không có gì, hãy ghép nối iPhone và bật Chế độ nhà phát triển trước.",
+    "No matching apps.": "Không có ứng dụng nào phù hợp.",
     "No matching profile": "Không có hồ sơ nào khớp",
     "Expires today": "Hết hạn hôm nay",
     "Expires tomorrow": "Hết hạn ngày mai",

@@ -1625,6 +1625,10 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
         defer { session.invalidateAndCancel() }
 
         var idle = 0
+        // B1 (0.9.141): retries that went back to the start link for a fresh
+        // storage link. The loop below is otherwise bounded (pauses /
+        // firstPauses run out and throw); this counter bounds this path too.
+        var storageRetries = 0
         while true {
             try Task.checkCancellation()
             let before = written, fromStorage = storage != nil
@@ -1661,8 +1665,17 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
                 if fromStorage, retryAfter == nil {
                     // Expired, most likely: straight back to the start link,
                     // whose answer comes from a new storage link or not at all.
-                    log("The storage link for \(name) answered HTTP \(status) — asking \(start.host ?? "the start link") for a new one.")
+                    // B1 (0.9.141): bounded — a deleted or renamed asset
+                    // answers 404/403 every time, and this path used to
+                    // `continue` with no sleep and no limit, spinning
+                    // forever with the progress wheel turning and no error.
+                    // Three tries, then the refusal surfaces like any other.
+                    storageRetries += 1
+                    guard storageRetries <= 3 else { throw reason }
+                    log("The storage link for \(name) answered HTTP \(status) — asking \(start.host ?? "the start link") for a new one (attempt \(storageRetries) of 3).")
                     storage = nil
+                    let storagePause = Self.pauses[min(storageRetries - 1, Self.pauses.count - 1)]
+                    try await Task.sleep(nanoseconds: storagePause * 1_000_000_000)
                     continue
                 }
                 guard retryAfter == nil, (500...599).contains(status) else { throw reason }
@@ -1671,6 +1684,9 @@ private final class ResumingDownload: NSObject, URLSessionDataDelegate, @uncheck
             let pause: UInt64
             if written > before {
                 idle = 0
+                // B1 (0.9.141): bytes arrived, so the storage link works
+                // again — a later expiry starts a fresh set of three tries.
+                storageRetries = 0
                 pause = 1
             } else {
                 let table = responded ? Self.pauses : Self.firstPauses

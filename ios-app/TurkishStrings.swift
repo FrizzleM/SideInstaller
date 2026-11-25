@@ -564,6 +564,7 @@ let turkishStrings: [String: String] = [
         "Bu cihazda hiçbir şey sağlama profiliyle yüklenmemiş. App Store uygulamalarının süresi dolmaz, bu yüzden burada listelenmezler.",
     "No apps were read. Tap Reload to read this iPhone again; pair it and turn on Developer Mode first if nothing shows.":
         "Hiç uygulama okunamadı. Bu iPhone'u yeniden okumak için Yeniden yükle'ye dokunun; hâlâ bir şey görünmüyorsa önce iPhone'u eşleştirin ve Geliştirici Modu'nu açın.",
+    "No matching apps.": "Eşleşen uygulama yok.",
     "No matching profile": "Eşleşen profil yok",
     "Expires today": "Bugün doluyor",
     "Expires tomorrow": "Yarın doluyor",

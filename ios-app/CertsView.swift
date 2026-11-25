@@ -37,6 +37,19 @@ struct CertsView: View {
             .animation(.smooth(duration: 0.3), value: manager.isWorking)
             .animation(.smooth(duration: 0.35), value: manager.teamSummary)
         }
+        .refreshable {
+            // F2 (0.9.141): pull to reload the certificate list.
+            // loadCerts declines silently when a revoke is running or no
+            // Apple ID is saved, and a stored `then` is dropped when the
+            // load fails — so don't wait on its callback, or the spinner
+            // could stick forever. Wait on isWorking instead, bounded.
+            await MainActor.run { manager.loadCerts() }
+            for _ in 0..<120 {
+                let working = await MainActor.run { manager.isWorking }
+                guard working else { break }
+                try? await Task.sleep(nanoseconds: 250_000_000)
+            }
+        }
         .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
         .sheet(isPresented: $showSettings) { SettingsView() }
@@ -175,7 +188,7 @@ struct CertsView: View {
                             .textSelection(.enabled)
                             .padding(8)
                             .background(Color.secondary.opacity(0.1))
-                            .cornerRadius(12)
+                            .cornerRadius(Theme.controlRadius)
                     }
                 }
             } else {
