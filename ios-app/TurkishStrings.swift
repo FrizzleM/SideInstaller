@@ -341,6 +341,7 @@ let turkishStrings: [String: String] = [
     "That isn't a valid coordinate.": "Bu geçerli bir koordinat değil.",
     "Location session closed — set it up again.": "Konum oturumu kapandı — yeniden ayarla.",
     "Downloading %@ failed (HTTP %d).": "%@ indirme başarısız (HTTP %d).",
+    "The download of %@ came back empty. Try again.": "%@ indirmesi boş geldi. Yeniden deneyin.",
     "Couldn't build the download URL for %@.": "%@ için indirme adresi oluşturulamadı.",
     "Couldn't build the certificate link.": "Sertifika bağlantısı oluşturulamadı.",
     // Location › saved places and GPX routes.
@@ -702,6 +703,10 @@ let turkishStrings: [String: String] = [
     // Settings › Developer Mode: AMFI requests over the device link.
 
     "Developer Mode": "Geliştirici Modu",
+    "Developer disk image": "Geliştirici disk görüntüsü",
+    "Downloaded": "İndirildi",
+    "Not downloaded": "İndirilmedi",
+    "Re-download": "Yeniden indir",
     "Show Developer Mode in Settings": "Ayarlar'da Geliştirici Modu'nu göster",
     "Turn on Developer Mode": "Geliştirici Modu'nu aç",
     "Asking this iPhone…": "Bu iPhone'a soruluyor…",

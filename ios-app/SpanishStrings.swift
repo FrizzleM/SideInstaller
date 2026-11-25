@@ -376,6 +376,7 @@ let spanishStrings: [String: String] = [
     "Location session closed — set it up again.":
         "La sesión de ubicación se ha cerrado: vuelve a prepararla.",
     "Downloading %@ failed (HTTP %d).": "La descarga de %@ ha fallado (HTTP %d).",
+    "The download of %@ came back empty. Try again.": "La descarga de %@ llegó vacía. Inténtalo de nuevo.",
     "Couldn't build the download URL for %@.":
         "No se ha podido construir la URL de descarga de %@.",
     "Couldn't build the certificate link.": "No se pudo crear el enlace del certificado.",
@@ -739,6 +740,10 @@ let spanishStrings: [String: String] = [
 
     // Settings › Developer Mode: AMFI requests over the device link.
     "Developer Mode": "Modo desarrollador",
+    "Developer disk image": "Imagen de disco de desarrollador",
+    "Downloaded": "Descargada",
+    "Not downloaded": "No descargada",
+    "Re-download": "Volver a descargar",
     "Show Developer Mode in Settings": "Mostrar el Modo desarrollador en Ajustes",
     "Turn on Developer Mode": "Activar el Modo desarrollador",
     "Asking this iPhone…": "Preguntando a este iPhone…",

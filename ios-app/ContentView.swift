@@ -531,8 +531,13 @@ struct ContentView: View {
             .fieldBackground()
             // Progress bar for link downloads (file copies report no progress).
             if engine.isImportingIPA, let fraction = engine.importProgress {
-                ProgressView(value: fraction)
-                    .tint(Theme.accent)
+                HStack(spacing: 8) {
+                    ProgressView(value: fraction)
+                        .tint(Theme.accent)
+                    Button(L("Cancel")) { engine.cancelLinkImport() }
+                        .buttonStyle(.plain, sound: .tap)
+                        .foregroundStyle(Theme.accent)
+                }
             }
         }
         .animation(.smooth(duration: 0.25), value: engine.importProgress == nil)
@@ -547,7 +552,9 @@ struct ContentView: View {
         guard linkIsUsable else { return }
         linkFieldFocused = false
         let link = ipaLink
-        Task { _ = await engine.importCustomIPA(fromLink: link) }
+        // B1 (0.9.147): the task lives in the engine, so the link row can
+        // cancel it — the old fire-and-forget Task had no handle.
+        engine.startLinkImport(link)
     }
 
     // MARK: Primary action

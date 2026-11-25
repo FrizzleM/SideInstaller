@@ -374,6 +374,7 @@ let vietnameseStrings: [String: String] = [
     "That isn't a valid coordinate.": "Tọa độ đó không hợp lệ.",
     "Location session closed — set it up again.": "Phiên vị trí đã đóng — hãy thiết lập lại.",
     "Downloading %@ failed (HTTP %d).": "Tải %@ thất bại (HTTP %d).",
+    "The download of %@ came back empty. Try again.": "Tải xuống %@ về trống. Hãy thử lại.",
     "Couldn't build the download URL for %@.": "Không thể tạo URL tải cho %@.",
     "Couldn't build the certificate link.": "Không thể tạo liên kết chứng chỉ.",
 
@@ -736,6 +737,10 @@ let vietnameseStrings: [String: String] = [
 
     // Settings › Developer Mode: AMFI requests over the device link.
     "Developer Mode": "Chế độ nhà phát triển",
+    "Developer disk image": "Ảnh đĩa nhà phát triển",
+    "Downloaded": "Đã tải xuống",
+    "Not downloaded": "Chưa tải xuống",
+    "Re-download": "Tải lại",
     "Show Developer Mode in Settings": "Hiện Chế độ nhà phát triển trong Cài đặt",
     "Turn on Developer Mode": "Bật Chế độ nhà phát triển",
     "Asking this iPhone…": "Đang hỏi iPhone này…",

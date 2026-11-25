@@ -887,6 +887,12 @@ final class JITManager: ObservableObject {
     /// The app being got ready for (disk image, device link) before its
     /// session starts.
     @Published private(set) var startingBundleID: String?
+    /// DDI download progress (0…1) while a session start is fetching it;
+    /// nil otherwise (B2, 0.9.147).
+    @Published private(set) var ddiDownloadProgress: Double?
+    /// The task starting a session, so a download in progress can be
+    /// cancelled (B2, 0.9.147).
+    private var startTask: Task<Void, Never>?
     /// The running session. Nil once it ends; its outcome is a popup.
     @Published private(set) var status: Status?
     @Published var lastError: String?
@@ -1004,7 +1010,7 @@ final class JITManager: ObservableObject {
         startingBundleID = app.bundleID
         let jitProtocol = jitProtocol(for: app)
         engine.log("=== JIT: \(app.name) (\(app.bundleID), \(jitProtocol.logName)) ===")
-        Task {
+        startTask = Task {
             do {
                 try await getReady()
                 let deviceIP = engine.deviceHost
@@ -1018,7 +1024,14 @@ final class JITManager: ObservableObject {
                 engine.log("⛔️ JIT: \(message)")
             }
             startingBundleID = nil
+            startTask = nil
         }
+    }
+
+    /// Cancels a session start in progress, including a disk-image download
+    /// (B2, 0.9.147).
+    func cancelStart() {
+        startTask?.cancel()
     }
 
     /// Quits the app the session is attached to, which ends the session.
@@ -1032,7 +1045,16 @@ final class JITManager: ObservableObject {
         try requireDeveloperMode()
         try await ensurePairingFile()
         if !DeveloperDiskImage.isDownloaded {
-            try await DeveloperDiskImage.downloadMissing { _ in }
+            ddiDownloadProgress = 0
+            do {
+                try await DeveloperDiskImage.downloadMissing { fraction in
+                    Task { @MainActor in self.ddiDownloadProgress = fraction }
+                }
+            } catch {
+                ddiDownloadProgress = nil
+                throw error
+            }
+            ddiDownloadProgress = nil
         }
         // Mount progress goes to the activity log only.
         var lastLogged = -1

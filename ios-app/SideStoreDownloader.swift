@@ -1068,40 +1068,74 @@ enum SideStoreDownloader {
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         let dest = staging.appendingPathComponent(name)
 
-        return try await withCheckedThrowingContinuation { cont in
-            // A-2：KVO 路的进度节流器（与 byte-loop 路同一 helper，各自的状态）。
-            let progressThrottler = ProgressThrottler()
-            // Progress is observed via KVO on the task's `Progress` instead of
-            // a download delegate, which would conflict over the downloaded file.
-            var observation: NSKeyValueObservation?
-            let task = URLSession.shared.downloadTask(with: req) { file, response, error in
-                observation?.invalidate()
-                do {
-                    if let error { throw error }
-                    guard let file, let http = response as? HTTPURLResponse else {
-                        throw DownloadError.badURL
-                    }
-                    guard (200...299).contains(http.statusCode) else {
-                        throw DownloadError.linkStatus(http.statusCode)
-                    }
-                    // The temp file is deleted when this handler returns, so
-                    // move it now.
-                    try FileManager.default.moveItem(at: file, to: dest)
-                    cont.resume(returning: dest)
-                } catch let urlError as URLError {
-                    // N3(C)：失败路只 resume、不删 staging，会留空 ipa-link-* 目录。
+        // B1 (0.9.147): cancellable — the old bare continuation left a
+        // pasted link unstoppable once started, with the import button
+        // disabled until it finished. The task is made before the
+        // continuation, so the cancel handler reaches it as a plain `let`
+        // (the `attempt` shape below); the continuation is resumed only
+        // through `settle`, which takes it once, so a cancel landing as
+        // the download finishes can't resume it twice.
+        let settleLock = NSLock()
+        var pending: CheckedContinuation<URL, Error>?
+        func settle(_ result: Result<URL, Error>) {
+            settleLock.lock()
+            let continuation = pending
+            pending = nil
+            settleLock.unlock()
+            switch result {
+            case .success(let url): continuation?.resume(returning: url)
+            case .failure(let error): continuation?.resume(throwing: error)
+            }
+        }
+        // A-2：KVO 路的进度节流器（与 byte-loop 路同一 helper，各自的状态）。
+        let progressThrottler = ProgressThrottler()
+        // Progress is observed via KVO on the task's `Progress` instead of
+        // a download delegate, which would conflict over the downloaded file.
+        var observation: NSKeyValueObservation?
+        let task = URLSession.shared.downloadTask(with: req) { file, response, error in
+            observation?.invalidate()
+            do {
+                if let error { throw error }
+                guard let file, let http = response as? HTTPURLResponse else {
+                    throw DownloadError.badURL
+                }
+                guard (200...299).contains(http.statusCode) else {
+                    throw DownloadError.linkStatus(http.statusCode)
+                }
+                // The temp file is deleted when this handler returns, so
+                // move it now.
+                try FileManager.default.moveItem(at: file, to: dest)
+                settle(.success(dest))
+            } catch let urlError as URLError {
+                // N3(C)：失败路只 resume、不删 staging，会留空 ipa-link-* 目录。
+                try? FileManager.default.removeItem(at: staging)
+                settle(.failure(urlError.code == .cancelled
+                            ? CancellationError() : DownloadError.unreachable(urlError)))
+            } catch {
+                try? FileManager.default.removeItem(at: staging)
+                settle(.failure(error))
+            }
+        }
+        observation = task.progress.observe(\.fractionCompleted) { done, _ in
+            progressThrottler.publish(done.fractionCompleted, send: progress)
+        }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                pending = cont
+                if Task.isCancelled {
+                    // Cancelled before the download started: stop the task
+                    // and resume here — the cancel may or may not deliver
+                    // the completion handler, and `settle` lets only the
+                    // first resume through.
+                    task.cancel()
                     try? FileManager.default.removeItem(at: staging)
-                    cont.resume(throwing: urlError.code == .cancelled
-                                ? CancellationError() : DownloadError.unreachable(urlError))
-                } catch {
-                    try? FileManager.default.removeItem(at: staging)
-                    cont.resume(throwing: error)
+                    settle(.failure(CancellationError()))
+                } else {
+                    task.resume()
                 }
             }
-            observation = task.progress.observe(\.fractionCompleted) { done, _ in
-                progressThrottler.publish(done.fractionCompleted, send: progress)
-            }
-            task.resume()
+        } onCancel: {
+            task.cancel()
         }
     }
 

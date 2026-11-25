@@ -369,6 +369,7 @@ let chineseStrings: [String: String] = [
     "That isn't a valid coordinate.": "该坐标无效。",
     "Location session closed — set it up again.": "位置会话已关闭 — 请重新设置。",
     "Downloading %@ failed (HTTP %d).": "下载 %@ 失败（HTTP %d）。",
+    "The download of %@ came back empty. Try again.": "“%@”下载回来是空文件，请重试。",
     "Couldn't build the download URL for %@.": "无法为 %@ 构建下载链接。",
     "Couldn't build the certificate link.": "无法构建证书链接。",
 
@@ -737,6 +738,10 @@ let chineseStrings: [String: String] = [
 
     // Settings › Developer Mode: AMFI requests over the device link.
     "Developer Mode": "开发者模式",
+    "Developer disk image": "开发者磁盘映像",
+    "Downloaded": "已下载",
+    "Not downloaded": "未下载",
+    "Re-download": "重新下载",
     "Show Developer Mode in Settings": "在设置中显示开发者模式",
     "Turn on Developer Mode": "打开开发者模式",
     "Asking this iPhone…": "正在询问这台 iPhone…",

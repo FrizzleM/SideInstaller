@@ -368,6 +368,7 @@ let japaneseStrings: [String: String] = [
     "That isn't a valid coordinate.": "有効な座標ではありません。",
     "Location session closed — set it up again.": "位置情報のセッションが終了しました。もう一度設定してください。",
     "Downloading %@ failed (HTTP %d).": "%@ のダウンロードに失敗しました（HTTP %d）。",
+    "The download of %@ came back empty. Try again.": "%@ のダウンロード結果が空でした。もう一度お試しください。",
     "Couldn't build the download URL for %@.": "%@ のダウンロード URL を作成できませんでした。",
     "Couldn't build the certificate link.": "証明書のリンクを作成できませんでした。",
 
@@ -655,6 +656,10 @@ let japaneseStrings: [String: String] = [
 
     // Settings › Developer Mode: AMFI requests over the device link.
     "Developer Mode": "デベロッパモード",
+    "Developer disk image": "開発者ディスクイメージ",
+    "Downloaded": "ダウンロード済み",
+    "Not downloaded": "未ダウンロード",
+    "Re-download": "再ダウンロード",
     "Show Developer Mode in Settings": "設定にデベロッパモードを表示",
     "Turn on Developer Mode": "デベロッパモードをオンにする",
     "Asking this iPhone…": "この iPhone に問い合わせ中…",

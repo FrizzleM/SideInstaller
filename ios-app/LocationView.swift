@@ -45,27 +45,122 @@ enum DeveloperDiskImage {
     /// whole set rather than per file.
     static func downloadMissing(progress: @escaping (Double) -> Void) async throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        // B3 (0.9.147): a 0-byte file counts as missing — a truncated
+        // download used to satisfy `fileExists` while `isDownloaded`
+        // demanded a size above zero, so every setup failed with no way
+        // back except deleting the app's data.
         let missing = files.filter { name in
-            !FileManager.default.fileExists(atPath: directory.appendingPathComponent(name).path)
+            let path = directory.appendingPathComponent(name).path
+            let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int ?? 0
+            return size <= 0
         }
         guard !missing.isEmpty else { progress(1); return }
 
         for (index, name) in missing.enumerated() {
+            try Task.checkCancellation()
             progress(Double(index) / Double(missing.count))
             guard let url = URL(string: "\(baseURL)/\(name)") else {
                 throw EngineError.message(L("Couldn't build the download URL for %@.", name))
             }
-            let (tmp, response) = try await URLSession.shared.download(from: url)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                throw EngineError.message(L("Downloading %@ failed (HTTP %d).", name, code))
-            }
             let destination = directory.appendingPathComponent(name)
-            try? FileManager.default.removeItem(at: destination)
-            try FileManager.default.moveItem(at: tmp, to: destination)
+            try await downloadOne(from: url, to: destination) { fileFraction in
+                progress((Double(index) + fileFraction) / Double(missing.count))
+            }
             Engine.shared.log("DDI: downloaded \(name).")
         }
         progress(1)
+    }
+
+    /// Deletes the downloaded files, so a corrupt or truncated copy can be
+    /// fetched again (B3, 0.9.147).
+    static func clearDownloaded() {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    /// Downloads one file with progress, a 15-second idle timeout (the
+    /// manual update check's), and cancellation — `URLSession.download(from:)`
+    /// reports no progress, so this uses a download task with KVO like
+    /// `SideStoreDownloader.fetchDirect`. `progress` is called on an
+    /// arbitrary queue, throttled to whole-percent steps.
+    private static func downloadOne(from url: URL, to destination: URL,
+                                    progress: @escaping (Double) -> Void) async throws {
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData,
+                                 timeoutInterval: 15)
+        request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        // Same shape as `fetchDirect`: the continuation is resumed only
+        // through `settle`, which takes it once, so a cancel landing as
+        // the download finishes can't resume it twice.
+        let settleLock = NSLock()
+        var pending: CheckedContinuation<URL, Error>?
+        func settle(_ result: Result<URL, Error>) {
+            settleLock.lock()
+            let continuation = pending
+            pending = nil
+            settleLock.unlock()
+            switch result {
+            case .success(let url): continuation?.resume(returning: url)
+            case .failure(let error): continuation?.resume(throwing: error)
+            }
+        }
+        var observation: NSKeyValueObservation?
+        var lastPublished = -1
+        let task = URLSession.shared.downloadTask(with: request) { file, response, error in
+            observation?.invalidate()
+            if let error {
+                settle(.failure((error as? URLError)?.code == .cancelled
+                                ? CancellationError() : error))
+                return
+            }
+            guard let file, let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode) else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                settle(.failure(EngineError.message(
+                    L("Downloading %@ failed (HTTP %d).", destination.lastPathComponent, code))))
+                return
+            }
+            do {
+                try? FileManager.default.removeItem(at: destination)
+                try FileManager.default.moveItem(at: file, to: destination)
+                settle(.success(destination))
+            } catch {
+                settle(.failure(error))
+            }
+        }
+        observation = task.progress.observe(\.fractionCompleted) { done, _ in
+            settleLock.lock()
+            let percent = Int(done.fractionCompleted * 100)
+            let fresh = percent > lastPublished
+            if fresh { lastPublished = percent }
+            settleLock.unlock()
+            guard fresh else { return }
+            progress(done.fractionCompleted)
+        }
+        let tmp = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { cont in
+                pending = cont
+                if Task.isCancelled {
+                    // Cancelled before the download started: stop the task
+                    // and resume here — the cancel may or may not deliver
+                    // the completion handler, and `settle` lets only the
+                    // first resume through.
+                    task.cancel()
+                    settle(.failure(CancellationError()))
+                } else {
+                    task.resume()
+                }
+            }
+        } onCancel: {
+            task.cancel()
+        }
+        // B3 (0.9.147): a 200 with an empty body used to land on disk, and
+        // from then on `isDownloaded` stayed false while this function kept
+        // skipping the file. Refuse the empty file instead.
+        let size = (try? FileManager.default.attributesOfItem(atPath: tmp.path))?[.size] as? Int ?? 0
+        guard size > 0 else {
+            try? FileManager.default.removeItem(at: tmp)
+            throw EngineError.message(
+                L("The download of %@ came back empty. Try again.", destination.lastPathComponent))
+        }
     }
 }
 
@@ -385,6 +480,12 @@ final class LocationManager: ObservableObject {
     }
 
     @Published private(set) var stage: Stage = .notReady
+    /// DDI download progress (0…1) while `stage` is `.downloading`; nil
+    /// otherwise (B2, 0.9.147).
+    @Published private(set) var downloadProgress: Double?
+    /// The task running setup (`prepareQuietly`, `simulate`, `playRoute`),
+    /// so a download in progress can be cancelled (B2, 0.9.147).
+    private var readyTask: Task<Void, Never>?
     @Published private(set) var isBusy = false
     /// The coordinate the device is currently being told it is at.
     @Published private(set) var simulated: CLLocationCoordinate2D?
@@ -471,12 +572,37 @@ final class LocationManager: ObservableObject {
     func prepareQuietly() {
         guard stage != .ready, !isBusy else { return }
         isBusy = true
-        Task {
+        readyTask = Task {
             do { try await ensureReady(quietly: true) }
             catch is CancellationError { }
             catch { engine.log("Location: not ready yet (\(message(error)))") }
             isBusy = false
+            readyTask = nil
         }
+    }
+
+    /// Cancels a disk-image download in progress. The download stops in
+    /// `downloadMissing`; setup stays not ready (B2, 0.9.147).
+    func cancelDownload() {
+        readyTask?.cancel()
+    }
+
+    /// Deletes the disk image and downloads it again, for a copy that mounts
+    /// badly or came back truncated (B3, 0.9.147). Not while simulating:
+    /// the mounted image's files stay put until the session ends.
+    func redownloadDDI() {
+        guard !isBusy, simulated == nil else { return }
+        DeveloperDiskImage.clearDownloaded()
+        stage = .notReady
+        prepareQuietly()
+    }
+
+    /// Deletes the downloaded disk image, freeing the space (B3, 0.9.147).
+    /// Not while simulating, for the same reason as `redownloadDDI`.
+    func clearDDI() {
+        guard !isBusy, simulated == nil else { return }
+        DeveloperDiskImage.clearDownloaded()
+        stage = .notReady
     }
 
     /// Download the image if it's missing, mount it if the device has none, and
@@ -487,7 +613,20 @@ final class LocationManager: ObservableObject {
         guard stage != .ready else { return }
         if !DeveloperDiskImage.isDownloaded {
             stage = .downloading
-            try await DeveloperDiskImage.downloadMissing { _ in }
+            downloadProgress = 0
+            do {
+                try await DeveloperDiskImage.downloadMissing { fraction in
+                    Task { @MainActor in self.downloadProgress = fraction }
+                }
+            } catch {
+                downloadProgress = nil
+                // Back to not ready, or the page would sit on "downloading"
+                // with nothing running — a cancelled quiet download ends
+                // here, with no other code resetting the stage.
+                stage = .notReady
+                throw error
+            }
+            downloadProgress = nil
         }
         if quietly {
             engine.refreshNetworkStatus()
@@ -528,14 +667,18 @@ final class LocationManager: ObservableObject {
         isBusy = true
         lastError = nil
         lastSuccess = nil
-        Task {
+        readyTask = Task {
             do {
                 try await performSimulate(coordinate)
                 lastSuccess = L("Location set to %@.", name ?? Self.format(coordinate))
+            } catch is CancellationError {
+                // Cancelled mid-download: setup just stays not ready, with
+                // no error popup (B2, 0.9.147).
             } catch {
                 lastError = message(error)
             }
             isBusy = false
+            readyTask = nil
         }
     }
 
@@ -721,13 +864,16 @@ final class LocationManager: ObservableObject {
         isBusy = true
         lastError = nil
         lastSuccess = nil
-        Task {
+        readyTask = Task {
             do {
                 try await beginPlayback(timeline, name: name)
+            } catch is CancellationError {
+                // Cancelled mid-download: no error popup (B2, 0.9.147).
             } catch {
                 lastError = message(error)
             }
             isBusy = false
+            readyTask = nil
         }
     }
 
@@ -1088,6 +1234,7 @@ struct LocationView: View {
                     plannerCard.cascadeItem(3)
                     savedPlacesCard.cascadeItem(4)
                     routeCard.cascadeItem(5)
+                    ddiCard.cascadeItem(6)
                     // Errors and confirmations show as popups, which `RootView`
                     // lays over the app.
                 }
@@ -1184,6 +1331,28 @@ struct LocationView: View {
         }
     }
 
+    /// The developer disk image: whether it's on disk, and a way to fetch
+    /// it again or delete it when the copy is corrupt (B3, 0.9.147).
+    private var ddiCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionTitle(L("Developer disk image"), systemImage: "internaldrive")
+                HStack(spacing: 8) {
+                    Text(DeveloperDiskImage.isDownloaded ? L("Downloaded") : L("Not downloaded"))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 8)
+                    Button(L("Re-download")) { manager.redownloadDDI() }
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                        .disabled(manager.isBusy || manager.isSimulating)
+                    Button(L("Clear")) { manager.clearDDI() }
+                        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                        .disabled(manager.isBusy || manager.isSimulating || !DeveloperDiskImage.isDownloaded)
+                }
+            }
+        }
+    }
+
     // MARK: Map
 
     private var mapCard: some View {
@@ -1245,6 +1414,24 @@ struct LocationView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(!canSetLocation)
+
+                // DDI download progress, with a way out (B2, 0.9.147).
+                if manager.stage == .downloading {
+                    HStack(spacing: 8) {
+                        ProgressView(value: manager.downloadProgress ?? 0)
+                            .tint(Theme.accent)
+                        if let fraction = manager.downloadProgress {
+                            Text(L("Downloading… %d%%", Int(fraction * 100)))
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(Theme.muted)
+                                .contentTransition(.numericText())
+                        }
+                        Spacer(minLength: 8)
+                        Button(L("Cancel")) { manager.cancelDownload() }
+                            .buttonStyle(.plain, sound: .tap)
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
 
                 if manager.isSimulating {
                     Button { manager.stop() } label: {

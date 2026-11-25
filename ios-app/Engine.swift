@@ -583,6 +583,10 @@ final class Engine {
     private(set) var isImportingIPA = false
     /// Download progress of a link import (0…1); nil for file imports.
     private(set) var importProgress: Double?
+    /// The link import's task, so the link row can cancel a download in
+    /// progress (B1, 0.9.147). The file-copy import has no such task: it
+    /// finishes too fast to need one.
+    @ObservationIgnored private var linkImportTask: Task<Bool, Never>?
 
     /// Lets one Apple ID sign-in talk to Apple at a time, whichever feature
     /// started it.
@@ -2051,6 +2055,25 @@ final class Engine {
             log("⛔️ Import: \(lastError ?? "")")
             return false
         }
+    }
+
+    /// Starts a link import as a task the link row can cancel, instead of
+    /// the fire-and-forget `Task` the view used to own (B1, 0.9.147).
+    /// Returns immediately; the import itself runs in `importCustomIPA`.
+    @MainActor
+    func startLinkImport(_ text: String) {
+        guard linkImportTask == nil else { return }
+        linkImportTask = Task { @MainActor in
+            defer { linkImportTask = nil }
+            return await importCustomIPA(fromLink: text)
+        }
+    }
+
+    /// Cancels a link import in progress. The download stops in
+    /// `fetchDirect`; the import's `defer` clears `isImportingIPA`.
+    @MainActor
+    func cancelLinkImport() {
+        linkImportTask?.cancel()
     }
 
     /// Downloads an IPA from a pasted link and stores it as the custom import.

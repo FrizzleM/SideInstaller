@@ -369,6 +369,7 @@ let koreanStrings: [String: String] = [
     "That isn't a valid coordinate.": "올바른 좌표가 아닙니다.",
     "Location session closed — set it up again.": "위치 세션이 종료되었습니다. 다시 설정하세요.",
     "Downloading %@ failed (HTTP %d).": "%@ 다운로드에 실패했습니다(HTTP %d).",
+    "The download of %@ came back empty. Try again.": "%@ 다운로드 결과가 비어 있습니다. 다시 시도하세요.",
     "Couldn't build the download URL for %@.": "%@의 다운로드 URL을 만들지 못했습니다.",
     "Couldn't build the certificate link.": "인증서 링크를 만들지 못했습니다.",
 
@@ -656,6 +657,10 @@ let koreanStrings: [String: String] = [
 
     // Settings › Developer Mode: AMFI requests over the device link.
     "Developer Mode": "개발자 모드",
+    "Developer disk image": "개발자 디스크 이미지",
+    "Downloaded": "다운로드됨",
+    "Not downloaded": "다운로드되지 않음",
+    "Re-download": "다시 다운로드",
     "Show Developer Mode in Settings": "설정에서 개발자 모드 표시",
     "Turn on Developer Mode": "개발자 모드 켜기",
     "Asking this iPhone…": "이 iPhone에 요청하는 중…",

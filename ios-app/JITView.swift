@@ -14,6 +14,7 @@ struct JITView: View {
         ScrollView {
             VStack(spacing: 16) {
                 header.cascadeItem(0)
+                ddiProgressCard
                 sessionCard
                 loadButton.cascadeItem(1)
                 // Errors show as a popup, which `RootView` lays over the app.
@@ -24,6 +25,7 @@ struct JITView: View {
             .animation(.smooth(duration: 0.35), value: manager.apps)
             .animation(.smooth(duration: 0.3), value: manager.isLoading)
             .animation(.smooth(duration: 0.35), value: manager.status)
+            .animation(.smooth(duration: 0.3), value: manager.ddiDownloadProgress)
         }
         .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
@@ -48,6 +50,29 @@ struct JITView: View {
     }
 
     // MARK: Session
+
+    /// The disk-image download while a session starts: percent and a way
+    /// out (B2, 0.9.147).
+    @ViewBuilder
+    private var ddiProgressCard: some View {
+        if let progress = manager.ddiDownloadProgress {
+            PanelCard {
+                HStack(spacing: 8) {
+                    ProgressView(value: progress)
+                        .tint(Theme.accent)
+                    Text(L("Downloading… %d%%", Int(progress * 100)))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Theme.muted)
+                        .contentTransition(.numericText())
+                    Spacer(minLength: 8)
+                    Button(L("Cancel")) { manager.cancelStart() }
+                        .buttonStyle(.plain, sound: .tap)
+                        .foregroundStyle(Theme.accent)
+                }
+            }
+            .transition(.cardAppear)
+        }
+    }
 
     /// The session while it runs: what it's doing, and the way to end it
     /// while the debugger stays attached.
