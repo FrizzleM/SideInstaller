@@ -1606,4 +1606,15 @@ let japaneseStrings: [String: String] = [
     "Import sources": "ソースをインポート",
     "The clipboard has no source list to import.": "クリップボードにインポートできるソース一覧がありません。",
     "Imported %d, already added %d, failed %d.": "%d 件インポート、%d 件は追加済み、%d 件失敗しました。",
+
+    // MARK: - F3 update-all, F4 batch move & F5 log export (0.9.154)
+
+    "全部更新": "すべて更新",
+    "正在更新第 %d/%d 个：%@": "%d/%d 個目を更新中：%@",
+    "全部更新完成：%d 个已更新。": "すべて更新完了：%d 個更新済み。",
+    "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "すべて更新完了：成功 %d 個、失敗 %d 個。失敗：%@",
+    "移动": "移動",
+    "已移动 %d 个。": "%d 個移動しました。",
+    "已移动 %d 个，失败 %d 个。失败：%@": "%d 個移動、%d 個失敗。失敗：%@",
+    "导出日志": "ログを書き出す",
 ]

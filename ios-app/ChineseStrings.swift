@@ -1618,4 +1618,15 @@ let chineseStrings: [String: String] = [
     "Import sources": "导入源列表",
     "The clipboard has no source list to import.": "剪贴板里没有可导入的源列表。",
     "Imported %d, already added %d, failed %d.": "已导入 %d 个，已添加过 %d 个，失败 %d 个。",
+
+    // MARK: - F3 update-all, F4 batch move & F5 log export (0.9.154)
+
+    "全部更新": "全部更新",
+    "正在更新第 %d/%d 个：%@": "正在更新第 %d/%d 个：%@",
+    "全部更新完成：%d 个已更新。": "全部更新完成：%d 个已更新。",
+    "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "全部更新完成：成功 %d 个，失败 %d 个。失败：%@",
+    "移动": "移动",
+    "已移动 %d 个。": "已移动 %d 个。",
+    "已移动 %d 个，失败 %d 个。失败：%@": "已移动 %d 个，失败 %d 个。失败：%@",
+    "导出日志": "导出日志",
 ]

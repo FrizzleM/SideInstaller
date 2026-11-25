@@ -1640,4 +1640,15 @@ let vietnameseStrings: [String: String] = [
     "Import sources": "Nhập danh sách nguồn",
     "The clipboard has no source list to import.": "Bảng tạm không có danh sách nguồn để nhập.",
     "Imported %d, already added %d, failed %d.": "Đã nhập %d, đã thêm %d, lỗi %d.",
+
+    // MARK: - F3 update-all, F4 batch move & F5 log export (0.9.154)
+
+    "全部更新": "Cập nhật tất cả",
+    "正在更新第 %d/%d 个：%@": "Đang cập nhật %d/%d: %@",
+    "全部更新完成：%d 个已更新。": "Cập nhật xong: đã cập nhật %d.",
+    "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "Cập nhật xong: thành công %d, thất bại %d. Thất bại: %@",
+    "移动": "Di chuyển",
+    "已移动 %d 个。": "Đã di chuyển %d.",
+    "已移动 %d 个，失败 %d 个。失败：%@": "Đã di chuyển %d, thất bại %d. Thất bại: %@",
+    "导出日志": "Xuất nhật ký",
 ]

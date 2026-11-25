@@ -1633,4 +1633,15 @@ let portugueseStrings: [String: String] = [
     "Import sources": "Importar fontes",
     "The clipboard has no source list to import.": "A área de transferência não tem uma lista de fontes para importar.",
     "Imported %d, already added %d, failed %d.": "%d importadas, %d já adicionadas, %d com falha.",
+
+    // MARK: - F3 update-all, F4 batch move & F5 log export (0.9.154)
+
+    "全部更新": "Atualizar tudo",
+    "正在更新第 %d/%d 个：%@": "Atualizando %d/%d: %@",
+    "全部更新完成：%d 个已更新。": "Atualizações concluídas: %d atualizadas.",
+    "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "Atualizações concluídas: %d com sucesso, %d com falha. Falhas: %@",
+    "移动": "Mover",
+    "已移动 %d 个。": "%d movidos.",
+    "已移动 %d 个，失败 %d 个。失败：%@": "%d movidos, %d com falha. Falhas: %@",
+    "导出日志": "Exportar registro",
 ]

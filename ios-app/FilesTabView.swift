@@ -188,6 +188,9 @@ struct FilesTabView: View {
     @State private var showNewFolderAlert = false
     /// 要移动的文件/文件夹（sheet 的 item，nil 就不弹）。
     @State private var moveItem: LocalFileItem?
+    /// F4 (0.9.154): the batch-move sheet, shown from the selection bar
+    /// (the single-move sheet above is per file, via `moveItem`).
+    @State private var showMoveSelectionSheet = false
     @StateObject private var lanServer = LANTransferServer()
     /// 文件页已签名安装：走 Engine 配对链路（v68 回退，证书页
     /// startEngineInstall 同款）。进行中标志 + 完成弹框（inFlight
@@ -1021,6 +1024,10 @@ struct FilesTabView: View {
         .sheet(item: $moveItem) { item in
             moveSheetContent(item: item)
         }
+        // F4 (0.9.154): the batch-move sheet (see moveSelectionSheetContent).
+        .sheet(isPresented: $showMoveSelectionSheet) {
+            moveSelectionSheetContent()
+        }
         .confirmationDialog(installChoiceRecord?.appName ?? "", isPresented: Binding(
             get: { installChoiceRecord != nil },
             set: { if !$0 { installChoiceRecord = nil } }
@@ -1322,6 +1329,15 @@ struct FilesTabView: View {
                             if opBusy { ProgressView() }
                             Text(L("压缩成 ZIP"))
                         }
+                    }
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    .disabled(selection.isEmpty || opBusy || batchInstallTask != nil)
+                    // F4 (0.9.154): move every selected file/folder to one
+                    // destination (see moveSelectionSheetContent).
+                    Button {
+                        showMoveSelectionSheet = true
+                    } label: {
+                        Text(L("移动"))
                     }
                     .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                     .disabled(selection.isEmpty || opBusy || batchInstallTask != nil)
@@ -1921,6 +1937,90 @@ struct FilesTabView: View {
                     Button(L("Cancel")) { moveItem = nil }
                 }
             }
+        }
+    }
+
+    /// F4 (0.9.154): the batch-move sheet — the single-move sheet's
+    /// destinations, narrowed to the ones every selected item can go to
+    /// (see moveSelectionDestinations), so a tap can't pick a folder one
+    /// of the items can't go into.
+    @ViewBuilder
+    private func moveSelectionSheetContent() -> some View {
+        NavigationStack {
+            List {
+                if moveSelectionDestinations.isEmpty {
+                    Text(L("没有可移动到的文件夹，先新建一个。"))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
+                ForEach(moveSelectionDestinations, id: \.dir) { dest in
+                    Button {
+                        showMoveSelectionSheet = false
+                        moveSelectionToFolder(dest.dir)
+                    } label: {
+                        HStack {
+                            Image(systemName: dest.dir.isEmpty ? "house" : "folder")
+                            Text(dest.name)
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .navigationTitle(L("移动到"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L("Cancel")) { showMoveSelectionSheet = false }
+                }
+            }
+        }
+    }
+
+    /// F4 (0.9.154): the destinations every selected item can move to —
+    /// the intersection of the single-item lists, so a tap can't pick a
+    /// folder one of the items can't go into (itself, its child, or the
+    /// folder it already sits in).
+    private var moveSelectionDestinations: [(dir: String, name: String)] {
+        let items = files.filter { selection.contains($0.id) }
+        guard let first = items.first else { return [] }
+        var common = moveDestinations(for: first)
+        for item in items.dropFirst() {
+            let dirs = Set(moveDestinations(for: item).map(\.dir))
+            common.removeAll { !dirs.contains($0.dir) }
+        }
+        return common
+    }
+
+    /// F4 (0.9.154): move every selected file/folder to one destination,
+    /// reusing the single-item move (same guards, same refusal) and
+    /// reporting the failures by name at the end instead of the last
+    /// item's message. `moveItemToFolder` reports through opMessage /
+    /// opFailed, so each item's verdict is read back before the next
+    /// item overwrites it; the selection clears like deleteSelection's.
+    private func moveSelectionToFolder(_ destDir: String) {
+        let items = files.filter { selection.contains($0.id) }
+        guard !items.isEmpty else { return }
+        var moved = 0
+        var failedNames: [String] = []
+        for item in items {
+            opMessage = nil
+            opFailed = false
+            moveItemToFolder(item, destDir)
+            if opFailed { failedNames.append(item.name) } else { moved += 1 }
+        }
+        selection = []
+        selecting = false
+        if failedNames.isEmpty {
+            opMessage = L("已移动 %d 个。", moved)
+            opFailed = false
+        } else {
+            let shown = failedNames.prefix(5).joined(separator: "、")
+            var list = shown
+            if failedNames.count > 5 {
+                list += "、" + L("等 %d 个", failedNames.count - 5)
+            }
+            opMessage = L("已移动 %d 个，失败 %d 个。失败：%@", moved, failedNames.count, list)
+            opFailed = true
         }
     }
 

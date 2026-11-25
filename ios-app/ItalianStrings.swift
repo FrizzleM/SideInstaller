@@ -1642,4 +1642,15 @@ let italianStrings: [String: String] = [
     "Import sources": "Importa fonti",
     "The clipboard has no source list to import.": "Negli appunti non c'è un elenco di fonti da importare.",
     "Imported %d, already added %d, failed %d.": "%d importate, %d già aggiunte, %d non riuscite.",
+
+    // MARK: - F3 update-all, F4 batch move & F5 log export (0.9.154)
+
+    "全部更新": "Aggiorna tutto",
+    "正在更新第 %d/%d 个：%@": "Aggiornamento %d/%d: %@",
+    "全部更新完成：%d 个已更新。": "Aggiornamenti completati: %d aggiornate.",
+    "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "Aggiornamenti completati: %d riusciti, %d non riusciti. Non riusciti: %@",
+    "移动": "Sposta",
+    "已移动 %d 个。": "%d spostati.",
+    "已移动 %d 个，失败 %d 个。失败：%@": "%d spostati, %d non riusciti. Non riusciti: %@",
+    "导出日志": "Esporta registro",
 ]

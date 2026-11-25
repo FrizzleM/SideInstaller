@@ -240,6 +240,15 @@ struct SourceAppsView: View {
     /// row can show the downloader's progress and the others stay disabled.
     @State private var activeID: String?
     @State private var downloadTask: Task<Void, Never>?
+    /// F3 (0.9.154): the batch update-all run, if one is going — its Task
+    /// (the cancel handle), which app it is on, and the summary the
+    /// end-of-batch alert shows.
+    @State private var updateAllTask: Task<Void, Never>?
+    @State private var updateAllIndex = 0
+    @State private var updateAllTotal = 0
+    @State private var updateAllCurrent: String?
+    @State private var updateAllSummary: String?
+    @State private var showingUpdateAllSummary = false
     /// U-UI：应用列表排序。
     @State private var appSort = SourceSort.default
     /// U-UI：应用列表搜索（名字含查询串，不区分大小写）。
@@ -281,8 +290,29 @@ struct SourceAppsView: View {
                         ForEach(updateApps, id: \.id) { app in
                             appRow(app)
                         }
+                        // F3 (0.9.154): the batch run's progress + stop
+                        // button, next to the rows it is working through.
+                        if updateAllTask != nil {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                Text(L("正在更新第 %d/%d 个：%@", updateAllIndex, updateAllTotal, updateAllCurrent ?? ""))
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.muted)
+                                Spacer()
+                                Button(L("Cancel")) { cancelUpdateAll() }
+                                    .font(.footnote)
+                            }
+                        }
                     } header: {
-                        Text(L("Updates"))
+                        HStack {
+                            Text(L("Updates"))
+                            Spacer()
+                            // F3 (0.9.154): update every app in this
+                            // section, one at a time (see startUpdateAll).
+                            Button(L("全部更新")) { startUpdateAll() }
+                                .font(.subheadline)
+                                .disabled(updateAllTask != nil || activeID != nil || engine.isRunning)
+                        }
                     }
                 }
                 ForEach(displayedApps, id: \.id) { app in
@@ -329,6 +359,12 @@ struct SourceAppsView: View {
                     Text(L("筛选")).foregroundStyle(.white)
                 }
             }
+        }
+        // F3 (0.9.154): the update-all totals, once the batch finishes.
+        .alert(L("全部更新"), isPresented: $showingUpdateAllSummary) {
+            Button(L("OK")) {}
+        } message: {
+            Text(updateAllSummary ?? "")
         }
         // F2 (0.9.153): leaving the page no longer cancels the download —
         // the shared downloader keeps it running, and the completion
@@ -608,6 +644,96 @@ struct SourceAppsView: View {
                 states[app.id] = .failed(error.localizedDescription)
             }
         }
+    }
+
+    /// F3 (0.9.154): update every app in the Updates section, one at a
+    /// time — download, then `installOneCustomIPA` (import + one-click
+    /// install + wait for it to finish), skipping failures and reporting
+    /// the totals at the end. The single-install path (`startInstall`)
+    /// dismisses the page after starting, so the batch reuses its steps
+    /// through `installOneCustomIPA` instead of calling it; `activeID`
+    /// stays set for the whole item (download + install) so a row's
+    /// Download button can't start a second install mid-batch, while
+    /// the row's progress pill only shows during the download itself.
+    private func startUpdateAll() {
+        guard updateAllTask == nil, !updateApps.isEmpty, activeID == nil, !engine.isRunning else { return }
+        let targets = updateApps
+        updateAllTotal = targets.count
+        updateAllIndex = 0
+        updateAllCurrent = nil
+        updateAllTask = Task { @MainActor in
+            var succeeded = 0
+            var failed: [(name: String, error: String)] = []
+            var stopped = false
+            for (offset, app) in targets.enumerated() {
+                if Task.isCancelled || stopped { break }
+                updateAllIndex = offset + 1
+                let name = app.name ?? app.bundleIdentifier ?? ""
+                updateAllCurrent = name
+                guard let url = app.downloadLink else {
+                    failed.append((name, L("Import failed")))
+                    continue
+                }
+                activeID = app.id
+                states[app.id] = .downloading
+                do {
+                    let file = try await downloader.download(from: url)
+                    states[app.id] = nil
+                    let outcome = await engine.installOneCustomIPA(file)
+                    if let error = outcome.error {
+                        failed.append((name, error))
+                        stopped = outcome.stopped
+                    } else {
+                        succeeded += 1
+                    }
+                } catch {
+                    // B-C2 同款：取消下载不记失败行——这里是整批取消，
+                    // 记一条“已停止”就收尾，剩下的进下面的未跑填补。
+                    if Task.isCancelled || (error as? URLError)?.code == .cancelled {
+                        failed.append((name, L("Install stopped")))
+                        activeID = nil
+                        states[app.id] = nil
+                        break
+                    }
+                    failed.append((name, error.localizedDescription))
+                }
+                activeID = nil
+                states[app.id] = nil
+            }
+            // 没跑到的各项：停批的原因同样记一条，不静默丢掉
+            // （installSelection 同款）。
+            if failed.count + succeeded < targets.count {
+                let reason = failed.last?.error ?? L("Install stopped")
+                for app in targets[(failed.count + succeeded)...] {
+                    failed.append((app.name ?? app.bundleIdentifier ?? "", reason))
+                }
+            }
+            updateAllTask = nil
+            updateAllCurrent = nil
+            updateAllIndex = 0
+            updateAllTotal = 0
+            activeID = nil
+            if failed.isEmpty {
+                updateAllSummary = L("全部更新完成：%d 个已更新。", succeeded)
+            } else {
+                let shown = failed.prefix(5).map { "\($0.name)：\($0.error)" }
+                var list = shown.joined(separator: "、")
+                if failed.count > 5 {
+                    list += "、" + L("等 %d 个", failed.count - 5)
+                }
+                updateAllSummary = L("全部更新完成：成功 %d 个，失败 %d 个。失败：%@", succeeded, failed.count, list)
+            }
+            showingUpdateAllSummary = true
+        }
+    }
+
+    /// F3 (0.9.154): stop the update-all run — cancel the batch Task
+    /// (the loop stops after the current item) and the running download
+    /// / install itself (the batch-install Cancel button 同款）.
+    private func cancelUpdateAll() {
+        updateAllTask?.cancel()
+        downloader.cancel()
+        engine.cancelOneClick()
     }
 
     /// Download the app's IPA like `startInstall`, but hand it to the

@@ -1648,4 +1648,15 @@ let frenchStrings: [String: String] = [
     "Import sources": "Importer les sources",
     "The clipboard has no source list to import.": "Le presse-papiers ne contient aucune liste de sources à importer.",
     "Imported %d, already added %d, failed %d.": "%d importées, %d déjà ajoutées, %d en échec.",
+
+    // MARK: - F3 update-all, F4 batch move & F5 log export (0.9.154)
+
+    "全部更新": "Tout mettre à jour",
+    "正在更新第 %d/%d 个：%@": "Mise à jour %d/%d : %@",
+    "全部更新完成：%d 个已更新。": "Mises à jour terminées : %d mises à jour.",
+    "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "Mises à jour terminées : %d réussies, %d échouées. Échouées : %@",
+    "移动": "Déplacer",
+    "已移动 %d 个。": "%d déplacés.",
+    "已移动 %d 个，失败 %d 个。失败：%@": "%d déplacés, %d échoués. Échoués : %@",
+    "导出日志": "Exporter le journal",
 ]

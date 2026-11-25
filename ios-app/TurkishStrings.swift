@@ -1560,4 +1560,15 @@ let turkishStrings: [String: String] = [
     "Import sources": "Kaynakları içe aktar",
     "The clipboard has no source list to import.": "Panoda içe aktarılacak kaynak listesi yok.",
     "Imported %d, already added %d, failed %d.": "%d içe aktarıldı, %d zaten ekli, %d başarısız.",
+
+    // MARK: - F3 update-all, F4 batch move & F5 log export (0.9.154)
+
+    "全部更新": "Tümünü güncelle",
+    "正在更新第 %d/%d 个：%@": "%d/%d güncelleniyor: %@",
+    "全部更新完成：%d 个已更新。": "Tüm güncellemeler tamamlandı: %d güncellendi.",
+    "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "Tüm güncellemeler tamamlandı: %d başarılı, %d başarısız. Başarısız: %@",
+    "移动": "Taşı",
+    "已移动 %d 个。": "%d taşındı.",
+    "已移动 %d 个，失败 %d 个。失败：%@": "%d taşındı, %d başarısız. Başarısız: %@",
+    "导出日志": "Günlüğü dışa aktar",
 ]

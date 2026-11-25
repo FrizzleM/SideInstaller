@@ -1645,4 +1645,15 @@ let spanishStrings: [String: String] = [
     "Import sources": "Importar fuentes",
     "The clipboard has no source list to import.": "El portapapeles no tiene una lista de fuentes para importar.",
     "Imported %d, already added %d, failed %d.": "%d importadas, %d ya añadidas, %d fallidas.",
+
+    // MARK: - F3 update-all, F4 batch move & F5 log export (0.9.154)
+
+    "全部更新": "Actualizar todo",
+    "正在更新第 %d/%d 个：%@": "Actualizando %d/%d: %@",
+    "全部更新完成：%d 个已更新。": "Actualizaciones completadas: %d actualizadas.",
+    "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "Actualizaciones completadas: %d correctas y %d fallidas. Fallidas: %@",
+    "移动": "Mover",
+    "已移动 %d 个。": "%d movidos.",
+    "已移动 %d 个，失败 %d 个。失败：%@": "%d movidos, %d fallidos. Fallidos: %@",
+    "导出日志": "Exportar registro",
 ]

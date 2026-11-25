@@ -1607,4 +1607,15 @@ let koreanStrings: [String: String] = [
     "Import sources": "소스 가져오기",
     "The clipboard has no source list to import.": "클립보드에 가져올 소스 목록이 없습니다.",
     "Imported %d, already added %d, failed %d.": "%d개를 가져왔고, %d개는 이미 추가됨, %d개 실패.",
+
+    // MARK: - F3 update-all, F4 batch move & F5 log export (0.9.154)
+
+    "全部更新": "모두 업데이트",
+    "正在更新第 %d/%d 个：%@": "%d/%d개 업데이트 중: %@",
+    "全部更新完成：%d 个已更新。": "모두 업데이트 완료: %d개 업데이트됨.",
+    "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "모두 업데이트 완료: 성공 %d개, 실패 %d개. 실패: %@",
+    "移动": "이동",
+    "已移动 %d 个。": "%d개 이동됨.",
+    "已移动 %d 个，失败 %d 个。失败：%@": "%d개 이동, %d개 실패. 실패: %@",
+    "导出日志": "로그 내보내기",
 ]

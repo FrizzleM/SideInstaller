@@ -191,6 +191,14 @@ final class DownloadsManager: ObservableObject {
     @MainActor
     func deleteAll() {
         guard deletingID == nil else { return }
+        // B-cand-1 (0.9.154): the old code never set `deletingID`, so this
+        // guard and the Clear button's `.disabled(deletingID != nil)`
+        // could never fire mid-clear — a second tap re-ran the loop and
+        // counted just-deleted files as failures. A file id would lie
+        // (no such row is being deleted), so the clear uses its own
+        // sentinel, cleared on every exit via defer.
+        deletingID = "__clearAll__"
+        defer { deletingID = nil }
         lastError = nil
         var deletedIDs: [String] = []
         var failed = 0

@@ -1307,8 +1307,16 @@ struct AppsView: View {
             // SideloadedAppsManager is @MainActor; load() returns the Task
             // doing the load (nil when one is already running), so awaiting
             // its value keeps the spinner up until the fresh list lands.
+            // B-cand-2 (0.9.154): when load() declines because one is
+            // already running, the old code awaited nil and the spinner
+            // vanished at once while the list was still stale — wait on
+            // the in-flight load instead; no second load is started.
             let task = await MainActor.run { manager.load() }
-            await task?.value
+            if let task {
+                await task.value
+            } else if let inFlight = await MainActor.run({ manager.inFlightLoadTask }) {
+                await inFlight.value
+            }
         }
         .background(AppBackground())
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }

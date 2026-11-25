@@ -1,5 +1,7 @@
+import CoreTransferable
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 /// The settings sheet: occasional configuration and the activity log, kept out
 /// of the main flow.
@@ -757,6 +759,12 @@ struct SettingsView: View {
                 } label: {
                     Label(L("Copy"), systemImage: "doc.on.doc")
                 }
+                // F5 (0.9.154): share the log as a .txt file (see
+                // LogExportFile — the file is written only when the share
+                // actually happens, so this never reads the log in body).
+                ShareLink(item: LogExportFile()) {
+                    Label(L("导出日志"), systemImage: "square.and.arrow.up")
+                }
                 Spacer()
                 Button(role: .destructive) {
                     showingClearLogConfirm = true
@@ -779,6 +787,23 @@ struct SettingsView: View {
             LogHeader()
         } footer: {
             Text(L("Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log."))
+        }
+    }
+}
+
+/// F5 (0.9.154): the activity log as a shareable .txt file. The struct
+/// carries no log text itself — the exporting closure reads
+/// `LogStore.shared.text` and writes the tmp file only when the share
+/// actually happens, so building the ShareLink never reads the log in
+/// `body` (the log lines stay observed only by LogConsole/LogHeader,
+/// see logSection). The tmp file is overwritten on every export.
+private struct LogExportFile: Transferable {
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .plainText) { _ in
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("SideInstaller-log.txt")
+            try LogStore.shared.text.write(to: url, atomically: true, encoding: .utf8)
+            return SentTransferredFile(url, allowAccessingOriginalFile: false)
         }
     }
 }

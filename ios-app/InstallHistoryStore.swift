@@ -48,8 +48,14 @@ enum InstallHistoryStore {
     }
 
     private static func save(_ entries: [InstallHistoryEntry]) {
-        if let data = try? JSONEncoder().encode(entries) {
-            try? data.write(to: fileURL, options: .atomic)
+        // B-cand-3 (0.9.154): the old code swallowed write failures whole
+        // (try? twice) — a full disk lost history with no trace. Log the
+        // failure; the behaviour (best-effort write) is unchanged.
+        do {
+            let data = try JSONEncoder().encode(entries)
+            try data.write(to: fileURL, options: .atomic)
+        } catch {
+            Engine.shared.log("⛔️ InstallHistory: couldn't save (\(error.localizedDescription)).")
         }
     }
 
