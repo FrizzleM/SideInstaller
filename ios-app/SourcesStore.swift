@@ -239,7 +239,8 @@ final class SourceStore: ObservableObject {
     init() {
         // B-1 (0.9.158): drop stale resume points left by cancelled
         // downloads, before any new download can reuse the folder.
-        Self.purgeStaleResumeData()
+        // (The sweep lives on IPADownloader, which owns resumeData/.)
+        IPADownloader.purgeStaleResumeData()
         sources = UnifiedSourceList.load().map { LoadedSource(url: $0) }
         disabled = UnifiedSourceList.disabledURLs()
     }
@@ -250,7 +251,7 @@ final class SourceStore: ObservableObject {
     func syncURLs() {
         // B-1 (0.9.158): same sweep as `init` — entering the page is the
         // moment a cancelled download's point stops being reachable.
-        Self.purgeStaleResumeData()
+        IPADownloader.purgeStaleResumeData()
         let urls = UnifiedSourceList.load()
         disabled = UnifiedSourceList.disabledURLs()
         var kept: [URL: LoadedSource] = [:]
@@ -655,8 +656,9 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// so cancelling several sources and never reopening them doesn't leave
     /// one `.resume` file per URL behind forever. A live run's point is
     /// fresh by construction, so the sweep never touches it; callers run
-    /// this on entry (`init` + `syncURLs`), never mid-download.
-    nonisolated private static func purgeStaleResumeData() {
+    /// this on entry (`SourceStore.init` + `syncURLs`), never mid-download.
+    /// Internal (not private): the callers live on `SourceStore`.
+    nonisolated static func purgeStaleResumeData() {
         let dir = resumeDataDirectory
         guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return }
         for file in files where file.pathExtension == "resume" {
