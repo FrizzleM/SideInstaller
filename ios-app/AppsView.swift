@@ -1264,6 +1264,10 @@ struct AppsView: View {
     /// F1 (0.9.141): the app list's search text — the file page's SearchBar
     /// 同款，过滤按名字或 Bundle ID（见 `filteredEntries`）。
     @State private var appSearchText = ""
+    /// F-3 (0.9.158): true while the header badge's tap filters the list
+    /// to the apps expiring within 3 days (or already expired); tapping
+    /// the badge again, or "Show all", restores the full list.
+    @State private var showExpiringOnly = false
     /// F3 (0.9.145): the app list's sort — the file page's FileSort 同款
     /// （到期日 / 名称 / Bundle ID），@AppStorage 持久化。只改显示顺序，
     /// 不动匹配与续签；默认到期日就是 ProfileMatcher 的顺序，原样返回。
@@ -1372,13 +1376,22 @@ struct AppsView: View {
         BrandHeader(icon: "app.badge.clock", image: "AppsLogo", title: L("Sideloaded apps")) {
             if manager.hasLoaded {
                 let expiring = manager.expiringSoon
-                StatusDot(text: expiring > 0
-                             ? (expiring == 1 ? L("%d app needs refreshing", expiring)
-                                              : L("%d apps need refreshing", expiring))
-                             : (manager.entries.count == 1 ? L("%d app", manager.entries.count)
-                                                           : L("%d apps", manager.entries.count)),
-                          color: expiring > 0 ? Theme.warning : Theme.positive)
-                    .transition(.opacity)
+                // F-3 (0.9.158): the badge is a filter, not just a count —
+                // tap it to show only the apps expiring within 3 days (or
+                // already expired); tap again to restore the full list.
+                // With nothing expiring there is nothing to filter to.
+                Button {
+                    if expiring > 0 { showExpiringOnly.toggle() }
+                } label: {
+                    StatusDot(text: expiring > 0
+                                 ? (expiring == 1 ? L("%d app needs refreshing", expiring)
+                                                  : L("%d apps need refreshing", expiring))
+                                 : (manager.entries.count == 1 ? L("%d app", manager.entries.count)
+                                                               : L("%d apps", manager.entries.count)),
+                              color: expiring > 0 ? Theme.warning : Theme.positive)
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity)
             }
         }
     }
@@ -1587,8 +1600,12 @@ struct AppsView: View {
     /// contains the query, case-insensitive (the file page's matching() 同款取法).
     /// F3 (0.9.145): then sorted by `appSort` — expiry is the matcher's own
     /// order, returned as-is; name / Bundle ID sort case-insensitively.
+    /// F-3 (0.9.158): when the header badge's filter is on, only the apps
+    /// expiring within 3 days (or already expired) stay — the same bands
+    /// `expiringSoon` counts, plus `.soon` (2–3 days), per
+    /// `ExpiryUrgency.of`.
     private var filteredEntries: [SideloadedAppStatus] {
-        let base: [SideloadedAppStatus]
+        var base: [SideloadedAppStatus]
         if appSearchText.isEmpty {
             base = manager.entries
         } else {
@@ -1596,6 +1613,14 @@ struct AppsView: View {
             base = manager.entries.filter {
                 $0.app.name.lowercased().contains(query)
                     || $0.app.bundleID.lowercased().contains(query)
+            }
+        }
+        if showExpiringOnly {
+            base = base.filter {
+                switch ExpiryUrgency.of($0.current) {
+                case .expired, .critical, .soon: return true
+                default: return false
+                }
             }
         }
         switch appSort {
@@ -1624,6 +1649,13 @@ struct AppsView: View {
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(Theme.muted)
                     Spacer()
+                    // F-3 (0.9.158): the badge filter's way back — only
+                    // while it is on, next to the count it shrank.
+                    if showExpiringOnly {
+                        Button(L("Show all")) { showExpiringOnly = false }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
                     if let refreshed = manager.lastRefreshed {
                         Text(refreshed.formatted(Date.FormatStyle(date: .omitted, time: .shortened)
                                                      .locale(Localizer.locale)))

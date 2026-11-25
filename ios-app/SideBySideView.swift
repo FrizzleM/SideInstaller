@@ -1627,6 +1627,19 @@ final class SideBySideManager: ObservableObject {
                                       : app.source == nil ? L("No SideInstaller IPA downloaded.")
                                                           : L("No SideStore IPA downloaded."))
         }
+        // F-1 (0.9.158): the IPA's own minimum, against their iPhone — not
+        // this one. Block before signing, so a too-new IPA doesn't burn an
+        // App ID first. A fresh download of a known build was already
+        // filtered by `downloadLatest(runningOn:)`; this also covers a
+        // fallback copy from Documents and the custom IPA.
+        if let info = IPALibrary.appInfo(at: ipa) {
+            let theirOS = targetOSVersion.flatMap(SideStoreDownloader.osVersion)
+                ?? ProcessInfo.processInfo.operatingSystemVersion
+            let theirOSText = targetOSVersion ?? engine.osVersionText
+            if let reason = Engine.minOSBlockReason(info: info, runningOn: theirOS, osText: theirOSText) {
+                throw EngineError.message(reason)
+            }
+        }
         // Their UDID is registered with the team before the profile is asked
         // for, or Apple refuses it with error 8220.
         let udid = targetUDID ?? ""

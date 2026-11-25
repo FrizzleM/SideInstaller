@@ -1122,6 +1122,9 @@ let koreanStrings: [String: String] = [
     // MARK: - Madeira
 
     "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ 앱은 iOS %d 이상이 필요합니다. 이 iPhone의 iOS 버전은 %@입니다.",
+    "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ 앱은 iOS %@ 이상이 필요합니다. 이 iPhone의 iOS 버전은 %@입니다.",
+    "Minimum iOS": "최소 iOS",
+    "Show all": "모두 표시",
     "Open Madeira from your Home Screen.": "홈 화면에서 Madeira를 여세요.",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
         "설정 화면의 “Set up JIT”에서 “In-app with pairing file”을 선택하세요. SideInstaller가 이미 파일을 넣어 두었으니 “Continue”를 탭하면 됩니다.",

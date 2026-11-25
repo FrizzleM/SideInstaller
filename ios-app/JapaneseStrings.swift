@@ -1122,6 +1122,9 @@ let japaneseStrings: [String: String] = [
     // MARK: - Madeira
 
     "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ には iOS %d 以降が必要です。この iPhone は iOS %@ です。",
+    "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ には iOS %@ 以降が必要です。この iPhone は iOS %@ です。",
+    "Minimum iOS": "最小 iOS",
+    "Show all": "すべて表示",
     "Open Madeira from your Home Screen.": "ホーム画面から Madeira を開いてください。",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
         "初期設定の「Set up JIT」で「In-app with pairing file」を選んでください。ファイルは SideInstaller がすでに入れてあるので、「Continue」をタップします。",

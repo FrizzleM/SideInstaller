@@ -124,6 +124,9 @@ struct InstallHistoryView: View {
             if !ok, let error = engine.lastError {
                 notice = error
             }
+            // B-6 (0.9.158): a successful reinstall writes a new entry at
+            // the top — re-read, so it shows without leaving the page.
+            if ok { entries = InstallHistoryStore.load() }
             reinstallingID = nil
         }
     }

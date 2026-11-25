@@ -1140,6 +1140,9 @@ let portugueseStrings: [String: String] = [
 
     "%@ needs iOS %d or later. This iPhone runs iOS %@.":
         "O %@ precisa do iOS %d ou posterior. Este iPhone usa o iOS %@.",
+    "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "O %@ precisa do iOS %@ ou posterior. Este iPhone usa o iOS %@.",
+    "Minimum iOS": "iOS mínimo",
+    "Show all": "Mostrar tudo",
     "Open Madeira from your Home Screen.": "Abra o Madeira pela Tela de Início.",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
         "Na configuração dele, em “Set up JIT”, escolha “In-app with pairing file”: o SideInstaller já colocou o arquivo lá, então toque em “Continue”.",

@@ -1127,6 +1127,9 @@ let chineseStrings: [String: String] = [
     // MARK: - Madeira
 
     "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ 需要 iOS %d 或更高版本。这台 iPhone 运行的是 iOS %@。",
+    "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ 需要 iOS %@ 或更高版本。这台 iPhone 运行的是 iOS %@。",
+    "Minimum iOS": "最低 iOS",
+    "Show all": "显示全部",
     "Open Madeira from your Home Screen.": "从主屏幕打开 Madeira。",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
         "在它的设置流程中，在“Set up JIT”下选择“In-app with pairing file”：SideInstaller 已经把文件放进去了，轻点“Continue”即可。",

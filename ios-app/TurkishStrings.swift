@@ -1077,6 +1077,9 @@ let turkishStrings: [String: String] = [
     // MARK: - Madeira
 
     "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ için iOS %d veya sonrası gerekir. Bu iPhone iOS %@ çalıştırıyor.",
+    "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ için iOS %@ veya sonrası gerekir. Bu iPhone iOS %@ çalıştırıyor.",
+    "Minimum iOS": "Asgari iOS",
+    "Show all": "Tümünü göster",
     "Open Madeira from your Home Screen.": "Madeira'yı Ana Ekran'dan aç.",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
         "Kurulumunda “Set up JIT” altında “In-app with pairing file” seç: SideInstaller dosyayı zaten oraya koydu, “Continue”e dokun.",

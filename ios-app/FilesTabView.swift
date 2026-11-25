@@ -1220,7 +1220,7 @@ struct FilesTabView: View {
     private func detailSheetContent(item: LocalFileItem,
                                     renewalByPath: [String: RenewalSourceEntry],
                                     renewalByBundleID: [String: RenewalSourceEntry]) -> some View {
-        FileDetailSheet(item: item, renewalAppName: renewalSource(for: item, byPath: renewalByPath, byBundleID: renewalByBundleID)?.appName, onDelete: {
+        FileDetailSheet(item: item, ipaInfo: fileIPAInfo[item.url.path], renewalAppName: renewalSource(for: item, byPath: renewalByPath, byBundleID: renewalByBundleID)?.appName, onDelete: {
             detailItem = nil
             // B-1（fileActionButtons 同例）：sheet 正在收起，确认弹窗
             // 推迟一轮 runloop 再立，免得被收起中的 sheet 吞掉。
@@ -3432,6 +3432,9 @@ private enum CertLibraryTab: Identifiable, Hashable {
 /// 文件夹没有字节大小可言，大小那行显示“共 n 项”。
 private struct FileDetailSheet: View {
     let item: LocalFileItem
+    /// The IPA info the list row already parsed, if it has (nil = not an
+    /// IPA, or the row hadn't parsed it yet — the sheet parses it itself).
+    var ipaInfo: IPALibrary.AppInfo? = nil
     /// 是续签源时传 App 名（nil = 不是续签用的文件）。
     var renewalAppName: String? = nil
     var onDelete: () -> Void
@@ -3439,6 +3442,12 @@ private struct FileDetailSheet: View {
     var onMove: () -> Void
     var onDuplicate: () -> Void
     @Environment(\.dismiss) private var dismiss
+    /// F-2 (0.9.158): the row's parse, when the caller hadn't got it yet.
+    @State private var parsedInfo: IPALibrary.AppInfo? = nil
+
+    /// The IPA metadata to show: the caller's parse first, the sheet's own
+    /// background parse once it lands.
+    private var shownIPAInfo: IPALibrary.AppInfo? { ipaInfo ?? parsedInfo }
 
     var body: some View {
         NavigationStack {
@@ -3449,6 +3458,21 @@ private struct FileDetailSheet: View {
                           : ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file))
                 detailRow(L("修改时间"), item.modified?.formatted(date: .abbreviated, time: .standard) ?? L("unknown"))
                 detailRow(L("路径"), item.url.path, middleTruncation: true)
+                // F-2 (0.9.158): the IPA's own metadata — version, Bundle
+                // ID, minimum iOS — parsed already for the row's second
+                // line, so this is display only, no new parsing on the
+                // common path. Each value copies on long-press.
+                if item.isIPA, let info = shownIPAInfo {
+                    if let version = info.version, !version.isEmpty {
+                        detailRow(L("Version"), version)
+                    }
+                    if !info.bundleID.isEmpty {
+                        detailRow(L("Bundle ID"), info.bundleID)
+                    }
+                    if let minOS = info.minOS, !minOS.isEmpty {
+                        detailRow(L("Minimum iOS"), "iOS \(minOS)")
+                    }
+                }
                 if let renewalAppName {
                     detailRow(L("续签用的应用"), renewalAppName)
                 }
@@ -3488,6 +3512,17 @@ private struct FileDetailSheet: View {
                     Button(L("Done")) { dismiss() }
                 }
             }
+            // F-2 (0.9.158): the row hadn't parsed this IPA yet — parse it
+            // off the main thread (`appInfo(at:)` is lock-guarded, so a
+            // background read can't race the row's own parse).
+            .task {
+                if ipaInfo == nil, item.isIPA {
+                    // Only the URL crosses into the detached task (a
+                    // Sendable value); the row itself stays on this side.
+                    let url = item.url
+                    parsedInfo = await Task.detached { IPALibrary.appInfo(at: url) }.value
+                }
+            }
         }
     }
 
@@ -3500,6 +3535,11 @@ private struct FileDetailSheet: View {
                 .font(.subheadline)
                 .lineLimit(2)
                 .truncationMode(middleTruncation ? .middle : .tail)
+                // F-2 (0.9.158): every detail value copies on long-press —
+                // the metadata rows above all go through here.
+                .contextMenu {
+                    Button(L("Copy")) { UIPasteboard.general.string = value }
+                }
         }
     }
 }

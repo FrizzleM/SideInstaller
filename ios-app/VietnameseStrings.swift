@@ -1146,6 +1146,9 @@ let vietnameseStrings: [String: String] = [
 
     "%@ needs iOS %d or later. This iPhone runs iOS %@.":
         "%@ cần iOS %d trở lên. iPhone này đang chạy iOS %@.",
+    "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ cần iOS %@ trở lên. iPhone này đang chạy iOS %@.",
+    "Minimum iOS": "iOS tối thiểu",
+    "Show all": "Hiển thị tất cả",
     "Open Madeira from your Home Screen.": "Mở Madeira từ Màn hình chính.",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
         "Trong phần thiết lập của nó, ở mục “Set up JIT”, chọn “In-app with pairing file”: SideInstaller đã đặt sẵn tệp ở đó, nên hãy chạm vào “Continue”.",

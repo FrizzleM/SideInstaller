@@ -1415,7 +1415,9 @@ enum SideStoreDownloader {
 
     /// True when iOS `os` is in a listing's range: `min` or later, and `max`
     /// or earlier when it gives one. A bound that isn't a version is no bound.
-    private static func runs(on os: OperatingSystemVersion, from min: String?, to max: String?) -> Bool {
+    /// Internal (not private): F-1 (0.9.158) reuses it for the IPA's own
+    /// MinimumOSVersion pre-check in `Engine` and Side by Side.
+    static func runs(on os: OperatingSystemVersion, from min: String?, to max: String?) -> Bool {
         let key = { (v: OperatingSystemVersion) in (v.majorVersion, v.minorVersion, v.patchVersion) }
         if let min = min.flatMap(osVersion), key(os) < key(min) { return false }
         if let max = max.flatMap(osVersion), key(os) > key(max) { return false }

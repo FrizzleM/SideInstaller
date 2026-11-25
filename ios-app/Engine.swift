@@ -462,6 +462,15 @@ final class Engine {
     /// 清零会让结束时的比对永远对不上）。
     var installSessionID: UUID?
 
+    /// B4 (0.9.158): the signer the history records for this run, when it
+    /// isn't the Apple ID — the enterprise-cert and already-signed installs
+    /// never sign in, so they set this to the active enterprise profile's
+    /// name (see `enterpriseCertHistoryIdentity`); nil means the Apple ID
+    /// path, which records `normalizedAppleID` as before. Set after
+    /// `resetRun` (which clears it), read by `finishSuccess` and the two
+    /// recordFailure sites of those two pipelines.
+    var historyIdentityOverride: String?
+
     /// True from a cancel until the run stops, which waits for the step in
     /// flight to reach a safe point.
     private(set) var isCancelling: Bool = false
@@ -748,6 +757,9 @@ final class Engine {
             // isRunning = true 之前各 mint 一个新 UUID；跑完不清零
             //（结束时的比对还要认它），下一跑起跑时自然轮换。
             self.installSessionID = nil
+            // B4 (0.9.158): the history-signer override goes with it — the
+            // Apple ID path reads nil, the other two set it after this.
+            self.historyIdentityOverride = nil
             self.lastError = nil
             self.pendingInvalidLinkMessage = nil
             self.finished = false
@@ -769,6 +781,30 @@ final class Engine {
     }
 
     // MARK: - One-click pipeline (the default flow)
+
+    /// F-1 (0.9.158): nil when the IPA described by `info` runs on `os`,
+    /// else the user-facing reason it can't — the IPA's own
+    /// MinimumOSVersion, not the source's floor
+    /// (`InstallSource.minimumOSMajorVersion`, which only covers
+    /// SideInstaller/SideStore/LiveContainer's own builds). An IPA whose
+    /// minimum can't be read never blocks: it signs ahead as before.
+    static func minOSBlockReason(info: IPALibrary.AppInfo,
+                                 runningOn os: OperatingSystemVersion, osText: String) -> String? {
+        guard let minOS = info.minOS,
+              !SideStoreDownloader.runs(on: os, from: minOS, to: nil) else { return nil }
+        return L("%@ needs iOS %@ or later. This iPhone runs iOS %@.", info.name, minOS, osText)
+    }
+
+    /// B4 (0.9.158): the signer the history records for the two installs
+    /// that never sign in with an Apple ID (enterprise-cert and
+    /// already-signed): the active enterprise profile's name. No profile:
+    /// the provisioning profile file's name when one is on disk, else
+    /// empty — never the Apple ID saved in Settings.
+    private static func enterpriseCertHistoryIdentity() -> String {
+        if let name = EnterpriseCertStore.activeProfile()?.name, !name.isEmpty { return name }
+        if EnterpriseCertStore.hasProvision { return EnterpriseCertStore.provisionURL.lastPathComponent }
+        return ""
+    }
 
     /// Run every install step in order, stopping at the first failure.
     /// `afterProbe` is set on the second pass, once a full-tunnel VPN's probe
@@ -806,6 +842,18 @@ final class Engine {
         if installSource == .custom, IPALibrary.customImport() == nil {
             setGuide(Guides.customIPA)
             log("⛔️ No IPA imported yet. Tap “Import .ipa” and pick one, then tap Install again.")
+            return
+        }
+        // F-1 (0.9.158): the imported IPA's own minimum — the source floor
+        // above only covers SideInstaller's own builds. Block before
+        // signing, so a too-new IPA doesn't burn an App ID first.
+        if installSource == .custom, let entry = IPALibrary.customImport(),
+           let info = IPALibrary.appInfo(at: entry.url),
+           let reason = Self.minOSBlockReason(info: info,
+                                              runningOn: ProcessInfo.processInfo.operatingSystemVersion,
+                                              osText: osVersionText) {
+            lastError = reason
+            log("⛔️ \(reason)")
             return
         }
         // The install runs over the loopback tunnel, so require it up front,
@@ -2345,6 +2393,15 @@ final class Engine {
         guard !isRunning else {
             return BatchInstallOutcome(name: name, error: L("An install is already running. Wait for it to finish, then try again."), stopped: true)
         }
+        // F-1 (0.9.158): the IPA's own minimum — checked here, not left to
+        // runOneClick's guard, so one too-new item skips (stopped: false)
+        // instead of aborting the whole batch as a systemic failure.
+        if let info = IPALibrary.appInfo(at: url),
+           let reason = Self.minOSBlockReason(info: info,
+                                              runningOn: ProcessInfo.processInfo.operatingSystemVersion,
+                                              osText: osVersionText) {
+            return BatchInstallOutcome(name: name, error: reason, stopped: false)
+        }
         installSource = .custom
         let guideBefore = guide
         runOneClick()
@@ -2875,6 +2932,9 @@ final class Engine {
         // B-2：起跑前 mint 新会话凭证（resetRun 已清掉旧值）。
         installSessionID = UUID()
         isRunning = true
+        // B4 (0.9.158): this run never signs in — the history records the
+        // enterprise profile's name, not the Apple ID from Settings.
+        historyIdentityOverride = Self.enterpriseCertHistoryIdentity()
         // B2：配对窗口期先登记源路径，收尾再注销（见 isInstallingSource）。
         installingSourcePath = ipaURL.path
         log("=== Starting enterprise-cert install ===")
@@ -2931,7 +2991,7 @@ final class Engine {
                 // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
                 InstallHistoryStore.recordFailure(appName: installedAppName,
                                                   version: signedAppVersion() ?? downloadedVersion,
-                                                  identity: normalizedAppleID,
+                                                  identity: historyIdentityOverride ?? normalizedAppleID,
                                                   reason: msg)
             }
             InstallActivity.shared.runEnded(outcome)
@@ -3041,6 +3101,10 @@ final class Engine {
         // 原先这句在 isRunning = true 之后，现并入统一 mint 点）。
         installSessionID = UUID()
         isRunning = true
+        // B4 (0.9.158): this run installs an already-signed IPA and never
+        // signs in — the history records the enterprise profile's name,
+        // not the Apple ID from Settings.
+        historyIdentityOverride = Self.enterpriseCertHistoryIdentity()
         // B2：配对窗口期先登记源路径，收尾再注销（见 isInstallingSource）。
         installingSourcePath = ipaURL.path
         log("=== Installing already-signed IPA ===")
@@ -3107,7 +3171,7 @@ final class Engine {
                 // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
                 InstallHistoryStore.recordFailure(appName: installedAppName,
                                                   version: signedAppVersion() ?? downloadedVersion,
-                                                  identity: normalizedAppleID,
+                                                  identity: historyIdentityOverride ?? normalizedAppleID,
                                                   reason: msg)
             }
             InstallActivity.shared.runEnded(outcome)
@@ -3689,7 +3753,7 @@ final class Engine {
         // a failed run never reaches here, so it leaves no entry.
         InstallHistoryStore.record(appName: installedAppName,
                                    version: signedAppVersion() ?? downloadedVersion,
-                                   identity: normalizedAppleID)
+                                   identity: historyIdentityOverride ?? normalizedAppleID)
         let source = installedBuild
         if signedAppIsMadeira(source) {
             setGuide(Guides.trustMadeira(holding: madeiraHandoff))

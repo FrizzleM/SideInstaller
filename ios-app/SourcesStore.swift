@@ -237,6 +237,9 @@ final class SourceStore: ObservableObject {
     private static let sourceBodyCap = 10 * 1024 * 1024
 
     init() {
+        // B-1 (0.9.158): drop stale resume points left by cancelled
+        // downloads, before any new download can reuse the folder.
+        Self.purgeStaleResumeData()
         sources = UnifiedSourceList.load().map { LoadedSource(url: $0) }
         disabled = UnifiedSourceList.disabledURLs()
     }
@@ -245,6 +248,9 @@ final class SourceStore: ObservableObject {
     /// documents of sources still listed, add new ones unloaded, drop
     /// removed ones. Called when the page appears and when the list changes.
     func syncURLs() {
+        // B-1 (0.9.158): same sweep as `init` — entering the page is the
+        // moment a cancelled download's point stops being reachable.
+        Self.purgeStaleResumeData()
         let urls = UnifiedSourceList.load()
         disabled = UnifiedSourceList.disabledURLs()
         var kept: [URL: LoadedSource] = [:]
@@ -642,6 +648,25 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
 
     nonisolated private static func deleteResumeDataFromDisk(url: URL) {
         try? FileManager.default.removeItem(at: resumeDataFileURL(for: url))
+    }
+
+    /// B-1 (0.9.158): sweep `resumeData/` for points no download will ever
+    /// claim again — expired (older than `resumeDataMaxAge`) or unreadable,
+    /// so cancelling several sources and never reopening them doesn't leave
+    /// one `.resume` file per URL behind forever. A live run's point is
+    /// fresh by construction, so the sweep never touches it; callers run
+    /// this on entry (`init` + `syncURLs`), never mid-download.
+    nonisolated private static func purgeStaleResumeData() {
+        let dir = resumeDataDirectory
+        guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return }
+        for file in files where file.pathExtension == "resume" {
+            guard let encoded = try? Data(contentsOf: file),
+                  let record = try? JSONDecoder().decode(PersistedResumeData.self, from: encoded),
+                  Date().timeIntervalSince(record.savedAt) < Self.resumeDataMaxAge else {
+                try? FileManager.default.removeItem(at: file)
+                continue
+            }
+        }
     }
 
     /// A-1（SIDE-32）：本下载的进度节流器（delegate 队列是串行的，锁只是兜底）。
