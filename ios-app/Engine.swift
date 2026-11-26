@@ -2567,13 +2567,22 @@ final class Engine {
     /// `stopped` false: the batch skips that item and moves on.
     /// `declined` (B-3, 0.9.166) is true when the user declined this item's
     /// downgrade prompt — a skip, not a failure; the summary counts it
-    /// apart from failures. Defaults false, so the other call sites keep
-    /// their meaning.
+    /// apart from failures. It defaults to false in the initializer below
+    /// (a property default alone doesn't give the memberwise initializer a
+    /// default argument — the 0.9.166 first push went red on exactly that),
+    /// so the other call sites keep their meaning.
     struct BatchInstallOutcome {
         let name: String
         let error: String?
         let stopped: Bool
-        let declined: Bool = false
+        let declined: Bool
+
+        init(name: String, error: String?, stopped: Bool, declined: Bool = false) {
+            self.name = name
+            self.error = error
+            self.stopped = stopped
+            self.declined = declined
+        }
     }
 
     /// F2 (0.9.151): install one IPA through the single-install path
