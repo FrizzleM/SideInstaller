@@ -2,7 +2,7 @@
 
 All notable changes to SideInstaller are documented here.
 
-## Unreleased
+## 2.3.0
 
 ### Added
 - **Routes from more kinds of file.** Play a GPX route, and the Play GPX Route shortcut, also take
