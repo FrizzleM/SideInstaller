@@ -16,6 +16,17 @@ struct InstallHistoryEntry: Codable, Identifiable {
     var version: String?
     /// Who signed it: the Apple ID for a one-click install.
     var identity: String
+    /// F-1 (0.9.168): the installed app's bundle ID (the signed one —
+    /// personal-ID signing appends `.<teamID>`, so `historyIPAURL`
+    /// matches its IPA by that prefix too). Two same-name clones
+    /// (multi-open) share a name but never an ID, so this is what
+    /// tells them apart in search and in reinstall. Optional: entries
+    /// written before 0.9.168 have no such key and decode to nil — the
+    /// synthesized decoder reads a defaulted property with
+    /// `decodeIfPresent`, it doesn't demand the key — and a failed run
+    /// that never got as far as signing records nil rather than an
+    /// invented ID.
+    var bundleID: String? = nil
     /// False for a run that failed; `failureReason` then says why. Defaults
     /// to true so entries written before 0.9.155 (no such key) still decode
     /// — the synthesized decoder reads a defaulted property with
@@ -69,13 +80,13 @@ enum InstallHistoryStore {
     }
 
     /// Record one successful install.
-    static func record(appName: String, version: String?, identity: String) {
+    static func record(appName: String, version: String?, identity: String, bundleID: String? = nil) {
         logLock.lock()
         defer { logLock.unlock() }
         var entries = load()
         entries.insert(InstallHistoryEntry(id: UUID(), date: Date(),
                                            appName: appName, version: version,
-                                           identity: identity), at: 0)
+                                           identity: identity, bundleID: bundleID), at: 0)
         if entries.count > maxEntries { entries = Array(entries.prefix(maxEntries)) }
         save(entries)
     }
@@ -84,14 +95,14 @@ enum InstallHistoryStore {
     /// reason it stopped — the same row the success path writes, so the
     /// history shows the failure and its one-tap reinstall instead of
     /// leaving no trace of the run.
-    static func recordFailure(appName: String, version: String?, identity: String, reason: String) {
+    static func recordFailure(appName: String, version: String?, identity: String, reason: String, bundleID: String? = nil) {
         logLock.lock()
         defer { logLock.unlock() }
         var entries = load()
         entries.insert(InstallHistoryEntry(id: UUID(), date: Date(),
                                            appName: appName, version: version,
                                            identity: identity, success: false,
-                                           failureReason: reason), at: 0)
+                                           failureReason: reason, bundleID: bundleID), at: 0)
         if entries.count > maxEntries { entries = Array(entries.prefix(maxEntries)) }
         save(entries)
     }

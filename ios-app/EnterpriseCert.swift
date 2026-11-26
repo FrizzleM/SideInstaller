@@ -1232,7 +1232,17 @@ struct SignedIPARecord: Codable, Identifiable {
     /// mobileprovision 的 ExpirationDate）。可选：老记录没有这个
     /// 字段，解码得 nil，文件页进页时 fillMissingCertInfo 按需补。
     var expiresAt: Date?
-    var id: String { fileName }
+    /// B-1 (0.9.168)：文件在 Signed 目录下的相对路径（如
+    /// "游戏/X.ipa"），nil 的老记录回落到根目录（`fileName` 本身）。
+    /// 只按文件名认记录时，根与子文件夹里的同名 IPA 会互相删错、
+    /// 改错；移进子文件夹的记录还会从 load() 里直接消失。路径是
+    /// 记录的身份，不只是文件名。
+    var relativePath: String? = nil
+    /// 在 Signed 树下的身份键：相对路径优先，老记录回落文件名。
+    /// `add` 去重、`remove`/`forget`、改名/移动、证书补齐合并全按
+    /// 它认记录，不再按文件名。
+    var pathKey: String { relativePath ?? fileName }
+    var id: String { pathKey }
 }
 
 enum SignedIPAStore {
@@ -1248,7 +1258,51 @@ enum SignedIPAStore {
     }
 
     static func url(for record: SignedIPARecord) -> URL {
-        dir.appendingPathComponent(record.fileName)
+        // B-1 (0.9.168)：相对路径优先——子文件夹里的记录指向子文件夹；
+        // 老记录没存路径，回落根目录 + 文件名，行为不变。
+        if let relativePath = record.relativePath, !relativePath.isEmpty {
+            return dir.appendingPathComponent(relativePath)
+        }
+        return dir.appendingPathComponent(record.fileName)
+    }
+
+    /// `url` 在 Signed 目录下的相对路径（"游戏/X.ipa"），不在树下
+    /// 就 nil——移出 Signed 的记录不改路径，load() 照旧滤掉它，移回来
+    /// 自动恢复（B-1 0.9.168：updatePath 的回落口径）。
+    private static func relativePath(of url: URL) -> String? {
+        let dirPath = dir.standardized.path
+        let path = url.standardized.path
+        guard path.hasPrefix(dirPath + "/") else { return nil }
+        return String(path.dropFirst(dirPath.count + 1))
+    }
+
+    /// B-1 (0.9.168)：文件/文件夹在 Signed 树内移动或改名后，同步
+    /// 清单里受影响记录的路径——整个文件或文件夹按 URL 认，子项按前缀
+    /// 换基（改名文件夹时它里面的已签 IPA 一起跟过去）。新位置在
+    /// Signed 树外的移动不改记录（load() 照旧滤掉，移回来自动恢复）。
+    /// 没记录命中就是空操作，调用方不用先判是不是已签文件。
+    static func updatePath(from oldURL: URL, to newURL: URL) {
+        guard let newRelative = relativePath(of: newURL) else { return }
+        let oldPath = oldURL.standardized.path
+        let dirPath = dir.standardized.path
+        guard oldPath == dirPath || oldPath.hasPrefix(dirPath + "/") else { return }
+        storeLock.lock()
+        defer { storeLock.unlock() }
+        var records = loadRaw()
+        var changed = false
+        for index in records.indices {
+            let recordPath = url(for: records[index]).standardized.path
+            if recordPath == oldPath {
+                records[index].fileName = newURL.lastPathComponent
+                records[index].relativePath = newRelative
+                changed = true
+            } else if recordPath.hasPrefix(oldPath + "/") {
+                let rest = String(recordPath.dropFirst(oldPath.count + 1))
+                records[index].relativePath = newRelative + "/" + rest
+                changed = true
+            }
+        }
+        if changed { save(records) }
     }
 
     /// A-8（SIDE-36）：清单缓存——load() 原来每次都读盘 + 解码 +
@@ -1305,18 +1359,19 @@ enum SignedIPAStore {
     }
 
     static func add(_ record: SignedIPARecord) {
-        // 同文件名只留一条（id 就是 fileName）：并发签出同名时
-        // 不再出现两个同 id 记录，删的时候也不会误删一对。
+        // B-1 (0.9.168)：同路径只留一条（`pathKey` 就是相对路径）：
+        // 根与子文件夹里的同名 IPA 是两条记录，并发签出同名时也不再
+        // 出现两个同 id 记录，删的时候也不会误删一对。
         storeLock.lock()
         defer { storeLock.unlock() }
-        save([record] + loadRaw().filter { $0.fileName != record.fileName })
+        save([record] + loadRaw().filter { $0.pathKey != record.pathKey })
     }
 
     static func remove(_ record: SignedIPARecord) {
         try? FileManager.default.removeItem(at: url(for: record))
         storeLock.lock()
         defer { storeLock.unlock() }
-        save(loadRaw().filter { $0.fileName != record.fileName })
+        save(loadRaw().filter { $0.pathKey != record.pathKey })
     }
 
     /// B-38-B3：只删记录、不碰磁盘文件——WebDAV PUT 覆盖 Signed/ 下的
@@ -1326,18 +1381,19 @@ enum SignedIPAStore {
     static func forget(_ record: SignedIPARecord) {
         storeLock.lock()
         defer { storeLock.unlock() }
-        save(loadRaw().filter { $0.fileName != record.fileName })
+        save(loadRaw().filter { $0.pathKey != record.pathKey })
     }
 
     /// 批量删除：一次读清单、一次写回，不按条循环调 remove。
+    /// B-1 (0.9.168)：按路径认记录——同名不同文件夹的各删各的。
     static func remove(_ records: [SignedIPARecord]) {
-        let names = Set(records.map { $0.fileName })
+        let keys = Set(records.map { $0.pathKey })
         for record in records {
             try? FileManager.default.removeItem(at: url(for: record))
         }
         storeLock.lock()
         defer { storeLock.unlock() }
-        save(loadRaw().filter { !names.contains($0.fileName) })
+        save(loadRaw().filter { !keys.contains($0.pathKey) })
     }
 
     /// 老记录证书段补齐：v61 之前签的记录没存 certName/teamID，
@@ -1418,10 +1474,10 @@ enum SignedIPAStore {
             defer { storeLock.unlock() }
             var current = loadRaw()
             var didMerge = false
-            let filledByName = Dictionary(records.map { ($0.fileName, $0) },
+            let filledByPath = Dictionary(records.map { ($0.pathKey, $0) },
                                           uniquingKeysWith: { first, _ in first })
             for index in current.indices {
-                guard let filled = filledByName[current[index].fileName] else { continue }
+                guard let filled = filledByPath[current[index].pathKey] else { continue }
                 if current[index].certName == nil, let name = filled.certName {
                     current[index].certName = name
                     didMerge = true
@@ -1475,15 +1531,11 @@ enum SignedIPAStore {
         provisionInfo(of: ipaURL)?.expiresAt
     }
 
-    /// 文件页改名后同步清单里的文件名。
-    static func renameFile(from oldName: String, to newName: String) {
-        storeLock.lock()
-        defer { storeLock.unlock() }
-        var records = loadRaw()
-        for index in records.indices where records[index].fileName == oldName {
-            records[index].fileName = newName
-        }
-        save(records)
+    /// 文件页改名后同步清单里的文件名与路径。B-1 (0.9.168)：按 URL
+    /// 认记录——同名不同文件夹的各改各的；文件夹改名时它里面的已签
+    /// IPA 也一起换基（直接走 `updatePath`），不再按名全量改。
+    static func renameFile(at url: URL, to newName: String) {
+        updatePath(from: url, to: url.deletingLastPathComponent().appendingPathComponent(newName))
     }
 
     /// 去掉主名末尾已带的“-已签”后缀（可重复，如二次签已签好的包）：

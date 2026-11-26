@@ -574,7 +574,7 @@ final class LANTransferServer: ObservableObject {
             .replacingOccurrences(of: root.path, with: "")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         if relDir == "Signed",
-           let record = SignedIPAStore.load().first(where: { $0.fileName == file.lastPathComponent }) {
+           let record = SignedIPAStore.load().first(where: { SignedIPAStore.url(for: $0) == file }) {
             SignedIPAStore.remove(record)
             return true
         } else {

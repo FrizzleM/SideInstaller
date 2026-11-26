@@ -533,13 +533,19 @@ struct FilesTabView: View {
         }
     }
 
-    /// 动作菜单里的查看文件位置：切到这行 IPA 所在的切栏 + 文件夹，
-    /// 清掉搜索，让这一行在当前视图里直接可见；位置在操作提示里明说。
-    /// 触感不另加：切栏变化会触发上面的 fileTab onChange 震一次 .light。
+    /// 动作菜单里的查看文件位置：切到这行文件所在的切栏 + 文件夹，
+    /// 清掉搜索与类型筛选，让这一行在当前视图里直接可见；位置在操作
+    /// 提示里明说。触感不另加：切栏变化会触发上面的 fileTab onChange
+    /// 震一次 .light。
+    /// B-3 (0.9.168)：落点按目标类型定——已签名栏只显示 IPA + 文件夹，
+    /// 非 IPA 文件（Signed/ 里的 ZIP 之类）切过去就消失；类型筛 ≠ All
+    /// 时定位到的行也可能被筛掉。IPA 目标去已签名栏（Signed 树下）
+    /// 或未签名栏（树外），非 IPA 目标一律留在未签名栏。
     private func locateFile(_ item: LocalFileItem) {
-        fileTab = item.isInSignedDir ? .signed : .unsigned
+        fileTab = (item.isIPA && item.isInSignedDir) ? .signed : .unsigned
         currentDir = item.relativeDir
         fileSearchText = ""
+        fileTypeFilter = .all
         opMessage = L("已定位到：%@", item.relativeDir.isEmpty ? L("根目录") : item.relativeDir)
         opFailed = false
     }
@@ -1943,7 +1949,7 @@ struct FilesTabView: View {
     /// 调用方写提示，别静默重扫了事。
     private func removeFileFromDisk(_ item: LocalFileItem) -> Bool {
         if item.isInSignedDir,
-           let record = SignedIPAStore.load().first(where: { $0.fileName == item.name }) {
+           let record = SignedIPAStore.load().first(where: { SignedIPAStore.url(for: $0) == item.url }) {
             SignedIPAStore.remove(record)
         } else if FileManager.default.fileExists(atPath: item.url.path) {
             do {
@@ -2254,6 +2260,13 @@ struct FilesTabView: View {
         }
         do {
             try FileManager.default.moveItem(at: item.url, to: dest)
+            // B-1 (0.9.168)：已签 IPA 在 Signed 树内移动（根 ↔ 子文件夹）
+            // 后，清单记录的路径跟着走，否则 load() 按旧路径找不到文件，
+            // 记录直接从已签名库消失；文件夹移动时它里面的记录一起换基。
+            // 移出 Signed 树的不改路径（load() 照旧滤掉，移回来恢复）。
+            if item.isInSignedDir || destDir == "Signed" || destDir.hasPrefix("Signed/") {
+                SignedIPAStore.updatePath(from: item.url, to: dest)
+            }
             refreshFiles(resetDir: true)
             // B-4：移动后刷新续签缓存与应用库列表，角标立即跟新位置。
             renewalSources = RenewalSourceStore.load()
@@ -2339,7 +2352,7 @@ struct FilesTabView: View {
             if engine.isRenewingSource(path: item.url.path) { skippedRenewing += 1; continue }
             if item.isIPA { hadIPA = true }
             if item.isInSignedDir,
-               let record = signedRecords.first(where: { $0.fileName == item.name }) {
+               let record = signedRecords.first(where: { SignedIPAStore.url(for: $0) == item.url }) {
                 signedToRemove.append(record)
                 continue
             }
@@ -2459,7 +2472,7 @@ struct FilesTabView: View {
         do {
             try FileManager.default.moveItem(at: item.url, to: dest)
             if item.isInSignedDir {
-                SignedIPAStore.renameFile(from: item.name, to: newName)
+                SignedIPAStore.renameFile(at: item.url, to: newName)
             }
             if !item.isDirectory, let idx = files.firstIndex(where: { $0.id == item.id }) {
                 // 文件改名只换这一行的 url/name（同目录，大小/日期/

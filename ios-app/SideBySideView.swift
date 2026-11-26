@@ -613,7 +613,8 @@ final class SideBySideManager: ObservableObject {
                 InstallHistoryStore.recordFailure(appName: installedAppName ?? runName,
                                                   version: installedAppVersion,
                                                   identity: credentials.id,
-                                                  reason: message)
+                                                  reason: message,
+                                                  bundleID: signedBundleID)
             }
             pairingInSettings = false
             pairingPIN = nil
@@ -766,7 +767,8 @@ final class SideBySideManager: ObservableObject {
         // 本次运行的 Apple ID。
         InstallHistoryStore.record(appName: name,
                                    version: installedAppVersion,
-                                   identity: credentials?.id ?? "")
+                                   identity: credentials?.id ?? "",
+                                   bundleID: signedBundleID)
         engine.log("✅ Side by Side done: \(name) is on their iPhone. One trust step left, on their side.")
         // Theirs pairs itself and signs itself in, or SideStore now holds the
         // record and signs in itself: this iPhone has no more use for the

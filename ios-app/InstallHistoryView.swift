@@ -125,6 +125,15 @@ struct InstallHistoryView: View {
                                 .font(.footnote)
                                 .foregroundStyle(Theme.muted)
                                 .lineLimit(1)
+                            // F-1 (0.9.168)：有 Bundle ID 就显示一行——
+                            // 两个同名分身的行只有这里能分清，搜到的是哪
+                            // 个也一眼可见；老条目没存就不显示。
+                            if let bundleID = entry.bundleID, !bundleID.isEmpty {
+                                Text(verbatim: bundleID)
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.muted)
+                                    .lineLimit(1)
+                            }
                             // F-A (0.9.155): a failed run says so in red,
                             // with the reason it stopped — the row still
                             // reinstalls on tap, same as a success.
@@ -234,9 +243,9 @@ struct InstallHistoryView: View {
         }
     }
 
-    /// F-3 (0.9.165)：标题或签名身份命中即留。条目本身不存 Bundle ID
-    ///（identity 是签名用的 Apple ID），所以 Bundle ID 无字段可搜——
-    /// 标题（含版本）+ 签名身份就是行上看得见的全部可搜文本。
+    /// F-3 (0.9.165)：标题或签名身份命中即留。
+    /// F-1 (0.9.168)：Bundle ID 也可搜——0.9.168 起的条目都存了它，
+    /// 同名不同包靠搜 Bundle ID 分清；没存的老条目仍按标题/签名身份搜。
     /// F-1 (0.9.166)：结果筛选先行（`success` 字段），搜索再叠加上去。
     private var filteredEntries: [InstallHistoryEntry] {
         var list = entries
@@ -250,6 +259,7 @@ struct InstallHistoryView: View {
         return list.filter { entry in
             entry.title.lowercased().contains(query)
                 || entry.identity.lowercased().contains(query)
+                || (entry.bundleID?.lowercased().contains(query) ?? false)
         }
     }
 

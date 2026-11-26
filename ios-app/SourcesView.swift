@@ -918,7 +918,21 @@ struct SourceAppsView: View {
     /// the row's progress pill only shows during the download itself.
     private func startUpdateAll() {
         guard updateAllTask == nil, !updateApps.isEmpty, activeID == nil, !engine.isRunning else { return }
-        let targets = updateApps
+        // B-2 (0.9.168): `startInstall` 同款最低 iOS 前置检查——0.9.167
+        // 只堵了单装两路，全部更新是第三路：不符项整包下完才在后置守卫
+        // 被拒，白占一个下载位。事前滤出：不符项不进 targets、不占蜂窝
+        // 总量、不占下载位；汇总里按 startInstall 同款文案说明哪款、
+        // 为什么跳过（与失败行同一格式列出）。
+        var skippedMinOS: [(name: String, error: String)] = []
+        let targets = updateApps.filter { app in
+            guard let minOS = app.minOSVersion, !minOS.isEmpty,
+                  !SideStoreDownloader.runs(on: ProcessInfo.processInfo.operatingSystemVersion, from: minOS, to: nil)
+            else { return true }
+            skippedMinOS.append((app.name ?? app.bundleIdentifier ?? "",
+                                 L("%@ needs iOS %@ or later. This iPhone runs iOS %@.",
+                                   app.name ?? app.bundleIdentifier ?? "", minOS, engine.osVersionText)))
+            return false
+        }
         updateAllTotal = targets.count
         updateAllIndex = 0
         updateAllCurrent = nil
@@ -928,16 +942,19 @@ struct SourceAppsView: View {
             var stopped = false
             // F-G (0.9.156): one prompt for the whole batch, with the total
             // size when every app states one — not one prompt per item.
+            // B-2 (0.9.168): 全被滤掉时不弹确认——没有要下的东西，直接汇总。
             let batchSizes = targets.compactMap(\.size)
             let batchSize: Int64? = batchSizes.count == targets.count
                 ? Int64(batchSizes.reduce(0, +)) : nil
-            guard await engine.confirmCellularDownload(size: batchSize,
-                                                       what: L("%d updates", targets.count)) else {
-                updateAllTask = nil
-                updateAllCurrent = nil
-                updateAllIndex = 0
-                updateAllTotal = 0
-                return
+            if !targets.isEmpty {
+                guard await engine.confirmCellularDownload(size: batchSize,
+                                                           what: L("%d updates", targets.count)) else {
+                    updateAllTask = nil
+                    updateAllCurrent = nil
+                    updateAllIndex = 0
+                    updateAllTotal = 0
+                    return
+                }
             }
             for (offset, app) in targets.enumerated() {
                 if Task.isCancelled || stopped { break }
@@ -982,6 +999,10 @@ struct SourceAppsView: View {
                     failed.append((app.name ?? app.bundleIdentifier ?? "", reason))
                 }
             }
+            // B-2 (0.9.168): 事前滤出的最低 iOS 不符项——没下载、没占位，
+            // 但汇总里要说明哪款、为什么跳过；与失败行同一格式列出。
+            // 放在未跑填补之后：填补按 targets 索引，混进跳过项会越界。
+            failed.append(contentsOf: skippedMinOS)
             updateAllTask = nil
             updateAllCurrent = nil
             updateAllIndex = 0
@@ -1229,19 +1250,25 @@ struct SourceVersion: Decodable, Equatable, Identifiable {
     let notes: String?
     let downloadURL: URL
     let size: Int64?
+    /// F-2 (0.9.168): the lowest iOS this build runs on, as the source
+    /// lists it (`AltSourceListing.Version.minOSVersion` 同款字段）.
+    /// Optional: sources that don't list it decode to nil, and the
+    /// version line just omits the iOS part.
+    let minOSVersion: String?
 
     var id: String { version + "|" + downloadURL.absoluteString }
 
-    init(version: String, date: Date?, notes: String?, downloadURL: URL, size: Int64?) {
+    init(version: String, date: Date?, notes: String?, downloadURL: URL, size: Int64?, minOSVersion: String? = nil) {
         self.version = version
         self.date = date
         self.notes = notes
         self.downloadURL = downloadURL
         self.size = size
+        self.minOSVersion = minOSVersion
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, date, localizedDescription, downloadURL, size
+        case version, date, localizedDescription, downloadURL, size, minOSVersion
     }
 
     init(from decoder: Decoder) throws {
@@ -1255,6 +1282,7 @@ struct SourceVersion: Decodable, Equatable, Identifiable {
         date = Self.date(try? c.decode(String.self, forKey: .date))
         notes = try? c.decode(String.self, forKey: .localizedDescription)
         size = try? c.decode(Int64.self, forKey: .size)
+        minOSVersion = try? c.decode(String.self, forKey: .minOSVersion)
     }
 
     /// Sources write dates as ISO 8601, with or without the time.
@@ -1649,14 +1677,25 @@ final class SourcesManager: ObservableObject {
 
     /// Puts up the install popup for `version`, as a `sideinstaller://install`
     /// link would. On yes, the Install tab downloads, signs and installs it.
-    func install(_ version: SourceVersion, of app: SourceApp) {
+    /// F-2 (0.9.168): `startInstall` 同款最低 iOS 前置检查——详情页安装
+    /// 是第三路（B-2 0.9.167 只堵了 startInstall 与 startCertInstall），
+    /// 没它就得等几百 MB 下完才在 Engine 的后置守卫被拒。不符返回
+    /// false、不发深链，调用方把原因告诉用户；文案与 startInstall 同款。
+    @discardableResult
+    func install(_ version: SourceVersion, of app: SourceApp) -> Bool {
+        if let minOS = version.minOSVersion, !minOS.isEmpty,
+           !SideStoreDownloader.runs(on: ProcessInfo.processInfo.operatingSystemVersion, from: minOS, to: nil) {
+            Engine.shared.log("Sources: \(app.name) \(version.version) needs iOS \(minOS)+ — this iPhone runs iOS \(Engine.shared.osVersionText).")
+            return false
+        }
         var components = URLComponents()
         components.scheme = DeepLink.scheme
         components.host = "install"
         components.queryItems = [URLQueryItem(name: "url", value: version.downloadURL.absoluteString)]
-        guard let link = components.url else { return }
+        guard let link = components.url else { return false }
         Engine.shared.log("Sources: \(app.name) \(version.version) from \(version.downloadURL.absoluteString).")
         Engine.shared.receiveLink(link)
+        return true
     }
 }
 
@@ -2205,6 +2244,9 @@ struct SourceAppView: View {
 
     @State private var showSettings = false
     @State private var confirm: SourceVersion?
+    /// F-2/F-3 (0.9.168)：详情页的操作提示——最低 iOS 前置拦截的
+    /// 原因，或复制直链后的“已复制”；静默不做事是最差的反馈。
+    @State private var notice: String?
 
     private var app: SourceApp { listing.app }
 
@@ -2238,7 +2280,7 @@ struct SourceAppView: View {
         .alert(confirm.map { L("Install %@ %@?", app.name, $0.version) } ?? "",
                isPresented: Binding(get: { confirm != nil }, set: { if !$0 { confirm = nil } })) {
             Button(L("Install")) {
-                if let confirm { manager.install(confirm, of: app) }
+                if let confirm { install(confirm) }
                 confirm = nil
             }
             Button(L("Cancel"), role: .cancel) { confirm = nil }
@@ -2248,6 +2290,14 @@ struct SourceAppView: View {
             } else {
                 Text(L("This version is older than the newest one. It's installed over the copy on this iPhone, which may not open data a newer version saved."))
             }
+        }
+        .alert(app.name, isPresented: Binding(
+            get: { notice != nil },
+            set: { if !$0 { notice = nil } }
+        )) {
+            Button(L("OK"), role: .cancel) { notice = nil }
+        } message: {
+            Text(notice ?? "")
         }
     }
 
@@ -2308,7 +2358,7 @@ struct SourceAppView: View {
                     if listing.isDowngrade(to: latest) {
                         confirm = latest
                     } else {
-                        manager.install(latest, of: app)
+                        install(latest)
                     }
                 } label: {
                     HStack(spacing: 8) {
@@ -2324,6 +2374,18 @@ struct SourceAppView: View {
                     .multilineTextAlignment(.center)
             }
         }
+    }
+
+    /// F-2 (0.9.168): the detail page's install entry — both the main
+    /// button and the downgrade confirm go through here. The minOS
+    /// pre-check lives in `manager.install`; a refusal shows the same
+    /// reason `startInstall` writes on its row instead of silently
+    /// doing nothing. (`minOSVersion` is non-nil whenever the check
+    /// can refuse, so the `?? ""` never shows.)
+    private func install(_ version: SourceVersion) {
+        guard !manager.install(version, of: app) else { return }
+        notice = L("%@ needs iOS %@ or later. This iPhone runs iOS %@.",
+                   app.name, version.minOSVersion ?? "", Engine.shared.osVersionText)
     }
 
     private func whatsNew(_ latest: SourceVersion) -> some View {
@@ -2361,6 +2423,18 @@ struct SourceAppView: View {
                                 .font(.caption)
                                 .foregroundStyle(Theme.muted)
                             Spacer()
+                            // F-3 (0.9.168): copy this version's IPA link —
+                            // the source row's Copy link 同款（源 URL 换成
+                            // 版本直链），拷完提示已复制，不静默。
+                            Button {
+                                UIPasteboard.general.string = version.downloadURL.absoluteString
+                                notice = L("Copied")
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                            }
+                            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                            .controlSize(.small)
+                            .accessibilityLabel(L("Copy link"))
                             Button(L("Install")) { confirm = version }
                                 .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                                 .controlSize(.small)
@@ -2380,7 +2454,10 @@ struct SourceAppView: View {
             .foregroundStyle(.secondary)
     }
 
-    /// "16 Nov 2026 · 10.4 MB", with what the source gives.
+    /// "16 Nov 2026 · 10.4 MB · iOS 18+", with what the source gives.
+    /// F-2 (0.9.168): the lowest iOS joins the line when the source
+    /// lists it — one place, so the newest-version header and every
+    /// history row show it. Sources without the field omit the part.
     private func versionMeta(_ version: SourceVersion) -> String {
         var parts: [String] = []
         if let date = version.date {
@@ -2389,6 +2466,9 @@ struct SourceAppView: View {
         }
         if let size = version.size, size > 0 {
             parts.append(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))
+        }
+        if let minOS = version.minOSVersion, !minOS.isEmpty {
+            parts.append("iOS \(minOS)+")
         }
         return parts.joined(separator: " · ")
     }

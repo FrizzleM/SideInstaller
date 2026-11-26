@@ -1107,7 +1107,8 @@ final class Engine {
                 InstallHistoryStore.recordFailure(appName: installedAppName,
                                                   version: signedAppVersion() ?? downloadedVersion,
                                                   identity: normalizedAppleID,
-                                                  reason: msg)
+                                                  reason: msg,
+                                                  bundleID: signedAppBundleID())
             }
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
@@ -2435,18 +2436,32 @@ final class Engine {
     /// no IPA" apart from "tried and failed", so both call this one
     /// matcher — a file the single path finds is one the loop counts
     /// as present, and vice versa.
+    /// F-1 (0.9.168): when the entry records a bundle ID, matching is
+    /// by bundle ID first — two same-name clones (multi-open) share a
+    /// name but never an ID. The recorded ID is the signed one:
+    /// personal-ID signing appends `.<teamID>` to the installed ID
+    /// (AppInfo 同款注释）, so a candidate IPA matches when its ID is
+    /// the recorded one or the recorded one is its ID plus that suffix;
+    /// enterprise signing rewrites nothing, so the exact match covers
+    /// it. A recorded ID with no bundle-ID match returns nil — falling
+    /// back to name matching here could reinstall the wrong clone,
+    /// which is the bug this fixes. Entries with no bundle ID (written
+    /// before 0.9.168, or failed runs that never reached signing) keep
+    /// the old name matching, behaviour unchanged.
     @MainActor
     func historyIPAURL(for entry: InstallHistoryEntry) -> URL? {
         let needle = entry.appName.lowercased()
         guard !needle.isEmpty else { return nil }
         // Candidates: the library scan (known builds + the custom import)
         // plus any unrecognized IPA in Documents, whose filename is the
-        // only name a hand-saved custom IPA has.
-        var candidates: [(url: URL, modified: Date, rank: Int)] = []
+        // only name a hand-saved custom IPA has. Each candidate carries
+        // the bundle ID its IPA declares (nil when it won't parse).
+        var candidates: [(url: URL, modified: Date, rank: Int, bundleID: String?)] = []
         for item in IPALibrary.scan() {
             if let rank = Self.historyMatchRank(fileStem: item.url.deletingPathExtension().lastPathComponent.lowercased(),
                                                 sourceName: item.source.displayName.lowercased(), needle: needle) {
-                candidates.append((item.url, item.modified ?? .distantPast, rank))
+                candidates.append((item.url, item.modified ?? .distantPast, rank,
+                                   IPALibrary.appInfo(at: item.url)?.bundleID))
             }
         }
         for name in IPALibrary.unrecognized() {
@@ -2454,8 +2469,18 @@ final class Engine {
             let modified = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) ?? .distantPast
             if let rank = Self.historyMatchRank(fileStem: url.deletingPathExtension().lastPathComponent.lowercased(),
                                                 sourceName: "", needle: needle) {
-                candidates.append((url, modified, rank))
+                candidates.append((url, modified, rank, IPALibrary.appInfo(at: url)?.bundleID))
             }
+        }
+        if let wanted = entry.bundleID, !wanted.isEmpty {
+            let byID = candidates.filter { candidate in
+                guard let id = candidate.bundleID else { return false }
+                return id == wanted || wanted.hasPrefix(id + ".") || id.hasPrefix(wanted + ".")
+            }
+            return byID.sorted(by: { a, b in
+                if a.rank != b.rank { return a.rank < b.rank }
+                return a.modified > b.modified
+            }).first?.url
         }
         return candidates.sorted(by: { a, b in
             if a.rank != b.rank { return a.rank < b.rank }
@@ -3364,7 +3389,8 @@ final class Engine {
                 InstallHistoryStore.recordFailure(appName: installedAppName,
                                                   version: signedAppVersion() ?? downloadedVersion,
                                                   identity: historyIdentityOverride ?? normalizedAppleID,
-                                                  reason: msg)
+                                                  reason: msg,
+                                                  bundleID: signedAppBundleID())
             }
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
@@ -3564,7 +3590,8 @@ final class Engine {
                 InstallHistoryStore.recordFailure(appName: installedAppName,
                                                   version: signedAppVersion() ?? downloadedVersion,
                                                   identity: historyIdentityOverride ?? normalizedAppleID,
-                                                  reason: msg)
+                                                  reason: msg,
+                                                  bundleID: signedAppBundleID())
             }
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
@@ -4145,7 +4172,8 @@ final class Engine {
         // a failed run never reaches here, so it leaves no entry.
         InstallHistoryStore.record(appName: installedAppName,
                                    version: signedAppVersion() ?? downloadedVersion,
-                                   identity: historyIdentityOverride ?? normalizedAppleID)
+                                   identity: historyIdentityOverride ?? normalizedAppleID,
+                                   bundleID: signedAppBundleID())
         let source = installedBuild
         if signedAppIsMadeira(source) {
             setGuide(Guides.trustMadeira(holding: madeiraHandoff))

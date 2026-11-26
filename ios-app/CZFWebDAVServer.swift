@@ -247,7 +247,7 @@ final class CZFWebDAVServer: ObservableObject {
                 .replacingOccurrences(of: root.path, with: "")
                 .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             if relDir == "Signed",
-               let record = SignedIPAStore.load().first(where: { $0.fileName == url.lastPathComponent }) {
+               let record = SignedIPAStore.load().first(where: { SignedIPAStore.url(for: $0) == url }) {
                 SignedIPAStore.forget(record)
             }
         }
@@ -282,7 +282,7 @@ final class CZFWebDAVServer: ObservableObject {
             .replacingOccurrences(of: root.path, with: "")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         if relDir == "Signed",
-           let record = SignedIPAStore.load().first(where: { $0.fileName == url.lastPathComponent }) {
+           let record = SignedIPAStore.load().first(where: { SignedIPAStore.url(for: $0) == url }) {
             SignedIPAStore.remove(record)
             return GCDWebServerResponse(statusCode: 204)
         }
