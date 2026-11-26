@@ -101,8 +101,9 @@ enum InstallHistoryStore {
         var entries = load()
         entries.insert(InstallHistoryEntry(id: UUID(), date: Date(),
                                            appName: appName, version: version,
-                                           identity: identity, success: false,
-                                           failureReason: reason, bundleID: bundleID), at: 0)
+                                           identity: identity, bundleID: bundleID,
+                                           success: false,
+                                           failureReason: reason), at: 0)
         if entries.count > maxEntries { entries = Array(entries.prefix(maxEntries)) }
         save(entries)
     }
