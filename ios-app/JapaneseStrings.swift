@@ -1749,4 +1749,10 @@ let japaneseStrings: [String: String] = [
     "从未巡检": "未実施",
     "上次自动续签：%@": "前回の自動更新：%@",
 
+    // 0.9.179
+    "Choose how to sign": "署名方法を選択",
+    "Enterprise signing keeps the Bundle ID unchanged.": "企業証明書での署名は Bundle ID を変更しません。",
+    "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "Apple ID での署名は Bundle ID を「元の ID.チーム ID」に変更するため、2 つ目のアイコンとしてインストールされます。",
+    "Update to %@ · %@": "%@ · %@ にアップデート",
+
 ]

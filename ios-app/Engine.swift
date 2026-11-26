@@ -684,6 +684,11 @@ final class Engine {
     /// (or the guide it stopped on) is in front instead of the user having
     /// to go to the Install tab by hand. Cleared when RootView consumes it.
     var sharedIPAReady = false
+    /// F-2 (0.9.179): a share-in IPA import waiting on the certificate
+    /// choice — set by the share path once the IPA is staged (RootView
+    /// shows the choice sheet for it); the choice clears it. Nil when
+    /// no choice is pending.
+    var pendingSigningChoice: SigningChoiceRequest?
     /// The build of SideInstaller's own that the imported IPA is, if it is one.
     private(set) var customIPABuild: InstallSource?
     /// True while a picked IPA is being copied in.

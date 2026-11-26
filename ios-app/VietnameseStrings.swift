@@ -1786,4 +1786,10 @@ let vietnameseStrings: [String: String] = [
     "从未巡检": "Chưa từng chạy",
     "上次自动续签：%@": "Lần tự động gia hạn gần nhất: %@",
 
+    // 0.9.179
+    "Choose how to sign": "Chọn cách ký",
+    "Enterprise signing keeps the Bundle ID unchanged.": "Ký bằng chứng chỉ doanh nghiệp giữ nguyên Bundle ID.",
+    "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "Ký bằng ID Apple sẽ đổi Bundle ID thành “ID gốc.ID nhóm” nên ứng dụng được cài dưới dạng biểu tượng thứ hai.",
+    "Update to %@ · %@": "Cập nhật lên %@ · %@",
+
 ]

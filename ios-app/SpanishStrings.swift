@@ -1793,4 +1793,10 @@ let spanishStrings: [String: String] = [
     "从未巡检": "Nunca realizada",
     "上次自动续签：%@": "Última renovación automática: %@",
 
+    // 0.9.179
+    "Choose how to sign": "Elige cómo firmar",
+    "Enterprise signing keeps the Bundle ID unchanged.": "La firma con el certificado empresarial mantiene el Bundle ID sin cambios.",
+    "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "La firma con el ID de Apple cambia el Bundle ID a “ID original.ID de equipo” y se instala como un segundo icono.",
+    "Update to %@ · %@": "Actualizar a %@ · %@",
+
 ]

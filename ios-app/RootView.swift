@@ -174,6 +174,8 @@ struct RootView: View {
                 .tag(Page.settings)
         }
         .environmentObject(certWorkspace)
+        // F-2 (0.9.179): the share-in certificate choice sheet.
+        .modifier(SigningChoiceSheetModifier())
         // F-3 (0.9.164): a history row's "Show in Downloads" — switch to the
         // Downloads tab; DownloadsListView scrolls to the file itself.
         .onReceive(NotificationCenter.default.publisher(for: Engine.revealDownload)) { _ in

@@ -169,14 +169,21 @@ struct SideInstallerApp: App {
                             return
                         }
                         guard await engine.importCustomIPA(from: url) else { return }
-                        if IPALibrary.customImport() != nil {
-                            // 先跳安装页：管线在跑时进度在那一页，guard 停下时
-                            // 指引卡也在那一页，不用用户自己再去安装页找。
-                            // B-39-B2：源赋值移到导入成功之后——导入被拒时
-                            // 在途管线读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
-                            engine.installSource = .custom
-                            engine.sharedIPAReady = true
-                            engine.runOneClick()
+                        // F-2 (0.9.179): don't run straight into the Apple
+                        // ID pipeline — the import is staged; ask which
+                        // certificate signs it first. The choice sheet
+                        // (RootView) runs the ID pipeline or hands the
+                        // staged IPA to the enterprise signing page.
+                        // B-39-B2 同款：源赋值移到导入成功之后——导入被拒时
+                        // 在途管线读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
+                        // 非隔离 Task：挂选择请求前跳回 @MainActor。
+                        let staged = IPALibrary.customImport()
+                        await MainActor.run {
+                            if let staged {
+                                engine.pendingSigningChoice = SigningChoiceRequest(ipaURL: staged.url)
+                            } else {
+                                engine.lastError = L("Import failed")
+                            }
                         }
                     }
                 }

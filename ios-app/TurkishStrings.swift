@@ -1707,4 +1707,10 @@ let turkishStrings: [String: String] = [
     "从未巡检": "Hiç yapılmadı",
     "上次自动续签：%@": "Son otomatik yenileme: %@",
 
+    // 0.9.179
+    "Choose how to sign": "Nasıl imzalayacağını seç",
+    "Enterprise signing keeps the Bundle ID unchanged.": "Kurumsal sertifika ile imzalama, Bundle ID'yi değiştirmez.",
+    "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "Apple ID ile imzalama, Bundle ID'yi “orijinal ID.ekip ID” olarak değiştirir ve ikinci bir simge olarak yüklenir.",
+    "Update to %@ · %@": "%@ · %@ sürümüne güncelle",
+
 ]

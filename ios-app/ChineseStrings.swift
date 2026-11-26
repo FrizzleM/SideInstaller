@@ -1761,4 +1761,10 @@ let chineseStrings: [String: String] = [
     "从未巡检": "从未巡检",
     "上次自动续签：%@": "上次自动续签：%@",
 
+    // 0.9.179
+    "Choose how to sign": "选择签名方式",
+    "Enterprise signing keeps the Bundle ID unchanged.": "企业证书签名不改 Bundle ID。",
+    "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "Apple ID 签名会把 Bundle ID 改成“原 ID.团队号”，装出第二个图标。",
+    "Update to %@ · %@": "更新到 %@ · %@",
+
 ]

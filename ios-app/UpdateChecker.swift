@@ -45,6 +45,29 @@ final class UpdateChecker: ObservableObject {
     /// verified newer release.
     @Published private(set) var releaseNotes: String?
 
+    /// B-1 (0.9.179): why the release gate failed — the banner / About
+    /// row tells a network failure apart from a release that is still
+    /// being published. Nil when the gate passed or never ran.
+    @Published private(set) var gateFailure: ReleaseGateFailure?
+
+    /// F-3 (0.9.179): the verified release IPA's size in bytes (the
+    /// `size` of the `SideInstaller.ipa` asset), for the "Update to …
+    /// · 28 MB" line. Cleared whenever the gate fails, like
+    /// `releaseNotes`.
+    @Published private(set) var latestAssetSize: Int?
+
+    /// B-1 (0.9.179): why `verifyReleaseAsset` failed. `.network` is a
+    /// fetch / parse failure (including timeout); `.tagMismatch` is a
+    /// draft / prerelease / tag that doesn't name `latest`;
+    /// `.missingAsset` is a published release whose IPA asset isn't up
+    /// yet. The last two mean the release is still being published;
+    /// only `.network` means the phone couldn't reach GitHub.
+    enum ReleaseGateFailure: Equatable {
+        case network
+        case tagMismatch
+        case missingAsset
+    }
+
     /// B-1 (0.9.177): the version file names a newer version but the
     /// release gate hasn't passed — the release is still being published
     /// (or the gate failed). The banner stays up, but its copy says so
@@ -52,6 +75,14 @@ final class UpdateChecker: ObservableObject {
     var pendingRelease: Bool {
         guard let latest = latestVersion else { return false }
         return showBanner && Self.isNewer(latest, than: currentVersion) && !updateAssetVerified
+    }
+
+    /// B-1 (0.9.179): the pending release is pending because the gate's
+    /// network fetch failed — not because the release is still
+    /// publishing. The banner and About show the network copy for
+    /// this one.
+    var pendingReleaseNetworkFailed: Bool {
+        pendingRelease && gateFailure == .network
     }
 
     /// F-1 (0.9.177): the release notes trimmed for the banner / About —
@@ -115,6 +146,20 @@ final class UpdateChecker: ObservableObject {
 
         let latest = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !latest.isEmpty else { return .failed }
+        // B-3 (0.9.179): snapshot the verified state before the gate
+        // runs — a failed or cancelled re-check must not strip an
+        // update that was already verified (the "Update now" button
+        // and the About pill would vanish until the next successful
+        // check). Taken BEFORE `latestVersion` is overwritten, so
+        // `wasLatest` is the version the verified state belongs to;
+        // restored below only when it names the same version — a
+        // newer version file names a different release, and the old
+        // verified state is stale for it (restoring it would offer
+        // an update the gate never verified).
+        let wasVerified = updateAssetVerified
+        let wasLatest = latestVersion
+        let wasNotes = releaseNotes
+        let wasSize = latestAssetSize
         latestVersion = latest
         showBanner = Self.isNewer(latest, than: currentVersion)
         // The release gate only runs when there is something newer: a
@@ -127,11 +172,20 @@ final class UpdateChecker: ObservableObject {
         // hours even though the release never verified. The "up to date"
         // stamp is unchanged: no gate runs, nothing to fail.
         let verified = showBanner ? await verifyReleaseAsset(for: latest) : true
+        if showBanner, !verified, wasVerified, wasLatest == latest {
+            updateAssetVerified = true
+            releaseNotes = wasNotes
+            latestAssetSize = wasSize
+            gateFailure = nil
+            return .newer(latest)
+        }
         updateAssetVerified = showBanner ? verified : false
         // F-1 (0.9.177): no newer version, no notes to show. (When the
         // gate runs, `verifyReleaseAsset` clears them itself on failure
         // and fills them on success.)
-        if !showBanner { releaseNotes = nil }
+        // F-3 (0.9.179): same for the asset size and the gate failure —
+        // with nothing newer there is no gate outcome to keep.
+        if !showBanner { releaseNotes = nil; latestAssetSize = nil; gateFailure = nil }
         // B-1 (0.9.177): the version file is newer but the release gate
         // didn't pass — report it as pending, not as a verified newer
         // version. `latestVersion` stays set and `updateAssetVerified`
@@ -147,11 +201,20 @@ final class UpdateChecker: ObservableObject {
     /// release (not a draft or prerelease), its tag must name exactly that
     /// version, and its assets must include `SideInstaller.ipa`.
     /// Fails closed — any fetch or parse failure returns false.
+    /// B-1 (0.9.179): the failure leaves its reason in `gateFailure`,
+    /// so the banner / About can tell a network failure apart from a
+    /// release that is still being published.
     private func verifyReleaseAsset(for latest: String) async -> Bool {
         // F-1 (0.9.177): the notes only describe a verified release —
         // clear them first; a failed gate leaves nothing behind.
+        // F-3 (0.9.179): same for the asset size.
         releaseNotes = nil
-        guard let url = URL(string: Self.latestReleaseAPIURL) else { return false }
+        latestAssetSize = nil
+        gateFailure = nil
+        guard let url = URL(string: Self.latestReleaseAPIURL) else {
+            gateFailure = .network
+            return false
+        }
         var req = URLRequest(url: url)
         req.cachePolicy = .reloadIgnoringLocalCacheData
         // Same 15-second bound as the version check (B5, 0.9.146).
@@ -161,20 +224,40 @@ final class UpdateChecker: ObservableObject {
         guard let (data, response) = try? await URLSession.shared.data(for: req),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              (json["draft"] as? Bool) == false,
+              let assets = json["assets"] as? [[String: Any]] else {
+            gateFailure = .network
+            return false
+        }
+        // B-1 (0.9.179): a draft / prerelease / wrong tag means the
+        // release for this version isn't published yet — not a network
+        // problem.
+        guard (json["draft"] as? Bool) == false,
               (json["prerelease"] as? Bool) == false,
-              let tag = json["tag_name"] as? String,
-              let assets = json["assets"] as? [[String: Any]] else { return false }
+              let tag = json["tag_name"] as? String else {
+            gateFailure = .tagMismatch
+            return false
+        }
         // The tag names the version with a "v" in front ("v0.9.149").
         let tagVersion = tag.hasPrefix("v") || tag.hasPrefix("V") ? String(tag.dropFirst()) : tag
         // Equal, not just newer: a release for another version — older or
         // newer than the version file — is not the one to install.
-        guard !Self.isNewer(tagVersion, than: latest), !Self.isNewer(latest, than: tagVersion) else { return false }
+        guard !Self.isNewer(tagVersion, than: latest), !Self.isNewer(latest, than: tagVersion) else {
+            gateFailure = .tagMismatch
+            return false
+        }
+        // F-3 (0.9.179): keep the IPA asset's size for the update line.
+        // B-1 (0.9.179): a release without its IPA asset yet is still
+        // being published.
+        guard let asset = assets.first(where: { ($0["name"] as? String) == Self.releaseAssetName }) else {
+            gateFailure = .missingAsset
+            return false
+        }
+        latestAssetSize = asset["size"] as? Int
         // F-1 (0.9.177): the gate passed — keep the release notes for
         // the banner / About "What's new".
         let body = (json["body"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         releaseNotes = (body?.isEmpty == false) ? body : nil
-        return assets.contains { ($0["name"] as? String) == Self.releaseAssetName }
+        return true
     }
 
     /// Close the banner for this launch.
@@ -236,7 +319,7 @@ final class UpdateChecker: ObservableObject {
     /// user; a refusal leaves its reason on this page instead of failing
     /// silently.
     func startSelfUpdate() {
-        guard selfUpdateAvailable, let latest = latestVersion, !isSelfUpdating else { return }
+        guard selfUpdateAvailable, !isSelfUpdating else { return }
         let engine = Engine.shared
         // B-1 (0.9.173): an update-all batch owns the install slot —
         // the self-update's import would be refused mid-batch; say so
@@ -249,32 +332,9 @@ final class UpdateChecker: ObservableObject {
         selfUpdateFinished = false
         isSelfUpdating = true
         selfUpdateTask = Task {
-            // Re-check the gate at tap time: still newer, still verified.
-            guard updateAssetVerified,
-                  Self.isNewer(latest, than: currentVersion) else {
-                isSelfUpdating = false
-                selfUpdateTask = nil
-                return
-            }
-            let ok = await engine.importCustomIPA(fromLink: Self.releaseDownloadURL)
-            if Task.isCancelled {
-                isSelfUpdating = false
-                selfUpdateTask = nil
-                return
-            }
-            guard ok else {
-                selfUpdateError = engine.lastError
-                isSelfUpdating = false
-                selfUpdateTask = nil
-                return
-            }
-            // B-2 (0.9.178): re-check the batch guard AFTER the import —
-            // the tap-time guard above passed, but an update-all batch
-            // may have started during the download; starting the run now
-            // would steal its slot. Say so (the tap-time reason) instead
-            // of running into it.
-            if engine.batchUpdateRunning {
-                selfUpdateError = L("全部更新进行中，等它跑完再更新。")
+            // F-1 (0.9.179): the download phase is shared with the
+            // enterprise branch (`downloadSelfUpdateIPA`).
+            guard await downloadSelfUpdateIPA() != nil else {
                 isSelfUpdating = false
                 selfUpdateTask = nil
                 return
@@ -337,6 +397,76 @@ final class UpdateChecker: ObservableObject {
             }
             isSelfUpdating = false
             selfUpdateTask = nil
+        }
+    }
+
+    /// F-1 (0.9.179): the download phase shared by the self-update's two
+    /// branches — re-checks the gate at tap time, downloads the verified
+    /// release IPA into the custom slot, and returns its staged URL.
+    /// Sets `selfUpdateError` on failure; does NOT touch
+    /// `isSelfUpdating` (the caller owns the run flag and its task).
+    func downloadSelfUpdateIPA() async -> URL? {
+        // Re-check the gate at tap time: still newer, still verified.
+        guard let latest = latestVersion,
+              updateAssetVerified,
+              Self.isNewer(latest, than: currentVersion) else { return nil }
+        let engine = Engine.shared
+        // B-1 (0.9.173): an update-all batch owns the install slot —
+        // the self-update's import would be refused mid-batch; say so
+        // instead of failing silently. `startSelfUpdate` checks this
+        // before spawning its task too; the race between the two is
+        // covered here.
+        if engine.batchUpdateRunning {
+            selfUpdateError = L("全部更新进行中，等它跑完再更新。")
+            return nil
+        }
+        let ok = await engine.importCustomIPA(fromLink: Self.releaseDownloadURL)
+        if Task.isCancelled { return nil }
+        guard ok else {
+            selfUpdateError = engine.lastError
+            return nil
+        }
+        // B-2 (0.9.178): re-check the batch guard AFTER the import —
+        // the tap-time guard above passed, but an update-all batch
+        // may have started during the download; starting the run now
+        // would steal its slot. Say so (the tap-time reason) instead
+        // of running into it.
+        if engine.batchUpdateRunning {
+            selfUpdateError = L("全部更新进行中，等它跑完再更新。")
+            return nil
+        }
+        guard let staged = IPALibrary.customImport() else {
+            selfUpdateError = engine.lastError ?? L("Import failed")
+            return nil
+        }
+        return staged.url
+    }
+
+    /// F-1 (0.9.179): the enterprise branch of the self-update choice —
+    /// downloads the verified IPA like `startSelfUpdate`, then hands its
+    /// staged URL to `onDownloaded` (the view forwards it to
+    /// `CertWorkspace`, which opens the signing page) instead of running
+    /// the Apple ID pipeline. The run flag and task are owned here, so
+    /// the pill's cancel works while the download runs.
+    func startSelfUpdateEnterprise(onDownloaded: @escaping @MainActor (URL) -> Void) {
+        guard selfUpdateAvailable, !isSelfUpdating else { return }
+        let engine = Engine.shared
+        if engine.batchUpdateRunning {
+            selfUpdateError = L("全部更新进行中，等它跑完再更新。")
+            return
+        }
+        selfUpdateError = nil
+        selfUpdateFinished = false
+        isSelfUpdating = true
+        selfUpdateTask = Task {
+            guard let url = await downloadSelfUpdateIPA() else {
+                isSelfUpdating = false
+                selfUpdateTask = nil
+                return
+            }
+            isSelfUpdating = false
+            selfUpdateTask = nil
+            await onDownloaded(url)
         }
     }
 

@@ -8,6 +8,9 @@ struct AboutView: View {
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
     @EnvironmentObject private var updateChecker: UpdateChecker
+    /// F-1 (0.9.179): the enterprise branch of the self-update hands its
+    /// downloaded IPA to the signing page through this workspace.
+    @EnvironmentObject private var certWorkspace: CertWorkspace
     // F-1 (0.9.176): the self-update's state lives on `updateChecker`
     // now, shared with the Install tab's banner — this view only reads
     // it (see `versionPillText` / `updateCheckDetail`). The progress
@@ -26,6 +29,10 @@ struct AboutView: View {
     @State private var updateCheckStatus: UpdateChecker.CheckResult?
     /// F-2 (0.9.178): true while the full release-notes sheet is up.
     @State private var showingReleaseNotes = false
+    /// F-1 (0.9.179): true while the certificate choice sheet is up —
+    /// a verified update doesn't install straight away any more, the
+    /// user picks enterprise or Apple ID signing first.
+    @State private var showingSigningChoice = false
 
     var body: some View {
         NavigationStack {
@@ -46,6 +53,12 @@ struct AboutView: View {
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showCrypto) { CryptoDonationsView() }
             .sheet(isPresented: $showReport) { ReportProblemView() }
+            .sheet(isPresented: $showingSigningChoice) {
+                CertificateChoiceSheet(
+                    onChoose: { showingSigningChoice = false; chooseSelfUpdateIdentity($0, updateChecker: updateChecker, certWorkspace: certWorkspace) },
+                    onCancel: { showingSigningChoice = false }
+                )
+            }
         }
     }
 
@@ -82,6 +95,11 @@ struct AboutView: View {
         if updateChecker.isSelfUpdating { return L("Installing — tap to cancel") }
         if let progress = updateChecker.selfUpdateProgressText { return progress }
         if updateChecker.selfUpdateAvailable, let latest = updateChecker.latestVersion {
+            // F-3 (0.9.179): "Update to 0.9.179 · 28 MB" — the verified
+            // release IPA's size, when the gate recorded it.
+            if let size = updateChecker.latestAssetSize {
+                return L("Update to %@ · %@", latest, CZFFormattedSize.size(size))
+            }
             return L("Update to %@", latest)
         }
         if isCheckingUpdate { return L("Checking for updates…") }
@@ -102,12 +120,14 @@ struct AboutView: View {
     /// next tap installs it. While a self-update runs the row cancels it
     /// instead (B-2, 0.9.164) — the install itself keeps going on the
     /// Install page; only the watching stops.
+    /// F-1 (0.9.179): a verified update no longer installs straight
+    /// away — the certificate choice sheet comes first.
     private func versionRowTapped() {
         if updateChecker.isSelfUpdating {
             updateChecker.cancelSelfUpdate()
             return
         }
-        if updateChecker.selfUpdateAvailable { updateChecker.startSelfUpdate(); return }
+        if updateChecker.selfUpdateAvailable { showingSigningChoice = true; return }
         runUpdateCheck()
     }
 
@@ -181,6 +201,13 @@ struct AboutView: View {
             // B-1 (0.9.177): txt 已新、门控未过 — the same sentence the
             // Install banner shows; the update itself stays unoffered
             // until the release verifies.
+            // B-1 (0.9.179): a gate that failed on the network says so —
+            // the release-is-still-publishing sentence is only for a
+            // gate that failed on the release itself (wrong tag /
+            // missing asset).
+            if updateChecker.pendingReleaseNetworkFailed {
+                return L("Couldn't check for updates. Check your connection and try again.")
+            }
             return L("SideInstaller %@ is still being published — try again later.", latest)
         case .failed:
             return L("Couldn't check for updates. Check your connection and try again.")

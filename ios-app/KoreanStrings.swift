@@ -1750,4 +1750,10 @@ let koreanStrings: [String: String] = [
     "从未巡检": "실행한 적 없음",
     "上次自动续签：%@": "마지막 자동 갱신: %@",
 
+    // 0.9.179
+    "Choose how to sign": "서명 방법 선택",
+    "Enterprise signing keeps the Bundle ID unchanged.": "기업 인증서 서명은 Bundle ID를 변경하지 않습니다.",
+    "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "Apple ID 서명은 Bundle ID를 “원본 ID.팀 ID”로 변경하므로 두 번째 아이콘으로 설치됩니다.",
+    "Update to %@ · %@": "%@ · %@(으)로 업데이트",
+
 ]

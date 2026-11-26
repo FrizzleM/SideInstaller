@@ -70,7 +70,9 @@ struct EnterpriseCertView: View {
     // 待签 IPA 与修改项
     @State private var selectedIPA: URL?
     /// SIDE-53：签名方式，默认企业证书（现有行为一字不动）。
-    @State private var signIdentity: CZFSignIdentity = .enterprise
+    /// B-2 (0.9.179): 上次用的方式——进页即从 UserDefaults 恢复，
+    /// 改了就写回（下面 onChange），跨页面跨启动都保留。
+    @State private var signIdentity: CZFSignIdentity = CZFSignIdentity.stored
     @State private var mods = CertSignMods()
     @State private var showIPAPicker = false
     @State private var showLibraryPicker = false
@@ -194,6 +196,11 @@ struct EnterpriseCertView: View {
         }
         .onChange(of: workspace.selectedIPA) { _, shared in
             if let shared {
+                // B-2 (0.9.179): a handoff may have stored a new last
+                // choice (F-2 share-in while this page is already open)
+                // — re-read it; otherwise the page keeps the old
+                // identity even though the choice said otherwise.
+                signIdentity = CZFSignIdentity.stored
                 select(shared)
                 workspace.selectedIPA = nil
             }
@@ -1049,7 +1056,11 @@ struct EnterpriseCertView: View {
                 }
                 .pickerStyle(.segmented)
             }
-            .onChange(of: signIdentity) { _, _ in signBlockedMessage = nil }
+            .onChange(of: signIdentity) { _, new in
+                // B-2 (0.9.179): 记住这次用的签名方式，下次进页恢复。
+                new.store()
+                signBlockedMessage = nil
+            }
             if let url = selectedIPA {
                 PanelCard {
                     selectedIPASummary(url)
@@ -2523,12 +2534,6 @@ struct EnterpriseCertView: View {
 }
 
 /// 签名流程两种去向：仅签名存已签名，或签名后走配对安装。
-/// SIDE-53：签名方式——企业证书（现有行为）或 Apple ID（一键安装）。
-private enum CZFSignIdentity: String {
-    case enterprise
-    case appleID
-}
-
 private enum CertSignKind {
     case signOnly
     case signAndInstall

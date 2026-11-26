@@ -6,6 +6,9 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @Environment(Engine.self) private var engine
     @EnvironmentObject private var updateChecker: UpdateChecker
+    /// F-1 (0.9.179): the enterprise branch of the self-update hands its
+    /// downloaded IPA to the signing page through this workspace.
+    @EnvironmentObject private var certWorkspace: CertWorkspace
     /// Dismisses this full-screen cover; P0 (0.9.152) uses it for the Back
     /// button — leaving the page never cancels the run.
     @Environment(\.dismiss) private var dismiss
@@ -42,6 +45,10 @@ struct ContentView: View {
     @State private var checkTask: Task<Void, Never>?
     /// F-2 (0.9.178): true while the full release-notes sheet is up.
     @State private var showingReleaseNotes = false
+    /// F-1 (0.9.179): true while the certificate choice sheet is up —
+    /// a verified update doesn't install straight away any more, the
+    /// user picks enterprise or Apple ID signing first.
+    @State private var showingSigningChoice = false
     /// The tunnel was closed by hand from the pill: the holder-only
     /// auto-reconnect must not pull it back up until it comes up again.
     @State private var tunnelManualOff = false
@@ -157,6 +164,12 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showPrecheck) {
                 PrecheckSheet(onContinue: continueAfterPrecheck)
+            }
+            .sheet(isPresented: $showingSigningChoice) {
+                CertificateChoiceSheet(
+                    onChoose: { showingSigningChoice = false; chooseSelfUpdateIdentity($0, updateChecker: updateChecker, certWorkspace: certWorkspace) },
+                    onCancel: { showingSigningChoice = false }
+                )
             }
             .alert(L("LocalDevVPN 隧道"), isPresented: $showLOCStopNote) {
                 Button(L("打开 LocalDevVPN")) { engine.startLocalDevVPN() }
@@ -329,6 +342,32 @@ struct ContentView: View {
 
     // MARK: Update banner
 
+    /// B-1 (0.9.177): txt 已新、门控未过 — the banner stays up, but
+    /// the second line says the release is still being published
+    /// instead of offering an update that isn't verified yet (About's
+    /// detail line shares the same sentence).
+    /// B-1 (0.9.179): a gate that failed on the network says so —
+    /// the release-is-still-publishing sentence is only for a gate
+    /// that failed on the release itself (wrong tag / missing asset).
+    private var updateBannerDetail: String {
+        if updateChecker.pendingReleaseNetworkFailed {
+            return L("Couldn't check for updates. Check your connection and try again.")
+        }
+        if updateChecker.pendingRelease {
+            return L("SideInstaller %@ is still being published — try again later.",
+                     updateChecker.latestVersion ?? "")
+        }
+        return L("SideInstaller %@ is available — you're on %@.",
+                 updateChecker.latestVersion ?? "", updateChecker.currentVersion)
+    }
+
+    /// F-3 (0.9.179): "Update now · 28 MB" — the verified release IPA's
+    /// size, when the gate recorded it; plain "Update now" when it didn't.
+    private var updateNowText: String {
+        guard let size = updateChecker.latestAssetSize else { return L("Update now") }
+        return L("Update now") + " · " + CZFFormattedSize.size(size)
+    }
+
     /// Notice shown when GitHub advertises a newer version than this build.
     private var updateBanner: some View {
         PanelCard {
@@ -340,16 +379,7 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(L("Update available"))
                             .font(.subheadline.weight(.medium))
-                        // B-1 (0.9.177): txt 已新、门控未过 — the banner
-                        // stays up, but the second line says the release
-                        // is still being published instead of offering an
-                        // update that isn't verified yet (About's detail
-                        // line shares the same sentence).
-                        Text(updateChecker.pendingRelease
-                             ? L("SideInstaller %@ is still being published — try again later.",
-                                 updateChecker.latestVersion ?? "")
-                             : L("SideInstaller %@ is available — you're on %@.",
-                                 updateChecker.latestVersion ?? "", updateChecker.currentVersion))
+                        Text(updateBannerDetail)
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -383,7 +413,9 @@ struct ContentView: View {
                     // F-1 (0.9.178): the release is still being published —
                     // re-run the check from here instead of sending the
                     // user to About → Check for updates. A second tap
-                    // while one is in flight cancels it; the banner itself
+                    // while one is in flight cancels it (B-3, 0.9.179:
+                    // no `.disabled` any more — AboutView's runUpdateCheck
+                    // 同款, which never had one); the banner itself
                     // reports the outcome, so nothing is stored here.
                     if updateChecker.pendingRelease {
                         Button {
@@ -394,7 +426,6 @@ struct ContentView: View {
                                 .foregroundStyle(Theme.accent)
                         }
                         .buttonStyle(.plain)
-                        .disabled(isCheckingUpdate)
                     }
                     // F-1 (0.9.176): 一键自更新——About 页 `startSelfUpdate`
                     // 同一条管线（0.9.143 搁置的一键选项至今没补），状态
@@ -403,17 +434,19 @@ struct ContentView: View {
                     // 显示进度、点它取消；被拒的原因写在下面一行。本轮
                     // UI 打磨：更新按钮做成实心 pill，与链接并排，不再
                     // 只有一行弱链接。
+                    // F-1 (0.9.179): 点它不再直装——先弹证书选择（企业证书 /
+                    // Apple ID），与 About 的版本 pill 同款。
                     if updateChecker.selfUpdateAvailable || updateChecker.isSelfUpdating {
                         Button {
                             if updateChecker.isSelfUpdating {
                                 updateChecker.cancelSelfUpdate()
                             } else {
-                                updateChecker.startSelfUpdate()
+                                showingSigningChoice = true
                             }
                         } label: {
                             Text(updateChecker.isSelfUpdating
                                  ? (updateChecker.selfUpdateProgressText ?? L("Installing — tap to cancel"))
-                                 : L("Update now"))
+                                 : updateNowText)
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 12)
