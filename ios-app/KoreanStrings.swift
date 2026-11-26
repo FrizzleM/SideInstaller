@@ -574,6 +574,7 @@ let koreanStrings: [String: String] = [
     "Needs LocalDevVPN on their iPhone": "상대방 iPhone에 LocalDevVPN 필요",
     "Couldn't download %@: %@": "%@을(를) 다운로드할 수 없습니다: %@",
     "Couldn't find %@ in Downloads. Download it again first.": "다운로드에서 %@을(를) 찾을 수 없습니다. 먼저 다시 다운로드하세요.",
+    "The IPA for %@ in Downloads is a different clone. Its bundle ID doesn't match this history entry. Download this clone's IPA first.": "다운로드에 있는 %@ IPA는 다른 클론입니다. 번들 ID가 이 기록과 일치하지 않습니다. 먼저 이 클론의 IPA를 다운로드하세요.",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "상대방 iPhone에는 이미 무료 Apple ID로 서명된 앱이 3개 있습니다. 만료된 앱을 포함해 iOS가 허용하는 최대치입니다. 상대방이 하나를 삭제한 뒤 다시 시도하세요.",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":

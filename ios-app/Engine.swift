@@ -2440,22 +2440,70 @@ final class Engine {
     /// by bundle ID first — two same-name clones (multi-open) share a
     /// name but never an ID. The recorded ID is the signed one:
     /// personal-ID signing appends `.<teamID>` to the installed ID
-    /// (AppInfo 同款注释）, so a candidate IPA matches when its ID is
-    /// the recorded one or the recorded one is its ID plus that suffix;
-    /// enterprise signing rewrites nothing, so the exact match covers
-    /// it. A recorded ID with no bundle-ID match returns nil — falling
-    /// back to name matching here could reinstall the wrong clone,
-    /// which is the bug this fixes. Entries with no bundle ID (written
-    /// before 0.9.168, or failed runs that never reached signing) keep
-    /// the old name matching, behaviour unchanged.
+    /// (AppInfo 同款注释）, so a candidate IPA matches when it is the
+    /// recorded ID itself, or the recorded ID is its ID plus that one
+    /// team suffix — `ProfileMatcher.installed` encodes exactly that
+    /// (the suffix after the base ID must be one 10-character team ID,
+    /// upper-case letters and digits only). A clone segment (`.2`) is
+    /// not a team suffix, so a clone row never matches the original
+    /// IPA and an original row never matches a clone IPA: the old
+    /// two-way `hasPrefix` did both, silently reinstalling the wrong
+    /// clone (B-1, 0.9.169). Enterprise signing rewrites nothing, so
+    /// the exact match covers it. A recorded ID with no bundle-ID
+    /// match returns nil — falling back to name matching here could
+    /// reinstall the wrong clone, which is the bug this fixes. Entries
+    /// with no bundle ID (written before 0.9.168, or failed runs that
+    /// never reached signing) keep the old name matching, behaviour
+    /// unchanged.
     @MainActor
     func historyIPAURL(for entry: InstallHistoryEntry) -> URL? {
+        let candidates = historyCandidates(for: entry)
+        if let wanted = entry.bundleID, !wanted.isEmpty {
+            let byID = candidates.filter { candidate in
+                guard let id = candidate.bundleID else { return false }
+                return ProfileMatcher.installed(wanted, isBuiltFrom: id, teamID: nil)
+            }
+            return byID.sorted(by: { a, b in
+                if a.rank != b.rank { return a.rank < b.rank }
+                return a.modified > b.modified
+            }).first?.url
+        }
+        return candidates.sorted(by: { a, b in
+            if a.rank != b.rank { return a.rank < b.rank }
+            return a.modified > b.modified
+        }).first?.url
+    }
+
+    /// B-1 (0.9.169): why `historyIPAURL` returned nil for an entry
+    /// that recorded a bundle ID — true when Downloads holds a
+    /// same-name IPA but none whose bundle ID matches the recorded
+    /// one, i.e. the library copy is another clone (multi-open), not
+    /// a missing download. False when there is no same-name IPA at
+    /// all, or the entry recorded no bundle ID.
+    @MainActor
+    func historyMissIsCloneMismatch(for entry: InstallHistoryEntry) -> Bool {
+        guard let wanted = entry.bundleID, !wanted.isEmpty else { return false }
+        // Only a candidate with a readable bundle ID can be called a
+        // mismatch: an IPA that won't parse (nil ID) is neither a match
+        // nor another clone, so it falls back to the generic prompt.
+        var sawID = false
+        for candidate in historyCandidates(for: entry) {
+            guard let id = candidate.bundleID else { continue }
+            sawID = true
+            if ProfileMatcher.installed(wanted, isBuiltFrom: id, teamID: nil) { return false }
+        }
+        return sawID
+    }
+
+    /// The name-matched IPA candidates `historyIPAURL` chooses from:
+    /// the library scan (known builds + the custom import) plus any
+    /// unrecognized IPA in Documents, whose filename is the only name
+    /// a hand-saved custom IPA has. Each candidate carries the bundle
+    /// ID its IPA declares (nil when it won't parse). Empty when the
+    /// entry has no app name — `historyIPAURL` then returns nil.
+    private func historyCandidates(for entry: InstallHistoryEntry) -> [(url: URL, modified: Date, rank: Int, bundleID: String?)] {
         let needle = entry.appName.lowercased()
-        guard !needle.isEmpty else { return nil }
-        // Candidates: the library scan (known builds + the custom import)
-        // plus any unrecognized IPA in Documents, whose filename is the
-        // only name a hand-saved custom IPA has. Each candidate carries
-        // the bundle ID its IPA declares (nil when it won't parse).
+        guard !needle.isEmpty else { return [] }
         var candidates: [(url: URL, modified: Date, rank: Int, bundleID: String?)] = []
         for item in IPALibrary.scan() {
             if let rank = Self.historyMatchRank(fileStem: item.url.deletingPathExtension().lastPathComponent.lowercased(),
@@ -2472,20 +2520,7 @@ final class Engine {
                 candidates.append((url, modified, rank, IPALibrary.appInfo(at: url)?.bundleID))
             }
         }
-        if let wanted = entry.bundleID, !wanted.isEmpty {
-            let byID = candidates.filter { candidate in
-                guard let id = candidate.bundleID else { return false }
-                return id == wanted || wanted.hasPrefix(id + ".") || id.hasPrefix(wanted + ".")
-            }
-            return byID.sorted(by: { a, b in
-                if a.rank != b.rank { return a.rank < b.rank }
-                return a.modified > b.modified
-            }).first?.url
-        }
-        return candidates.sorted(by: { a, b in
-            if a.rank != b.rank { return a.rank < b.rank }
-            return a.modified > b.modified
-        }).first?.url
+        return candidates
     }
 
     /// F1 (0.9.148): reinstall a history entry — find the newest IPA in the
@@ -2500,7 +2535,14 @@ final class Engine {
     @MainActor
     func reinstallFromHistory(_ entry: InstallHistoryEntry) async -> Bool {
         guard let matchURL = historyIPAURL(for: entry) else {
-            lastError = L("Couldn't find %@ in Downloads. Download it again first.", entry.appName)
+            // B-1 (0.9.169): say which it is — no same-name IPA at all,
+            // or the library copy is another clone (same name, different
+            // bundle ID), so re-downloading the same file won't help.
+            if historyMissIsCloneMismatch(for: entry) {
+                lastError = L("The IPA for %@ in Downloads is a different clone. Its bundle ID doesn't match this history entry. Download this clone's IPA first.", entry.appName)
+            } else {
+                lastError = L("Couldn't find %@ in Downloads. Download it again first.", entry.appName)
+            }
             log("⛔️ History reinstall: no IPA for \(entry.appName) in Downloads.")
             return false
         }

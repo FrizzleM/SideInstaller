@@ -37,6 +37,12 @@ private struct HistoryExportFile: Transferable {
             if !entry.success, let reason = entry.failureReason, !reason.isEmpty {
                 line += ": \(reason)"
             }
+            // F-2 (0.9.169): the Bundle ID, so two same-name clones
+            // (multi-open) stay distinguishable in the export — the row
+            // and the search show it since 0.9.168, the export dropped it.
+            if let bundleID = entry.bundleID, !bundleID.isEmpty {
+                line += " — \(bundleID)"
+            }
             lines.append(line)
         }
         return lines.joined(separator: "\n")
@@ -269,7 +275,13 @@ struct InstallHistoryView: View {
     /// on. No matching IPA means a notice, never a silent no-op.
     private func locate(_ entry: InstallHistoryEntry) {
         guard let url = engine.historyIPAURL(for: entry) else {
-            notice = L("Couldn't find %@ in Downloads. Download it again first.", entry.appName)
+            // B-1 (0.9.169): `reinstallFromHistory` 同款区分——库里没
+            // 有同名 IPA，和库里的同名 IPA 是另一个分身，是两回事。
+            if engine.historyMissIsCloneMismatch(for: entry) {
+                notice = L("The IPA for %@ in Downloads is a different clone. Its bundle ID doesn't match this history entry. Download this clone's IPA first.", entry.appName)
+            } else {
+                notice = L("Couldn't find %@ in Downloads. Download it again first.", entry.appName)
+            }
             return
         }
         NotificationCenter.default.post(name: Engine.revealDownload, object: nil,

@@ -573,6 +573,7 @@ let japaneseStrings: [String: String] = [
     "Needs LocalDevVPN on their iPhone": "相手の iPhone に LocalDevVPN が必要",
     "Couldn't download %@: %@": "%@ をダウンロードできませんでした：%@",
     "Couldn't find %@ in Downloads. Download it again first.": "ダウンロードに %@ が見つかりません。まずもう一度ダウンロードしてください。",
+    "The IPA for %@ in Downloads is a different clone. Its bundle ID doesn't match this history entry. Download this clone's IPA first.": "ダウンロードにある %@ の IPA は別のクローンです。バンドル ID がこの履歴と一致しません。まずこのクローンの IPA をダウンロードしてください。",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "相手の iPhone には、無料 Apple ID で署名されたアプリがすでに 3 つあります（期限切れのものも含む）。これが iOS の上限です。1 つ削除してもらってから、もう一度お試しください。",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":

@@ -573,7 +573,9 @@ final class LANTransferServer: ObservableObject {
         let relDir = file.deletingLastPathComponent().path
             .replacingOccurrences(of: root.path, with: "")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        if relDir == "Signed",
+        // B-3 (0.9.169): subtree, like `LocalFileItem.isInSignedDir` —
+        // a signed IPA in Signed/<subfolder>/ is a Signed record too.
+        if relDir == "Signed" || relDir.hasPrefix("Signed/"),
            let record = SignedIPAStore.load().first(where: { SignedIPAStore.url(for: $0) == file }) {
             SignedIPAStore.remove(record)
             return true

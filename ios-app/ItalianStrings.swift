@@ -650,6 +650,7 @@ let italianStrings: [String: String] = [
     "Needs LocalDevVPN on their iPhone": "Serve LocalDevVPN sul loro iPhone",
     "Couldn't download %@: %@": "Impossibile scaricare %@: %@",
     "Couldn't find %@ in Downloads. Download it again first.": "Non trovo %@ in Download. Scaricalo di nuovo prima.",
+    "The IPA for %@ in Downloads is a different clone. Its bundle ID doesn't match this history entry. Download this clone's IPA first.": "L'IPA di %@ in Download è un altro clone. Il suo bundle ID non corrisponde a questa voce della cronologia. Scarica prima l'IPA di questo clone.",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "Il loro iPhone ha già tre app firmate con un Apple ID gratuito, il massimo consentito da iOS, contando anche quelle scadute. Devono eliminarne una, poi puoi riprovare.",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":

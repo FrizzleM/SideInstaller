@@ -651,6 +651,7 @@ let vietnameseStrings: [String: String] = [
     "Needs LocalDevVPN on their iPhone": "Cần LocalDevVPN trên iPhone của họ",
     "Couldn't download %@: %@": "Không tải được %@: %@",
     "Couldn't find %@ in Downloads. Download it again first.": "Không tìm thấy %@ trong Tải xuống. Hãy tải lại trước.",
+    "The IPA for %@ in Downloads is a different clone. Its bundle ID doesn't match this history entry. Download this clone's IPA first.": "IPA của %@ trong Tải về là một bản sao khác. ID gói của nó không khớp với mục lịch sử này. Hãy tải IPA của bản sao này trước.",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "iPhone của họ đã có ba ứng dụng được ký bằng Apple ID miễn phí, mức tối đa iOS cho phép, tính cả ứng dụng đã hết hạn. Họ cần xóa một ứng dụng, rồi bạn có thể thử lại.",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":

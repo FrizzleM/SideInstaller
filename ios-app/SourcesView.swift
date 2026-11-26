@@ -572,7 +572,10 @@ struct SourceAppsView: View {
         let q = appSearchText.trimmingCharacters(in: .whitespaces).lowercased()
         var list = source.apps
         if !q.isEmpty {
-            list = list.filter { ($0.name ?? "").lowercased().contains(q) }
+            // F-1 (0.9.169): a pasted Bundle ID matches too — the history
+            // (0.9.168) and Files (0.9.168) searches already match on ID,
+            // this one only matched the name, so a pasted ID found nothing.
+            list = list.filter { ($0.name ?? "").lowercased().contains(q) || ($0.bundleIdentifier ?? "").lowercased().contains(q) }
         }
         switch appSort {
         case .default:
@@ -939,6 +942,12 @@ struct SourceAppsView: View {
         updateAllTask = Task { @MainActor in
             var succeeded = 0
             var failed: [(name: String, error: String)] = []
+            // B-2 (0.9.169): the user declining a downgrade is a skip,
+            // not a failure — the Files batch (`FilesTabView`) and
+            // history Reinstall all (`InstallHistoryView`) already count
+            // `outcome.declined` apart; update-all was the third site
+            // 0.9.166 B-3 missed.
+            var skipped = 0
             var stopped = false
             // F-G (0.9.156): one prompt for the whole batch, with the total
             // size when every app states one — not one prompt per item.
@@ -971,7 +980,9 @@ struct SourceAppsView: View {
                     let file = try await downloader.download(from: url)
                     states[app.id] = nil
                     let outcome = await engine.installOneCustomIPA(file)
-                    if let error = outcome.error {
+                    if outcome.declined {
+                        skipped += 1
+                    } else if let error = outcome.error {
                         failed.append((name, error))
                         stopped = outcome.stopped
                     } else {
@@ -992,10 +1003,11 @@ struct SourceAppsView: View {
                 states[app.id] = nil
             }
             // 没跑到的各项：停批的原因同样记一条，不静默丢掉
-            // （installSelection 同款）。
-            if failed.count + succeeded < targets.count {
+            // （installSelection 同款）。已跑的项 = 成功 + 失败 + 跳过
+            // （拒绝降级），三桶都算上，填补才不会把已跳过的项再记一遍。
+            if failed.count + succeeded + skipped < targets.count {
                 let reason = failed.last?.error ?? L("Install stopped")
-                for app in targets[(failed.count + succeeded)...] {
+                for app in targets[(failed.count + succeeded + skipped)...] {
                     failed.append((app.name ?? app.bundleIdentifier ?? "", reason))
                 }
             }
@@ -1017,6 +1029,11 @@ struct SourceAppsView: View {
                     list += "、" + L("等 %d 个", failed.count - 5)
                 }
                 updateAllSummary = L("全部更新完成：成功 %d 个，失败 %d 个。失败：%@", succeeded, failed.count, list)
+            }
+            // B-2 (0.9.169)：拒绝降级的项单独报数（失败桶里已不含它们），
+            // 文件页批量安装同款后置句式。
+            if skipped > 0 {
+                updateAllSummary += " " + L("其中 %d 个因拒绝降级而跳过。", skipped)
             }
             showingUpdateAllSummary = true
         }

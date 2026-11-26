@@ -1362,7 +1362,7 @@ struct FilesTabView: View {
     private func detailSheetContent(item: LocalFileItem,
                                     renewalByPath: [String: RenewalSourceEntry],
                                     renewalByBundleID: [String: RenewalSourceEntry]) -> some View {
-        FileDetailSheet(item: item, ipaInfo: fileIPAInfo[item.url.path], renewalAppName: renewalSource(for: item, byPath: renewalByPath, byBundleID: renewalByBundleID)?.appName, onDelete: {
+        FileDetailSheet(item: item, ipaInfo: fileIPAInfo[item.url.path], renewalAppName: renewalSource(for: item, byPath: renewalByPath, byBundleID: renewalByBundleID)?.appName, expiresAt: signedRecords.first(where: { SignedIPAStore.url(for: $0) == item.url })?.expiresAt, onDelete: {
             detailItem = nil
             // B-1（fileActionButtons 同例）：sheet 正在收起，确认弹窗
             // 推迟一轮 runloop 再立，免得被收起中的 sheet 吞掉。
@@ -3657,6 +3657,10 @@ private struct FileDetailSheet: View {
     var ipaInfo: IPALibrary.AppInfo? = nil
     /// 是续签源时传 App 名（nil = 不是续签用的文件）。
     var renewalAppName: String? = nil
+    /// F-3 (0.9.169): the signing certificate's expiry, read off the
+    /// Signed record by the caller (nil = unsigned IPA, or an old record
+    /// with no expiry — the row stays hidden either way).
+    var expiresAt: Date? = nil
     var onDelete: () -> Void
     var onRename: () -> Void
     var onMove: () -> Void
@@ -3677,6 +3681,26 @@ private struct FileDetailSheet: View {
     /// The IPA metadata to show: the caller's parse first, the sheet's own
     /// background parse once it lands.
     private var shownIPAInfo: IPALibrary.AppInfo? { ipaInfo ?? parsedInfo }
+
+    /// F-3 (0.9.169): remaining days, natural-day aligned — the same
+    /// algorithm as `FilesTabView.remainingDays` and
+    /// `EnterpriseCertView.remainingDays` (S7): "1 = tomorrow", the
+    /// expiry day itself counts 0.
+    private func remainingDays(to expiration: Date) -> Int {
+        let calendar = Calendar.current
+        return calendar.dateComponents([.day],
+            from: calendar.startOfDay(for: Date()),
+            to: calendar.startOfDay(for: expiration)).day ?? 0
+    }
+
+    /// F-3 (0.9.169): the days suffix for the expiry row —
+    /// `EnterpriseCertView.remainingText` 同款 key、同一套算法。
+    private func remainingText(_ expiration: Date) -> String {
+        let days = remainingDays(to: expiration)
+        if days < 0 { return L(" (expired)") }
+        if days == 0 { return L("（今天到期）") }
+        return L("（剩 %d 天）", days)
+    }
 
     var body: some View {
         NavigationStack {
@@ -3704,6 +3728,13 @@ private struct FileDetailSheet: View {
                 }
                 if let renewalAppName {
                     detailRow(L("续签用的应用"), renewalAppName)
+                }
+                // F-3 (0.9.169): the signing certificate's expiry — the
+                // list row only shows "剩 N 天", the exact date lives here.
+                // `expiresAt` is nil for unsigned IPAs, so this row never
+                // appears for them.
+                if let expiresAt {
+                    detailRow(L("证书到期日"), expiresAt.formatted(date: .abbreviated, time: .omitted) + remainingText(expiresAt))
                 }
                 // F-3 (0.9.163): the IPA's SHA-256, so a download can be
                 // checked for completeness or tampering before installing.

@@ -481,6 +481,7 @@ let turkishStrings: [String: String] = [
     "Couldn't download %@: %@":
         "%@ indirilemedi: %@",
     "Couldn't find %@ in Downloads. Download it again first.": "İndirilenler'de %@ bulunamadı. Önce yeniden indirin.",
+    "The IPA for %@ in Downloads is a different clone. Its bundle ID doesn't match this history entry. Download this clone's IPA first.": "İndirilenler'deki %@ IPA'sı farklı bir klon. Paket kimliği bu kayıtla eşleşmiyor. Önce bu klonun IPA'sını indirin.",
     "Do this on their iPhone, then start.":
         "Bunu onların iPhone'unda yap, sonra başlat.",
     "Finish on their iPhone":

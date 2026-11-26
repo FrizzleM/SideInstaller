@@ -657,6 +657,7 @@ let chineseStrings: [String: String] = [
     "Needs LocalDevVPN on their iPhone": "对方的 iPhone 需要 LocalDevVPN",
     "Couldn't download %@: %@": "无法下载 %@：%@",
     "Couldn't find %@ in Downloads. Download it again first.": "在“下载”里找不到 %@。请先重新下载它。",
+    "The IPA for %@ in Downloads is a different clone. Its bundle ID doesn't match this history entry. Download this clone's IPA first.": "“下载”里 %@ 的 IPA 是另一个分身，它的 Bundle ID 与这条历史记录不符。请先下载这个分身的 IPA。",
     "Their iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. They need to delete one, then you can try again.":
         "对方的 iPhone 上已有三个用免费 Apple ID 签名的 App（已过期的也算），这是 iOS 允许的上限。请对方先删除一个，然后再试。",
     "%@ is on their iPhone, but its pairing file couldn't be added (%@). Run Side by Side again, or import a pairing file in %@.":
