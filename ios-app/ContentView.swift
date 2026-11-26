@@ -352,17 +352,51 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain, sound: .dismiss)
                 }
-                Button {
-                    if let url = URL(string: UpdateChecker.installPageURL) { openURL(url) }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(L("Get the latest version"))
-                        Image(systemName: "arrow.up.right")
+                HStack(spacing: 12) {
+                    Button {
+                        if let url = URL(string: UpdateChecker.installPageURL) { openURL(url) }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(L("Get the latest version"))
+                            Image(systemName: "arrow.up.right")
+                        }
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(Theme.accent)
                     }
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Theme.accent)
+                    .buttonStyle(.plain)
+                    // F-1 (0.9.176): 一键自更新——About 页 `startSelfUpdate`
+                    // 同一条管线（0.9.143 搁置的一键选项至今没补），状态
+                    // 已抽到 `UpdateChecker` 共享处，横幅上直接跑。只在
+                    // 已验证有新版时出现（未验证仍只留网页链接）；跑着时
+                    // 显示进度、点它取消；被拒的原因写在下面一行。本轮
+                    // UI 打磨：更新按钮做成实心 pill，与链接并排，不再
+                    // 只有一行弱链接。
+                    if updateChecker.selfUpdateAvailable || updateChecker.isSelfUpdating {
+                        Button {
+                            if updateChecker.isSelfUpdating {
+                                updateChecker.cancelSelfUpdate()
+                            } else {
+                                updateChecker.startSelfUpdate()
+                            }
+                        } label: {
+                            Text(updateChecker.isSelfUpdating
+                                 ? (updateChecker.selfUpdateProgressText ?? L("Installing — tap to cancel"))
+                                 : L("Update now"))
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(Theme.accent))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.plain)
+                if let error = updateChecker.selfUpdateError {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.negative)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -431,7 +465,7 @@ struct ContentView: View {
             .animation(.smooth(duration: 0.28), value: engine.installSource)
             .animation(.smooth(duration: 0.28), value: engine.stableReleased)
         }
-        .disabled(engine.isRunning)
+        .disabled(engine.isRunning || engine.batchUpdateRunning)
         // Madeira offers Stable only once its first stable release is out.
         .task(id: engine.installSource) { await engine.checkStableRelease(for: engine.installSource) }
     }

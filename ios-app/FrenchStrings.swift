@@ -1594,6 +1594,7 @@ let frenchStrings: [String: String] = [
         "Une mise à jour de toutes les apps est en cours. Attendez qu'elle se termine avant de réinstaller.",
     "全部更新进行中，等它跑完再重试。":
         "Une mise à jour de toutes les apps est en cours. Attendez qu'elle se termine avant de réessayer.",
+    "全部更新进行中，等它跑完再续签。": "Une mise à jour de toutes les apps est en cours. Attendez qu'elle se termine avant de renouveler.",
     "An update-all batch is running. Wait for it to finish, then try again.":
         "Une mise à jour de toutes les apps est en cours. Attendez qu'elle se termine, puis réessayez.",
     "全部更新进行中，等它跑完再更新。":
@@ -1607,6 +1608,7 @@ let frenchStrings: [String: String] = [
         "%d sources",
     "Update to %@":
         "Mettre à jour vers %@",
+    "Update now": "Mettre à jour maintenant",
     "Install %@ %@?":
         "Installer %@ %@ ?",
     "Version %@ · from %@":

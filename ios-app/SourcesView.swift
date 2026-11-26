@@ -229,6 +229,18 @@ struct SourcesView: View {
     }
 }
 
+/// What one app's row is doing — shared by the single-source page
+/// (`SourceAppsView.states`, keyed by app id) and the cross-source page
+/// (`AppSourcesView.crossStates`, keyed by listing id). F-2 (0.9.176): moved
+/// out of `SourceAppsView` unchanged — single-source behaviour untouched.
+enum RowState: Equatable {
+    case downloading
+    /// F-1 (0.9.163): tapped while another download runs — the
+    /// downloader queues it, and the row shows this until its turn.
+    case queued
+    case failed(String)
+}
+
 /// One source's apps, each with an Install button that downloads the IPA and
 /// hands it to the one-click pipeline on the main screen.
 struct SourceAppsView: View {
@@ -310,15 +322,6 @@ struct SourceAppsView: View {
     /// `SourceStore.contentDidChange` post in the same swipe action
     /// (RootView's recount wiring).
     @State private var ignoredVersionNonce = 0
-
-    /// What one app's row is doing.
-    private enum RowState: Equatable {
-        case downloading
-        /// F-1 (0.9.163): tapped while another download runs — the
-        /// downloader queues it, and the row shows this until its turn.
-        case queued
-        case failed(String)
-    }
 
     /// F-1 (0.9.163): what the row shows — the downloader's live state
     /// wins over the tap-time state: a queued tap becomes "downloading"
@@ -409,7 +412,7 @@ struct SourceAppsView: View {
                             // section, one at a time (see startUpdateAll).
                             Button(L("全部更新")) { startUpdateAll() }
                                 .font(.subheadline)
-                                .disabled(updateAllTask != nil || activeID != nil || engine.isRunning || engine.batchUpdateRunning)
+                                .disabled(updateAllTask != nil || activeID != nil || engine.isRunning || engine.batchUpdateRunning || appsManager.isRefreshing)
                         }
                     }
                 }
@@ -1032,8 +1035,13 @@ struct SourceAppsView: View {
         // pre-filter and same cellular prompt, not a second simplified
         // path. Nil means a fresh run over the Updates section.
         let candidates = retryTargets ?? updateApps
+        // B-3 (0.9.176): 续签跑着时点“全部更新”，每项先下完几百 MB
+        // 再在导入守卫（`importCustomIPA` 的 `isRefreshing` 拒路）
+        // 上失败。入口先拦，与 `isRunning` / `batchUpdateRunning`
+        // 同款静默 return（本函数历来静默）；按钮下方的 disabled
+        // 同步加 `isRefreshing`。
         guard updateAllTask == nil, !candidates.isEmpty, activeID == nil, !engine.isRunning,
-              !engine.batchUpdateRunning else { return }
+              !engine.batchUpdateRunning, !appsManager.isRefreshing else { return }
         // B-2 (0.9.168): `startInstall` 同款最低 iOS 前置检查——0.9.167
         // 只堵了单装两路，全部更新是第三路：不符项整包下完才在后置守卫
         // 被拒，白占一个下载位。事前滤出：不符项不进 targets、不占蜂窝
@@ -2157,6 +2165,12 @@ struct AppSourcesView: View {
     /// going — SourceAppsView's batch state 同款，only over listings
     /// from every source instead of one source's apps.
     @State private var updateAllTask: Task<Void, Never>?
+    /// F-2 (0.9.176): the cross-source batch's row states, keyed by
+    /// listing id (SourceAppsView's `states` 同款，keyed by app id) —
+    /// `.queued` up front (“等待中”), `.downloading` on the current
+    /// item, cleared per item and in bulk at the end. Only the Updates
+    /// rows read it; the Apps rows keep no state.
+    @State private var crossStates: [String: RowState] = [:]
     @State private var updateAllIndex = 0
     @State private var updateAllTotal = 0
     @State private var updateAllCurrent: String?
@@ -2525,7 +2539,7 @@ struct AppSourcesView: View {
                     Spacer()
                     Button(L("全部更新")) { startUpdateAllAcrossSources() }
                         .font(.subheadline)
-                        .disabled(updateAllTask != nil || engine.isRunning || engine.batchUpdateRunning)
+                        .disabled(updateAllTask != nil || engine.isRunning || engine.batchUpdateRunning || appsManager.isRefreshing)
                 }
                 .padding(.bottom, 8)
                 if updateAllTask != nil {
@@ -2545,7 +2559,7 @@ struct AppSourcesView: View {
                             .font(.footnote)
                     }
                 }
-                listingRows(listings)
+                listingRows(listings, states: crossStates)
             }
         }
     }
@@ -2553,13 +2567,16 @@ struct AppSourcesView: View {
     /// F-1 (0.9.171): the rows of a section, shared by `section` and
     /// `updatesSection` so the cross-source header doesn't duplicate
     /// the row (with its ignore long-press menu).
-    private func listingRows(_ listings: [SourceListing]) -> some View {
+    /// F-2 (0.9.176): `states` carries the batch state per listing id —
+    /// only `updatesSection` passes it; `section` leaves it nil and
+    /// its rows keep no state.
+    private func listingRows(_ listings: [SourceListing], states: [String: RowState]? = nil) -> some View {
         ForEach(Array(listings.enumerated()), id: \.element.id) { index, listing in
             if index > 0 { Divider().overlay(Theme.hairline) }
             NavigationLink {
                 SourceAppView(listing: listing, manager: manager)
             } label: {
-                SourceAppRow(listing: listing)
+                SourceAppRow(listing: listing, state: states?[listing.id])
             }
             .buttonStyle(.plain, sound: .tick)
             // F-1 (0.9.170): this section lives in a ScrollView, not
@@ -2595,8 +2612,11 @@ struct AppSourcesView: View {
         // from the summary alert — the same loop below, not a second
         // simplified path. Nil means a fresh run over the Updates section.
         let targets = retryListings ?? listings.filter(\.hasUpdate)
+        // B-3 (0.9.176): 单源批跑同款——续签跑着时不另起跨源批跑，
+        // 不然每项先下完再在导入守卫上失败。静默 return（本函数
+        // 历来静默）；按钮下方的 disabled 同步加 `isRefreshing`。
         guard updateAllTask == nil, !targets.isEmpty, !engine.isRunning,
-              !engine.batchUpdateRunning else { return }
+              !engine.batchUpdateRunning, !appsManager.isRefreshing else { return }
         // B-2 (0.9.168) 同款：最低 iOS 事前过滤——不符项不进
         // targets、不占蜂窝总量、不占下载位；汇总里按源分组说明
         // 哪款、为什么跳过（与失败行同一格式列出）。
@@ -2656,6 +2676,13 @@ struct AppSourcesView: View {
                     return
                 }
             }
+            // F-2 (0.9.176): every target waits its turn from here —
+            // mark them all `.queued` up front, so the Updates rows read
+            // “等待中” (single-source F-3, 0.9.175 同款）. The current
+            // item flips to `.downloading` below; the loop tail clears
+            // each item it touches, and the blanket clear after the loop
+            // covers items the run never reached.
+            for listing in runnable { crossStates[listing.id] = .queued }
             for (offset, listing) in runnable.enumerated() {
                 if Task.isCancelled { cancelled = true; break }
                 if stopped { break }
@@ -2676,6 +2703,7 @@ struct AppSourcesView: View {
                     failedListings.append(listing)
                     continue
                 }
+                crossStates[listing.id] = .downloading
                 let url = latest.downloadURL
                 do {
                     updateAllCurrentURL = url
@@ -2714,7 +2742,15 @@ struct AppSourcesView: View {
                 // F-2 (0.9.174): 单源批跑同款——下载抛错也没清掉的
                 // URL 在这里清，不然 Skip 一直亮着、点它误跳下一项。
                 updateAllCurrentURL = nil
+                crossStates[listing.id] = nil
             }
+            // F-2 (0.9.176): clear the `.queued` marks set above — the
+            // loop tail already cleared every item it touched, but items
+            // the run never reached (Skip between items, a stop, a
+            // cancel) still carry `.queued`; without this their rows
+            // would read “等待中” forever after the batch ends
+            // (single-source F-3, 0.9.175 同款）.
+            for listing in runnable { crossStates[listing.id] = nil }
             // 没跑到的各项：停批的原因同样记一条，不静默丢掉
             // （单源版同款）。已跑的项 = 成功 + 失败 + 跳过
             // （拒绝降级）+ 用户跳过，四桶都算上，填补才不会把已跳过
@@ -3011,6 +3047,10 @@ struct SourceRowsCard: View {
 /// tag when the source has a newer one than the iPhone.
 private struct SourceAppRow: View {
     let listing: SourceListing
+    /// F-2 (0.9.176): the cross-source batch's state for this row, if
+    /// any — only the Updates section passes one; the Apps section
+    /// leaves it nil and the row looks exactly as before.
+    var state: RowState? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -3029,6 +3069,12 @@ private struct SourceAppRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
+            if let state {
+                Text(stateText(state))
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+                    .lineLimit(1)
+            }
             if listing.hasUpdate {
                 Tag(text: L("Update"), color: Theme.warning)
             } else if listing.installedVersion != nil {
@@ -3048,6 +3094,16 @@ private struct SourceAppRow: View {
             return "\(installed) → \(latest)"
         }
         return latest
+    }
+
+    /// F-2 (0.9.176): the batch state's one-line text — the single-source
+    /// row's wording (`installControl` 同款：`.queued` 读“等待中”）.
+    private func stateText(_ state: RowState) -> String {
+        switch state {
+        case .queued: return L("Waiting")
+        case .downloading: return L("Downloading")
+        case .failed(let message): return message
+        }
     }
 }
 

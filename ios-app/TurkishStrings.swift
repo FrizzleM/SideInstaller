@@ -1506,6 +1506,7 @@ let turkishStrings: [String: String] = [
         "Tüm uygulamalar güncelleniyor. Yeniden kurmadan önce bitmesini bekleyin.",
     "全部更新进行中，等它跑完再重试。":
         "Tüm uygulamalar güncelleniyor. Yeniden denemeden önce bitmesini bekleyin.",
+    "全部更新进行中，等它跑完再续签。": "Tüm uygulamalar güncelleniyor. Yenilemeden önce bitmesini bekleyin.",
     "An update-all batch is running. Wait for it to finish, then try again.":
         "Tüm uygulamalar güncelleniyor. Bitmesini bekleyin, sonra yeniden deneyin.",
     "全部更新进行中，等它跑完再更新。":
@@ -1518,6 +1519,7 @@ let turkishStrings: [String: String] = [
         "%d kaynak",
     "Update to %@":
         "%@ sürümüne güncelle",
+    "Update now": "Şimdi güncelle",
     "Install %@ %@?":
         "%@ %@ yüklensin mi?",
     "Version %@ · from %@":

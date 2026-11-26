@@ -99,7 +99,11 @@ final class AutoRefreshService {
         let manager = SideloadedAppsManager.shared
         let engine = Engine.shared
         guard isEnabled else { return true }
-        guard !manager.isRefreshing, !engine.isRunning else { return false }
+        // B-3 (0.9.176): 批跑下载间隙 `isRunning` 也是 false——巡检
+        // 放行会起跑续签、占住隧道，批跑后续项逐个撞
+        // `guard !isRefreshing` 失败。返回 false（瞬时阻挡，与
+        // 安装进行中同款），后台唤醒据此 finish(false)。
+        guard !manager.isRefreshing, !engine.isRunning, !engine.batchUpdateRunning else { return false }
 
         // 来源去重：上一轮巡检 10 分钟内跑过就静默跳过。BG 唤醒、
         // 30 分钟循环、回前台三路撞在一起时，只留一轮干活。

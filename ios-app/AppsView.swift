@@ -680,6 +680,18 @@ final class SideloadedAppsManager: ObservableObject {
             engine.log("Refresh all: install already running.")
             return
         }
+        // B-3 (0.9.176): 批跑下载间隙 `isRunning` 也是 false——只查
+        // 上面那道会放行，续签起跑占住隧道，批跑后续项逐个撞
+        // `guard !isRefreshing` 失败。分流照 C3/C27：界面入口置
+        // lastError，快捷指令/自动巡检入口只写日志。只加入口守卫，
+        // 不改续签对象、团队过滤与第二道闸（铁律不管“何时起跑”）。
+        guard !engine.batchUpdateRunning else {
+            if showsFailure {
+                lastError = L("全部更新进行中，等它跑完再续签。")
+            }
+            engine.log("Refresh all: update-all batch already running.")
+            return
+        }
         // B-38-B2（对称口）：导入进行中不点全部续签——rebuildRefreshable
         // 可能读到正在被 replaceCustomImport 清空的 Custom/。分流照 C3/C27：
         // 界面入口置 lastError，快捷指令/自动巡检入口只写日志。
@@ -1507,7 +1519,7 @@ struct AppsView: View {
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(manager.refreshable.isEmpty || manager.isRefreshing || manager.isWorking)
+                .disabled(manager.refreshable.isEmpty || manager.isRefreshing || manager.isWorking || engine.batchUpdateRunning)
                 // Only the install step reports progress.
                 if manager.isRefreshing, engine.installProgress > 0, engine.installProgress < 1 {
                     ProgressView(value: engine.installProgress)

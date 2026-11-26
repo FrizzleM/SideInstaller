@@ -1585,6 +1585,7 @@ let vietnameseStrings: [String: String] = [
     "全部更新进行中，等它跑完再重装。":
         "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi mới cài đặt lại.",
     "全部更新进行中，等它跑完再重试。": "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi mới thử lại.",
+    "全部更新进行中，等它跑完再续签。": "Đang cập nhật tất cả ứng dụng. Vui lòng đợi xong rồi mới gia hạn.",
     "An update-all batch is running. Wait for it to finish, then try again.":
         "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi thử lại.",
     "全部更新进行中，等它跑完再更新。":
@@ -1597,6 +1598,7 @@ let vietnameseStrings: [String: String] = [
         "%d nguồn",
     "Update to %@":
         "Cập nhật lên %@",
+    "Update now": "Cập nhật ngay",
     "Install %@ %@?":
         "Cài %@ %@?",
     "Version %@ · from %@":

@@ -177,6 +177,16 @@ struct InstallHistoryView: View {
                         Label(L("Show in Downloads"), systemImage: "magnifyingglass")
                     }
                     .tint(Theme.accent)
+                    // F-3 (0.9.176): delete just this record — no
+                    // confirmation, it deletes the history line, not
+                    // the app. The in-memory list drops with the store
+                    // so the row vanishes at once.
+                    Button(role: .destructive) {
+                        InstallHistoryStore.remove(id: entry.id)
+                        entries.removeAll { $0.id == entry.id }
+                    } label: {
+                        Label(L("Delete"), systemImage: "trash")
+                    }
                 }
                 .contextMenu {
                     Button {

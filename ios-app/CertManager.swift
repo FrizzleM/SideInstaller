@@ -377,8 +377,18 @@ final class CertManager: ObservableObject {
                 // follows the new list — the old date must not linger.
                 DevCertExpiryNotifier.reschedule(certs: certs)
                 if retryInstall {
-                    engine.log("Retrying the install with \(name).")
-                    engine.runOneClick()
+                    // B-2 (0.9.176): 证书重试导入后重跑安装——批跑下载
+                    // 间隙 `isRunning` 也是 false，`runOneClick` 会
+                    // 直接起跑、抢占安装槽，批跑下一项导入被拒、全批
+                    // 报废。证书本身已导入成功，只拦重跑这一路，原因
+                    // 写本页的 `lastError`。
+                    if engine.batchUpdateRunning {
+                        lastError = L("全部更新进行中，等它跑完再安装。")
+                        engine.log("⛔️ Certificates: retry install refused — an update-all batch is running.")
+                    } else {
+                        engine.log("Retrying the install with \(name).")
+                        engine.runOneClick()
+                    }
                 } else if lastError == nil {
                     lastSuccess = result.replacedKey
                         ? L("SideInstaller signs with “%@” from now on. Nothing was revoked, so the apps already signed with it keep working.", name)

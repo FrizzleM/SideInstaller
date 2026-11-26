@@ -108,6 +108,17 @@ enum InstallHistoryStore {
         save(entries)
     }
 
+    /// F-3 (0.9.176): drop one entry by id — the row's swipe deletes
+    /// the record, not the app, so no confirmation (the Clear-all
+    /// alert stays for the whole list).
+    static func remove(id: UUID) {
+        logLock.lock()
+        defer { logLock.unlock() }
+        var entries = load()
+        entries.removeAll { $0.id == id }
+        save(entries)
+    }
+
     /// F3 (0.9.148): empty the history (`LogStore.clear` 同款：只清列表，
     /// 已装的 App 不受影响）。
     static func clear() {

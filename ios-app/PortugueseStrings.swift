@@ -1579,6 +1579,7 @@ let portugueseStrings: [String: String] = [
         "Uma atualização de todos os apps está em andamento. Aguarde terminar antes de reinstalar.",
     "全部更新进行中，等它跑完再重试。":
         "Uma atualização de todos os apps está em andamento. Aguarde terminar antes de tentar novamente.",
+    "全部更新进行中，等它跑完再续签。": "Uma atualização de todos os apps está em andamento. Aguarde terminar antes de renovar.",
     "An update-all batch is running. Wait for it to finish, then try again.":
         "Uma atualização de todos os apps está em andamento. Aguarde terminar e tente novamente.",
     "全部更新进行中，等它跑完再更新。":
@@ -1592,6 +1593,7 @@ let portugueseStrings: [String: String] = [
         "%d fontes",
     "Update to %@":
         "Atualizar para %@",
+    "Update now": "Atualizar agora",
     "Install %@ %@?":
         "Instalar %@ %@?",
     "Version %@ · from %@":

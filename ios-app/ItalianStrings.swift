@@ -1588,6 +1588,7 @@ let italianStrings: [String: String] = [
         "È in corso l'aggiornamento di tutte le app. Attendi che finisca prima di reinstallare.",
     "全部更新进行中，等它跑完再重试。":
         "È in corso l'aggiornamento di tutte le app. Attendi che finisca prima di riprovare.",
+    "全部更新进行中，等它跑完再续签。": "È in corso l'aggiornamento di tutte le app. Attendi che finisca prima di rinnovare.",
     "An update-all batch is running. Wait for it to finish, then try again.":
         "È in corso l'aggiornamento di tutte le app. Attendi che finisca, poi riprova.",
     "全部更新进行中，等它跑完再更新。":
@@ -1601,6 +1602,7 @@ let italianStrings: [String: String] = [
         "%d sorgenti",
     "Update to %@":
         "Aggiorna a %@",
+    "Update now": "Aggiorna ora",
     "Install %@ %@?":
         "Installare %@ %@?",
     "Version %@ · from %@":

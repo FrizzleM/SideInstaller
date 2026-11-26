@@ -131,6 +131,153 @@ final class UpdateChecker: ObservableObject {
     /// Close the banner for this launch.
     func dismiss() { showBanner = false }
 
+    // MARK: - Self-update
+
+    /// F-1 (0.9.176): the self-update's state lives here now, not in
+    /// `AboutView` — the Install tab's update banner runs the same
+    /// pipeline from the same state (one run, one progress line, one
+    /// error), and the About row only reads it. Moved verbatim from
+    /// `AboutView.startSelfUpdate` (0.9.148–0.9.173); `engine` there
+    /// was the shared instance too.
+    /// True from the update tap until its run ends (or it fails to start).
+    @Published var isSelfUpdating = false
+    /// Set once this launch's self-update installed: the row goes back to
+    /// static text instead of offering the same version again.
+    @Published var selfUpdateFinished = false
+    /// Why the last self-update didn't start, shown under "Check for updates".
+    @Published var selfUpdateError: String?
+    /// The in-flight self-update, so its state survives redraws.
+    private var selfUpdateTask: Task<Void, Never>?
+    /// B-2 (0.9.164): how long the self-update wait runs before giving up
+    /// on watching it — the install itself keeps going on the Install page.
+    private static let selfUpdateWaitTimeout: TimeInterval = 600
+
+    /// True when a newer version is confirmed AND its release asset is
+    /// verified: the only state in which the version row (or the banner)
+    /// installs anything. Independent of the Install tab's banner —
+    /// dismissing that must not hide the update here. Never true after
+    /// this launch's self-update already installed.
+    var selfUpdateAvailable: Bool {
+        guard !selfUpdateFinished, let latest = latestVersion else { return false }
+        return Self.isNewer(latest, than: currentVersion) && updateAssetVerified
+    }
+
+    /// What the self-update is doing: the download percent, or "Installing"
+    /// once the run starts. Nil when no self-update is running.
+    var selfUpdateProgressText: String? {
+        guard isSelfUpdating else { return nil }
+        let engine = Engine.shared
+        if engine.isRunning { return L("Installing") }
+        return L("Downloading… %d%%", Int((engine.importProgress ?? 0) * 100))
+    }
+
+    /// While a self-update runs the row (or the banner) cancels it instead
+    /// (B-2, 0.9.164) — the install itself keeps going on the Install
+    /// page; only the watching stops.
+    func cancelSelfUpdate() {
+        selfUpdateTask?.cancel()
+    }
+
+    /// Downloads the verified release IPA into the custom slot and runs the
+    /// one-click pipeline on it (reinstallFromHistory 同款，0.9.148):
+    /// no separate self-update path. The Install sheet comes forward
+    /// (F4 同款 sharedIPAReady) so the run's progress is in front of the
+    /// user; a refusal leaves its reason on this page instead of failing
+    /// silently.
+    func startSelfUpdate() {
+        guard selfUpdateAvailable, let latest = latestVersion, !isSelfUpdating else { return }
+        let engine = Engine.shared
+        // B-1 (0.9.173): an update-all batch owns the install slot —
+        // the self-update's import would be refused mid-batch; say so
+        // instead of failing silently.
+        if engine.batchUpdateRunning {
+            selfUpdateError = L("全部更新进行中，等它跑完再更新。")
+            return
+        }
+        selfUpdateError = nil
+        selfUpdateFinished = false
+        isSelfUpdating = true
+        selfUpdateTask = Task {
+            // Re-check the gate at tap time: still newer, still verified.
+            guard updateAssetVerified,
+                  Self.isNewer(latest, than: currentVersion) else {
+                isSelfUpdating = false
+                selfUpdateTask = nil
+                return
+            }
+            let ok = await engine.importCustomIPA(fromLink: Self.releaseDownloadURL)
+            if Task.isCancelled {
+                isSelfUpdating = false
+                selfUpdateTask = nil
+                return
+            }
+            guard ok else {
+                selfUpdateError = engine.lastError
+                isSelfUpdating = false
+                selfUpdateTask = nil
+                return
+            }
+            // B-39-B2 同款 (0.9.148): the source is only switched once the
+            // import really landed, so a refused import can't retarget a
+            // pipeline that's already running.
+            engine.installSource = .custom
+            engine.runOneClick()
+            // Shortcuts.install 同款：等管线起跑再认成功；起不来时把原因
+            // 留在检查行里，不静默、不开空的安装页。
+            var waited = 0.0
+            while !engine.isRunning, !Task.isCancelled, waited < 3.0 {
+                try? await Task.sleep(for: .milliseconds(100))
+                waited += 0.1
+            }
+            if Task.isCancelled {
+                isSelfUpdating = false
+                selfUpdateTask = nil
+                return
+            }
+            if engine.isRunning {
+                engine.sharedIPAReady = true
+                // Wait the run out so the row doesn't offer the same update
+                // again while it installs; the floating Install pill carries
+                // the progress meanwhile.
+                // B-2 (0.9.164): bounded — the run can hang in
+                // `ensureNetwork` (Wi-Fi drops mid-run) or on an
+                // unanswered 2FA prompt, and the old loop had no timeout
+                // and the row refused taps while it ran, so the page sat
+                // on "Installing" forever. Ten minutes, then stop watching:
+                // the install itself keeps going on the Install page.
+                var waited = 0.0
+                while engine.isRunning, !Task.isCancelled, waited < Self.selfUpdateWaitTimeout {
+                    try? await Task.sleep(for: .seconds(1))
+                    waited += 1
+                }
+                if Task.isCancelled {
+                    isSelfUpdating = false
+                    selfUpdateTask = nil
+                    return
+                }
+                if waited >= Self.selfUpdateWaitTimeout, engine.isRunning {
+                    selfUpdateError = L("Still installing — check the Install page for progress.")
+                    isSelfUpdating = false
+                    selfUpdateTask = nil
+                    return
+                }
+                if engine.finished {
+                    selfUpdateFinished = true
+                }
+            } else if let guide = engine.guide {
+                // B-2 (0.9.163): 向导优先于 lastError——runOneClick 入口
+                // 已清掉上一跑的 lastError/guide，剩下的向导就是这次
+                // 起跑守卫拦住的真原因（没账号/没配对文件），不再先报
+                // lastError 里的上一跑旧错。
+                selfUpdateError = guide.title
+            } else if let error = engine.lastError {
+                selfUpdateError = error
+            }
+            isSelfUpdating = false
+            selfUpdateTask = nil
+        }
+    }
+
     /// Compare dotted versions numerically, so "0.10.0" > "0.9.0". Anything
     /// after a "-" (e.g. "-beta.1") is ignored.
     nonisolated static func isNewer(_ lhs: String, than rhs: String) -> Bool {

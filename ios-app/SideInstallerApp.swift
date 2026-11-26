@@ -158,6 +158,16 @@ struct SideInstallerApp: App {
                         // 这里的 wasRunning 分支已不可达——删掉，导入成功就直接起管线。
                         // 管线自己的 guards 会在缺证书/配对/WiFi 时停下并给出指引，
                         // 与点安装按钮同一套。
+                        // B-2 (0.9.176): 批跑下载间隙 `isRunning` 也是
+                        // false——只查上面那道会放行，导入成功后
+                        // runOneClick 立即起跑、抢占安装槽，批跑下一项
+                        // 导入被拒、全批报废。入口先拦，原因写
+                        // `engine.lastError`（安装页弹）。
+                        guard !engine.batchUpdateRunning else {
+                            engine.lastError = L("全部更新进行中，等它跑完再安装。")
+                            engine.log("⛔️ Share: \(engine.lastError ?? "")")
+                            return
+                        }
                         guard await engine.importCustomIPA(from: url) else { return }
                         if IPALibrary.customImport() != nil {
                             // 先跳安装页：管线在跑时进度在那一页，guard 停下时

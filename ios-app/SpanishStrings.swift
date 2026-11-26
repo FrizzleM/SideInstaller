@@ -1591,6 +1591,7 @@ let spanishStrings: [String: String] = [
         "Hay una actualización de todas las apps en curso. Espera a que termine antes de reinstalar.",
     "全部更新进行中，等它跑完再重试。":
         "Hay una actualización de todas las apps en curso. Espera a que termine antes de reintentarlo.",
+    "全部更新进行中，等它跑完再续签。": "Hay una actualización de todas las apps en curso. Espera a que termine antes de renovar.",
     "An update-all batch is running. Wait for it to finish, then try again.":
         "Hay una actualización de todas las apps en curso. Espera a que termine y vuelve a intentarlo.",
     "全部更新进行中，等它跑完再更新。":
@@ -1604,6 +1605,7 @@ let spanishStrings: [String: String] = [
         "%d fuentes",
     "Update to %@":
         "Actualizar a %@",
+    "Update now": "Actualizar ahora",
     "Install %@ %@?":
         "¿Instalar %@ %@?",
     "Version %@ · from %@":

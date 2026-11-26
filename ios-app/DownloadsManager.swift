@@ -395,6 +395,10 @@ struct DownloadsListView: View {
     @State private var installingID: String?
     /// F-3 (0.9.171): the failed-download retry in flight, if any.
     @State private var retryTask: Task<Void, Never>?
+    /// B-1 (0.9.176): the failed row whose retry has downloaded and is
+    /// waiting for the install slot (an install or a batch in its gap) —
+    /// its row reads “等待中” meanwhile (single-source `.queued` 同款）.
+    @State private var waitingRetryURL: URL?
     /// F-1 (0.9.174): the retry-all run in flight, if any — the header
     /// button turns into Cancel while it runs, and cancelling stops
     /// after the current item instead of starting the next one.
@@ -651,6 +655,19 @@ struct DownloadsListView: View {
                                         .font(.caption)
                                         .foregroundStyle(Theme.negative)
                                         .lineLimit(2)
+                                    // B-1 (0.9.176): the retry has landed
+                                    // and is waiting for the install slot —
+                                    // say so on the row instead of leaving
+                                    // the old error up while nothing
+                                    // visibly happens.
+                                    if waitingRetryURL == failed.url {
+                                        HStack(spacing: 6) {
+                                            ProgressView().controlSize(.small)
+                                            Text(L("Waiting"))
+                                                .font(.caption)
+                                                .foregroundStyle(Theme.muted)
+                                        }
+                                    }
                                     HStack(spacing: 12) {
                                         Button(L("Try again")) { retryFailedDownload(failed) }
                                             .font(.caption)
@@ -1009,6 +1026,18 @@ struct DownloadsListView: View {
         guard await engine.confirmCellularDownload(size: nil, what: failed.name) else { return false }
         do {
             let file = try await downloader.download(from: failed.url)
+            // B-1 (0.9.176): `startInstall` 同款 wait 循环——下载落地
+            // 时不等在途安装，直接撞 `importCustomIPA` 的 `guard
+            // !isRunning` 被拒，且拒掉那路会调 `discardInboxCopy`
+            // 把刚下好的几百 MB 删掉（再重试从零重下）；更糟是批跑
+            // 下载间隙落地会偷走批跑的槽。等的同时行上标“等待中”
+            // （`waitingRetryURL`，上面）；取消即返。
+            waitingRetryURL = failed.url
+            while engine.isRunning || engine.batchUpdateRunning, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+            waitingRetryURL = nil
+            guard !Task.isCancelled else { return true }
             let outcome = await engine.installOneCustomIPA(file)
             if let error = outcome.error, !outcome.declined {
                 manager.lastError = error

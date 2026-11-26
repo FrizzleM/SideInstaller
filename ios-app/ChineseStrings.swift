@@ -1563,6 +1563,7 @@ let chineseStrings: [String: String] = [
     "全部更新进行中，等它跑完再批量安装。": "全部更新进行中，等它跑完再批量安装。",
     "全部更新进行中，等它跑完再重装。": "全部更新进行中，等它跑完再重装。",
     "全部更新进行中，等它跑完再重试。": "全部更新进行中，等它跑完再重试。",
+    "全部更新进行中，等它跑完再续签。": "全部更新进行中，等它跑完再续签。",
     "An update-all batch is running. Wait for it to finish, then try again.":
         "全部更新进行中，等它跑完再试。",
     "全部更新进行中，等它跑完再更新。": "全部更新进行中，等它跑完再更新。",
@@ -1574,6 +1575,7 @@ let chineseStrings: [String: String] = [
         "%d 个源",
     "Update to %@":
         "更新到 %@",
+    "Update now": "立即更新",
     "Install %@ %@?":
         "安装 %@ %@？",
     "Version %@ · from %@":

@@ -4975,7 +4975,10 @@ final class Engine {
         case .invalid(let message):
             log("⛔️ Link: \(message)")
             // A run's own popups come first; the log keeps the reason.
-            if isRunning {
+            // B-2 (0.9.176): a batch in its download gap counts the
+            // same — `isRunning` alone lets the message land while the
+            // batch's next item fails and takes it for its own reason.
+            if isRunning || batchUpdateRunning {
                 // B1 (0.9.152): parked until the run ends, then shown with
                 // the finished popups — it used to vanish into the log.
                 pendingInvalidLinkMessage = message
@@ -5015,6 +5018,17 @@ final class Engine {
         lastError = nil
         switch link {
         case .install(let url):
+            // B-2 (0.9.176): an update-all batch owns the install slot —
+            // its download gaps leave `isRunning` false, so this link's
+            // download would land mid-batch and steal the slot (the
+            // `startLinkImport` entry 同款，`answerLink` 是漏网的）。
+            // Refuse up front with a reason instead of starting a
+            // download that ends in a refused import.
+            guard !batchUpdateRunning else {
+                lastError = L("全部更新进行中，等它跑完再安装。")
+                log("⛔️ Link: \(lastError ?? "")")
+                return
+            }
             Task {
                 // C12：只凭这次导入的返回值起管线——进行中被跳过时
                 // importCustomIPA 已置 lastError，旧 IPA 不会再被
