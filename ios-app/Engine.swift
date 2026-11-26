@@ -2433,6 +2433,21 @@ final class Engine {
             return false
         }
         guard await importCustomIPA(from: matchURL) else { return false }
+        // B-1 (0.9.162): installOneCustomIPA 同款起跑前 guard — import
+        // 期间另一路安装可能已起跑：这时 runOneClick 会因 isRunning 静默
+        // 返回，而下面的等待循环会把别人的跑当成自己的等完、再拿它的
+        // 成败当本次结果。守卫必须在 installSource = .custom 之前——
+        // 别先改源再拦，管线中途读 installSource，改了就可能串源。
+        // 两道检查到 runOneClick 之间没有 suspension 点，主 actor 上
+        // 是原子的，拦完不可能再有人插进来。
+        if Task.isCancelled {
+            lastError = L("Install stopped")
+            return false
+        }
+        guard !isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            return false
+        }
         // B-39-B2 同款：源赋值移到导入成功之后——导入被拒时在途管线
         // 读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
         installSource = .custom

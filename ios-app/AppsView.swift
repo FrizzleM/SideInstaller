@@ -121,6 +121,10 @@ struct SideloadedApp: Identifiable, Equatable {
     /// `TEAMID.bundle.id` from the app's signed entitlements. When missing,
     /// profile matching falls back to the bundle ID.
     let applicationIdentifier: String?
+    /// F-1 (0.9.162): the app's first URL scheme, from `CFBundleURLTypes`
+    /// — the detail page's Open button uses it. Nil when the app
+    /// declares no scheme, so no button shows.
+    let urlScheme: String?
 
     var id: String { bundleID }
 
@@ -139,6 +143,13 @@ struct SideloadedApp: Identifiable, Equatable {
         self.name = display?.isEmpty == false ? display! : (bundleName?.isEmpty == false ? bundleName! : bundleID)
         self.version = plist["CFBundleShortVersionString"] as? String
         self.applicationIdentifier = entitlements?["application-identifier"] as? String
+        // F-1 (0.9.162): `CFBundleURLTypes` is an array of dictionaries,
+        // each with a `CFBundleURLSchemes` array — the first non-empty
+        // scheme is the one the Open button launches.
+        self.urlScheme = (plist["CFBundleURLTypes"] as? [[String: Any]])?
+            .compactMap { $0["CFBundleURLSchemes"] as? [String] }
+            .flatMap { $0 }
+            .first(where: { !$0.isEmpty })
     }
 
     /// Whether an app came from TestFlight: Apple signed it (only App Store and
@@ -2078,6 +2089,23 @@ private struct AppProfileDetail: View {
                 }
                 if let version = status.app.version {
                     field(L("Version"), version)
+                }
+                // F-1 (0.9.162): one-tap open through the app's own URL
+                // scheme, parsed from its plist. No scheme, no button.
+                // Not gated on canOpenURL: the scheme isn't in
+                // LSApplicationQueriesSchemes, so that answer proves
+                // nothing (importCertificate 同款） — and a scheme from
+                // the installed app itself opens.
+                if let scheme = status.app.urlScheme,
+                   let url = URL(string: "\(scheme)://") {
+                    Button {
+                        UIApplication.shared.open(url)
+                    } label: {
+                        Label(L("Open"), systemImage: "arrow.up.right")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
                 }
             }
         }

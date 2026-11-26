@@ -361,6 +361,16 @@ extension Shortcuts {
     static func install(named name: String) async throws -> String {
         let engine = Engine.shared
         let guideBefore = engine.guide
+        // B-2 (0.9.162): requireNoInstall() only ran before the import, and
+        // the import awaits — another install may have started in between
+        // (tapped in the app, or auto-refresh). Recheck at the last moment
+        // before runOneClick; no suspension point sits between the guard
+        // and the start, so nothing can slip in after it. Without this,
+        // the wait below takes someone else's run for this shortcut's and
+        // reports "%@ is installed." for an app never installed.
+        guard !engine.isRunning else {
+            throw ShortcutError(L("An install is already running. Wait for it to finish, then try again."))
+        }
         engine.runOneClick()
         // A full-tunnel VPN's probe holds the start back half a second at most.
         var waited = 0.0

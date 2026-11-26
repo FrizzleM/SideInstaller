@@ -363,6 +363,11 @@ final class DownloadsManager: ObservableObject {
 struct DownloadsListView: View {
     @Environment(Engine.self) private var engine
     @StateObject private var manager = DownloadsManager()
+    /// F-2 (0.9.162): the shared source downloader — the "Downloading"
+    /// section at the top observes its in-flight state, so a download
+    /// started on the source page stays visible here. Same instance the
+    /// source rows observe (SourcesView 同款）.
+    @StateObject private var downloader = IPADownloader.shared
     @State private var pendingDelete: DownloadedIPA?
     /// B-1 (0.9.160): the renewal-source app name for `pendingDelete`,
     /// read when the Delete button is tapped (clear-all's
@@ -423,6 +428,17 @@ struct DownloadsListView: View {
         }
     }
 
+    /// F-2 (0.9.162): the in-flight row's speed line — SourcesView's
+    /// `downloadDetailLine` 同款 minus the ETA (this row shows the
+    /// percent already; the estimate lives on the source row).
+    private var downloadDetailLine: String {
+        let speed = L("%@/s", ByteCountFormatter.string(fromByteCount: Int64(downloader.downloadSpeed), countStyle: .file))
+        if downloader.totalBytesExpected > 0 {
+            return "\(speed) • \(L("%@ of %@", ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file), ByteCountFormatter.string(fromByteCount: downloader.totalBytesExpected, countStyle: .file)))"
+        }
+        return "\(speed) • \(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file)))"
+    }
+
     /// A-39-2：下载行日期文案静态缓存——照抄 SIDE-38 A4 的
     /// ExpiryUrgency.textCache 模式；每行每 body 求值现建
     /// Date.FormatStyle 太贵。key 带今天（值本身不依赖今天，防以后
@@ -468,6 +484,63 @@ struct DownloadsListView: View {
             }
             .padding(.horizontal, 20)
             List {
+                // F-2 (0.9.162): the in-flight source download, at the top —
+                // the source page's row state is local to that page, so
+                // switching here used to hide the download entirely. The
+                // row reuses the shared downloader's pause/cancel and
+                // vanishes when the file lands (`isDownloading` falls in
+                // `finish()`); a cancel here settles the source row too
+                // (its catch treats `.cancelled` as silent).
+                if downloader.isDownloading, let name = downloader.currentName {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 8) {
+                                Text(name)
+                                    .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                                Spacer()
+                                if downloader.totalBytesExpected > 0 {
+                                    Text(L("Downloading… %d%%", Int(downloader.progress * 100)))
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.muted)
+                                        .contentTransition(.numericText())
+                                }
+                            }
+                            if downloader.totalBytesExpected > 0 {
+                                ProgressView(value: downloader.progress)
+                                    .tint(Theme.accent)
+                            } else {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                    Text(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file)))
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.muted)
+                                }
+                            }
+                            if downloader.downloadSpeed > 0 {
+                                Text(downloadDetailLine)
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.muted)
+                            }
+                            HStack(spacing: 12) {
+                                Button(downloader.isPaused ? L("Resume") : L("Pause")) {
+                                    if downloader.isPaused {
+                                        downloader.resume()
+                                    } else {
+                                        downloader.pause()
+                                    }
+                                }
+                                .font(.caption)
+                                Button(L("Cancel")) {
+                                    downloader.cancel()
+                                }
+                                .font(.caption)
+                            }
+                        }
+                    } header: {
+                        Text(L("Downloading"))
+                    }
+                }
                 if let error = manager.lastError {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)

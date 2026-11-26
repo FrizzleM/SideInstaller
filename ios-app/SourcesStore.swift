@@ -620,6 +620,15 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// the row's Pause button (`downloadTask.suspend()`).
     @Published private(set) var isPaused = false
 
+    /// F-2 (0.9.162): true while a download is in flight, and the name
+    /// the Downloads page shows for it — the staged filename, so the row
+    /// reads the same as the file that lands in Downloads. The source
+    /// page's row state is local to that page; this shared state is what
+    /// the Downloads page's "Downloading" section observes. Both fall
+    /// together in `finish()`, so the row vanishes when the file lands.
+    @Published private(set) var isDownloading = false
+    @Published private(set) var currentName: String?
+
     /// C-6：源下载的 IPA 上限 8GB——与解压总量上限（enterprise.rs）同数。
     /// 不要与源 JSON 的 10MB 共用一个常量：IPA 常规就是几十 MB 到 1GB+，
     /// 10MB 会断掉几乎全部源安装。
@@ -738,6 +747,11 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         lastSpeedBytes = 0
         lastSpeedAt = nil
         progressThrottler.reset()
+        // F-2 (0.9.162): after the cancel above — it settles the old run
+        // through finish(), which clears these — so the new run's flag
+        // can't be undone by the old run's teardown.
+        isDownloading = true
+        currentName = Engine.importFileName(for: url)
         let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
         self.session = session
         var request = URLRequest(url: url)
@@ -861,6 +875,12 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         currentTask = nil
         currentTaskID = nil
         currentURL = nil
+        // F-2 (0.9.162): the run is over — success, failure, or cancel —
+        // so the Downloads page's row goes away with it. After the guard
+        // above, so a stale callback (or a cancel with nothing running)
+        // can't clear a newer run's flag.
+        isDownloading = false
+        currentName = nil
         // F-C (0.9.156): the row goes away with the download — don't leave
         // a stale speed and estimate for the next one to show first.
         downloadSpeed = 0

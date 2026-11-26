@@ -157,6 +157,7 @@ let turkishStrings: [String: String] = [
     "SideInstaller recognizes this as %@ and sets it up just like its own download.":
         "SideInstaller bunu %@ olarak tanır ve kendi indirmesi gibi kurar.",
     "Downloading… %d%%": "İndiriliyor… %%%d",
+    "Downloading": "İndiriliyor",
     "iOS %@ required": "iOS %@ gerekli",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Bu iPhone iOS %@ çalıştırıyor; SideInstaller buna yükleme yapamaz. Ayarlar › Genel › Yazılım Güncelleme'den iOS %@ veya sonrasına güncelle.",
@@ -904,6 +905,7 @@ let turkishStrings: [String: String] = [
     "Paused": "Duraklatıldı",
     "Pause": "Duraklat",
     "Resume": "Devam et",
+    "Open": "Aç",
     "Open SideInstaller to finish the install.": "Yüklemeyi bitirmek için SideInstaller'ı aç.",
     "Check the App IDs it needs, then tap Install.": "İhtiyacı olan App ID'leri kontrol et, sonra Yükle'ye dokun.",
     "Tap Trust": "Güven'e dokun",
@@ -1528,6 +1530,7 @@ let turkishStrings: [String: String] = [
     "Couldn't reach the debugger on this iPhone: %@":
         "Bu iPhone'un hata ayıklayıcısına ulaşılamadı: %@",
     "Enable JIT": "JIT'i etkinleştir",
+    "Continue JIT for %@": "%@ için JIT'e devam et",
     "JIT is on for %@ until it quits.": "%@ için JIT, uygulama kapanana kadar açık.",
     "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
         "JIT açık. %@ çalışırken SideInstaller bağlı kalır: SideInstaller'ı arka planda bırak, çünkü kapatmak JIT'i sonlandırır.",

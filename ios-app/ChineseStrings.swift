@@ -181,6 +181,7 @@ let chineseStrings: [String: String] = [
     "SideInstaller recognizes this as %@ and sets it up just like its own download.":
         "SideInstaller 识别出这是 %@，会像它自己下载的版本一样完成设置。",
     "Downloading… %d%%": "正在下载… %d%%",
+    "Downloading": "正在下载",
     "iOS %@ required": "需要 iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "此 iPhone 运行的是 iOS %@，SideInstaller 无法在该版本上安装。请在 设置 › 通用 › 软件更新 中更新到 iOS %@ 或更高版本。",
@@ -934,6 +935,7 @@ let chineseStrings: [String: String] = [
     "Paused": "已暂停",
     "Pause": "暂停",
     "Resume": "继续",
+    "Open": "打开",
     "Open SideInstaller to finish the install.":
         "打开 SideInstaller 以完成安装。",
     "Check the App IDs it needs, then tap Install.":
@@ -1587,6 +1589,7 @@ let chineseStrings: [String: String] = [
     "Couldn't open %@ under the debugger: %@": "无法在调试器下打开 %@：%@",
     "Couldn't reach the debugger on this iPhone: %@": "无法连接此 iPhone 的调试器：%@",
     "Enable JIT": "启用 JIT",
+    "Continue JIT for %@": "继续为 %@ 开 JIT",
     "JIT is on for %@ until it quits.": "%@ 的 JIT 已开启，直到它退出。",
     "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
         "JIT 已开启。%@ 运行期间，SideInstaller 会保持附加：请让 SideInstaller 留在后台，关闭它会结束 JIT。",

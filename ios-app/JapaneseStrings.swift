@@ -180,6 +180,7 @@ let japaneseStrings: [String: String] = [
     "SideInstaller recognizes this as %@ and sets it up just like its own download.":
         "SideInstaller はこれを %@ と認識し、自分でダウンロードした場合と同じように設定します。",
     "Downloading… %d%%": "ダウンロード中… %d%%",
+    "Downloading": "ダウンロード中",
     "iOS %@ required": "iOS %@ が必要です",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "この iPhone は iOS %@ で動作しており、SideInstaller ではインストールできません。「設定 › 一般 › ソフトウェア・アップデート」から iOS %@ 以降に更新してください。",
@@ -867,6 +868,7 @@ let japaneseStrings: [String: String] = [
     "Paused": "一時停止中",
     "Pause": "一時停止",
     "Resume": "再開",
+    "Open": "開く",
     "Open SideInstaller to finish the install.":
         "インストールを完了するには SideInstaller を開いてください。",
     "Check the App IDs it needs, then tap Install.":
@@ -1575,6 +1577,7 @@ let japaneseStrings: [String: String] = [
     "Couldn't open %@ under the debugger: %@": "%@ をデバッガで開けませんでした: %@",
     "Couldn't reach the debugger on this iPhone: %@": "この iPhone のデバッガに接続できませんでした: %@",
     "Enable JIT": "JIT を有効にする",
+    "Continue JIT for %@": "%@ で JIT を続ける",
     "JIT is on for %@ until it quits.": "%@ の JIT は終了するまで有効です。",
     "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
         "JIT は有効です。%@ の実行中は SideInstaller がアタッチしたままになります。SideInstaller を閉じると JIT が終わるため、バックグラウンドに残しておいてください。",

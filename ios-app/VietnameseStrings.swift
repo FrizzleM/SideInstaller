@@ -182,6 +182,7 @@ let vietnameseStrings: [String: String] = [
     "SideInstaller recognizes this as %@ and sets it up just like its own download.":
         "SideInstaller nhận ra đây là %@ và thiết lập nó y như bản tự tải về.",
     "Downloading… %d%%": "Đang tải… %d%%",
+    "Downloading": "Đang tải xuống",
     "iOS %@ required": "Yêu cầu iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "iPhone này đang chạy iOS %@, SideInstaller không thể cài đặt trên phiên bản đó. Cập nhật lên iOS %@ trở lên trong Cài đặt › Cài đặt chung › Cập nhật phần mềm.",
@@ -950,6 +951,7 @@ let vietnameseStrings: [String: String] = [
     "Paused": "Đã tạm dừng",
     "Pause": "Tạm dừng",
     "Resume": "Tiếp tục",
+    "Open": "Mở",
     "Open SideInstaller to finish the install.":
         "Mở SideInstaller để hoàn tất cài đặt.",
     "Check the App IDs it needs, then tap Install.":
@@ -1608,6 +1610,7 @@ let vietnameseStrings: [String: String] = [
     "Couldn't reach the debugger on this iPhone: %@":
         "Không thể kết nối tới trình gỡ lỗi trên iPhone này: %@",
     "Enable JIT": "Bật JIT",
+    "Continue JIT for %@": "Tiếp tục JIT cho %@",
     "JIT is on for %@ until it quits.": "JIT đã bật cho %@ cho đến khi ứng dụng thoát.",
     "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
         "JIT đã bật. SideInstaller vẫn gắn vào trong khi %@ chạy: hãy để SideInstaller chạy nền, vì đóng nó sẽ kết thúc JIT.",

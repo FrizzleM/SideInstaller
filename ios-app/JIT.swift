@@ -990,6 +990,18 @@ final class JITManager: ObservableObject {
         UserDefaults.standard.set(modes, forKey: Self.modesKey)
     }
 
+    /// F-3 (0.9.162): the bundle ID JIT last ran for (modes 同款
+    /// UserDefaults) — the page offers it again in one tap.
+    private static let lastJITBundleIDKey = "jitLastBundleID"
+
+    /// F-3 (0.9.162): the app JIT last ran for, resolved against the
+    /// loaded list — an app that left the device offers no dead button.
+    /// Nil until the list loads, or no JIT session has ever attached.
+    var lastJITApp: JITApp? {
+        guard let bundleID = UserDefaults.standard.string(forKey: Self.lastJITBundleIDKey) else { return nil }
+        return apps.first(where: { $0.bundleID == bundleID })
+    }
+
     /// How JIT stays on for `app` here, with the mode picked for it.
     func jitProtocol(for app: JITApp) -> JITProtocol {
         JITApps.resolve(mode(for: app), appName: app.name, preparesRegions: JITDevice.preparesRegions)
@@ -1123,6 +1135,14 @@ final class JITManager: ObservableObject {
             if case .ended(let outcome) = phase {
                 end(outcome)
             } else {
+                // F-3 (0.9.162): attached means JIT is really on — this
+                // session's app is the one the page offers again next
+                // time. Earlier phases (connecting / launching /
+                // attaching) don't count: a start that dies there was
+                // never "last".
+                if phase == .attached, let app = status?.app {
+                    UserDefaults.standard.set(app.bundleID, forKey: Self.lastJITBundleIDKey)
+                }
                 status?.phase = phase
             }
         case .prepared(let bytes):

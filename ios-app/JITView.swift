@@ -16,6 +16,7 @@ struct JITView: View {
                 header.cascadeItem(0)
                 ddiProgressCard
                 sessionCard
+                lastJITCard
                 loadButton.cascadeItem(1)
                 // Errors show as a popup, which `RootView` lays over the app.
                 appList
@@ -119,6 +120,35 @@ struct JITView: View {
         case .attached, .ended:
             L("JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.",
               status.app.name)
+        }
+    }
+
+    /// F-3 (0.9.162): the app JIT last ran for, one tap to run it again.
+    /// Only while nothing is starting or attached — then the session card
+    /// already shows it — and only when the app is still on the device
+    /// (`lastJITApp` resolves against the loaded list, so a removed app
+    /// offers no dead button).
+    @ViewBuilder
+    private var lastJITCard: some View {
+        if let app = manager.lastJITApp, !manager.isBusy {
+            PanelCard {
+                Button {
+                    manager.enable(app)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "bolt.fill")
+                            .foregroundStyle(Theme.accent)
+                        Text(L("Continue JIT for %@", app.name))
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+                .buttonStyle(.plain, sound: .tap)
+            }
+            .transition(.cardAppear)
         }
     }
 

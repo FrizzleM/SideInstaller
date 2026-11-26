@@ -148,16 +148,36 @@ final class AutoRefreshService {
         let loadTask = manager.load(quiet: true) ?? manager.inFlightLoadTask
         var loadTimedOut = false
         if let loadTask {
-            let finished: Bool = await withCheckedContinuation { continuation in
-                let gate = SingleResume()
-                Task {
-                    await loadTask.value
-                    if gate.claim() { continuation.resume(returning: true) }
+            // B-3 (0.9.162): S1 (0.9.159) 同款 — a bare continuation never
+            // resumes when only the waiting task is cancelled: BG expiry
+            // cancels the work Task and stop() cancels the loop Task, so
+            // the patrol would hang until the 20 s sleep race fires and
+            // `finish(ran)` would miss the BG deadline. `onCancel`
+            // resumes through the same single-fire gate; the helpers keep
+            // their claim() shape. The gate is hoisted out of the
+            // continuation closure so `onCancel` can reach it, and the
+            // `Task.isCancelled` recheck covers an `onCancel` that fired
+            // before the continuation was stored (cancellation is sticky,
+            // so the check still sees it).
+            let gate = SingleResume()
+            let finished: Bool = await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    gate.store(continuation)
+                    if Task.isCancelled {
+                        gate.resumeStored(returning: false)
+                        return
+                    }
+                    Task {
+                        await loadTask.value
+                        if gate.claim() { continuation.resume(returning: true) }
+                    }
+                    Task {
+                        try? await Task.sleep(nanoseconds: 20 * 1_000_000_000)
+                        if gate.claim() { continuation.resume(returning: false) }
+                    }
                 }
-                Task {
-                    try? await Task.sleep(nanoseconds: 20 * 1_000_000_000)
-                    if gate.claim() { continuation.resume(returning: false) }
-                }
+            } onCancel: {
+                gate.resumeStored(returning: false)
             }
             loadTimedOut = !finished
         }
@@ -260,6 +280,34 @@ private final class SingleResume: @unchecked Sendable {
         guard !resumed else { return false }
         resumed = true
         return true
+    }
+
+    /// B-3 (0.9.162): the continuation this gate guards, so
+    /// `withTaskCancellationHandler`'s non-isolated `onCancel` can resume
+    /// the wait `tick()` is stuck in. Stored under the same lock — the
+    /// handler may run while the wait is still being set up, before the
+    /// continuation exists.
+    private var continuation: CheckedContinuation<Bool, Never>?
+    func store(_ continuation: CheckedContinuation<Bool, Never>) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.continuation = continuation
+    }
+    /// Resume the stored continuation once with `value` — first caller
+    /// wins, later ones no-op. Deliberately does NOT claim the gate when
+    /// nothing is stored yet: an `onCancel` that fires before `store`
+    /// must not eat the claim, or the `Task.isCancelled` recheck after
+    /// `store` would find the gate spent and the wait would hang until
+    /// the 20 s sleep fires.
+    func resumeStored(returning value: Bool) {
+        lock.lock()
+        guard !resumed, let continuation else {
+            lock.unlock()
+            return
+        }
+        resumed = true
+        lock.unlock()
+        continuation.resume(returning: value)
     }
 }
 

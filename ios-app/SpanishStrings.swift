@@ -183,6 +183,7 @@ let spanishStrings: [String: String] = [
     "SideInstaller recognizes this as %@ and sets it up just like its own download.":
         "SideInstaller lo reconoce como %@ y lo configura igual que si lo hubiera descargado él mismo.",
     "Downloading… %d%%": "Descargando… %d%%",
+    "Downloading": "Descargando",
     "iOS %@ required": "Se requiere iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Este iPhone tiene iOS %@, y con esa versión SideInstaller no puede instalar nada. Actualiza a iOS %@ o posterior en Ajustes › General › Actualización de software.",
@@ -954,6 +955,7 @@ let spanishStrings: [String: String] = [
     "Paused": "En pausa",
     "Pause": "Pausar",
     "Resume": "Reanudar",
+    "Open": "Abrir",
     "Open SideInstaller to finish the install.":
         "Abre SideInstaller para terminar la instalación.",
     "Check the App IDs it needs, then tap Install.":
@@ -1613,6 +1615,7 @@ let spanishStrings: [String: String] = [
     "Couldn't reach the debugger on this iPhone: %@":
         "No se pudo llegar al depurador de este iPhone: %@",
     "Enable JIT": "Activar JIT",
+    "Continue JIT for %@": "Continuar JIT para %@",
     "JIT is on for %@ until it quits.": "JIT activo para %@ hasta que se cierre.",
     "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
         "JIT activo. SideInstaller sigue adjunto mientras %@ se ejecuta: deja SideInstaller en segundo plano, porque cerrarlo termina el JIT.",

@@ -181,6 +181,7 @@ let koreanStrings: [String: String] = [
     "SideInstaller recognizes this as %@ and sets it up just like its own download.":
         "SideInstaller가 이 파일을 %@(으)로 인식하여 직접 다운로드한 경우와 똑같이 설정합니다.",
     "Downloading… %d%%": "다운로드 중… %d%%",
+    "Downloading": "다운로드 중",
     "iOS %@ required": "iOS %@ 필요",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "이 iPhone의 iOS 버전은 %@이므로 SideInstaller로 설치할 수 없습니다. 설정 › 일반 › 소프트웨어 업데이트에서 iOS %@ 이상으로 업데이트하세요.",
@@ -868,6 +869,7 @@ let koreanStrings: [String: String] = [
     "Paused": "일시 중지됨",
     "Pause": "일시 정지",
     "Resume": "계속",
+    "Open": "열기",
     "Open SideInstaller to finish the install.":
         "SideInstaller를 열어 설치를 마치세요.",
     "Check the App IDs it needs, then tap Install.":
@@ -1576,6 +1578,7 @@ let koreanStrings: [String: String] = [
     "Couldn't open %@ under the debugger: %@": "디버거로 %@ 앱을 열 수 없습니다: %@",
     "Couldn't reach the debugger on this iPhone: %@": "이 iPhone의 디버거에 연결할 수 없습니다: %@",
     "Enable JIT": "JIT 켜기",
+    "Continue JIT for %@": "%@에 JIT 계속 적용",
     "JIT is on for %@ until it quits.": "%@ 앱은 종료할 때까지 JIT가 켜져 있습니다.",
     "JIT is on. SideInstaller stays attached while %@ runs: keep SideInstaller in the background, since closing it ends JIT.":
         "JIT가 켜졌습니다. %@ 앱이 실행되는 동안 SideInstaller가 연결된 상태를 유지합니다. SideInstaller를 닫으면 JIT가 끝나므로 백그라운드에 두세요.",
