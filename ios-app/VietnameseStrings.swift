@@ -956,6 +956,9 @@ let vietnameseStrings: [String: String] = [
     "Installing %@": "Đang cài đặt %@",
     "Paused": "Đã tạm dừng",
     "Ignore this version": "Bỏ qua phiên bản này",
+    "已忽略的更新": "Bản cập nhật đã bỏ qua",
+    "没有已忽略的更新。": "Không có bản cập nhật nào bị bỏ qua.",
+    "所有已忽略的版本都将重新提示更新。": "Tất cả phiên bản đã bỏ qua sẽ lại nhắc cập nhật.",
     "Pause": "Tạm dừng",
     "Pause all": "Tạm dừng tất cả",
     "Resume": "Tiếp tục",
@@ -1665,6 +1668,7 @@ let vietnameseStrings: [String: String] = [
 
     "全部更新": "Cập nhật tất cả",
     "正在更新第 %d/%d 个：%@": "Đang cập nhật %d/%d: %@",
+    "正在读取已装 App…": "Đang đọc các app đã cài…",
     "全部更新完成：%d 个已更新。": "Cập nhật xong: đã cập nhật %d.",
     "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "Cập nhật xong: thành công %d, thất bại %d. Thất bại: %@",
     "移动": "Di chuyển",

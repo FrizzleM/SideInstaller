@@ -960,6 +960,9 @@ let spanishStrings: [String: String] = [
     "Installing %@": "Instalando %@",
     "Paused": "En pausa",
     "Ignore this version": "Ignorar esta versión",
+    "已忽略的更新": "Actualizaciones ignoradas",
+    "没有已忽略的更新。": "No hay actualizaciones ignoradas.",
+    "所有已忽略的版本都将重新提示更新。": "Todas las versiones ignoradas volverán a avisar de actualizaciones.",
     "Pause": "Pausar",
     "Pause all": "Pausar todo",
     "Resume": "Reanudar",
@@ -1670,6 +1673,7 @@ let spanishStrings: [String: String] = [
 
     "全部更新": "Actualizar todo",
     "正在更新第 %d/%d 个：%@": "Actualizando %d/%d: %@",
+    "正在读取已装 App…": "Leyendo las apps instaladas…",
     "全部更新完成：%d 个已更新。": "Actualizaciones completadas: %d actualizadas.",
     "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "Actualizaciones completadas: %d correctas y %d fallidas. Fallidas: %@",
     "移动": "Mover",

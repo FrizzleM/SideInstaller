@@ -393,6 +393,8 @@ struct DownloadsListView: View {
     @State private var renameText = ""
     /// `id` of the IPA being moved into the Install tab's custom slot, if any.
     @State private var installingID: String?
+    /// F-3 (0.9.171): the failed-download retry in flight, if any.
+    @State private var retryTask: Task<Void, Never>?
     /// Clear-all confirmation: true while the alert stands, with the
     /// renewal-source app names it must warn about (read when the button
     /// is tapped, not on every body pass).
@@ -623,6 +625,34 @@ struct DownloadsListView: View {
                             }
                         }
                     }
+                    // F-3 (0.9.171): the last source download that failed —
+                    // the source row's failure vanishes when that page
+                    // goes away, so this is where the retry lives. A
+                    // retry that lands clears the row (the downloader
+                    // drops its record on a matching success); a retry
+                    // that fails again replaces it with the new reason.
+                    if let failed = downloader.lastFailedDownload {
+                        Section {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(failed.name)
+                                    .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                                Text(failed.error)
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.negative)
+                                    .lineLimit(2)
+                                HStack(spacing: 12) {
+                                    Button(L("Try again")) { retryFailedDownload() }
+                                        .font(.caption)
+                                        .disabled(downloader.isDownloading || engine.isRunning || retryTask != nil)
+                                    Button(L("Remove")) { downloader.clearLastFailedDownload() }
+                                        .font(.caption)
+                                }
+                            }
+                        } header: {
+                            Text(L("Failed"))
+                        }
+                    }
                     if let error = manager.lastError {
                         Label(error, systemImage: "exclamationmark.triangle.fill")
                             .font(.caption)
@@ -849,6 +879,37 @@ struct DownloadsListView: View {
             Button(L("OK"), role: .cancel) { cleanupResult = nil }
         } message: {
             Text(cleanupResult ?? "")
+        }
+    }
+
+    /// F-3 (0.9.171): re-run the failed download, then install it the
+    /// way the update-all batch does — a bare re-download would strand
+    /// the file in staging with nothing to install it. The downloader's
+    /// own record clears on a landing retry; a failed retry replaces
+    /// it with the new reason, and an install failure lands on this
+    /// page's error line instead.
+    private func retryFailedDownload() {
+        guard let failed = downloader.lastFailedDownload, retryTask == nil,
+              !downloader.isDownloading, !engine.isRunning else { return }
+        retryTask = Task {
+            do {
+                // The source row's retry re-runs its install path, which
+                // asks first — this one does the same, so a big IPA over
+                // cellular doesn't re-download silently.
+                guard await engine.confirmCellularDownload(size: nil, what: failed.name) else {
+                    retryTask = nil
+                    return
+                }
+                let file = try await downloader.download(from: failed.url)
+                let outcome = await engine.installOneCustomIPA(file)
+                if let error = outcome.error, !outcome.declined {
+                    manager.lastError = error
+                }
+            } catch {
+                // A fresh failure is already the downloader's record; a
+                // cancel just drops the wait silently.
+            }
+            retryTask = nil
         }
     }
 

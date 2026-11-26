@@ -399,6 +399,12 @@ struct SourceAppsView: View {
         // P2: read the device once, so the update check below has installed
         // versions to compare against (same as the upstream Sources page).
         .task { appsManager.autoLoad() }
+        // F-2 (0.9.171): an ignored version removed in Settings redraws
+        // this page too — `hasUpdate(for:)` reads UserDefaults, which no
+        // observed object publishes.
+        .onReceive(NotificationCenter.default.publisher(for: IgnoredUpdateVersions.didChange)) { _ in
+            ignoredVersionNonce += 1
+        }
         }
         .blueTopBar()
         .navigationBarTitleDisplayMode(.inline)
@@ -1390,21 +1396,60 @@ struct SourceListing: Identifiable, Equatable {
 /// (bundle ID → version) in UserDefaults, so it survives restarts.
 /// Ignoring silences the badge and the Updates row for exactly that
 /// version; a newer version later is a different key, so the ignore
-/// lifts itself without any UI to un-ignore. No `UserDefaults` suite
-/// or `@AppStorage` wrapper: both `hasUpdate` sites read it straight
-/// from the store, and the views bump their own `@State` nonce to
-/// redraw after an ignore.
+/// lifts itself. F-2 (0.9.171) added the way back: the Settings list
+/// below reads `all()` and un-ignores one entry (or all) through
+/// `remove` / `removeAll`. No `UserDefaults` suite or `@AppStorage`
+/// wrapper: both `hasUpdate` sites read it straight from the store,
+/// and the views bump their own `@State` nonce to redraw after an
+/// ignore — or listen to `didChange`.
 enum IgnoredUpdateVersions {
     private static let key = "czfIgnoredUpdateVersions"
 
+    /// F-2 (0.9.171): posted whenever the map changes, so the sources
+    /// pages (and the badge recount) redraw — `hasUpdate` reads
+    /// UserDefaults straight, which no observed object publishes.
+    static let didChange = Notification.Name("czfIgnoredUpdateVersionsDidChange")
+
     static func isIgnored(bundleID: String, version: String) -> Bool {
-        (UserDefaults.standard.dictionary(forKey: key) as? [String: String])?[bundleID] == version
+        // B-2 (0.9.171): an empty bundle ID would match every
+        // empty-ID app — never match one (the single-source swipe
+        // :538 同款守卫，收敛到这一个 choke 点）。
+        guard !bundleID.isEmpty else { return false }
+        return (UserDefaults.standard.dictionary(forKey: key) as? [String: String])?[bundleID] == version
     }
 
     static func ignore(bundleID: String, version: String) {
+        // B-2 (0.9.171): 同 isIgnored — an empty ID must never be
+        // written, or it silences every same-version empty-ID app.
+        guard !bundleID.isEmpty else { return }
         var map = (UserDefaults.standard.dictionary(forKey: key) as? [String: String]) ?? [:]
         map[bundleID] = version
         UserDefaults.standard.set(map, forKey: key)
+        NotificationCenter.default.post(name: didChange, object: nil)
+    }
+
+    /// F-2 (0.9.171): every ignored version, for the Settings list —
+    /// sorted by bundle ID so the list is stable.
+    static func all() -> [(bundleID: String, version: String)] {
+        let map = (UserDefaults.standard.dictionary(forKey: key) as? [String: String]) ?? [:]
+        return map.map { (bundleID: $0.key, version: $0.value) }.sorted { $0.bundleID < $1.bundleID }
+    }
+
+    /// F-2 (0.9.171): un-ignore one app — its update prompt (and the
+    /// badge, via `didChange`) comes back at once: `hasUpdate` reads
+    /// the same map.
+    static func remove(bundleID: String) {
+        guard !bundleID.isEmpty else { return }
+        var map = (UserDefaults.standard.dictionary(forKey: key) as? [String: String]) ?? [:]
+        map.removeValue(forKey: bundleID)
+        UserDefaults.standard.set(map, forKey: key)
+        NotificationCenter.default.post(name: didChange, object: nil)
+    }
+
+    /// F-2 (0.9.171): un-ignore everything.
+    static func removeAll() {
+        UserDefaults.standard.removeObject(forKey: key)
+        NotificationCenter.default.post(name: didChange, object: nil)
     }
 }
 
@@ -1779,10 +1824,15 @@ final class SourcesManager: ObservableObject {
 /// installed ones have updates, and install from them without fetching the
 /// IPA by hand.
 struct AppSourcesView: View {
+    @Environment(Engine.self) private var engine
     @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: SourcesManager
     /// What is installed comes from the Sideloaded apps page's device read.
     @ObservedObject var appsManager: SideloadedAppsManager
+    /// F-1 (0.9.171): the shared source downloader — the cross-source
+    /// update-all batch below downloads through it, same as the
+    /// single-source batch (SourceAppsView 同款）.
+    @StateObject private var downloader = IPADownloader.shared
 
     @State private var showSettings = false
     @State private var newSource = ""
@@ -1798,6 +1848,15 @@ struct AppSourcesView: View {
     /// which no observed object publishes. The badge recounts in the
     /// same action, straight through the manager.
     @State private var ignoredVersionNonce = 0
+    /// F-1 (0.9.171): the cross-source update-all run, if one is
+    /// going — SourceAppsView's batch state 同款，only over listings
+    /// from every source instead of one source's apps.
+    @State private var updateAllTask: Task<Void, Never>?
+    @State private var updateAllIndex = 0
+    @State private var updateAllTotal = 0
+    @State private var updateAllCurrent: String?
+    @State private var updateAllSummary: String?
+    @State private var showingUpdateAllSummary = false
 
     private var listings: [SourceListing] { manager.listings(installed: appsManager.entries) }
 
@@ -1812,7 +1871,7 @@ struct AppSourcesView: View {
                     addCard.transition(.cardAppear)
                 }
                 if !updates.isEmpty {
-                    section(title: L("Updates"), listings: updates)
+                    updatesSection(listings: updates)
                         .transition(.cardAppear)
                         .cascadeItem(3)
                 }
@@ -1884,6 +1943,21 @@ struct AppSourcesView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UnifiedSourceList.didChange)) { _ in
             Task { @MainActor in manager.syncURLs() }
+        }
+        // F-2 (0.9.171): an ignored version removed in Settings (or
+        // anywhere else) redraws this list and recounts the badge —
+        // `hasUpdate` reads UserDefaults, which no observed object
+        // publishes, so the change has to arrive as a notification.
+        .onReceive(NotificationCenter.default.publisher(for: IgnoredUpdateVersions.didChange)) { _ in
+            ignoredVersionNonce += 1
+            manager.recountUpdates(installed: appsManager.entries)
+        }
+        // F-1 (0.9.171): the cross-source update-all totals, once the
+        // batch finishes (single-source page 同款 alert).
+        .alert(L("全部更新"), isPresented: $showingUpdateAllSummary) {
+            Button(L("OK")) {}
+        } message: {
+            Text(updateAllSummary ?? "")
         }
     }
 
@@ -2088,34 +2162,224 @@ struct AppSourcesView: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 8)
-                ForEach(Array(listings.enumerated()), id: \.element.id) { index, listing in
-                    if index > 0 { Divider().overlay(Theme.hairline) }
-                    NavigationLink {
-                        SourceAppView(listing: listing, manager: manager)
-                    } label: {
-                        SourceAppRow(listing: listing)
+                listingRows(listings)
+            }
+        }
+    }
+
+    /// F-1 (0.9.171): the Updates section with its own "全部更新"
+    /// button — every source's updates in one batch, instead of one
+    /// batch per source page. The progress row and the summary alert
+    /// are the single-source page's (SourceAppsView) 同款.
+    private func updatesSection(listings: [SourceListing]) -> some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(L("Updates"))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(L("全部更新")) { startUpdateAllAcrossSources() }
+                        .font(.subheadline)
+                        .disabled(updateAllTask != nil || engine.isRunning)
+                }
+                .padding(.bottom, 8)
+                if updateAllTask != nil {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text(L("正在更新第 %d/%d 个：%@", updateAllIndex, updateAllTotal, updateAllCurrent ?? ""))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                        Spacer()
+                        Button(L("Cancel")) { cancelUpdateAllAcrossSources() }
+                            .font(.footnote)
                     }
-                    .buttonStyle(.plain, sound: .tick)
-                    // F-1 (0.9.170): this section lives in a ScrollView, not
-                    // a List, so there is no swipe — the ignore action is a
-                    // long-press menu instead, same key, same effect as the
-                    // per-source page's swipe. Only on rows that have an
-                    // update; the badge recounts in the same tap.
-                    .contextMenu {
-                        if listing.hasUpdate, let version = listing.app.latest?.version {
-                            Button {
-                                IgnoredUpdateVersions.ignore(bundleID: listing.app.bundleIdentifier,
-                                                             version: version)
-                                ignoredVersionNonce += 1
-                                manager.recountUpdates(installed: appsManager.entries)
-                            } label: {
-                                Label(L("Ignore this version"), systemImage: "eye.slash")
-                            }
-                        }
+                }
+                listingRows(listings)
+            }
+        }
+    }
+
+    /// F-1 (0.9.171): the rows of a section, shared by `section` and
+    /// `updatesSection` so the cross-source header doesn't duplicate
+    /// the row (with its ignore long-press menu).
+    private func listingRows(_ listings: [SourceListing]) -> some View {
+        ForEach(Array(listings.enumerated()), id: \.element.id) { index, listing in
+            if index > 0 { Divider().overlay(Theme.hairline) }
+            NavigationLink {
+                SourceAppView(listing: listing, manager: manager)
+            } label: {
+                SourceAppRow(listing: listing)
+            }
+            .buttonStyle(.plain, sound: .tick)
+            // F-1 (0.9.170): this section lives in a ScrollView, not
+            // a List, so there is no swipe — the ignore action is a
+            // long-press menu instead, same key, same effect as the
+            // per-source page's swipe. Only on rows that have an
+            // update; the badge recounts in the same tap.
+            .contextMenu {
+                if listing.hasUpdate, let version = listing.app.latest?.version {
+                    Button {
+                        IgnoredUpdateVersions.ignore(bundleID: listing.app.bundleIdentifier,
+                                                     version: version)
+                        ignoredVersionNonce += 1
+                        manager.recountUpdates(installed: appsManager.entries)
+                    } label: {
+                        Label(L("Ignore this version"), systemImage: "eye.slash")
                     }
                 }
             }
         }
+    }
+
+    /// F-1 (0.9.171): update every app in the Updates section, across
+    /// all sources — `SourceAppsView.startUpdateAll` 泛化：the same
+    /// loop (lowest-iOS pre-filter, one cellular prompt for the whole
+    /// batch, download then `installOneCustomIPA`, downgrade declines
+    /// counted apart, un-run items filled in with the stop reason),
+    /// only the targets are listings from every source. The summary
+    /// groups failures by source, one line per source, instead of
+    /// mixing every app into one list.
+    private func startUpdateAllAcrossSources() {
+        let targets = listings.filter(\.hasUpdate)
+        guard updateAllTask == nil, !targets.isEmpty, !engine.isRunning else { return }
+        // B-2 (0.9.168) 同款：最低 iOS 事前过滤——不符项不进
+        // targets、不占蜂窝总量、不占下载位；汇总里按源分组说明
+        // 哪款、为什么跳过（与失败行同一格式列出）。
+        var skippedMinOS: [(source: String, name: String, error: String)] = []
+        let runnable = targets.filter { listing in
+            guard let latest = listing.app.latest,
+                  let minOS = latest.minOSVersion, !minOS.isEmpty,
+                  !SideStoreDownloader.runs(on: ProcessInfo.processInfo.operatingSystemVersion, from: minOS, to: nil)
+            else { return true }
+            skippedMinOS.append((listing.sourceName, listing.app.name,
+                                 L("%@ needs iOS %@ or later. This iPhone runs iOS %@.",
+                                   listing.app.name, minOS, engine.osVersionText)))
+            return false
+        }
+        updateAllTotal = runnable.count
+        updateAllIndex = 0
+        updateAllCurrent = nil
+        updateAllTask = Task { @MainActor in
+            var succeeded = 0
+            var failed: [(source: String, name: String, error: String)] = []
+            var skipped = 0
+            var stopped = false
+            // F-G (0.9.156) 同款：整批一次蜂窝确认，带全部大小（每款
+            // 都报大小时才有总量）。全被滤掉时不弹确认——没有要下的
+            // 东西，直接汇总。
+            let batchSizes = runnable.compactMap { $0.app.latest?.size }
+            let batchSize: Int64? = batchSizes.count == runnable.count
+                ? Int64(batchSizes.reduce(0, +)) : nil
+            if !runnable.isEmpty {
+                guard await engine.confirmCellularDownload(size: batchSize,
+                                                           what: L("%d updates", runnable.count)) else {
+                    updateAllTask = nil
+                    updateAllCurrent = nil
+                    updateAllIndex = 0
+                    updateAllTotal = 0
+                    return
+                }
+            }
+            for (offset, listing) in runnable.enumerated() {
+                if Task.isCancelled || stopped { break }
+                updateAllIndex = offset + 1
+                let name = listing.app.name
+                // The progress line names the source too — the same app
+                // name can come from more than one source.
+                updateAllCurrent = "\(listing.sourceName) — \(name)"
+                guard let latest = listing.app.latest else {
+                    failed.append((listing.sourceName, name, L("Import failed")))
+                    continue
+                }
+                let url = latest.downloadURL
+                do {
+                    let file = try await downloader.download(from: url)
+                    let outcome = await engine.installOneCustomIPA(file)
+                    if outcome.declined {
+                        skipped += 1
+                    } else if let error = outcome.error {
+                        failed.append((listing.sourceName, name, error))
+                        stopped = outcome.stopped
+                    } else {
+                        succeeded += 1
+                    }
+                } catch {
+                    if Task.isCancelled || (error as? URLError)?.code == .cancelled {
+                        failed.append((listing.sourceName, name, L("Install stopped")))
+                        break
+                    }
+                    failed.append((listing.sourceName, name, error.localizedDescription))
+                }
+            }
+            // 没跑到的各项：停批的原因同样记一条，不静默丢掉
+            // （单源版同款）。已跑的项 = 成功 + 失败 + 跳过
+            // （拒绝降级），三桶都算上，填补才不会把已跳过的项再记一遍。
+            if failed.count + succeeded + skipped < runnable.count {
+                let reason = failed.last?.error ?? L("Install stopped")
+                for listing in runnable[(failed.count + succeeded + skipped)...] {
+                    failed.append((listing.sourceName, listing.app.name, reason))
+                }
+            }
+            // 事前滤出的最低 iOS 不符项——没下载、没占位，但汇总里
+            // 要说明哪款、为什么跳过；与失败行同一格式列出。
+            // 放在未跑填补之后：填补按 runnable 索引，混进跳过项会越界。
+            failed.append(contentsOf: skippedMinOS)
+            updateAllTask = nil
+            updateAllCurrent = nil
+            updateAllIndex = 0
+            updateAllTotal = 0
+            if failed.isEmpty {
+                updateAllSummary = L("全部更新完成：%d 个已更新。", succeeded)
+            } else {
+                updateAllSummary = L("全部更新完成：成功 %d 个，失败 %d 个。失败：%@", succeeded, failed.count, Self.updateAllFailureList(failed))
+            }
+            // B-2 (0.9.169) 同款：拒绝降级的项单独报数（失败桶里已
+            // 不含它们）。`updateAllSummary` 是 String?，`+=` 编不
+            // 过——上面两分支刚赋过非 nil，`?? ""` 只是过类型关，
+            // 走不到。
+            if skipped > 0 {
+                updateAllSummary = (updateAllSummary ?? "") + " " + L("其中 %d 个因拒绝降级而跳过。", skipped)
+            }
+            showingUpdateAllSummary = true
+            // The device list is stale now — updated apps would stay
+            // in this section (and the badge) until the next appear.
+            // Re-read it, then recount (uninstall swipe 同款等待）.
+            let task = appsManager.load(quiet: true)
+            if let task { await task.value } else { await appsManager.inFlightLoadTask?.value }
+            manager.recountUpdates(installed: appsManager.entries)
+        }
+    }
+
+    /// F-1 (0.9.171): the failure part of the update-all summary,
+    /// grouped by source — one line per source, "源名：App名：原因、
+    /// App名：原因", so a multi-source batch doesn't mix every app
+    /// into one undifferentiated list. At most 5 entries, as the
+    /// single-source summary, with the overflow counted after.
+    private static func updateAllFailureList(_ failed: [(source: String, name: String, error: String)]) -> String {
+        let shown = failed.prefix(5)
+        var groups: [(source: String, items: [(name: String, error: String)])] = []
+        for entry in shown {
+            if let index = groups.firstIndex(where: { $0.source == entry.source }) {
+                groups[index].items.append((entry.name, entry.error))
+            } else {
+                groups.append((entry.source, [(entry.name, entry.error)]))
+            }
+        }
+        var list = groups.map { group in
+            group.source + "：" + group.items.map { "\($0.name)：\($0.error)" }.joined(separator: "、")
+        }.joined(separator: "\n")
+        if failed.count > 5 {
+            list += "\n" + L("等 %d 个", failed.count - 5)
+        }
+        return list
+    }
+
+    /// F-1 (0.9.171): stop the cross-source update-all run — the
+    /// single-source `cancelUpdateAll` 同款.
+    private func cancelUpdateAllAcrossSources() {
+        updateAllTask?.cancel()
+        engine.cancelOneClick()
     }
 
     // MARK: Sources

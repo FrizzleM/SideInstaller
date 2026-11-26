@@ -910,6 +910,9 @@ let turkishStrings: [String: String] = [
     "Installing %@": "%@ yükleniyor",
     "Paused": "Duraklatıldı",
     "Ignore this version": "Bu sürümü yoksay",
+    "已忽略的更新": "Yoksayılan güncellemeler",
+    "没有已忽略的更新。": "Yoksayılan güncelleme yok.",
+    "所有已忽略的版本都将重新提示更新。": "Yoksayılan tüm sürümler güncellemeleri yeniden önerecek.",
     "Pause": "Duraklat",
     "Pause all": "Tümünü duraklat",
     "Resume": "Devam et",
@@ -1585,6 +1588,7 @@ let turkishStrings: [String: String] = [
 
     "全部更新": "Tümünü güncelle",
     "正在更新第 %d/%d 个：%@": "%d/%d güncelleniyor: %@",
+    "正在读取已装 App…": "Yüklü uygulamalar okunuyor…",
     "全部更新完成：%d 个已更新。": "Tüm güncellemeler tamamlandı: %d güncellendi.",
     "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "Tüm güncellemeler tamamlandı: %d başarılı, %d başarısız. Başarısız: %@",
     "移动": "Taşı",

@@ -760,10 +760,13 @@ struct FilesTabView: View {
     /// 跑完成功弹框，失败快照原因 +“重试安装”。前置检查（配对文件、
     /// 隧道、设备 IP）不过时 Engine 直接返回、isRunning 根本没置位，
     /// 这时就别留着进行中标志，并把原因快照到页内（证书页同款：
-    /// 优先用 Engine 的前置向导，向导没变或是上一次跑剩的旧向导时
-    /// 给通用提示，不读 lastError——前置失败不置它）。名字只用于
-    /// 步骤日志：有记录用记录名，没记录现解析，解析不到就用文件名，
-    /// Engine 安装本身不需要 Bundle ID，不再因解析不到而拒装。
+    /// B-1 (0.9.171)：先读 Engine 的 lastError——入口已清零，本次
+    /// 返回后非空即是这次的前置原因（已有安装在跑/配对文件生成中/
+    /// iOS 不支持/最低 iOS/隧道未开），再读向导，最后才落通用句。
+    /// 旧注释“前置失败不置 lastError”自 0.9.163 B-1（守卫留 fresh
+    /// 原因）与 0.9.170 B-1 起已过期。名字只用于步骤日志：有记录用
+    /// 记录名，没记录现解析，解析不到就用文件名，Engine 安装本身
+    /// 不需要 Bundle ID，不再因解析不到而拒装。
     /// 文件页安装跑完写一条「仅安装」日志（kind 有 installOnly 后
     /// 不再会说成“签名并安装”）；前置失败不进日志（与此前一致）。
     private func startEnterpriseInstall(ipaURL: URL, record: SignedIPARecord?) {
@@ -784,7 +787,13 @@ struct FilesTabView: View {
         localInstall.appendStepLog(L("配对安装开始：%@", appName))
         engine.runInstallSignedIPA(ipaURL: ipaURL)
         if !engine.isRunning {
-            if let guide = engine.guide,
+            // B-1 (0.9.171): the entry's guards write the exact reason
+            // into lastError — cleared on entry, so a non-nil value here
+            // is this run's, never stale. A guide is the other fresh
+            // signal; the generic line is last.
+            if let error = engine.lastError {
+                fileInstallErrorText = error
+            } else if let guide = engine.guide,
                guide != guideBefore
                || guide == Guides.importPairing || guide == Guides.vpn
                || guide == Guides.deviceIPMismatch {

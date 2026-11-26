@@ -553,6 +553,13 @@ final class SideloadedAppsManager: ObservableObject {
         load(quiet: true)
     }
 
+    /// B-3 (0.9.171): let the next `autoLoad()` try again after a load
+    /// that started but never delivered entries — otherwise one failed
+    /// read (tunnel up, device unreachable) burns the single auto-load
+    /// for the whole launch, and the certificate page's revoke confirm
+    /// can never list the affected apps again without restarting.
+    func resetAutoLoad() { didAutoLoad = false }
+
     /// Ask the device what it has. `quiet` logs failures instead of showing them.
     /// Returns the Task doing the load (nil when the guard declines because
     /// one is already running), so a caller that must wait on it can await

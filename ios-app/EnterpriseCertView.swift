@@ -2213,11 +2213,13 @@ struct EnterpriseCertView: View {
     /// 前置检查（配对文件、隧道、设备 IP）不过时 Engine 直接返回、
     /// isRunning 根本没置位——这时就别留着进行中标志（否则之后
     /// 别的 tab 一次成功安装也会误弹），并把原因快照到页内：
-    /// 优先用 Engine 的前置向导（标题 + 步骤，告诉用户去补配对
-    /// 文件/连隧道）；向导没变（纯日志那两路）或是上一次跑剩的
-    /// 旧向导时，一律给通用提示，不把旧向导当成这次的原因；
-    /// 不读 lastError——前置失败不置它，读到的只会是上一次跑的
-    /// 旧错。重复同一个前置失败时向导值不变，但它仍是这次的
+    /// B-1 (0.9.171)：先读 Engine 的 lastError——入口已清零，本次
+    /// 返回后非空即是这次的前置原因（已有安装在跑/配对文件生成中/
+    /// iOS 不支持/最低 iOS/隧道未开）；再读前置向导（标题 + 步骤，
+    /// 告诉用户去补配对文件/连隧道）；向导没变（纯日志那两路）且
+    /// lastError 为空时，才落通用提示。旧注释“前置失败不置
+    /// lastError”自 0.9.163 B-1（守卫留 fresh 原因）与 0.9.170 B-1
+    /// 起已过期。重复同一个前置失败时向导值不变，但它仍是这次的
     /// 原因（前置三向导认值，不认新旧）。跑完的成功/失败由
     /// onChange 按 finished/lastError 记日志 + 弹框（见 body 层）。
     private func startEngineInstall(record: SignedIPARecord) {
@@ -2241,7 +2243,11 @@ struct EnterpriseCertView: View {
         engine.runInstallSignedIPA(ipaURL: SignedIPAStore.url(for: record))
         if !engine.isRunning {
             if !enterpriseInstallInFlight { engineInstallLogAppName = nil }
-            if let guide = engine.guide,
+            // B-1 (0.9.171): 文件页同款——先读这次的前置 lastError，
+            // 再读向导，最后才落通用句。
+            if let error = engine.lastError {
+                enterpriseInstallErrorText = error
+            } else if let guide = engine.guide,
                guide != guideBefore
                || guide == Guides.importPairing || guide == Guides.vpn
                || guide == Guides.deviceIPMismatch {

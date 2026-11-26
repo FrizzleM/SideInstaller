@@ -964,6 +964,9 @@ let frenchStrings: [String: String] = [
     "Installing %@": "Installation de %@",
     "Paused": "En pause",
     "Ignore this version": "Ignorer cette version",
+    "已忽略的更新": "Mises à jour ignorées",
+    "没有已忽略的更新。": "Aucune mise à jour ignorée.",
+    "所有已忽略的版本都将重新提示更新。": "Toutes les versions ignorées proposeront à nouveau des mises à jour.",
     "Pause": "Pause",
     "Pause all": "Tout suspendre",
     "Resume": "Reprendre",
@@ -1673,6 +1676,7 @@ let frenchStrings: [String: String] = [
 
     "全部更新": "Tout mettre à jour",
     "正在更新第 %d/%d 个：%@": "Mise à jour %d/%d : %@",
+    "正在读取已装 App…": "Lecture des apps installées…",
     "全部更新完成：%d 个已更新。": "Mises à jour terminées : %d mises à jour.",
     "全部更新完成：成功 %d 个，失败 %d 个。失败：%@": "Mises à jour terminées : %d réussies, %d échouées. Échouées : %@",
     "移动": "Déplacer",

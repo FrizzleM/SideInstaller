@@ -10,6 +10,10 @@ struct CertsView: View {
     @State private var showSettings = false
     /// The certificate the user tapped "Revoke" on, pending confirmation.
     @State private var pendingRevoke: DevCert?
+    /// B-3 (0.9.171): the certificate whose affected-apps read is still
+    /// in flight — its Revoke button shows the wait instead of opening
+    /// a confirm box with an empty list.
+    @State private var loadingAppsForRevokeCert: DevCert?
     /// F-2 (0.9.163): the installed apps, for the revoke confirm's
     /// affected list — the shared instance, not an environment object,
     /// so the confirm works wherever this page is pushed from.
@@ -71,6 +75,42 @@ struct CertsView: View {
             if let cert = pendingRevoke {
                 Text(revokeMessage(for: cert))
             }
+        }
+    }
+
+    /// B-3 (0.9.171): open the revoke confirm only once the installed
+    /// list is in — the confirm's affected-apps list reads
+    /// `appsManager.entries`, and the old tap set `pendingRevoke` first
+    /// and fired a fire-and-forget `autoLoad()` after it, so on a cold
+    /// start the box always rendered against empty entries. Now the tap
+    /// waits on the load (`inFlightLoadTask`, A-5 SIDE-32) before the
+    /// box opens; a load that fails still opens the box (generic
+    /// warning only), never wedges the revoke entry — and the failed
+    /// attempt resets `didAutoLoad`, so the next tap retries instead
+    /// of being guarded off for the rest of the launch. A tap while
+    /// the tunnel is down skips the wait (autoLoad declines without
+    /// consuming the chance) and opens the box at once.
+    private func revokeTapped(_ cert: DevCert) {
+        guard loadingAppsForRevokeCert == nil else { return }
+        // Already read: nothing to wait for.
+        if appsManager.hasLoaded {
+            pendingRevoke = cert
+            return
+        }
+        loadingAppsForRevokeCert = cert
+        Task { @MainActor in
+            // A previous failed auto-load must not burn this tap's
+            // chance: reset first, so autoLoad gets a fresh attempt.
+            appsManager.resetAutoLoad()
+            appsManager.autoLoad()
+            if let task = appsManager.inFlightLoadTask {
+                await task.value
+            }
+            // Still nothing: this attempt failed too — reset again, so
+            // the next tap can retry.
+            if !appsManager.hasLoaded { appsManager.resetAutoLoad() }
+            loadingAppsForRevokeCert = nil
+            pendingRevoke = cert
         }
     }
 
@@ -416,18 +456,15 @@ struct CertsView: View {
                     // Revoke lives at the card's top right as a small text
                     // button, so the card's foot isn't a full-width button.
                     Button(role: .destructive) {
-                        pendingRevoke = cert
-                        // F-2 (0.9.163): the confirm lists the apps this
-                        // certificate signed — read the device now if the
-                        // installed-apps page never did, so the list is
-                        // there when the box opens. A no-op when already
-                        // loaded, or when the tunnel is down.
-                        appsManager.autoLoad()
+                        revokeTapped(cert)
                     } label: {
                         HStack(spacing: 4) {
                             if revoking {
                                 ProgressView().controlSize(.small)
                                 Text(L("Revoking"))
+                            } else if loadingAppsForRevokeCert == cert {
+                                ProgressView().controlSize(.small)
+                                Text(L("正在读取已装 App…"))
                             } else {
                                 Image(systemName: "trash")
                                 Text(L("Revoke"))
@@ -437,8 +474,8 @@ struct CertsView: View {
                     }
                     .buttonStyle(.plain, sound: .tap)
                     .foregroundStyle(Theme.negative)
-                    .disabled(revoking || manager.isWorking || manager.revokingID != nil)
-                    .opacity(revoking || manager.isWorking || manager.revokingID != nil ? 0.4 : 1)
+                    .disabled(revoking || loadingAppsForRevokeCert != nil || manager.isWorking || manager.revokingID != nil)
+                    .opacity(revoking || loadingAppsForRevokeCert != nil || manager.isWorking || manager.revokingID != nil ? 0.4 : 1)
                 }
 
                 if cert.expiresAt != nil || !cert.serialNumber.isEmpty {

@@ -76,6 +76,11 @@ struct SettingsView: View {
     @State private var showingClearLogConfirm = false
     /// Buttons, switches and messages make sounds; see `SoundEffects`.
     @AppStorage(SoundEffects.enabledKey) private var soundEffects = true
+    /// F-2 (0.9.171): bumped when an ignored version is removed here,
+    /// so the list below (read straight from UserDefaults) redraws.
+    @State private var ignoredVersionsNonce = 0
+    /// F-2 (0.9.171): true while the clear-all-ignored confirm stands.
+    @State private var showingClearIgnoredConfirm = false
 
     /// 界面外观，与 App 入口共用同一 UserDefaults 键，改完立即生效。
     @AppStorage("SIDAppearance") private var appearance: AppAppearance = .system
@@ -98,6 +103,7 @@ struct SettingsView: View {
                 developerModeSection
                 autoRefreshSection
                 downloadsSection
+                ignoredUpdatesSection
                 anisetteSection
                 advancedSection
                 logSection
@@ -696,6 +702,57 @@ struct SettingsView: View {
                 Text(L("When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data."))
                 Text(L("Deletes the source IPA after a successful install. Files used for renewal are kept."))
             }
+        }
+    }
+
+    /// F-2 (0.9.171): the update versions the user ignored, with a way
+    /// back — swiping one away (or clearing all) re-arms its update
+    /// prompt at once: `hasUpdate` reads the same map, and the change
+    /// notification recounts the badge. Before this there was no UI to
+    /// un-ignore at all, so a mis-tapped ignore silenced that version
+    /// until the source shipped a newer one.
+    private var ignoredUpdatesSection: some View {
+        Section {
+            let ignored = IgnoredUpdateVersions.all()
+            if ignored.isEmpty {
+                Text(L("没有已忽略的更新。"))
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.muted)
+            } else {
+                ForEach(ignored, id: \.bundleID) { entry in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(entry.bundleID)
+                            .font(.subheadline)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Text(entry.version)
+                            .font(.caption)
+                            .foregroundStyle(Theme.muted)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            IgnoredUpdateVersions.remove(bundleID: entry.bundleID)
+                            ignoredVersionsNonce += 1
+                        } label: {
+                            Label(L("Remove"), systemImage: "trash")
+                        }
+                    }
+                }
+                Button(L("清空全部"), role: .destructive) {
+                    showingClearIgnoredConfirm = true
+                }
+            }
+        } header: {
+            Text(L("已忽略的更新"))
+        }
+        .alert(L("清空全部"), isPresented: $showingClearIgnoredConfirm) {
+            Button(L("清空全部"), role: .destructive) {
+                IgnoredUpdateVersions.removeAll()
+                ignoredVersionsNonce += 1
+            }
+            Button(L("Cancel"), role: .cancel) {}
+        } message: {
+            Text(L("所有已忽略的版本都将重新提示更新。"))
         }
     }
 
