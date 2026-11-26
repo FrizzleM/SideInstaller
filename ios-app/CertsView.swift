@@ -10,6 +10,10 @@ struct CertsView: View {
     @State private var showSettings = false
     /// The certificate the user tapped "Revoke" on, pending confirmation.
     @State private var pendingRevoke: DevCert?
+    /// F-2 (0.9.163): the installed apps, for the revoke confirm's
+    /// affected list — the shared instance, not an environment object,
+    /// so the confirm works wherever this page is pushed from.
+    @ObservedObject private var appsManager = SideloadedAppsManager.shared
     /// Exported p12 file URL for ShareLink.
     @State private var exportURL: URL?
     /// Exported password txt URL for ShareLink: written next to the p12 in
@@ -65,10 +69,38 @@ struct CertsView: View {
             Button(L("Cancel"), role: .cancel) { pendingRevoke = nil }
         } message: {
             if let cert = pendingRevoke {
-                Text(L("“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.",
-                       cert.displayName))
+                Text(revokeMessage(for: cert))
             }
         }
+    }
+
+    /// F-2 (0.9.163): the revoke confirm names the installed apps it
+    /// will break, not just "apps signed with it" — the names come from
+    /// `affectedApps()`, matched by team (see `CertManager.teamID`).
+    /// No team, or no device read yet, means the generic warning alone:
+    /// never list an app the match can't prove.
+    private func revokeMessage(for cert: DevCert) -> String {
+        let base = L("“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.",
+                     cert.displayName)
+        let affected = affectedApps()
+        guard !affected.isEmpty else { return base }
+        let shown = affected.prefix(5)
+        var list = shown.joined(separator: "\n")
+        if affected.count > 5 {
+            list += "\n" + L("等 %d 个", affected.count - 5)
+        }
+        return base + "\n\n" + L("Apps signed with this certificate:\n%@", list)
+    }
+
+    /// F-2 (0.9.163): the installed apps signed under this certificate's
+    /// team — an app counts when its current profile's team is the
+    /// certificate's team. Sorted by name for the confirm box.
+    private func affectedApps() -> [String] {
+        guard let teamID = manager.teamID else { return [] }
+        return appsManager.entries
+            .filter { $0.current?.teamIdentifier == teamID }
+            .map(\.app.name)
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     // MARK: Header
@@ -363,6 +395,12 @@ struct CertsView: View {
                     // button, so the card's foot isn't a full-width button.
                     Button(role: .destructive) {
                         pendingRevoke = cert
+                        // F-2 (0.9.163): the confirm lists the apps this
+                        // certificate signed — read the device now if the
+                        // installed-apps page never did, so the list is
+                        // there when the box opens. A no-op when already
+                        // loaded, or when the tunnel is down.
+                        appsManager.autoLoad()
                     } label: {
                         HStack(spacing: 4) {
                             if revoking {

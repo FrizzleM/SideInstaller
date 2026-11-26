@@ -106,7 +106,16 @@ final class PairingManager: ObservableObject {
     /// the steps for Settings.
     private func pairThisDevice() async throws {
         _ = try await PairingController.shared.startAndWait()
-        engine.connection.disconnect()
+        // B-3 (0.9.163): generation started while no install was running,
+        // but one may have started since (runOneClick refuses while
+        // generating, but the enterprise / signed entries don't go
+        // through it) — dropping the link now would cut that install's
+        // device link mid-run (`disconnect()` releases the adapter, and
+        // every later device call throws), so leave it; the next run
+        // re-pairs with the new file.
+        if !engine.isRunning {
+            engine.connection.disconnect()
+        }
         targets = []
         hasScanned = false
         // Allow an auto-scan again for the new pairing file.

@@ -181,6 +181,7 @@ let japaneseStrings: [String: String] = [
         "SideInstaller はこれを %@ と認識し、自分でダウンロードした場合と同じように設定します。",
     "Downloading… %d%%": "ダウンロード中… %d%%",
     "Downloading": "ダウンロード中",
+    "Queued": "待機中",
     "iOS %@ required": "iOS %@ が必要です",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "この iPhone は iOS %@ で動作しており、SideInstaller ではインストールできません。「設定 › 一般 › ソフトウェア・アップデート」から iOS %@ 以降に更新してください。",
@@ -215,6 +216,7 @@ let japaneseStrings: [String: String] = [
     "Connect LocalDevVPN. Spoofing runs over its tunnel, like everything else here.":
         "LocalDevVPN を接続してください。位置情報の偽装も、ここでの他の処理と同様にこのトンネル経由で行われます。",
     "LocalDevVPN isn't connected. Connect it, then try again.": "LocalDevVPN が接続されていません。接続してから再度お試しください。",
+    "No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.": "ループバック VPN に接続されておらず、トンネルの自動起動がオフです。設定で「必要なときに LocalDevVPN を起動」をオンにしてから、もう一度インストールをタップしてください。",
     "Connect LocalDevVPN": "LocalDevVPN を接続",
     "Install LocalDevVPN from the App Store and open it.": "App Store から LocalDevVPN をインストールして開いてください。",
     "If GitHub is blocked where you are, use a VPN that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through.":
@@ -240,6 +242,7 @@ let japaneseStrings: [String: String] = [
     "Pairing file ready": "ペアリングファイルの準備ができました",
     "No pairing file": "ペアリングファイルがありません",
     "Pairing file": "ペアリングファイル",
+    "Pairing file is being generated. Wait for it to finish, then try again.": "ペアリングファイルを生成中です。完了するまで待ってから、もう一度お試しください。",
     "Pairing…": "ペアリング中…",
     "Regenerate": "再生成",
     "Generate pairing file": "ペアリングファイルを生成",
@@ -305,6 +308,7 @@ let japaneseStrings: [String: String] = [
     "Revoking": "失効処理中",
     "“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.":
         "「%@」が失効します。この証明書で署名済みのアプリは、すべてのデバイスで起動できなくなります。この操作は取り消せません。",
+    "Apps signed with this certificate:\n%@": "この証明書で署名されたアプリ：\n%@",
     "Refreshing": "更新中",
     "Signing in": "サインイン中",
     "Refresh": "更新",
@@ -1126,6 +1130,7 @@ let japaneseStrings: [String: String] = [
     "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ には iOS %d 以降が必要です。この iPhone は iOS %@ です。",
     "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ には iOS %@ 以降が必要です。この iPhone は iOS %@ です。",
     "Minimum iOS": "最小 iOS",
+    "SHA-256": "SHA-256",
     "Show all": "すべて表示",
     "Open Madeira from your Home Screen.": "ホーム画面から Madeira を開いてください。",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":

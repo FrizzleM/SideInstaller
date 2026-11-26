@@ -183,6 +183,7 @@ let vietnameseStrings: [String: String] = [
         "SideInstaller nhận ra đây là %@ và thiết lập nó y như bản tự tải về.",
     "Downloading… %d%%": "Đang tải… %d%%",
     "Downloading": "Đang tải xuống",
+    "Queued": "Đang chờ",
     "iOS %@ required": "Yêu cầu iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "iPhone này đang chạy iOS %@, SideInstaller không thể cài đặt trên phiên bản đó. Cập nhật lên iOS %@ trở lên trong Cài đặt › Cài đặt chung › Cập nhật phần mềm.",
@@ -218,6 +219,7 @@ let vietnameseStrings: [String: String] = [
         "Kết nối LocalDevVPN. Việc giả lập chạy qua đường hầm của nó, như mọi thứ khác ở đây.",
     "LocalDevVPN isn't connected. Connect it, then try again.":
         "LocalDevVPN chưa được kết nối. Hãy kết nối rồi thử lại.",
+    "No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.": "Chưa kết nối VPN vòng lặp và tự động khởi động tunnel đang tắt. Hãy bật “Khởi động LocalDevVPN khi cần” trong Cài đặt rồi chạm Cài đặt lại.",
     "Connect LocalDevVPN": "Kết nối LocalDevVPN",
     "Install LocalDevVPN from the App Store and open it.":
         "Cài LocalDevVPN từ App Store rồi mở ứng dụng.",
@@ -244,6 +246,7 @@ let vietnameseStrings: [String: String] = [
     "Pairing file ready": "Tệp ghép nối đã sẵn sàng",
     "No pairing file": "Chưa có tệp ghép nối",
     "Pairing file": "Tệp ghép nối",
+    "Pairing file is being generated. Wait for it to finish, then try again.": "Đang tạo tệp ghép nối. Hãy đợi hoàn tất rồi thử lại.",
     "Pairing…": "Đang ghép nối…",
     "Regenerate": "Tạo lại",
     "Generate pairing file": "Tạo tệp ghép nối",
@@ -310,6 +313,7 @@ let vietnameseStrings: [String: String] = [
     "Revoking": "Đang thu hồi",
     "“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.":
         "“%@” sẽ bị thu hồi. Các ứng dụng đã ký bằng chứng chỉ này sẽ không mở được trên mọi thiết bị. Không thể hoàn tác.",
+    "Apps signed with this certificate:\n%@": "Ứng dụng đã ký bằng chứng chỉ này:\n%@",
     "Refreshing": "Đang làm mới",
     "Signing in": "Đang đăng nhập",
     "Refresh": "Làm mới",
@@ -1150,6 +1154,7 @@ let vietnameseStrings: [String: String] = [
         "%@ cần iOS %d trở lên. iPhone này đang chạy iOS %@.",
     "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ cần iOS %@ trở lên. iPhone này đang chạy iOS %@.",
     "Minimum iOS": "iOS tối thiểu",
+    "SHA-256": "SHA-256",
     "Show all": "Hiển thị tất cả",
     "Open Madeira from your Home Screen.": "Mở Madeira từ Màn hình chính.",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":

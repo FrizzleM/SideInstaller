@@ -158,6 +158,7 @@ let turkishStrings: [String: String] = [
         "SideInstaller bunu %@ olarak tanır ve kendi indirmesi gibi kurar.",
     "Downloading… %d%%": "İndiriliyor… %%%d",
     "Downloading": "İndiriliyor",
+    "Queued": "Sırada",
     "iOS %@ required": "iOS %@ gerekli",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Bu iPhone iOS %@ çalıştırıyor; SideInstaller buna yükleme yapamaz. Ayarlar › Genel › Yazılım Güncelleme'den iOS %@ veya sonrasına güncelle.",
@@ -188,6 +189,7 @@ let turkishStrings: [String: String] = [
     "Connect LocalDevVPN. Spoofing runs over its tunnel, like everything else here.":
         "LocalDevVPN'e bağlan. Konum taklidi de buradaki her şey gibi onun tüneli üzerinden çalışır.",
     "LocalDevVPN isn't connected. Connect it, then try again.": "LocalDevVPN bağlı değil. Bağlan, sonra yeniden dene.",
+    "No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.": "Döngü VPN’i bağlı değil ve tünelin otomatik başlatılması kapalı. Ayarlar’dan “Gerektiğinde LocalDevVPN’i başlat” seçeneğini açıp Yükle’ye yeniden dokunun.",
     "Connect LocalDevVPN": "LocalDevVPN'e bağlan",
     "Install LocalDevVPN from the App Store and open it.": "LocalDevVPN'i App Store'dan yükle ve aç.",
     "If GitHub is blocked where you are, use a VPN that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through.":
@@ -213,6 +215,7 @@ let turkishStrings: [String: String] = [
     "Pairing file ready": "Eşleme dosyası hazır",
     "No pairing file": "Eşleme dosyası yok",
     "Pairing file": "Eşleme dosyası",
+    "Pairing file is being generated. Wait for it to finish, then try again.": "Eşleştirme dosyası oluşturuluyor. Tamamlanmasını bekleyip yeniden deneyin.",
     "Pairing…": "Eşleniyor…",
     "Regenerate": "Yeniden oluştur",
     "Generate pairing file": "Eşleme dosyası oluştur",
@@ -278,6 +281,7 @@ let turkishStrings: [String: String] = [
     "Revoking": "İptal ediliyor",
     "“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.":
         "“%@” iptal edilecek. Bununla imzalanmış uygulamalar her cihazda açılmayı bırakır. Bu geri alınamaz.",
+    "Apps signed with this certificate:\n%@": "Bu sertifikayla imzalanmış uygulamalar:\n%@",
     "Refreshing": "Yenileniyor",
     "Signing in": "Oturum açılıyor",
     "Refresh": "Yenile",
@@ -1081,6 +1085,7 @@ let turkishStrings: [String: String] = [
     "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ için iOS %d veya sonrası gerekir. Bu iPhone iOS %@ çalıştırıyor.",
     "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ için iOS %@ veya sonrası gerekir. Bu iPhone iOS %@ çalıştırıyor.",
     "Minimum iOS": "Asgari iOS",
+    "SHA-256": "SHA-256",
     "Show all": "Tümünü göster",
     "Open Madeira from your Home Screen.": "Madeira'yı Ana Ekran'dan aç.",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":

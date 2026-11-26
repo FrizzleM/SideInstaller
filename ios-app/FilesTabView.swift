@@ -3488,6 +3488,9 @@ private struct FileDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     /// F-2 (0.9.158): the row's parse, when the caller hadn't got it yet.
     @State private var parsedInfo: IPALibrary.AppInfo? = nil
+    /// F-3 (0.9.163): the IPA's SHA-256 hex, hashed off the main thread
+    /// once the sheet opens — nil until it lands.
+    @State private var sha256: String? = nil
 
     /// The IPA metadata to show: the caller's parse first, the sheet's own
     /// background parse once it lands.
@@ -3519,6 +3522,14 @@ private struct FileDetailSheet: View {
                 }
                 if let renewalAppName {
                     detailRow(L("续签用的应用"), renewalAppName)
+                }
+                // F-3 (0.9.163): the IPA's SHA-256, so a download can be
+                // checked for completeness or tampering before installing.
+                // The value copies on long-press like every other row
+                // (`detailRow`'s context menu); "Loading…" until the
+                // background hash lands.
+                if item.isIPA {
+                    detailRow(L("SHA-256"), sha256 ?? L("Loading…"))
                 }
                 Section {
                     if !item.isDirectory {
@@ -3565,6 +3576,13 @@ private struct FileDetailSheet: View {
                     // Sendable value); the row itself stays on this side.
                     let url = item.url
                     parsedInfo = await Task.detached { IPALibrary.appInfo(at: url) }.value
+                }
+                // F-3 (0.9.163): the SHA-256, hashed off the main thread —
+                // a big IPA takes a moment, and `sha256(of:)` already
+                // reads a megabyte at a time, so this is just the hop.
+                if item.isIPA, sha256 == nil {
+                    let url = item.url
+                    sha256 = await Task.detached { IPALibrary.sha256(of: url) }.value
                 }
             }
         }

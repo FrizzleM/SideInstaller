@@ -258,10 +258,15 @@ struct SourceAppsView: View {
     /// 分流——企业失败重试企业路，ID 失败重试 ID 路，不串路。
     /// 任一路成功就清掉（成功即复位，下次失败重新定性）。
     @State private var certFailedIDs: Set<String> = []
-    /// The app currently downloading, if any: one download at a time, so its
-    /// row can show the downloader's progress and the others stay disabled.
+    /// The app the update-all batch is on, if one is going: only the
+    /// batch sets this now — single downloads queue in the downloader
+    /// instead (F-1, 0.9.163), so it no longer means "a download is
+    /// running". The batch's button and the rows' guards still read it.
     @State private var activeID: String?
-    @State private var downloadTask: Task<Void, Never>?
+    /// F-1 (0.9.163): one Task per downloading app, keyed by app id —
+    /// several rows can be downloading or queued at once now, so the
+    /// single `downloadTask` can't say which row a Cancel tap means.
+    @State private var downloadTasks: [String: Task<Void, Never>] = [:]
     /// F3 (0.9.154): the batch update-all run, if one is going — its Task
     /// (the cancel handle), which app it is on, and the summary the
     /// end-of-batch alert shows.
@@ -286,7 +291,40 @@ struct SourceAppsView: View {
     /// What one app's row is doing.
     private enum RowState: Equatable {
         case downloading
+        /// F-1 (0.9.163): tapped while another download runs — the
+        /// downloader queues it, and the row shows this until its turn.
+        case queued
         case failed(String)
+    }
+
+    /// F-1 (0.9.163): what the row shows — the downloader's live state
+    /// wins over the tap-time state: a queued tap becomes "downloading"
+    /// when its turn comes, without the row re-tapping anything. A row
+    /// whose download landed and is waiting for an earlier install to
+    /// finish keeps its tap-time `.queued` (the install wait has no
+    /// progress of its own to show).
+    private func effectiveRowState(for app: AltApp) -> RowState? {
+        guard let state = states[app.id] else { return nil }
+        switch state {
+        case .downloading, .queued:
+            guard let url = app.downloadLink else { return state }
+            if downloader.currentURL == url { return .downloading }
+            if downloader.queue.contains(where: { $0.url == url }) { return .queued }
+            return state
+        case .failed:
+            return state
+        }
+    }
+
+    /// F-1 (0.9.163): stop one row's download — the running one, or a
+    /// queued one. `cancelDownload(url:)` only settles that row's waiter,
+    /// so cancelling a queued row can't kill the download in front of it;
+    /// cancelling the row's Task covers the wait before the download
+    /// starts (the cellular prompt), and its catch clears the row.
+    private func cancelRowDownload(_ app: AltApp) {
+        if let url = app.downloadLink { downloader.cancelDownload(url: url) }
+        downloadTasks[app.id]?.cancel()
+        downloadTasks[app.id] = nil
     }
 
     /// The source as last loaded; nil once removed elsewhere.
@@ -611,7 +649,7 @@ struct SourceAppsView: View {
     /// percentage, or a failure with a retry.
     @ViewBuilder
     private func installControl(_ app: AltApp) -> some View {
-        switch states[app.id] {
+        switch effectiveRowState(for: app) {
         case .downloading:
             VStack(spacing: 4) {
                 // B1 (0.9.155): a chunked transfer never states a total, so
@@ -652,14 +690,19 @@ struct SourceAppsView: View {
                         }
                     }
                     .font(.caption)
-                    Button(L("Cancel")) {
-                        downloadTask?.cancel()
-                        downloader.cancel()
-                        activeID = nil
-                        states[app.id] = nil
-                    }
+                    Button(L("Cancel")) { cancelRowDownload(app) }
                     .font(.caption)
                 }
+            }
+        case .queued:
+            // F-1 (0.9.163): waiting for the slot — the name of the state
+            // is the whole UI, plus the same Cancel as the running row.
+            VStack(spacing: 4) {
+                Text(L("Queued"))
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+                Button(L("Cancel")) { cancelRowDownload(app) }
+                    .font(.caption)
             }
         case .failed(let message):
             VStack(alignment: .trailing, spacing: 4) {
@@ -674,7 +717,6 @@ struct SourceAppsView: View {
                 }
                 .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                 .controlSize(.small)
-                .disabled(activeID != nil)
                 Text(message)
                     .font(.footnote)
                     .foregroundStyle(Theme.negative)
@@ -698,13 +740,16 @@ struct SourceAppsView: View {
                 } label: {
                     DownloadPill()
                 }
-                .disabled(activeID != nil || engine.isRunning)
+                // F-1 (0.9.163): a tap while another download runs queues
+                // behind it now, so the row is only disabled while an
+                // install runs — not while a download does.
+                .disabled(engine.isRunning)
             } else {
                 Button { startInstall(app) } label: {
                     DownloadPill()
                 }
                 .buttonStyle(.plain)
-                .disabled(activeID != nil || engine.isRunning)
+                .disabled(engine.isRunning)
             }
         }
     }
@@ -745,22 +790,37 @@ struct SourceAppsView: View {
 
     /// Download the app's IPA, import it as the custom IPA, then start the
     /// one-click install and pop back to the main screen to watch it run.
+    /// F-1 (0.9.163): a tap while another download runs queues behind it
+    /// (`states` goes to `.queued`; the downloader's live state decides
+    /// what the row shows from there). The guard only bars a second tap
+    /// on the same row.
     private func startInstall(_ app: AltApp) {
-        guard activeID == nil, let url = app.downloadLink else { return }
-        activeID = app.id
-        states[app.id] = .downloading
+        guard states[app.id] == nil, let url = app.downloadLink else { return }
+        states[app.id] = .queued
         let expectedName = Engine.importFileName(for: url)
-        downloadTask = Task {
+        downloadTasks[app.id] = Task {
             do {
                 // F-G (0.9.156): with "Wi-Fi only downloads" on, a cellular
                 // download asks first — the row's size is what the prompt shows.
                 guard await engine.confirmCellularDownload(size: app.size.map(Int64.init),
                                                            what: app.name ?? expectedName) else {
-                    activeID = nil
                     states[app.id] = nil
                     return
                 }
                 let file = try await downloader.download(from: url)
+                // F-1 (0.9.163): a queued download lands while an earlier
+                // item's install is still running — the import refuses
+                // mid-run (B3) and deletes the staged file, so wait the
+                // run out first, then import and install this one in
+                // turn. The row keeps `.queued` meanwhile (the downloader
+                // has moved on, so the effective state falls back to it).
+                while engine.isRunning, !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(500))
+                }
+                guard !Task.isCancelled else {
+                    states[app.id] = nil
+                    return
+                }
                 // The staged file already carries `expectedName`: the import
                 // names the custom slot after it.
                 _ = await engine.importCustomIPA(from: file)
@@ -772,7 +832,6 @@ struct SourceAppsView: View {
                                                 engine.lastError ?? L("Import failed")])
                 }
                 guard !Task.isCancelled else {
-                    activeID = nil
                     states[app.id] = nil
                     return
                 }
@@ -782,7 +841,6 @@ struct SourceAppsView: View {
                 // the import from disk (its own check would skip it anyway:
                 // the cached source no longer matches).
                 engine.downloadedIPAPath = nil
-                activeID = nil
                 states[app.id] = nil
                 certFailedIDs.remove(app.id)
                 engine.runOneClick()
@@ -790,15 +848,13 @@ struct SourceAppsView: View {
             } catch {
                 // B-C2：取消下载时不记失败行——成功路的
                 // Task.isCancelled 守卫同款，catch 里也要有。
-                // F2 (0.9.153)：共享下载器上，另一路下载开始会先取消
-                // 这一路的 continuation（URLError .cancelled，Task 本身
-                // 没取消）——同样静默，不记失败行。
+                // F-1 (0.9.163)：取消一条排队的下载只结算它自己的
+                // continuation（URLError .cancelled，Task 本身没取消）
+                // ——同样静默，不记失败行。
                 if Task.isCancelled || (error as? URLError)?.code == .cancelled {
-                    activeID = nil
                     states[app.id] = nil
                     return
                 }
-                activeID = nil
                 states[app.id] = .failed(error.localizedDescription)
             }
         }
@@ -901,9 +957,12 @@ struct SourceAppsView: View {
     /// F3 (0.9.154): stop the update-all run — cancel the batch Task
     /// (the loop stops after the current item) and the running download
     /// / install itself (the batch-install Cancel button 同款）.
+    /// F-1 (0.9.163): no `downloader.cancel()` here any more — the
+    /// batch Task is itself the download's waiter, so cancelling it
+    /// settles its own request through `onCancel`; a blanket cancel
+    /// would kill a single download the user queued ahead of the batch.
     private func cancelUpdateAll() {
         updateAllTask?.cancel()
-        downloader.cancel()
         engine.cancelOneClick()
     }
 
@@ -920,22 +979,30 @@ struct SourceAppsView: View {
     /// 取消（行内取消按钮；F2 前是离开页面取消，F2 后离开不再
     /// 取消），不 dismiss——否则会多 pop 一层（次要竞态，顺手堵上）。
     private func startCertInstall(_ app: AltApp) {
-        guard activeID == nil, let url = app.downloadLink else { return }
-        activeID = app.id
-        states[app.id] = .downloading
+        guard states[app.id] == nil, let url = app.downloadLink else { return }
+        states[app.id] = .queued
         certFailedIDs.remove(app.id)
         let expectedName = Engine.importFileName(for: url)
-        downloadTask = Task {
+        downloadTasks[app.id] = Task {
             do {
                 // F-G (0.9.156): 同 startInstall——蜂窝下先确认再下载。
                 guard await engine.confirmCellularDownload(size: app.size.map(Int64.init),
                                                            what: app.name ?? expectedName) else {
-                    activeID = nil
                     states[app.id] = nil
                     certFailedIDs.remove(app.id)
                     return
                 }
                 let file = try await downloader.download(from: url)
+                // F-1 (0.9.163): startInstall 同款——排队的下载落地时若
+                // 有安装在跑，先等它结束再导入，否则 B3 拒掉导入并删掉
+                // 刚下好的文件。
+                while engine.isRunning, !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(500))
+                }
+                guard !Task.isCancelled else {
+                    states[app.id] = nil
+                    return
+                }
                 _ = await engine.importCustomIPA(from: file)
                 guard engine.lastError == nil,
                       let entry = IPALibrary.customImport(),
@@ -946,7 +1013,6 @@ struct SourceAppsView: View {
                                                 engine.lastError ?? L("Import failed")])
                 }
                 guard !Task.isCancelled else {
-                    activeID = nil
                     states[app.id] = nil
                     return
                 }
@@ -957,20 +1023,18 @@ struct SourceAppsView: View {
                 // U-UI：企业页已搬进设置——交完 IPA 还要举手让 RootView
                 // 切到设置 tab 并打开企业证书页，否则用户留在源页看不到表单。
                 await MainActor.run { certWorkspace.openEnterpriseSign = true }
-                activeID = nil
                 states[app.id] = nil
                 dismiss()
             } catch {
                 // B-C2：同上；取消也不污染重试分流（certFailedIDs）。
-                // F2 (0.9.153)：共享下载器被另一路下载取消时是
-                // URLError .cancelled，Task 本身没取消——同样静默。
+                // F-1 (0.9.163)：取消一条排队的下载只结算它自己的
+                // continuation（URLError .cancelled，Task 本身没取消）
+                // ——同样静默。
                 if Task.isCancelled || (error as? URLError)?.code == .cancelled {
-                    activeID = nil
                     states[app.id] = nil
                     certFailedIDs.remove(app.id)
                     return
                 }
-                activeID = nil
                 states[app.id] = .failed(error.localizedDescription)
                 certFailedIDs.insert(app.id)
             }

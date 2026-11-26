@@ -182,6 +182,7 @@ let chineseStrings: [String: String] = [
         "SideInstaller 识别出这是 %@，会像它自己下载的版本一样完成设置。",
     "Downloading… %d%%": "正在下载… %d%%",
     "Downloading": "正在下载",
+    "Queued": "排队中",
     "iOS %@ required": "需要 iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "此 iPhone 运行的是 iOS %@，SideInstaller 无法在该版本上安装。请在 设置 › 通用 › 软件更新 中更新到 iOS %@ 或更高版本。",
@@ -216,6 +217,7 @@ let chineseStrings: [String: String] = [
     "Connect LocalDevVPN. Spoofing runs over its tunnel, like everything else here.":
         "连接 LocalDevVPN。和这里的其他功能一样，模拟也走它的隧道。",
     "LocalDevVPN isn't connected. Connect it, then try again.": "LocalDevVPN 未连接。请先连接，然后重试。",
+    "No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.": "没有连接回环 VPN，且自动启动隧道已关闭。请在设置里打开“需要时启动 LocalDevVPN”，然后再点安装。",
     "Connect LocalDevVPN": "连接 LocalDevVPN",
     "Install LocalDevVPN from the App Store and open it.": "从 App Store 安装 LocalDevVPN 并打开它。",
     "If GitHub is blocked where you are, use a VPN that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through.":
@@ -241,6 +243,7 @@ let chineseStrings: [String: String] = [
     "Pairing file ready": "配对文件已就绪",
     "No pairing file": "没有配对文件",
     "Pairing file": "配对文件",
+    "Pairing file is being generated. Wait for it to finish, then try again.": "正在生成配对文件，请等它完成再试。",
     "Pairing…": "正在配对…",
     "Regenerate": "重新生成",
     "Generate pairing file": "生成配对文件",
@@ -306,6 +309,7 @@ let chineseStrings: [String: String] = [
     "Revoking": "正在吊销",
     "“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.":
         "“%@”将被吊销。已用它签名的应用将无法在任何设备上启动。此操作无法撤销。",
+    "Apps signed with this certificate:\n%@": "用该证书签名的已装 App：\n%@",
     "Refreshing": "正在刷新",
     "Signing in": "正在登录",
     "Refresh": "刷新",
@@ -1131,6 +1135,7 @@ let chineseStrings: [String: String] = [
     "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ 需要 iOS %d 或更高版本。这台 iPhone 运行的是 iOS %@。",
     "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ 需要 iOS %@ 或更高版本。这台 iPhone 运行的是 iOS %@。",
     "Minimum iOS": "最低 iOS",
+    "SHA-256": "SHA-256",
     "Show all": "显示全部",
     "Open Madeira from your Home Screen.": "从主屏幕打开 Madeira。",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":

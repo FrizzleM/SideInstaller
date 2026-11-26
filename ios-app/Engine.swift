@@ -876,8 +876,30 @@ final class Engine {
         // the early guards below return before resetRun runs, so a stale
         // warning would otherwise pop on a run that never started.
         installWarning = nil
+        // B-1 (0.9.163): a run the guards stop never reaches resetRun, so
+        // a stale lastError/guide from the previous run would outlive it
+        // — the batch and history readers below would report the old
+        // failure as this run's. Clear both up front; every guard below
+        // leaves its own fresh reason (a guide, or lastError), so nothing
+        // real is lost.
+        lastError = nil
+        guide = nil
+        // B-3 (0.9.163): a pairing file being generated drops the device
+        // link when it finishes (`pairThisDevice`), so an install started
+        // now would lose its link mid-run — refuse until generation is
+        // done (`generateForPage` refuses the other way round, while an
+        // install is running).
+        guard !PairingManager.shared.isGenerating else {
+            lastError = L("Pairing file is being generated. Wait for it to finish, then try again.")
+            log("⛔️ Pairing file is being generated — install refused until it finishes, so the link isn't dropped mid-install.")
+            return
+        }
         // Nothing downstream works on an older iOS.
         guard osSupported else {
+            // B-1 (0.9.163): the log-only branch left no reason behind —
+            // the readers below would report the previous run's error.
+            lastError = L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
+                          osVersionText, Engine.minimumTunnelOSText)
             log("⛔️ iOS \(osVersionText) isn't supported — SideInstaller needs iOS \(Engine.minimumTunnelOSText) or later.")
             return
         }
@@ -955,6 +977,10 @@ final class Engine {
             if BuiltinTunnel.useBuiltinDirectly {
                 // 内置隧道在包里就不再弹 LocalDevVPN 指引卡：
                 // 自动启动关着时，装不成的原因是那个开关。
+                // B-1 (0.9.163): the log-only branch left no reason
+                // behind — say it in lastError too, so the callers that
+                // read it report this run's cause, not the last run's.
+                lastError = L("No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
                 log("⛔️ No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
             } else {
                 setGuide(Guides.vpn)
@@ -2451,7 +2477,6 @@ final class Engine {
         // B-39-B2 同款：源赋值移到导入成功之后——导入被拒时在途管线
         // 读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
         installSource = .custom
-        let guideBefore = guide
         runOneClick()
         // B2 (0.9.156): installOneCustomIPA 同款——等管线起跑（全隧道探针
         // 最多拖半秒），3 秒还不起跑就是起跑守卫拦住了（无账号/无配对
@@ -2485,9 +2510,11 @@ final class Engine {
             return false
         }
         guard isRunning else {
-            // 没起跑：向导优先于 lastError——没起跑的路不经过 resetRun，
-            // lastError 可能是上一跑剩下的旧值。
-            if let guide, guide != guideBefore {
+            // B-1 (0.9.163): runOneClick 入口已清掉上一跑的 lastError/
+            // guide，所以这里剩下的向导或错误就是这次起跑守卫拦住的
+            // 原因——向导优先于 lastError，不再拿 guideBefore 比对
+            // （旧向导与新向导相同时比对会漏掉真原因）。
+            if let guide {
                 lastError = ([guide.title] + guide.steps).joined(separator: "\n")
             } else if lastError == nil {
                 lastError = L("The install didn't start. Open SideInstaller to see why.")
@@ -2566,7 +2593,6 @@ final class Engine {
             return BatchInstallOutcome(name: name, error: reason, stopped: false)
         }
         installSource = .custom
-        let guideBefore = guide
         runOneClick()
         // Shortcuts.install 同款：等管线起跑（全隧道探针最多拖半秒），
         // 3 秒还不起跑就是起跑守卫拦住了，不是起跑慢。
@@ -2581,10 +2607,12 @@ final class Engine {
         guard isRunning else {
             // 没起跑：守卫原因（账号/配对/隧道/向导）对剩下每项都一样，
             // 逐个重跑只会重复同一失败，整批到此为止。向导优先于
-            // lastError——没起跑的路不经过 resetRun，lastError 可能
-            // 还是上一跑剩下的旧值。
+            // lastError——B-1 (0.9.163)：runOneClick 入口已清掉上一跑
+            // 的 lastError/guide，所以这里剩下的就是这次的原因，不再
+            // 拿 guideBefore 比对（旧向导与新向导相同时比对会漏掉
+            // 真原因）。
             let reason: String
-            if let guide, guide != guideBefore {
+            if let guide {
                 reason = ([guide.title] + guide.steps).joined(separator: "\n")
             } else if let lastError {
                 reason = lastError
@@ -3120,6 +3148,9 @@ final class Engine {
     func runEnterpriseCertInstall() {
         guard let entry = IPALibrary.customImport() else {
             guard !isRunning else { return }
+            // B-1 (0.9.163): runOneClick 同款——没起跑的路不经过
+            // resetRun，旧 lastError 不能留给这次的调用方。
+            lastError = nil
             setGuide(Guides.customIPA)
             log("⛔️ No IPA imported yet. Import an .ipa above first, then sign it with the enterprise certificate.")
             return
@@ -3133,6 +3164,10 @@ final class Engine {
             lastError = L("An install is already running. Wait for it to finish, then refresh.")
             return
         }
+        // B-1 (0.9.163): runOneClick 同款——起跑守卫前先清掉上一跑
+        // 的 lastError/guide，否则被拦住的这次会报上一次的错。
+        lastError = nil
+        guide = nil
         guard osSupported else {
             lastError = L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
                           osVersionText, Engine.minimumTunnelOSText)
@@ -3152,6 +3187,9 @@ final class Engine {
         refreshNetworkStatus()
         guard tunnelAvailable else {
             if BuiltinTunnel.useBuiltinDirectly {
+                // B-1 (0.9.163): runOneClick 同款——只写日志不留原因，
+                // 调用方会报上一跑的旧错。
+                lastError = L("No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
                 log("⛔️ No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
             } else {
                 setGuide(Guides.vpn)
@@ -3306,6 +3344,10 @@ final class Engine {
             lastError = L("An install is already running. Wait for it to finish, then refresh.")
             return
         }
+        // B-1 (0.9.163): runOneClick 同款——起跑守卫前先清掉上一跑
+        // 的 lastError/guide，否则被拦住的这次会报上一次的错。
+        lastError = nil
+        guide = nil
         guard osSupported else {
             lastError = L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
                           osVersionText, Engine.minimumTunnelOSText)
@@ -3320,6 +3362,9 @@ final class Engine {
         refreshNetworkStatus()
         guard tunnelAvailable else {
             if BuiltinTunnel.useBuiltinDirectly {
+                // B-1 (0.9.163): runOneClick 同款——只写日志不留原因，
+                // 调用方会报上一跑的旧错。
+                lastError = L("No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
                 log("⛔️ No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.")
             } else {
                 setGuide(Guides.vpn)

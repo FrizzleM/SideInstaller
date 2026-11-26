@@ -66,6 +66,13 @@ extension CertManager {
             }
         }
     }
+
+    /// F-2 (0.9.163): the team the signed-in Apple ID's certificates
+    /// belong to, parsed from the sign-in summary — the revoke confirm
+    /// matches installed apps against it. Their profiles carry the team,
+    /// not the certificate serial, so the match is by team: a free
+    /// account signs everything with the one certificate that team holds.
+    var teamID: String? { teamSummary.flatMap(Engine.teamID(inSummary:)) }
 }
 
 /// What `si_cert_import` reports: the team's certificate SideInstaller now signs

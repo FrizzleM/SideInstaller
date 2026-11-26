@@ -593,8 +593,10 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// leaving the source page killed the download with no trace. The
     /// shared instance keeps running when the page goes away; only an
     /// explicit Cancel (the row's button, or starting another download)
-    /// stops it. One download at a time: `download` cancels any in-flight
-    /// one first, as before.
+    /// stops it.
+    /// F-1 (0.9.163): one download runs at a time, but the rest no longer
+    /// cancel it — `download(from:)` queues behind the running one and
+    /// starts when its turn comes (see `pending` / `pumpIfIdle`).
     static let shared = IPADownloader()
 
     @Published private(set) var progress: Double = 0
@@ -629,6 +631,41 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     @Published private(set) var isDownloading = false
     @Published private(set) var currentName: String?
 
+    /// F-1 (0.9.163): one queued download, as the source rows and the
+    /// Downloads page show it — the URL it fetches and the staged
+    /// filename it lands as.
+    struct QueuedDownload: Identifiable, Equatable {
+        let id: UUID
+        let url: URL
+        let name: String
+    }
+
+    /// F-1 (0.9.163): the downloads still waiting, in tap order — the
+    /// running one is `currentURL`, not here. The source rows read this
+    /// for "排队中", the Downloads page lists it under the running row.
+    @Published private(set) var queue: [QueuedDownload] = []
+
+    /// F-1 (0.9.163): one entry in the FIFO queue — the URL, the staged
+    /// filename, and the continuation its waiter suspended in. A class,
+    /// not a struct: the waiter stores its continuation into the same
+    /// object the queue holds, and the pump drops it once it settles.
+    private final class DownloadRequest {
+        let id = UUID()
+        let url: URL
+        let name: String
+        var continuation: CheckedContinuation<URL, Error>?
+        init(url: URL) {
+            self.url = url
+            self.name = Engine.importFileName(for: url)
+        }
+    }
+
+    /// F-1 (0.9.163): the requests still waiting for the slot, in tap
+    /// order. The running one lives in `activeRequest`, not here.
+    private var pending: [DownloadRequest] = []
+    /// F-1 (0.9.163): the request the slot is running now, if any.
+    private var activeRequest: DownloadRequest?
+
     /// C-6：源下载的 IPA 上限 8GB——与解压总量上限（enterprise.rs）同数。
     /// 不要与源 JSON 的 10MB 共用一个常量：IPA 常规就是几十 MB 到 1GB+，
     /// 10MB 会断掉几乎全部源安装。
@@ -644,8 +681,9 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     private var currentTask: URLSessionDownloadTask?
     private var currentTaskID: ObjectIdentifier?
     /// F-B: the URL the current task is fetching, for resume-data matching.
-    private var currentURL: URL?
-    private var continuation: CheckedContinuation<URL, Error>?
+    /// F-1 (0.9.163): published, so a source row can tell whether *its*
+    /// URL is the running one (downloading UI) or a waiting one (queued UI).
+    @Published private(set) var currentURL: URL?
     /// F-B: resume data + its URL, kept when a download is cancelled so a
     /// re-tap of the same link resumes instead of restarting.
     private var resumeData: Data?
@@ -734,10 +772,67 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
 
     /// Download `url` and return the staged file. Throws on a non-2xx answer
     /// or a transport error.
+    /// F-1 (0.9.163): a tap no longer cancels the running download — this
+    /// call joins the FIFO queue and awaits its own turn. The waiter
+    /// suspends in its request's continuation; `pumpIfIdle` starts the
+    /// head once the slot frees, and `finish` pumps the next one.
     func download(from url: URL) async throws -> URL {
-        // A new download drops the previous run without keeping its resume
-        // data: the slot holds one URL, and this URL is about to replace it.
-        cancel(keepingResumeData: false)
+        if Task.isCancelled { throw CancellationError() }
+        let request = DownloadRequest(url: url)
+        pending.append(request)
+        publishQueue()
+        // S1 (0.9.159): a bare continuation never resumes when only the
+        // waiting task is cancelled — the task would hang forever. The
+        // handler settles it through `cancelRequest`, which drops only
+        // this request: the running download and the rest of the queue
+        // are untouched (pre-0.9.163 it called `cancel()` and killed
+        // whatever was running). `onCancel` is a non-isolated
+        // synchronous context, so it hops back to the main actor
+        // through a Task first (Engine's `confirmPairingImportMismatch`
+        // shape); `cancelRequest` no-ops when the request is already gone.
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                // The cancel handler may already have dropped this request
+                // (a Cancel tap landing before the continuation stored):
+                // settle at once instead of waiting for a pump that will
+                // never see it.
+                guard pending.contains(where: { $0 === request }) else {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                request.continuation = continuation
+                pumpIfIdle()
+            }
+        } onCancel: {
+            Task { @MainActor in self.cancelRequest(request.id) }
+        }
+    }
+
+    /// F-1 (0.9.163): publish the waiting queue for the rows that show
+    /// it — the running request is `currentURL`, never here.
+    private func publishQueue() {
+        queue = pending.map { QueuedDownload(id: $0.id, url: $0.url, name: $0.name) }
+    }
+
+    /// F-1 (0.9.163): start the head of the queue when the slot is free.
+    /// Called when a waiter stores its continuation, and when the running
+    /// one settles (`finish`). A request whose continuation isn't stored
+    /// yet can't start — it isn't runnable until its waiter suspends, and
+    /// the waiter's own `pumpIfIdle` picks it up then.
+    private func pumpIfIdle() {
+        guard activeRequest == nil, let next = pending.first, next.continuation != nil else { return }
+        pending.removeFirst()
+        publishQueue()
+        startDownload(next)
+    }
+
+    /// F-1 (0.9.163): run one queued request on the slot — the old
+    /// `download(from:)` body, minus the cancel-the-previous-run head
+    /// (the queue replaces it) and minus the `defer` that invalidated
+    /// the session when the await returned: this returns at once now,
+    /// so the session is invalidated in `finish()` instead.
+    private func startDownload(_ request: DownloadRequest) {
+        activeRequest = request
         progress = 0
         bytesWritten = 0
         totalBytesExpected = -1
@@ -747,15 +842,16 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         lastSpeedBytes = 0
         lastSpeedAt = nil
         progressThrottler.reset()
-        // F-2 (0.9.162): after the cancel above — it settles the old run
-        // through finish(), which clears these — so the new run's flag
-        // can't be undone by the old run's teardown.
+        // F-2 (0.9.162): the new run's flag can't be undone by the old
+        // run's teardown — `finish()` clears these before the pump, so
+        // the order here is safe by construction.
         isDownloading = true
-        currentName = Engine.importFileName(for: url)
+        currentName = request.name
+        let url = request.url
         let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
         self.session = session
-        var request = URLRequest(url: url)
-        request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
+        var httpRequest = URLRequest(url: url)
+        httpRequest.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
         // F-1 (0.9.157): memory is empty after a relaunch, but the disk
         // point from the last cancel may still be there — load it, and
         // consume it at once: the data now lives in memory, a cancel
@@ -779,30 +875,47 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         if resumeURL == url, let data = resumeData {
             task = session.downloadTask(withResumeData: data)
         } else {
-            task = session.downloadTask(with: request)
+            task = session.downloadTask(with: httpRequest)
         }
         resumeData = nil
         resumeURL = nil
         currentTask = task
         currentTaskID = ObjectIdentifier(task)
         currentURL = url
-        defer { session.finishTasksAndInvalidate() }
-        // S1 (0.9.159): a bare continuation never resumes when only the
-        // waiting task is cancelled — the task would hang forever, `activeID`
-        // would stay set, and every Download button would stay disabled
-        // until Cancel or a new download. The handler settles it through
-        // the same `cancel()` the Cancel button uses. `onCancel` is a
-        // non-isolated synchronous context, so it hops back to the main
-        // actor through a Task first (Engine's `confirmPairingImportMismatch`
-        // shape); `cancel()` no-ops when the continuation is already gone.
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                self.continuation = continuation
-                task.resume()
-            }
-        } onCancel: {
-            Task { @MainActor in self.cancel() }
+        task.resume()
+    }
+
+    /// F-1 (0.9.163): drop one request by id — the running one, or a
+    /// waiting one. A waiting cancel only settles its own waiter with
+    /// `.cancelled` (its row clears silently, like the active one's);
+    /// the running download and the rest of the queue are untouched.
+    /// A no-op when the request already settled.
+    private func cancelRequest(_ id: UUID) {
+        if activeRequest?.id == id {
+            cancel()
+            return
         }
+        guard let index = pending.firstIndex(where: { $0.id == id }) else { return }
+        let request = pending.remove(at: index)
+        publishQueue()
+        request.continuation?.resume(throwing: URLError(.cancelled))
+        request.continuation = nil
+    }
+
+    /// F-1 (0.9.163): stop one download by URL — the running one, or a
+    /// queued one. The rows' Cancel button calls this instead of
+    /// `cancel()`, so cancelling a queued row can't kill the download
+    /// in front of it.
+    func cancelDownload(url: URL) {
+        if activeRequest?.url == url {
+            cancel()
+            return
+        }
+        guard let index = pending.firstIndex(where: { $0.url == url }) else { return }
+        let request = pending.remove(at: index)
+        publishQueue()
+        request.continuation?.resume(throwing: URLError(.cancelled))
+        request.continuation = nil
     }
 
     /// F-B (0.9.155): suspend the in-flight download; the row's Resume
@@ -822,10 +935,11 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         isPaused = false
     }
 
-    /// Stop an in-flight download, if any.
+    /// Stop the in-flight download, if any — and start the next queued
+    /// one, if one is waiting (`finish` pumps it). The queue itself is
+    /// untouched: use `cancelDownload(url:)` to stop one waiting entry.
     /// - Parameter keepingResumeData: true for an explicit user cancel
-    ///   (the row's Cancel button), so a re-tap of the same link resumes;
-    ///   false when a new download is about to replace this one.
+    ///   (the row's Cancel button), so a re-tap of the same link resumes.
     func cancel(keepingResumeData: Bool = true) {
         // F-B: keep resume data for the URL being stopped, so tapping the
         // same app again resumes instead of restarting. The callback lands
@@ -868,10 +982,16 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     ///   continuation, so an unguarded finish would resume the *new*
     ///   download with the *old* cancelled error. Stale callbacks drop
     ///   here; a nil id (the synchronous `cancel()` path) always applies.
+    /// F-1 (0.9.163): the continuation lives on the running request now,
+    /// and settling it pumps the next queued download. The session is
+    /// invalidated here, before the pump — `startDownload` returns at
+    /// once now, so the old `download(from:)` `defer` that did this when
+    /// the await returned has nowhere else to live.
     private func finish(_ result: Result<URL, Error>, for taskID: ObjectIdentifier? = nil) {
         if let taskID, taskID != currentTaskID { return }
-        guard let continuation else { return }
-        self.continuation = nil
+        guard let request = activeRequest, let continuation = request.continuation else { return }
+        request.continuation = nil
+        activeRequest = nil
         currentTask = nil
         currentTaskID = nil
         currentURL = nil
@@ -888,6 +1008,9 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         lastSpeedBytes = 0
         lastSpeedAt = nil
         continuation.resume(with: result)
+        session?.finishTasksAndInvalidate()
+        session = nil
+        pumpIfIdle()
     }
 
     /// F-C (0.9.156): folds one published sample into the speed and the

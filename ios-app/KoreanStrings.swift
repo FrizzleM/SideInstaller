@@ -182,6 +182,7 @@ let koreanStrings: [String: String] = [
         "SideInstaller가 이 파일을 %@(으)로 인식하여 직접 다운로드한 경우와 똑같이 설정합니다.",
     "Downloading… %d%%": "다운로드 중… %d%%",
     "Downloading": "다운로드 중",
+    "Queued": "대기 중",
     "iOS %@ required": "iOS %@ 필요",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "이 iPhone의 iOS 버전은 %@이므로 SideInstaller로 설치할 수 없습니다. 설정 › 일반 › 소프트웨어 업데이트에서 iOS %@ 이상으로 업데이트하세요.",
@@ -216,6 +217,7 @@ let koreanStrings: [String: String] = [
     "Connect LocalDevVPN. Spoofing runs over its tunnel, like everything else here.":
         "LocalDevVPN을 연결하세요. 위치 변경도 여기 있는 다른 기능처럼 이 터널을 통해 작동합니다.",
     "LocalDevVPN isn't connected. Connect it, then try again.": "LocalDevVPN이 연결되어 있지 않습니다. 연결한 뒤 다시 시도하세요.",
+    "No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.": "루프백 VPN에 연결되지 않았고 터널 자동 시작이 꺼져 있습니다. 설정에서 “필요할 때 LocalDevVPN 시작”을 켠 뒤 다시 설치를 눌러 주세요.",
     "Connect LocalDevVPN": "LocalDevVPN 연결",
     "Install LocalDevVPN from the App Store and open it.": "App Store에서 LocalDevVPN을 설치하고 실행하세요.",
     "If GitHub is blocked where you are, use a VPN that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through.":
@@ -241,6 +243,7 @@ let koreanStrings: [String: String] = [
     "Pairing file ready": "페어링 파일 준비됨",
     "No pairing file": "페어링 파일 없음",
     "Pairing file": "페어링 파일",
+    "Pairing file is being generated. Wait for it to finish, then try again.": "페어링 파일을 생성하는 중입니다. 완료될 때까지 기다렸다가 다시 시도해 주세요.",
     "Pairing…": "페어링 중…",
     "Regenerate": "다시 생성",
     "Generate pairing file": "페어링 파일 생성",
@@ -306,6 +309,7 @@ let koreanStrings: [String: String] = [
     "Revoking": "폐기 중",
     "“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.":
         "“%@” 인증서가 폐기됩니다. 이 인증서로 서명된 앱은 모든 기기에서 실행되지 않게 됩니다. 이 작업은 되돌릴 수 없습니다.",
+    "Apps signed with this certificate:\n%@": "이 인증서로 서명된 앱:\n%@",
     "Refreshing": "새로 고치는 중",
     "Signing in": "로그인 중",
     "Refresh": "새로 고침",
@@ -1126,6 +1130,7 @@ let koreanStrings: [String: String] = [
     "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ 앱은 iOS %d 이상이 필요합니다. 이 iPhone의 iOS 버전은 %@입니다.",
     "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ 앱은 iOS %@ 이상이 필요합니다. 이 iPhone의 iOS 버전은 %@입니다.",
     "Minimum iOS": "최소 iOS",
+    "SHA-256": "SHA-256",
     "Show all": "모두 표시",
     "Open Madeira from your Home Screen.": "홈 화면에서 Madeira를 여세요.",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":

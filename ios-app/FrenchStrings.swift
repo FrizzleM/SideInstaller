@@ -183,6 +183,7 @@ let frenchStrings: [String: String] = [
         "SideInstaller reconnaît ici %@ et le configure comme s'il l'avait téléchargé lui-même.",
     "Downloading… %d%%": "Téléchargement… %d%%",
     "Downloading": "Téléchargement en cours",
+    "Queued": "En file d’attente",
     "iOS %@ required": "iOS %@ requis",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Cet iPhone est sous iOS %@, sur lequel SideInstaller ne peut rien installer. Mettez à jour vers iOS %@ ou une version ultérieure dans Réglages › Général › Mise à jour logicielle.",
@@ -218,6 +219,7 @@ let frenchStrings: [String: String] = [
         "Connecte LocalDevVPN. La simulation passe par son tunnel, comme tout le reste ici.",
     "LocalDevVPN isn't connected. Connect it, then try again.":
         "LocalDevVPN n'est pas connecté. Connecte-le, puis réessaie.",
+    "No loopback VPN is connected, and automatic tunnel start is off. Turn on “Start LocalDevVPN when needed” in Settings, then tap Install again.": "Aucun VPN de bouclage n’est connecté et le démarrage automatique du tunnel est désactivé. Activez « Démarrer LocalDevVPN si nécessaire » dans Réglages, puis touchez à nouveau Installer.",
     "Connect LocalDevVPN": "Connecte LocalDevVPN",
     "Install LocalDevVPN from the App Store and open it.":
         "Installe LocalDevVPN depuis l'App Store et ouvre-le.",
@@ -244,6 +246,7 @@ let frenchStrings: [String: String] = [
     "Pairing file ready": "Fichier de jumelage prêt",
     "No pairing file": "Aucun fichier de jumelage",
     "Pairing file": "Fichier de jumelage",
+    "Pairing file is being generated. Wait for it to finish, then try again.": "Le fichier de jumelage est en cours de génération. Attendez qu’il soit terminé, puis réessayez.",
     "Pairing…": "Jumelage…",
     "Regenerate": "Régénérer",
     "Generate pairing file": "Générer le fichier de jumelage",
@@ -310,6 +313,7 @@ let frenchStrings: [String: String] = [
     "Revoking": "Révocation en cours",
     "“%@” will be revoked. Apps already signed with it will stop launching on every device. This can't be undone.":
         "« %@ » sera révoqué. Les apps déjà signées avec ce certificat ne s'ouvriront plus sur aucun appareil. Cette action est irréversible.",
+    "Apps signed with this certificate:\n%@": "Apps signées avec ce certificat :\n%@",
     "Refreshing": "Actualisation",
     "Signing in": "Connexion en cours",
     "Refresh": "Actualiser",
@@ -1159,6 +1163,7 @@ let frenchStrings: [String: String] = [
         "%@ nécessite iOS %d ou une version ultérieure. Cet iPhone utilise iOS %@.",
     "%@ needs iOS %@ or later. This iPhone runs iOS %@.": "%@ nécessite iOS %@ ou une version ultérieure. Cet iPhone utilise iOS %@.",
     "Minimum iOS": "iOS minimum",
+    "SHA-256": "SHA-256",
     "Show all": "Tout afficher",
     "Open Madeira from your Home Screen.": "Ouvrez Madeira depuis votre écran d'accueil.",
     "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":

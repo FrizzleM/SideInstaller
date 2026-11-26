@@ -536,6 +536,26 @@ struct DownloadsListView: View {
                                 }
                                 .font(.caption)
                             }
+                            // F-1 (0.9.163): the downloads waiting behind
+                            // this one, in tap order — each with the same
+                            // Cancel the running row has (a queued cancel
+                            // only settles its own waiter, never the run
+                            // in front of it).
+                            ForEach(downloader.queue) { queued in
+                                HStack(spacing: 8) {
+                                    Text(queued.name)
+                                        .font(.subheadline)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text(L("Queued"))
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.muted)
+                                    Button(L("Cancel")) {
+                                        downloader.cancelDownload(url: queued.url)
+                                    }
+                                    .font(.caption)
+                                }
+                            }
                         }
                     } header: {
                         Text(L("Downloading"))

@@ -181,10 +181,14 @@ struct AboutView: View {
                 if !Task.isCancelled, engine.finished {
                     selfUpdateFinished = true
                 }
+            } else if let guide = engine.guide {
+                // B-2 (0.9.163): 向导优先于 lastError——runOneClick 入口
+                // 已清掉上一跑的 lastError/guide，剩下的向导就是这次
+                // 起跑守卫拦住的真原因（没账号/没配对文件），不再先报
+                // lastError 里的上一跑旧错。
+                selfUpdateError = guide.title
             } else if let error = engine.lastError {
                 selfUpdateError = error
-            } else if let guide = engine.guide {
-                selfUpdateError = guide.title
             }
             isSelfUpdating = false
             selfUpdateTask = nil

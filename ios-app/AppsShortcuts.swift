@@ -360,7 +360,6 @@ extension Shortcuts {
     /// When it can't start, it says why, as the Install tab does.
     static func install(named name: String) async throws -> String {
         let engine = Engine.shared
-        let guideBefore = engine.guide
         // B-2 (0.9.162): requireNoInstall() only ran before the import, and
         // the import awaits — another install may have started in between
         // (tapped in the app, or auto-refresh). Recheck at the last moment
@@ -379,10 +378,14 @@ extension Shortcuts {
             waited += 0.1
         }
         guard engine.isRunning else {
-            if let error = engine.lastError { throw ShortcutError(error) }
-            if let guide = engine.guide, guide != guideBefore {
+            // B-2 (0.9.163): 向导优先于 lastError——runOneClick 入口已
+            // 清掉上一跑的 lastError/guide，所以这里剩下的向导就是这次
+            // 起跑守卫拦住的真原因（没账号/没配对文件），不再先报
+            // lastError 里的上一跑旧错。
+            if let guide = engine.guide {
                 throw ShortcutError(([guide.title] + guide.steps).joined(separator: "\n"))
             }
+            if let error = engine.lastError { throw ShortcutError(error) }
             throw ShortcutError(L("The install didn't start. Open SideInstaller to see why."))
         }
         // Stopping the shortcut leaves the install to finish in the app.
