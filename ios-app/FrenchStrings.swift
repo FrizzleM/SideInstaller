@@ -8,6 +8,7 @@ let frenchStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "Date d'expiration",
+    "Signed date": "Date de signature",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "Pas assez d'espace libre sur cet iPhone pour télécharger cet IPA : il faut %@, mais il ne reste que %@. Libérez de l'espace puis réessayez.",
@@ -962,8 +963,11 @@ let frenchStrings: [String: String] = [
     // The install's progress outside the app
     "Installing %@": "Installation de %@",
     "Paused": "En pause",
+    "Ignore this version": "Ignorer cette version",
     "Pause": "Pause",
+    "Pause all": "Tout suspendre",
     "Resume": "Reprendre",
+    "Resume all": "Tout reprendre",
     "Open": "Ouvrir",
     "Open SideInstaller to finish the install.":
         "Ouvrez SideInstaller pour terminer l'installation.",

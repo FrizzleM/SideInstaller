@@ -9,6 +9,7 @@ let spanishStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "Caducidad",
+    "Signed date": "Fecha de firma",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "No hay suficiente espacio libre en este iPhone para descargar este IPA: necesita %@, pero solo quedan %@ libres. Libera espacio e inténtalo de nuevo.",
@@ -958,8 +959,11 @@ let spanishStrings: [String: String] = [
     // The install's progress outside the app
     "Installing %@": "Instalando %@",
     "Paused": "En pausa",
+    "Ignore this version": "Ignorar esta versión",
     "Pause": "Pausar",
+    "Pause all": "Pausar todo",
     "Resume": "Reanudar",
+    "Resume all": "Reanudar todo",
     "Open": "Abrir",
     "Open SideInstaller to finish the install.":
         "Abre SideInstaller para terminar la instalación.",

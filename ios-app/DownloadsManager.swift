@@ -603,7 +603,24 @@ struct DownloadsListView: View {
                                 }
                             }
                         } header: {
-                            Text(L("Downloading"))
+                            // F-2 (0.9.170): pause / resume everything at
+                            // once — the downloader runs one download at a
+                            // time (0.9.163 queue), so one `pause()` /
+                            // `resume()` covers the running item and the
+                            // queued ones stay queued behind it. No-op when
+                            // nothing is running or already paused.
+                            HStack {
+                                Text(L("Downloading"))
+                                Spacer()
+                                Button(downloader.isPaused ? L("Resume all") : L("Pause all")) {
+                                    if downloader.isPaused {
+                                        downloader.resume()
+                                    } else {
+                                        downloader.pause()
+                                    }
+                                }
+                                .font(.caption)
+                            }
                         }
                     }
                     if let error = manager.lastError {

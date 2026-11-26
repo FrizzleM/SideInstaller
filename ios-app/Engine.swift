@@ -1104,11 +1104,17 @@ final class Engine {
                 // with the reason it stopped — the success path's
                 // `finishSuccess` is the only other writer, so one run
                 // writes exactly one entry, success or failure.
+                // B-3 (0.9.170): a custom run's IPA is the current import
+                // (`customImport()?.url`) — never `downloadedIPAPath`,
+                // which resetRun doesn't clear and still points at the
+                // previous run before this run's download. A built-in
+                // source has no local file before its download, so it
+                // passes nil and keeps the name-match fallback.
                 InstallHistoryStore.recordFailure(appName: installedAppName,
                                                   version: signedAppVersion() ?? downloadedVersion,
                                                   identity: normalizedAppleID,
                                                   reason: msg,
-                                                  bundleID: signedAppBundleID())
+                                                  bundleID: failureRecordBundleID(ipaURL: installSource == .custom ? IPALibrary.customImport()?.url : nil))
             }
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
@@ -3428,11 +3434,13 @@ final class Engine {
                 failActiveStep(to: .failed)
                 // F-A (0.9.155): 同 runOneClick——失败也记一条历史
                 // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
+                // B-3 (0.9.170): `ipaURL` 是本入口的参数，签名前失败时
+                // `signedAppBundleID()` 还是 nil，就读它的包名。
                 InstallHistoryStore.recordFailure(appName: installedAppName,
                                                   version: signedAppVersion() ?? downloadedVersion,
                                                   identity: historyIdentityOverride ?? normalizedAppleID,
                                                   reason: msg,
-                                                  bundleID: signedAppBundleID())
+                                                  bundleID: failureRecordBundleID(ipaURL: ipaURL))
             }
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
@@ -3529,6 +3537,20 @@ final class Engine {
             lastError = L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
                           osVersionText, Engine.minimumTunnelOSText)
             log("⛔️ iOS \(osVersionText) isn't supported — SideInstaller needs iOS \(Engine.minimumTunnelOSText) or later.")
+            return
+        }
+        // B-1 (0.9.170): the signed IPA's own minimum — runOneClick's
+        // custom path (:959) and installOneCustomIPA (:2692) both refuse
+        // up front; this entry didn't, so a too-new IPA burned pairing,
+        // unpack and upload before failing at install/start time. Same
+        // check, same wording; an IPA that won't parse never blocks
+        // (`minOSBlockReason`'s `guard let minOS`).
+        if let info = IPALibrary.appInfo(at: ipaURL),
+           let reason = Self.minOSBlockReason(info: info,
+                                              runningOn: ProcessInfo.processInfo.operatingSystemVersion,
+                                              osText: osVersionText) {
+            lastError = reason
+            log("⛔️ \(reason)")
             return
         }
         guard canSelfPair || hasPairingFile else {
@@ -3629,11 +3651,13 @@ final class Engine {
                 failActiveStep(to: .failed)
                 // F-A (0.9.155): 同 runOneClick——失败也记一条历史
                 // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
+                // B-3 (0.9.170): `ipaURL` 是本入口的参数，签名前失败时
+                // `signedAppBundleID()` 还是 nil，就读它的包名。
                 InstallHistoryStore.recordFailure(appName: installedAppName,
                                                   version: signedAppVersion() ?? downloadedVersion,
                                                   identity: historyIdentityOverride ?? normalizedAppleID,
                                                   reason: msg,
-                                                  bundleID: signedAppBundleID())
+                                                  bundleID: failureRecordBundleID(ipaURL: ipaURL))
             }
             InstallActivity.shared.runEnded(outcome)
             if tunnelAcquired { releaseTunnel() }
@@ -4256,6 +4280,18 @@ final class Engine {
             log("Keeping \(url.lastPathComponent): it is a renewal source.")
             return
         }
+        // B-2 (0.9.170): a signed finished product is never the switch's
+        // target — the switch deletes the source IPA the run installed
+        // from, and a Signed/ file going away also drops its
+        // SignedIPAStore record (`load()` filters on file existence), so
+        // "sign and install" used to mean "sign, then delete". Only
+        // Downloads/Custom source IPAs are deleted; the Signed/ subtree
+        // check is `SignedIPAStore.relativePath(of:)`'s own prefix test.
+        let signedDir = SignedIPAStore.dir.standardized.path
+        if url.standardized.path == signedDir || url.standardized.path.hasPrefix(signedDir + "/") {
+            log("Keeping \(url.lastPathComponent): it is a signed IPA in Signed/ — the delete-after-install switch only removes source IPAs.")
+            return
+        }
         do {
             try FileManager.default.removeItem(at: url)
             DownloadLedger.forget(url)
@@ -4720,6 +4756,20 @@ final class Engine {
         Task { @MainActor in
             do { try await writePairing() } catch { log("Write pairing FAILED: \(short(error))") }
         }
+    }
+
+    /// B-3 (0.9.170): the bundle ID a failure history entry records —
+    /// the signed bundle when signing got that far, else the IPA file
+    /// this run was handed. `downloadedIPAPath` is deliberately not read
+    /// here: resetRun never clears it, so before this run's download step
+    /// it still points at the previous run's file (0.9.168) and would
+    /// record the wrong clone's ID. Callers pass their own run's IPA; a
+    /// run with no local file yet (a built-in source before its download)
+    /// passes nil and keeps the old name-match fallback.
+    private func failureRecordBundleID(ipaURL: URL?) -> String? {
+        if let signed = signedAppBundleID() { return signed }
+        guard let ipaURL else { return nil }
+        return IPALibrary.appInfo(at: ipaURL)?.bundleID
     }
 
     /// Read CFBundleIdentifier from the signed .app's Info.plist.

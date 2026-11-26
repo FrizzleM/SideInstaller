@@ -351,6 +351,22 @@ struct FilesTabView: View {
     @AppStorage("CZFFileSort") private var fileSortRaw = FileSort.default.rawValue
     private var fileSort: FileSort { FileSort(rawValue: fileSortRaw) ?? .default }
 
+    /// F-3 (0.9.170): the signed list's sort — FileSort 同款 @AppStorage
+    /// 持久化。只改显示顺序，不动记录。默认签名日期（load() 的顺序，
+    /// 原样返回）；到期日是升序、没到期日的老记录沉底（nil 最后），
+    /// 好先看到哪个快到期、该安排重签了。
+    private enum SignedSort: String, CaseIterable {
+        case date, expiry
+        var label: String {
+            switch self {
+            case .date: return L("Signed date")
+            case .expiry: return L("Expiry date")
+            }
+        }
+    }
+    @AppStorage("CZFSignedSort") private var signedSortRaw = SignedSort.date.rawValue
+    private var signedSort: SignedSort { SignedSort(rawValue: signedSortRaw) ?? .date }
+
     private func sortedFiles(_ items: [LocalFileItem]) -> [LocalFileItem] {
         switch fileSort {
         case .default: return items
@@ -3406,6 +3422,29 @@ struct FilesTabView: View {
         VStack(alignment: .leading, spacing: 12) {
             // A-5(a)：ForEach 外求一次存局部量，不再每行重建数组。
             let list = filteredSigned
+            // F-3 (0.9.170): sort switch — signed date or expiry date
+            // (Downloads 页的排序 Menu 同款）。只改显示顺序，不动记录。
+            if !signedRecords.isEmpty {
+                HStack {
+                    Menu {
+                        ForEach(SignedSort.allCases, id: \.self) { option in
+                            Button {
+                                signedSortRaw = option.rawValue
+                            } label: {
+                                if signedSort == option {
+                                    Label(option.label, systemImage: "checkmark")
+                                } else {
+                                    Text(option.label)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(L("排序：%@", signedSort.label), systemImage: "arrow.up.arrow.down")
+                            .font(.footnote.weight(.semibold))
+                    }
+                    Spacer()
+                }
+            }
             if signedRecords.isEmpty {
                 Text(L("还没有已签名的 IPA。用设置里企业证书页的「仅签名」签好就会存到这里，随时能装、能分享。"))
                     .font(.footnote)
@@ -3512,13 +3551,34 @@ struct FilesTabView: View {
     }
 
     /// 搜索过滤：名字命中 App 名或文件名都算。
+    /// F-3 (0.9.170): then the signed sort — date is `load()`'s own
+    /// order (signed date, newest first); expiry is soonest first,
+    /// records without an expiry date sink to the bottom (old records
+    /// predate `expiresAt`), ties fall back to signed date.
     private var filteredSigned: [SignedIPARecord] {
-        guard !librarySearchText.isEmpty else { return signedRecords }
-        let query = librarySearchText.lowercased()
-        return signedRecords.filter { record in
-            record.appName.lowercased().contains(query)
-                || record.fileName.lowercased().contains(query)
-                || record.bundleID.lowercased().contains(query)
+        let base: [SignedIPARecord]
+        if librarySearchText.isEmpty {
+            base = signedRecords
+        } else {
+            let query = librarySearchText.lowercased()
+            base = signedRecords.filter { record in
+                record.appName.lowercased().contains(query)
+                    || record.fileName.lowercased().contains(query)
+                    || record.bundleID.lowercased().contains(query)
+            }
+        }
+        switch signedSort {
+        case .date:
+            return base
+        case .expiry:
+            return base.sorted { a, b in
+                switch (a.expiresAt, b.expiresAt) {
+                case let (ea?, eb?): return ea != eb ? ea < eb : a.date > b.date
+                case (_?, nil): return true
+                case (nil, _?): return false
+                case (nil, nil): return a.date > b.date
+                }
+            }
         }
     }
 

@@ -9,6 +9,7 @@ let chineseStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "到期日",
+    "Signed date": "签名日期",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "这台 iPhone 剩余空间不足，下载这个 IPA 需要 %@，但只剩 %@。清理一些空间后再试。",
@@ -938,8 +939,11 @@ let chineseStrings: [String: String] = [
     // The install's progress outside the app
     "Installing %@": "正在安装 %@",
     "Paused": "已暂停",
+    "Ignore this version": "忽略此版本",
     "Pause": "暂停",
+    "Pause all": "全部暂停",
     "Resume": "继续",
+    "Resume all": "全部继续",
     "Open": "打开",
     "Open SideInstaller to finish the install.":
         "打开 SideInstaller 以完成安装。",

@@ -287,6 +287,12 @@ struct SourceAppsView: View {
     @State private var pendingUninstall: (bundleID: String, name: String)?
     @State private var uninstallingID: String?
     @State private var uninstallError: String?
+    /// F-1 (0.9.170): bumped when an update version is ignored, so the
+    /// list redraws — `hasUpdate(for:)` reads UserDefaults, which no
+    /// observed object publishes, and the badge recount rides the
+    /// `SourceStore.contentDidChange` post in the same swipe action
+    /// (RootView's recount wiring).
+    @State private var ignoredVersionNonce = 0
 
     /// What one app's row is doing.
     private enum RowState: Equatable {
@@ -524,6 +530,21 @@ struct SourceAppsView: View {
         }
         .padding(.vertical, 4)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            // F-1 (0.9.170): ignore this version's update — the row leaves
+            // the Updates section and the badge drops with it (the
+            // `contentDidChange` post re-runs RootView's badge recount).
+            // Only on rows that actually have an update; a newer version
+            // later is a different key, so the ignore lifts itself.
+            if hasUpdate(for: app), let bundleID = app.bundleIdentifier, !bundleID.isEmpty,
+               let version = app.version, !version.isEmpty {
+                Button {
+                    IgnoredUpdateVersions.ignore(bundleID: bundleID, version: version)
+                    ignoredVersionNonce += 1
+                    NotificationCenter.default.post(name: SourceStore.contentDidChange, object: nil)
+                } label: {
+                    Label(L("Ignore this version"), systemImage: "eye.slash")
+                }
+            }
             // F-1 (0.9.161): uninstall the installed copy — only when this
             // source's app is on the device, never SideInstaller itself.
             if let bundleID = installedBundleID(for: app),
@@ -634,9 +655,14 @@ struct SourceAppsView: View {
 
     /// True when the source offers a newer version than the installed one.
     /// (P2, upstream `SourceListing.hasUpdate`.)
+    /// F-1 (0.9.170): the upstream struct's filter, over `AltApp` — an
+    /// ignored version is not an update here either, so the row leaves
+    /// this page's Updates section and `startUpdateAll` never targets it.
     private func hasUpdate(for app: AltApp) -> Bool {
         guard let installed = installedVersion(for: app),
               let latest = app.version, !latest.isEmpty else { return false }
+        if let bundleID = app.bundleIdentifier, !bundleID.isEmpty,
+           IgnoredUpdateVersions.isIgnored(bundleID: bundleID, version: latest) { return false }
         return UpdateChecker.isNewer(latest, than: installed)
     }
 
@@ -1336,8 +1362,15 @@ struct SourceListing: Identifiable, Equatable {
     }
 
     /// True when the source has a newer version than the installed one.
+    /// F-1 (0.9.170): not when the user ignored exactly this version —
+    /// `IgnoredUpdateVersions` keys by (bundle ID, version), so a newer
+    /// version appearing later is a different key and the ignore lifts
+    /// itself. The badge (`updateCount`), the Updates section and the
+    /// detail page all read this one property, so one filter silences
+    /// all three.
     var hasUpdate: Bool {
         guard let installedVersion, let latest = app.latest?.version else { return false }
+        guard !IgnoredUpdateVersions.isIgnored(bundleID: app.bundleIdentifier, version: latest) else { return false }
         return UpdateChecker.isNewer(latest, than: installedVersion)
     }
 
@@ -1352,6 +1385,28 @@ struct SourceListing: Identifiable, Equatable {
 }
 
 // MARK: - Manager
+
+/// F-1 (0.9.170): update versions the user ignored, one per app —
+/// (bundle ID → version) in UserDefaults, so it survives restarts.
+/// Ignoring silences the badge and the Updates row for exactly that
+/// version; a newer version later is a different key, so the ignore
+/// lifts itself without any UI to un-ignore. No `UserDefaults` suite
+/// or `@AppStorage` wrapper: both `hasUpdate` sites read it straight
+/// from the store, and the views bump their own `@State` nonce to
+/// redraw after an ignore.
+enum IgnoredUpdateVersions {
+    private static let key = "czfIgnoredUpdateVersions"
+
+    static func isIgnored(bundleID: String, version: String) -> Bool {
+        (UserDefaults.standard.dictionary(forKey: key) as? [String: String])?[bundleID] == version
+    }
+
+    static func ignore(bundleID: String, version: String) {
+        var map = (UserDefaults.standard.dictionary(forKey: key) as? [String: String]) ?? [:]
+        map[bundleID] = version
+        UserDefaults.standard.set(map, forKey: key)
+    }
+}
 
 /// The sources the user added, what they offer, and which of their apps have
 /// updates. Owned by `RootView`, so it survives tab switches. Installs go
@@ -1738,6 +1793,11 @@ struct AppSourcesView: View {
     @State private var showSources = false
     /// The import result, shown in an alert (F2, 0.9.152).
     @State private var importSummary: String?
+    /// F-1 (0.9.170): bumped when an update version is ignored, so the
+    /// list redraws — `SourceListing.hasUpdate` reads UserDefaults,
+    /// which no observed object publishes. The badge recounts in the
+    /// same action, straight through the manager.
+    @State private var ignoredVersionNonce = 0
 
     private var listings: [SourceListing] { manager.listings(installed: appsManager.entries) }
 
@@ -2036,6 +2096,23 @@ struct AppSourcesView: View {
                         SourceAppRow(listing: listing)
                     }
                     .buttonStyle(.plain, sound: .tick)
+                    // F-1 (0.9.170): this section lives in a ScrollView, not
+                    // a List, so there is no swipe — the ignore action is a
+                    // long-press menu instead, same key, same effect as the
+                    // per-source page's swipe. Only on rows that have an
+                    // update; the badge recounts in the same tap.
+                    .contextMenu {
+                        if listing.hasUpdate, let version = listing.app.latest?.version {
+                            Button {
+                                IgnoredUpdateVersions.ignore(bundleID: listing.app.bundleIdentifier,
+                                                             version: version)
+                                ignoredVersionNonce += 1
+                                manager.recountUpdates(installed: appsManager.entries)
+                            } label: {
+                                Label(L("Ignore this version"), systemImage: "eye.slash")
+                            }
+                        }
+                    }
                 }
             }
         }

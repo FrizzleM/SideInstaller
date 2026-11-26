@@ -610,11 +610,14 @@ final class SideBySideManager: ObservableObject {
                 failActiveStep(to: .failed)
                 // F-A (0.9.155): 同 Engine 管线——失败也记一条历史
                 // （成功路的 `finishSuccess` 是另一出口，一跑只记一条）。
+                // B-3 (0.9.170): 签名前失败时 `signedBundleID` 还是 nil，
+                // 就读本次挑的 IPA（`custom?.file`）的包名；非自定义路
+                // `custom` 为 nil，仍留 nil，走回名字匹配。
                 InstallHistoryStore.recordFailure(appName: installedAppName ?? runName,
                                                   version: installedAppVersion,
                                                   identity: credentials.id,
                                                   reason: message,
-                                                  bundleID: signedBundleID)
+                                                  bundleID: signedBundleID ?? custom.flatMap { IPALibrary.appInfo(at: $0.file)?.bundleID })
             }
             pairingInSettings = false
             pairingPIN = nil

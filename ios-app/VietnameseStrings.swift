@@ -9,6 +9,7 @@ let vietnameseStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "Ngày hết hạn",
+    "Signed date": "Ngày ký",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "iPhone này không còn đủ dung lượng trống để tải IPA này — cần %@, nhưng chỉ còn %@. Hãy giải phóng dung lượng rồi thử lại.",
@@ -954,8 +955,11 @@ let vietnameseStrings: [String: String] = [
     // The install's progress outside the app
     "Installing %@": "Đang cài đặt %@",
     "Paused": "Đã tạm dừng",
+    "Ignore this version": "Bỏ qua phiên bản này",
     "Pause": "Tạm dừng",
+    "Pause all": "Tạm dừng tất cả",
     "Resume": "Tiếp tục",
+    "Resume all": "Tiếp tục tất cả",
     "Open": "Mở",
     "Open SideInstaller to finish the install.":
         "Mở SideInstaller để hoàn tất cài đặt.",

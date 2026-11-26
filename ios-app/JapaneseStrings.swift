@@ -9,6 +9,7 @@ let japaneseStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "有効期限",
+    "Signed date": "署名日",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "この iPhone の空き容量が足りず、この IPA をダウンロードできません。%@ 必要ですが、空きは %@ しかありません。空き容量を増やしてからもう一度お試しください。",
@@ -871,8 +872,11 @@ let japaneseStrings: [String: String] = [
     // The install's progress outside the app
     "Installing %@": "%@ をインストール中",
     "Paused": "一時停止中",
+    "Ignore this version": "このバージョンを無視",
     "Pause": "一時停止",
+    "Pause all": "すべて一時停止",
     "Resume": "再開",
+    "Resume all": "すべて再開",
     "Open": "開く",
     "Open SideInstaller to finish the install.":
         "インストールを完了するには SideInstaller を開いてください。",

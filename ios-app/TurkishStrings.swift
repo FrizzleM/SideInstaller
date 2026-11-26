@@ -9,6 +9,7 @@ let turkishStrings: [String: String] = [
     // MARK: - Shared
 
     "Expiry date": "Bitiş tarihi",
+    "Signed date": "İmza tarihi",
     "Bundle ID": "Bundle ID",
     "Not enough free space on this iPhone to download this IPA — it needs %@, but only %@ is free. Free some space and try again.":
         "Bu iPhone'da bu IPA'yı indirmek için yeterli boş alan yok: %@ gerekiyor ama yalnızca %@ boş. Yer açıp yeniden deneyin.",
@@ -908,8 +909,11 @@ let turkishStrings: [String: String] = [
 
     "Installing %@": "%@ yükleniyor",
     "Paused": "Duraklatıldı",
+    "Ignore this version": "Bu sürümü yoksay",
     "Pause": "Duraklat",
+    "Pause all": "Tümünü duraklat",
     "Resume": "Devam et",
+    "Resume all": "Tümünü sürdür",
     "Open": "Aç",
     "Open SideInstaller to finish the install.": "Yüklemeyi bitirmek için SideInstaller'ı aç.",
     "Check the App IDs it needs, then tap Install.": "İhtiyacı olan App ID'leri kontrol et, sonra Yükle'ye dokun.",
