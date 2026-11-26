@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// The Pairing page: generate the pairing file, export it, and write it into a
+/// The Pairing page: generate or import the pairing file, export it, and write it into a
 /// supported app installed on this iPhone over the loopback tunnel. Pushed from
 /// Tools, whose `NavigationStack` this relies on.
 struct PairingView: View {
@@ -71,7 +71,7 @@ struct PairingView: View {
         }
     }
 
-    // MARK: Pairing file (generate + export)
+    // MARK: Pairing file
 
     private var pairingFileCard: some View {
         PanelCard {
@@ -94,6 +94,8 @@ struct PairingView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(manager.isBusy || engine.isRunning)
+
+                PairingImportButton { manager.lastError = $0 }
 
                 if let url = manager.exportURL {
                     ShareLink(item: url) {

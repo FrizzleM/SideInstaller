@@ -11,8 +11,6 @@ struct ContentView: View {
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
     @State private var showImporter = false
-    /// True while the pairing-file picker is up.
-    @State private var showPairingImporter = false
     /// When false, the Advanced section under the Install button shows only its
     /// title.
     @State private var advancedExpanded = false
@@ -103,13 +101,6 @@ struct ContentView: View {
                 FileImporterRepresentableView(allowedContentTypes: [.ipa]) { urls in
                     guard let url = urls.first else { return }   // empty means cancelled
                     Task { await engine.importCustomIPA(from: url) }
-                }
-                .ignoresSafeArea()
-            }
-            .sheet(isPresented: $showPairingImporter) {
-                FileImporterRepresentableView(allowedContentTypes: UTType.pairingFileTypes) { urls in
-                    guard let url = urls.first else { return }   // empty means cancelled
-                    Task { await engine.importPairingFile(from: url) }
                 }
                 .ignoresSafeArea()
             }
@@ -603,7 +594,7 @@ struct ContentView: View {
                     }
                 }
 
-                pairingImportButton
+                PairingImportButton()
                 if engine.canGetSideStorePairing {
                     orDivider
                     sideStorePairingButton
@@ -660,36 +651,6 @@ struct ContentView: View {
             .foregroundStyle(Theme.accent)
         }
         .buttonStyle(.plain, sound: .tick)
-    }
-
-    /// Import button, labelled with the imported file's name once one is in.
-    private var pairingImportButton: some View {
-        Button { showPairingImporter = true } label: {
-            HStack(spacing: 8) {
-                if engine.isImportingPairing {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Image(systemName: engine.importedPairingName == nil
-                          ? "square.and.arrow.down" : "checkmark.circle")
-                        .contentTransition(.symbolEffect(.replace))
-                        .foregroundStyle(engine.importedPairingName == nil ? Color.secondary : Theme.accent)
-                }
-                Text(engine.importedPairingName ?? L("Import pairing file"))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .foregroundStyle(.primary)
-                Spacer()
-                if engine.importedPairingName != nil, !engine.isImportingPairing {
-                    Text(L("Replace"))
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(Theme.accent)
-                }
-            }
-            .fieldBackground()
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain, sound: .tap)
-        .disabled(engine.isImportingPairing)
     }
 
     // MARK: Advanced
@@ -809,7 +770,7 @@ struct ContentView: View {
             Text(L("(Optional)"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-            pairingImportButton
+            PairingImportButton()
             pairingDocsLink
         }
     }
@@ -1642,6 +1603,56 @@ private struct StepBadge: View {
 }
 
 // MARK: - File picker
+
+/// Shares the file picker and its Import / Replace control between Install and Tools.
+struct PairingImportButton: View {
+    @Environment(Engine.self) private var engine
+    @EnvironmentObject private var loc: Localizer
+    @ObservedObject private var manager = PairingManager.shared
+    @State private var showPairingImporter = false
+
+    private let reportError: ((String?) -> Void)?
+
+    init(reportError: ((String?) -> Void)? = nil) {
+        self.reportError = reportError
+    }
+
+    var body: some View {
+        Button { showPairingImporter = true } label: {
+            HStack(spacing: 8) {
+                if engine.isImportingPairing {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: engine.importedPairingName == nil
+                          ? "square.and.arrow.down" : "checkmark.circle")
+                        .contentTransition(.symbolEffect(.replace))
+                        .foregroundStyle(engine.importedPairingName == nil ? Color.secondary : Theme.accent)
+                }
+                Text(engine.importedPairingName ?? L("Import pairing file"))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(.primary)
+                Spacer()
+                if engine.importedPairingName != nil, !engine.isImportingPairing {
+                    Text(L("Replace"))
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(Theme.accent)
+                }
+            }
+            .fieldBackground()
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain, sound: .tap)
+        .disabled(engine.isRunning || manager.isBusy || engine.isImportingPairing)
+        .sheet(isPresented: $showPairingImporter) {
+            FileImporterRepresentableView(allowedContentTypes: UTType.pairingFileTypes) { urls in
+                guard let url = urls.first else { return }
+                Task { await engine.importPairingFile(from: url, reportError: reportError) }
+            }
+            .ignoresSafeArea()
+        }
+    }
+}
 
 extension UTType {
     /// The `.ipa` type exported in Info.plist. Without that declaration the

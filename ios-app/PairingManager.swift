@@ -107,10 +107,15 @@ final class PairingManager: ObservableObject {
     private func pairThisDevice() async throws {
         _ = try await PairingController.shared.startAndWait()
         engine.connection.disconnect()
+        pairingFileDidChange()
+    }
+
+    /// An imported or newly generated record needs a fresh scan, even if its name is unchanged.
+    func pairingFileDidChange() {
         targets = []
         hasScanned = false
-        // Allow an auto-scan again for the new pairing file.
         didAutoScan = false
+        refresh()
     }
 
     // MARK: - Popups

@@ -3048,28 +3048,29 @@ final class Engine {
 
     /// Imports a pairing file made elsewhere (jitterbugpair, pymobiledevice3,
     /// idevicepair, …), replacing the one on disk. Required below iOS 27;
-    /// optional (under Advanced) from 27 on.
+    /// optional from 27 on.
     @MainActor
-    func importPairingFile(from url: URL) async {
+    func importPairingFile(from url: URL, reportError: ((String?) -> Void)? = nil) async {
         guard !isImportingPairing else { return }
         isImportingPairing = true
         // Delete the picker's temporary copy once the import is done.
         defer { isImportingPairing = false; Self.discardInboxCopy(url) }
-        lastError = nil
+        let setError = reportError ?? { self.lastError = $0 }
+        setError(nil)
         log("Importing pairing file \(url.lastPathComponent) …")
         do {
             let data = try Self.readImport(from: url)
             let kind = PairingFileKind.of(data: data)
             guard kind.isUsable else {
-                lastError = ErrorHelp.explained(L("%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.",
-                                                  url.lastPathComponent))
-                log("⛔️ Pairing import: \(lastError ?? "")")
-                return
+                throw EngineError.message(ErrorHelp.explained(L("%@ isn't a pairing file. Pick the file your computer made — a .mobiledevicepairing or .plist holding this iPhone's pair record.",
+                                                                  url.lastPathComponent)))
             }
             try adoptPairingFile(data, kind: kind, name: url.lastPathComponent)
         } catch {
-            lastError = L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
-            log("⛔️ Pairing import: \(lastError ?? "")")
+            let message = (error as? EngineError)?.errorDescription
+                ?? L("Couldn't import %@: %@", url.lastPathComponent, error.localizedDescription)
+            log("⛔️ Pairing import: \(message)")
+            setError(message)
         }
     }
 
@@ -3093,6 +3094,10 @@ final class Engine {
     /// and shows it under `name` as the imported file.
     @MainActor
     private func adoptPairingFile(_ data: Data, kind: PairingFileKind, name: String) throws {
+        guard !isRunning else {
+            throw EngineError.message(L("An install is already running. Wait for it to finish, then try again."))
+        }
+        guard !PairingManager.shared.isBusy else { throw PairingController.PairingError.busy }
         try data.write(to: PrivateStore.pairingFile, options: .atomic)
         // Drop the cached merged file; it was built from the old record.
         CompositePairingFile.invalidateMerged()
@@ -3102,6 +3107,7 @@ final class Engine {
         connection.disconnect()
         deviceSummary = nil
         pairingStatus = L("imported pairing file")
+        PairingManager.shared.pairingFileDidChange()
         setGuide(nil)
         let records = [kind.hasLockdown ? "lockdown" : nil,
                        kind.hasRemotePairing ? "remote-pairing" : nil]
