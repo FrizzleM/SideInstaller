@@ -59,6 +59,28 @@ struct SourcesView: View {
                         sourceRow(source)
                     }
                     .deleteDisabled(source.url == UnifiedSourceList.builtInURL)
+                    // F-2 (0.9.180): swipe-left refresh for one source —
+                    // pull-to-refresh is all-or-nothing. The Delete action
+                    // is spelled out here too: adding swipeActions takes
+                    // over the swipe, so the onDelete swipe below would
+                    // otherwise lose its gesture.
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button {
+                            Task { await store.fetch(source.url, force: true) }
+                        } label: {
+                            Label(L("Refresh"), systemImage: "arrow.clockwise")
+                        }
+                        .tint(Theme.accent)
+                        .disabled(source.isLoading)
+                        Button(role: .destructive) {
+                            if let idx = store.sources.firstIndex(where: { $0.url == source.url }) {
+                                store.removeSource(at: IndexSet(integer: idx))
+                            }
+                        } label: {
+                            Label(L("Delete"), systemImage: "trash")
+                        }
+                        .disabled(source.url == UnifiedSourceList.builtInURL)
+                    }
                 }
                 .onDelete { offsets in
                     for offset in offsets {
@@ -88,6 +110,18 @@ struct SourcesView: View {
                 Button { showAddAlert = true } label: {
                     Image(systemName: "plus").foregroundStyle(.white)
                 }
+                .accessibilityLabel(L("Add Source"))
+            }
+            // F-3 (0.9.180): explicit refresh — re-checking used to need
+            // pull-to-refresh; the list header already says while a
+            // fetch is running, and per-source fetch guards double taps.
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Task { await store.fetchAll(force: true) }
+                } label: {
+                    Image(systemName: "arrow.clockwise").foregroundStyle(.white)
+                }
+                .accessibilityLabel(L("Refresh"))
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
@@ -103,7 +137,9 @@ struct SourcesView: View {
                         }
                     }
                 } label: {
-                    Text(L("筛选")).foregroundStyle(.white)
+                    // B-3 (0.9.180): the label names the current sort, like
+                    // the file and apps pages — "筛选" never said which.
+                    Text(L("排序：%@", sourceSort.label)).foregroundStyle(.white)
                 }
             }
         }

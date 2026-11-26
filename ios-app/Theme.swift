@@ -559,6 +559,16 @@ struct SearchBar: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
                 .textFieldStyle(.plain)
+            // F-1 (0.9.180): one-tap clear — every list with a search
+            // field used to need selecting the text to empty it.
+            if !text.isEmpty {
+                Button { text = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(Theme.muted)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L("Clear"))
+            }
         }
         .padding(8)
         .background(Theme.control)

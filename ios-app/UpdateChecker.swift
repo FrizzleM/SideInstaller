@@ -119,12 +119,52 @@ final class UpdateChecker: ObservableObject {
         case failed
     }
 
+    /// B-2 (0.9.180): the check in flight, so a second call joins it
+    /// instead of running the release gate again and wiping the first
+    /// call's verified state (the three call sites — app launch, About,
+    /// Install tab — can overlap). The `force` flag records whether the
+    /// running check satisfies a forced caller: a forced run satisfies
+    /// everyone, a non-forced run only satisfies non-forced callers.
+    /// `generation` guards the clear: a forced caller queued behind a
+    /// non-forced run installs its own entry after ours finishes, and
+    /// our clear must not drop it.
+    private var inFlightCheck: (force: Bool, task: Task<CheckResult, Never>)?
+    private var inFlightCheckGeneration = 0
+
     /// Fetch the remote version and reveal the banner if it's newer.
     /// B2 (0.9.142): the stamp is only set once a version was really fetched.
     /// A failed check used to stamp too, so a launch with no network on the
     /// day a new version shipped silenced the banner for the next 24 hours.
     @discardableResult
     func check(force: Bool = false) async -> CheckResult {
+        // Join a running check when it satisfies this call.
+        if let inFlight = inFlightCheck, inFlight.force || !force {
+            return await inFlight.task.value
+        }
+        // A forced call behind a non-forced run waits for it, then runs
+        // its own — never two gates at once. Cancelling the waiter only
+        // cancels the wait, never the shared run: awaiting a Task's value
+        // neither throws nor cancels the awaited task (same shape as the
+        // apps page awaiting `manager.inFlightLoadTask`).
+        if let inFlight = inFlightCheck {
+            _ = await inFlight.task.value
+        }
+        inFlightCheckGeneration += 1
+        let generation = inFlightCheckGeneration
+        let task = Task { [weak self] in
+            guard let self else { return CheckResult.failed }
+            return await self.performCheck(force: force)
+        }
+        inFlightCheck = (force: force, task: task)
+        let result = await task.value
+        if inFlightCheckGeneration == generation { inFlightCheck = nil }
+        return result
+    }
+
+    /// The check itself, pulled out of `check()` (B-2, 0.9.180) so the
+    /// wrapper above can share one run between callers. Behaviour
+    /// unchanged.
+    private func performCheck(force: Bool) async -> CheckResult {
         // One check a day: skip when the last successful check was recent.
         // A failed check stamps nothing, so the next launch tries again.
         let now = Date()

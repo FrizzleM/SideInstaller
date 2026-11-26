@@ -1858,6 +1858,27 @@ struct AppsView: View {
                     }
                 }
             }
+        } else if !manager.hasLoaded, let loadError = manager.lastLoadError, !manager.isWorking {
+            // B-1 (0.9.180): a failed load used to leave a blank page —
+            // the quiet auto-load logs the error and neither branch above
+            // renders (no entries, hasLoaded false), so the failure and a
+            // retry belong here, not only in the stale-list banner above
+            // (which needs old entries to show at all). The load button
+            // above already shows the spinner while a load runs, so this
+            // branch stays out of its way until the load settles.
+            CalloutCard(tint: Theme.negative) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(loadError)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.negative)
+                    Button { manager.load() } label: {
+                        Label(L("Reload"), systemImage: "arrow.clockwise")
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .foregroundStyle(Theme.accent)
+                }
+            }
+            .transition(.cardAppear)
         }
     }
 
