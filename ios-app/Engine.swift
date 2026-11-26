@@ -3660,47 +3660,83 @@ final class Engine {
     // image and a session kept open while the location is simulated. Same
     // approach as StikDebug, over the RPPairing tunnel.
 
-    /// Connect, mount the developer disk image unless the device already has
-    /// one, and open the location session. Returns true when a mount actually
-    /// ran, so the UI can say so.
+    /// Connect, put the developer disk image on the device unless it already
+    /// has one, and open the location session. Returns true when the image
+    /// went on now, so the UI can say so.
     @MainActor
     @discardableResult
-    func prepareLocationSimulation(imagePath: String,
-                                   trustcachePath: String,
-                                   manifestPath: String,
-                                   progress: @escaping (Double) -> Void) async throws -> Bool {
-        let mounted = try await prepareDeveloperDiskImage(imagePath: imagePath,
-                                                          trustcachePath: trustcachePath,
-                                                          manifestPath: manifestPath,
-                                                          progress: progress)
+    func prepareLocationSimulation(progress: @escaping (Double) -> Void) async throws -> Bool {
+        let mounted = try await prepareDeveloperDiskImage(progress: progress)
         try await onDeviceQueue { try self.connection.beginLocationSimulation() }
         return mounted
     }
 
-    /// Connect, and mount the developer disk image unless the device already
-    /// has one. Location simulation and JIT both need it: DVT and debugserver
-    /// come with it. Returns true when a mount actually ran.
+    /// Connect, and put the developer disk image on the device unless it
+    /// already has one. Location simulation and JIT both need it: DVT and
+    /// debugserver come with it. Returns true when it went on now.
+    ///
+    /// From iOS 26.4 it's installed as a cryptex, as StikDebug installs it,
+    /// which newer iPhones than the personalized image knows take too; when
+    /// that fails, the personalized image is mounted instead
+    /// (`DeveloperDiskImage.variants`). A form not downloaded yet is
+    /// downloaded first. `progress` follows the personalized mount, the one
+    /// that reports any.
     @MainActor
     @discardableResult
-    func prepareDeveloperDiskImage(imagePath: String,
-                                   trustcachePath: String,
-                                   manifestPath: String,
-                                   progress: @escaping (Double) -> Void) async throws -> Bool {
+    func prepareDeveloperDiskImage(progress: @escaping (Double) -> Void) async throws -> Bool {
         try await ensurePairingConnection()
-        let mounted = try await onDeviceQueue { try self.connection.mountedDeveloperImageCount() }
-        if mounted > 0 {
-            log("Developer disk image already mounted (\(mounted) image(s)).")
+        let checksCryptex = DeveloperDiskImage.installsAsCryptex
+        let present = try await onDeviceQueue {
+            try self.connection.developerImagePresence(checkingCryptex: checksCryptex)
+        }
+        if let present {
+            log("Developer disk image already on the device (\(present)).")
             return false
         }
-        log("No developer disk image mounted — mounting the personalized one…")
-        try await onDeviceQueue {
-            try self.connection.mountPersonalizedDeveloperImage(imagePath: imagePath,
-                                                               trustcachePath: trustcachePath,
-                                                               manifestPath: manifestPath,
-                                                               progress: progress)
+        let variants = DeveloperDiskImage.variants
+        var firstFailure: Error?
+        for (index, variant) in variants.enumerated() {
+            do {
+                if !DeveloperDiskImage.isDownloaded(variant) {
+                    try await DeveloperDiskImage.downloadMissing(variant) { _ in }
+                }
+                switch variant {
+                case .cryptex:
+                    log("No developer disk image on the device — installing it as a cryptex…")
+                    let directory = DeveloperDiskImage.cryptexDirectory
+                    let version = try await onDeviceQueue {
+                        try self.connection.installCryptexDeveloperImage(directory: directory)
+                    }
+                    log("Developer disk image installed as a cryptex\(version.isEmpty ? "" : " (\(version))").")
+                case .personalized:
+                    log("No developer disk image on the device — mounting the personalized one…")
+                    let image = DeveloperDiskImage.imagePath
+                    let trustcache = DeveloperDiskImage.trustcachePath
+                    let manifest = DeveloperDiskImage.manifestPath
+                    try await onDeviceQueue {
+                        try self.connection.mountPersonalizedDeveloperImage(imagePath: image,
+                                                                           trustcachePath: trustcache,
+                                                                           manifestPath: manifest,
+                                                                           progress: progress)
+                    }
+                    log("Developer disk image mounted.")
+                }
+                return true
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                // What the preferred form said is what's reported; the
+                // fallback's failure is in the log.
+                if firstFailure == nil { firstFailure = error }
+                if index + 1 < variants.count {
+                    log("The developer disk image didn't go on as a \(variant.logName) (\(short(error))). Trying the \(variants[index + 1].logName) …")
+                } else if index > 0 {
+                    log("The \(variant.logName) didn't go on either (\(short(error))).")
+                }
+            }
         }
-        log("Developer disk image mounted.")
-        return true
+        // `variants` is never empty, so the loop failed at least once here.
+        throw firstFailure ?? CancellationError()
     }
 
     /// Push a coordinate to the device. The caller repeats this on a timer —

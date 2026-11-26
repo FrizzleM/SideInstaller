@@ -1751,9 +1751,9 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jktcp"
-version = "0.1.6"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54408d8a86952b9f1cc009782ad7bbb4007a7caaba0599db441e0eae8785288c"
+checksum = "f67259b6408391e66f7d7fd3dbef41ef3bc65e1d67f4c8d5512f2e59835f7844"
 dependencies = [
  "futures",
  "getrandom 0.3.4",

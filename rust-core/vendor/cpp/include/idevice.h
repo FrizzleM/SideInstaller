@@ -27,6 +27,26 @@
 
 #define LOCKDOWN_PORT 62078
 
+/**
+ * The nonce domain index cryptexes are personalized against
+ */
+#define IDEVICE_CRYPTEXD_NONCE_DOMAIN_CRYPTEX 2
+
+/**
+ * The `image-type-index` a DeveloperDiskImage install uses
+ */
+#define IDEVICE_CRYPTEXD_DDI_IMAGE_TYPE_INDEX 10
+
+/**
+ * The `persistence` a DeveloperDiskImage install uses
+ */
+#define IDEVICE_CRYPTEXD_DDI_PERSISTENCE 2
+
+/**
+ * The `nonce-persistence` a DeveloperDiskImage install uses
+ */
+#define IDEVICE_CRYPTEXD_DDI_NONCE_PERSISTENCE 1
+
 typedef enum AfcFopenMode {
   AfcRdOnly = 1,
   AfcRw = 2,
@@ -150,6 +170,20 @@ typedef struct ConditionInducerHandle ConditionInducerHandle;
 typedef struct CoreDeviceProxyHandle CoreDeviceProxyHandle;
 
 typedef struct CrashReportCopyMobileHandle CrashReportCopyMobileHandle;
+
+/**
+ * Opaque handle to the payloads a Cryptex1 DeveloperDiskImage install needs
+ */
+typedef struct Cryptex1AssetsHandle Cryptex1AssetsHandle;
+
+/**
+ * Opaque handle to a CryptexdClient
+ *
+ * The daemon serves one routine per connection, so every call below consumes
+ * the handle: it is freed by the call and must not be used again, even when
+ * the call fails.
+ */
+typedef struct CryptexdHandle CryptexdHandle;
 
 /**
  * Opaque handle to a DebugProxyClient
@@ -426,6 +460,74 @@ typedef struct IconDataC {
   double minimum_width;
   double minimum_height;
 } IconDataC;
+
+/**
+ * A cryptex installed on the device
+ */
+typedef struct InstalledCryptexC {
+  /**
+   * Free with `idevice_string_free`
+   */
+  char *identifier;
+  /**
+   * Free with `idevice_string_free`
+   */
+  char *version;
+} InstalledCryptexC;
+
+/**
+ * Which nonce domain a get-nonce or roll-nonce request refers to
+ */
+typedef struct CryptexNonceDomain {
+  /**
+   * When 1, `value` is a nonce domain handle, e.g. a build identity's
+   * `Cryptex1,NonceDomain`. When 0, it is a domain index, e.g.
+   * `IDEVICE_CRYPTEXD_NONCE_DOMAIN_CRYPTEX`.
+   */
+  int is_handle;
+  uint64_t value;
+} CryptexNonceDomain;
+
+/**
+ * The payloads and parameters one install needs
+ */
+typedef struct CryptexInstallRequestC {
+  /**
+   * The cryptex disk image, i.e. the manifest's `Cryptex1,GenericDmg`
+   */
+  const uint8_t *image;
+  uintptr_t image_len;
+  /**
+   * `Cryptex1,GenericTrustCache`
+   */
+  const uint8_t *trustcache;
+  uintptr_t trustcache_len;
+  /**
+   * The Cryptex1 personalization ticket
+   */
+  const uint8_t *im4m;
+  uintptr_t im4m_len;
+  /**
+   * `Cryptex1,CryptexInfoPlist`, which names and versions the cryptex
+   */
+  const uint8_t *info;
+  uintptr_t info_len;
+  /**
+   * `Cryptex1,GenericVolume` root hash
+   */
+  const uint8_t *volumehash;
+  uintptr_t volumehash_len;
+  /**
+   * The `Cryptex1,*` parameters from the build identity, as a plist
+   * dictionary. Non-negative integers are sent as uint64, which the daemon
+   * requires.
+   */
+  plist_t cryptex1_properties;
+  int64_t image_type_index;
+  uint64_t persistence;
+  uint64_t nonce_persistence;
+  uint64_t auth;
+} CryptexInstallRequestC;
 
 /**
  * Represents a debugserver command
@@ -2376,6 +2478,338 @@ struct IdeviceFfiError *crash_report_flush(struct IdeviceProviderHandle *provide
  * or NULL (in which case this function does nothing)
  */
 void crash_report_client_free(struct CrashReportCopyMobileHandle *handle);
+
+/**
+ * Creates a new CryptexdClient using RSD connection
+ *
+ * # Arguments
+ * * [`provider`] - An adapter created by this library
+ * * [`handshake`] - An RSD handshake from the same provider
+ * * [`handle`] - Pointer to store the newly created handle
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * `provider` and `handshake` must be valid pointers to handles allocated by this library
+ * `handle` must be a valid pointer to a location where the handle will be stored
+ */
+struct IdeviceFfiError *cryptexd_connect_rsd(struct AdapterHandle *provider,
+                                             struct RsdHandshakeHandle *handshake,
+                                             struct CryptexdHandle **handle);
+
+/**
+ * Creates a new CryptexdClient from a socket
+ *
+ * # Arguments
+ * * [`socket`] - The socket to use for communication. Consumed regardless of the result.
+ * * [`handle`] - Pointer to store the newly created handle
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * `socket` must be a valid pointer to a handle allocated by this library
+ * `handle` must be a valid pointer to a location where the handle will be stored
+ */
+struct IdeviceFfiError *cryptexd_new(struct ReadWriteOpaque *socket,
+                                     struct CryptexdHandle **handle);
+
+/**
+ * Reads the device's AppleImage4 chip instance, which identifies it in a
+ * Cryptex1 personalization request
+ *
+ * The keys are the daemon's `img4_chip_*` names, e.g. `img4_chip_chip`
+ * (ChipID), `img4_chip_bord` (BoardID) and `img4_chip_ecid` (ECID).
+ *
+ * # Arguments
+ * * [`handle`] - The CryptexdClient handle. Consumed by this call.
+ * * [`identifiers`] - Pointer to store the identifiers
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All pointer parameters must be valid
+ */
+struct IdeviceFfiError *cryptexd_read_personalization_identifiers(struct CryptexdHandle *handle,
+                                                                  plist_t *identifiers);
+
+/**
+ * Lists the cryptexes installed on the device
+ *
+ * # Arguments
+ * * [`handle`] - The CryptexdClient handle. Consumed by this call.
+ * * [`cryptexes`] - Pointer to store the list, freed with `cryptexd_free_installed`
+ * * [`len`] - Pointer to store the number of entries
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All pointer parameters must be valid
+ */
+struct IdeviceFfiError *cryptexd_copy_installed(struct CryptexdHandle *handle,
+                                                struct InstalledCryptexC **cryptexes,
+                                                uintptr_t *len);
+
+/**
+ * Frees the list from `cryptexd_copy_installed`
+ *
+ * # Safety
+ * `cryptexes` must be a pointer returned by `cryptexd_copy_installed` with its
+ * reported length, or NULL
+ */
+void cryptexd_free_installed(struct InstalledCryptexC *cryptexes, uintptr_t len);
+
+/**
+ * Frees an InstalledCryptexC allocated by this library
+ *
+ * # Safety
+ * `cryptex` must be a pointer allocated by this library, or NULL
+ */
+void cryptexd_free_installed_cryptex(struct InstalledCryptexC *cryptex);
+
+/**
+ * Reads a nonce domain's nonce structure
+ *
+ * Use `cryptexd_cryptex_nonce` for the nonce a TSS request wants.
+ *
+ * # Arguments
+ * * [`handle`] - The CryptexdClient handle. Consumed by this call.
+ * * [`domain`] - The nonce domain to read
+ * * [`nonce`] - Pointer to store the nonce, freed with `idevice_data_free`
+ * * [`nonce_len`] - Pointer to store the number of bytes
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All pointer parameters must be valid
+ */
+struct IdeviceFfiError *cryptexd_get_nonce(struct CryptexdHandle *handle,
+                                           struct CryptexNonceDomain domain,
+                                           uint8_t **nonce,
+                                           uintptr_t *nonce_len);
+
+/**
+ * Reads the nonce a Cryptex1 TSS request is personalized against
+ *
+ * # Arguments
+ * * [`handle`] - The CryptexdClient handle. Consumed by this call.
+ * * [`nonce_domain_handle`] - The build identity's `Cryptex1,NonceDomain`
+ * * [`nonce`] - Pointer to store the nonce, freed with `idevice_data_free`
+ * * [`nonce_len`] - Pointer to store the number of bytes
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All pointer parameters must be valid
+ */
+struct IdeviceFfiError *cryptexd_cryptex_nonce(struct CryptexdHandle *handle,
+                                               uint64_t nonce_domain_handle,
+                                               uint8_t **nonce,
+                                               uintptr_t *nonce_len);
+
+/**
+ * Rolls (regenerates) a nonce domain's nonce, invalidating anything
+ * personalized against the previous one
+ *
+ * # Arguments
+ * * [`handle`] - The CryptexdClient handle. Consumed by this call.
+ * * [`domain`] - The nonce domain to roll
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * `handle` must be a valid pointer to a handle allocated by this library
+ */
+struct IdeviceFfiError *cryptexd_roll_nonce(struct CryptexdHandle *handle,
+                                            struct CryptexNonceDomain domain);
+
+/**
+ * Uninstalls a cryptex by the identifier `cryptexd_copy_installed` reports
+ *
+ * # Arguments
+ * * [`handle`] - The CryptexdClient handle. Consumed by this call.
+ * * [`identifier`] - The cryptex's identifier
+ * * [`version`] - The version to scope the uninstall to, or NULL for all of them
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All non-NULL pointer parameters must be valid
+ */
+struct IdeviceFfiError *cryptexd_uninstall(struct CryptexdHandle *handle,
+                                           const char *identifier,
+                                           const char *version);
+
+/**
+ * Installs a cryptex
+ *
+ * # Arguments
+ * * [`handle`] - The CryptexdClient handle. Consumed by this call.
+ * * [`request`] - The payloads and parameters to install
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All pointer parameters must be valid, and the request's buffers must be
+ * readable for their stated lengths
+ */
+struct IdeviceFfiError *cryptexd_install(struct CryptexdHandle *handle,
+                                         const struct CryptexInstallRequestC *request);
+
+/**
+ * Extracts the nonce from cryptexd's nonce structure
+ *
+ * # Arguments
+ * * [`blob`] - The structure `cryptexd_get_nonce` returned
+ * * [`blob_len`] - Its length
+ * * [`nonce`] - Pointer to store the nonce, freed with `idevice_data_free`
+ * * [`nonce_len`] - Pointer to store the number of bytes
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All pointer parameters must be valid, and `blob` must be readable for
+ * `blob_len` bytes
+ */
+struct IdeviceFfiError *cryptexd_unwrap_nonce(const uint8_t *blob,
+                                              uintptr_t blob_len,
+                                              uint8_t **nonce,
+                                              uintptr_t *nonce_len);
+
+/**
+ * Loads the DeveloperDiskImage payloads from an unpacked DDI `Restore` directory
+ *
+ * # Arguments
+ * * [`restore_dir`] - The directory to read
+ * * [`handle`] - Pointer to store the newly created handle
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All pointer parameters must be valid
+ */
+struct IdeviceFfiError *cryptex1_assets_load(const char *restore_dir,
+                                             struct Cryptex1AssetsHandle **handle);
+
+/**
+ * Builds the DeveloperDiskImage payloads from buffers the caller already has
+ *
+ * # Arguments
+ * * [`image`] / [`image_len`] - `Cryptex1,GenericDmg`
+ * * [`trustcache`] / [`trustcache_len`] - `Cryptex1,GenericTrustCache`
+ * * [`info`] / [`info_len`] - `Cryptex1,CryptexInfoPlist`
+ * * [`volumehash`] / [`volumehash_len`] - `Cryptex1,GenericVolume`
+ * * [`build_identity`] - The build identity the payloads came from
+ * * [`handle`] - Pointer to store the newly created handle
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All pointer parameters must be valid, and each buffer must be readable for
+ * its stated length
+ */
+struct IdeviceFfiError *cryptex1_assets_from_parts(const uint8_t *image,
+                                                   uintptr_t image_len,
+                                                   const uint8_t *trustcache,
+                                                   uintptr_t trustcache_len,
+                                                   const uint8_t *info,
+                                                   uintptr_t info_len,
+                                                   const uint8_t *volumehash,
+                                                   uintptr_t volumehash_len,
+                                                   plist_t build_identity,
+                                                   struct Cryptex1AssetsHandle **handle);
+
+/**
+ * The handle of the nonce domain the assets are personalized against, i.e. the
+ * build identity's `Cryptex1,NonceDomain`
+ *
+ * # Arguments
+ * * [`handle`] - The assets handle
+ * * [`nonce_domain`] - Pointer to store the handle
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All pointer parameters must be valid
+ */
+struct IdeviceFfiError *cryptex1_assets_nonce_domain(struct Cryptex1AssetsHandle *handle,
+                                                     uint64_t *nonce_domain);
+
+/**
+ * Frees a Cryptex1Assets handle
+ *
+ * # Safety
+ * `handle` must be a valid pointer to a handle allocated by this library or NULL
+ */
+void cryptex1_assets_free(struct Cryptex1AssetsHandle *handle);
+
+/**
+ * Personalizes and installs the DeveloperDiskImage cryptex end to end
+ *
+ * The cryptex equivalent of the image mounter's auto-mount: reads the device's
+ * personalization identifiers and cryptex nonce, has Apple sign a Cryptex1
+ * ticket for them, and installs the assets. Each step opens its own connection
+ * off the adapter, since the daemon serves one routine per connection.
+ *
+ * # Arguments
+ * * [`provider`] - An adapter created by this library
+ * * [`handshake`] - An RSD handshake from the same provider
+ * * [`assets`] - The payloads to install
+ * * [`installed`] - Pointer to store the installed cryptex, freed with
+ *   `cryptexd_free_installed_cryptex`. May be NULL to ignore it.
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All non-NULL pointer parameters must be valid
+ */
+struct IdeviceFfiError *cryptexd_install_ddi(struct AdapterHandle *provider,
+                                             struct RsdHandshakeHandle *handshake,
+                                             struct Cryptex1AssetsHandle *assets,
+                                             struct InstalledCryptexC **installed);
+
+/**
+ * The installed DeveloperDiskImage cryptex, if there is one
+ *
+ * # Arguments
+ * * [`provider`] - An adapter created by this library
+ * * [`handshake`] - An RSD handshake from the same provider
+ * * [`installed`] - Pointer to store the cryptex, set to NULL when no DDI is
+ *   installed. Freed with `cryptexd_free_installed_cryptex`.
+ *
+ * # Returns
+ * An IdeviceFfiError on error, null on success
+ *
+ * # Safety
+ * All pointer parameters must be valid
+ */
+struct IdeviceFfiError *cryptexd_installed_ddi(struct AdapterHandle *provider,
+                                               struct RsdHandshakeHandle *handshake,
+                                               struct InstalledCryptexC **installed);
+
+/**
+ * Frees a CryptexdClient handle
+ *
+ * Only needed for a handle no routine was invoked on: every routine consumes
+ * the handle it is passed.
+ *
+ * # Safety
+ * `handle` must be a valid pointer to a handle allocated by this library or NULL
+ */
+void cryptexd_free(struct CryptexdHandle *handle);
 
 /**
  * Creates a new DebugserverCommand

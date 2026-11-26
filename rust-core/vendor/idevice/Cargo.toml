@@ -24,7 +24,7 @@ plist = { version = "1.8" }
 plist-macro = { version = "0.1.6" }
 serde = { version = "1", features = ["derive"] }
 ns-keyed-archive = { version = "0.1.5", optional = true }
-jktcp = { version = "0.1.6", optional = true, default-features = false }
+jktcp = { version = "0.1.8", optional = true, default-features = false }
 
 thiserror = { version = "2" }
 tracing = { version = "0.1.41" }
@@ -140,6 +140,9 @@ display_stream = [
   "dep:web-time",
 ]
 crashreportcopymobile = ["afc"]
+# Installing the DeveloperDiskImage as a cryptex, which iOS 26.4 and newer
+# devices take (vendor README, change 9).
+cryptexd = ["xpc", "rsd", "tss"]
 debug_proxy = []
 diagnostics_relay = []
 dvt = ["dep:ns-keyed-archive"]
@@ -248,6 +251,7 @@ full = [
   "core_device_proxy",
   "display_stream",
   "crashreportcopymobile",
+  "cryptexd",
   "debug_proxy",
   "diagnostics_relay",
   "dvt",

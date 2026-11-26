@@ -358,10 +358,12 @@ let koreanStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "지도 아래의 저장을 탭하면 핀이 가리키는 위치를 저장합니다. 저장된 장소를 탭하면 바로 그 위치로 설정됩니다.",
     "Play a GPX route": "GPX 경로 재생",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        ".gpx 파일을 가져오면 기기가 선택한 속도로 그 경로를 따라 이동하고, 마지막 지점에 머뭅니다.",
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick, then stays at its last point.":
+        "GPX, KML, GeoJSON 파일이나 좌표 목록을 가져오면 기기가 선택한 속도로 그 경로를 따라 이동하고, 마지막 지점에 머뭅니다.",
     "Import GPX file": "GPX 파일 가져오기",
     "Couldn't read %@ as a GPX file.": "%@ 파일을 GPX 파일로 읽지 못했습니다.",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "%@ 파일을 경로로 읽지 못했습니다. GPX, KML, GeoJSON 파일이나 줄마다 위도와 경도가 있는 파일을 가져오세요.",
     "%@ has no track, route or waypoints in it.": "%@ 파일에 트랙, 경로, 웨이포인트가 없습니다.",
     "As recorded": "기록된 대로",
     "Walk": "도보",

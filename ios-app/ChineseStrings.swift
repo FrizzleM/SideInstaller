@@ -356,10 +356,12 @@ let chineseStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "轻点地图下方的“存储”即可保留图钉下的位置。轻点已存储的地点会立即设置该位置。",
     "Play a GPX route": "播放 GPX 路线",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        "导入 .gpx 文件后，设备会按你选择的速度沿路线移动，结束后停在最后一个点。",
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick, then stays at its last point.":
+        "导入 GPX、KML 或 GeoJSON 文件，或一份坐标列表后，设备会按你选择的速度沿路线移动，结束后停在最后一个点。",
     "Import GPX file": "导入 GPX 文件",
     "Couldn't read %@ as a GPX file.": "无法将 %@ 读取为 GPX 文件。",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "无法将 %@ 读取为路线。请导入 GPX、KML 或 GeoJSON 文件，或每行包含一个纬度和经度的文件。",
     "%@ has no track, route or waypoints in it.": "%@ 中没有轨迹、路线或航点。",
     "As recorded": "按记录时间",
     "Walk": "步行",

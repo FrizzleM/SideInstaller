@@ -13,8 +13,9 @@ replaces it.
 
 ## Local changes
 
-Three files differ from upstream (`Cargo.toml`, `build.rs`,
-`src/tunnel_provider.rs`), and `idevice.h` is generated here. To list them again:
+`Cargo.toml`, `build.rs`, `src/lib.rs` and `src/tunnel_provider.rs` differ from
+upstream, `src/cryptexd.rs` is upstream's from a later revision, and `idevice.h`
+is generated here. To list them again:
 `diff -rq ~/.cargo/git/checkouts/idevice-*/7bd551c/ffi rust-core/vendor/idevice-ffi`.
 
 **1. `Cargo.toml` — `crate-type = ["rlib"]`.**
@@ -71,9 +72,34 @@ the new one, that error says nothing useful.
 `idevice.h` here, `vendor/cpp/include/idevice.h` and `rust-core/include/idevice.h`
 carry the new function and enum.
 
+**5. `src/tunnel_provider.rs` — segments capped at 8192 bytes (upstream
+`edf2587`).**
+
+The RPPairing tunnel's adapter takes `min(mtu, 8192) - 60` as its MSS, as
+upstream sets it, where it took the MTU less 60 (`vendor/idevice` change 8).
+
+**6. `src/cryptexd.rs`, `src/lib.rs`, `Cargo.toml` — cryptexd's C API
+(upstream `2bc58aa`).**
+
+Upstream's file from `master` @ `c8fff6d` as it is, for `vendor/idevice`'s
+change 9, behind a `cryptexd` feature that `full` includes.
+`DeviceConnection.swift` calls `cryptexd_installed_ddi`, `cryptex1_assets_load`
+and `cryptexd_install_ddi`, the calls StikDebug installs the DeveloperDiskImage
+with from iOS 26.4 on.
+
+**7. `Cargo.toml` — a `[patch]` to `../idevice`, for build.rs's cbindgen.**
+
+cbindgen runs `cargo metadata` on this crate as its own root, where rust-core's
+`[patch]` doesn't apply, so `idevice` resolved to the pinned git revision,
+which has no `cryptexd` feature, and the build script failed. The same patch
+here makes that run resolve `vendor/idevice` too. In rust-core's build only the
+workspace root's patches count, and they name the same folder, so nothing else
+changes. `Cargo.lock` here follows: `idevice` from the path, jktcp 0.1.8.
+
 ## Re-vendoring
 
-None of these changes is upstream as of `master` @ `8970209` (2026-10-27).
-Re-vendor from the same revision as `vendor/idevice`, keep changes 1 and 2 or the
-build breaks, and carry change 4 over or the Swift side stops compiling.
-Regenerate `idevice.h` and copy it to `rust-core/include/` afterwards.
+None of changes 1–4 is upstream as of `master` @ `8970209` (2026-10-27); 5 and 6
+are from `master` @ `c8fff6d` (2026-11-22). Re-vendor from the same revision as
+`vendor/idevice`, keep changes 1, 2 and 7 or the build breaks, and carry change
+4 over or the Swift side stops compiling. Regenerate `idevice.h` and copy it to
+`rust-core/include/` afterwards.

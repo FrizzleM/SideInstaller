@@ -366,10 +366,12 @@ let spanishStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "Toca Guardar bajo el mapa para conservar el punto bajo el pin. Al tocar un lugar guardado, se fija al instante.",
     "Play a GPX route": "Reproducir una ruta GPX",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        "Importa un archivo .gpx y el dispositivo lo recorrerá a la velocidad que elijas; al final se queda en el último punto.",
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick, then stays at its last point.":
+        "Importa un archivo GPX, KML o GeoJSON, o una lista de coordenadas, y el dispositivo lo recorrerá a la velocidad que elijas; al final se queda en el último punto.",
     "Import GPX file": "Importar archivo GPX",
     "Couldn't read %@ as a GPX file.": "No se ha podido leer %@ como archivo GPX.",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "No se ha podido leer %@ como ruta. Importa un archivo GPX, KML o GeoJSON, o uno con una latitud y una longitud en cada línea.",
     "%@ has no track, route or waypoints in it.": "%@ no contiene ningún track, ruta ni waypoint.",
     "As recorded": "Como se grabó",
     "Walk": "A pie",

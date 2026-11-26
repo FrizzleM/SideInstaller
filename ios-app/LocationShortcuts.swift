@@ -328,9 +328,13 @@ struct PlayGPXRouteIntent: AppIntent, ForegroundContinuableIntent {
         searchKeywords: ["spoof", "gpx", "track", "route", "walk", "joystick"])
 
     // Type identifiers rather than UTTypes, which need iOS 18. Any file
-    // goes, since one saved from the web is often typed as plain data.
+    // goes, since one saved from the web is often typed as plain data: KML,
+    // GeoJSON and lists of coordinates are read too (`RouteFile`).
     @Parameter(title: "GPX File",
-               supportedTypeIdentifiers: ["com.topografix.gpx", "public.xml", "public.data"])
+               supportedTypeIdentifiers: ["com.topografix.gpx", "com.google.earth.kml",
+                                          "public.geojson", "public.json", "public.xml",
+                                          "public.comma-separated-values-text", "public.plain-text",
+                                          "public.data"])
     var file: IntentFile
 
     @Parameter(title: "Speed",

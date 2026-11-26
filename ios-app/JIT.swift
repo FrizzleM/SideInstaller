@@ -1036,15 +1036,12 @@ final class JITManager: ObservableObject {
         }
         // Mount progress goes to the activity log only.
         var lastLogged = -1
-        try await engine.prepareDeveloperDiskImage(
-            imagePath: DeveloperDiskImage.imagePath,
-            trustcachePath: DeveloperDiskImage.trustcachePath,
-            manifestPath: DeveloperDiskImage.manifestPath) { fraction in
-                let step = Int(fraction * 4) * 25
-                guard step > lastLogged else { return }
-                lastLogged = step
-                Engine.shared.log("DDI mount: \(step)%")
-            }
+        try await engine.prepareDeveloperDiskImage { fraction in
+            let step = Int(fraction * 4) * 25
+            guard step > lastLogged else { return }
+            lastLogged = step
+            Engine.shared.log("DDI mount: \(step)%")
+        }
     }
 
     private func requireDeveloperMode() throws {

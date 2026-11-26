@@ -146,6 +146,10 @@ crate::impl_to_structs!(InnerFileDescriptor<'_>, OwnedInnerFileDescriptor; {
                 .send_packet(AfcOpcode::Read, header_payload, Vec::new())
                 .await?;
 
+            // The end of the file: nothing more will come.
+            if res.payload.is_empty() {
+                break;
+            }
             collected_bytes.extend(res.payload);
         }
         Ok(collected_bytes)
@@ -167,10 +171,18 @@ crate::impl_to_structs!(InnerFileDescriptor<'_>, OwnedInnerFileDescriptor; {
         let mut bytes_left = file_info.size.saturating_sub(seek_pos);
         let mut collected_bytes = Vec::with_capacity(bytes_left);
 
+        // Upstream df4cf18: ask for no more than is left, and stop at an empty
+        // read, so a file that shrank since its size was read doesn't loop
+        // for ever and one that grew doesn't underflow the count.
         while bytes_left > 0 {
-            let bytes = self.as_mut().read_n(MAX_TRANSFER as usize).await?;
+            let want = bytes_left.min(MAX_TRANSFER as usize);
+            let bytes = self.as_mut().read_n(want).await?;
 
-            bytes_left -= bytes.len();
+            if bytes.is_empty() {
+                break;
+            }
+
+            bytes_left = bytes_left.saturating_sub(bytes.len());
             collected_bytes.extend(bytes);
         }
 

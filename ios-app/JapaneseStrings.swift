@@ -357,10 +357,12 @@ let japaneseStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "地図の下の「保存」をタップすると、ピンの位置を保存できます。保存した場所をタップすると、すぐにその位置に設定されます。",
     "Play a GPX route": "GPX ルートを再生",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        ".gpx ファイルを読み込むと、デバイスが選んだ速度でルートに沿って移動し、最後の地点で止まります。",
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick, then stays at its last point.":
+        "GPX、KML、GeoJSON ファイルや座標のリストを読み込むと、デバイスが選んだ速度でルートに沿って移動し、最後の地点で止まります。",
     "Import GPX file": "GPX ファイルを読み込む",
     "Couldn't read %@ as a GPX file.": "%@ を GPX ファイルとして読み込めませんでした。",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "%@ をルートとして読み込めませんでした。GPX、KML、GeoJSON ファイル、または各行に緯度と経度があるファイルを読み込んでください。",
     "%@ has no track, route or waypoints in it.": "%@ にはトラック、ルート、ウェイポイントがありません。",
     "As recorded": "記録どおり",
     "Walk": "徒歩",

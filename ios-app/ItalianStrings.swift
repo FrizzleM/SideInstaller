@@ -363,10 +363,12 @@ let italianStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "Tocca Salva sotto la mappa per tenere il punto sotto la puntina. Toccando un luogo salvato lo imposti subito.",
     "Play a GPX route": "Riproduci un percorso GPX",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        "Importa un file .gpx: il dispositivo lo percorre alla velocità che scegli, poi resta sull'ultimo punto.",
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick, then stays at its last point.":
+        "Importa un file GPX, KML o GeoJSON, o un elenco di coordinate: il dispositivo lo percorre alla velocità che scegli, poi resta sull'ultimo punto.",
     "Import GPX file": "Importa file GPX",
     "Couldn't read %@ as a GPX file.": "Impossibile leggere %@ come file GPX.",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "Impossibile leggere %@ come percorso. Importa un file GPX, KML o GeoJSON, o un file con una latitudine e una longitudine per riga.",
     "%@ has no track, route or waypoints in it.": "%@ non contiene tracce, percorsi o waypoint.",
     "As recorded": "Come registrato",
     "Walk": "A piedi",

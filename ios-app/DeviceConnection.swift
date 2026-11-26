@@ -1878,8 +1878,9 @@ final class DeviceConnection {
 
     // MARK: Developer disk image (image_mounter over RSD)
 
-    /// How many developer images the device has mounted. Zero means the DVT
-    /// services — location simulation among them — aren't reachable yet.
+    /// How many developer images the image mounter has mounted. Zero means the
+    /// DVT services — location simulation among them — aren't reachable yet,
+    /// unless the image went on as a cryptex (`installedCryptexDeveloperImage`).
     func mountedDeveloperImageCount() throws -> Int {
         guard let adapter, let handshake else { throw fail("not connected") }
         var client: OpaquePointer?
@@ -1963,6 +1964,71 @@ final class DeviceConnection {
         plist_get_uint_val(value, &chipID)
         guard chipID != 0 else { throw fail("device reported an empty UniqueChipID") }
         return chipID
+    }
+
+    /// What developer disk image the device has, for the log, or nil when it
+    /// has none. With `checkingCryptex` (iOS 26.4 and newer, where it goes on
+    /// as a cryptex) cryptexd is asked first, as StikDebug asks it; the image
+    /// mounter decides otherwise. When the image mounter can't be asked but
+    /// cryptexd answered that there's none, there's none.
+    func developerImagePresence(checkingCryptex: Bool) throws -> String? {
+        var cryptexAnswered = false
+        var cryptexFailure: Error?
+        if checkingCryptex {
+            do {
+                if let version = try installedCryptexDeveloperImage() {
+                    return version.isEmpty ? "a cryptex" : "cryptex \(version)"
+                }
+                cryptexAnswered = true
+            } catch {
+                cryptexFailure = error
+                Engine.shared.log("cryptexd didn't say whether the developer disk image is installed (\(error)). Asking the image mounter …")
+            }
+        }
+        do {
+            let count = try mountedDeveloperImageCount()
+            return count > 0 ? "\(count) image(s) mounted" : nil
+        } catch {
+            if cryptexAnswered { return nil }
+            throw cryptexFailure ?? error
+        }
+    }
+
+    // MARK: Developer disk image as a cryptex (cryptexd over RSD)
+
+    /// The version of the DeveloperDiskImage cryptex installed on the device,
+    /// nil when there's none. Read from cryptexd: an image installed through
+    /// it, as from iOS 26.4 on, isn't one the image mounter lists.
+    func installedCryptexDeveloperImage() throws -> String? {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var installed: UnsafeMutablePointer<InstalledCryptexC>?
+        try check(cryptexd_installed_ddi(adapter, handshake, &installed),
+                  "cryptexd_installed_ddi failed")
+        guard let installed else { return nil }
+        defer { cryptexd_free_installed_cryptex(installed) }
+        return installed.pointee.version.map { String(cString: $0) } ?? ""
+    }
+
+    /// Installs the DeveloperDiskImage cryptex from `directory`, its Restore
+    /// directory, as StikDebug does from iOS 26.4 on (`cryptexd_install_ddi`):
+    /// cryptexd gives this iPhone's identifiers and nonce, Apple signs a
+    /// Cryptex1 ticket for them, and cryptexd installs the image with it.
+    /// Returns the installed cryptex's version.
+    @discardableResult
+    func installCryptexDeveloperImage(directory: String) throws -> String {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var assets: OpaquePointer?
+        try check(directory.withCString { cryptex1_assets_load($0, &assets) },
+                  "loading the developer disk image cryptex from \(directory) failed")
+        guard let assets else { throw fail("cryptex assets handle was null") }
+        defer { cryptex1_assets_free(assets) }
+
+        var installed: UnsafeMutablePointer<InstalledCryptexC>?
+        try check(cryptexd_install_ddi(adapter, handshake, assets, &installed),
+                  "installing the developer disk image cryptex failed")
+        guard let installed else { return "" }
+        defer { cryptexd_free_installed_cryptex(installed) }
+        return installed.pointee.version.map { String(cString: $0) } ?? ""
     }
 
     // MARK: Developer Mode (AMFI)

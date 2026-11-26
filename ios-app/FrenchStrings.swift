@@ -365,10 +365,12 @@ let frenchStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "Touche Enregistrer sous la carte pour garder le point sous l'épingle. Toucher un lieu enregistré le définit aussitôt.",
     "Play a GPX route": "Lire un itinéraire GPX",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        "Importe un fichier .gpx : l'appareil le parcourt à la vitesse choisie, puis reste sur le dernier point.",
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick, then stays at its last point.":
+        "Importe un fichier GPX, KML ou GeoJSON, ou une liste de coordonnées : l'appareil le parcourt à la vitesse choisie, puis reste sur le dernier point.",
     "Import GPX file": "Importer un fichier GPX",
     "Couldn't read %@ as a GPX file.": "Impossible de lire %@ comme fichier GPX.",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "Impossible de lire %@ comme itinéraire. Importe un fichier GPX, KML ou GeoJSON, ou un fichier avec une latitude et une longitude par ligne.",
     "%@ has no track, route or waypoints in it.":
         "%@ ne contient ni trace, ni itinéraire, ni waypoint.",
     "As recorded": "Comme enregistré",

@@ -330,10 +330,12 @@ let turkishStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "İğnenin altındaki yeri saklamak için haritanın altındaki Kaydet'e dokun. Kayıtlı bir yere dokunmak hemen uygular.",
     "Play a GPX route": "GPX rotası oynat",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        ".gpx dosyası içe aktar; cihaz seçtiğin hızda rota boyunca hareket eder, sonra son noktada kalır.",
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick, then stays at its last point.":
+        "GPX, KML veya GeoJSON dosyası ya da bir koordinat listesi içe aktar; cihaz seçtiğin hızda rota boyunca hareket eder, sonra son noktada kalır.",
     "Import GPX file": "GPX dosyasını içe aktar",
     "Couldn't read %@ as a GPX file.": "%@ bir GPX dosyası olarak okunamadı.",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "%@ bir rota olarak okunamadı. GPX, KML veya GeoJSON dosyası ya da her satırında bir enlem ve boylam olan bir dosya içe aktar.",
     "%@ has no track, route or waypoints in it.": "%@ içinde iz, rota veya yol noktası yok.",
     "As recorded": "Kayıtlı hızda",
     "Walk": "Yürüme",

@@ -363,10 +363,12 @@ let vietnameseStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "Chạm Lưu bên dưới bản đồ để giữ lại điểm dưới ghim. Chạm vào một địa điểm đã lưu để đặt ngay.",
     "Play a GPX route": "Phát lộ trình GPX",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        "Nhập tệp .gpx và thiết bị sẽ di chuyển theo nó với tốc độ bạn chọn, rồi dừng ở điểm cuối.",
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick, then stays at its last point.":
+        "Nhập tệp GPX, KML hoặc GeoJSON, hoặc một danh sách tọa độ, và thiết bị sẽ di chuyển theo nó với tốc độ bạn chọn, rồi dừng ở điểm cuối.",
     "Import GPX file": "Nhập tệp GPX",
     "Couldn't read %@ as a GPX file.": "Không thể đọc %@ dưới dạng tệp GPX.",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "Không thể đọc %@ dưới dạng tuyến đường. Hãy nhập tệp GPX, KML hoặc GeoJSON, hoặc tệp có vĩ độ và kinh độ trên mỗi dòng.",
     "%@ has no track, route or waypoints in it.": "%@ không có track, route hay waypoint nào.",
     "As recorded": "Như đã ghi",
     "Walk": "Đi bộ",

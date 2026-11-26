@@ -88,7 +88,9 @@ impl CoreDeviceProxy {
         let mtu = self.tunnel.info.mtu as usize;
         let stream: Box<dyn crate::ReadWrite> = self.tunnel.into_inner();
         let mut adapter = crate::tcp::adapter::Adapter::new(Box::new(stream), our_ip, their_ip);
-        adapter.set_mss(mtu.saturating_sub(60));
+        // Capped at 8192 as upstream does (edf2587): the tunnel's MTU can be
+        // far larger than the segments the device's end takes.
+        adapter.set_mss(mtu.min(8192).saturating_sub(60));
         Ok(adapter)
     }
 }
