@@ -1671,4 +1671,22 @@ let chineseStrings: [String: String] = [
     "Failed: %@": "失败：%@",
     "Still getting ready. Try again in a moment.": "正在准备，稍后再试。",
 
+    // MARK: - 0.9.161: uninstall, clean up old versions, last-checked, partial pairing write
+
+    "Uninstall": "卸载",
+    "Uninstall %@?": "卸载 %@？",
+    "This removes %@ from this iPhone, including its data.": "这会从这台 iPhone 上删除 %@，包括它的数据。",
+    "SideInstaller can't uninstall itself.": "SideInstaller 不能卸载自己。",
+    "Clean up old versions": "清理旧版本",
+    "Clean up %d old versions?": "清理 %d 个旧版本？",
+    "Only the newest version of each app is kept. Deleted files can't be recovered.": "每个 App 只保留最新版本。删掉的文件无法恢复。",
+    "Cleaned up %d old versions.": "已清理 %d 个旧版本。",
+    "No old versions to clean up.": "没有可清理的旧版本。",
+    "%d files skipped (in use or needed for renewal).": "%d 个文件已跳过（正在使用或续签需要）。",
+    "%d files couldn't be deleted: %@": "%d 个文件删不掉：%@",
+    "Checked just now": "刚刚检查过",
+    "Checked %d minutes ago": "%d 分钟前检查过",
+    "Checked %d hours ago": "%d 小时前检查过",
+    "Checked %d days ago": "%d 天前检查过",
+    "Pairing file installed into %@, but couldn't be written into %@.": "配对文件已写入 %@，但没能写入 %@。",
 ]

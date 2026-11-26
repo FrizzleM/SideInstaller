@@ -1659,4 +1659,22 @@ let japaneseStrings: [String: String] = [
     "Failed: %@": "失敗：%@",
     "Still getting ready. Try again in a moment.": "準備中です。しばらくしてからもう一度お試しください。",
 
+    // MARK: - 0.9.161: uninstall, clean up old versions, last-checked, partial pairing write
+
+    "Uninstall": "アンインストール",
+    "Uninstall %@?": "%@ をアンインストールしますか？",
+    "This removes %@ from this iPhone, including its data.": "%@ をこの iPhone から削除します。データも含みます。",
+    "SideInstaller can't uninstall itself.": "SideInstaller は自分自身をアンインストールできません。",
+    "Clean up old versions": "古いバージョンを整理",
+    "Clean up %d old versions?": "%d 件の古いバージョンを整理しますか？",
+    "Only the newest version of each app is kept. Deleted files can't be recovered.": "各アプリの最新バージョンのみ残します。削除したファイルは復元できません。",
+    "Cleaned up %d old versions.": "%d 件の古いバージョンを整理しました。",
+    "No old versions to clean up.": "整理する古いバージョンはありません。",
+    "%d files skipped (in use or needed for renewal).": "%d 件のファイルをスキップしました（使用中または更新に必要）。",
+    "%d files couldn't be deleted: %@": "%d 件のファイルを削除できませんでした：%@",
+    "Checked just now": "たった今確認",
+    "Checked %d minutes ago": "%d 分前に確認",
+    "Checked %d hours ago": "%d 時間前に確認",
+    "Checked %d days ago": "%d 日前に確認",
+    "Pairing file installed into %@, but couldn't be written into %@.": "ペアリングファイルを %@ にインストールしましたが、%@ には書き込めませんでした。",
 ]

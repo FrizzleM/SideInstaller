@@ -127,17 +127,40 @@ struct InstallHistoryView: View {
 
     /// F1: reinstall this entry from Downloads — the newest same-name IPA,
     /// or a notice telling the user to download it again first.
+    /// B-1 (0.9.161): `reinstallFromHistory` returns when its run *starts*,
+    /// not when it lands — the old code re-read the list at once, so the
+    /// new entry (written by `finishSuccess` / `recordFailure` when the
+    /// run ends) wasn't there yet and the stale failed row stayed, and
+    /// `reinstallingID` cleared while the run was still going (spinner
+    /// stopped early, and tapping the row again reported a phantom
+    /// "already running"). Wait the run out first (`reinstallAllFailed`
+    /// 同款：`isRunning` 落袋再看 `finished`), then re-read; the row
+    /// stays disabled until it lands.
     private func reinstall(_ entry: InstallHistoryEntry) {
         guard reinstallingID == nil else { return }
         reinstallingID = entry.id
-        Task {
-            let ok = await engine.reinstallFromHistory(entry)
-            if !ok, let error = engine.lastError {
+        Task { @MainActor in
+            let started = await engine.reinstallFromHistory(entry)
+            if started {
+                while engine.isRunning, !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(500))
+                }
+                if Task.isCancelled {
+                    reinstallingID = nil
+                    return
+                }
+                // A run that ended writes its entry either way (success via
+                // finishSuccess, failure via recordFailure) — re-read
+                // unconditionally, so the new row replaces the stale one.
+                entries = InstallHistoryStore.load()
+                if engine.downgradeDeclined {
+                    notice = engine.downgradeDeclinedMessage ?? engine.lastError
+                } else if !engine.finished, let error = engine.lastError {
+                    notice = error
+                }
+            } else if let error = engine.lastError {
                 notice = error
             }
-            // B-6 (0.9.158): a successful reinstall writes a new entry at
-            // the top — re-read, so it shows without leaving the page.
-            if ok { entries = InstallHistoryStore.load() }
             reinstallingID = nil
         }
     }

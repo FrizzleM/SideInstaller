@@ -167,6 +167,15 @@ struct SourcesView: View {
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                 }
+                // F-3 (0.9.161): when this source was last checked — the
+                // persisted time, so it survives a restart. Over 24 hours
+                // without a check reads as stale, in the warning color.
+                if let checked = source.lastCheckedAt {
+                    Text(Self.checkedText(for: checked))
+                        .font(.caption)
+                        .foregroundStyle(Date().timeIntervalSince(checked) > 24 * 3600 ? Theme.warning : Theme.muted)
+                        .lineLimit(1)
+                }
             }
             Spacer()
             if source.isLoading {
@@ -190,6 +199,19 @@ struct SourcesView: View {
             .labelsHidden()
         }
         .opacity(store.isDisabled(source.url) ? 0.5 : 1)
+    }
+
+    /// F-3 (0.9.161): "x 分钟前检查过" — just now / minutes / hours / days
+    /// from the persisted last-check time. Over 24 hours the row colors
+    /// it as stale (see the call site in `sourceRow`).
+    private static func checkedText(for date: Date) -> String {
+        let seconds = max(0, Date().timeIntervalSince(date))
+        if seconds < 60 { return L("Checked just now") }
+        let minutes = Int(seconds / 60)
+        if minutes < 60 { return L("Checked %d minutes ago", minutes) }
+        let hours = minutes / 60
+        if hours < 24 { return L("Checked %d hours ago", hours) }
+        return L("Checked %d days ago", hours / 24)
     }
 
     /// A source or app icon: the remote image, or a box placeholder while it
@@ -253,6 +275,13 @@ struct SourceAppsView: View {
     @State private var appSort = SourceSort.default
     /// U-UI：应用列表搜索（名字含查询串，不区分大小写）。
     @State private var appSearchText = ""
+    /// F-1 (0.9.161): the installed app awaiting uninstall confirmation
+    /// (installed bundle ID + shown name), the one uninstalling, and a
+    /// failure to report — the confirm box is the swipe's, the failure
+    /// box the run's.
+    @State private var pendingUninstall: (bundleID: String, name: String)?
+    @State private var uninstallingID: String?
+    @State private var uninstallError: String?
 
     /// What one app's row is doing.
     private enum RowState: Equatable {
@@ -366,6 +395,29 @@ struct SourceAppsView: View {
         } message: {
             Text(updateAllSummary ?? "")
         }
+        // F-1 (0.9.161): uninstall confirm + failure, for the row swipe.
+        .alert(L("Uninstall %@?", pendingUninstall?.name ?? ""), isPresented: Binding(
+            get: { pendingUninstall != nil },
+            set: { if !$0 { pendingUninstall = nil } }
+        )) {
+            Button(L("Uninstall"), role: .destructive) {
+                if let pending = pendingUninstall {
+                    pendingUninstall = nil
+                    uninstallApp(bundleID: pending.bundleID)
+                }
+            }
+            Button(L("Cancel"), role: .cancel) { pendingUninstall = nil }
+        } message: {
+            Text(L("This removes %@ from this iPhone, including its data.", pendingUninstall?.name ?? ""))
+        }
+        .alert(L("Uninstall"), isPresented: Binding(
+            get: { uninstallError != nil },
+            set: { if !$0 { uninstallError = nil } }
+        )) {
+            Button(L("OK"), role: .cancel) { uninstallError = nil }
+        } message: {
+            Text(uninstallError ?? "")
+        }
         // F2 (0.9.153): leaving the page no longer cancels the download —
         // the shared downloader keeps it running, and the completion
         // notification (see startInstall/startCertInstall) says when it
@@ -415,6 +467,19 @@ struct SourceAppsView: View {
             }
         }
         .padding(.vertical, 4)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            // F-1 (0.9.161): uninstall the installed copy — only when this
+            // source's app is on the device, never SideInstaller itself.
+            if let bundleID = installedBundleID(for: app),
+               bundleID != Bundle.main.bundleIdentifier {
+                Button(role: .destructive) {
+                    pendingUninstall = (bundleID, app.name ?? bundleID)
+                } label: {
+                    Label(L("Uninstall"), systemImage: "trash")
+                }
+                .disabled(uninstallingID != nil)
+            }
+        }
     }
 
     /// 第二行：“应用 - 源名”，副标题有就跟在括号里（截图同款）。
@@ -474,6 +539,34 @@ struct SourceAppsView: View {
         return appsManager.entries.first {
             ProfileMatcher.installed($0.app.bundleID, isBuiltFrom: bundleID, teamID: nil)
         }?.app.version
+    }
+
+    /// F-1 (0.9.161): the installed bundle ID behind `installedVersion`,
+    /// for the uninstall swipe — the exact ID installd knows, team suffix
+    /// and all, not the source's base ID.
+    private func installedBundleID(for app: AltApp) -> String? {
+        guard let bundleID = app.bundleIdentifier, !bundleID.isEmpty else { return nil }
+        return appsManager.entries.first {
+            ProfileMatcher.installed($0.app.bundleID, isBuiltFrom: bundleID, teamID: nil)
+        }?.app.bundleID
+    }
+
+    /// F-1 (0.9.161): uninstall one installed app, then re-read the device
+    /// list so the row's "installed" line is gone without leaving the
+    /// page. Failures surface here, next to the row the user swiped.
+    private func uninstallApp(bundleID: String) {
+        guard uninstallingID == nil else { return }
+        uninstallingID = bundleID
+        Task { @MainActor in
+            do {
+                try await engine.uninstallApp(bundleID: bundleID)
+                let task = appsManager.load()
+                if let task { await task.value } else { await appsManager.inFlightLoadTask?.value }
+            } catch {
+                uninstallError = userFacingErrorMessage(error)
+            }
+            uninstallingID = nil
+        }
     }
 
     /// True when the source offers a newer version than the installed one.

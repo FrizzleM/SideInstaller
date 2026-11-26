@@ -1268,6 +1268,12 @@ struct AppsView: View {
     /// to the apps expiring within 3 days (or already expired); tapping
     /// the badge again, or "Show all", restores the full list.
     @State private var showExpiringOnly = false
+    /// F-1 (0.9.161): the installed app awaiting uninstall confirmation,
+    /// the one uninstalling, and a failure to report — the confirm box
+    /// is the swipe's, the failure box the run's.
+    @State private var pendingUninstall: SideloadedAppStatus?
+    @State private var uninstallingID: String?
+    @State private var uninstallError: String?
     /// F3 (0.9.145): the app list's sort — the file page's FileSort 同款
     /// （到期日 / 名称 / Bundle ID），@AppStorage 持久化。只改显示顺序，
     /// 不动匹配与续签；默认到期日就是 ProfileMatcher 的顺序，原样返回。
@@ -1367,6 +1373,47 @@ struct AppsView: View {
             Button(L("Cancel"), role: .cancel) { }
         } message: {
             Text(L("续签要走 LocalDevVPN 的本地隧道。先装好 LocalDevVPN，之后点续签会自动打开它连接，不用手动开。"))
+        }
+        // F-1 (0.9.161): uninstall confirm + failure, for the row swipe.
+        .alert(L("Uninstall %@?", pendingUninstall?.app.name ?? ""), isPresented: Binding(
+            get: { pendingUninstall != nil },
+            set: { if !$0 { pendingUninstall = nil } }
+        )) {
+            Button(L("Uninstall"), role: .destructive) {
+                if let status = pendingUninstall {
+                    pendingUninstall = nil
+                    uninstall(status)
+                }
+            }
+            Button(L("Cancel"), role: .cancel) { pendingUninstall = nil }
+        } message: {
+            Text(L("This removes %@ from this iPhone, including its data.", pendingUninstall?.app.name ?? ""))
+        }
+        .alert(L("Uninstall"), isPresented: Binding(
+            get: { uninstallError != nil },
+            set: { if !$0 { uninstallError = nil } }
+        )) {
+            Button(L("OK"), role: .cancel) { uninstallError = nil }
+        } message: {
+            Text(uninstallError ?? "")
+        }
+    }
+
+    /// F-1 (0.9.161): uninstall one sideloaded app, then re-read the device
+    /// list so the row is gone without leaving the page. Failures surface
+    /// here, next to the row the user swiped — not in the manager's popup.
+    private func uninstall(_ status: SideloadedAppStatus) {
+        guard uninstallingID == nil else { return }
+        uninstallingID = status.app.bundleID
+        Task { @MainActor in
+            do {
+                try await engine.uninstallApp(bundleID: status.app.bundleID)
+                let task = manager.load()
+                if let task { await task.value } else { await manager.inFlightLoadTask?.value }
+            } catch {
+                uninstallError = userFacingErrorMessage(error)
+            }
+            uninstallingID = nil
         }
     }
 
@@ -1735,6 +1782,17 @@ struct AppsView: View {
                                     Label(L("Renew this app"), systemImage: "arrow.clockwise")
                                 }
                                 .tint(Theme.accent)
+                            }
+                            // F-1 (0.9.161): uninstall the installed copy —
+                            // never SideInstaller itself (it lists here too:
+                            // it is installed with a provisioning profile).
+                            if status.app.bundleID != Bundle.main.bundleIdentifier {
+                                Button(role: .destructive) {
+                                    pendingUninstall = status
+                                } label: {
+                                    Label(L("Uninstall"), systemImage: "trash")
+                                }
+                                .disabled(uninstallingID != nil)
                             }
                         }
                         .cascadeItem(6 + idx)

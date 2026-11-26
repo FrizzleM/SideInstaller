@@ -258,6 +258,103 @@ final class DownloadsManager: ObservableObject {
         }
         refresh()
     }
+
+    /// F-2 (0.9.161): what "clean up old versions" would delete, before
+    /// anything is deleted — per bundle ID, only the newest IPA stays
+    /// (newest version, then newest file); files in use or serving as a
+    /// renewal source are never candidates, they're counted as skipped.
+    /// A file no IPA on disk can be identified by (no readable bundle ID
+    /// or version) is left alone: without a version it can't be proven
+    /// older than the one kept.
+    @MainActor
+    func cleanupPreview() -> (deletable: [DownloadedIPA], skipped: Int) {
+        var byBundleID: [String: [(item: DownloadedIPA, version: String)]] = [:]
+        for item in downloads {
+            guard let info = IPALibrary.appInfo(at: item.url),
+                  let version = info.version ?? item.version, !version.isEmpty
+            else { continue }
+            byBundleID[info.bundleID, default: []].append((item, version))
+        }
+        var deletable: [DownloadedIPA] = []
+        var skipped = 0
+        for (_, group) in byBundleID {
+            guard group.count > 1 else { continue }
+            // Newest first: higher version, then later modification.
+            let ranked = group.sorted { a, b in
+                if a.version != b.version { return UpdateChecker.isNewer(a.version, than: b.version) }
+                return (a.item.modified ?? .distantPast) > (b.item.modified ?? .distantPast)
+            }
+            for old in ranked.dropFirst() {
+                let path = old.item.url.path
+                // deleteAll 同款三道拦 + 续签源（Engine.finishSuccess 同款判据）。
+                if engine.isInstallingSource(path: path)
+                    || engine.isSigningSource(path: path)
+                    || engine.isRenewingSource(path: path) {
+                    skipped += 1
+                    continue
+                }
+                if RenewalSourceStore.source(forFileURL: old.item.url,
+                                            bundleID: IPALibrary.appInfo(at: old.item.url)?.bundleID) != nil {
+                    skipped += 1
+                    continue
+                }
+                deletable.append(old.item)
+            }
+        }
+        return (deletable, skipped)
+    }
+
+    /// F-2 (0.9.161): delete the preview's candidates, with `delete(_:)`
+    /// 同款 bookkeeping per file (ledger, custom slot, renewal pairing),
+    /// and report what happened — deleted, skipped, failed — as one
+    /// summary the view shows, instead of leaving the list to speak
+    /// for itself.
+    @MainActor
+    func cleanupOldVersions() -> String {
+        let preview = cleanupPreview()
+        var deleted = 0
+        var failed = 0
+        var failedNames: [String] = []
+        var deletedItems: [DownloadedIPA] = []
+        for item in preview.deletable {
+            do {
+                try FileManager.default.removeItem(at: item.url)
+                DownloadLedger.forget(item.url)
+                if engine.downloadedIPAPath == item.url.path {
+                    engine.downloadedIPAPath = nil
+                }
+                if item.source == .custom { engine.refreshCustomIPA() }
+                engine.log("Downloads: cleaned up old version \(item.fileName).")
+                deleted += 1
+                deletedItems.append(item)
+            } catch {
+                failed += 1
+                failedNames.append(item.fileName)
+                engine.log("⛔️ Downloads: couldn't delete \(item.fileName) (\(error.localizedDescription))")
+            }
+        }
+        if deleted > 0 {
+            SideloadedAppsManager.shared.refreshRefreshableOnly()
+        }
+        // Only the files actually deleted leave the list locally — a
+        // failed delete stays until the background rescan confirms it.
+        downloads.removeAll { deletedItems.contains($0) }
+        refresh()
+        var summary = deleted > 0
+            ? L("Cleaned up %d old versions.", deleted)
+            : L("No old versions to clean up.")
+        if preview.skipped > 0 {
+            summary += " " + L("%d files skipped (in use or needed for renewal).", preview.skipped)
+        }
+        if failed > 0 {
+            var list = failedNames.prefix(5).joined(separator: "、")
+            if failedNames.count > 5 {
+                list += "、" + L("等 %d 个", failedNames.count - 5)
+            }
+            summary += " " + L("%d files couldn't be deleted: %@", failed, list)
+        }
+        return summary
+    }
 }
 
 /// 下载列表独立页（工具 tab 固定入口，复用 DownloadsManager）：
@@ -282,6 +379,11 @@ struct DownloadsListView: View {
     /// is tapped, not on every body pass).
     @State private var confirmingClearAll = false
     @State private var clearAllRenewalNames: [String] = []
+    /// F-2 (0.9.161): the old-version cleanup's confirm (count + skipped)
+    /// and its result line — the counts are read when the button is
+    /// tapped, not on every body pass.
+    @State private var pendingCleanup: (count: Int, skipped: Int)?
+    @State private var cleanupResult: String?
     /// U1 (0.9.148): search text + sort (FilesTabView FileSort 同款，
     /// 只改显示顺序，不动磁盘顺序）。
     @State private var searchText = ""
@@ -394,6 +496,19 @@ struct DownloadsListView: View {
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                         Spacer()
+                        // F-2 (0.9.161): one-tap old-version cleanup — the
+                        // count is read now, for the confirm box; nothing
+                        // to delete means the result line at once, no box.
+                        Button(L("Clean up old versions")) {
+                            let preview = manager.cleanupPreview()
+                            if preview.deletable.isEmpty {
+                                cleanupResult = manager.cleanupOldVersions()
+                            } else {
+                                pendingCleanup = (preview.deletable.count, preview.skipped)
+                            }
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .disabled(manager.deletingID != nil)
                         Button(L("清空全部")) {
                             clearAllRenewalNames = manager.downloads.compactMap {
                                 RenewalSourceStore.source(forFileURL: $0.url, bundleID: nil)?.appName
@@ -527,6 +642,30 @@ struct DownloadsListView: View {
             } else {
                 Text(L("删除后无法恢复"))
             }
+        }
+        // F-2 (0.9.161): old-version cleanup — confirm with the count,
+        // then the result line (deleted / skipped / failed).
+        .alert(L("Clean up %d old versions?", pendingCleanup?.count ?? 0), isPresented: Binding(
+            get: { pendingCleanup != nil },
+            set: { if !$0 { pendingCleanup = nil } }
+        )) {
+            Button(L("Delete"), role: .destructive) {
+                cleanupResult = manager.cleanupOldVersions()
+                pendingCleanup = nil
+            }
+            Button(L("Cancel"), role: .cancel) { pendingCleanup = nil }
+        } message: {
+            let skipped = pendingCleanup?.skipped ?? 0
+            Text(L("Only the newest version of each app is kept. Deleted files can't be recovered.")
+                + (skipped > 0 ? " " + L("%d files skipped (in use or needed for renewal).", skipped) : ""))
+        }
+        .alert(L("Clean up old versions"), isPresented: Binding(
+            get: { cleanupResult != nil },
+            set: { if !$0 { cleanupResult = nil } }
+        )) {
+            Button(L("OK"), role: .cancel) { cleanupResult = nil }
+        } message: {
+            Text(cleanupResult ?? "")
         }
     }
 

@@ -1613,4 +1613,22 @@ let turkishStrings: [String: String] = [
     "Failed: %@": "Başarısız: %@",
     "Still getting ready. Try again in a moment.": "Hâlâ hazırlanıyor. Birazdan yeniden deneyin.",
 
+    // MARK: - 0.9.161: uninstall, clean up old versions, last-checked, partial pairing write
+
+    "Uninstall": "Kaldır",
+    "Uninstall %@?": "%@ kaldırılsın mı?",
+    "This removes %@ from this iPhone, including its data.": "Bu, %@ uygulamasını verileriyle birlikte bu iPhone'dan kaldırır.",
+    "SideInstaller can't uninstall itself.": "SideInstaller kendisini kaldıramaz.",
+    "Clean up old versions": "Eski sürümleri temizle",
+    "Clean up %d old versions?": "%d eski sürüm temizlensin mi?",
+    "Only the newest version of each app is kept. Deleted files can't be recovered.": "Her uygulamanın yalnızca en yeni sürümü tutulur. Silinen dosyalar kurtarılamaz.",
+    "Cleaned up %d old versions.": "%d eski sürüm temizlendi.",
+    "No old versions to clean up.": "Temizlenecek eski sürüm yok.",
+    "%d files skipped (in use or needed for renewal).": "%d dosya atlandı (kullanımda veya yenileme için gerekli).",
+    "%d files couldn't be deleted: %@": "%d dosya silinemedi: %@",
+    "Checked just now": "Şimdi denetlendi",
+    "Checked %d minutes ago": "%d dakika önce denetlendi",
+    "Checked %d hours ago": "%d saat önce denetlendi",
+    "Checked %d days ago": "%d gün önce denetlendi",
+    "Pairing file installed into %@, but couldn't be written into %@.": "Eşleştirme dosyası %@ içine yüklendi, ancak %@ içine yazılamadı.",
 ]

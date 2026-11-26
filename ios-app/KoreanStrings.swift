@@ -1660,4 +1660,22 @@ let koreanStrings: [String: String] = [
     "Failed: %@": "실패: %@",
     "Still getting ready. Try again in a moment.": "아직 준비 중입니다. 잠시 후 다시 시도하세요.",
 
+    // MARK: - 0.9.161: uninstall, clean up old versions, last-checked, partial pairing write
+
+    "Uninstall": "삭제",
+    "Uninstall %@?": "%@을(를) 삭제하시겠습니까?",
+    "This removes %@ from this iPhone, including its data.": "이 iPhone에서 %@을(를) 데이터와 함께 삭제합니다.",
+    "SideInstaller can't uninstall itself.": "SideInstaller는 자기 자신을 삭제할 수 없습니다.",
+    "Clean up old versions": "이전 버전 정리",
+    "Clean up %d old versions?": "이전 버전 %d개를 정리하시겠습니까?",
+    "Only the newest version of each app is kept. Deleted files can't be recovered.": "각 앱의 최신 버전만 유지합니다. 삭제된 파일은 복원할 수 없습니다.",
+    "Cleaned up %d old versions.": "이전 버전 %d개를 정리했습니다.",
+    "No old versions to clean up.": "정리할 이전 버전이 없습니다.",
+    "%d files skipped (in use or needed for renewal).": "파일 %d개를 건너뛰었습니다(사용 중이거나 갱신에 필요).",
+    "%d files couldn't be deleted: %@": "파일 %d개를 삭제할 수 없습니다: %@",
+    "Checked just now": "방금 확인함",
+    "Checked %d minutes ago": "%d분 전에 확인함",
+    "Checked %d hours ago": "%d시간 전에 확인함",
+    "Checked %d days ago": "%d일 전에 확인함",
+    "Pairing file installed into %@, but couldn't be written into %@.": "페어링 파일을 %@에 설치했지만 %@에는 쓸 수 없었습니다.",
 ]

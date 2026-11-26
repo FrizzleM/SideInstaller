@@ -1701,4 +1701,22 @@ let frenchStrings: [String: String] = [
     "Failed: %@": "Échec : %@",
     "Still getting ready. Try again in a moment.": "Préparation en cours. Réessayez dans un instant.",
 
+    // MARK: - 0.9.161: uninstall, clean up old versions, last-checked, partial pairing write
+
+    "Uninstall": "Désinstaller",
+    "Uninstall %@?": "Désinstaller %@ ?",
+    "This removes %@ from this iPhone, including its data.": "Cela supprime %@ de cet iPhone, y compris ses données.",
+    "SideInstaller can't uninstall itself.": "SideInstaller ne peut pas se désinstaller.",
+    "Clean up old versions": "Nettoyer les anciennes versions",
+    "Clean up %d old versions?": "Nettoyer %d anciennes versions ?",
+    "Only the newest version of each app is kept. Deleted files can't be recovered.": "Seule la version la plus récente de chaque app est conservée. Les fichiers supprimés ne peuvent pas être récupérés.",
+    "Cleaned up %d old versions.": "%d anciennes versions nettoyées.",
+    "No old versions to clean up.": "Aucune ancienne version à nettoyer.",
+    "%d files skipped (in use or needed for renewal).": "%d fichiers ignorés (en cours d'utilisation ou nécessaires au renouvellement).",
+    "%d files couldn't be deleted: %@": "Impossible de supprimer %d fichiers : %@",
+    "Checked just now": "Vérifié à l'instant",
+    "Checked %d minutes ago": "Vérifié il y a %d minutes",
+    "Checked %d hours ago": "Vérifié il y a %d heures",
+    "Checked %d days ago": "Vérifié il y a %d jours",
+    "Pairing file installed into %@, but couldn't be written into %@.": "Fichier de jumelage installé dans %@, mais impossible de l'écrire dans %@.",
 ]

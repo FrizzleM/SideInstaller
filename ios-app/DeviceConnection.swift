@@ -1224,6 +1224,21 @@ final class DeviceConnection {
         return (0..<count).contains { plistString(apps[$0], "CFBundleIdentifier") == bundleID }
     }
 
+    /// Uninstall the app with this bundle ID, via installation_proxy
+    /// (F-1, 0.9.161). `options` is NULL: installd needs none for a
+    /// plain uninstall. Same connect pattern as `installedApps` above.
+    func uninstallApp(bundleID: String) throws {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var client: OpaquePointer?
+        try check(installation_proxy_connect_rsd(adapter, handshake, &client),
+                  "installation_proxy_connect_rsd failed")
+        guard let client else { throw fail("installation_proxy client was null") }
+        defer { installation_proxy_client_free(client) }
+
+        let err = bundleID.withCString { installation_proxy_uninstall(client, $0, nil) }
+        try check(err, "installation_proxy_uninstall failed")
+    }
+
     /// The host app's exact bundle id for the pairing write, matched on display
     /// name first — isideload rewrites bundle ids — then on "<base>[.<teamID>]".
     func resolveInstalledBundleID(displayName: String, bundleIDBase: String) throws -> String? {

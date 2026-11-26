@@ -79,6 +79,11 @@ struct LoadedSource: Identifiable {
     /// When `model` was last fetched (network or disk cache); nil if never.
     /// Drives the 15-minute TTL in `fetch(_:force:)`.
     var fetchedAt: Date?
+    /// F-3 (0.9.161): when this source's document was last checked
+    /// (successfully fetched, network or disk cache) — persisted in
+    /// UserDefaults, unlike `fetchedAt`, so the row still knows after a
+    /// restart. The row shows it as "x 分钟前检查过", stale past 24 h.
+    var lastCheckedAt: Date?
 
     var id: String { url.absoluteString }
 
@@ -243,6 +248,35 @@ final class SourceStore: ObservableObject {
         IPADownloader.purgeStaleResumeData()
         sources = UnifiedSourceList.load().map { LoadedSource(url: $0) }
         disabled = UnifiedSourceList.disabledURLs()
+        // F-3 (0.9.161): restore the persisted last-check times.
+        let checked = Self.loadLastChecked()
+        for i in sources.indices { sources[i].lastCheckedAt = checked[sources[i].url.absoluteString] }
+    }
+
+    /// F-3 (0.9.161): per-source last-check time, persisted across launches
+    /// (the in-memory `fetchedAt` drives the 15-minute TTL and dies with
+    /// the process). One dict, URL string → seconds since 1970.
+    private static let lastCheckedKey = "CZFSourceLastChecked"
+
+    private static func loadLastChecked() -> [String: Date] {
+        guard let raw = UserDefaults.standard.dictionary(forKey: lastCheckedKey) else { return [:] }
+        var out: [String: Date] = [:]
+        for (key, value) in raw {
+            if let seconds = value as? TimeInterval { out[key] = Date(timeIntervalSince1970: seconds) }
+        }
+        return out
+    }
+
+    private static func saveLastChecked(url: URL, at date: Date) {
+        var stored = loadLastChecked()
+        stored[url.absoluteString] = date
+        UserDefaults.standard.set(stored.mapValues { $0.timeIntervalSince1970 }, forKey: lastCheckedKey)
+    }
+
+    private static func removeLastChecked(keys: [String]) {
+        var stored = loadLastChecked()
+        for key in keys { stored.removeValue(forKey: key) }
+        UserDefaults.standard.set(stored.mapValues { $0.timeIntervalSince1970 }, forKey: lastCheckedKey)
     }
 
     /// Re-read the unified list (the other page saved it): keep the loaded
@@ -257,6 +291,12 @@ final class SourceStore: ObservableObject {
         var kept: [URL: LoadedSource] = [:]
         for source in sources { kept[source.url] = source }
         sources = urls.map { kept[$0] ?? LoadedSource(url: $0) }
+        // F-3 (0.9.161): a source added elsewhere still gets its persisted
+        // last-check time; kept ones already carry it.
+        let checked = Self.loadLastChecked()
+        for i in sources.indices where sources[i].lastCheckedAt == nil {
+            sources[i].lastCheckedAt = checked[sources[i].url.absoluteString]
+        }
     }
 
     func isDisabled(_ url: URL) -> Bool { disabled.contains(url.absoluteString) }
@@ -293,6 +333,7 @@ final class SourceStore: ObservableObject {
         sources.remove(atOffsets: IndexSet(kept))
         persist()
         Self.removeFromSourceCache(keys: removed)
+        Self.removeLastChecked(keys: removed)
     }
 
     /// Disk cache for source documents, in Engine's `releaseCatalogs.json`
@@ -440,6 +481,10 @@ final class SourceStore: ObservableObject {
            Date().timeIntervalSince(cached.fetched) < 15 * 60 {
             sources[index].model = cached.model
             sources[index].fetchedAt = cached.fetched
+            // F-3 (0.9.161): a disk hit is still a check — its time is
+            // when the document was actually fetched, not now.
+            sources[index].lastCheckedAt = cached.fetched
+            Self.saveLastChecked(url: url, at: cached.fetched)
             sources[index].errorMessage = nil
             return
         }
@@ -452,7 +497,11 @@ final class SourceStore: ObservableObject {
             let model = try await Self.fetchSourceDocument(url: url)
             guard let index = sources.firstIndex(where: { $0.url == url }) else { return }
             sources[index].model = model
-            sources[index].fetchedAt = Date()
+            let now = Date()
+            sources[index].fetchedAt = now
+            // F-3 (0.9.161): a successful fetch is a check — record it.
+            sources[index].lastCheckedAt = now
+            Self.saveLastChecked(url: url, at: now)
             sources[index].isLoading = false
             await Self.saveSourceCache(url: url, model: model)
             // B-2 (0.9.157): a new document landed — the badge counts from

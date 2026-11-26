@@ -1693,4 +1693,22 @@ let vietnameseStrings: [String: String] = [
     "Failed: %@": "Thất bại: %@",
     "Still getting ready. Try again in a moment.": "Vẫn đang chuẩn bị. Hãy thử lại sau giây lát.",
 
+    // MARK: - 0.9.161: uninstall, clean up old versions, last-checked, partial pairing write
+
+    "Uninstall": "Gỡ cài đặt",
+    "Uninstall %@?": "Gỡ cài đặt %@?",
+    "This removes %@ from this iPhone, including its data.": "Thao tác này sẽ xóa %@ khỏi iPhone này, bao gồm cả dữ liệu của nó.",
+    "SideInstaller can't uninstall itself.": "SideInstaller không thể tự gỡ cài đặt chính nó.",
+    "Clean up old versions": "Dọn các phiên bản cũ",
+    "Clean up %d old versions?": "Dọn %d phiên bản cũ?",
+    "Only the newest version of each app is kept. Deleted files can't be recovered.": "Chỉ giữ lại phiên bản mới nhất của mỗi ứng dụng. Không thể khôi phục các tệp đã xóa.",
+    "Cleaned up %d old versions.": "Đã dọn %d phiên bản cũ.",
+    "No old versions to clean up.": "Không có phiên bản cũ để dọn.",
+    "%d files skipped (in use or needed for renewal).": "Đã bỏ qua %d tệp (đang dùng hoặc cần cho việc gia hạn).",
+    "%d files couldn't be deleted: %@": "Không thể xóa %d tệp: %@",
+    "Checked just now": "Vừa kiểm tra",
+    "Checked %d minutes ago": "Đã kiểm tra %d phút trước",
+    "Checked %d hours ago": "Đã kiểm tra %d giờ trước",
+    "Checked %d days ago": "Đã kiểm tra %d ngày trước",
+    "Pairing file installed into %@, but couldn't be written into %@.": "Đã cài tệp ghép nối vào %@, nhưng không thể ghi vào %@.",
 ]

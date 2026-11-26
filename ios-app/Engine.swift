@@ -2442,18 +2442,30 @@ final class Engine {
         // 最多拖半秒），3 秒还不起跑就是起跑守卫拦住了（无账号/无配对
         // 文件/系统版本过低），不是起跑慢。旧代码直接 return true，历史页
         // 毫无反馈：行内 spinner 停了，指引卡在用户没看的安装页。
+        // B-2 (0.9.161): whether this call's run ever started — the wait
+        // below also records a run that started and stopped inside one
+        // 100 ms tick, so the downgrade check after it can tell this
+        // run's decline from a stale one.
         var waited = 0.0
+        var started = false
         while !isRunning, !Task.isCancelled, waited < 3.0 {
             try? await Task.sleep(for: .milliseconds(100))
             waited += 0.1
+            started = started || isRunning
         }
+        if isRunning { started = true }
         if Task.isCancelled {
             lastError = L("Install stopped")
             return false
         }
         // F-2 (0.9.159): the user declined this entry's downgrade — the run
         // never started, so say why instead of the generic "didn't start".
-        if downgradeDeclined {
+        // B-2 (0.9.161): only when this call's run actually started — the
+        // flag is cleared in resetRun, which a run stopped by an early
+        // guard never reaches, so a decline left over from an earlier run
+        // would otherwise mask the guard's real reason (no account / no
+        // pairing file) in the branch below.
+        if started, downgradeDeclined {
             lastError = downgradeDeclinedMessage ?? L("Install stopped")
             return false
         }
@@ -4928,6 +4940,29 @@ final class Engine {
         return targets
     }
 
+    /// F-1 (0.9.161): uninstall the app with this bundle ID, via
+    /// installation_proxy. The running app can't uninstall itself —
+    /// installd would kill SideInstaller mid-call — so that is refused
+    /// here, not left to the swipe button that offered it.
+    @MainActor
+    func uninstallApp(bundleID: String) async throws {
+        guard bundleID != Bundle.main.bundleIdentifier else {
+            throw EngineError.message(L("SideInstaller can't uninstall itself."))
+        }
+        // SIDE-2：隧道按需开——同 installedPairingTargets。
+        var tunnelAcquired = false
+        defer { if tunnelAcquired { releaseTunnel() } }
+        guard await acquireTunnel() else {
+            throw EngineError.message(BuiltinTunnel.useBuiltinDirectly
+                ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                : L("LocalDevVPN isn't connected. Connect it, then try again."))
+        }
+        tunnelAcquired = true
+        try await ensurePairingConnection()
+        try await onDeviceQueue { try self.connection.uninstallApp(bundleID: bundleID) }
+        log("Uninstalled \(bundleID).")
+    }
+
     /// Write the current pairing file into one installed target app's container.
     @MainActor
     func installPairing(into target: InstalledPairingTarget) async throws {
@@ -4971,11 +5006,13 @@ final class Engine {
             try self.resolvePlacement(rpPairingPath: path, udid: udid)
         }
         var failures: [String] = []
+        var succeeded: [String] = []
         for target in targets {
             do {
                 try await onDeviceQueue {
                     try self.performInstallPairing(target: target, placementPath: placement, udid: udid)
                 }
+                succeeded.append(target.name)
             } catch {
                 // One app refusing the write shouldn't cost the rest.
                 log("⚠️ Couldn't write into \(target.name) (\(short(error))).")
@@ -4983,7 +5020,15 @@ final class Engine {
             }
         }
         guard failures.isEmpty else {
-            throw EngineError.message(L("Couldn't write into %@.", failures.joined(separator: ", ")))
+            // B7 (0.9.161): a partial write used to report only the failures —
+            // the apps that did get the file were invisible, so a user
+            // couldn't tell a partial success from a total one. Say both.
+            if succeeded.isEmpty {
+                throw EngineError.message(L("Couldn't write into %@.", failures.joined(separator: ", ")))
+            }
+            throw EngineError.message(L("Pairing file installed into %@, but couldn't be written into %@.",
+                                        succeeded.joined(separator: ", "),
+                                        failures.joined(separator: ", ")))
         }
     }
 

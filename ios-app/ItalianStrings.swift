@@ -1695,4 +1695,22 @@ let italianStrings: [String: String] = [
     "Failed: %@": "Non riuscite: %@",
     "Still getting ready. Try again in a moment.": "Preparazione in corso. Riprova tra un momento.",
 
+    // MARK: - 0.9.161: uninstall, clean up old versions, last-checked, partial pairing write
+
+    "Uninstall": "Disinstalla",
+    "Uninstall %@?": "Disinstallare %@?",
+    "This removes %@ from this iPhone, including its data.": "Rimuove %@ da questo iPhone, inclusi i suoi dati.",
+    "SideInstaller can't uninstall itself.": "SideInstaller non può disinstallare sé stesso.",
+    "Clean up old versions": "Pulisci vecchie versioni",
+    "Clean up %d old versions?": "Pulire %d vecchie versioni?",
+    "Only the newest version of each app is kept. Deleted files can't be recovered.": "Viene conservata solo la versione più recente di ogni app. I file eliminati non possono essere recuperati.",
+    "Cleaned up %d old versions.": "%d vecchie versioni eliminate.",
+    "No old versions to clean up.": "Nessuna vecchia versione da pulire.",
+    "%d files skipped (in use or needed for renewal).": "%d file ignorati (in uso o necessari per il rinnovo).",
+    "%d files couldn't be deleted: %@": "Impossibile eliminare %d file: %@",
+    "Checked just now": "Controllato ora",
+    "Checked %d minutes ago": "Controllato %d minuti fa",
+    "Checked %d hours ago": "Controllato %d ore fa",
+    "Checked %d days ago": "Controllato %d giorni fa",
+    "Pairing file installed into %@, but couldn't be written into %@.": "File di abbinamento installato in %@, ma impossibile scriverlo in %@.",
 ]
