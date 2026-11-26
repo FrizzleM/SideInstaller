@@ -488,6 +488,14 @@ final class Engine {
     /// True while the one-click pipeline is running.
     var isRunning: Bool = false
 
+    /// B-2 (0.9.172): true while a Sources update-all batch is running —
+    /// including the download gaps, when `isRunning` is false. The row
+    /// install buttons and the detail page's install entry read this,
+    /// so a tap between two batch items can't start a second install
+    /// and knock the batch over; both batch sites (single-source and
+    /// cross-source) set it, and it also bars the other batch starting.
+    var batchUpdateRunning: Bool = false
+
     /// 本次安装会话的归属凭证：三条管线起跑时（resetRun 之后、
     /// isRunning = true 之前）各 mint 一个新 UUID，resetRun 先把
     /// 旧值清掉，旧凭证从此再匹配不上。Engine 是单管线，isRunning

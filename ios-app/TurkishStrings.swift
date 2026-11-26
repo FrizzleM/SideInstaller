@@ -762,6 +762,7 @@ let turkishStrings: [String: String] = [
     "Latest (%@)": "En son (%@)",
     "Couldn't load the other versions: %@": "Diğer sürümler yüklenemedi: %@",
     "Try again": "Yeniden dene",
+    "Retry failed items": "Başarısız öğeleri yeniden dene",
     "couldn't find the IPA in the %@ %@ release": "%@ %@ sürümünde IPA bulunamadı",
     "%@ has no %@ release right now": "%@ için şu anda %@ sürüm yok",
     "bad asset URL": "geçersiz varlık adresi",

@@ -717,6 +717,7 @@ let koreanStrings: [String: String] = [
     "Latest (%@)": "최신 (%@)",
     "Couldn't load the other versions: %@": "다른 버전을 불러오지 못했습니다: %@",
     "Try again": "다시 시도",
+    "Retry failed items": "실패한 항목 다시 시도",
 
     "couldn't find the IPA in the %@ %@ release":
         "%@ %@ 릴리즈에서 IPA를 찾을 수 없습니다",

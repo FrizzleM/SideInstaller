@@ -721,7 +721,11 @@ struct SettingsView: View {
             } else {
                 ForEach(ignored, id: \.bundleID) { entry in
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.bundleID)
+                        // F-3 (0.9.172): the app's name, not just its
+                        // bundle ID — a bare ID doesn't say which app
+                        // it is. Falls back to the ID when no loaded
+                        // source lists it.
+                        Text(sourcesManager.appName(for: entry.bundleID) ?? entry.bundleID)
                             .font(.subheadline)
                             .lineLimit(1)
                             .truncationMode(.middle)

@@ -271,6 +271,10 @@ struct SourceAppsView: View {
     /// (the cancel handle), which app it is on, and the summary the
     /// end-of-batch alert shows.
     @State private var updateAllTask: Task<Void, Never>?
+    /// F-1 (0.9.172): the batch's failed targets, kept so the summary
+    /// alert can offer "Retry failed items" — only the failed subset
+    /// runs again, not the whole batch.
+    @State private var updateAllFailedTargets: [AltApp] = []
     @State private var updateAllIndex = 0
     @State private var updateAllTotal = 0
     @State private var updateAllCurrent: String?
@@ -384,7 +388,7 @@ struct SourceAppsView: View {
                             // section, one at a time (see startUpdateAll).
                             Button(L("全部更新")) { startUpdateAll() }
                                 .font(.subheadline)
-                                .disabled(updateAllTask != nil || activeID != nil || engine.isRunning)
+                                .disabled(updateAllTask != nil || activeID != nil || engine.isRunning || engine.batchUpdateRunning)
                         }
                     }
                 }
@@ -440,7 +444,18 @@ struct SourceAppsView: View {
             }
         }
         // F3 (0.9.154): the update-all totals, once the batch finishes.
+        // F-1 (0.9.172): when something failed, offer to run just the
+        // failed subset again — same loop, same targets filter, fresh
+        // cellular prompt included (see `startUpdateAll(retryTargets:)`).
         .alert(L("全部更新"), isPresented: $showingUpdateAllSummary) {
+            if !updateAllFailedTargets.isEmpty {
+                Button(L("Retry failed items")) {
+                    let retry = updateAllFailedTargets
+                    updateAllFailedTargets = []
+                    showingUpdateAllSummary = false
+                    startUpdateAll(retryTargets: retry)
+                }
+            }
             Button(L("OK")) {}
         } message: {
             Text(updateAllSummary ?? "")
@@ -787,6 +802,10 @@ struct SourceAppsView: View {
                         startInstall(app)
                     }
                 }
+                // B-2 (0.9.172): not while a batch is running — the retry
+                // would start a second install and knock the batch over
+                // (same as the Download button below).
+                .disabled(updateAllTask != nil || engine.batchUpdateRunning)
                 .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                 .controlSize(.small)
                 Text(message)
@@ -815,13 +834,17 @@ struct SourceAppsView: View {
                 // F-1 (0.9.163): a tap while another download runs queues
                 // behind it now, so the row is only disabled while an
                 // install runs — not while a download does.
-                .disabled(engine.isRunning)
+                // B-2 (0.9.172): and while an update-all batch runs — its
+                // download gaps leave `engine.isRunning` false, so this
+                // is what stops a tap between two batch items colliding
+                // with the batch's own install.
+                .disabled(engine.isRunning || updateAllTask != nil || engine.batchUpdateRunning)
             } else {
                 Button { startInstall(app) } label: {
                     DownloadPill()
                 }
                 .buttonStyle(.plain)
-                .disabled(engine.isRunning)
+                .disabled(engine.isRunning || updateAllTask != nil || engine.batchUpdateRunning)
             }
         }
     }
@@ -867,7 +890,11 @@ struct SourceAppsView: View {
     /// what the row shows from there). The guard only bars a second tap
     /// on the same row.
     private func startInstall(_ app: AltApp) {
-        guard states[app.id] == nil, let url = app.downloadLink else { return }
+        // B-2 (0.9.172): the buttons above are disabled while a batch
+        // runs; the guard is the second lock, so no path can start a
+        // second install into the batch's download gap.
+        guard states[app.id] == nil, updateAllTask == nil, !engine.batchUpdateRunning,
+              let url = app.downloadLink else { return }
         states[app.id] = .queued
         let expectedName = Engine.importFileName(for: url)
         // B-2 (0.9.167)：最低 iOS 不符直接拒——行上已显示 minOSVersion，
@@ -951,15 +978,21 @@ struct SourceAppsView: View {
     /// stays set for the whole item (download + install) so a row's
     /// Download button can't start a second install mid-batch, while
     /// the row's progress pill only shows during the download itself.
-    private func startUpdateAll() {
-        guard updateAllTask == nil, !updateApps.isEmpty, activeID == nil, !engine.isRunning else { return }
+    private func startUpdateAll(retryTargets: [AltApp]? = nil) {
+        // F-1 (0.9.172): `retryTargets` re-runs only the failed subset
+        // from the summary alert — the same loop below, same lowest-iOS
+        // pre-filter and same cellular prompt, not a second simplified
+        // path. Nil means a fresh run over the Updates section.
+        let candidates = retryTargets ?? updateApps
+        guard updateAllTask == nil, !candidates.isEmpty, activeID == nil, !engine.isRunning,
+              !engine.batchUpdateRunning else { return }
         // B-2 (0.9.168): `startInstall` 同款最低 iOS 前置检查——0.9.167
         // 只堵了单装两路，全部更新是第三路：不符项整包下完才在后置守卫
         // 被拒，白占一个下载位。事前滤出：不符项不进 targets、不占蜂窝
         // 总量、不占下载位；汇总里按 startInstall 同款文案说明哪款、
         // 为什么跳过（与失败行同一格式列出）。
         var skippedMinOS: [(name: String, error: String)] = []
-        let targets = updateApps.filter { app in
+        let targets = candidates.filter { app in
             guard let minOS = app.minOSVersion, !minOS.isEmpty,
                   !SideStoreDownloader.runs(on: ProcessInfo.processInfo.operatingSystemVersion, from: minOS, to: nil)
             else { return true }
@@ -971,9 +1004,18 @@ struct SourceAppsView: View {
         updateAllTotal = targets.count
         updateAllIndex = 0
         updateAllCurrent = nil
+        // B-2 (0.9.172): up before the Task starts, so the row and
+        // detail install buttons are disabled from the tap — the Task's
+        // `defer` below clears it on every exit (finish, cancel, or a
+        // declined cellular prompt).
+        engine.batchUpdateRunning = true
         updateAllTask = Task { @MainActor in
+            defer { engine.batchUpdateRunning = false }
             var succeeded = 0
             var failed: [(name: String, error: String)] = []
+            // F-1 (0.9.172): the failed targets, in step with `failed`
+            // above — the summary alert's retry re-runs exactly these.
+            var failedTargets: [AltApp] = []
             // B-2 (0.9.169): the user declining a downgrade is a skip,
             // not a failure — the Files batch (`FilesTabView`) and
             // history Reinstall all (`InstallHistoryView`) already count
@@ -1004,6 +1046,7 @@ struct SourceAppsView: View {
                 updateAllCurrent = name
                 guard let url = app.downloadLink else {
                     failed.append((name, L("Import failed")))
+                    failedTargets.append(app)
                     continue
                 }
                 activeID = app.id
@@ -1016,6 +1059,7 @@ struct SourceAppsView: View {
                         skipped += 1
                     } else if let error = outcome.error {
                         failed.append((name, error))
+                        failedTargets.append(app)
                         stopped = outcome.stopped
                     } else {
                         succeeded += 1
@@ -1025,11 +1069,13 @@ struct SourceAppsView: View {
                     // 记一条“已停止”就收尾，剩下的进下面的未跑填补。
                     if Task.isCancelled || (error as? URLError)?.code == .cancelled {
                         failed.append((name, L("Install stopped")))
+                        failedTargets.append(app)
                         activeID = nil
                         states[app.id] = nil
                         break
                     }
                     failed.append((name, error.localizedDescription))
+                    failedTargets.append(app)
                 }
                 activeID = nil
                 states[app.id] = nil
@@ -1041,12 +1087,18 @@ struct SourceAppsView: View {
                 let reason = failed.last?.error ?? L("Install stopped")
                 for app in targets[(failed.count + succeeded + skipped)...] {
                     failed.append((app.name ?? app.bundleIdentifier ?? "", reason))
+                    failedTargets.append(app)
                 }
             }
             // B-2 (0.9.168): 事前滤出的最低 iOS 不符项——没下载、没占位，
             // 但汇总里要说明哪款、为什么跳过；与失败行同一格式列出。
             // 放在未跑填补之后：填补按 targets 索引，混进跳过项会越界。
             failed.append(contentsOf: skippedMinOS)
+            // F-1 (0.9.172): keep the failed targets for the summary
+            // alert's retry — skippedMinOS items are not in them (they
+            // never entered `targets`, and the pre-filter would drop
+            // them again on a retry).
+            updateAllFailedTargets = failedTargets
             updateAllTask = nil
             updateAllCurrent = nil
             updateAllIndex = 0
@@ -1070,6 +1122,16 @@ struct SourceAppsView: View {
                 updateAllSummary = (updateAllSummary ?? "") + " " + L("其中 %d 个因拒绝降级而跳过。", skipped)
             }
             showingUpdateAllSummary = true
+            // B-1 (0.9.172): re-read the device list, so an app just
+            // updated leaves the Updates section (and the badge) at
+            // once — the cross-source batch already did this (0.9.171),
+            // this one only showed the summary and left the old
+            // versions in place until the page was re-entered. The
+            // badge recounts itself on `appsManager.entries` changing
+            // (RootView's onChange); no manager to recount through
+            // here, this page never held one.
+            let task = appsManager.load(quiet: true)
+            if let task { await task.value } else { await appsManager.inFlightLoadTask?.value }
         }
     }
 
@@ -1098,7 +1160,9 @@ struct SourceAppsView: View {
     /// 取消（行内取消按钮；F2 前是离开页面取消，F2 后离开不再
     /// 取消），不 dismiss——否则会多 pop 一层（次要竞态，顺手堵上）。
     private func startCertInstall(_ app: AltApp) {
-        guard states[app.id] == nil, let url = app.downloadLink else { return }
+        // B-2 (0.9.172): startInstall 同款——批跑时不另起安装。
+        guard states[app.id] == nil, updateAllTask == nil, !engine.batchUpdateRunning,
+              let url = app.downloadLink else { return }
         states[app.id] = .queued
         certFailedIDs.remove(app.id)
         let expectedName = Engine.importFileName(for: url)
@@ -1577,6 +1641,19 @@ final class SourcesManager: ObservableObject {
         availableUpdateCount = updateCount(installed: apps)
     }
 
+    /// F-3 (0.9.172): the display name of the app a loaded source lists
+    /// under `bundleID`, for the Settings ignored-updates list — a
+    /// bundle ID alone doesn't say which app it is. Nil when no loaded
+    /// source lists it, and the caller falls back to the bundle ID.
+    func appName(for bundleID: String) -> String? {
+        for case .loaded(let source) in states.values {
+            if let app = source.apps.first(where: { $0.bundleIdentifier == bundleID }) {
+                return app.name
+            }
+        }
+        return nil
+    }
+
     /// B-2 (0.9.157): adopt what the fork store just fetched, for the
     /// badge. The Sources tab runs on `SourceStore`, not this manager —
     /// its fetches never touch `states`, so recounting here alone would
@@ -1739,6 +1816,30 @@ final class SourcesManager: ObservableObject {
         }
     }
 
+    /// F-2 (0.9.172): fetches one source again, for its row's retry —
+    /// the whole-list `refresh()` above, for a single URL, so a failed
+    /// source doesn't make the user re-pull every healthy one. Same
+    /// rules: a source that fetched before keeps its apps if this
+    /// fetch fails, and a cancelled fetch restores the row's prior state.
+    func refresh(url: URL) async {
+        guard urls.contains(url), !isDisabled(url) else { return }
+        let before = states[url]
+        states[url] = .loading
+        do {
+            states[url] = .loaded(try await Self.fetch(url))
+        } catch is CancellationError {
+            states[url] = before
+        } catch let error as URLError where error.code == .cancelled {
+            states[url] = before
+        } catch {
+            if case .loaded? = before {
+                states[url] = before
+            } else {
+                states[url] = .failed(await Self.describe(error))
+            }
+        }
+    }
+
     /// Fetches the sources not fetched yet, when the page opens. The rest
     /// were fetched at launch; pull down or Check for updates fetches them again.
     func refreshMissing() async {
@@ -1857,6 +1958,10 @@ struct AppSourcesView: View {
     @State private var updateAllCurrent: String?
     @State private var updateAllSummary: String?
     @State private var showingUpdateAllSummary = false
+    /// F-1 (0.9.172): the cross-source batch's failed listings, kept
+    /// so the summary alert can offer "Retry failed items" — only the
+    /// failed subset runs again (single-source page 同款）.
+    @State private var updateAllFailedListings: [SourceListing] = []
 
     private var listings: [SourceListing] { manager.listings(installed: appsManager.entries) }
 
@@ -1878,7 +1983,7 @@ struct AppSourcesView: View {
                 if !manager.urls.isEmpty {
                     sourcesButton.cascadeItem(4)
                     if showSources {
-                        SourceRowsCard(manager: manager)
+                        SourceRowsCard(manager: manager, appsManager: appsManager)
                             .transition(.cardAppear)
                     }
                 }
@@ -1954,7 +2059,16 @@ struct AppSourcesView: View {
         }
         // F-1 (0.9.171): the cross-source update-all totals, once the
         // batch finishes (single-source page 同款 alert).
+        // F-1 (0.9.172): retry just the failed listings (同款）.
         .alert(L("全部更新"), isPresented: $showingUpdateAllSummary) {
+            if !updateAllFailedListings.isEmpty {
+                Button(L("Retry failed items")) {
+                    let retry = updateAllFailedListings
+                    updateAllFailedListings = []
+                    showingUpdateAllSummary = false
+                    startUpdateAllAcrossSources(retryListings: retry)
+                }
+            }
             Button(L("OK")) {}
         } message: {
             Text(updateAllSummary ?? "")
@@ -2181,7 +2295,7 @@ struct AppSourcesView: View {
                     Spacer()
                     Button(L("全部更新")) { startUpdateAllAcrossSources() }
                         .font(.subheadline)
-                        .disabled(updateAllTask != nil || engine.isRunning)
+                        .disabled(updateAllTask != nil || engine.isRunning || engine.batchUpdateRunning)
                 }
                 .padding(.bottom, 8)
                 if updateAllTask != nil {
@@ -2240,9 +2354,13 @@ struct AppSourcesView: View {
     /// only the targets are listings from every source. The summary
     /// groups failures by source, one line per source, instead of
     /// mixing every app into one list.
-    private func startUpdateAllAcrossSources() {
-        let targets = listings.filter(\.hasUpdate)
-        guard updateAllTask == nil, !targets.isEmpty, !engine.isRunning else { return }
+    private func startUpdateAllAcrossSources(retryListings: [SourceListing]? = nil) {
+        // F-1 (0.9.172): `retryListings` re-runs only the failed subset
+        // from the summary alert — the same loop below, not a second
+        // simplified path. Nil means a fresh run over the Updates section.
+        let targets = retryListings ?? listings.filter(\.hasUpdate)
+        guard updateAllTask == nil, !targets.isEmpty, !engine.isRunning,
+              !engine.batchUpdateRunning else { return }
         // B-2 (0.9.168) 同款：最低 iOS 事前过滤——不符项不进
         // targets、不占蜂窝总量、不占下载位；汇总里按源分组说明
         // 哪款、为什么跳过（与失败行同一格式列出）。
@@ -2260,9 +2378,16 @@ struct AppSourcesView: View {
         updateAllTotal = runnable.count
         updateAllIndex = 0
         updateAllCurrent = nil
+        // B-2 (0.9.172): single-source batch 同款——起跑前立标志，
+        // Task 的 `defer` 在每个出口清掉。
+        engine.batchUpdateRunning = true
         updateAllTask = Task { @MainActor in
+            defer { engine.batchUpdateRunning = false }
             var succeeded = 0
             var failed: [(source: String, name: String, error: String)] = []
+            // F-1 (0.9.172): the failed listings, in step with `failed`
+            // above — the summary alert's retry re-runs exactly these.
+            var failedListings: [SourceListing] = []
             var skipped = 0
             var stopped = false
             // F-G (0.9.156) 同款：整批一次蜂窝确认，带全部大小（每款
@@ -2290,6 +2415,7 @@ struct AppSourcesView: View {
                 updateAllCurrent = "\(listing.sourceName) — \(name)"
                 guard let latest = listing.app.latest else {
                     failed.append((listing.sourceName, name, L("Import failed")))
+                    failedListings.append(listing)
                     continue
                 }
                 let url = latest.downloadURL
@@ -2300,6 +2426,7 @@ struct AppSourcesView: View {
                         skipped += 1
                     } else if let error = outcome.error {
                         failed.append((listing.sourceName, name, error))
+                        failedListings.append(listing)
                         stopped = outcome.stopped
                     } else {
                         succeeded += 1
@@ -2307,9 +2434,11 @@ struct AppSourcesView: View {
                 } catch {
                     if Task.isCancelled || (error as? URLError)?.code == .cancelled {
                         failed.append((listing.sourceName, name, L("Install stopped")))
+                        failedListings.append(listing)
                         break
                     }
                     failed.append((listing.sourceName, name, error.localizedDescription))
+                    failedListings.append(listing)
                 }
             }
             // 没跑到的各项：停批的原因同样记一条，不静默丢掉
@@ -2319,12 +2448,18 @@ struct AppSourcesView: View {
                 let reason = failed.last?.error ?? L("Install stopped")
                 for listing in runnable[(failed.count + succeeded + skipped)...] {
                     failed.append((listing.sourceName, listing.app.name, reason))
+                    failedListings.append(listing)
                 }
             }
             // 事前滤出的最低 iOS 不符项——没下载、没占位，但汇总里
             // 要说明哪款、为什么跳过；与失败行同一格式列出。
             // 放在未跑填补之后：填补按 runnable 索引，混进跳过项会越界。
             failed.append(contentsOf: skippedMinOS)
+            // F-1 (0.9.172): keep the failed listings for the summary
+            // alert's retry — skippedMinOS items are not in them (they
+            // never entered `runnable`, and the pre-filter would drop
+            // them again on a retry).
+            updateAllFailedListings = failedListings
             updateAllTask = nil
             updateAllCurrent = nil
             updateAllIndex = 0
@@ -2415,6 +2550,10 @@ struct AppSourcesView: View {
 /// each can be copied or removed.
 struct SourceRowsCard: View {
     @ObservedObject var manager: SourcesManager
+    /// F-2 (0.9.172): the device read, so a single-source retry can
+    /// recount the badge after the fetch — the card's only other use of
+    /// it. Memberwise init order: manager, then appsManager.
+    @ObservedObject var appsManager: SideloadedAppsManager
 
     var body: some View {
         PanelCard {
@@ -2467,6 +2606,20 @@ struct SourceRowsCard: View {
             Menu {
                 Button { UIPasteboard.general.string = url.absoluteString } label: {
                     Label(L("Copy link"), systemImage: "doc.on.doc")
+                }
+                // F-2 (0.9.172): retry just this source — only when its
+                // last fetch failed, so a healthy row never offers it.
+                // The whole-list refresh stays on pull / Check for
+                // updates; this one re-pulls a single URL.
+                if let state = manager.states[url], case .failed = state {
+                    Button {
+                        Task {
+                            await manager.refresh(url: url)
+                            manager.recountUpdates(installed: appsManager.entries)
+                        }
+                    } label: {
+                        Label(L("Try again"), systemImage: "arrow.clockwise")
+                    }
                 }
                 if !manager.isBuiltIn(url) {
                     Button(role: .destructive) { manager.remove(url) } label: {
@@ -2599,6 +2752,7 @@ struct AppIconView: View {
 /// every version with its release notes.
 struct SourceAppView: View {
     @EnvironmentObject private var loc: Localizer
+    @Environment(Engine.self) private var engine
     let listing: SourceListing
     @ObservedObject var manager: SourcesManager
 
@@ -2727,6 +2881,11 @@ struct SourceAppView: View {
                                                : L("Install %@", latest.version))
                     }
                 }
+                // B-2 (0.9.172): not while an update-all batch runs —
+                // the batch's download gaps leave `engine.isRunning`
+                // false, so a tap here would start a second install and
+                // knock the batch over (same as the single-source rows).
+                .disabled(engine.batchUpdateRunning)
                 .buttonStyle(PrimaryButtonStyle())
                 Text(L("Downloads the IPA from the source, then signs it with your Apple ID and installs it, as a custom .ipa would be."))
                     .font(.caption)
@@ -2743,6 +2902,15 @@ struct SourceAppView: View {
     /// doing nothing. (`minOSVersion` is non-nil whenever the check
     /// can refuse, so the `?? ""` never shows.)
     private func install(_ version: SourceVersion) {
+        // B-2 (0.9.172): the buttons above are disabled while a batch
+        // runs; the guard is the second lock, for a tap that slipped
+        // through (or the confirm alert's Install button, set before
+        // the batch started). The message reuses the pipeline's own
+        // "already running" wording — no new translation key.
+        guard !engine.batchUpdateRunning else {
+            notice = L("An install is already running. Wait for it to finish, then try again.")
+            return
+        }
         guard !manager.install(version, of: app) else { return }
         notice = L("%@ needs iOS %@ or later. This iPhone runs iOS %@.",
                    app.name, version.minOSVersion ?? "", Engine.shared.osVersionText)
@@ -2798,6 +2966,8 @@ struct SourceAppView: View {
                             Button(L("Install")) { confirm = version }
                                 .buttonStyle(SecondaryButtonStyle(), sound: .tap)
                                 .controlSize(.small)
+                                // B-2 (0.9.172): 同主按钮——批跑时不另起安装。
+                                .disabled(engine.batchUpdateRunning)
                         }
                         if let notes = version.notes, !notes.isEmpty {
                             ReleaseNotesText(text: notes)

@@ -716,6 +716,7 @@ let japaneseStrings: [String: String] = [
     "Latest (%@)": "最新（%@）",
     "Couldn't load the other versions: %@": "他のバージョンを読み込めませんでした：%@",
     "Try again": "再試行",
+    "Retry failed items": "失敗した項目を再試行",
 
     "couldn't find the IPA in the %@ %@ release":
         "%@ チャンネルの %@ リリースに IPA が見つかりませんでした",

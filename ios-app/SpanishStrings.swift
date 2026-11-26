@@ -801,6 +801,7 @@ let spanishStrings: [String: String] = [
     "Latest (%@)": "Última (%@)",
     "Couldn't load the other versions: %@": "No se han podido cargar las demás versiones: %@",
     "Try again": "Reintentar",
+    "Retry failed items": "Reintentar los elementos fallidos",
 
     "couldn't find the IPA in the %@ %@ release":
         "no se ha encontrado el IPA en la versión %@ de %@",

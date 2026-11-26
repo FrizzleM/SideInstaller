@@ -784,6 +784,7 @@ let chineseStrings: [String: String] = [
     "Latest (%@)": "最新（%@）",
     "Couldn't load the other versions: %@": "无法加载其他版本：%@",
     "Try again": "重试",
+    "Retry failed items": "重试失败项",
 
     "couldn't find the IPA in the %@ %@ release":
         "在 %@ 渠道的 %@ 发行版中找不到 IPA 文件",

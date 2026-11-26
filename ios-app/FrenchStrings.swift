@@ -804,6 +804,7 @@ let frenchStrings: [String: String] = [
     "Latest (%@)": "Dernière (%@)",
     "Couldn't load the other versions: %@": "Impossible de charger les autres versions : %@",
     "Try again": "Réessayer",
+    "Retry failed items": "Réessayer les éléments échoués",
 
     "couldn't find the IPA in the %@ %@ release":
         "impossible de trouver l'IPA dans la version %@ de %@",

@@ -798,6 +798,7 @@ let vietnameseStrings: [String: String] = [
     "Latest (%@)": "Mới nhất (%@)",
     "Couldn't load the other versions: %@": "Không thể tải các phiên bản khác: %@",
     "Try again": "Thử lại",
+    "Retry failed items": "Thử lại các mục thất bại",
 
     "couldn't find the IPA in the %@ %@ release":
         "không tìm thấy tệp IPA trong bản phát hành %@ của %@",

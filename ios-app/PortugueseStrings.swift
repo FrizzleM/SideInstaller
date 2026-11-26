@@ -797,6 +797,7 @@ let portugueseStrings: [String: String] = [
     "Latest (%@)": "Mais recente (%@)",
     "Couldn't load the other versions: %@": "Não foi possível carregar as outras versões: %@",
     "Try again": "Tentar de novo",
+    "Retry failed items": "Tentar novamente os itens com falha",
 
     "couldn't find the IPA in the %@ %@ release":
         "não foi possível encontrar o IPA na versão %@ %@",
