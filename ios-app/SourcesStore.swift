@@ -921,18 +921,65 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// F-B (0.9.155): suspend the in-flight download; the row's Resume
     /// button picks it back up on the same task. A no-op with nothing
     /// running, or while already paused.
+    /// B-2 (0.9.165): a bare suspend() leaves no resume point — kill the
+    /// app and the suspended task dies with it, so the next tap restarts
+    /// from zero. Pause now cancels by producing resume data instead:
+    /// the point is saved to disk (+ memory while still paused) at once,
+    /// and resume() restarts the same request from it. Pause is not
+    /// cancel: activeRequest and its continuation stay pending, the slot
+    /// stays held (pumpIfIdle only starts when activeRequest is nil), and
+    /// no queued download is pumped.
     func pause() {
         guard let task = currentTask, !isPaused else { return }
-        task.suspend()
         isPaused = true
+        guard let url = currentURL else {
+            task.suspend()
+            return
+        }
+        // The session stays alive until the callback lands — invalidating
+        // it now would drop the callback. The callback invalidates the
+        // captured session itself once the point is safe on disk.
+        let session = self.session
+        task.cancel(byProducingResumeData: { [weak self] data in
+            if let data {
+                // B-1 (0.9.165) 同款：落盘不经守卫，回调在 delegate 队列
+                // 上同步落盘，杀进程也丢不了；内存那一份才在跳回主线程
+                // 后守卫（仍暂停、且没新跑占位才留）。
+                Self.saveResumeDataToDisk(url: url, data: data)
+            }
+            Task { @MainActor in
+                session?.finishTasksAndInvalidate()
+                guard let self, self.isPaused, self.currentTask == nil else { return }
+                if let data {
+                    self.resumeData = data
+                    self.resumeURL = url
+                }
+            }
+        })
+        currentTask = nil
+        currentTaskID = nil
     }
 
     /// F-B (0.9.155): resume a download `pause()` suspended. A no-op
     /// with nothing running, or while not paused.
+    /// B-2 (0.9.165): pause() now cancels by producing resume data, so
+    /// there is no suspended task to wake — restart the same request
+    /// from the saved point instead. startDownload picks the memory or
+    /// disk point up for the same URL, so this resumes, never restarts.
+    /// A still-suspended task (pause's no-URL fallback) resumes in place.
     func resume() {
-        guard let task = currentTask, isPaused else { return }
-        task.resume()
+        guard isPaused else { return }
+        if let task = currentTask {
+            task.resume()
+            isPaused = false
+            return
+        }
+        guard let request = activeRequest else {
+            isPaused = false
+            return
+        }
         isPaused = false
+        startDownload(request)
     }
 
     /// Stop the in-flight download, if any — and start the next queued
@@ -948,13 +995,17 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
         if keepingResumeData, let task = currentTask, let url = currentURL {
             task.cancel(byProducingResumeData: { [weak self] data in
                 guard let data else { return }
+                // B-1 (0.9.165)：落盘不经 `currentTask == nil` 守卫——
+                // 回调是异步的（delegate 队列 + 跳回 MainActor 两跳），
+                // 而 cancel() 同步尾行 finish() → pumpIfIdle() 已把
+                // currentTask 置为下一个排队下载，守卫到时必失败，内存
+                // 与磁盘两份断点全丢。落盘文件按 URL 哈希分文件，与
+                // 新跑的断点不冲突；只守卫内存那一份。
+                Self.saveResumeDataToDisk(url: url, data: data)
                 Task { @MainActor in
                     guard let self, self.currentTask == nil else { return }
                     self.resumeData = data
                     self.resumeURL = url
-                    // F-1 (0.9.157): the same point on disk, so a kill or
-                    // a system reclaim doesn't lose it.
-                    Self.saveResumeDataToDisk(url: url, data: data)
                 }
             })
         }

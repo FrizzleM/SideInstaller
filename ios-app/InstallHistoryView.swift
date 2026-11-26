@@ -10,6 +10,9 @@ struct InstallHistoryView: View {
     @Environment(Engine.self) private var engine
 
     @State private var entries: [InstallHistoryEntry] = []
+    /// F-3 (0.9.165)：历史搜索——标题/签名身份内存过滤（文件页
+    /// filteredUnsigned 同款），不碰写入。
+    @State private var historySearchText = ""
     /// `id` of the entry whose reinstall is running, if any.
     @State private var reinstallingID: UUID?
     /// F-3 (0.9.160): true while the reinstall-all loop runs; the
@@ -29,7 +32,11 @@ struct InstallHistoryView: View {
     @State private var confirmingClear = false
 
     var body: some View {
-        List {
+        VStack(spacing: 0) {
+            SearchBar(text: $historySearchText, placeholder: L("搜索"))
+                .padding(.horizontal)
+                .padding(.top, 8)
+            List {
             if entries.isEmpty {
                 // U2 (0.9.151): the empty state used to be one bare line;
                 // Downloads page empty state 同款：图标 + 主文案 + 一行
@@ -47,7 +54,7 @@ struct InstallHistoryView: View {
                 }
                 .padding(.vertical, 8)
             }
-            ForEach(entries) { entry in
+            ForEach(filteredEntries) { entry in
                 Button { reinstall(entry) } label: {
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -110,6 +117,7 @@ struct InstallHistoryView: View {
             }
         }
         .listStyle(.plain)
+        }
         .navigationTitle(L("Install history"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -156,6 +164,18 @@ struct InstallHistoryView: View {
             Button(L("OK"), role: .cancel) { notice = nil }
         } message: {
             Text(notice ?? "")
+        }
+    }
+
+    /// F-3 (0.9.165)：标题或签名身份命中即留。条目本身不存 Bundle ID
+    ///（identity 是签名用的 Apple ID），所以 Bundle ID 无字段可搜——
+    /// 标题（含版本）+ 签名身份就是行上看得见的全部可搜文本。
+    private var filteredEntries: [InstallHistoryEntry] {
+        guard !historySearchText.isEmpty else { return entries }
+        let query = historySearchText.lowercased()
+        return entries.filter { entry in
+            entry.title.lowercased().contains(query)
+                || entry.identity.lowercased().contains(query)
         }
     }
 

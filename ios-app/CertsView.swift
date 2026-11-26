@@ -125,6 +125,20 @@ struct CertsView: View {
         }
     }
 
+    /// F-2 (0.9.165)：红条下受影响的已装 App——跟吊销确认框同一份
+    /// `affectedApps()`（按 team 匹配）、同一份前 5 +「等 N 个」
+    /// 截断；没 team、没读到设备列表就 nil，红条不画蛇添足。
+    private var affectedAppsText: String? {
+        let affected = affectedApps()
+        guard !affected.isEmpty else { return nil }
+        let shown = affected.prefix(5)
+        var list = shown.joined(separator: "\n")
+        if affected.count > 5 {
+            list += "\n" + L("等 %d 个", affected.count - 5)
+        }
+        return L("Apps signed with this certificate:\n%@", list)
+    }
+
     /// 企业页已有同款红条，个人证书页之前只有行内小字到期日：
     /// 7 天有效期的个人证书到期前毫无预警，App 打不开才发现。
     /// 任一证书 7 天内到期就出红条，写明证书名 + 到期日，下附一行
@@ -137,14 +151,22 @@ struct CertsView: View {
                     Text(L("证书到期提醒"))
                         .font(.subheadline.weight(.semibold))
                     ForEach(expiringCerts, id: \.id) { cert in
-                        HStack {
-                            Text(cert.displayName)
-                                .font(.subheadline)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer()
-                            if let expiry = cert.expiresAt {
-                                Text(expiryLabel(expiry))
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(cert.displayName)
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer()
+                                if let expiry = cert.expiresAt {
+                                    Text(expiryLabel(expiry))
+                                        .font(.footnote)
+                                        .foregroundStyle(Theme.muted)
+                                }
+                            }
+                            // F-2 (0.9.165)：这张证书到期会断掉的已装 App。
+                            if let affectedText = affectedAppsText {
+                                Text(affectedText)
                                     .font(.footnote)
                                     .foregroundStyle(Theme.muted)
                             }

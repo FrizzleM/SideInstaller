@@ -1228,6 +1228,10 @@ struct SignedIPARecord: Codable, Identifiable {
     var certName: String?
     /// 描述文件里的 TeamIdentifier（如 HP24Y7433B），没有就 nil。
     var teamID: String?
+    /// F-1 (0.9.165)：签名时写进来的描述文件到期日（embedded.
+    /// mobileprovision 的 ExpirationDate）。可选：老记录没有这个
+    /// 字段，解码得 nil，文件页进页时 fillMissingCertInfo 按需补。
+    var expiresAt: Date?
     var id: String { fileName }
 }
 
@@ -1370,12 +1374,20 @@ enum SignedIPAStore {
         var changed = false
         for index in records.indices {
             let old = records[index]
-            guard old.certName == nil || old.teamID == nil else { continue }
+            guard old.certName == nil || old.teamID == nil || old.expiresAt == nil else { continue }
+            let ipaURL = url(for: old)
+            // F-1 (0.9.165)：到期日是文件的事实，不认当前证书——
+            // 团队不符的记录也补，tried 集只管证书段，不管它。
+            // 解不出就留空，下次进页再试一次（跟证书段同例）。
+            if old.expiresAt == nil,
+               let expiry = provisionExpirationDate(of: ipaURL) {
+                records[index].expiresAt = expiry
+                changed = true
+            }
             // 已有团队号且与当前团队不同：这条记录对应的文件后来
             // 换证重签过（或记录本身就是旧证的），不拿当前证书名
             // 去盖它。
             if let storedTeam = old.teamID, storedTeam != currentTeam { continue }
-            let ipaURL = url(for: old)
             // A-5：上次补不上（解不出、或团队与当前证书不符）的文件
             // 不再重解。
             let triedKey = IPALibrary.fileFingerprint(of: ipaURL).map { "\($0)|\(currentTeam)" }
@@ -1418,15 +1430,22 @@ enum SignedIPAStore {
                     current[index].teamID = team
                     didMerge = true
                 }
+                // F-1 (0.9.165)：到期日同款合并——只补仍为 nil 的字段。
+                if current[index].expiresAt == nil, let expiry = filled.expiresAt {
+                    current[index].expiresAt = expiry
+                    didMerge = true
+                }
             }
             if didMerge { save(current) }
             return didMerge
         }()
     }
 
-    /// 已签 IPA 里的描述文件团队号：只读 `Payload/*.app/embedded.mobileprovision`
+    /// 已签 IPA 里的描述文件信息：只读 `Payload/*.app/embedded.mobileprovision`
     /// 这一条目，不解压整个 IPA。解不出就 nil（调用方跳过，不报错）。
-    private static func provisionTeamID(of ipaURL: URL) -> String? {
+    /// F-1 (0.9.165)：一次解析同时取团队号与到期日——fillMissingCertInfo
+    /// 给老记录补到期日、签时给新记录写到期日，都走这里，不各解一次。
+    private static func provisionInfo(of ipaURL: URL) -> (teamID: String?, expiresAt: Date?)? {
         guard let data = IPALibrary.embeddedProvisionData(inIPA: ipaURL),
               let text = String(data: data, encoding: .isoLatin1),
               let start = text.range(of: "<?xml"),
@@ -1436,12 +1455,24 @@ enum SignedIPAStore {
         let xml = String(text[start.lowerBound..<end.upperBound])
         guard let xmlData = xml.data(using: .utf8),
               let plist = try? PropertyListSerialization.propertyList(
-                  from: xmlData, options: [], format: nil) as? [String: Any],
-              let teams = plist["TeamIdentifier"] as? [String],
-              let team = teams.first, !team.isEmpty else {
+                  from: xmlData, options: [], format: nil) as? [String: Any] else {
             return nil
         }
-        return team
+        let teams = plist["TeamIdentifier"] as? [String]
+        let team = teams?.first
+        return ((team?.isEmpty == false) ? team : nil,
+                plist["ExpirationDate"] as? Date)
+    }
+
+    /// 已签 IPA 里的描述文件团队号：只读 `Payload/*.app/embedded.mobileprovision`
+    /// 这一条目，不解压整个 IPA。解不出就 nil（调用方跳过，不报错）。
+    private static func provisionTeamID(of ipaURL: URL) -> String? {
+        provisionInfo(of: ipaURL)?.teamID
+    }
+
+    /// F-1 (0.9.165)：已签 IPA 里描述文件的到期日（签时写新记录用）。
+    static func provisionExpirationDate(of ipaURL: URL) -> Date? {
+        provisionInfo(of: ipaURL)?.expiresAt
     }
 
     /// 文件页改名后同步清单里的文件名。
@@ -1850,6 +1881,8 @@ enum CertSigner {
             let size = (try? fm.attributesOfItem(atPath: outURL.path))?[.size] as? Int ?? 0
             // 已签名行第三行用：证书名取 p12 的名头，团队 ID 取描述文件
             // 的 TeamIdentifier；读不出来就留空，行里不显示第三行。
+            // F-1 (0.9.165)：到期日取刚签好的包里 embedded.mobileprovision
+            // 的 ExpirationDate，已签行第二行据此显示剩 N 天/已过期。
             let certName = EnterpriseCertStore.certInfo?.name
             let teamID = EnterpriseCertStore.provisionInfo?.teamID
             let record = SignedIPARecord(
@@ -1859,7 +1892,8 @@ enum CertSigner {
                 version: mods.version.isEmpty ? info?.version : mods.version,
                 date: Date(), size: size,
                 certName: (certName?.isEmpty == false) ? certName : nil,
-                teamID: (teamID?.isEmpty == false) ? teamID : nil)
+                teamID: (teamID?.isEmpty == false) ? teamID : nil,
+                expiresAt: SignedIPAStore.provisionExpirationDate(of: outURL))
             SignedIPAStore.add(record)
             return record
         }.value

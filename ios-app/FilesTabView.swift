@@ -3394,6 +3394,10 @@ struct FilesTabView: View {
 
     /// 已签名行第二行（轻松签应用库同款）：V版本 | 大小 | Bundle ID；
     /// 版本缺了就省掉 V 那段（跟未签名行同例）。
+    /// F-1 (0.9.165)：末尾追加到期信号——剩 N 天 / 今天到期 / 已过期，
+    /// 跟 EnterpriseCertView.remainingText 同一套 key、同一套自然日
+    /// 算法（remainingDays）；老记录没到期日就不显示，等
+    /// fillMissingCertInfo 进页补上。
     private func signedSecondLine(_ record: SignedIPARecord) -> String {
         let size = CZFFormattedSize.size(record.size)
         var parts: [String] = []
@@ -3403,6 +3407,16 @@ struct FilesTabView: View {
         parts.append(size)
         if !record.bundleID.isEmpty {
             parts.append(record.bundleID)
+        }
+        if let expiry = record.expiresAt {
+            let days = remainingDays(to: expiry)
+            if days < 0 {
+                parts.append(L(" (expired)"))
+            } else if days == 0 {
+                parts.append(L("（今天到期）"))
+            } else {
+                parts.append(L("（剩 %d 天）", days))
+            }
         }
         return parts.joined(separator: " | ")
     }

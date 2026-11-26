@@ -483,17 +483,35 @@ struct SourceAppsView: View {
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                     if let installed = installedVersion(for: app) {
-                        Text(hasUpdate(for: app)
-                             ? L("%@ installed · %@ available", installed, app.version ?? "")
-                             : L("%@ installed · up to date", installed))
-                            .font(.caption)
-                            .foregroundStyle(hasUpdate(for: app) ? Theme.warning : Theme.muted)
-                            .lineLimit(1)
+                        if hasUpdate(for: app) {
+                            Text(L("%@ installed · %@ available", installed, app.version ?? ""))
+                                .font(.caption)
+                                .foregroundStyle(Theme.warning)
+                                .lineLimit(1)
+                        } else if isDowngrade(for: app), let latest = app.version {
+                            // B-3 (0.9.165)：源比已装旧——不再写死「up to date」，
+                            // 行文案就是 0.9.164 的版本对比 tag。
+                            let tag = czfVersionComparisonTag(fileVersion: latest, installedVersion: installed)
+                            Text(tag.text)
+                                .font(.caption)
+                                .foregroundStyle(tag.color)
+                                .lineLimit(1)
+                        } else {
+                            Text(L("%@ installed · up to date", installed))
+                                .font(.caption)
+                                .foregroundStyle(Theme.muted)
+                                .lineLimit(1)
+                        }
                     }
                 }
                 Spacer()
                 if hasUpdate(for: app) {
                     Tag(text: L("Update"), color: Theme.warning)
+                } else if isDowngrade(for: app), let installed = installedVersion(for: app),
+                          let latest = app.version {
+                    // B-3 (0.9.165)：降级角标——同一份 tag，不再冒充 Installed。
+                    let tag = czfVersionComparisonTag(fileVersion: latest, installedVersion: installed)
+                    Tag(text: tag.text, color: tag.color)
                 } else if installedVersion(for: app) != nil {
                     Tag(text: L("Installed"), color: Theme.positive)
                 }
@@ -613,6 +631,15 @@ struct SourceAppsView: View {
         guard let installed = installedVersion(for: app),
               let latest = app.version, !latest.isEmpty else { return false }
         return UpdateChecker.isNewer(latest, than: installed)
+    }
+
+    /// B-3 (0.9.165): true when the source's newest build is older than
+    /// the installed one — the source lags behind the app's releases
+    /// (SourceListing.isDowngrade 同款，live 路的 AltApp 版）。
+    private func isDowngrade(for app: AltApp) -> Bool {
+        guard let installed = installedVersion(for: app),
+              let latest = app.version, !latest.isEmpty else { return false }
+        return UpdateChecker.isNewer(installed, than: latest)
     }
 
     /// U-UI：搜索框。
@@ -2221,11 +2248,17 @@ struct SourceAppView: View {
                         .multilineTextAlignment(.center)
                 }
             }
-            StatusDot(text: statusText, color: listing.hasUpdate ? Theme.warning : Theme.positive,
+            StatusDot(text: statusText, color: (listing.hasUpdate || isDowngrade) ? Theme.warning : Theme.positive,
                       idle: listing.installedVersion == nil)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
+    }
+
+    /// B-3 (0.9.165)：源最新版比已装旧（SourceListing.isDowngrade 同款）。
+    private var isDowngrade: Bool {
+        guard let latest = app.latest else { return false }
+        return listing.isDowngrade(to: latest)
     }
 
     private var statusText: String {
@@ -2233,8 +2266,15 @@ struct SourceAppView: View {
         guard let installed = listing.installedVersion else {
             return L("Version %@ · from %@", latest, listing.sourceName)
         }
-        return listing.hasUpdate ? L("%@ installed · %@ available", installed, latest)
-                                 : L("%@ installed · up to date", installed)
+        if listing.hasUpdate {
+            return L("%@ installed · %@ available", installed, latest)
+        }
+        // B-3 (0.9.165)：源比已装旧——不再写死「up to date」，行文案
+        // 就是 0.9.164 的版本对比 tag；安装本身仍走降级确认，不动。
+        if isDowngrade {
+            return czfVersionComparisonTag(fileVersion: latest, installedVersion: installed).text
+        }
+        return L("%@ installed · up to date", installed)
     }
 
     @ViewBuilder
