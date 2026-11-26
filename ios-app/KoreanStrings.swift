@@ -574,6 +574,8 @@ let koreanStrings: [String: String] = [
         "%@:%d에서 연결을 거부했습니다. 터널은 트래픽을 전달하고 있지만, 개발자 모드가 켜져 있는데도 이 iPhone이 페어링 포트를 열고 있지 않습니다. “페어링 파일”에서 이 iPhone을 다시 페어링한 뒤 다시 시도하세요. 그래도 실패하면 iPhone을 재시동하세요.",
     "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
         "%@:%d에서 연결을 받았지만 이 iPhone의 페어링 포트로 응답하지 않았고, 다른 포트도 그렇게 응답하지 않았습니다. 켜져 있는 VPN이 LocalDevVPN인지, 개발자 모드가 켜져 있는지(설정 › 개인정보 보호 및 보안 › 개발자 모드) 확인한 뒤 다시 시도하세요. 그래도 실패하면 iPhone을 재시동하세요.",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Connect to a Wi-Fi network, then try again.":
+        "이 iPhone은 Wi-Fi가 아닌 모바일 데이터를 사용 중이며, 이때 iOS는 페어링 포트를 닫아 두기 때문에 %@:%d이(가) 연결을 거부했습니다. Wi-Fi 네트워크에 연결한 뒤 다시 시도하세요.",
     "Start LocalDevVPN when needed": "필요할 때 LocalDevVPN 시작",
     "Start LocalDevVPN now": "지금 LocalDevVPN 시작",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":

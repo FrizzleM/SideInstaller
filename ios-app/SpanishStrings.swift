@@ -660,6 +660,8 @@ let spanishStrings: [String: String] = [
         "Algo en %@:%d rechazó la conexión, así que el túnel funciona, pero este iPhone no está escuchando en su puerto de emparejamiento, aunque el Modo de desarrollador está activado. Vuelve a emparejar este iPhone desde “Archivo de emparejamiento” y vuelve a intentarlo. Si sigue fallando, reinicia el iPhone.",
     "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
         "Algo en %@:%d aceptó la conexión pero no respondió como el puerto de emparejamiento de este iPhone, y ningún otro puerto respondió como tal. Comprueba que la VPN activa sea LocalDevVPN y que el Modo de desarrollador esté activado (Ajustes › Privacidad y seguridad › Modo de desarrollador) y vuelve a intentarlo. Si sigue fallando, reinicia el iPhone.",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Connect to a Wi-Fi network, then try again.":
+        "Este iPhone está usando datos móviles, no Wi-Fi, y en ese caso iOS mantiene cerrado su puerto de emparejamiento, así que %@:%d rechazó la conexión. Conéctate a una red Wi-Fi y vuelve a intentarlo.",
     "Start LocalDevVPN when needed": "Iniciar LocalDevVPN cuando haga falta",
     "Start LocalDevVPN now": "Iniciar LocalDevVPN ahora",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":

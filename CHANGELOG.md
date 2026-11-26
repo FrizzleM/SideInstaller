@@ -32,6 +32,10 @@ All notable changes to SideInstaller are documented here.
   StikDebug ships: a segment that arrives out of order is no longer dropped until it's sent again,
   a write cut short can no longer leave half a packet in the tunnel, and an open tunnel no longer
   wakes the app a thousand times a second. Segments are capped at 8 KB, as idevice caps them now.
+- **On mobile data, the error says to join Wi-Fi.** While this iPhone is on mobile data and not on
+  Wi-Fi, iOS refuses every new connection LocalDevVPN carries to it. SideInstaller said to pair
+  again or restart the iPhone, which can't help, after spending seconds searching the iPhone's
+  other ports for its pairing port. It now says to connect to Wi-Fi, without the search.
 - Reading back a file just written into another app's container can't loop for ever when the file
   changes size meanwhile, and an app whose container iOS won't open is reported as such.
 

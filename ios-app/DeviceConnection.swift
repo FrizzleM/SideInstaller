@@ -417,6 +417,19 @@ final class DeviceConnection {
             guard let retried = try reach(port) else { return }
             miss = retried
         }
+        // On mobile data alone, iOS keeps this iPhone's listener closed on
+        // every port, so there's no other port to look for it on.
+        if findsMovedPort, case .refused(let failure) = miss {
+            let links = NetworkStatus.links()
+            if links.mobileDataOnly {
+                Engine.shared.log("Port \(port) refused, and this iPhone is on mobile data only (\(links.summary)): iOS keeps its remote pairing listener closed then, so its other ports aren't searched.")
+                throw TunnelError(
+                    kind: failure.kind,
+                    advice: L("This iPhone is on mobile data, not Wi-Fi, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Connect to a Wi-Fi network, then try again.",
+                              deviceIP, Int(port)),
+                    underlying: failure.raw)
+            }
+        }
         if findsMovedPort, let notThere = miss.notThere {
             passed.append(port)
             let advert = NetworkStatus.ownRemotePairingAdvert()
