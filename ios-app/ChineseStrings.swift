@@ -1717,4 +1717,9 @@ let chineseStrings: [String: String] = [
     "Move": "移动",
     "其中 %d 个因拒绝降级而跳过。": "其中 %d 个因拒绝降级而跳过。",
 
+    // 0.9.167
+    "Folder": "文件夹",
+    "Export history": "导出历史",
+    "No files match the current filter.": "没有符合筛选的文件。",
+
 ]

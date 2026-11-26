@@ -1747,4 +1747,9 @@ let frenchStrings: [String: String] = [
     "Move": "Déplacer",
     "其中 %d 个因拒绝降级而跳过。": "Dont %d ont été ignorés pour refus de rétrograder.",
 
+    // 0.9.167
+    "Folder": "Dossier",
+    "Export history": "Exporter l'historique",
+    "No files match the current filter.": "Aucun fichier ne correspond au filtre actuel.",
+
 ]

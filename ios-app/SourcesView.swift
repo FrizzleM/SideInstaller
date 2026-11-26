@@ -835,6 +835,16 @@ struct SourceAppsView: View {
         guard states[app.id] == nil, let url = app.downloadLink else { return }
         states[app.id] = .queued
         let expectedName = Engine.importFileName(for: url)
+        // B-2 (0.9.167)：最低 iOS 不符直接拒——行上已显示 minOSVersion，
+        // 却要等几百 MB 下完、导入完才在 runOneClick 的后置守卫
+        // （minOSBlockReason）被拒。下载前、蜂窝确认前就拦：不下载、
+        // 不弹流量确认，失败文案与 runOneClick 的同款。
+        if let minOS = app.minOSVersion, !minOS.isEmpty,
+           !SideStoreDownloader.runs(on: ProcessInfo.processInfo.operatingSystemVersion, from: minOS, to: nil) {
+            states[app.id] = .failed(L("%@ needs iOS %@ or later. This iPhone runs iOS %@.",
+                                        app.name ?? expectedName, minOS, engine.osVersionText))
+            return
+        }
         downloadTasks[app.id] = Task {
             do {
                 // F-G (0.9.156): with "Wi-Fi only downloads" on, a cellular
@@ -1020,6 +1030,14 @@ struct SourceAppsView: View {
         states[app.id] = .queued
         certFailedIDs.remove(app.id)
         let expectedName = Engine.importFileName(for: url)
+        // B-2 (0.9.167)：startInstall 同款——最低 iOS 不符下载前直接拒，
+        // 不下完整 IPA、不弹蜂窝确认；失败文案与 runOneClick 的同款。
+        if let minOS = app.minOSVersion, !minOS.isEmpty,
+           !SideStoreDownloader.runs(on: ProcessInfo.processInfo.operatingSystemVersion, from: minOS, to: nil) {
+            states[app.id] = .failed(L("%@ needs iOS %@ or later. This iPhone runs iOS %@.",
+                                        app.name ?? expectedName, minOS, engine.osVersionText))
+            return
+        }
         downloadTasks[app.id] = Task {
             do {
                 // F-G (0.9.156): 同 startInstall——蜂窝下先确认再下载。

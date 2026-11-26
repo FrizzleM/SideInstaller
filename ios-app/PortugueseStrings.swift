@@ -1732,4 +1732,9 @@ let portugueseStrings: [String: String] = [
     "Move": "Mover",
     "其中 %d 个因拒绝降级而跳过。": "%d foram ignorados por recusarem o downgrade.",
 
+    // 0.9.167
+    "Folder": "Pasta",
+    "Export history": "Exportar histórico",
+    "No files match the current filter.": "Nenhum arquivo corresponde ao filtro atual.",
+
 ]

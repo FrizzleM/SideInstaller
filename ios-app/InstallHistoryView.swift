@@ -8,6 +8,41 @@ private enum HistoryResultFilter {
     case failed
 }
 
+/// F-3 (0.9.167): the filtered history as a shareable .txt file —
+/// SettingsView's `LogExportFile` 同款：a custom Transferable with a
+/// `FileRepresentation`, the file written only when the share actually
+/// happens. The entries ride in the struct (≤100 short lines); the
+/// preview is passed at the ShareLink call site — a custom Transferable
+/// has no default preview (0.9.154 修法教训，别自己发明写法）。
+private struct HistoryExportFile: Transferable {
+    let entries: [InstallHistoryEntry]
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation<HistoryExportFile>(exportedContentType: .plainText) { file in
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("SideInstaller-history.txt")
+            try file.exportText.write(to: url, atomically: true, encoding: .utf8)
+            return SentTransferredFile(url, allowAccessingOriginalFile: false)
+        }
+    }
+
+    /// One line per entry: title — date — signer — Succeeded/Failed[: reason].
+    /// The date style is the row's own (abbreviated + shortened).
+    private var exportText: String {
+        var lines = [L("Install history")]
+        let style = Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localizer.locale)
+        for entry in entries {
+            var line = "\(entry.title) — \(entry.date.formatted(style)) — \(entry.identity) — "
+            line += entry.success ? L("Succeeded") : L("Failed")
+            if !entry.success, let reason = entry.failureReason, !reason.isEmpty {
+                line += ": \(reason)"
+            }
+            lines.append(line)
+        }
+        return lines.joined(separator: "\n")
+    }
+}
+
 /// The install history: every successful one-click install, newest first.
 /// Tap a row to reinstall it from the IPA still in Downloads (F1, 0.9.148);
 /// the toolbar trash empties the list (F3, 0.9.148). Entries are written by
@@ -149,6 +184,17 @@ struct InstallHistoryView: View {
                 if reinstallingID != nil || reinstallingAll {
                     Button(L("Cancel")) { reinstallTask?.cancel() }
                 }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                // F-3 (0.9.167): export the filtered list (same result filter
+                // + search as the rows on screen) as a .txt file — preview
+                // 是必填的：自定义 Transferable 没有默认预览
+                // （LogExportFile 同款，0.9.154 教训）。空列表时禁用。
+                ShareLink(item: HistoryExportFile(entries: filteredEntries),
+                          preview: SharePreview(L("Export history"), image: Image(systemName: "doc.text"))) {
+                    Label(L("Export history"), systemImage: "square.and.arrow.up")
+                }
+                .disabled(filteredEntries.isEmpty)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

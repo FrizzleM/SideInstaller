@@ -1705,4 +1705,9 @@ let japaneseStrings: [String: String] = [
     "Move": "移動",
     "其中 %d 个因拒绝降级而跳过。": "そのうち %d 件はダウングレードを拒否したためスキップされました。",
 
+    // 0.9.167
+    "Folder": "フォルダ",
+    "Export history": "履歴をエクスポート",
+    "No files match the current filter.": "現在のフィルターに一致するファイルがありません。",
+
 ]

@@ -1739,4 +1739,9 @@ let vietnameseStrings: [String: String] = [
     "Move": "Di chuyển",
     "其中 %d 个因拒绝降级而跳过。": "Trong đó %d mục đã bỏ qua do từ chối hạ cấp.",
 
+    // 0.9.167
+    "Folder": "Thư mục",
+    "Export history": "Xuất lịch sử",
+    "No files match the current filter.": "Không có tệp nào khớp với bộ lọc hiện tại.",
+
 ]

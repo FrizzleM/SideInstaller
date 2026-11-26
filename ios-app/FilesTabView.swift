@@ -17,7 +17,11 @@ struct LocalFileItem: Identifiable {
     var id: String { url.path }
     var isIPA: Bool { name.lowercased().hasSuffix(".ipa") }
     var isZip: Bool { name.lowercased().hasSuffix(".zip") }
-    var isInSignedDir: Bool { relativeDir == "Signed" }
+    /// B-3 (0.9.167)：在 Signed 子文件夹里的也算已签名——原来只认
+    /// relativeDir == "Signed"，Signed/游戏/ 里的 IPA 全被算成未签名：
+    /// 根目录已签名栏看不到、文件夹里已签名栏也滤掉、安装按钮还走
+    /// 未签名那路。Signed 树下的一律是已签名，子文件夹只是整理。
+    var isInSignedDir: Bool { relativeDir == "Signed" || relativeDir.hasPrefix("Signed/") }
     /// App 自己用的 DDI 支撑文件，不是用户文件：DDI 文件夹、以及根
     /// 目录或 DDI/ 里的 Image.dmg、trustcache、BuildManifest。文件页
     /// 默认不把它们混在用户文件里，收到系统文件组里，需要时再展开。
@@ -166,6 +170,11 @@ struct FilesTabView: View {
     /// 已签名 tab 只显示已签名 IPA；未签名 tab 显示未签名 IPA +
     /// 其他文件 + 系统文件。
     @State private var fileTab = FileListTab.unsigned
+    /// F-1 (0.9.167)：文件页类型筛选——全部 / IPA / ZIP / 文件夹，叠加
+    /// 在切栏 + 搜索之上（filteredIPAs、flatFiles、visibleDirItems
+    /// 三处同认）。系统文件组不动：isSystem 仍归系统文件组，只是
+    /// 类型筛到 IPA/ZIP/文件夹时它们照样被滤掉。
+    @State private var fileTypeFilter = FileTypeFilter.all
     /// IPA 行信息缓存（路径 → Info.plist 解析结果）：行格式第二行
     /// 要版本/Bundle ID，文件页以前只取图标不解析，这里按行在后台
     /// 解析一次；键带大小 + 修改时间，文件换了就重解析。
@@ -362,18 +371,38 @@ struct FilesTabView: View {
 
     /// 切栏 + 搜索过滤后的 IPA 列表（根目录视图用，递归扫描的全量）——
     /// A-38-A5：接受 body-local 的 partition，不再自己读 ipas 派生。
+    /// F-1 (0.9.167)：类型筛选再叠一层——IPA 栏之外类型筛掉的 IPA
+    /// 不进列表（ZIP/文件夹筛时这里是空的，下面的其他文件组承接）。
     private func filteredIPAs(partition: FilePartition) -> [LocalFileItem] {
-        sortedFiles(matching(partition.ipas).filter { fileTabMatches($0) })
+        sortedFiles(matching(partition.ipas).filter { fileTabMatches($0) && fileTypeMatches($0) })
+    }
+
+    /// F-1 (0.9.167)：类型筛选命中这行——全部放行；IPA/ZIP 按后缀，
+    /// 文件夹按 isDirectory。系统文件也按这一层过滤（分组不动）。
+    private func fileTypeMatches(_ item: LocalFileItem) -> Bool {
+        switch fileTypeFilter {
+        case .all: return true
+        case .ipa: return item.isIPA
+        case .zip: return item.isZip
+        case .folder: return item.isDirectory
+        }
     }
 
     /// 当前文件夹视图里切栏过滤后的可见项：未签名 tab 显示未签名 IPA
     /// + 其他文件 + 系统文件；已签名 tab 只显示已签名 IPA（其他文件、
     /// 系统文件与文件夹内的非 IPA 行一律不显示）。
+    /// B-3 (0.9.167)：文件夹在两栏都显示——原来已签名栏只留
+    /// `isIPA && isInSignedDir` 的行，Signed/ 的子文件夹根本进不去；
+    /// 进去后行内项仍按栏过滤（isInSignedDir 是 Signed 子树语义，
+    /// Signed/游戏/ 里的 IPA 在已签名栏正常显示）。
+    /// F-1 (0.9.167)：类型筛选同样叠一层。
     /// A-38-A5：接受 body-local 的当前文件夹项，body 内只调一次；不取
     /// partition——它的输入是 currentDirItems（按文件夹过滤），partition
     /// 的六元组里没有文件夹维度的切分。
     private func visibleDirItems(in items: [LocalFileItem]) -> [LocalFileItem] {
         items.filter { item in
+            guard fileTypeMatches(item) else { return false }
+            if item.isDirectory { return true }
             if fileTab == .signed {
                 return item.isIPA && item.isInSignedDir
             }
@@ -1153,6 +1182,15 @@ struct FilesTabView: View {
             selection = []
             selecting = false
         }
+        // F-1 (0.9.167)：类型分段——跟上面切栏同款 segmented，叠加
+        // 在切栏 + 搜索之上；IPA/ZIP 是各语言通用的缩写，不走 L()。
+        Picker("", selection: $fileTypeFilter) {
+            Text(L("All")).tag(FileTypeFilter.all)
+            Text(verbatim: "IPA").tag(FileTypeFilter.ipa)
+            Text(verbatim: "ZIP").tag(FileTypeFilter.zip)
+            Text(L("Folder")).tag(FileTypeFilter.folder)
+        }
+        .pickerStyle(.segmented)
         fileSearchBar
         // 排序：只改显示顺序（IPA 列表、文件夹内列表、其他文件
         // 组都按同一规则排）；默认保持扫描顺序，不动老习惯。
@@ -1176,13 +1214,28 @@ struct FilesTabView: View {
             Spacer()
         }
         if !currentDir.isEmpty {
-            currentDirBar
             let dirItems = currentDirItems
             let dirVisible = visibleDirItems(in: dirItems)
+            // B-3 (0.9.167)：计数用过滤后的数量——原来 currentDirBar
+            // 读 currentDirItems.count（搜索前/切栏前），正文却按
+            // dirVisible 判空，顶上写着“N 项”正文却说没有，文案撒谎。
+            currentDirBar(count: dirVisible.count)
             if dirItems.isEmpty {
-                emptyCard.cascadeItem(2)
+                // B-3 (0.9.167)：空态按原因区分——搜了没命中是搜索
+                // 无匹配；没搜才是文件夹真空（currentDirItems 已先
+                // 按搜索过滤，dirVisible 为空时搜索一定命中过东西，
+                // 所以搜索无匹配只可能落在这里）。
+                if fileSearchText.isEmpty {
+                    emptyCard.cascadeItem(2)
+                } else {
+                    Text(L("没有匹配的 IPA。"))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
             } else if dirVisible.isEmpty {
-                Text(L("没有匹配的 IPA。"))
+                // 切栏/类型筛选把搜到的行全滤掉了——不是搜索没命中，
+                // 是筛选后无内容，跟上面那句分开写。
+                Text(L("No files match the current filter."))
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
             } else {
@@ -1197,7 +1250,8 @@ struct FilesTabView: View {
             // 扁平列表（过滤逻辑不动）。
             ipaList(partition: partition, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID).cascadeItem(2)
             if fileTab == .unsigned {
-                let flatFiles = sortedFiles(matching(partition.others) + matching(partition.systemFiles))
+                // F-1 (0.9.167)：类型筛选叠到其他文件 + 系统文件组上。
+                let flatFiles = sortedFiles((matching(partition.others) + matching(partition.systemFiles)).filter { fileTypeMatches($0) })
                 if !flatFiles.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(flatFiles) { item in
@@ -1602,7 +1656,9 @@ struct FilesTabView: View {
     }
 
     /// 当前文件夹返回条：点回上级（根目录就回文件组）。
-    private var currentDirBar: some View {
+    /// B-3 (0.9.167)：计数是调用方传进来的过滤后数量，不再自己读
+    /// currentDirItems.count（那是过滤前的数）。
+    private func currentDirBar(count: Int) -> some View {
         PanelCard {
             HStack(spacing: 8) {
                 Button {
@@ -1621,7 +1677,7 @@ struct FilesTabView: View {
                     .font(.headline)
                     .lineLimit(1)
                 Spacer()
-                Text(L("%d 项", currentDirItems.count))
+                Text(L("%d 项", count))
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
             }
@@ -1655,8 +1711,12 @@ struct FilesTabView: View {
             // A-5(a)：ForEach 外求一次存局部量，不再每行重建数组。
             let list = filteredIPAs(partition: partition)
             if list.isEmpty {
+                // F-1 (0.9.167)：类型筛到 ZIP/文件夹时 IPA 区定义上就是
+                // 空的，别说“还没有已签名的 IPA。”——那句只在类型为全部时真。
                 Text(fileSearchText.isEmpty
-                     ? (fileTab == .unsigned ? L("还没有未签名的 IPA。") : L("还没有已签名的 IPA。"))
+                     ? (fileTypeFilter == .all
+                        ? (fileTab == .unsigned ? L("还没有未签名的 IPA。") : L("还没有已签名的 IPA。"))
+                        : L("No files match the current filter."))
                      : L("没有匹配的 IPA。"))
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
@@ -3550,6 +3610,14 @@ private enum FileListTab: Hashable {
     case signed
 }
 
+/// 文件页类型筛选：全部 / IPA / ZIP / 文件夹（F-1，0.9.167）。
+private enum FileTypeFilter: Hashable {
+    case all
+    case ipa
+    case zip
+    case folder
+}
+
 /// 应用库切栏。
 private enum CertLibraryTab: Identifiable, Hashable {
     case unsigned
@@ -3586,6 +3654,12 @@ private struct FileDetailSheet: View {
     /// F-3 (0.9.163): the IPA's SHA-256 hex, hashed off the main thread
     /// once the sheet opens — nil until it lands.
     @State private var sha256: String? = nil
+    /// F-2 (0.9.167): the IPA's entitlement keys from its
+    /// `embedded.mobileprovision` — nil until the background parse lands,
+    /// nil forever when there is no (readable) profile, in which case the
+    /// section below never appears. Empty (profile with only boilerplate
+    /// keys) also hides the section: nothing to show.
+    @State private var capabilityKeys: [String]? = nil
 
     /// The IPA metadata to show: the caller's parse first, the sheet's own
     /// background parse once it lands.
@@ -3625,6 +3699,23 @@ private struct FileDetailSheet: View {
                 // background hash lands.
                 if item.isIPA {
                     detailRow(L("SHA-256"), sha256 ?? L("Loading…"))
+                }
+                // F-2 (0.9.167)：IPA 的 Entitlements——embedded.mobileprovision
+                // 里的权限键（推送/iCloud/App Groups 等免费证书给不了的先
+                // 在这里看见，装完才发现某功能悄悄失效之前）。只读列表，
+                // 每行长按复制；无 provision（或只有 4 个样板键）不显示该节。
+                if item.isIPA, let keys = capabilityKeys, !keys.isEmpty {
+                    Section(L("Entitlements")) {
+                        ForEach(keys, id: \.self) { key in
+                            Text(verbatim: key)
+                                .font(.subheadline)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .contextMenu {
+                                    Button(L("Copy")) { UIPasteboard.general.string = key }
+                                }
+                        }
+                    }
                 }
                 Section {
                     if !item.isDirectory {
@@ -3678,6 +3769,19 @@ private struct FileDetailSheet: View {
                 if item.isIPA, sha256 == nil {
                     let url = item.url
                     sha256 = await Task.detached { IPALibrary.sha256(of: url) }.value
+                }
+                // F-2 (0.9.167)：Entitlements，SHA-256 同款 detached 解析——
+                // 只读 central directory 里 embedded.mobileprovision 这一条
+                // 目，不解压整包；`capabilityKeys` 已去 4 个样板键
+                // （AppsView 同款）。Task<…, Never>.value 永不抛，无需
+                // do/catch；无 provision/解析失败就留 nil，该节不显示。
+                if item.isIPA, capabilityKeys == nil {
+                    let url = item.url
+                    capabilityKeys = await Task.detached {
+                        guard let data = IPALibrary.embeddedProvisionData(inIPA: url),
+                              let profile = ProvisioningProfile(data: data) else { return nil }
+                        return profile.capabilityKeys
+                    }.value
                 }
             }
         }

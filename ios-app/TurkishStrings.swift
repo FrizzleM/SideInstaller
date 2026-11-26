@@ -1659,4 +1659,9 @@ let turkishStrings: [String: String] = [
     "Move": "Taşı",
     "其中 %d 个因拒绝降级而跳过。": "%d tanesi düşürmeyi reddettiği için atlandı.",
 
+    // 0.9.167
+    "Folder": "Klasör",
+    "Export history": "Geçmişi dışa aktar",
+    "No files match the current filter.": "Geçerli filtreyle eşleşen dosya yok.",
+
 ]

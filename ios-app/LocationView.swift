@@ -1015,7 +1015,17 @@ final class LocationManager: ObservableObject {
                     guard !Task.isCancelled else { return }
                     self.endPlayback()
                     self.lastSuccess = nil
-                    self.lastError = L("Route playback stopped: %@", self.message(error))
+                    // B-1 (0.9.167)：中途发送失败也是路线的结束——原来这里只
+                    // endPlayback() + 报错就返回，开关开着也不恢复，设备一直
+                    // 停在伪造点（endPlayback 还会重开重发定时器，顶着最后
+                    // 那个伪造点继续发）。播完路径同款：开关开就
+                    // 走 restoreRealLocationAfterRoute()，关才保留这条报错。
+                    if self.restoreRealAfterRoute {
+                        self.engine.log("Location: route playback failed — restoring real location.")
+                        self.restoreRealLocationAfterRoute()
+                    } else {
+                        self.lastError = L("Route playback stopped: %@", self.message(error))
+                    }
                     return
                 }
                 // Stopped or replaced while that was sending.

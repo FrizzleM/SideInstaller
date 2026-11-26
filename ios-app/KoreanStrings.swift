@@ -1706,4 +1706,9 @@ let koreanStrings: [String: String] = [
     "Move": "이동",
     "其中 %d 个因拒绝降级而跳过。": "그중 %d개는 다운그레이드를 거부하여 건너뛰었습니다.",
 
+    // 0.9.167
+    "Folder": "폴더",
+    "Export history": "기록 내보내기",
+    "No files match the current filter.": "현재 필터와 일치하는 파일이 없습니다.",
+
 ]
