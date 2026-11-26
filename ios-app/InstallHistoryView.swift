@@ -308,8 +308,17 @@ struct InstallHistoryView: View {
             return
         }
         reinstallingID = entry.id
+        // B-1 (0.9.174): 立全部更新的标志再起跑——重装先 import
+        // （此时 isRunning 还是 false），两路 startUpdateAll 的守卫
+        // 只认 isRunning / batchUpdateRunning，标志不立就会在重装
+        // 进行中放行全部更新、逐项撞导入守卫。FilesTabView 文件批
+        // 量安装同款（0.9.173 B-1）。Task 的 defer 在每个出口清掉
+        // （完成、取消、超时、失败），不留常亮；importCustomIPA /
+        // runOneClick 本身不查该标志，不会自锁。
+        engine.batchUpdateRunning = true
         reinstallTask = Task { @MainActor in
             defer { reinstallTask = nil }
+            defer { engine.batchUpdateRunning = false }
             let started = await engine.reinstallFromHistory(entry)
             if Task.isCancelled {
                 reinstallingID = nil
@@ -373,8 +382,12 @@ struct InstallHistoryView: View {
             return
         }
         reinstallingAll = true
+        // B-1 (0.9.174): 同 reinstall——全部重装跑着时也立全部更新
+        // 的标志，Task 的 defer 在每个出口清掉。
+        engine.batchUpdateRunning = true
         reinstallTask = Task { @MainActor in
             defer { reinstallTask = nil }
+            defer { engine.batchUpdateRunning = false }
             var succeeded = 0
             var failedCount = 0
             var skipped = 0

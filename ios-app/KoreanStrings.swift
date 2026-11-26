@@ -1731,4 +1731,12 @@ let koreanStrings: [String: String] = [
     "Export history": "기록 내보내기",
     "No files match the current filter.": "현재 필터와 일치하는 파일이 없습니다.",
 
+    // 0.9.174
+    "Retry all": "모두 다시 시도",
+    "Skip": "건너뛰기",
+    "Clear all": "모두 지우기",
+    "Clear all failed downloads?": "실패한 다운로드를 모두 지우겠습니까?",
+    "全部更新进行中，等它跑完再安装。": "전체 업데이트가 진행 중입니다. 끝날 때까지 기다렸다가 설치하세요.",
+    "其中 %d 个已跳过。": "그중 %d개를 건너뛰었습니다.",
+
 ]

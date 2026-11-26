@@ -1730,4 +1730,12 @@ let japaneseStrings: [String: String] = [
     "Export history": "履歴をエクスポート",
     "No files match the current filter.": "現在のフィルターに一致するファイルがありません。",
 
+    // 0.9.174
+    "Retry all": "すべて再試行",
+    "Skip": "スキップ",
+    "Clear all": "すべて消去",
+    "Clear all failed downloads?": "失敗したダウンロードをすべて消去しますか？",
+    "全部更新进行中，等它跑完再安装。": "すべて更新中です。終わるまで待ってからインストールしてください。",
+    "其中 %d 个已跳过。": "うち %d 件をスキップしました。",
+
 ]

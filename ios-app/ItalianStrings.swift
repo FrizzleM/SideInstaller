@@ -1771,4 +1771,12 @@ let italianStrings: [String: String] = [
     "Export history": "Esporta cronologia",
     "No files match the current filter.": "Nessun file corrisponde al filtro corrente.",
 
+    // 0.9.174
+    "Retry all": "Riprova tutto",
+    "Skip": "Salta",
+    "Clear all": "Cancella tutto",
+    "Clear all failed downloads?": "Eliminare tutti i download non riusciti?",
+    "全部更新进行中，等它跑完再安装。": "È in corso un aggiornamento di tutte le app. Attendi che finisca prima di installare.",
+    "其中 %d 个已跳过。": "Di cui %d saltate.",
+
 ]

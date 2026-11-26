@@ -1767,4 +1767,12 @@ let vietnameseStrings: [String: String] = [
     "Export history": "Xuất lịch sử",
     "No files match the current filter.": "Không có tệp nào khớp với bộ lọc hiện tại.",
 
+    // 0.9.174
+    "Retry all": "Thử lại tất cả",
+    "Skip": "Bỏ qua",
+    "Clear all": "Xóa tất cả",
+    "Clear all failed downloads?": "Xóa tất cả lượt tải xuống thất bại?",
+    "全部更新进行中，等它跑完再安装。": "Đang cập nhật tất cả ứng dụng. Vui lòng đợi xong rồi mới cài đặt.",
+    "其中 %d 个已跳过。": "Trong đó đã bỏ qua %d mục.",
+
 ]

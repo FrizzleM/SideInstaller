@@ -1688,4 +1688,12 @@ let turkishStrings: [String: String] = [
     "Export history": "Geçmişi dışa aktar",
     "No files match the current filter.": "Geçerli filtreyle eşleşen dosya yok.",
 
+    // 0.9.174
+    "Retry all": "Tümünü yeniden dene",
+    "Skip": "Atla",
+    "Clear all": "Tümünü temizle",
+    "Clear all failed downloads?": "Başarısız indirmelerin tümü temizlensin mi?",
+    "全部更新进行中，等它跑完再安装。": "Tüm uygulamalar güncelleniyor. Kurmadan önce bitmesini bekleyin.",
+    "其中 %d 个已跳过。": "Bunların %d tanesi atlandı.",
+
 ]

@@ -1742,4 +1742,12 @@ let chineseStrings: [String: String] = [
     "Export history": "导出历史",
     "No files match the current filter.": "没有符合筛选的文件。",
 
+    // 0.9.174
+    "Retry all": "全部重试",
+    "Skip": "跳过",
+    "Clear all": "全部清除",
+    "Clear all failed downloads?": "清除全部失败的下载？",
+    "全部更新进行中，等它跑完再安装。": "全部更新进行中，等它跑完再安装。",
+    "其中 %d 个已跳过。": "其中 %d 个已跳过。",
+
 ]

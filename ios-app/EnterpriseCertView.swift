@@ -1900,6 +1900,14 @@ struct EnterpriseCertView: View {
             signBlockedMessage = L("An import is already running. Wait for it to finish, then try again.")
             return
         }
+        // B-3 (0.9.174): 批跑下载间隙两项全是 false——只查上面两道
+        // 会放行，importCustomIPA 成功后 runOneClick 立即起跑、抢占
+        // 安装槽，批跑下一项导入被拒、全批报废。AboutView / 快捷
+        // 指令 / startLinkImport 都有这道守卫，本入口是漏网的。
+        if engine.batchUpdateRunning {
+            signBlockedMessage = L("全部更新进行中，等它跑完再安装。")
+            return
+        }
         signBlockedMessage = nil
         Task { @MainActor in
             guard await engine.importCustomIPA(from: url) else {

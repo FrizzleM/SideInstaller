@@ -278,6 +278,15 @@ struct SourceAppsView: View {
     @State private var updateAllIndex = 0
     @State private var updateAllTotal = 0
     @State private var updateAllCurrent: String?
+    /// F-2 (0.9.174): the batch item's download in flight, if one is —
+    /// the progress row's Skip is only live while this is set, so a
+    /// tap can't skip the item after its download (the install is
+    /// already running) or before it starts.
+    @State private var updateAllCurrentURL: URL?
+    /// F-2 (0.9.174): Skip was tapped for the item downloading now —
+    /// the loop's catch counts it as user-skipped and moves on, and
+    /// the loop head counts it if the tap landed between items.
+    @State private var skipCurrentItem = false
     @State private var updateAllSummary: String?
     @State private var showingUpdateAllSummary = false
     /// F-2 (0.9.173): the batch confirmation waiting on the user —
@@ -373,6 +382,11 @@ struct SourceAppsView: View {
                         }
                         // F3 (0.9.154): the batch run's progress + stop
                         // button, next to the rows it is working through.
+                        // F-2 (0.9.174): Skip next to Cancel — a slow or
+                        // stuck item no longer forces the whole batch to
+                        // be cancelled (the rest would go "remaining") or
+                        // waited out. Only live while a download is in
+                        // flight (see `skipCurrentUpdate`).
                         if updateAllTask != nil {
                             HStack(spacing: 8) {
                                 ProgressView()
@@ -380,6 +394,9 @@ struct SourceAppsView: View {
                                     .font(.footnote)
                                     .foregroundStyle(Theme.muted)
                                 Spacer()
+                                Button(L("Skip")) { skipCurrentUpdate() }
+                                    .font(.footnote)
+                                    .disabled(updateAllCurrentURL == nil)
                                 Button(L("Cancel")) { cancelUpdateAll() }
                                     .font(.footnote)
                             }
@@ -942,7 +959,12 @@ struct SourceAppsView: View {
                 // run out first, then import and install this one in
                 // turn. The row keeps `.queued` meanwhile (the downloader
                 // has moved on, so the effective state falls back to it).
-                while engine.isRunning, !Task.isCancelled {
+                // B-2 (0.9.174): a batch in its download gap counts the
+                // same — `isRunning` alone lets this import land between
+                // two batch items and steal the slot, so wait the batch
+                // out too. The row's Cancel still stops the wait
+                // (`Task.isCancelled`).
+                while engine.isRunning || engine.batchUpdateRunning, !Task.isCancelled {
                     try? await Task.sleep(for: .milliseconds(500))
                 }
                 guard !Task.isCancelled else {
@@ -1041,6 +1063,11 @@ struct SourceAppsView: View {
             // `outcome.declined` apart; update-all was the third site
             // 0.9.166 B-3 missed.
             var skipped = 0
+            // F-2 (0.9.174): items the user skipped with the progress
+            // row's Skip — counted apart from `skipped` (that bucket's
+            // summary line is the downgrade-decline wording), and apart
+            // from failures: a skipped item is un-updated, not failed.
+            var userSkipped = 0
             var stopped = false
             // B-3 (0.9.173): true when the run was cancelled by the
             // user — the summary says "stopped" then, and the un-run
@@ -1075,6 +1102,14 @@ struct SourceAppsView: View {
             for (offset, app) in targets.enumerated() {
                 if Task.isCancelled { cancelled = true; break }
                 if stopped { break }
+                // F-2 (0.9.174): Skip tapped between items — the item
+                // never starts, it counts as user-skipped, the batch
+                // moves straight on to the next one.
+                if skipCurrentItem {
+                    skipCurrentItem = false
+                    userSkipped += 1
+                    continue
+                }
                 updateAllIndex = offset + 1
                 let name = app.name ?? app.bundleIdentifier ?? ""
                 updateAllCurrent = name
@@ -1086,7 +1121,9 @@ struct SourceAppsView: View {
                 activeID = app.id
                 states[app.id] = .downloading
                 do {
+                    updateAllCurrentURL = url
                     let file = try await downloader.download(from: url)
+                    updateAllCurrentURL = nil
                     states[app.id] = nil
                     let outcome = await engine.installOneCustomIPA(file)
                     if outcome.declined {
@@ -1099,6 +1136,18 @@ struct SourceAppsView: View {
                         succeeded += 1
                     }
                 } catch {
+                    // F-2 (0.9.174): Skip tapped mid-download — the
+                    // download was stopped with `cancelDownload`, so
+                    // this item counts as user-skipped, not cancelled
+                    // and not failed, and the batch runs the next item.
+                    if skipCurrentItem {
+                        skipCurrentItem = false
+                        userSkipped += 1
+                        activeID = nil
+                        states[app.id] = nil
+                        updateAllCurrentURL = nil
+                        continue
+                    }
                     // B-C2 同款：取消下载不记失败行——这里是整批取消，
                     // 记一条“已停止”就收尾，剩下的进下面的未跑填补。
                     if Task.isCancelled || (error as? URLError)?.code == .cancelled {
@@ -1109,6 +1158,7 @@ struct SourceAppsView: View {
                         cancelled = true
                         activeID = nil
                         states[app.id] = nil
+                        updateAllCurrentURL = nil
                         break
                     }
                     failed.append((name, error.localizedDescription))
@@ -1116,15 +1166,19 @@ struct SourceAppsView: View {
                 }
                 activeID = nil
                 states[app.id] = nil
+                // F-2 (0.9.174): 下载抛错也没清掉的 URL 在这里清——
+                // 不然 Skip 一直亮着，点它会把下一项误跳。
+                updateAllCurrentURL = nil
             }
             // 没跑到的各项：停批的原因同样记一条，不静默丢掉
             // （installSelection 同款）。已跑的项 = 成功 + 失败 + 跳过
-            // （拒绝降级），三桶都算上，填补才不会把已跳过的项再记一遍。
+            // （拒绝降级）+ 用户跳过，四桶都算上，填补才不会把已跳过
+            // 的项再记一遍。
             // B-3 (0.9.173): not after a cancel — the un-run items are
             // the summary's "remaining", not failures.
-            if !cancelled, failed.count + succeeded + skipped < targets.count {
+            if !cancelled, failed.count + succeeded + skipped + userSkipped < targets.count {
                 let reason = failed.last?.error ?? L("Install stopped")
-                for app in targets[(failed.count + succeeded + skipped)...] {
+                for app in targets[(failed.count + succeeded + skipped + userSkipped)...] {
                     failed.append((app.name ?? app.bundleIdentifier ?? "", reason))
                     failedTargets.append(app)
                 }
@@ -1135,7 +1189,7 @@ struct SourceAppsView: View {
             // B-3 (0.9.173): the un-updated count for the stopped
             // summary — taken before the min-iOS skips join `failed`
             // for display (they never entered `targets`).
-            let remaining = targets.count - succeeded - failed.count - skipped
+            let remaining = targets.count - succeeded - failed.count - skipped - userSkipped
             failed.append(contentsOf: skippedMinOS)
             // F-1 (0.9.172): keep the failed targets for the summary
             // alert's retry — skippedMinOS items are not in them (they
@@ -1178,6 +1232,11 @@ struct SourceAppsView: View {
             if skipped > 0 {
                 updateAllSummary = (updateAllSummary ?? "") + " " + L("其中 %d 个因拒绝降级而跳过。", skipped)
             }
+            // F-2 (0.9.174): 用户跳过的项单独报数——不混进失败数，
+            // 也不混进拒绝降级那句（文案是降级专用的）。
+            if userSkipped > 0 {
+                updateAllSummary = (updateAllSummary ?? "") + " " + L("其中 %d 个已跳过。", userSkipped)
+            }
             showingUpdateAllSummary = true
             // B-1 (0.9.172): re-read the device list, so an app just
             // updated leaves the Updates section (and the badge) at
@@ -1216,6 +1275,19 @@ struct SourceAppsView: View {
         guard let confirm = updateAllConfirm else { return }
         updateAllConfirm = nil
         confirm.reply.resume(returning: proceed)
+    }
+
+    /// F-2 (0.9.174): skip the item downloading now — stop its download
+    /// and flag it, so the batch loop counts it as user-skipped and runs
+    /// the next item instead of cancelling the whole batch. Only acts
+    /// while a download is in flight (`updateAllCurrentURL` is set):
+    /// once the download has landed the install is already running and
+    /// there is nothing to skip, and the flag is never left set for the
+    /// next item to swallow by accident.
+    private func skipCurrentUpdate() {
+        guard let url = updateAllCurrentURL else { return }
+        skipCurrentItem = true
+        downloader.cancelDownload(url: url)
     }
 
     /// F3 (0.9.154): stop the update-all run — cancel the batch Task
@@ -1270,7 +1342,11 @@ struct SourceAppsView: View {
                 // F-1 (0.9.163): startInstall 同款——排队的下载落地时若
                 // 有安装在跑，先等它结束再导入，否则 B3 拒掉导入并删掉
                 // 刚下好的文件。
-                while engine.isRunning, !Task.isCancelled {
+                // B-2 (0.9.174): 批跑下载间隙同款——只等 `isRunning` 会
+                // 在间隙里导入，批跑下一项导入时 `replaceCustomImport`
+                // 把刚交过去的文件逐出，企业页填表时文件已不在。等批
+                // 跑完再交；行内取消仍可停（`Task.isCancelled`）。
+                while engine.isRunning || engine.batchUpdateRunning, !Task.isCancelled {
                     try? await Task.sleep(for: .milliseconds(500))
                 }
                 guard !Task.isCancelled else {
@@ -2063,6 +2139,15 @@ struct AppSourcesView: View {
     @State private var updateAllIndex = 0
     @State private var updateAllTotal = 0
     @State private var updateAllCurrent: String?
+    /// F-2 (0.9.174): the batch item's download in flight, if one is —
+    /// the progress row's Skip is only live while this is set, so a
+    /// tap can't skip the item after its download (the install is
+    /// already running) or before it starts.
+    @State private var updateAllCurrentURL: URL?
+    /// F-2 (0.9.174): Skip was tapped for the item downloading now —
+    /// the loop's catch counts it as user-skipped and moves on, and
+    /// the loop head counts it if the tap landed between items.
+    @State private var skipCurrentItem = false
     @State private var updateAllSummary: String?
     @State private var showingUpdateAllSummary = false
     /// F-2 (0.9.173): the batch confirmation waiting on the user —
@@ -2429,6 +2514,12 @@ struct AppSourcesView: View {
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                         Spacer()
+                        // F-2 (0.9.174): Skip next to Cancel — single-
+                        // source page 同款：a slow item no longer forces
+                        // the whole batch to be cancelled or waited out.
+                        Button(L("Skip")) { skipCurrentUpdate() }
+                            .font(.footnote)
+                            .disabled(updateAllCurrentURL == nil)
                         Button(L("Cancel")) { cancelUpdateAllAcrossSources() }
                             .font(.footnote)
                     }
@@ -2513,6 +2604,9 @@ struct AppSourcesView: View {
             // above — the summary alert's retry re-runs exactly these.
             var failedListings: [SourceListing] = []
             var skipped = 0
+            // F-2 (0.9.174): 单源批跑同款——用户跳过的项另计，不进
+            // `skipped`（拒绝降级专用桶），也不进失败桶。
+            var userSkipped = 0
             var stopped = false
             // B-3 (0.9.173): 单源批跑同款——取消与失败分开汇总。
             var cancelled = false
@@ -2544,6 +2638,13 @@ struct AppSourcesView: View {
             for (offset, listing) in runnable.enumerated() {
                 if Task.isCancelled { cancelled = true; break }
                 if stopped { break }
+                // F-2 (0.9.174): 单源批跑同款——两项之间点的 Skip，
+                // 本项不跑、记用户跳过、直接下一项。
+                if skipCurrentItem {
+                    skipCurrentItem = false
+                    userSkipped += 1
+                    continue
+                }
                 updateAllIndex = offset + 1
                 let name = listing.app.name
                 // The progress line names the source too — the same app
@@ -2556,7 +2657,9 @@ struct AppSourcesView: View {
                 }
                 let url = latest.downloadURL
                 do {
+                    updateAllCurrentURL = url
                     let file = try await downloader.download(from: url)
+                    updateAllCurrentURL = nil
                     let outcome = await engine.installOneCustomIPA(file)
                     if outcome.declined {
                         skipped += 1
@@ -2568,23 +2671,37 @@ struct AppSourcesView: View {
                         succeeded += 1
                     }
                 } catch {
+                    // F-2 (0.9.174): 单源批跑同款——下载中点的 Skip，
+                    // `cancelDownload` 停掉本次下载，本项记用户跳过、
+                    // 不记取消、不记失败，批跑下一项。
+                    if skipCurrentItem {
+                        skipCurrentItem = false
+                        userSkipped += 1
+                        updateAllCurrentURL = nil
+                        continue
+                    }
                     if Task.isCancelled || (error as? URLError)?.code == .cancelled {
                         // B-3 (0.9.173): 单源批跑同款——取消不记失败，
                         // 剩余项不进重试名单。
                         cancelled = true
+                        updateAllCurrentURL = nil
                         break
                     }
                     failed.append((listing.sourceName, name, error.localizedDescription))
                     failedListings.append(listing)
                 }
+                // F-2 (0.9.174): 单源批跑同款——下载抛错也没清掉的
+                // URL 在这里清，不然 Skip 一直亮着、点它误跳下一项。
+                updateAllCurrentURL = nil
             }
             // 没跑到的各项：停批的原因同样记一条，不静默丢掉
             // （单源版同款）。已跑的项 = 成功 + 失败 + 跳过
-            // （拒绝降级），三桶都算上，填补才不会把已跳过的项再记一遍。
+            // （拒绝降级）+ 用户跳过，四桶都算上，填补才不会把已跳过
+            // 的项再记一遍。
             // B-3 (0.9.173): 取消后不填补——剩余项是“未更新”，不是失败。
-            if !cancelled, failed.count + succeeded + skipped < runnable.count {
+            if !cancelled, failed.count + succeeded + skipped + userSkipped < runnable.count {
                 let reason = failed.last?.error ?? L("Install stopped")
-                for listing in runnable[(failed.count + succeeded + skipped)...] {
+                for listing in runnable[(failed.count + succeeded + skipped + userSkipped)...] {
                     failed.append((listing.sourceName, listing.app.name, reason))
                     failedListings.append(listing)
                 }
@@ -2594,7 +2711,7 @@ struct AppSourcesView: View {
             // 放在未跑填补之后：填补按 runnable 索引，混进跳过项会越界。
             // B-3 (0.9.173): 停止汇总的剩余数——在最低 iOS 跳过项并
             // 入 `failed` 之前算（它们从没进 `runnable`）。
-            let remaining = runnable.count - succeeded - failed.count - skipped
+            let remaining = runnable.count - succeeded - failed.count - skipped - userSkipped
             failed.append(contentsOf: skippedMinOS)
             // F-1 (0.9.172): keep the failed listings for the summary
             // alert's retry — skippedMinOS items are not in them (they
@@ -2624,6 +2741,10 @@ struct AppSourcesView: View {
             // 走不到。
             if skipped > 0 {
                 updateAllSummary = (updateAllSummary ?? "") + " " + L("其中 %d 个因拒绝降级而跳过。", skipped)
+            }
+            // F-2 (0.9.174): 单源批跑同款——用户跳过的项单独报数。
+            if userSkipped > 0 {
+                updateAllSummary = (updateAllSummary ?? "") + " " + L("其中 %d 个已跳过。", userSkipped)
             }
             showingUpdateAllSummary = true
             // The device list is stale now — updated apps would stay
@@ -2681,6 +2802,16 @@ struct AppSourcesView: View {
         guard let confirm = updateAllConfirm else { return }
         updateAllConfirm = nil
         confirm.reply.resume(returning: proceed)
+    }
+
+    /// F-2 (0.9.174): skip the item downloading now — single-source
+    /// page 同款：stop its download and flag it, so the loop counts it
+    /// as user-skipped and runs the next item. Only acts while a
+    /// download is in flight.
+    private func skipCurrentUpdate() {
+        guard let url = updateAllCurrentURL else { return }
+        skipCurrentItem = true
+        downloader.cancelDownload(url: url)
     }
 
     /// F-1 (0.9.171): stop the cross-source update-all run — the

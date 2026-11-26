@@ -667,6 +667,11 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// F-1 (0.9.173): drop one failed-download row (its Remove button).
     func removeFailedDownload(_ failed: FailedDownload) { failedDownloads.removeAll { $0 == failed } }
 
+    /// F-3 (0.9.174): drop every failed-download row at once (the Failed
+    /// section's Clear all, after its confirm box). The in-flight and
+    /// queued downloads are untouched — only this list is cleared.
+    func clearFailedDownloads() { failedDownloads.removeAll() }
+
     /// F-1 (0.9.163): one entry in the FIFO queue — the URL, the staged
     /// filename, and the continuation its waiter suspended in. A class,
     /// not a struct: the waiter stores its continuation into the same

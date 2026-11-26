@@ -1777,4 +1777,12 @@ let frenchStrings: [String: String] = [
     "Export history": "Exporter l'historique",
     "No files match the current filter.": "Aucun fichier ne correspond au filtre actuel.",
 
+    // 0.9.174
+    "Retry all": "Tout réessayer",
+    "Skip": "Ignorer",
+    "Clear all": "Tout effacer",
+    "Clear all failed downloads?": "Effacer tous les téléchargements échoués ?",
+    "全部更新进行中，等它跑完再安装。": "Une mise à jour de toutes les apps est en cours. Attendez qu'elle se termine avant d'installer.",
+    "其中 %d 个已跳过。": "Dont %d ignorées.",
+
 ]

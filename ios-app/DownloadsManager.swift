@@ -395,6 +395,13 @@ struct DownloadsListView: View {
     @State private var installingID: String?
     /// F-3 (0.9.171): the failed-download retry in flight, if any.
     @State private var retryTask: Task<Void, Never>?
+    /// F-1 (0.9.174): the retry-all run in flight, if any — the header
+    /// button turns into Cancel while it runs, and cancelling stops
+    /// after the current item instead of starting the next one.
+    @State private var retryAllTask: Task<Void, Never>?
+    /// F-3 (0.9.174): the Clear-all-failed confirmation, true while its
+    /// alert stands.
+    @State private var confirmingClearFailed = false
     /// Clear-all confirmation: true while the alert stands, with the
     /// renewal-source app names it must warn about (read when the button
     /// is tapped, not on every body pass).
@@ -647,14 +654,39 @@ struct DownloadsListView: View {
                                     HStack(spacing: 12) {
                                         Button(L("Try again")) { retryFailedDownload(failed) }
                                             .font(.caption)
-                                            .disabled(downloader.isDownloading || engine.isRunning || retryTask != nil)
+                                            .disabled(downloader.isDownloading || engine.isRunning || retryTask != nil || retryAllTask != nil)
                                         Button(L("Remove")) { downloader.removeFailedDownload(failed) }
                                             .font(.caption)
                                     }
                                 }
                             }
                         } header: {
-                            Text(L("Failed"))
+                            // F-1/F-3 (0.9.174): retry every failed row,
+                            // or clear them all — the rows alone only
+                            // offer one-at-a-time Try again / Remove, and
+                            // a batch failure leaves several rows to work
+                            // through. Retry all needs at least two rows
+                            // (one row's Try again already does the job);
+                            // while it runs the button is Cancel instead,
+                            // so a tap stops after the current item. Clear
+                            // all asks first (below), and never touches
+                            // the in-flight or queued downloads.
+                            HStack {
+                                Text(L("Failed"))
+                                Spacer()
+                                Button(retryAllTask != nil ? L("Cancel") : L("Retry all")) {
+                                    if retryAllTask != nil {
+                                        retryAllTask?.cancel()
+                                    } else {
+                                        retryAllFailedDownloads()
+                                    }
+                                }
+                                .font(.caption)
+                                .disabled(retryAllTask == nil && (downloader.failedDownloads.count < 2 || retryTask != nil || downloader.isDownloading || engine.isRunning || engine.batchUpdateRunning))
+                                Button(L("Clear all")) { confirmingClearFailed = true }
+                                    .font(.caption)
+                                    .disabled(retryTask != nil || retryAllTask != nil)
+                            }
                         }
                     }
                     if let error = manager.lastError {
@@ -860,6 +892,19 @@ struct DownloadsListView: View {
                 Text(L("删除后无法恢复"))
             }
         }
+        // F-3 (0.9.174): clear the whole Failed section at once — the
+        // header's Clear all asks first, so one tap can't wipe several
+        // failure records by accident. Only the failed rows go; the
+        // in-flight and queued downloads are untouched.
+        .alert(L("Clear all failed downloads?"), isPresented: $confirmingClearFailed) {
+            Button(L("Delete"), role: .destructive) {
+                confirmingClearFailed = false
+                downloader.clearFailedDownloads()
+            }
+            Button(L("Cancel"), role: .cancel) { confirmingClearFailed = false }
+        } message: {
+            Text(L("删除后无法恢复"))
+        }
         // F-2 (0.9.161): old-version cleanup — confirm with the count,
         // then the result line (deleted / skipped / failed).
         .alert(L("Clean up %d old versions?", pendingCleanup?.count ?? 0), isPresented: Binding(
@@ -893,7 +938,7 @@ struct DownloadsListView: View {
     /// it with the new reason, and an install failure lands on this
     /// page's error line instead.
     private func retryFailedDownload(_ failed: IPADownloader.FailedDownload) {
-        guard retryTask == nil, !downloader.isDownloading, !engine.isRunning else { return }
+        guard retryTask == nil, retryAllTask == nil, !downloader.isDownloading, !engine.isRunning else { return }
         // B-1 (0.9.173): an update-all batch owns the install slot —
         // the retry's install would be refused mid-batch, so say so on
         // this page instead of failing silently. The button stays
@@ -903,25 +948,59 @@ struct DownloadsListView: View {
             return
         }
         retryTask = Task {
-            do {
-                // The source row's retry re-runs its install path, which
-                // asks first — this one does the same, so a big IPA over
-                // cellular doesn't re-download silently.
-                guard await engine.confirmCellularDownload(size: nil, what: failed.name) else {
-                    retryTask = nil
-                    return
-                }
-                let file = try await downloader.download(from: failed.url)
-                let outcome = await engine.installOneCustomIPA(file)
-                if let error = outcome.error, !outcome.declined {
-                    manager.lastError = error
-                }
-            } catch {
-                // A fresh failure is already the downloader's record; a
-                // cancel just drops the wait silently.
-            }
+            await runFailedRetry(failed)
             retryTask = nil
         }
+    }
+
+    /// F-1 (0.9.174): retry every failed download, one at a time — the
+    /// same body as the row's Try again (`runFailedRetry`), serially,
+    /// so two installs never race for the install slot. The snapshot
+    /// is taken up front (rows clear as their retries land); a
+    /// declined cellular ask stops the run, and cancelling stops after
+    /// the current item instead of starting the next one.
+    private func retryAllFailedDownloads() {
+        guard retryAllTask == nil, retryTask == nil, !downloader.isDownloading, !engine.isRunning else { return }
+        // B-1 (0.9.173) 同款：批跑时不另起重装——行按钮同款文案。
+        if engine.batchUpdateRunning {
+            manager.lastError = L("全部更新进行中，等它跑完再重试。")
+            return
+        }
+        let targets = downloader.failedDownloads
+        guard targets.count >= 2 else { return }
+        retryAllTask = Task {
+            for failed in targets {
+                if Task.isCancelled { break }
+                guard await runFailedRetry(failed) else { break }
+            }
+            retryAllTask = nil
+        }
+    }
+
+    /// F-1 (0.9.174): one failed download's retry body — the cellular
+    /// ask, the download, then the install like the batch does. Shared
+    /// by the row's Try again and Retry all, so the two paths can't
+    /// drift apart. Returns false only when the user declined the
+    /// cellular ask (the caller stops); a download or install failure
+    /// is already recorded — a fresh failure replaces the row, an
+    /// install failure lands on this page's error line — so it still
+    /// returns true.
+    private func runFailedRetry(_ failed: IPADownloader.FailedDownload) async -> Bool {
+        // The source row's retry re-runs its install path, which
+        // asks first — this one does the same, so a big IPA over
+        // cellular doesn't re-download silently.
+        guard await engine.confirmCellularDownload(size: nil, what: failed.name) else { return false }
+        do {
+            let file = try await downloader.download(from: failed.url)
+            let outcome = await engine.installOneCustomIPA(file)
+            if let error = outcome.error, !outcome.declined {
+                manager.lastError = error
+            }
+        } catch {
+            // A fresh failure is already the downloader's record; a
+            // cancel just drops the wait silently.
+        }
+        return true
     }
 
     /// Tap a row to install that IPA: copy it into the Install tab's custom
