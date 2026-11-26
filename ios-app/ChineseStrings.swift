@@ -167,6 +167,7 @@ let chineseStrings: [String: String] = [
     "Tunnel off": "隧道已关闭",
     "Tunnel standby": "隧道待启动",
     "Update available": "有可用更新",
+    "SideInstaller %@ is still being published — try again later.": "SideInstaller %@ 还在发布中，稍后再试。",
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ 已发布 —— 你当前使用的是 %@。",
     "Get the latest version": "获取最新版本",
@@ -1249,6 +1250,7 @@ let chineseStrings: [String: String] = [
     "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
         "SideInstaller 自身的崩溃会在下次打开时由 iOS 交给它。SideStore、LiveContainer 和 Madeira 的崩溃日志通过 LocalDevVPN 从此 iPhone 读取。",
     "Open a GitHub issue": "在 GitHub 上新建 Issue",
+    "Share": "分享",
     "Share the report": "分享报告",
     "Preview the report": "预览报告",
     "Report": "报告",
@@ -1715,6 +1717,7 @@ let chineseStrings: [String: String] = [
     "No old versions to clean up.": "没有可清理的旧版本。",
     "%d files skipped (in use or needed for renewal).": "%d 个文件已跳过（正在使用或续签需要）。",
     "%d files couldn't be deleted: %@": "%d 个文件删不掉：%@",
+    "上次巡检：%@": "上次巡检：%@",
     "Checked just now": "刚刚检查过",
     "Checked %d minutes ago": "%d 分钟前检查过",
     "Checked %d hours ago": "%d 小时前检查过",
@@ -1727,6 +1730,7 @@ let chineseStrings: [String: String] = [
     "Older than installed %@": "比已装的 %@ 更旧",
     "Same as installed %@": "与已装的 %@ 相同",
     "Show in Downloads": "在下载里查看",
+    "Timed out waiting for the install slot — the download was discarded. Try again.": "等待安装位超时，已下载的文件已删除，请再试一次。",
     "Still installing — check the Install page for progress.": "仍在安装——去安装页查看进度。",
     "Installing — tap to cancel": "正在安装——点按可取消",
 

@@ -682,7 +682,21 @@ struct SettingsView: View {
                 Text(L("Location is not set to “Always”, so only silent audio is keeping the app alive — renewal from the lock screen may be suspended. Set Location to “Always” in Settings."))
                     .foregroundStyle(Theme.warning)
             }
+            // F-3 (0.9.177): when the last patrol ran — only while the
+            // switch is on; off means no patrol runs at all.
+            if autoRefreshEnabled {
+                Text(lastPatrolText)
+            }
         }
+    }
+
+    /// F-3 (0.9.177): "上次巡检：x 分钟前" — the relative time is
+    /// `SourcesView.checkedText` 同款; no patrol yet reads "—".
+    private var lastPatrolText: String {
+        guard let last = AutoRefreshService.shared.lastPatrolDate else {
+            return L("上次巡检：%@", "—")
+        }
+        return L("上次巡检：%@", SourcesView.checkedText(for: last))
     }
 
     // MARK: Downloaded IPAs

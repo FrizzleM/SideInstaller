@@ -395,6 +395,11 @@ struct DownloadsListView: View {
     @State private var installingID: String?
     /// F-3 (0.9.171): the failed-download retry in flight, if any.
     @State private var retryTask: Task<Void, Never>?
+    /// B-2 (0.9.177): how long a landed retry waits for the install slot
+    /// before giving up — 10 minutes, the same bound as
+    /// `UpdateChecker.selfUpdateWaitTimeout` and
+    /// `InstallHistoryView.reinstallWaitTimeout`.
+    private static let retryWaitTimeout: TimeInterval = 600
     /// B-1 (0.9.176): the failed row whose retry has downloaded and is
     /// waiting for the install slot (an install or a batch in its gap) —
     /// its row reads “等待中” meanwhile (single-source `.queued` 同款）.
@@ -666,6 +671,20 @@ struct DownloadsListView: View {
                                             Text(L("Waiting"))
                                                 .font(.caption)
                                                 .foregroundStyle(Theme.muted)
+                                            // B-2 (0.9.177): the wait has a
+                                            // Cancel of its own now — the
+                                            // header's Retry-all Cancel
+                                            // only covers that run, and
+                                            // this row's wait had no
+                                            // handle at all. Cancelling
+                                            // drops the downloaded file
+                                            // (below). Hidden during
+                                            // Retry all, whose Cancel
+                                            // lives in the header.
+                                            if retryTask != nil {
+                                                Button(L("Cancel")) { retryTask?.cancel() }
+                                                    .font(.caption)
+                                            }
                                         }
                                     }
                                     HStack(spacing: 12) {
@@ -808,6 +827,13 @@ struct DownloadsListView: View {
                             // keeps every other row on its default background.
                             .listRowBackground(highlightedID == item.id ? Theme.accent.opacity(0.12) : nil)
                             .swipeActions {
+                                // F-2 (0.9.177): share a downloaded IPA —
+                                // save to Files, AirDrop it, and so on
+                                // (the p12 export's `ShareLink` 同款).
+                                ShareLink(item: item.url) {
+                                    Label(L("Share"), systemImage: "square.and.arrow.up")
+                                }
+                                .tint(Theme.accent)
                                 // F3 (0.9.152): rename from here, Files page
                                 // rules (same alert, same validation).
                                 Button {
@@ -1033,11 +1059,27 @@ struct DownloadsListView: View {
             // 下载间隙落地会偷走批跑的槽。等的同时行上标“等待中”
             // （`waitingRetryURL`，上面）；取消即返。
             waitingRetryURL = failed.url
-            while engine.isRunning || engine.batchUpdateRunning, !Task.isCancelled {
+            var waited = 0.0
+            while (engine.isRunning || engine.batchUpdateRunning), !Task.isCancelled, waited < Self.retryWaitTimeout {
                 try? await Task.sleep(for: .milliseconds(500))
+                waited += 0.5
             }
             waitingRetryURL = nil
-            guard !Task.isCancelled else { return true }
+            // B-2 (0.9.177): a cancelled or timed-out wait drops the file
+            // it just downloaded (`discardInboxCopy`, the 0.9.176 refusal
+            // path's disposal — the file sits in tmp/ipa-source-*) instead
+            // of leaving a few hundred MB orphaned in tmp; the row falls
+            // back to its failed state, and a timeout leaves its reason
+            // on the page.
+            if Task.isCancelled {
+                Engine.discardInboxCopy(file)
+                return true
+            }
+            if waited >= Self.retryWaitTimeout, engine.isRunning || engine.batchUpdateRunning {
+                Engine.discardInboxCopy(file)
+                manager.lastError = L("Timed out waiting for the install slot — the download was discarded. Try again.")
+                return true
+            }
             let outcome = await engine.installOneCustomIPA(file)
             if let error = outcome.error, !outcome.declined {
                 manager.lastError = error

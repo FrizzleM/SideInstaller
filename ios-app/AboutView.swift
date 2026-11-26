@@ -124,10 +124,25 @@ struct AboutView: View {
     /// tab's banner, which carries the download link.
     private var updateCheck: some View {
         PanelCard {
-            AboutRow(systemImage: "arrow.down.circle",
-                     title: L("Check for updates"),
-                     detail: updateCheckDetail,
-                     action: { runUpdateCheck() })
+            VStack(alignment: .leading, spacing: 12) {
+                AboutRow(systemImage: "arrow.down.circle",
+                         title: L("Check for updates"),
+                         detail: updateCheckDetail,
+                         action: { runUpdateCheck() })
+                // F-1 (0.9.177): the verified newer release's notes —
+                // the same section as the Install banner; only when an
+                // install is actually offered.
+                if updateChecker.selfUpdateAvailable, let notes = updateChecker.releaseNotesPreview {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L("What's new"))
+                            .font(.subheadline.weight(.medium))
+                        Text(notes)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
         }
     }
 
@@ -144,6 +159,11 @@ struct AboutView: View {
         case .newer(let latest):
             return L("SideInstaller %@ is available — you're on %@.",
                      latest, updateChecker.currentVersion)
+        case .pendingRelease(let latest):
+            // B-1 (0.9.177): txt 已新、门控未过 — the same sentence the
+            // Install banner shows; the update itself stays unoffered
+            // until the release verifies.
+            return L("SideInstaller %@ is still being published — try again later.", latest)
         case .failed:
             return L("Couldn't check for updates. Check your connection and try again.")
         }

@@ -39,6 +39,33 @@ final class UpdateChecker: ObservableObject {
     /// static — never install an older build.
     @Published private(set) var updateAssetVerified = false
 
+    /// F-1 (0.9.177): the latest release's notes (the `body` of the release
+    /// JSON), taken while the gate runs. Cleared whenever the gate fails
+    /// or there is nothing newer — the notes only ever describe a
+    /// verified newer release.
+    @Published private(set) var releaseNotes: String?
+
+    /// B-1 (0.9.177): the version file names a newer version but the
+    /// release gate hasn't passed — the release is still being published
+    /// (or the gate failed). The banner stays up, but its copy says so
+    /// instead of offering an update that isn't verified yet.
+    var pendingRelease: Bool {
+        guard let latest = latestVersion else { return false }
+        return showBanner && Self.isNewer(latest, than: currentVersion) && !updateAssetVerified
+    }
+
+    /// F-1 (0.9.177): the release notes trimmed for the banner / About —
+    /// the first 5 lines, at most ~500 characters, markdown shown as
+    /// plain text. Nil when there are no notes to show.
+    var releaseNotesPreview: String? {
+        guard let notes = releaseNotes, !notes.isEmpty else { return nil }
+        let lines = notes.split(separator: "\n", omittingEmptySubsequences: false)
+        var text = lines.prefix(5).joined(separator: "\n")
+        let wasCut = lines.count > 5 || text.count > 500
+        if text.count > 500 { text = String(text.prefix(500)) }
+        return wasCut ? text + "…" : text
+    }
+
     /// This build's marketing version, e.g. "0.5.0".
     let currentVersion =
         (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
@@ -53,6 +80,11 @@ final class UpdateChecker: ObservableObject {
         case skipped
         case upToDate
         case newer(String)
+        /// B-1 (0.9.177): the version file is newer but the release gate
+        /// didn't pass — the release is still being published (or the gate
+        /// failed): a newer version is known, but nothing is verified to
+        /// install.
+        case pendingRelease(String)
         case failed
     }
 
@@ -96,7 +128,17 @@ final class UpdateChecker: ObservableObject {
         // stamp is unchanged: no gate runs, nothing to fail.
         let verified = showBanner ? await verifyReleaseAsset(for: latest) : true
         updateAssetVerified = showBanner ? verified : false
-        guard verified else { return .newer(latest) }
+        // F-1 (0.9.177): no newer version, no notes to show. (When the
+        // gate runs, `verifyReleaseAsset` clears them itself on failure
+        // and fills them on success.)
+        if !showBanner { releaseNotes = nil }
+        // B-1 (0.9.177): the version file is newer but the release gate
+        // didn't pass — report it as pending, not as a verified newer
+        // version. `latestVersion` stays set and `updateAssetVerified`
+        // stays false, and the daily stamp is NOT set here (B5, 0.9.153:
+        // the stamp only lands below, once the gate has passed or there
+        // is nothing newer to gate), so the next launch retries the gate.
+        guard verified else { return .pendingRelease(latest) }
         UserDefaults.standard.set(now, forKey: Self.lastCheckKey)
         return showBanner ? .newer(latest) : .upToDate
     }
@@ -106,6 +148,9 @@ final class UpdateChecker: ObservableObject {
     /// version, and its assets must include `SideInstaller.ipa`.
     /// Fails closed — any fetch or parse failure returns false.
     private func verifyReleaseAsset(for latest: String) async -> Bool {
+        // F-1 (0.9.177): the notes only describe a verified release —
+        // clear them first; a failed gate leaves nothing behind.
+        releaseNotes = nil
         guard let url = URL(string: Self.latestReleaseAPIURL) else { return false }
         var req = URLRequest(url: url)
         req.cachePolicy = .reloadIgnoringLocalCacheData
@@ -125,6 +170,10 @@ final class UpdateChecker: ObservableObject {
         // Equal, not just newer: a release for another version — older or
         // newer than the version file — is not the one to install.
         guard !Self.isNewer(tagVersion, than: latest), !Self.isNewer(latest, than: tagVersion) else { return false }
+        // F-1 (0.9.177): the gate passed — keep the release notes for
+        // the banner / About "What's new".
+        let body = (json["body"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        releaseNotes = (body?.isEmpty == false) ? body : nil
         return assets.contains { ($0["name"] as? String) == Self.releaseAssetName }
     }
 
@@ -280,6 +329,9 @@ final class UpdateChecker: ObservableObject {
 
     /// Compare dotted versions numerically, so "0.10.0" > "0.9.0". Anything
     /// after a "-" (e.g. "-beta.1") is ignored.
+    /// B-1 note (0.9.177): that also makes a beta tag compare equal to its
+    /// formal version ("0.9.177-beta.1" == "0.9.177") — noted, deliberately
+    /// not fixed this round.
     nonisolated static func isNewer(_ lhs: String, than rhs: String) -> Bool {
         func parts(_ v: String) -> [Int] {
             let core = v.split(separator: "-", maxSplits: 1).first ?? ""

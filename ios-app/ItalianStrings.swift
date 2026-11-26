@@ -167,6 +167,7 @@ let italianStrings: [String: String] = [
     "Tunnel connected": "Tunnel connesso",
     "Tunnel off": "Tunnel disattivato",
     "Update available": "Aggiornamento disponibile",
+    "SideInstaller %@ is still being published — try again later.": "SideInstaller %@ è ancora in fase di pubblicazione — riprova più tardi.",
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ è disponibile — tu hai la %@.",
     "Get the latest version": "Scarica l'aggiornamento",
@@ -1274,6 +1275,7 @@ let italianStrings: [String: String] = [
     "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
         "iOS passa a SideInstaller i suoi arresti anomali alla successiva apertura. I log degli arresti anomali di SideStore, LiveContainer e Madeira vengono letti da questo iPhone tramite LocalDevVPN.",
     "Open a GitHub issue": "Apri una segnalazione su GitHub",
+    "Share": "Condividi",
     "Share the report": "Condividi la segnalazione",
     "Preview the report": "Anteprima della segnalazione",
     "Report": "Segnalazione",
@@ -1744,6 +1746,7 @@ let italianStrings: [String: String] = [
     "No old versions to clean up.": "Nessuna vecchia versione da pulire.",
     "%d files skipped (in use or needed for renewal).": "%d file ignorati (in uso o necessari per il rinnovo).",
     "%d files couldn't be deleted: %@": "Impossibile eliminare %d file: %@",
+    "上次巡检：%@": "Ultimo controllo: %@",
     "Checked just now": "Controllato ora",
     "Checked %d minutes ago": "Controllato %d minuti fa",
     "Checked %d hours ago": "Controllato %d ore fa",
@@ -1756,6 +1759,7 @@ let italianStrings: [String: String] = [
     "Older than installed %@": "Meno recente della versione installata %@",
     "Same as installed %@": "Uguale alla versione installata %@",
     "Show in Downloads": "Mostra in Download",
+    "Timed out waiting for the install slot — the download was discarded. Try again.": "Tempo di attesa per lo slot di installazione scaduto — il download è stato eliminato. Riprova.",
     "Still installing — check the Install page for progress.": "Installazione ancora in corso — controlla la pagina Installazione per i progressi.",
     "Installing — tap to cancel": "Installazione in corso — tocca per annullare",
 

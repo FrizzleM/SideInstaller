@@ -144,6 +144,7 @@ let turkishStrings: [String: String] = [
     "Tunnel connected": "Tünel bağlı",
     "Tunnel off": "Tünel kapalı",
     "Update available": "Güncelleme mevcut",
+    "SideInstaller %@ is still being published — try again later.": "SideInstaller %@ hâlâ yayımlanıyor — daha sonra tekrar deneyin.",
     "SideInstaller %@ is available — you're on %@.": "SideInstaller %@ mevcut — sen %@ sürümündesin.",
     "Get the latest version": "En son sürümü al",
     "Release": "Sürüm",
@@ -1200,6 +1201,7 @@ let turkishStrings: [String: String] = [
     "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
         "iOS, SideInstaller'ın kendi çökmelerini bir sonraki açılışta iletir. SideStore, LiveContainer ve Madeira çökme günlükleri LocalDevVPN üzerinden bu iPhone'dan okunur.",
     "Open a GitHub issue": "GitHub sorunu aç",
+    "Share": "Paylaş",
     "Share the report": "Raporu paylaş",
     "Preview the report": "Raporu önizle",
     "Report": "Rapor",
@@ -1661,6 +1663,7 @@ let turkishStrings: [String: String] = [
     "No old versions to clean up.": "Temizlenecek eski sürüm yok.",
     "%d files skipped (in use or needed for renewal).": "%d dosya atlandı (kullanımda veya yenileme için gerekli).",
     "%d files couldn't be deleted: %@": "%d dosya silinemedi: %@",
+    "上次巡检：%@": "Son denetim: %@",
     "Checked just now": "Şimdi denetlendi",
     "Checked %d minutes ago": "%d dakika önce denetlendi",
     "Checked %d hours ago": "%d saat önce denetlendi",
@@ -1673,6 +1676,7 @@ let turkishStrings: [String: String] = [
     "Older than installed %@": "Yüklü %@ sürümünden daha eski",
     "Same as installed %@": "Yüklü %@ ile aynı",
     "Show in Downloads": "İndirilenlerde göster",
+    "Timed out waiting for the install slot — the download was discarded. Try again.": "Kurulum yuvası için bekleme süresi doldu — indirilen dosya silindi. Tekrar deneyin.",
     "Still installing — check the Install page for progress.": "Hâlâ yükleniyor — ilerlemeyi Yükleme sayfasından kontrol edin.",
     "Installing — tap to cancel": "Yükleniyor — iptal için dokunun",
 

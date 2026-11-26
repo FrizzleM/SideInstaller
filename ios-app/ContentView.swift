@@ -332,8 +332,16 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(L("Update available"))
                             .font(.subheadline.weight(.medium))
-                        Text(L("SideInstaller %@ is available — you're on %@.",
-                               updateChecker.latestVersion ?? "", updateChecker.currentVersion))
+                        // B-1 (0.9.177): txt 已新、门控未过 — the banner
+                        // stays up, but the second line says the release
+                        // is still being published instead of offering an
+                        // update that isn't verified yet (About's detail
+                        // line shares the same sentence).
+                        Text(updateChecker.pendingRelease
+                             ? L("SideInstaller %@ is still being published — try again later.",
+                                 updateChecker.latestVersion ?? "")
+                             : L("SideInstaller %@ is available — you're on %@.",
+                                 updateChecker.latestVersion ?? "", updateChecker.currentVersion))
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -389,6 +397,19 @@ struct ContentView: View {
                                 .background(Capsule().fill(Theme.accent))
                         }
                         .buttonStyle(.plain)
+                    }
+                }
+                // F-1 (0.9.177): the verified newer release's notes —
+                // the same section as About; only when an install is
+                // actually offered.
+                if updateChecker.selfUpdateAvailable, let notes = updateChecker.releaseNotesPreview {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L("What's new"))
+                            .font(.footnote.weight(.semibold))
+                        Text(notes)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 if let error = updateChecker.selfUpdateError {
@@ -2012,6 +2033,16 @@ struct InstallPopup: View {
                 Button(revokeButtonLabel(for: cert), role: .destructive) {
                     certManager.revoke(cert) {
                         engine.log("Retrying the install after revoking \(cert.displayName).")
+                        // B-3 (0.9.177): the revoke takes seconds, so a
+                        // batch can have started after the tap — check
+                        // the slot here, at the callback, not at the
+                        // tap. A running batch keeps the popup up and
+                        // the reason on the page; the user can retry
+                        // once the batch is done.
+                        if engine.batchUpdateRunning {
+                            engine.lastError = L("全部更新进行中，等它跑完再安装。")
+                            return
+                        }
                         engine.runOneClick()
                     }
                 }

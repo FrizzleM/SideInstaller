@@ -167,6 +167,7 @@ let koreanStrings: [String: String] = [
     "Tunnel connected": "터널 연결됨",
     "Tunnel off": "터널 꺼짐",
     "Update available": "업데이트 가능",
+    "SideInstaller %@ is still being published — try again later.": "SideInstaller %@ 아직 게시 중입니다 — 나중에 다시 시도해 주세요.",
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ 버전을 사용할 수 있습니다. 현재 버전은 %@입니다.",
     "Get the latest version": "최신 버전 받기",
@@ -1245,6 +1246,7 @@ let koreanStrings: [String: String] = [
     "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
         "SideInstaller 자체의 충돌 정보는 iOS가 다음에 앱을 열 때 전달해 줍니다. SideStore, LiveContainer, Madeira의 충돌 로그는 LocalDevVPN을 통해 이 iPhone에서 읽어 옵니다.",
     "Open a GitHub issue": "GitHub 이슈 열기",
+    "Share": "공유",
     "Share the report": "보고서 공유",
     "Preview the report": "보고서 미리 보기",
     "Report": "보고서",
@@ -1704,6 +1706,7 @@ let koreanStrings: [String: String] = [
     "No old versions to clean up.": "정리할 이전 버전이 없습니다.",
     "%d files skipped (in use or needed for renewal).": "파일 %d개를 건너뛰었습니다(사용 중이거나 갱신에 필요).",
     "%d files couldn't be deleted: %@": "파일 %d개를 삭제할 수 없습니다: %@",
+    "上次巡检：%@": "마지막 순찰: %@",
     "Checked just now": "방금 확인함",
     "Checked %d minutes ago": "%d분 전에 확인함",
     "Checked %d hours ago": "%d시간 전에 확인함",
@@ -1716,6 +1719,7 @@ let koreanStrings: [String: String] = [
     "Older than installed %@": "설치된 %@보다 이전 버전",
     "Same as installed %@": "설치된 %@와 동일",
     "Show in Downloads": "다운로드에서 보기",
+    "Timed out waiting for the install slot — the download was discarded. Try again.": "설치 슬롯 대기 시간이 초과되었습니다 — 다운로드한 파일이 삭제되었습니다. 다시 시도해 주세요.",
     "Still installing — check the Install page for progress.": "아직 설치 중입니다 — 진행 상황은 설치 페이지에서 확인하세요.",
     "Installing — tap to cancel": "설치 중 — 탭하여 취소",
 

@@ -2900,7 +2900,10 @@ final class Engine {
 
     /// Deletes a picked file only if it's in this app's temp directory (the
     /// picker's copy). Files opened in place are left alone.
-    private static func discardInboxCopy(_ url: URL) {
+    /// B-2 (0.9.177): no longer private — `DownloadsListView`'s landed
+    /// retry drops its temp file through this same disposal when its slot
+    /// wait is cancelled or times out.
+    static func discardInboxCopy(_ url: URL) {
         let tmp = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path
         guard url.resolvingSymlinksInPath().path.hasPrefix(tmp + "/") else { return }
         try? FileManager.default.removeItem(at: url)

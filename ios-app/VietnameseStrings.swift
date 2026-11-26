@@ -168,6 +168,7 @@ let vietnameseStrings: [String: String] = [
     "Tunnel connected": "Đã kết nối đường hầm",
     "Tunnel off": "Đường hầm đã tắt",
     "Update available": "Đã có bản cập nhật",
+    "SideInstaller %@ is still being published — try again later.": "SideInstaller %@ vẫn đang được phát hành — hãy thử lại sau.",
     "SideInstaller %@ is available — you're on %@.":
         "Đã có SideInstaller %@ — bạn đang dùng bản %@.",
     "Get the latest version": "Tải phiên bản mới nhất",
@@ -1272,6 +1273,7 @@ let vietnameseStrings: [String: String] = [
     "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
         "iOS chuyển các sự cố của chính SideInstaller cho ứng dụng vào lần mở tiếp theo. Nhật ký sự cố của SideStore, LiveContainer và Madeira được đọc từ iPhone này qua LocalDevVPN.",
     "Open a GitHub issue": "Mở issue trên GitHub",
+    "Share": "Chia sẻ",
     "Share the report": "Chia sẻ báo cáo",
     "Preview the report": "Xem trước báo cáo",
     "Report": "Báo cáo",
@@ -1740,6 +1742,7 @@ let vietnameseStrings: [String: String] = [
     "No old versions to clean up.": "Không có phiên bản cũ để dọn.",
     "%d files skipped (in use or needed for renewal).": "Đã bỏ qua %d tệp (đang dùng hoặc cần cho việc gia hạn).",
     "%d files couldn't be deleted: %@": "Không thể xóa %d tệp: %@",
+    "上次巡检：%@": "Lần kiểm tra gần nhất: %@",
     "Checked just now": "Vừa kiểm tra",
     "Checked %d minutes ago": "Đã kiểm tra %d phút trước",
     "Checked %d hours ago": "Đã kiểm tra %d giờ trước",
@@ -1752,6 +1755,7 @@ let vietnameseStrings: [String: String] = [
     "Older than installed %@": "Cũ hơn bản đã cài %@",
     "Same as installed %@": "Giống bản đã cài %@",
     "Show in Downloads": "Hiển thị trong Tải xuống",
+    "Timed out waiting for the install slot — the download was discarded. Try again.": "Hết thời gian chờ vị trí cài đặt — tệp đã tải xuống đã bị xóa. Hãy thử lại.",
     "Still installing — check the Install page for progress.": "Vẫn đang cài đặt — kiểm tra tiến trình trên trang Cài đặt.",
     "Installing — tap to cancel": "Đang cài đặt — chạm để hủy",
 

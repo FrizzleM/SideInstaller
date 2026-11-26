@@ -169,6 +169,7 @@ let spanishStrings: [String: String] = [
     "Tunnel connected": "Túnel conectado",
     "Tunnel off": "Túnel desactivado",
     "Update available": "Actualización disponible",
+    "SideInstaller %@ is still being published — try again later.": "SideInstaller %@ todavía se está publicando — inténtalo de nuevo más tarde.",
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ ya está disponible — tienes instalada la %@.",
     "Get the latest version": "Obtener la última versión",
@@ -1277,6 +1278,7 @@ let spanishStrings: [String: String] = [
     "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
         "iOS entrega a SideInstaller sus propios fallos la próxima vez que se abre. Los registros de fallos de SideStore, LiveContainer y Madeira se leen de este iPhone a través de LocalDevVPN.",
     "Open a GitHub issue": "Abrir una incidencia en GitHub",
+    "Share": "Compartir",
     "Share the report": "Compartir el informe",
     "Preview the report": "Ver el informe",
     "Report": "Informe",
@@ -1747,6 +1749,7 @@ let spanishStrings: [String: String] = [
     "No old versions to clean up.": "No hay versiones antiguas que limpiar.",
     "%d files skipped (in use or needed for renewal).": "%d archivos omitidos (en uso o necesarios para la renovación).",
     "%d files couldn't be deleted: %@": "No se pudieron eliminar %d archivos: %@",
+    "上次巡检：%@": "Última revisión: %@",
     "Checked just now": "Comprobado ahora mismo",
     "Checked %d minutes ago": "Comprobado hace %d minutos",
     "Checked %d hours ago": "Comprobado hace %d horas",
@@ -1759,6 +1762,7 @@ let spanishStrings: [String: String] = [
     "Older than installed %@": "Más antigua que la instalada %@",
     "Same as installed %@": "Igual que la instalada %@",
     "Show in Downloads": "Mostrar en Descargas",
+    "Timed out waiting for the install slot — the download was discarded. Try again.": "Se agotó el tiempo de espera del hueco de instalación — la descarga se descartó. Inténtalo de nuevo.",
     "Still installing — check the Install page for progress.": "Sigue instalando — consulta la página de instalación para ver el progreso.",
     "Installing — tap to cancel": "Instalando — toca para cancelar",
 

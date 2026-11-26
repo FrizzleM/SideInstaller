@@ -204,7 +204,10 @@ struct SourcesView: View {
     /// F-3 (0.9.161): "x 分钟前检查过" — just now / minutes / hours / days
     /// from the persisted last-check time. Over 24 hours the row colors
     /// it as stale (see the call site in `sourceRow`).
-    private static func checkedText(for date: Date) -> String {
+    /// F-3 (0.9.177): no longer private — the Settings page's
+    /// auto-refresh footer reuses the same relative time for the last
+    /// patrol.
+    static func checkedText(for date: Date) -> String {
         let seconds = max(0, Date().timeIntervalSince(date))
         if seconds < 60 { return L("Checked just now") }
         let minutes = Int(seconds / 60)

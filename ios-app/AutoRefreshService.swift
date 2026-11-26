@@ -41,6 +41,19 @@ final class AutoRefreshService {
     /// 设置页开关下面直接写出来，不让用户猜。
     var locationDegraded: Bool { keepAlive.locationUnavailable }
 
+    /// F-3 (0.9.177): when the last patrol round really ran (`tick()`
+    /// stamping `lastTickKey`) and when the last automatic renewal
+    /// round started (`lastRoundKey`) — read-only, for the Settings
+    /// page's footer. Nil when that round never ran.
+    var lastPatrolDate: Date? {
+        let t = UserDefaults.standard.double(forKey: Self.lastTickKey)
+        return t > 0 ? Date(timeIntervalSince1970: t) : nil
+    }
+    var lastRoundDate: Date? {
+        let t = UserDefaults.standard.double(forKey: Self.lastRoundKey)
+        return t > 0 ? Date(timeIntervalSince1970: t) : nil
+    }
+
     /// 开关开着且巡检没在跑时启动：双保活＋巡检循环。重复调用无副作用。
     func start() {
         guard isEnabled, !isRunning else { return }

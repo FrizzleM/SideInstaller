@@ -168,6 +168,7 @@ let portugueseStrings: [String: String] = [
     "Tunnel connected": "Túnel conectado",
     "Tunnel off": "Túnel desligado",
     "Update available": "Atualização disponível",
+    "SideInstaller %@ is still being published — try again later.": "O SideInstaller %@ ainda está a ser publicado — tente novamente mais tarde.",
     "SideInstaller %@ is available — you're on %@.":
         "O SideInstaller %@ está disponível — você está no %@.",
     "Get the latest version": "Baixar a versão mais recente",
@@ -1266,6 +1267,7 @@ let portugueseStrings: [String: String] = [
     "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
         "O iOS entrega ao SideInstaller as próprias falhas na próxima vez que ele abre. Os relatórios de falhas do SideStore, LiveContainer e Madeira são lidos deste iPhone pelo LocalDevVPN.",
     "Open a GitHub issue": "Abrir uma issue no GitHub",
+    "Share": "Partilhar",
     "Share the report": "Compartilhar o relatório",
     "Preview the report": "Ver o relatório",
     "Report": "Relatório",
@@ -1735,6 +1737,7 @@ let portugueseStrings: [String: String] = [
     "No old versions to clean up.": "Não há versões antigas para limpar.",
     "%d files skipped (in use or needed for renewal).": "%d ficheiros ignorados (em uso ou necessários para a renovação).",
     "%d files couldn't be deleted: %@": "Não foi possível eliminar %d ficheiros: %@",
+    "上次巡检：%@": "Última verificação: %@",
     "Checked just now": "Verificado agora mesmo",
     "Checked %d minutes ago": "Verificado há %d minutos",
     "Checked %d hours ago": "Verificado há %d horas",
@@ -1747,6 +1750,7 @@ let portugueseStrings: [String: String] = [
     "Older than installed %@": "Mais antiga que a instalada %@",
     "Same as installed %@": "Igual à instalada %@",
     "Show in Downloads": "Mostrar em Downloads",
+    "Timed out waiting for the install slot — the download was discarded. Try again.": "Tempo de espera pelo lugar de instalação esgotado — o download foi eliminado. Tente novamente.",
     "Still installing — check the Install page for progress.": "Ainda a instalar — consulte a página de instalação para ver o progresso.",
     "Installing — tap to cancel": "A instalar — toque para cancelar",
 

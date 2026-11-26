@@ -168,6 +168,7 @@ let frenchStrings: [String: String] = [
     "Tunnel connected": "Tunnel connecté",
     "Tunnel off": "Tunnel désactivé",
     "Update available": "Mise à jour disponible",
+    "SideInstaller %@ is still being published — try again later.": "SideInstaller %@ est toujours en cours de publication — réessayez plus tard.",
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ est disponible — vous utilisez la %@.",
     "Get the latest version": "Obtenir la dernière version",
@@ -1281,6 +1282,7 @@ let frenchStrings: [String: String] = [
     "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
         "iOS transmet à SideInstaller ses propres plantages à sa prochaine ouverture. Les rapports de plantage de SideStore, LiveContainer et Madeira sont lus sur cet iPhone via LocalDevVPN.",
     "Open a GitHub issue": "Ouvrir un ticket GitHub",
+    "Share": "Partager",
     "Share the report": "Partager le rapport",
     "Preview the report": "Aperçu du rapport",
     "Report": "Rapport",
@@ -1750,6 +1752,7 @@ let frenchStrings: [String: String] = [
     "No old versions to clean up.": "Aucune ancienne version à nettoyer.",
     "%d files skipped (in use or needed for renewal).": "%d fichiers ignorés (en cours d'utilisation ou nécessaires au renouvellement).",
     "%d files couldn't be deleted: %@": "Impossible de supprimer %d fichiers : %@",
+    "上次巡检：%@": "Dernière vérification : %@",
     "Checked just now": "Vérifié à l'instant",
     "Checked %d minutes ago": "Vérifié il y a %d minutes",
     "Checked %d hours ago": "Vérifié il y a %d heures",
@@ -1762,6 +1765,7 @@ let frenchStrings: [String: String] = [
     "Older than installed %@": "Plus ancien que la version installée %@",
     "Same as installed %@": "Identique à la version installée %@",
     "Show in Downloads": "Afficher dans Téléchargements",
+    "Timed out waiting for the install slot — the download was discarded. Try again.": "Délai d'attente de l'emplacement d'installation dépassé — le téléchargement a été supprimé. Réessayez.",
     "Still installing — check the Install page for progress.": "Installation toujours en cours — consultez la page d’installation pour suivre la progression.",
     "Installing — tap to cancel": "Installation en cours — toucher pour annuler",
 

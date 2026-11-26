@@ -166,6 +166,7 @@ let japaneseStrings: [String: String] = [
     "Tunnel connected": "トンネル接続済み",
     "Tunnel off": "トンネル未接続",
     "Update available": "アップデートがあります",
+    "SideInstaller %@ is still being published — try again later.": "SideInstaller %@ はまだ公開中です — しばらくしてからもう一度お試しください。",
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ が公開されています（現在お使いのバージョン：%@）。",
     "Get the latest version": "最新バージョンを取得",
@@ -1245,6 +1246,7 @@ let japaneseStrings: [String: String] = [
     "iOS hands SideInstaller its own crashes the next time it opens. Crash logs from SideStore, LiveContainer and Madeira are read from this iPhone through LocalDevVPN.":
         "SideInstaller 自身のクラッシュは、次に開いたときに iOS から渡されます。SideStore、LiveContainer、Madeira のクラッシュログは LocalDevVPN 経由でこの iPhone から読み取ります。",
     "Open a GitHub issue": "GitHub で Issue を作成",
+    "Share": "共有",
     "Share the report": "レポートを共有",
     "Preview the report": "レポートをプレビュー",
     "Report": "レポート",
@@ -1703,6 +1705,7 @@ let japaneseStrings: [String: String] = [
     "No old versions to clean up.": "整理する古いバージョンはありません。",
     "%d files skipped (in use or needed for renewal).": "%d 件のファイルをスキップしました（使用中または更新に必要）。",
     "%d files couldn't be deleted: %@": "%d 件のファイルを削除できませんでした：%@",
+    "上次巡检：%@": "前回の巡回：%@",
     "Checked just now": "たった今確認",
     "Checked %d minutes ago": "%d 分前に確認",
     "Checked %d hours ago": "%d 時間前に確認",
@@ -1715,6 +1718,7 @@ let japaneseStrings: [String: String] = [
     "Older than installed %@": "インストール済み %@ より古い",
     "Same as installed %@": "インストール済み %@ と同じ",
     "Show in Downloads": "ダウンロードで表示",
+    "Timed out waiting for the install slot — the download was discarded. Try again.": "インストール枠の待機がタイムアウトしました — ダウンロード済みファイルは削除されました。もう一度お試しください。",
     "Still installing — check the Install page for progress.": "インストールは続行中です — 進捗はインストール画面で確認してください。",
     "Installing — tap to cancel": "インストール中 — タップでキャンセル",
 
