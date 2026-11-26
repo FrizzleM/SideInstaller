@@ -181,6 +181,11 @@ struct FilesTabView: View {
     @State private var actionItem: LocalFileItem?
     /// 待确认删除的单个文件（行菜单/行内按钮/详情页点删除后先弹确认）。
     @State private var pendingDeleteItem: LocalFileItem?
+    /// B-2 (0.9.166): a move waiting on the user to confirm it — the file
+    /// is the Install tab's current custom import, and moving it empties
+    /// that slot. The destination waits with it until the user answers.
+    @State private var pendingMoveItem: LocalFileItem?
+    @State private var pendingMoveDestDir = ""
     /// 批量删除待确认（工具栏“删除所选”点后先弹确认，带数量）。
     @State private var pendingDeleteSelection = false
     /// 通用失败提示（UI-5：由 B-3 的删除失败 alert 泛化而来——页尾 opMessage
@@ -1013,6 +1018,23 @@ struct FilesTabView: View {
             } else {
                 Text(L("删除后无法恢复"))
             }
+        }
+        // B-2 (0.9.166): moving the Install tab's current import empties
+        // its slot — ask first, renewalDeleteWarning 同款确认（单删确认
+        // 同例：标题带文件名，确认才动）。
+        .alert(L("移动“%@”？", pendingMoveItem?.name ?? ""), isPresented: Binding(
+            get: { pendingMoveItem != nil },
+            set: { if !$0 { pendingMoveItem = nil } }
+        )) {
+            Button(L("Move")) {
+                if let item = pendingMoveItem {
+                    moveItemToFolder(item, pendingMoveDestDir, confirmed: true)
+                }
+                pendingMoveItem = nil
+            }
+            Button(L("Cancel"), role: .cancel) { pendingMoveItem = nil }
+        } message: {
+            Text(L("This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead."))
         }
         // 批量删确认，带数量。
         .alert(L("删除所选 %d 个？", selection.count), isPresented: $pendingDeleteSelection) {
@@ -2086,14 +2108,20 @@ struct FilesTabView: View {
         guard !items.isEmpty else { return }
         var moved = 0
         var failedNames: [String] = []
+        // B-2 (0.9.166): one of the items waits on the move confirmation —
+        // it counts as neither moved nor failed, and the batch summary waits
+        // for the answer (the confirmed move reports for itself).
+        var pendingConfirmation = false
         for item in items {
             opMessage = nil
             opFailed = false
             moveItemToFolder(item, destDir)
+            if pendingMoveItem != nil { pendingConfirmation = true; continue }
             if opFailed { failedNames.append(item.name) } else { moved += 1 }
         }
         selection = []
         selecting = false
+        guard !pendingConfirmation else { return }
         if failedNames.isEmpty {
             opMessage = L("已移动 %d 个。", moved)
             opFailed = false
@@ -2128,7 +2156,9 @@ struct FilesTabView: View {
     /// 把文件/文件夹移到目标目录（轻松签移动文件同款）：同名就拒，
     /// 移完重扫 + 当前目录复位；已签名 IPA 移出 Signed 目录时，
     /// 清单下次 load 会自动滤掉无文件记录，不用这里手动删。
-    private func moveItemToFolder(_ item: LocalFileItem, _ destDir: String) {
+    /// B-2 (0.9.166)：`confirmed` 只给确认框的回调用——第一次遇到当前
+    /// 导入 IPA 先弹确认不移动，点了确认才带着它再走一遍。
+    private func moveItemToFolder(_ item: LocalFileItem, _ destDir: String, confirmed: Bool = false) {
         let root = IPALibrary.documentsDir
         let parent = destDir.isEmpty ? root : root.appendingPathComponent(destDir)
         let dest = parent.appendingPathComponent(item.name)
@@ -2154,12 +2184,26 @@ struct FilesTabView: View {
             opFailed = true
             return
         }
+        // B-2 (0.9.166)：安装页当前导入的 IPA——移走后自定义槽位静默变
+        // 空，且旧名还挂在安装页上。先弹确认（renewalDeleteWarning 同款），
+        // 确认才动；其余守卫已在上面跑过，确认回来不再重问。
+        if !confirmed, !item.isDirectory, IPALibrary.customImport()?.url == item.url {
+            pendingMoveItem = item
+            pendingMoveDestDir = destDir
+            return
+        }
         do {
             try FileManager.default.moveItem(at: item.url, to: dest)
             refreshFiles(resetDir: true)
             // B-4：移动后刷新续签缓存与应用库列表，角标立即跟新位置。
             renewalSources = RenewalSourceStore.load()
             refreshUnsignedIPAs()
+            // B-2 (0.9.166)：槽位跟 Custom/ 里最新的 .ipa 走——移出（或
+            // 移进）Custom/ 都会改它，安装页标签立即刷新，不等下次导入。
+            if !item.isDirectory, item.isIPA,
+               (item.relativeDir == "Custom" || destDir == "Custom") {
+                engine.refreshCustomIPA()
+            }
             opMessage = L("已移动到 %@", destDir.isEmpty ? L("根目录") : destDir)
             opFailed = false
         } catch {
@@ -2372,6 +2416,11 @@ struct FilesTabView: View {
             // B-4：改名后刷新续签缓存与应用库列表，角标立即跟新名。
             renewalSources = RenewalSourceStore.load()
             refreshUnsignedIPAs()
+            // B-2 (0.9.166)：Custom/ 里的 IPA 改名不出目录，槽位功能上
+            // 还在，但安装页标签还是旧名——顺带刷新，跟移动同款。
+            if !item.isDirectory, item.isIPA, item.relativeDir == "Custom" {
+                engine.refreshCustomIPA()
+            }
             opMessage = L("已改名")
             opFailed = false
         } catch {
@@ -2500,7 +2549,10 @@ struct FilesTabView: View {
             selection = []
             selecting = false
             let ok = outcomes.filter { $0.error == nil }.count
-            let failed = outcomes.filter { $0.error != nil }
+            // B-3 (0.9.166)：拒绝降级的项是跳过、不是失败——跟历史页
+            // Reinstall all 的 skipped 桶同口径，不进失败名单。
+            let declined = outcomes.filter { $0.declined }
+            let failed = outcomes.filter { $0.error != nil && !$0.declined }
             var message: String
             if failed.isEmpty {
                 message = L("批量安装完成：%d 个已安装。", ok)
@@ -2513,6 +2565,11 @@ struct FilesTabView: View {
                     list += "、" + L("等 %d 个", failed.count - 5)
                 }
                 message = L("批量安装完成：成功 %d 个，失败 %d 个。失败：%@", ok, failed.count, list)
+            }
+            // B-3 (0.9.166)：拒绝降级的项单独报数（失败桶里已不含它们），
+            // “不是 IPA 已跳过”同款后置句式。
+            if !declined.isEmpty {
+                message += " " + L("其中 %d 个因拒绝降级而跳过。", declined.count)
             }
             if skipped > 0 {
                 message += " " + L("其中 %d 个不是 IPA，已跳过。", skipped)

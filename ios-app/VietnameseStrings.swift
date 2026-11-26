@@ -1728,4 +1728,15 @@ let vietnameseStrings: [String: String] = [
     "Show in Downloads": "Hiển thị trong Tải xuống",
     "Still installing — check the Install page for progress.": "Vẫn đang cài đặt — kiểm tra tiến trình trên trang Cài đặt.",
     "Installing — tap to cancel": "Đang cài đặt — chạm để hủy",
+
+    // 0.9.166
+    "All": "Tất cả",
+    "Succeeded": "Thành công",
+    "Restore real location when done": "Khôi phục vị trí thực khi xong",
+    "Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.": "Nhập tệp .gpx và thiết bị sẽ di chuyển theo nó với tốc độ bạn chọn. Khi xong, thiết bị dừng ở điểm cuối, trừ khi khôi phục vị trí thực khi xong đang bật.",
+    "移动“%@”？": "Di chuyển \"%@\"?",
+    "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "Đây là IPA trên tab Cài đặt. Di chuyển nó sẽ làm trống ô đó — hãy cài đặt từ thư mục mới của nó.",
+    "Move": "Di chuyển",
+    "其中 %d 个因拒绝降级而跳过。": "Trong đó %d mục đã bỏ qua do từ chối hạ cấp.",
+
 ]

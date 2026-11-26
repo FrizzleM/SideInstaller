@@ -529,6 +529,13 @@ final class LocationManager: ObservableObject {
     @Published var routeLoop = UserDefaults.standard.bool(forKey: "locationRouteLoop") {
         didSet { UserDefaults.standard.set(routeLoop, forKey: "locationRouteLoop") }
     }
+    /// F-3 (0.9.166): hand the device its real location back when a route
+    /// ends, instead of staying at its last point. Off by default, so an
+    /// untouched page behaves exactly as before; Shortcuts' Play GPX Route
+    /// leaves it alone (the switch on this page decides).
+    @Published var restoreRealAfterRoute = UserDefaults.standard.bool(forKey: "locationRestoreRealAfterRoute") {
+        didSet { UserDefaults.standard.set(restoreRealAfterRoute, forKey: "locationRestoreRealAfterRoute") }
+    }
     /// Set while a route is playing.
     @Published private(set) var routeProgress: RouteProgress?
     @Published private(set) var isImportingRoute = false
@@ -896,7 +903,8 @@ final class LocationManager: ObservableObject {
     /// Sets the location to the route's first point, then moves it along the
     /// route: a GPX route at `routeSpeed`, a planned one at each road's speed.
     /// At the end it stays on the last point — or starts again from the
-    /// first one when looping is on (F-1, 0.9.164).
+    /// first one when looping is on (F-1, 0.9.164), or hands the device its
+    /// real location back when restoring is on (F-3, 0.9.166).
     ///
     /// Sets up first, like `simulate`.
     func playRoute() {
@@ -949,13 +957,36 @@ final class LocationManager: ObservableObject {
         }
     }
 
-    /// Stops a playing route where it is, and keeps the device there.
+    /// Stops a playing route where it is, and keeps the device there —
+    /// unless restoring the real location when done is on (F-3, 0.9.166),
+    /// in which case the device gets its own location back instead.
     func stopRoute() {
         guard isPlayingRoute else { return }
         endPlayback()
         lastError = nil
+        if restoreRealAfterRoute {
+            engine.log("Location: route stopped — restoring real location.")
+            restoreRealLocationAfterRoute()
+            return
+        }
         lastSuccess = L("Route stopped. The device stays where it got to.")
         engine.log("Location: route stopped.")
+    }
+
+    /// F-3 (0.9.166): hands the device its real location back when a route
+    /// ends, through the same `resetLocation()` the manual Reset button
+    /// uses. Runs as its own task so both end paths (stopped mid-route,
+    /// played to the end) share it; the success line is reset's own, so a
+    /// failed restore reports instead of claiming the device stayed put.
+    private func restoreRealLocationAfterRoute() {
+        Task {
+            do {
+                try await resetLocation()
+                lastSuccess = L("Location reset. The device is using its own again.")
+            } catch {
+                lastError = message(error)
+            }
+        }
     }
 
     /// Sends where the route should be every `playbackTick`, going by the time
@@ -1004,8 +1035,13 @@ final class LocationManager: ObservableObject {
                     }
                     self.endPlayback()
                     self.lastError = nil
-                    self.lastSuccess = L("Route finished. The device stays at its last point.")
-                    self.engine.log("Location: route finished.")
+                    if self.restoreRealAfterRoute {
+                        self.engine.log("Location: route finished — restoring real location.")
+                        self.restoreRealLocationAfterRoute()
+                    } else {
+                        self.lastSuccess = L("Route finished. The device stays at its last point.")
+                        self.engine.log("Location: route finished.")
+                    }
                     return
                 }
             }
@@ -1983,7 +2019,7 @@ struct LocationView: View {
                 if let route = manager.route {
                     loadedRoute(route)
                 } else {
-                    Text(L("Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point."))
+                    Text(L("Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on."))
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -2094,6 +2130,13 @@ struct LocationView: View {
             Toggle(L("Loop route"), isOn: $manager.routeLoop)
                 .font(.subheadline)
                 .tint(Theme.accent)
+
+            // F-3 (0.9.166): restore the real location when the route ends
+            // instead of staying at the last point. Off by default; read
+            // when the end is reached, like the loop switch above.
+            Toggle(L("Restore real location when done"), isOn: $manager.restoreRealAfterRoute)
+                .font(.subheadline)
+                .tint(Theme.accent)
         } else {
             Button { manager.playRoute() } label: {
                 HStack(spacing: 8) {
@@ -2112,6 +2155,12 @@ struct LocationView: View {
             // F-1 (0.9.164): loop the route from the start when it ends,
             // instead of stopping at the last point. Off by default.
             Toggle(L("Loop route"), isOn: $manager.routeLoop)
+                .font(.subheadline)
+                .tint(Theme.accent)
+
+            // F-3 (0.9.166): restore the real location when the route ends
+            // instead of staying at the last point. Off by default.
+            Toggle(L("Restore real location when done"), isOn: $manager.restoreRealAfterRoute)
                 .font(.subheadline)
                 .tint(Theme.accent)
         }

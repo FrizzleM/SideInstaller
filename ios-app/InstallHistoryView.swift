@@ -1,5 +1,13 @@
 import SwiftUI
 
+/// F-1 (0.9.166): the history result filter — the segmented control's
+/// selection, file scope so the Picker's tags read it.
+private enum HistoryResultFilter {
+    case all
+    case succeeded
+    case failed
+}
+
 /// The install history: every successful one-click install, newest first.
 /// Tap a row to reinstall it from the IPA still in Downloads (F1, 0.9.148);
 /// the toolbar trash empties the list (F3, 0.9.148). Entries are written by
@@ -13,6 +21,9 @@ struct InstallHistoryView: View {
     /// F-3 (0.9.165)：历史搜索——标题/签名身份内存过滤（文件页
     /// filteredUnsigned 同款），不碰写入。
     @State private var historySearchText = ""
+    /// F-1 (0.9.166)：按结果筛选——全部 / 成功 / 失败，与搜索叠加
+    /// 用（`success` 是 F-A 0.9.155 起存的字段）；内存过滤，不碰写入。
+    @State private var historyResultFilter: HistoryResultFilter = .all
     /// `id` of the entry whose reinstall is running, if any.
     @State private var reinstallingID: UUID?
     /// F-3 (0.9.160): true while the reinstall-all loop runs; the
@@ -36,6 +47,16 @@ struct InstallHistoryView: View {
             SearchBar(text: $historySearchText, placeholder: L("搜索"))
                 .padding(.horizontal)
                 .padding(.top, 8)
+            // F-1 (0.9.166)：结果分段——文件页顶部分段同款（`.segmented`），
+            // 与上面的搜索叠加过滤。
+            Picker("", selection: $historyResultFilter) {
+                Text(L("All")).tag(HistoryResultFilter.all)
+                Text(L("Succeeded")).tag(HistoryResultFilter.succeeded)
+                Text(L("Failed")).tag(HistoryResultFilter.failed)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
             List {
             if entries.isEmpty {
                 // U2 (0.9.151): the empty state used to be one bare line;
@@ -170,10 +191,17 @@ struct InstallHistoryView: View {
     /// F-3 (0.9.165)：标题或签名身份命中即留。条目本身不存 Bundle ID
     ///（identity 是签名用的 Apple ID），所以 Bundle ID 无字段可搜——
     /// 标题（含版本）+ 签名身份就是行上看得见的全部可搜文本。
+    /// F-1 (0.9.166)：结果筛选先行（`success` 字段），搜索再叠加上去。
     private var filteredEntries: [InstallHistoryEntry] {
-        guard !historySearchText.isEmpty else { return entries }
+        var list = entries
+        switch historyResultFilter {
+        case .all: break
+        case .succeeded: list = list.filter { $0.success }
+        case .failed: list = list.filter { !$0.success }
+        }
+        guard !historySearchText.isEmpty else { return list }
         let query = historySearchText.lowercased()
-        return entries.filter { entry in
+        return list.filter { entry in
             entry.title.lowercased().contains(query)
                 || entry.identity.lowercased().contains(query)
         }
@@ -305,9 +333,11 @@ struct InstallHistoryView: View {
                     }
                     // installOneCustomIPA 同口径：降级拒绝是单项跳过
                     // （批继续），跑完看 finished，失败只计数、不停批。
+                    // B-3 (0.9.166)：注释一直说“跳过”，代码却记了失败——
+                    // 拒绝降级是用户主动不要装，记 skipped，不记失败、不进
+                    // Failed 名单（缺 IPA 的项走同一个桶）。
                     if engine.downgradeDeclined {
-                        failedCount += 1
-                        failedNames.append(entry.appName)
+                        skipped += 1
                     } else if engine.finished {
                         succeeded += 1
                     } else {

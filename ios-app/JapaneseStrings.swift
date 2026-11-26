@@ -1694,4 +1694,15 @@ let japaneseStrings: [String: String] = [
     "Show in Downloads": "ダウンロードで表示",
     "Still installing — check the Install page for progress.": "インストールは続行中です — 進捗はインストール画面で確認してください。",
     "Installing — tap to cancel": "インストール中 — タップでキャンセル",
+
+    // 0.9.166
+    "All": "すべて",
+    "Succeeded": "成功",
+    "Restore real location when done": "終了時に実際の位置に戻す",
+    "Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.": ".gpx ファイルを読み込むと、デバイスが選んだ速度でルートに沿って移動します。終了時は最後の地点にとどまりますが、「終了時に実際の位置に戻す」がオンの場合は実際の位置に戻ります。",
+    "移动“%@”？": "\"%@\"を移動しますか？",
+    "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "これは「インストール」タブの IPA です。移動するとその枠が空になります。新しいフォルダからインストールしてください。",
+    "Move": "移動",
+    "其中 %d 个因拒绝降级而跳过。": "そのうち %d 件はダウングレードを拒否したためスキップされました。",
+
 ]

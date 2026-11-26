@@ -1648,4 +1648,15 @@ let turkishStrings: [String: String] = [
     "Show in Downloads": "İndirilenlerde göster",
     "Still installing — check the Install page for progress.": "Hâlâ yükleniyor — ilerlemeyi Yükleme sayfasından kontrol edin.",
     "Installing — tap to cancel": "Yükleniyor — iptal için dokunun",
+
+    // 0.9.166
+    "All": "Tümü",
+    "Succeeded": "Başarılı",
+    "Restore real location when done": "Bitince gerçek konumu geri yükle",
+    "Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.": ".gpx dosyası içe aktar; cihaz seçtiğin hızda rota boyunca hareket eder. Bitince son noktada kalır, ancak bitince gerçek konumu geri yükleme açıksa gerçek konumuna döner.",
+    "移动“%@”？": "\"%@\" taşınsın mı?",
+    "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "Bu, Yükle sekmesindeki IPA'dır. Taşımak o yuvayı boşaltır — bunun yerine yeni klasöründen yükleyin.",
+    "Move": "Taşı",
+    "其中 %d 个因拒绝降级而跳过。": "%d tanesi düşürmeyi reddettiği için atlandı.",
+
 ]

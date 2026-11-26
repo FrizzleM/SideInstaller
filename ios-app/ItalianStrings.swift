@@ -1730,4 +1730,15 @@ let italianStrings: [String: String] = [
     "Show in Downloads": "Mostra in Download",
     "Still installing — check the Install page for progress.": "Installazione ancora in corso — controlla la pagina Installazione per i progressi.",
     "Installing — tap to cancel": "Installazione in corso — tocca per annullare",
+
+    // 0.9.166
+    "All": "Tutto",
+    "Succeeded": "Riusciti",
+    "Restore real location when done": "Ripristina la posizione reale al termine",
+    "Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.": "Importa un file .gpx: il dispositivo lo percorre alla velocità che scegli. Alla fine resta sull'ultimo punto, a meno che il ripristino della posizione reale non sia attivo.",
+    "移动“%@”？": "Spostare \"%@\"?",
+    "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "Questo è l'IPA nella scheda Installa. Spostarlo svuota quello slot — installalo invece dalla sua nuova cartella.",
+    "Move": "Sposta",
+    "其中 %d 个因拒绝降级而跳过。": "%d ignorati per aver rifiutato il downgrade.",
+
 ]

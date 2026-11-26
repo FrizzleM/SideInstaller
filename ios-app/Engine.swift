@@ -151,6 +151,22 @@ final class Engine {
     }
     private(set) var cellularDownloadRequest: CellularDownloadRequest?
     private var cellularDownloadReply: CheckedContinuation<Bool, Never>?
+    /// B-1 (0.9.166): downloads waiting behind the cellular prompt on
+    /// screen — one prompt at a time, but the rest queue instead of
+    /// declining silently. Each waiter suspends on its own continuation;
+    /// answering the prompt on screen presents the next one in turn.
+    private struct QueuedCellularDownload {
+        let id: UUID
+        let size: Int64?
+        let what: String
+        let reply: CheckedContinuation<Bool, Never>
+    }
+    private var cellularDownloadQueue: [QueuedCellularDownload] = []
+    /// B-1 (0.9.166): the queued waiter whose prompt is on screen now, if
+    /// it got there from the queue rather than asking first — so cancelling
+    /// it answers its own prompt, and a cancel landing before a waiter
+    /// even queued can't decline somebody else's.
+    private var presentedQueuedCellularDownloadID: UUID?
 
     /// The Settings switch for F-G. Off by default: the app's behaviour on
     /// cellular doesn't change until the user turns it on.
@@ -2549,10 +2565,15 @@ final class Engine {
     /// hit every remaining item the same way) or the run was stopped with
     /// no error (a cancel). A failed import or a failed run leaves
     /// `stopped` false: the batch skips that item and moves on.
+    /// `declined` (B-3, 0.9.166) is true when the user declined this item's
+    /// downgrade prompt — a skip, not a failure; the summary counts it
+    /// apart from failures. Defaults false, so the other call sites keep
+    /// their meaning.
     struct BatchInstallOutcome {
         let name: String
         let error: String?
         let stopped: Bool
+        let declined: Bool = false
     }
 
     /// F2 (0.9.151): install one IPA through the single-install path
@@ -2638,7 +2659,7 @@ final class Engine {
         if downgradeDeclined {
             return BatchInstallOutcome(name: name,
                                        error: downgradeDeclinedMessage ?? L("Install stopped"),
-                                       stopped: false)
+                                       stopped: false, declined: true)
         }
         if finished {
             return BatchInstallOutcome(name: name, error: nil, stopped: false)
@@ -2928,10 +2949,26 @@ final class Engine {
     func confirmCellularDownload(size: Int64?, what: String) async -> Bool {
         guard Self.wifiOnlyDownloads else { return true }
         guard await NetworkStatus.internetPath().isExpensive else { return true }
-        // One prompt at a time: a second download asking while one waits
-        // declines instead of stacking a popup on top of it — the UI only
-        // ever starts one download at a time anyway.
-        guard cellularDownloadReply == nil else { return false }
+        // B-1 (0.9.166): one prompt on screen at a time, but a second
+        // download asking while one waits queues behind it instead of
+        // declining silently — since 0.9.163 several rows can each start a
+        // download task, so the old "the UI only ever starts one download
+        // at a time anyway" premise no longer holds, and the declined row
+        // just went idle with no word at all.
+        if cellularDownloadReply != nil {
+            log("Cellular data: \(what) is waiting behind the download confirmation already on screen.")
+            let id = UUID()
+            return await withTaskCancellationHandler {
+                if Task.isCancelled { return false }
+                return await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+                    cellularDownloadQueue.append(QueuedCellularDownload(id: id, size: size, what: what, reply: cont))
+                }
+            } onCancel: {
+                // onCancel 是非隔离同步上下文，同 confirmPairingImportMismatch：
+                // 必须经 Task 跳回主线程再处理。
+                Task { @MainActor in cancelQueuedCellularDownload(id) }
+            }
+        }
         log("Cellular data: \(what) needs confirmation before downloading.")
         cellularDownloadRequest = CellularDownloadRequest(what: what, size: size)
         return await withTaskCancellationHandler {
@@ -2953,12 +2990,45 @@ final class Engine {
     }
 
     /// Answer the cellular-download popup: true downloads, false stops it.
+    /// B-1 (0.9.166): answering presents the next queued download's prompt,
+    /// if one waited behind this one.
     @MainActor
     func answerCellularDownload(_ proceed: Bool) {
         guard let reply = cellularDownloadReply else { return }
         cellularDownloadReply = nil
+        presentedQueuedCellularDownloadID = nil
         reply.resume(returning: proceed)
         cellularDownloadRequest = nil
+        presentNextCellularDownload()
+    }
+
+    /// B-1 (0.9.166): puts the next queued download's prompt on screen.
+    /// Only runs when no prompt is up — the waiter keeps suspending on its
+    /// own continuation until this prompt is answered.
+    @MainActor
+    private func presentNextCellularDownload() {
+        guard cellularDownloadReply == nil, !cellularDownloadQueue.isEmpty else { return }
+        let next = cellularDownloadQueue.removeFirst()
+        presentedQueuedCellularDownloadID = next.id
+        cellularDownloadRequest = CellularDownloadRequest(what: next.what, size: next.size)
+        cellularDownloadReply = next.reply
+    }
+
+    /// B-1 (0.9.166): takes a queued waiter out of the queue and declines
+    /// it — its download task was cancelled while it waited. When the waiter
+    /// is already the prompt on screen, answering it declines it the same
+    /// way; when it never queued at all (cancelled before suspending),
+    /// nothing happens — its prompt was never this one.
+    @MainActor
+    private func cancelQueuedCellularDownload(_ id: UUID) {
+        if let index = cellularDownloadQueue.firstIndex(where: { $0.id == id }) {
+            let waiter = cellularDownloadQueue.remove(at: index)
+            waiter.reply.resume(returning: false)
+            return
+        }
+        if presentedQueuedCellularDownloadID == id {
+            answerCellularDownload(false)
+        }
     }
 
     /// F-2 (0.9.159): asks before a custom IPA older than the copy on this

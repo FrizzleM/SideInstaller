@@ -1706,4 +1706,15 @@ let chineseStrings: [String: String] = [
     "Show in Downloads": "在下载里查看",
     "Still installing — check the Install page for progress.": "仍在安装——去安装页查看进度。",
     "Installing — tap to cancel": "正在安装——点按可取消",
+
+    // 0.9.166
+    "All": "全部",
+    "Succeeded": "成功",
+    "Restore real location when done": "结束时恢复真实位置",
+    "Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.": "导入 .gpx 文件后，设备会按你选择的速度沿路线移动，结束后停在最后一个点，除非开了“结束时恢复真实位置”。",
+    "移动“%@”？": "移动“%@”？",
+    "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "这是安装页上的 IPA。移走后那个槽位就空了——请从它所在的新文件夹安装。",
+    "Move": "移动",
+    "其中 %d 个因拒绝降级而跳过。": "其中 %d 个因拒绝降级而跳过。",
+
 ]

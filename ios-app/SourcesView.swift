@@ -547,12 +547,16 @@ struct SourceAppsView: View {
         return base
     }
 
-    /// 第三行：“V版本 | 大小 | 日期”，缺的段直接省掉（不留空竖线）。
+    /// 第三行：“V版本 | 大小 | 日期 | iOS 最低版本”，缺的段直接省掉（不留空竖线）。
+    /// F-2 (0.9.166)：最低 iOS 终于有地方看——`minOSVersion` 早就解码了
+    ///（SourcesStore），全仓却没一处显示；行上看不见，点了才下载整个
+    /// IPA，装时才在 Engine 的 minOS 守卫被拒。缺字段的源直接省掉这段。
     private func metaLine(for app: AltApp) -> String {
         var parts: [String] = []
         if let version = app.version, !version.isEmpty { parts.append("V\(version)") }
         if let size = app.sizeText { parts.append(size) }
         if let date = app.versionDate, !date.isEmpty { parts.append(date) }
+        if let minOS = app.minOSVersion, !minOS.isEmpty { parts.append("iOS \(minOS)+") }
         return parts.joined(separator: " | ")
     }
 

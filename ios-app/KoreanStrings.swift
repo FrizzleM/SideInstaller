@@ -1695,4 +1695,15 @@ let koreanStrings: [String: String] = [
     "Show in Downloads": "다운로드에서 보기",
     "Still installing — check the Install page for progress.": "아직 설치 중입니다 — 진행 상황은 설치 페이지에서 확인하세요.",
     "Installing — tap to cancel": "설치 중 — 탭하여 취소",
+
+    // 0.9.166
+    "All": "전체",
+    "Succeeded": "성공",
+    "Restore real location when done": "종료 시 실제 위치로 복원",
+    "Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.": ".gpx 파일을 가져오면 기기가 선택한 속도로 그 경로를 따라 이동합니다. 종료 시 마지막 지점에 머무르지만, 종료 시 실제 위치 복원이 켜져 있으면 실제 위치로 돌아갑니다.",
+    "移动“%@”？": "\"%@\"을(를) 이동할까요?",
+    "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "설치 탭에 있는 IPA입니다. 이동하면 해당 슬롯이 비게 됩니다. 새 폴더에서 설치하세요.",
+    "Move": "이동",
+    "其中 %d 个因拒绝降级而跳过。": "그중 %d개는 다운그레이드를 거부하여 건너뛰었습니다.",
+
 ]
