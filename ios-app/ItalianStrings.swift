@@ -1669,6 +1669,7 @@ let italianStrings: [String: String] = [
     "等 %d 个": "e altri %d",
     "其中 %d 个不是 IPA，已跳过。": "%d non erano IPA e sono stati ignorati.",
     "已有安装在进行，先等当前安装完成再批量安装。": "Un’installazione è già in corso. Attendi che finisca prima di installare in batch.",
+    "已有安装在进行，先等当前安装完成再试。": "Un’installazione è già in corso. Attendi che finisca prima di riprovare.",
     "正在签名，等它跑完再批量安装。": "Firma in corso. Attendi che finisca prima di installare in batch.",
     "Installed apps will be listed here.": "Le app installate saranno elencate qui.",
     "以下 %d 个删除失败：%@": "Impossibile eliminare %d file: %@",

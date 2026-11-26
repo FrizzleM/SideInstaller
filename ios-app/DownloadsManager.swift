@@ -654,7 +654,15 @@ struct DownloadsListView: View {
                                     HStack(spacing: 12) {
                                         Button(L("Try again")) { retryFailedDownload(failed) }
                                             .font(.caption)
-                                            .disabled(downloader.isDownloading || engine.isRunning || retryTask != nil || retryAllTask != nil)
+                                            // F-1 (0.9.175): no `isDownloading` here any
+                                            // more — `download(from:)` queues FIFO
+                                            // (0.9.163), so a retry tapped mid-download
+                                            // joins the queue and shows as Queued
+                                            // instead of being locked out until the
+                                            // running download ends. `isRunning`,
+                                            // the batch guard and the retry-task
+                                            // mutual exclusion all stay.
+                                            .disabled(engine.isRunning || retryTask != nil || retryAllTask != nil)
                                         Button(L("Remove")) { downloader.removeFailedDownload(failed) }
                                             .font(.caption)
                                     }
@@ -682,7 +690,10 @@ struct DownloadsListView: View {
                                     }
                                 }
                                 .font(.caption)
-                                .disabled(retryAllTask == nil && (downloader.failedDownloads.count < 2 || retryTask != nil || downloader.isDownloading || engine.isRunning || engine.batchUpdateRunning))
+                                // F-1 (0.9.175): 同 Try again——`isDownloading`
+                                // 不再锁 Retry all：重试进 FIFO 队列排队，
+                                // 行状态由队列里的 Queued 承接。
+                                .disabled(retryAllTask == nil && (downloader.failedDownloads.count < 2 || retryTask != nil || engine.isRunning || engine.batchUpdateRunning))
                                 Button(L("Clear all")) { confirmingClearFailed = true }
                                     .font(.caption)
                                     .disabled(retryTask != nil || retryAllTask != nil)
@@ -938,7 +949,11 @@ struct DownloadsListView: View {
     /// it with the new reason, and an install failure lands on this
     /// page's error line instead.
     private func retryFailedDownload(_ failed: IPADownloader.FailedDownload) {
-        guard retryTask == nil, retryAllTask == nil, !downloader.isDownloading, !engine.isRunning else { return }
+        // F-1 (0.9.175): no `isDownloading` here any more — the retry's
+        // download joins the FIFO queue (0.9.163) instead of being
+        // refused while another download runs; the batch guard below
+        // stays, so a retry never starts an install into a batch.
+        guard retryTask == nil, retryAllTask == nil, !engine.isRunning else { return }
         // B-1 (0.9.173): an update-all batch owns the install slot —
         // the retry's install would be refused mid-batch, so say so on
         // this page instead of failing silently. The button stays
@@ -960,7 +975,9 @@ struct DownloadsListView: View {
     /// declined cellular ask stops the run, and cancelling stops after
     /// the current item instead of starting the next one.
     private func retryAllFailedDownloads() {
-        guard retryAllTask == nil, retryTask == nil, !downloader.isDownloading, !engine.isRunning else { return }
+        // F-1 (0.9.175): 同 retryFailedDownload——`isDownloading` 不再
+        // 拦入口，重试进 FIFO 队列；batch 守卫保留。
+        guard retryAllTask == nil, retryTask == nil, !engine.isRunning else { return }
         // B-1 (0.9.173) 同款：批跑时不另起重装——行按钮同款文案。
         if engine.batchUpdateRunning {
             manager.lastError = L("全部更新进行中，等它跑完再重试。")
@@ -1016,6 +1033,16 @@ struct DownloadsListView: View {
             // say so instead of silently ignoring the tap (the import itself
             // still refuses while one is running; see importCustomIPA).
             manager.lastError = L("This file is being installed. Wait until it finishes.")
+            return
+        }
+        // B-1 (0.9.175): an update-all batch owns the install slot — its
+        // download gaps leave `engine.isRunning` false, so the import
+        // below would be refused mid-batch (Engine.swift:2386). Say so
+        // on this page instead of failing silently; the retry entry
+        // (`retryFailedDownload`) 同款：write `manager.lastError`,
+        // don't open the sheet.
+        if engine.batchUpdateRunning {
+            manager.lastError = L("全部更新进行中，等它跑完再安装。")
             return
         }
         installingID = item.id

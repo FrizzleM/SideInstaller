@@ -2238,7 +2238,9 @@ struct EnterpriseCertView: View {
         // 进行中标志若立着，之后别人的安装结束会被误认成这次
         // 的（归属劫持）。签名并安装路同样走这里复查：签名耗时
         // 几秒，点按瞬间没在跑不等于起安装时也没在跑。
-        guard !engine.isRunning else {
+        // B-3 (0.9.175): 全部更新的下载间隙里 `isRunning` 也是 false——
+        // 只认它会在批跑两项之间另起一路安装、撞掉批跑；批跑时同样只显错误文本。
+        guard !engine.isRunning, !engine.batchUpdateRunning else {
             enterpriseInstallErrorText = L("已有安装在进行，先等当前安装完成再试。")
             // 名额只在没跑认领时清：正跑着的那次还指着它记日志，
             // 忙时一点就清会把进行中那次的日志名额抹掉。

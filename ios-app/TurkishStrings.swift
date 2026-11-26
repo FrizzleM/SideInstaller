@@ -1586,6 +1586,7 @@ let turkishStrings: [String: String] = [
     "等 %d 个": "ve %d tane daha",
     "其中 %d 个不是 IPA，已跳过。": "%d tanesi IPA değildi, atlandı.",
     "已有安装在进行，先等当前安装完成再批量安装。": "Zaten bir yükleme sürüyor. Toplu yüklemeden önce bitmesini bekleyin.",
+    "已有安装在进行，先等当前安装完成再试。": "Zaten bir yükleme sürüyor. Bitmesini bekleyip yeniden deneyin.",
     "正在签名，等它跑完再批量安装。": "İmzalama sürüyor. Toplu yüklemeden önce bitmesini bekleyin.",
     "Installed apps will be listed here.": "Yüklenen uygulamalar burada listelenir.",
     "以下 %d 个删除失败：%@": "Şu %d dosya silinemedi: %@",

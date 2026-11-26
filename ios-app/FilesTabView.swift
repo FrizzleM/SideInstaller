@@ -156,6 +156,11 @@ struct FilesTabView: View {
     @State private var batchInstallIndex = 0
     @State private var batchInstallTotal = 0
     @State private var batchInstallCurrent: String?
+    /// F-2 (0.9.175): Skip was tapped for the item installing now — the
+    /// loop counts it as user-skipped and runs the next item instead of
+    /// cancelling the whole batch. 全部更新的 `skipCurrentItem` 同款，
+    /// 只认文件批量安装这一路。
+    @State private var skipCurrentBatchItem = false
     /// F-1 (0.9.160): the unsigned IPA being imported for Apple ID
     /// install (`installUnsignedFile`); `id` is the file path, same as
     /// the Downloads page's `installingID`.
@@ -778,7 +783,10 @@ struct FilesTabView: View {
             ?? ipaURL.deletingPathExtension().lastPathComponent
         // 别的 tab 的安装在跑时不新起（Engine 单管线）：只显错误
         // 文本，不进 runInstallSignedIPA、不记失败。
-        guard !engine.isRunning else {
+        // B-3 (0.9.175): 全部更新的下载间隙里 `isRunning` 也是 false——
+        // 只认它会在批跑两项之间另起一路安装、撞掉批跑；批跑时同样只显错误文本。
+        // 重试按钮（fileInstallStatus 的“重试安装”）走同一个入口，同款守卫。
+        guard !engine.isRunning, !engine.batchUpdateRunning else {
             fileInstallErrorText = L("已有安装在进行，先等当前安装完成再试。")
             return
         }
@@ -1557,6 +1565,13 @@ struct FilesTabView: View {
                                 .foregroundStyle(Theme.muted)
                         }
                         Spacer()
+                        // F-2 (0.9.175): Skip next to Cancel — 全部更新
+                        // 的进度行同款：慢的一项不再逼着整批取消（剩下
+                        // 的会成“剩余”）或干等。`batchInstallCurrent` 从
+                        // 循环头立到整批结束，间隙里点的 Skip 由循环头
+                        // 的分支认领，跳过下一项。
+                        Button(L("Skip")) { skipCurrentBatchInstall() }
+                            .font(.footnote)
                         Button(L("取消安装")) { cancelBatchInstall() }
                             .font(.footnote)
                     }
@@ -2634,11 +2649,44 @@ struct FilesTabView: View {
         batchInstallTask = Task { @MainActor in
             var outcomes: [Engine.BatchInstallOutcome] = []
             var stopped = false
+            // F-2 (0.9.175): items the user skipped with the progress
+            // row's Skip — counted apart from failures (a skipped item
+            // is un-installed, not failed) and apart from downgrade
+            // declines. `skippedOffsets` keeps the summary honest: a
+            // skipped item still appends one outcome (so the un-run
+            // fill-in below stays 1:1 with `targets`), but its error
+            // never lands in the failure bucket.
+            var userSkipped = 0
+            var skippedOffsets: Set<Int> = []
             for (offset, item) in targets.enumerated() {
                 if Task.isCancelled || stopped { break }
+                // F-2 (0.9.175): Skip tapped between items — this item
+                // never starts, it counts as user-skipped, the batch
+                // moves straight on to the next one. 全部更新的循环头
+                // 分支同款.
+                if skipCurrentBatchItem {
+                    skipCurrentBatchItem = false
+                    userSkipped += 1
+                    skippedOffsets.insert(offset)
+                    outcomes.append(Engine.BatchInstallOutcome(
+                        name: (item.name as NSString).deletingPathExtension,
+                        error: L("Install stopped"), stopped: false))
+                    continue
+                }
                 batchInstallIndex = offset + 1
                 batchInstallCurrent = (item.name as NSString).deletingPathExtension
                 let outcome = await engine.installOneCustomIPA(item.url)
+                // F-2 (0.9.175): Skip tapped mid-install — `cancelOneClick()`
+                // stopped this run, so its outcome (a stop, not a real
+                // failure) counts as user-skipped and must not set
+                // `stopped` and end the batch.
+                if skipCurrentBatchItem {
+                    skipCurrentBatchItem = false
+                    userSkipped += 1
+                    skippedOffsets.insert(offset)
+                    outcomes.append(outcome)
+                    continue
+                }
                 outcomes.append(outcome)
                 stopped = outcome.stopped
             }
@@ -2664,7 +2712,11 @@ struct FilesTabView: View {
             // B-3 (0.9.166)：拒绝降级的项是跳过、不是失败——跟历史页
             // Reinstall all 的 skipped 桶同口径，不进失败名单。
             let declined = outcomes.filter { $0.declined }
-            let failed = outcomes.filter { $0.error != nil && !$0.declined }
+            // F-2 (0.9.175): 用户跳过的项同理——占位 outcome 带的错不进失败名单。
+            let failed = outcomes.enumerated().filter { entry in
+                entry.element.error != nil && !entry.element.declined
+                    && !skippedOffsets.contains(entry.offset)
+            }.map { $0.element }
             var message: String
             if failed.isEmpty {
                 message = L("批量安装完成：%d 个已安装。", ok)
@@ -2683,6 +2735,11 @@ struct FilesTabView: View {
             if !declined.isEmpty {
                 message += " " + L("其中 %d 个因拒绝降级而跳过。", declined.count)
             }
+            // F-2 (0.9.175): 用户跳过的项单独报数——不混进失败数，也不混进
+            // 拒绝降级那句（文案是降级专用的）。全部更新汇总同款句式。
+            if userSkipped > 0 {
+                message += " " + L("其中 %d 个已跳过。", userSkipped)
+            }
             if skipped > 0 {
                 message += " " + L("其中 %d 个不是 IPA，已跳过。", skipped)
             }
@@ -2696,6 +2753,20 @@ struct FilesTabView: View {
     /// Cancel button 同款：engine.cancelOneClick).
     private func cancelBatchInstall() {
         batchInstallTask?.cancel()
+        engine.cancelOneClick()
+    }
+
+    /// F-2 (0.9.175): skip the item installing now — stop this install
+    /// and flag it, so the batch loop counts it as user-skipped and runs
+    /// the next item instead of cancelling the whole batch. 全部更新的
+    /// `skipCurrentUpdate` 同款：`cancelOneClick()` 只停当次安装，不碰
+    /// 批量 Task（不要复用 `cancelBatchInstall`，那会停整批）；取消与
+    /// 下一项导入之间的竞态由 `installOneCustomIPA` 起跑前的
+    /// `guard !isRunning` 兜底——上一次还没停稳时下一项直接被拒停批，
+    /// 不会两路并跑。
+    private func skipCurrentBatchInstall() {
+        guard batchInstallCurrent != nil else { return }
+        skipCurrentBatchItem = true
         engine.cancelOneClick()
     }
 

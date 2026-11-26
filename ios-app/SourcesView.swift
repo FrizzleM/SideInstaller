@@ -814,8 +814,15 @@ struct SourceAppsView: View {
         case .queued:
             // F-1 (0.9.163): waiting for the slot — the name of the state
             // is the whole UI, plus the same Cancel as the running row.
+            // F-3 (0.9.175): a batch-queued row waits its turn in the
+            // update-all run, not for a download slot — it reads “等待中”
+            // (L("Waiting"), 现成键）, while a row queued behind another
+            // download keeps “排队中”. The download queue is the tell —
+            // `effectiveRowState` 同款判定，判定本身不动.
+            let batchQueued = updateAllTask != nil
+                && (app.downloadLink.map { url in !downloader.queue.contains(where: { $0.url == url }) } ?? false)
             VStack(spacing: 4) {
-                Text(L("Queued"))
+                Text(batchQueued ? L("Waiting") : L("Queued"))
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
                 Button(L("Cancel")) { cancelRowDownload(app) }
@@ -1099,6 +1106,14 @@ struct SourceAppsView: View {
                     return
                 }
             }
+            // F-3 (0.9.175): every target waits its turn from here — mark
+            // them all `.queued` up front, so the rows read “等待中” (see
+            // `installControl`) instead of looking untouched until their
+            // turn. The current item flips to `.downloading` below; the
+            // loop tail clears each item it touches, and the blanket clear
+            // after the loop covers items the run never reached (Skip
+            // between items, a stop, a cancel).
+            for app in targets { states[app.id] = .queued }
             for (offset, app) in targets.enumerated() {
                 if Task.isCancelled { cancelled = true; break }
                 if stopped { break }
@@ -1170,6 +1185,12 @@ struct SourceAppsView: View {
                 // 不然 Skip 一直亮着，点它会把下一项误跳。
                 updateAllCurrentURL = nil
             }
+            // F-3 (0.9.175): clear the `.queued` marks set above — the
+            // loop tail already cleared every item it touched, but items
+            // the run never reached (Skip between items, a stop, a
+            // cancel) still carry `.queued`; without this their rows
+            // would read “等待中” forever after the batch ends.
+            for app in targets { states[app.id] = nil }
             // 没跑到的各项：停批的原因同样记一条，不静默丢掉
             // （installSelection 同款）。已跑的项 = 成功 + 失败 + 跳过
             // （拒绝降级）+ 用户跳过，四桶都算上，填补才不会把已跳过

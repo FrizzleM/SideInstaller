@@ -1665,6 +1665,7 @@ let vietnameseStrings: [String: String] = [
     "等 %d 个": "và %d mục nữa",
     "其中 %d 个不是 IPA，已跳过。": "%d mục không phải IPA nên đã bỏ qua.",
     "已有安装在进行，先等当前安装完成再批量安装。": "Đã có một lượt cài đặt đang chạy. Hãy đợi xong rồi mới cài đặt hàng loạt.",
+    "已有安装在进行，先等当前安装完成再试。": "Đã có một lượt cài đặt đang chạy. Hãy đợi xong rồi thử lại.",
     "正在签名，等它跑完再批量安装。": "Đang ký. Hãy đợi xong rồi mới cài đặt hàng loạt.",
     "Installed apps will be listed here.": "Các app đã cài sẽ được liệt kê ở đây.",
     "以下 %d 个删除失败：%@": "Không xóa được %d tệp: %@",

@@ -619,6 +619,10 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                         .contentShape(Rectangle())
                 }
+                // B-2 (0.9.175): 同 installButton——批跑时不另起安装；
+                // 不然点它会走到 startInstall 的守卫、往 `engine.lastError`
+                // 写原因，而批跑项正好在那时失败会把这句当成自己的失败原因。
+                .disabled(engine.batchUpdateRunning)
                 .buttonStyle(PressReportingButtonStyle(isPressed: $installPressed), sound: .press)
                 .transition(.surfaceSwap)
             }
@@ -683,6 +687,19 @@ struct ContentView: View {
     /// 橙色（安装时自动启动）时直接走继续安装的路，省一屏一 tap。
     /// 真正的门禁仍在 continueAfterPrecheck 与 runOneClick 里。
     private func startInstall() {
+        // B-2 (0.9.175): an update-all batch owns the install slot — its
+        // download gaps leave `engine.isRunning` false, so this tap would
+        // start a second install and knock the batch over. The source
+        // detail page's `install(_:)` 同款双锁：the button below is
+        // disabled while a batch runs, and this guard is the second lock
+        // for a tap that slipped through. The reason goes on
+        // `engine.lastError`, which the Install page shows as its error
+        // popup (runOneClick's own guards 同款）; the guard runs before
+        // the precheck sheet opens, so nothing opens over it.
+        guard !engine.batchUpdateRunning else {
+            engine.lastError = L("已有安装在进行，先等当前安装完成再试。")
+            return
+        }
         installPressed = false
         CZFHaptics.impact(.medium)
         engine.refreshNetworkStatus()
@@ -697,6 +714,18 @@ struct ContentView: View {
     ///（没隧道 + 没内置 + 没装 LOC 时弹安装提示、不进 run），
     /// 再进 runOneClick（它自己的门禁照常跑）。
     private func continueAfterPrecheck() {
+        // B-2 (0.9.175): the precheck sheet can outlive the tap that
+        // opened it — a batch started while it was open would slip past
+        // `startInstall`'s guard straight into `runOneClick`. Same lock
+        // here; the sheet closes first and the reason lands on
+        // `engine.lastError` on the next main-queue turn, so the sheet's
+        // dismissal doesn't swallow the popup （同款：下面的
+        // showInstallLOCPrompt 也是这么递延的）.
+        guard !engine.batchUpdateRunning else {
+            showPrecheck = false
+            Task { @MainActor in engine.lastError = L("已有安装在进行，先等当前安装完成再试。") }
+            return
+        }
         CZFHaptics.impact(.medium)
         showPrecheck = false
         // 点安装先检查隧道：没通也不再查 WiFi（2026-10-29，
@@ -721,6 +750,11 @@ struct ContentView: View {
     /// The button under a run's progress once it has ended.
     private var installButton: some View {
         Button(action: startInstall) { installLabel }
+            // B-2 (0.9.175): not while an update-all batch runs — the
+            // batch's download gaps leave `engine.isRunning` false, so
+            // this button would otherwise start a second install; the
+            // guard in `startInstall` is the second lock.
+            .disabled(engine.batchUpdateRunning)
             .buttonStyle(PrimaryButtonStyle())
     }
 

@@ -1675,6 +1675,7 @@ let frenchStrings: [String: String] = [
     "等 %d 个": "et %d autres",
     "其中 %d 个不是 IPA，已跳过。": "%d n’étaient pas des IPA, ils ont été ignorés.",
     "已有安装在进行，先等当前安装完成再批量安装。": "Une installation est déjà en cours. Attendez qu’elle se termine avant l’installation par lots.",
+    "已有安装在进行，先等当前安装完成再试。": "Une installation est déjà en cours. Attendez qu’elle se termine avant de réessayer.",
     "正在签名，等它跑完再批量安装。": "Signature en cours. Attendez qu’elle se termine avant l’installation par lots.",
     "Installed apps will be listed here.": "Les apps installées seront listées ici.",
     "以下 %d 个删除失败：%@": "Impossible de supprimer %d fichiers : %@",
