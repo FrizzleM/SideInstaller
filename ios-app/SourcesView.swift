@@ -1031,9 +1031,11 @@ struct SourceAppsView: View {
                 updateAllSummary = L("全部更新完成：成功 %d 个，失败 %d 个。失败：%@", succeeded, failed.count, list)
             }
             // B-2 (0.9.169)：拒绝降级的项单独报数（失败桶里已不含它们），
-            // 文件页批量安装同款后置句式。
+            // 文件页批量安装同款后置句式。`updateAllSummary` 是 String?
+            //（:277），`+=` 编不过——上面两分支刚赋过非 nil，`?? ""`
+            // 只是过类型关，走不到。
             if skipped > 0 {
-                updateAllSummary += " " + L("其中 %d 个因拒绝降级而跳过。", skipped)
+                updateAllSummary = (updateAllSummary ?? "") + " " + L("其中 %d 个因拒绝降级而跳过。", skipped)
             }
             showingUpdateAllSummary = true
         }
