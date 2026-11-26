@@ -301,6 +301,12 @@ struct InstallHistoryView: View {
     /// stays disabled until it lands.
     private func reinstall(_ entry: InstallHistoryEntry) {
         guard reinstallingID == nil else { return }
+        // B-1 (0.9.173): an update-all batch owns the install slot —
+        // say so instead of starting a run importCustomIPA would refuse.
+        if engine.batchUpdateRunning {
+            notice = L("全部更新进行中，等它跑完再重装。")
+            return
+        }
         reinstallingID = entry.id
         reinstallTask = Task { @MainActor in
             defer { reinstallTask = nil }
@@ -361,6 +367,11 @@ struct InstallHistoryView: View {
         guard reinstallingID == nil, !reinstallingAll else { return }
         let failed = entries.filter { !$0.success }
         guard !failed.isEmpty else { return }
+        // B-1 (0.9.173): 同 reinstall — 批跑时不另起重装。
+        if engine.batchUpdateRunning {
+            notice = L("全部更新进行中，等它跑完再重装。")
+            return
+        }
         reinstallingAll = true
         reinstallTask = Task { @MainActor in
             defer { reinstallTask = nil }

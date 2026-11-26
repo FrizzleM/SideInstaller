@@ -2611,10 +2611,22 @@ struct FilesTabView: View {
             opFailed = true
             return
         }
+        // B-1 (0.9.173): an update-all batch is running — its installs
+        // own the single-install slot (importCustomIPA refuses a second
+        // run), so starting here would only fail item by item. Wait it out.
+        if engine.batchUpdateRunning {
+            opMessage = L("全部更新进行中，等它跑完再批量安装。")
+            opFailed = true
+            return
+        }
         let skipped = selection.count - targets.count
         // 批量签名的 batchBusy 也是批量安装的互斥锁：入口立起来，批量
         // 签名在批量安装跑着时进不来（batchSign 入口认它）。
         workspace.batchBusy = true
+        // B-1 (0.9.173): 反向同理——文件批量安装跑着时也立全部更新
+        // 的标志，两路 startUpdateAll 入口已有的守卫把它拦下；Task
+        // 尾与 batchBusy 一起清掉。
+        engine.batchUpdateRunning = true
         batchInstallTotal = targets.count
         batchInstallIndex = 0
         batchInstallCurrent = nil
@@ -2644,6 +2656,8 @@ struct FilesTabView: View {
             batchInstallTotal = 0
             batchInstallIndex = 0
             workspace.batchBusy = false
+            // B-1 (0.9.173): 反向标志与 batchBusy 一起清掉。
+            engine.batchUpdateRunning = false
             selection = []
             selecting = false
             let ok = outcomes.filter { $0.error == nil }.count

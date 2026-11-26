@@ -354,6 +354,12 @@ extension Shortcuts {
         guard !Engine.shared.isRunning else {
             throw ShortcutError(L("An install is already running. Wait for it to finish, then try again."))
         }
+        // B-1 (0.9.173): an update-all batch owns the install slot too —
+        // the batch's downloads leave `isRunning` false between items,
+        // so this check alone would let a shortcut install slip in.
+        guard !Engine.shared.batchUpdateRunning else {
+            throw ShortcutError(L("An update-all batch is running. Wait for it to finish, then try again."))
+        }
     }
 
     /// Runs Install for the build already picked, and waits for it to finish.
@@ -369,6 +375,11 @@ extension Shortcuts {
         // reports "%@ is installed." for an app never installed.
         guard !engine.isRunning else {
             throw ShortcutError(L("An install is already running. Wait for it to finish, then try again."))
+        }
+        // B-1 (0.9.173): requireNoInstall() 同款——批跑的下载间隙
+        // `isRunning` 为 false，import 之后、起跑之前这段也要再拦一次。
+        guard !engine.batchUpdateRunning else {
+            throw ShortcutError(L("An update-all batch is running. Wait for it to finish, then try again."))
         }
         engine.runOneClick()
         // A full-tunnel VPN's probe holds the start back half a second at most.

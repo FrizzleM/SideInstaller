@@ -1498,6 +1498,20 @@ let turkishStrings: [String: String] = [
         "%d güncelleme",
     "%d updates":
         "%d güncelleme",
+    "%d updates · Total size: %@": "%d güncelleme · Toplam boyut: %@",
+    "%d 个可更新": "%d güncelleme mevcut",
+    "全部更新进行中，等它跑完再批量安装。":
+        "Tüm uygulamalar güncelleniyor. Toplu kuruluma başlamadan önce bitmesini bekleyin.",
+    "全部更新进行中，等它跑完再重装。":
+        "Tüm uygulamalar güncelleniyor. Yeniden kurmadan önce bitmesini bekleyin.",
+    "全部更新进行中，等它跑完再重试。":
+        "Tüm uygulamalar güncelleniyor. Yeniden denemeden önce bitmesini bekleyin.",
+    "An update-all batch is running. Wait for it to finish, then try again.":
+        "Tüm uygulamalar güncelleniyor. Bitmesini bekleyin, sonra yeniden deneyin.",
+    "全部更新进行中，等它跑完再更新。":
+        "Tüm uygulamalar güncelleniyor. Güncellemeden önce bitmesini bekleyin.",
+    "上次刷新失败：%@": "Son yenileme başarısız oldu: %@",
+    "已停止更新：成功 %d 个，剩余 %d 个未更新。": "Güncelleme durduruldu: %d başarılı, %d kalan güncellenmedi.",
     "%d source":
         "%d kaynak",
     "%d sources":

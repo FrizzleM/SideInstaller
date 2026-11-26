@@ -2768,6 +2768,13 @@ final class Engine {
     @MainActor
     func startLinkImport(_ text: String) {
         guard linkImportTask == nil else { return }
+        // B-1 (0.9.173): an update-all batch owns the install slot —
+        // refuse up front with a reason on the Install page, instead of
+        // letting the link's import fail silently mid-batch.
+        guard !batchUpdateRunning else {
+            lastError = L("An update-all batch is running. Wait for it to finish, then try again.")
+            return
+        }
         linkImportTask = Task { @MainActor in
             defer { linkImportTask = nil }
             return await importCustomIPA(fromLink: text)

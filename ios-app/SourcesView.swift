@@ -280,6 +280,10 @@ struct SourceAppsView: View {
     @State private var updateAllCurrent: String?
     @State private var updateAllSummary: String?
     @State private var showingUpdateAllSummary = false
+    /// F-2 (0.9.173): the batch confirmation waiting on the user —
+    /// count + total size — with the continuation the batch Task
+    /// suspends on until it is answered.
+    @State private var updateAllConfirm: (count: Int, size: Int64?, reply: CheckedContinuation<Bool, Never>)?
     /// U-UI：应用列表排序。
     @State private var appSort = SourceSort.default
     /// U-UI：应用列表搜索（名字含查询串，不区分大小写）。
@@ -459,6 +463,21 @@ struct SourceAppsView: View {
             Button(L("OK")) {}
         } message: {
             Text(updateAllSummary ?? "")
+        }
+        // F-2 (0.9.173): the batch confirmation (`confirmUpdateAll`) —
+        // count + total size, one box for the whole run. The binding's
+        // setter answers "no" on any dismissal that isn't a button tap;
+        // the button clears the request first, so the setter's second
+        // call finds nothing to answer (see `answerUpdateAllConfirm`).
+        .alert(L("全部更新"), isPresented: Binding(
+            get: { updateAllConfirm != nil },
+            set: { if !$0 { answerUpdateAllConfirm(false) } }
+        )) {
+            Button(L("Update")) { answerUpdateAllConfirm(true) }
+            Button(L("Cancel"), role: .cancel) { answerUpdateAllConfirm(false) }
+        } message: {
+            Text(L("%d updates · Total size: %@", updateAllConfirm?.count ?? 0,
+                   updateAllConfirm.flatMap(\.size).map { CZFFormattedSize.size(Int($0)) } ?? L("Size unknown")))
         }
         // F-1 (0.9.161): uninstall confirm + failure, for the row swipe.
         .alert(L("Uninstall %@?", pendingUninstall?.name ?? ""), isPresented: Binding(
@@ -1023,6 +1042,10 @@ struct SourceAppsView: View {
             // 0.9.166 B-3 missed.
             var skipped = 0
             var stopped = false
+            // B-3 (0.9.173): true when the run was cancelled by the
+            // user — the summary says "stopped" then, and the un-run
+            // items are "remaining", not failures.
+            var cancelled = false
             // F-G (0.9.156): one prompt for the whole batch, with the total
             // size when every app states one — not one prompt per item.
             // B-2 (0.9.168): 全被滤掉时不弹确认——没有要下的东西，直接汇总。
@@ -1030,6 +1053,16 @@ struct SourceAppsView: View {
             let batchSize: Int64? = batchSizes.count == targets.count
                 ? Int64(batchSizes.reduce(0, +)) : nil
             if !targets.isEmpty {
+                // F-2 (0.9.173): Wi-Fi gets this batch confirmation
+                // first; on cellular it returns at once and the data
+                // prompt below asks instead — never both.
+                guard await confirmUpdateAll(count: targets.count, size: batchSize) else {
+                    updateAllTask = nil
+                    updateAllCurrent = nil
+                    updateAllIndex = 0
+                    updateAllTotal = 0
+                    return
+                }
                 guard await engine.confirmCellularDownload(size: batchSize,
                                                            what: L("%d updates", targets.count)) else {
                     updateAllTask = nil
@@ -1040,7 +1073,8 @@ struct SourceAppsView: View {
                 }
             }
             for (offset, app) in targets.enumerated() {
-                if Task.isCancelled || stopped { break }
+                if Task.isCancelled { cancelled = true; break }
+                if stopped { break }
                 updateAllIndex = offset + 1
                 let name = app.name ?? app.bundleIdentifier ?? ""
                 updateAllCurrent = name
@@ -1068,8 +1102,11 @@ struct SourceAppsView: View {
                     // B-C2 同款：取消下载不记失败行——这里是整批取消，
                     // 记一条“已停止”就收尾，剩下的进下面的未跑填补。
                     if Task.isCancelled || (error as? URLError)?.code == .cancelled {
-                        failed.append((name, L("Install stopped")))
-                        failedTargets.append(app)
+                        // B-3 (0.9.173): a cancel is not a failure — the
+                        // item stays un-updated, not failed, and the
+                        // un-run items below are not filled in as
+                        // failures either; the summary says "stopped".
+                        cancelled = true
                         activeID = nil
                         states[app.id] = nil
                         break
@@ -1083,7 +1120,9 @@ struct SourceAppsView: View {
             // 没跑到的各项：停批的原因同样记一条，不静默丢掉
             // （installSelection 同款）。已跑的项 = 成功 + 失败 + 跳过
             // （拒绝降级），三桶都算上，填补才不会把已跳过的项再记一遍。
-            if failed.count + succeeded + skipped < targets.count {
+            // B-3 (0.9.173): not after a cancel — the un-run items are
+            // the summary's "remaining", not failures.
+            if !cancelled, failed.count + succeeded + skipped < targets.count {
                 let reason = failed.last?.error ?? L("Install stopped")
                 for app in targets[(failed.count + succeeded + skipped)...] {
                     failed.append((app.name ?? app.bundleIdentifier ?? "", reason))
@@ -1093,6 +1132,10 @@ struct SourceAppsView: View {
             // B-2 (0.9.168): 事前滤出的最低 iOS 不符项——没下载、没占位，
             // 但汇总里要说明哪款、为什么跳过；与失败行同一格式列出。
             // 放在未跑填补之后：填补按 targets 索引，混进跳过项会越界。
+            // B-3 (0.9.173): the un-updated count for the stopped
+            // summary — taken before the min-iOS skips join `failed`
+            // for display (they never entered `targets`).
+            let remaining = targets.count - succeeded - failed.count - skipped
             failed.append(contentsOf: skippedMinOS)
             // F-1 (0.9.172): keep the failed targets for the summary
             // alert's retry — skippedMinOS items are not in them (they
@@ -1104,7 +1147,21 @@ struct SourceAppsView: View {
             updateAllIndex = 0
             updateAllTotal = 0
             activeID = nil
-            if failed.isEmpty {
+            if cancelled {
+                // B-3 (0.9.173): the run was stopped, not finished —
+                // say so, and list only what truly failed (the retry
+                // list above already holds just those).
+                var text = L("已停止更新：成功 %d 个，剩余 %d 个未更新。", succeeded, remaining)
+                if !failed.isEmpty {
+                    let shown = failed.prefix(5).map { "\($0.name)：\($0.error)" }
+                    var list = shown.joined(separator: "、")
+                    if failed.count > 5 {
+                        list += "、" + L("等 %d 个", failed.count - 5)
+                    }
+                    text += " " + L("failed: %@", list)
+                }
+                updateAllSummary = text
+            } else if failed.isEmpty {
                 updateAllSummary = L("全部更新完成：%d 个已更新。", succeeded)
             } else {
                 let shown = failed.prefix(5).map { "\($0.name)：\($0.error)" }
@@ -1133,6 +1190,32 @@ struct SourceAppsView: View {
             let task = appsManager.load(quiet: true)
             if let task { await task.value } else { await appsManager.inFlightLoadTask?.value }
         }
+    }
+
+    /// F-2 (0.9.173): one confirmation for the whole batch — how many
+    /// apps and their total size — before anything downloads. Wi-Fi
+    /// only: on cellular the data prompt below (`confirmCellularDownload`)
+    /// already asks, so this one stays out of the way and the batch is
+    /// never asked twice. Declining runs nothing and leaves no state.
+    private func confirmUpdateAll(count: Int, size: Int64?) async -> Bool {
+        if Engine.wifiOnlyDownloads, await NetworkStatus.internetPath().isExpensive { return true }
+        return await withTaskCancellationHandler {
+            if Task.isCancelled { return false }
+            return await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+                updateAllConfirm = (count: count, size: size, reply: cont)
+            }
+        } onCancel: {
+            Task { @MainActor in self.answerUpdateAllConfirm(false) }
+        }
+    }
+
+    /// F-2 (0.9.173): answer the batch confirmation above — clears the
+    /// request first, so the alert's own dismissal (which re-fires the
+    /// binding's setter) can't answer the same continuation twice.
+    private func answerUpdateAllConfirm(_ proceed: Bool) {
+        guard let confirm = updateAllConfirm else { return }
+        updateAllConfirm = nil
+        confirm.reply.resume(returning: proceed)
     }
 
     /// F3 (0.9.154): stop the update-all run — cancel the batch Task
@@ -1534,6 +1617,12 @@ final class SourcesManager: ObservableObject {
     /// The sources, in the order they were added.
     @Published private(set) var urls: [URL] = []
     @Published private(set) var states: [URL: SourceState] = [:]
+    /// B-2 (0.9.173): the last refresh failure per source, while its
+    /// old apps stay listed — a source that fetched before keeps its
+    /// apps when a later fetch fails, so without this the row would
+    /// pass stale apps off as fresh. Cleared by a fetch that lands
+    /// (or a fresh cached adopt).
+    @Published private(set) var lastRefreshErrors: [URL: String] = [:]
     /// The disabled sources, by absolute URL string (F1, 0.9.152): kept
     /// here so rows and listings redraw when one flips; the truth lives
     /// in `UnifiedSourceList`.
@@ -1564,6 +1653,7 @@ final class SourcesManager: ObservableObject {
         urls = UnifiedSourceList.load()
         disabled = UnifiedSourceList.disabledURLs()
         states = states.filter { urls.contains($0.key) }
+        lastRefreshErrors = lastRefreshErrors.filter { urls.contains($0.key) }
     }
 
     func isDisabled(_ url: URL) -> Bool { disabled.contains(url.absoluteString) }
@@ -1667,6 +1757,9 @@ final class SourcesManager: ObservableObject {
             guard let alt = SourceStore.cachedModel(for: url),
                   let source = Self.appSource(from: alt) else { continue }
             states[url] = .loaded(source)
+            // B-2 (0.9.173): a fresh cached document is a good fetch —
+            // no stale-failure mark survives it.
+            lastRefreshErrors.removeValue(forKey: url)
         }
     }
 
@@ -1809,8 +1902,16 @@ final class SourcesManager: ObservableObject {
             }
             for await (url, state) in group where urls.contains(url) {
                 guard let state else { states[url] = before[url]; continue }
-                // A source that fetched before keeps its apps if this fetch fails.
-                if case .failed = state, case .loaded? = states[url] { continue }
+                if case .failed(let message) = state {
+                    // B-2 (0.9.173): remember the failure even when the
+                    // old apps stay — the row shows it, so stale apps
+                    // don't pass as fresh.
+                    lastRefreshErrors[url] = message
+                    // A source that fetched before keeps its apps if this fetch fails.
+                    if case .loaded? = states[url] { continue }
+                } else if case .loaded = state {
+                    lastRefreshErrors.removeValue(forKey: url)
+                }
                 states[url] = state
             }
         }
@@ -1827,15 +1928,21 @@ final class SourcesManager: ObservableObject {
         states[url] = .loading
         do {
             states[url] = .loaded(try await Self.fetch(url))
+            lastRefreshErrors.removeValue(forKey: url)
         } catch is CancellationError {
             states[url] = before
         } catch let error as URLError where error.code == .cancelled {
             states[url] = before
         } catch {
+            // B-2 (0.9.173): 同 refresh() — 旧数据留下时也记下这次
+            // 失败，行上露出；从没加载过的源同样记（行菜单的重试
+            // 条件看这处记录，.failed 状态只作兜底）。
+            let message = await Self.describe(error)
+            lastRefreshErrors[url] = message
             if case .loaded? = before {
                 states[url] = before
             } else {
-                states[url] = .failed(await Self.describe(error))
+                states[url] = .failed(message)
             }
         }
     }
@@ -1958,6 +2065,10 @@ struct AppSourcesView: View {
     @State private var updateAllCurrent: String?
     @State private var updateAllSummary: String?
     @State private var showingUpdateAllSummary = false
+    /// F-2 (0.9.173): the batch confirmation waiting on the user —
+    /// count + total size — with the continuation the batch Task
+    /// suspends on until it is answered. Single-source page 同款.
+    @State private var updateAllConfirm: (count: Int, size: Int64?, reply: CheckedContinuation<Bool, Never>)?
     /// F-1 (0.9.172): the cross-source batch's failed listings, kept
     /// so the summary alert can offer "Retry failed items" — only the
     /// failed subset runs again (single-source page 同款）.
@@ -2072,6 +2183,19 @@ struct AppSourcesView: View {
             Button(L("OK")) {}
         } message: {
             Text(updateAllSummary ?? "")
+        }
+        // F-2 (0.9.173): the batch confirmation (`confirmUpdateAll`) —
+        // count + total size, one box for the whole run (single-source
+        // page 同款）.
+        .alert(L("全部更新"), isPresented: Binding(
+            get: { updateAllConfirm != nil },
+            set: { if !$0 { answerUpdateAllConfirm(false) } }
+        )) {
+            Button(L("Update")) { answerUpdateAllConfirm(true) }
+            Button(L("Cancel"), role: .cancel) { answerUpdateAllConfirm(false) }
+        } message: {
+            Text(L("%d updates · Total size: %@", updateAllConfirm?.count ?? 0,
+                   updateAllConfirm.flatMap(\.size).map { CZFFormattedSize.size(Int($0)) } ?? L("Size unknown")))
         }
     }
 
@@ -2390,6 +2514,8 @@ struct AppSourcesView: View {
             var failedListings: [SourceListing] = []
             var skipped = 0
             var stopped = false
+            // B-3 (0.9.173): 单源批跑同款——取消与失败分开汇总。
+            var cancelled = false
             // F-G (0.9.156) 同款：整批一次蜂窝确认，带全部大小（每款
             // 都报大小时才有总量）。全被滤掉时不弹确认——没有要下的
             // 东西，直接汇总。
@@ -2397,6 +2523,15 @@ struct AppSourcesView: View {
             let batchSize: Int64? = batchSizes.count == runnable.count
                 ? Int64(batchSizes.reduce(0, +)) : nil
             if !runnable.isEmpty {
+                // F-2 (0.9.173): Wi-Fi 下先弹整批确认（数量 + 总量）；
+                // 蜂窝下直接返回、走下面的流量确认——两次确认不同时出现。
+                guard await confirmUpdateAll(count: runnable.count, size: batchSize) else {
+                    updateAllTask = nil
+                    updateAllCurrent = nil
+                    updateAllIndex = 0
+                    updateAllTotal = 0
+                    return
+                }
                 guard await engine.confirmCellularDownload(size: batchSize,
                                                            what: L("%d updates", runnable.count)) else {
                     updateAllTask = nil
@@ -2407,7 +2542,8 @@ struct AppSourcesView: View {
                 }
             }
             for (offset, listing) in runnable.enumerated() {
-                if Task.isCancelled || stopped { break }
+                if Task.isCancelled { cancelled = true; break }
+                if stopped { break }
                 updateAllIndex = offset + 1
                 let name = listing.app.name
                 // The progress line names the source too — the same app
@@ -2433,8 +2569,9 @@ struct AppSourcesView: View {
                     }
                 } catch {
                     if Task.isCancelled || (error as? URLError)?.code == .cancelled {
-                        failed.append((listing.sourceName, name, L("Install stopped")))
-                        failedListings.append(listing)
+                        // B-3 (0.9.173): 单源批跑同款——取消不记失败，
+                        // 剩余项不进重试名单。
+                        cancelled = true
                         break
                     }
                     failed.append((listing.sourceName, name, error.localizedDescription))
@@ -2444,7 +2581,8 @@ struct AppSourcesView: View {
             // 没跑到的各项：停批的原因同样记一条，不静默丢掉
             // （单源版同款）。已跑的项 = 成功 + 失败 + 跳过
             // （拒绝降级），三桶都算上，填补才不会把已跳过的项再记一遍。
-            if failed.count + succeeded + skipped < runnable.count {
+            // B-3 (0.9.173): 取消后不填补——剩余项是“未更新”，不是失败。
+            if !cancelled, failed.count + succeeded + skipped < runnable.count {
                 let reason = failed.last?.error ?? L("Install stopped")
                 for listing in runnable[(failed.count + succeeded + skipped)...] {
                     failed.append((listing.sourceName, listing.app.name, reason))
@@ -2454,6 +2592,9 @@ struct AppSourcesView: View {
             // 事前滤出的最低 iOS 不符项——没下载、没占位，但汇总里
             // 要说明哪款、为什么跳过；与失败行同一格式列出。
             // 放在未跑填补之后：填补按 runnable 索引，混进跳过项会越界。
+            // B-3 (0.9.173): 停止汇总的剩余数——在最低 iOS 跳过项并
+            // 入 `failed` 之前算（它们从没进 `runnable`）。
+            let remaining = runnable.count - succeeded - failed.count - skipped
             failed.append(contentsOf: skippedMinOS)
             // F-1 (0.9.172): keep the failed listings for the summary
             // alert's retry — skippedMinOS items are not in them (they
@@ -2464,7 +2605,15 @@ struct AppSourcesView: View {
             updateAllCurrent = nil
             updateAllIndex = 0
             updateAllTotal = 0
-            if failed.isEmpty {
+            if cancelled {
+                // B-3 (0.9.173): 单源批跑同款——汇总写“已停止”，
+                // 只列真正失败的项；重试名单里只有它们。
+                var text = L("已停止更新：成功 %d 个，剩余 %d 个未更新。", succeeded, remaining)
+                if !failed.isEmpty {
+                    text += " " + L("failed: %@", Self.updateAllFailureList(failed))
+                }
+                updateAllSummary = text
+            } else if failed.isEmpty {
                 updateAllSummary = L("全部更新完成：%d 个已更新。", succeeded)
             } else {
                 updateAllSummary = L("全部更新完成：成功 %d 个，失败 %d 个。失败：%@", succeeded, failed.count, Self.updateAllFailureList(failed))
@@ -2508,6 +2657,30 @@ struct AppSourcesView: View {
             list += "\n" + L("等 %d 个", failed.count - 5)
         }
         return list
+    }
+
+    /// F-2 (0.9.173): one confirmation for the whole batch — count +
+    /// total size — before anything downloads (single-source page
+    /// 同款）. Wi-Fi only: on cellular the data prompt already asks.
+    private func confirmUpdateAll(count: Int, size: Int64?) async -> Bool {
+        if Engine.wifiOnlyDownloads, await NetworkStatus.internetPath().isExpensive { return true }
+        return await withTaskCancellationHandler {
+            if Task.isCancelled { return false }
+            return await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+                updateAllConfirm = (count: count, size: size, reply: cont)
+            }
+        } onCancel: {
+            Task { @MainActor in self.answerUpdateAllConfirm(false) }
+        }
+    }
+
+    /// F-2 (0.9.173): answer the batch confirmation above — clears the
+    /// request first, so the alert's own dismissal can't answer the
+    /// same continuation twice (single-source page 同款）.
+    private func answerUpdateAllConfirm(_ proceed: Bool) {
+        guard let confirm = updateAllConfirm else { return }
+        updateAllConfirm = nil
+        confirm.reply.resume(returning: proceed)
     }
 
     /// F-1 (0.9.171): stop the cross-source update-all run — the
@@ -2579,7 +2752,8 @@ struct SourceRowsCard: View {
                     case .loaded(let source)?:
                         Text(sourceName(url) + " · " + (source.apps.count == 1
                                 ? L("%d app", source.apps.count)
-                                : L("%d apps", source.apps.count)))
+                                : L("%d apps", source.apps.count))
+                            + updateSuffix(for: url))
                     case .failed(let message)?:
                         Text(message).foregroundStyle(Theme.negative)
                     default:
@@ -2589,6 +2763,16 @@ struct SourceRowsCard: View {
                 .font(.caption)
                 .foregroundStyle(Theme.muted)
                 .lineLimit(2)
+                // B-2 (0.9.173): a source that loaded before keeps its
+                // old apps when a refresh fails — say so on the row,
+                // with the reason, so the stale list doesn't pass as
+                // fresh. The retry lives in the row's menu below.
+                if loadedSource(url) != nil, let refreshError = manager.lastRefreshErrors[url] {
+                    Text(L("上次刷新失败：%@", refreshError))
+                        .font(.caption)
+                        .foregroundStyle(Theme.negative)
+                        .lineLimit(2)
+                }
                 Text(url.absoluteString)
                     .font(.caption2)
                     .foregroundStyle(Theme.muted)
@@ -2611,7 +2795,10 @@ struct SourceRowsCard: View {
                 // last fetch failed, so a healthy row never offers it.
                 // The whole-list refresh stays on pull / Check for
                 // updates; this one re-pulls a single URL.
-                if let state = manager.states[url], case .failed = state {
+                // B-2 (0.9.173): also after a refresh failed on old
+                // data — the row's state stays .loaded, so the error
+                // record is the only thing that says retry is wanted.
+                if refreshFailed(url) {
                     Button {
                         Task {
                             await manager.refresh(url: url)
@@ -2637,6 +2824,24 @@ struct SourceRowsCard: View {
         }
         .padding(.vertical, 6)
         .opacity(manager.isDisabled(url) ? 0.5 : 1)
+    }
+
+    /// F-3 (0.9.173): "· N 个可更新" for this source's row — counted
+    /// from the same listings the Updates section reads, so the row
+    /// and the section never disagree. Zero shows nothing.
+    private func updateSuffix(for url: URL) -> String {
+        let count = manager.listings(installed: appsManager.entries)
+            .filter { $0.sourceURL == url && $0.hasUpdate }.count
+        return count > 0 ? " · " + L("%d 个可更新", count) : ""
+    }
+
+    /// B-2 (0.9.173): this source's last fetch failed — either it never
+    /// loaded (state .failed) or it keeps old apps with a recorded
+    /// refresh failure.
+    private func refreshFailed(_ url: URL) -> Bool {
+        if manager.lastRefreshErrors[url] != nil { return true }
+        if let state = manager.states[url], case .failed = state { return true }
+        return false
     }
 
     private func sourceName(_ url: URL) -> String {

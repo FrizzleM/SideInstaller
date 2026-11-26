@@ -1578,6 +1578,19 @@ let vietnameseStrings: [String: String] = [
         "%d bản cập nhật",
     "%d updates":
         "%d bản cập nhật",
+    "%d updates · Total size: %@": "%d bản cập nhật · Tổng dung lượng: %@",
+    "%d 个可更新": "Có %d bản cập nhật",
+    "全部更新进行中，等它跑完再批量安装。":
+        "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi mới cài đặt hàng loạt.",
+    "全部更新进行中，等它跑完再重装。":
+        "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi mới cài đặt lại.",
+    "全部更新进行中，等它跑完再重试。": "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi mới thử lại.",
+    "An update-all batch is running. Wait for it to finish, then try again.":
+        "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi thử lại.",
+    "全部更新进行中，等它跑完再更新。":
+        "Đang cập nhật tất cả ứng dụng. Hãy đợi xong rồi mới cập nhật.",
+    "上次刷新失败：%@": "Lần làm mới trước thất bại: %@",
+    "已停止更新：成功 %d 个，剩余 %d 个未更新。": "Đã dừng cập nhật: thành công %d, còn %d chưa cập nhật.",
     "%d source":
         "%d nguồn",
     "%d sources":

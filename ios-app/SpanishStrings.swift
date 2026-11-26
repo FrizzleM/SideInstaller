@@ -1583,6 +1583,21 @@ let spanishStrings: [String: String] = [
         "%d actualización",
     "%d updates":
         "%d actualizaciones",
+    "%d updates · Total size: %@": "%d actualizaciones · Tamaño total: %@",
+    "%d 个可更新": "%d actualizaciones disponibles",
+    "全部更新进行中，等它跑完再批量安装。":
+        "Hay una actualización de todas las apps en curso. Espera a que termine antes de instalar en lote.",
+    "全部更新进行中，等它跑完再重装。":
+        "Hay una actualización de todas las apps en curso. Espera a que termine antes de reinstalar.",
+    "全部更新进行中，等它跑完再重试。":
+        "Hay una actualización de todas las apps en curso. Espera a que termine antes de reintentarlo.",
+    "An update-all batch is running. Wait for it to finish, then try again.":
+        "Hay una actualización de todas las apps en curso. Espera a que termine y vuelve a intentarlo.",
+    "全部更新进行中，等它跑完再更新。":
+        "Hay una actualización de todas las apps en curso. Espera a que termine antes de actualizar.",
+    "上次刷新失败：%@": "La última actualización falló: %@",
+    "已停止更新：成功 %d 个，剩余 %d 个未更新。":
+        "Actualización detenida: %d correctas, %d restantes sin actualizar.",
     "%d source":
         "%d fuente",
     "%d sources":

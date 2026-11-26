@@ -143,6 +143,13 @@ struct AboutView: View {
     /// silently.
     private func startSelfUpdate() {
         guard updateAvailable, let latest = updateChecker.latestVersion, !isSelfUpdating else { return }
+        // B-1 (0.9.173): an update-all batch owns the install slot —
+        // the self-update's import would be refused mid-batch; say so
+        // on the version row instead of failing silently.
+        if engine.batchUpdateRunning {
+            selfUpdateError = L("全部更新进行中，等它跑完再更新。")
+            return
+        }
         selfUpdateError = nil
         selfUpdateFinished = false
         isSelfUpdating = true

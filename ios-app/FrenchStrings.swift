@@ -1586,6 +1586,21 @@ let frenchStrings: [String: String] = [
         "%d mise à jour",
     "%d updates":
         "%d mises à jour",
+    "%d updates · Total size: %@": "%d mises à jour · Taille totale : %@",
+    "%d 个可更新": "%d mises à jour disponibles",
+    "全部更新进行中，等它跑完再批量安装。":
+        "Une mise à jour de toutes les apps est en cours. Attendez qu'elle se termine avant d'installer en lot.",
+    "全部更新进行中，等它跑完再重装。":
+        "Une mise à jour de toutes les apps est en cours. Attendez qu'elle se termine avant de réinstaller.",
+    "全部更新进行中，等它跑完再重试。":
+        "Une mise à jour de toutes les apps est en cours. Attendez qu'elle se termine avant de réessayer.",
+    "An update-all batch is running. Wait for it to finish, then try again.":
+        "Une mise à jour de toutes les apps est en cours. Attendez qu'elle se termine, puis réessayez.",
+    "全部更新进行中，等它跑完再更新。":
+        "Une mise à jour de toutes les apps est en cours. Attendez qu'elle se termine avant de mettre à jour.",
+    "上次刷新失败：%@": "Dernier rafraîchissement échoué : %@",
+    "已停止更新：成功 %d 个，剩余 %d 个未更新。":
+        "Mise à jour interrompue : %d réussies, %d restantes non mises à jour.",
     "%d source":
         "%d source",
     "%d sources":

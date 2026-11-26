@@ -625,28 +625,32 @@ struct DownloadsListView: View {
                             }
                         }
                     }
-                    // F-3 (0.9.171): the last source download that failed —
-                    // the source row's failure vanishes when that page
-                    // goes away, so this is where the retry lives. A
-                    // retry that lands clears the row (the downloader
-                    // drops its record on a matching success); a retry
-                    // that fails again replaces it with the new reason.
-                    if let failed = downloader.lastFailedDownload {
+                    // F-1 (0.9.173): the source downloads that failed —
+                    // one row each, so a second failure no longer drops
+                    // the first one's retry (the 0.9.171 single slot did).
+                    // A retry that lands clears its own row (the
+                    // downloader drops its record on a matching success);
+                    // a retry that fails again replaces it with the new
+                    // reason, and an install failure lands on this
+                    // page's error line instead.
+                    if !downloader.failedDownloads.isEmpty {
                         Section {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(failed.name)
-                                    .font(.subheadline.weight(.medium))
-                                    .lineLimit(1)
-                                Text(failed.error)
-                                    .font(.caption)
-                                    .foregroundStyle(Theme.negative)
-                                    .lineLimit(2)
-                                HStack(spacing: 12) {
-                                    Button(L("Try again")) { retryFailedDownload() }
+                            ForEach(downloader.failedDownloads, id: \.url) { failed in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(failed.name)
+                                        .font(.subheadline.weight(.medium))
+                                        .lineLimit(1)
+                                    Text(failed.error)
                                         .font(.caption)
-                                        .disabled(downloader.isDownloading || engine.isRunning || retryTask != nil)
-                                    Button(L("Remove")) { downloader.clearLastFailedDownload() }
-                                        .font(.caption)
+                                        .foregroundStyle(Theme.negative)
+                                        .lineLimit(2)
+                                    HStack(spacing: 12) {
+                                        Button(L("Try again")) { retryFailedDownload(failed) }
+                                            .font(.caption)
+                                            .disabled(downloader.isDownloading || engine.isRunning || retryTask != nil)
+                                        Button(L("Remove")) { downloader.removeFailedDownload(failed) }
+                                            .font(.caption)
+                                    }
                                 }
                             }
                         } header: {
@@ -882,15 +886,22 @@ struct DownloadsListView: View {
         }
     }
 
-    /// F-3 (0.9.171): re-run the failed download, then install it the
+    /// F-1 (0.9.173): re-run one failed download, then install it the
     /// way the update-all batch does — a bare re-download would strand
     /// the file in staging with nothing to install it. The downloader's
     /// own record clears on a landing retry; a failed retry replaces
     /// it with the new reason, and an install failure lands on this
     /// page's error line instead.
-    private func retryFailedDownload() {
-        guard let failed = downloader.lastFailedDownload, retryTask == nil,
-              !downloader.isDownloading, !engine.isRunning else { return }
+    private func retryFailedDownload(_ failed: IPADownloader.FailedDownload) {
+        guard retryTask == nil, !downloader.isDownloading, !engine.isRunning else { return }
+        // B-1 (0.9.173): an update-all batch owns the install slot —
+        // the retry's install would be refused mid-batch, so say so on
+        // this page instead of failing silently. The button stays
+        // tappable so the tap can surface the reason.
+        if engine.batchUpdateRunning {
+            manager.lastError = L("全部更新进行中，等它跑完再重试。")
+            return
+        }
         retryTask = Task {
             do {
                 // The source row's retry re-runs its install path, which

@@ -645,24 +645,27 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// for "排队中", the Downloads page lists it under the running row.
     @Published private(set) var queue: [QueuedDownload] = []
 
-    /// F-3 (0.9.171): the most recent source download that failed —
-    /// name, URL and reason — so the Downloads page can show it with
-    /// a retry after the source page is gone. One entry only: a newer
-    /// failure replaces it, a retry that lands clears it. A cancel is
-    /// never a failure (the row's Cancel is silent by design). This is
-    /// the Downloads page's in-flight failure, not the history page's
-    /// failure records (F-A, 0.9.164) — those live on past installs.
+    /// F-1 (0.9.173): the source downloads that failed, one entry per
+    /// URL — so the Downloads page can show each with its own retry
+    /// after the source page is gone. F-3 (0.9.171) kept one entry only
+    /// ("a newer failure replaces it"); two failures in a row silently
+    /// dropped the first one's retry, so this is now a queue: a newer
+    /// failure for the same URL replaces its entry, a retry that lands
+    /// clears its own URL. A cancel is never a failure (the row's
+    /// Cancel is silent by design). This is the Downloads page's
+    /// in-flight failure, not the history page's failure records (F-A,
+    /// 0.9.164) — those live on past installs.
     struct FailedDownload: Equatable {
         let name: String
         let url: URL
         let error: String
     }
 
-    /// F-3 (0.9.171): the last failed download, if any.
-    @Published private(set) var lastFailedDownload: FailedDownload?
+    /// F-1 (0.9.173): the failed downloads, in failure order.
+    @Published private(set) var failedDownloads: [FailedDownload] = []
 
-    /// F-3 (0.9.171): drop the failed-download row (its Remove button).
-    func clearLastFailedDownload() { lastFailedDownload = nil }
+    /// F-1 (0.9.173): drop one failed-download row (its Remove button).
+    func removeFailedDownload(_ failed: FailedDownload) { failedDownloads.removeAll { $0 == failed } }
 
     /// F-1 (0.9.163): one entry in the FIFO queue — the URL, the staged
     /// filename, and the continuation its waiter suspended in. A class,
@@ -1060,16 +1063,20 @@ final class IPADownloader: NSObject, ObservableObject, URLSessionDownloadDelegat
     private func finish(_ result: Result<URL, Error>, for taskID: ObjectIdentifier? = nil) {
         if let taskID, taskID != currentTaskID { return }
         guard let request = activeRequest, let continuation = request.continuation else { return }
-        // F-3 (0.9.171): keep the latest failure for the Downloads
-        // page — a cancel is not a failure, and a success clears the
-        // record for its own URL (a retry that lands).
+        // F-1 (0.9.173): keep the failures for the Downloads page —
+        // a cancel is not a failure, and a success clears the record
+        // for its own URL (a retry that lands).
         switch result {
         case .success:
-            if lastFailedDownload?.url == request.url { lastFailedDownload = nil }
+            failedDownloads.removeAll { $0.url == request.url }
         case .failure(let error):
             if (error as? URLError)?.code != .cancelled, !(error is CancellationError) {
-                lastFailedDownload = FailedDownload(name: request.name, url: request.url,
-                                                    error: error.localizedDescription)
+                // F-1 (0.9.173): one entry per URL — a re-failure of
+                // the same URL replaces its entry, other URLs keep
+                // theirs.
+                failedDownloads.removeAll { $0.url == request.url }
+                failedDownloads.append(FailedDownload(name: request.name, url: request.url,
+                                                      error: error.localizedDescription))
             }
         }
         request.continuation = nil
