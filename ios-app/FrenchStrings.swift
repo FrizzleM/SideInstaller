@@ -1727,4 +1727,13 @@ let frenchStrings: [String: String] = [
     "Checked %d hours ago": "Vérifié il y a %d heures",
     "Checked %d days ago": "Vérifié il y a %d jours",
     "Pairing file installed into %@, but couldn't be written into %@.": "Fichier de jumelage installé dans %@, mais impossible de l'écrire dans %@.",
+
+    // 0.9.164
+    "Loop route": "Rejouer la route en boucle",
+    "Newer than installed %@": "Plus récent que la version installée %@",
+    "Older than installed %@": "Plus ancien que la version installée %@",
+    "Same as installed %@": "Identique à la version installée %@",
+    "Show in Downloads": "Afficher dans Téléchargements",
+    "Still installing — check the Install page for progress.": "Installation toujours en cours — consultez la page d’installation pour suivre la progression.",
+    "Installing — tap to cancel": "Installation en cours — toucher pour annuler",
 ]

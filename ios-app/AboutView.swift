@@ -29,6 +29,9 @@ struct AboutView: View {
     @State private var selfUpdateFinished = false
     /// Why the last self-update didn't start, shown under "Check for updates".
     @State private var selfUpdateError: String?
+    /// B-2 (0.9.164): how long the self-update wait runs before giving up
+    /// on watching it — the install itself keeps going on the Install page.
+    private static let selfUpdateWaitTimeout: TimeInterval = 600
 
     var body: some View {
         NavigationStack {
@@ -70,7 +73,9 @@ struct AboutView: View {
             StatusPill(text: versionPillText, systemImage: versionPillIcon, color: versionPillColor)
         }
         .buttonStyle(.plain, sound: .tick)
-        .disabled(isSelfUpdating)
+        // B-2 (0.9.164): no `.disabled(isSelfUpdating)` any more — the pill
+        // is the cancel while a self-update runs (versionRowTapped below),
+        // and the wait has no other handle.
     }
 
     /// True when a newer version is confirmed AND its release asset is
@@ -88,6 +93,9 @@ struct AboutView: View {
     /// doing — checking, offering the new version, downloading it,
     /// installing it.
     private var versionPillText: String {
+        // B-2 (0.9.164): while updating the pill is the cancel — the
+        // progress itself still shows under "Check for updates".
+        if isSelfUpdating { return L("Installing — tap to cancel") }
         if let progress = selfUpdateProgressText { return progress }
         if updateAvailable, let latest = updateChecker.latestVersion {
             return L("Update to %@", latest)
@@ -115,9 +123,14 @@ struct AboutView: View {
     /// The version row's tap: install when a verified update is waiting,
     /// otherwise check first (0.9.142 manual check, 0.9.146 timeout +
     /// cancel); a newer verified version lights the update state, and the
-    /// next tap installs it. While a self-update runs the row is disabled.
+    /// next tap installs it. While a self-update runs the row cancels it
+    /// instead (B-2, 0.9.164) — the install itself keeps going on the
+    /// Install page; only the watching stops.
     private func versionRowTapped() {
-        if isSelfUpdating { return }
+        if isSelfUpdating {
+            selfUpdateTask?.cancel()
+            return
+        }
         if updateAvailable { startSelfUpdate(); return }
         runUpdateCheck()
     }
@@ -175,10 +188,29 @@ struct AboutView: View {
                 // Wait the run out so the row doesn't offer the same update
                 // again while it installs; the floating Install pill carries
                 // the progress meanwhile.
-                while engine.isRunning, !Task.isCancelled {
+                // B-2 (0.9.164): bounded — the run can hang in
+                // `ensureNetwork` (Wi-Fi drops mid-run) or on an
+                // unanswered 2FA prompt, and the old loop had no timeout
+                // and the row refused taps while it ran, so the page sat
+                // on "Installing" forever. Ten minutes, then stop watching:
+                // the install itself keeps going on the Install page.
+                var waited = 0.0
+                while engine.isRunning, !Task.isCancelled, waited < Self.selfUpdateWaitTimeout {
                     try? await Task.sleep(for: .seconds(1))
+                    waited += 1
                 }
-                if !Task.isCancelled, engine.finished {
+                if Task.isCancelled {
+                    isSelfUpdating = false
+                    selfUpdateTask = nil
+                    return
+                }
+                if waited >= Self.selfUpdateWaitTimeout, engine.isRunning {
+                    selfUpdateError = L("Still installing — check the Install page for progress.")
+                    isSelfUpdating = false
+                    selfUpdateTask = nil
+                    return
+                }
+                if engine.finished {
                     selfUpdateFinished = true
                 }
             } else if let guide = engine.guide {

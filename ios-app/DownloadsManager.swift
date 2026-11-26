@@ -363,6 +363,20 @@ final class DownloadsManager: ObservableObject {
 struct DownloadsListView: View {
     @Environment(Engine.self) private var engine
     @StateObject private var manager = DownloadsManager()
+    /// F-2 (0.9.164): the installed apps, for the row's newer/older tag —
+    /// the shared instance RootView already observes, so the tag follows
+    /// the device list without another load.
+    @ObservedObject private var appsManager = SideloadedAppsManager.shared
+    /// F-3 (0.9.164): the download a history row asked to reveal
+    /// (`id` = file path), still waiting to be scrolled to.
+    @State private var pendingRevealID: String?
+    /// F-3 (0.9.164): the revealed download, highlighted until the user
+    /// taps its row to install it.
+    @State private var highlightedID: String?
+    /// F-3 (0.9.164): bumps on every reveal request, so the ScrollViewReader
+    /// answers even when the file is already listed (no download change
+    /// to observe).
+    @State private var revealNonce = 0
     /// F-2 (0.9.162): the shared source downloader — the "Downloading"
     /// section at the top observes its in-flight state, so a download
     /// started on the source page stays visible here. Same instance the
@@ -407,6 +421,34 @@ struct DownloadsListView: View {
             case .newest: return L("Latest")
             }
         }
+    }
+
+    /// F-2 (0.9.164): the installed-version comparison tag for a row — the
+    /// IPA's own version (the release version it was downloaded as when
+    /// the IPA can't be read) against what this iPhone has installed.
+    /// No readable version or no installed match means no tag, not a guess.
+    private func versionTag(for item: DownloadedIPA) -> (text: String, color: Color)? {
+        guard let info = IPALibrary.appInfo(at: item.url),
+              let fileVersion = info.version ?? item.version, !fileVersion.isEmpty,
+              !info.bundleID.isEmpty,
+              let installed = appsManager.installedVersion(forBundleID: info.bundleID) else { return nil }
+        return czfVersionComparisonTag(fileVersion: fileVersion, installedVersion: installed)
+    }
+
+    /// F-3 (0.9.164): scroll a revealed download into view and highlight it.
+    /// Nothing to do until the file is actually in the list — a refresh
+    /// still in flight just leaves the request pending, and the downloads
+    /// change below retries it; a loaded list without the file drops it
+    /// (the file was verified a moment ago, so this is only a race).
+    private func reveal(_ proxy: ScrollViewProxy) {
+        guard let id = pendingRevealID else { return }
+        guard manager.downloads.contains(where: { $0.id == id }) else {
+            if manager.hasLoaded { pendingRevealID = nil }
+            return
+        }
+        pendingRevealID = nil
+        highlightedID = id
+        withAnimation { proxy.scrollTo(id, anchor: .center) }
     }
 
     /// Search + sort applied to the scanned list: search matches the shown
@@ -483,192 +525,211 @@ struct DownloadsListView: View {
                 Spacer()
             }
             .padding(.horizontal, 20)
-            List {
-                // F-2 (0.9.162): the in-flight source download, at the top —
-                // the source page's row state is local to that page, so
-                // switching here used to hide the download entirely. The
-                // row reuses the shared downloader's pause/cancel and
-                // vanishes when the file lands (`isDownloading` falls in
-                // `finish()`); a cancel here settles the source row too
-                // (its catch treats `.cancelled` as silent).
-                if downloader.isDownloading, let name = downloader.currentName {
-                    Section {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 8) {
-                                Text(name)
-                                    .font(.subheadline.weight(.medium))
-                                    .lineLimit(1)
-                                Spacer()
-                                if downloader.totalBytesExpected > 0 {
-                                    Text(L("Downloading… %d%%", Int(downloader.progress * 100)))
-                                        .font(.caption)
-                                        .foregroundStyle(Theme.muted)
-                                        .contentTransition(.numericText())
-                                }
-                            }
-                            if downloader.totalBytesExpected > 0 {
-                                ProgressView(value: downloader.progress)
-                                    .tint(Theme.accent)
-                            } else {
+            // F-3 (0.9.164): the reader a history row's reveal scrolls with —
+            // the reveal handlers live inside it, where the proxy is.
+            ScrollViewReader { proxy in
+                List {
+                    // F-2 (0.9.162): the in-flight source download, at the top —
+                    // the source page's row state is local to that page, so
+                    // switching here used to hide the download entirely. The
+                    // row reuses the shared downloader's pause/cancel and
+                    // vanishes when the file lands (`isDownloading` falls in
+                    // `finish()`); a cancel here settles the source row too
+                    // (its catch treats `.cancelled` as silent).
+                    if downloader.isDownloading, let name = downloader.currentName {
+                        Section {
+                            VStack(alignment: .leading, spacing: 8) {
                                 HStack(spacing: 8) {
-                                    ProgressView()
-                                    Text(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file)))
-                                        .font(.caption)
-                                        .foregroundStyle(Theme.muted)
-                                }
-                            }
-                            if downloader.downloadSpeed > 0 {
-                                Text(downloadDetailLine)
-                                    .font(.caption)
-                                    .foregroundStyle(Theme.muted)
-                            }
-                            HStack(spacing: 12) {
-                                Button(downloader.isPaused ? L("Resume") : L("Pause")) {
-                                    if downloader.isPaused {
-                                        downloader.resume()
-                                    } else {
-                                        downloader.pause()
-                                    }
-                                }
-                                .font(.caption)
-                                Button(L("Cancel")) {
-                                    downloader.cancel()
-                                }
-                                .font(.caption)
-                            }
-                            // F-1 (0.9.163): the downloads waiting behind
-                            // this one, in tap order — each with the same
-                            // Cancel the running row has (a queued cancel
-                            // only settles its own waiter, never the run
-                            // in front of it).
-                            ForEach(downloader.queue) { queued in
-                                HStack(spacing: 8) {
-                                    Text(queued.name)
-                                        .font(.subheadline)
-                                        .lineLimit(1)
-                                    Spacer()
-                                    Text(L("Queued"))
-                                        .font(.caption)
-                                        .foregroundStyle(Theme.muted)
-                                    Button(L("Cancel")) {
-                                        downloader.cancelDownload(url: queued.url)
-                                    }
-                                    .font(.caption)
-                                }
-                            }
-                        }
-                    } header: {
-                        Text(L("Downloading"))
-                    }
-                }
-                if let error = manager.lastError {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundStyle(Theme.negative)
-                }
-                // UI-4：没扫完先给加载行，别让列表空白看着像没东西。
-                if !manager.hasLoaded {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                        Text(L("Loading…"))
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.muted)
-                    }
-                } else if manager.downloads.isEmpty {
-                    Text(L("No downloaded IPAs. Ones you install from a source or a file are cached here."))
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.muted)
-                } else if visibleDownloads.isEmpty {
-                    Text(L("没有匹配的 IPA。"))
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.muted)
-                } else {
-                    // F2：页顶合计行（文件页合计行同款文案 + 样式）与清空全部。
-                    HStack(spacing: 8) {
-                        Text(L("%d 个 IPA · %@", manager.downloads.count, manager.totalSizeText))
-                            .font(.footnote)
-                            .foregroundStyle(Theme.muted)
-                        Spacer()
-                        // F-2 (0.9.161): one-tap old-version cleanup — the
-                        // count is read now, for the confirm box; nothing
-                        // to delete means the result line at once, no box.
-                        Button(L("Clean up old versions")) {
-                            let preview = manager.cleanupPreview()
-                            if preview.deletable.isEmpty {
-                                cleanupResult = manager.cleanupOldVersions()
-                            } else {
-                                pendingCleanup = (preview.deletable.count, preview.skipped)
-                            }
-                        }
-                        .font(.subheadline.weight(.medium))
-                        .disabled(manager.deletingID != nil)
-                        Button(L("清空全部")) {
-                            clearAllRenewalNames = manager.downloads.compactMap {
-                                RenewalSourceStore.source(forFileURL: $0.url, bundleID: nil)?.appName
-                            }
-                            confirmingClearAll = true
-                        }
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Theme.negative)
-                        .disabled(manager.deletingID != nil)
-                    }
-                    ForEach(visibleDownloads) { item in
-                        Button { install(item) } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "shippingbox.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(Theme.brand)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.displayName)
+                                    Text(name)
                                         .font(.subheadline.weight(.medium))
                                         .lineLimit(1)
-                                    if let modified = item.modified {
-                                        let when = Self.dateText(for: modified)
-                                        Text(item.isImported ? L("Added %@", when) : L("Downloaded %@", when))
+                                    Spacer()
+                                    if downloader.totalBytesExpected > 0 {
+                                        Text(L("Downloading… %d%%", Int(downloader.progress * 100)))
+                                            .font(.caption)
+                                            .foregroundStyle(Theme.muted)
+                                            .contentTransition(.numericText())
+                                    }
+                                }
+                                if downloader.totalBytesExpected > 0 {
+                                    ProgressView(value: downloader.progress)
+                                        .tint(Theme.accent)
+                                } else {
+                                    HStack(spacing: 8) {
+                                        ProgressView()
+                                        Text(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file)))
                                             .font(.caption)
                                             .foregroundStyle(Theme.muted)
                                     }
                                 }
-                                Spacer()
-                                Text(item.sizeText)
-                                    .font(.caption2.weight(.bold))
-                                    .foregroundStyle(Theme.accent2)
-                                    .padding(.horizontal, 9)
-                                    .padding(.vertical, 4)
-                                    .background(Capsule().fill(Theme.accent.opacity(0.16)))
+                                if downloader.downloadSpeed > 0 {
+                                    Text(downloadDetailLine)
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.muted)
+                                }
+                                HStack(spacing: 12) {
+                                    Button(downloader.isPaused ? L("Resume") : L("Pause")) {
+                                        if downloader.isPaused {
+                                            downloader.resume()
+                                        } else {
+                                            downloader.pause()
+                                        }
+                                    }
+                                    .font(.caption)
+                                    Button(L("Cancel")) {
+                                        downloader.cancel()
+                                    }
+                                    .font(.caption)
+                                }
+                                // F-1 (0.9.163): the downloads waiting behind
+                                // this one, in tap order — each with the same
+                                // Cancel the running row has (a queued cancel
+                                // only settles its own waiter, never the run
+                                // in front of it).
+                                ForEach(downloader.queue) { queued in
+                                    HStack(spacing: 8) {
+                                        Text(queued.name)
+                                            .font(.subheadline)
+                                            .lineLimit(1)
+                                        Spacer()
+                                        Text(L("Queued"))
+                                            .font(.caption)
+                                            .foregroundStyle(Theme.muted)
+                                        Button(L("Cancel")) {
+                                            downloader.cancelDownload(url: queued.url)
+                                        }
+                                        .font(.caption)
+                                    }
+                                }
                             }
+                        } header: {
+                            Text(L("Downloading"))
                         }
-                        .buttonStyle(.plain)
-                        .disabled(installingID == item.id)
-                        .swipeActions {
-                            // F3 (0.9.152): rename from here, Files page
-                            // rules (same alert, same validation).
-                            Button {
-                                renameText = item.fileName
-                                renameItem = item
-                            } label: {
-                                Label(L("重命名"), systemImage: "pencil")
+                    }
+                    if let error = manager.lastError {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(Theme.negative)
+                    }
+                    // UI-4：没扫完先给加载行，别让列表空白看着像没东西。
+                    if !manager.hasLoaded {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text(L("Loading…"))
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.muted)
+                        }
+                    } else if manager.downloads.isEmpty {
+                        Text(L("No downloaded IPAs. Ones you install from a source or a file are cached here."))
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.muted)
+                    } else if visibleDownloads.isEmpty {
+                        Text(L("没有匹配的 IPA。"))
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.muted)
+                    } else {
+                        // F2：页顶合计行（文件页合计行同款文案 + 样式）与清空全部。
+                        HStack(spacing: 8) {
+                            Text(L("%d 个 IPA · %@", manager.downloads.count, manager.totalSizeText))
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                            Spacer()
+                            // F-2 (0.9.161): one-tap old-version cleanup — the
+                            // count is read now, for the confirm box; nothing
+                            // to delete means the result line at once, no box.
+                            Button(L("Clean up old versions")) {
+                                let preview = manager.cleanupPreview()
+                                if preview.deletable.isEmpty {
+                                    cleanupResult = manager.cleanupOldVersions()
+                                } else {
+                                    pendingCleanup = (preview.deletable.count, preview.skipped)
+                                }
                             }
-                            .tint(Theme.accent)
-                            Button(role: .destructive) {
-                                // B-1 (0.9.160): read the renewal source now,
-                                // while the row is tapped — the confirm box
-                                // below warns from this, Files page
-                                // `renewalDeleteWarning` 同款（路径对上，或
-                                // 包名对上），不只按路径认。
-                                pendingDeleteRenewalName = RenewalSourceStore.source(
-                                    forFileURL: item.url,
-                                    bundleID: IPALibrary.appInfo(at: item.url)?.bundleID)?.appName
-                                pendingDelete = item
-                            } label: {
-                                Label(L("Delete"), systemImage: "trash")
-                            }
+                            .font(.subheadline.weight(.medium))
                             .disabled(manager.deletingID != nil)
+                            Button(L("清空全部")) {
+                                clearAllRenewalNames = manager.downloads.compactMap {
+                                    RenewalSourceStore.source(forFileURL: $0.url, bundleID: nil)?.appName
+                                }
+                                confirmingClearAll = true
+                            }
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Theme.negative)
+                            .disabled(manager.deletingID != nil)
+                        }
+                        ForEach(visibleDownloads) { item in
+                            Button { install(item) } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "shippingbox.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(Theme.brand)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(item.displayName)
+                                            .font(.subheadline.weight(.medium))
+                                            .lineLimit(1)
+                                        if let modified = item.modified {
+                                            let when = Self.dateText(for: modified)
+                                            Text(item.isImported ? L("Added %@", when) : L("Downloaded %@", when))
+                                                .font(.caption)
+                                                .foregroundStyle(Theme.muted)
+                                        }
+                                        // F-2 (0.9.164): how this file's version
+                                        // compares with the installed one.
+                                        if let tag = versionTag(for: item) {
+                                            Text(tag.text)
+                                                .font(.caption)
+                                                .foregroundStyle(tag.color)
+                                        }
+                                    }
+                                    Spacer()
+                                    Text(item.sizeText)
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(Theme.accent2)
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 4)
+                                        .background(Capsule().fill(Theme.accent.opacity(0.16)))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(installingID == item.id)
+                            .id(item.id)
+                            // F-3 (0.9.164): the revealed row's highlight; nil
+                            // keeps every other row on its default background.
+                            .listRowBackground(highlightedID == item.id ? Theme.accent.opacity(0.12) : nil)
+                            .swipeActions {
+                                // F3 (0.9.152): rename from here, Files page
+                                // rules (same alert, same validation).
+                                Button {
+                                    renameText = item.fileName
+                                    renameItem = item
+                                } label: {
+                                    Label(L("重命名"), systemImage: "pencil")
+                                }
+                                .tint(Theme.accent)
+                                Button(role: .destructive) {
+                                    // B-1 (0.9.160): read the renewal source now,
+                                    // while the row is tapped — the confirm box
+                                    // below warns from this, Files page
+                                    // `renewalDeleteWarning` 同款（路径对上，或
+                                    // 包名对上），不只按路径认。
+                                    pendingDeleteRenewalName = RenewalSourceStore.source(
+                                        forFileURL: item.url,
+                                        bundleID: IPALibrary.appInfo(at: item.url)?.bundleID)?.appName
+                                    pendingDelete = item
+                                } label: {
+                                    Label(L("Delete"), systemImage: "trash")
+                                }
+                                .disabled(manager.deletingID != nil)
+                            }
                         }
                     }
                 }
+                .listStyle(.plain)
+                // F-3 (0.9.164): a reveal request, or the refreshed list it
+                // was waiting on — both funnel into the same scroll.
+                .onChange(of: revealNonce) { _, _ in reveal(proxy) }
+                .onChange(of: manager.downloads) { _, _ in reveal(proxy) }
             }
-            .listStyle(.plain)
         }
         .navigationTitle(L("Download"))
         .navigationBarTitleDisplayMode(.inline)
@@ -676,6 +737,18 @@ struct DownloadsListView: View {
         // F-1 (0.9.159): an install that deleted its source IPA rescans
         // this list now, instead of waiting for the next time it's opened.
         .onReceive(NotificationCenter.default.publisher(for: Engine.downloadsChanged)) { _ in
+            manager.refresh()
+        }
+        // F-3 (0.9.164): a history row's "Show in Downloads" — clear the
+        // search (it would hide the file), then ask for the reveal; the
+        // scroll itself happens in the ScrollViewReader above, once the
+        // refreshed list holds the file.
+        .onReceive(NotificationCenter.default.publisher(for: Engine.revealDownload)) { note in
+            guard let path = note.userInfo?["url"] as? String else { return }
+            searchText = ""
+            highlightedID = nil
+            pendingRevealID = path
+            revealNonce += 1
             manager.refresh()
         }
         .alert(L("删除这个下载的 IPA？"), isPresented: Binding(
@@ -768,6 +841,8 @@ struct DownloadsListView: View {
     /// or refresh already running) leaves the reason on this page instead of
     /// opening the sheet.
     private func install(_ item: DownloadedIPA) {
+        // F-3 (0.9.164): the highlight has done its job once the row is tapped.
+        highlightedID = nil
         guard installingID == nil else {
             // U2 (0.9.145): the other rows stay tappable while one imports —
             // say so instead of silently ignoring the tap (the import itself

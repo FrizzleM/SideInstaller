@@ -1721,4 +1721,13 @@ let italianStrings: [String: String] = [
     "Checked %d hours ago": "Controllato %d ore fa",
     "Checked %d days ago": "Controllato %d giorni fa",
     "Pairing file installed into %@, but couldn't be written into %@.": "File di abbinamento installato in %@, ma impossibile scriverlo in %@.",
+
+    // 0.9.164
+    "Loop route": "Ripeti il percorso in loop",
+    "Newer than installed %@": "Più recente della versione installata %@",
+    "Older than installed %@": "Meno recente della versione installata %@",
+    "Same as installed %@": "Uguale alla versione installata %@",
+    "Show in Downloads": "Mostra in Download",
+    "Still installing — check the Install page for progress.": "Installazione ancora in corso — controlla la pagina Installazione per i progressi.",
+    "Installing — tap to cancel": "Installazione in corso — tocca per annullare",
 ]

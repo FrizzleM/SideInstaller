@@ -15,6 +15,14 @@ struct InstallHistoryView: View {
     /// F-3 (0.9.160): true while the reinstall-all loop runs; the
     /// button and the rows stay disabled until it lands.
     @State private var reinstallingAll = false
+    /// B-2 (0.9.164): the in-flight reinstall (single or all), so a stuck
+    /// wait can be cancelled from the toolbar instead of spinning forever.
+    /// Cancelling only stops watching — the install itself keeps going on
+    /// the Install page.
+    @State private var reinstallTask: Task<Void, Never>?
+    /// B-2 (0.9.164): how long a reinstall wait runs before giving up on
+    /// watching it — the install itself keeps going on the Install page.
+    private static let reinstallWaitTimeout: TimeInterval = 600
     /// Failure notice (no matching IPA, or a refused import).
     @State private var notice: String?
     /// Clear-history confirmation: true while the alert stands.
@@ -81,12 +89,38 @@ struct InstallHistoryView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(reinstallingID != nil)
+                // F-3 (0.9.164): reveal this entry's IPA in Downloads —
+                // swipe for it, or long-press the row. The row tap itself
+                // still reinstalls.
+                .swipeActions(edge: .trailing) {
+                    Button {
+                        locate(entry)
+                    } label: {
+                        Label(L("Show in Downloads"), systemImage: "magnifyingglass")
+                    }
+                    .tint(Theme.accent)
+                }
+                .contextMenu {
+                    Button {
+                        locate(entry)
+                    } label: {
+                        Label(L("Show in Downloads"), systemImage: "magnifyingglass")
+                    }
+                }
             }
         }
         .listStyle(.plain)
         .navigationTitle(L("Install history"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                // B-2 (0.9.164): the wait's only way out while a run hangs
+                // (no Wi-Fi mid-run, an unanswered 2FA prompt) — the run
+                // itself keeps going on the Install page.
+                if reinstallingID != nil || reinstallingAll {
+                    Button(L("Cancel")) { reinstallTask?.cancel() }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     reinstallAllFailed()
@@ -125,6 +159,19 @@ struct InstallHistoryView: View {
         }
     }
 
+    /// F-3 (0.9.164): jump to the Downloads tab with this entry's IPA
+    /// scrolled to and highlighted — the same `historyIPAURL` matcher the
+    /// reinstall uses, so a file the row can find is one the jump lands
+    /// on. No matching IPA means a notice, never a silent no-op.
+    private func locate(_ entry: InstallHistoryEntry) {
+        guard let url = engine.historyIPAURL(for: entry) else {
+            notice = L("Couldn't find %@ in Downloads. Download it again first.", entry.appName)
+            return
+        }
+        NotificationCenter.default.post(name: Engine.revealDownload, object: nil,
+                                        userInfo: ["url": url.path])
+    }
+
     /// F1: reinstall this entry from Downloads — the newest same-name IPA,
     /// or a notice telling the user to download it again first.
     /// B-1 (0.9.161): `reinstallFromHistory` returns when its run *starts*,
@@ -139,13 +186,32 @@ struct InstallHistoryView: View {
     private func reinstall(_ entry: InstallHistoryEntry) {
         guard reinstallingID == nil else { return }
         reinstallingID = entry.id
-        Task { @MainActor in
+        reinstallTask = Task { @MainActor in
+            defer { reinstallTask = nil }
             let started = await engine.reinstallFromHistory(entry)
+            if Task.isCancelled {
+                reinstallingID = nil
+                return
+            }
             if started {
-                while engine.isRunning, !Task.isCancelled {
+                // B-2 (0.9.164): bounded wait — the run can hang in
+                // `ensureNetwork` (Wi-Fi drops mid-run) or on an
+                // unanswered 2FA prompt, and the old loop had no timeout
+                // and no handle to cancel it, so the spinner spun forever
+                // and every other row stayed blocked behind
+                // `reinstallingID`. Ten minutes, then stop watching: the
+                // install itself keeps going on the Install page.
+                var waited = 0.0
+                while engine.isRunning, !Task.isCancelled, waited < Self.reinstallWaitTimeout {
                     try? await Task.sleep(for: .milliseconds(500))
+                    waited += 0.5
                 }
                 if Task.isCancelled {
+                    reinstallingID = nil
+                    return
+                }
+                if waited >= Self.reinstallWaitTimeout, engine.isRunning {
+                    notice = L("Still installing — check the Install page for progress.")
                     reinstallingID = nil
                     return
                 }
@@ -180,11 +246,16 @@ struct InstallHistoryView: View {
         let failed = entries.filter { !$0.success }
         guard !failed.isEmpty else { return }
         reinstallingAll = true
-        Task { @MainActor in
+        reinstallTask = Task { @MainActor in
+            defer { reinstallTask = nil }
             var succeeded = 0
             var failedCount = 0
             var skipped = 0
             var failedNames: [String] = []
+            // B-2 (0.9.164): a wait that outruns the timeout stops the
+            // loop — the run keeps going on the Install page, so the
+            // summary gives way to that notice instead.
+            var timedOut = false
             for entry in failed {
                 if Task.isCancelled { break }
                 guard engine.historyIPAURL(for: entry) != nil else {
@@ -193,11 +264,22 @@ struct InstallHistoryView: View {
                 }
                 reinstallingID = entry.id
                 let started = await engine.reinstallFromHistory(entry)
+                if Task.isCancelled {
+                    reinstallingID = nil
+                    break
+                }
                 if started {
-                    while engine.isRunning, !Task.isCancelled {
+                    var waited = 0.0
+                    while engine.isRunning, !Task.isCancelled, waited < Self.reinstallWaitTimeout {
                         try? await Task.sleep(for: .milliseconds(500))
+                        waited += 0.5
                     }
                     if Task.isCancelled {
+                        reinstallingID = nil
+                        break
+                    }
+                    if waited >= Self.reinstallWaitTimeout, engine.isRunning {
+                        timedOut = true
                         reinstallingID = nil
                         break
                     }
@@ -220,6 +302,10 @@ struct InstallHistoryView: View {
             }
             reinstallingAll = false
             entries = InstallHistoryStore.load()
+            if timedOut {
+                notice = L("Still installing — check the Install page for progress.")
+                return
+            }
             var summary = L("Reinstall all finished: %d succeeded, %d failed, %d skipped.", succeeded, failedCount, skipped)
             if !failedNames.isEmpty {
                 summary += " " + L("Failed: %@", failedNames.prefix(5).joined(separator: "、"))

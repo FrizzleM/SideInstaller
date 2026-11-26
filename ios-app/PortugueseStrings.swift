@@ -1712,4 +1712,13 @@ let portugueseStrings: [String: String] = [
     "Checked %d hours ago": "Verificado há %d horas",
     "Checked %d days ago": "Verificado há %d dias",
     "Pairing file installed into %@, but couldn't be written into %@.": "Ficheiro de emparelhamento instalado em %@, mas não foi possível escrevê-lo em %@.",
+
+    // 0.9.164
+    "Loop route": "Repetir a rota em ciclo",
+    "Newer than installed %@": "Mais recente que a instalada %@",
+    "Older than installed %@": "Mais antiga que a instalada %@",
+    "Same as installed %@": "Igual à instalada %@",
+    "Show in Downloads": "Mostrar em Downloads",
+    "Still installing — check the Install page for progress.": "Ainda a instalar — consulte a página de instalação para ver o progresso.",
+    "Installing — tap to cancel": "A instalar — toque para cancelar",
 ]

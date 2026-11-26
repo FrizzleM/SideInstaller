@@ -522,6 +522,13 @@ final class LocationManager: ObservableObject {
     /// The imported GPX route, drawn on the map until it's removed.
     @Published private(set) var route: GPXRoute?
     @Published var routeSpeed: RouteSpeed = .walk
+    /// F-1 (0.9.164): loop a playing route — when the end is reached, start
+    /// again from the first point instead of stopping there. Off by default,
+    /// so an untouched page behaves exactly as before; Shortcuts' Play GPX
+    /// Route can turn it on for one playback.
+    @Published var routeLoop = UserDefaults.standard.bool(forKey: "locationRouteLoop") {
+        didSet { UserDefaults.standard.set(routeLoop, forKey: "locationRouteLoop") }
+    }
     /// Set while a route is playing.
     @Published private(set) var routeProgress: RouteProgress?
     @Published private(set) var isImportingRoute = false
@@ -888,7 +895,8 @@ final class LocationManager: ObservableObject {
 
     /// Sets the location to the route's first point, then moves it along the
     /// route: a GPX route at `routeSpeed`, a planned one at each road's speed.
-    /// At the end it stays on the last point.
+    /// At the end it stays on the last point — or starts again from the
+    /// first one when looping is on (F-1, 0.9.164).
     ///
     /// Sets up first, like `simulate`.
     func playRoute() {
@@ -955,9 +963,11 @@ final class LocationManager: ObservableObject {
     /// last point that went through, as StikDebug does.
     private func startPlayback(_ timeline: RouteTimeline) {
         stopResending()
-        let started = Date()
         routeProgress = RouteProgress(elapsed: 0, duration: timeline.duration)
         playbackTask = Task { [weak self] in
+            // Local to this task, so looping back just resets it — no
+            // captured var is mutated across the task boundary.
+            var started = Date()
             while true {
                 try? await Task.sleep(for: .seconds(Self.playbackTick))
                 guard let self, !Task.isCancelled else { return }
@@ -983,6 +993,15 @@ final class LocationManager: ObservableObject {
                 self.routeProgress = RouteProgress(elapsed: elapsed, duration: timeline.duration,
                                                    segment: timeline.segment(at: elapsed))
                 if elapsed >= timeline.duration {
+                    // F-1 (0.9.164): looping restarts from the first point
+                    // instead of stopping — the switch is read here, so
+                    // turning it on mid-route takes effect at the end.
+                    if self.routeLoop {
+                        started = Date()
+                        self.routeProgress = RouteProgress(elapsed: 0, duration: timeline.duration)
+                        self.engine.log("Location: route finished — looping back to the start.")
+                        continue
+                    }
                     self.endPlayback()
                     self.lastError = nil
                     self.lastSuccess = L("Route finished. The device stays at its last point.")
@@ -2068,6 +2087,13 @@ struct LocationView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+
+            // F-1 (0.9.164): the loop switch stays live while playing — it
+            // is read when the end is reached, so turning it on mid-route
+            // loops, and turning it off stops at the end.
+            Toggle(L("Loop route"), isOn: $manager.routeLoop)
+                .font(.subheadline)
+                .tint(Theme.accent)
         } else {
             Button { manager.playRoute() } label: {
                 HStack(spacing: 8) {
@@ -2082,6 +2108,12 @@ struct LocationView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(!canSetLocation)
+
+            // F-1 (0.9.164): loop the route from the start when it ends,
+            // instead of stopping at the last point. Off by default.
+            Toggle(L("Loop route"), isOn: $manager.routeLoop)
+                .font(.subheadline)
+                .tint(Theme.accent)
         }
     }
 

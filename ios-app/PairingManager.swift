@@ -68,6 +68,16 @@ final class PairingManager: ObservableObject {
     /// `Engine.pairingPIN`. Drops the device link, which a re-pair invalidates.
     func generate() {
         guard !isBusy else { return }
+        // B-3 (0.9.164): `generateForPage` refuses while an install runs,
+        // but this page's Generate only refused while its own work ran —
+        // starting one now would drop the install's device link when
+        // `pairThisDevice` disconnects at the end, so refuse the same way.
+        // (0.9.163's B-3 only skipped that disconnect at the end; this
+        // closes the race while generation is in progress.)
+        guard !engine.isRunning else {
+            lastError = L("An install is already running. Wait for it to finish, then try again.")
+            return
+        }
         lastError = nil
         lastSuccess = nil
         isGenerating = true

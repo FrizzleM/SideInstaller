@@ -1639,4 +1639,13 @@ let turkishStrings: [String: String] = [
     "Checked %d hours ago": "%d saat önce denetlendi",
     "Checked %d days ago": "%d gün önce denetlendi",
     "Pairing file installed into %@, but couldn't be written into %@.": "Eşleştirme dosyası %@ içine yüklendi, ancak %@ içine yazılamadı.",
+
+    // 0.9.164
+    "Loop route": "Rotayı döngüde oynat",
+    "Newer than installed %@": "Yüklü %@ sürümünden daha yeni",
+    "Older than installed %@": "Yüklü %@ sürümünden daha eski",
+    "Same as installed %@": "Yüklü %@ ile aynı",
+    "Show in Downloads": "İndirilenlerde göster",
+    "Still installing — check the Install page for progress.": "Hâlâ yükleniyor — ilerlemeyi Yükleme sayfasından kontrol edin.",
+    "Installing — tap to cancel": "Yükleniyor — iptal için dokunun",
 ]

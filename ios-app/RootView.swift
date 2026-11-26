@@ -174,6 +174,11 @@ struct RootView: View {
                 .tag(Page.settings)
         }
         .environmentObject(certWorkspace)
+        // F-3 (0.9.164): a history row's "Show in Downloads" — switch to the
+        // Downloads tab; DownloadsListView scrolls to the file itself.
+        .onReceive(NotificationCenter.default.publisher(for: Engine.revealDownload)) { _ in
+            page = .downloads
+        }
         // U-UI：文件页/源页把 IPA 交给企业证书页时（CertWorkspace.openEnterpriseSign），
         // 切到设置 tab 并让企业区自动打开；标志由这里清掉，只触发一次。
         .onChange(of: certWorkspace.openEnterpriseSign) { _, open in

@@ -1686,4 +1686,13 @@ let koreanStrings: [String: String] = [
     "Checked %d hours ago": "%d시간 전에 확인함",
     "Checked %d days ago": "%d일 전에 확인함",
     "Pairing file installed into %@, but couldn't be written into %@.": "페어링 파일을 %@에 설치했지만 %@에는 쓸 수 없었습니다.",
+
+    // 0.9.164
+    "Loop route": "경로 반복 재생",
+    "Newer than installed %@": "설치된 %@보다 최신",
+    "Older than installed %@": "설치된 %@보다 이전 버전",
+    "Same as installed %@": "설치된 %@와 동일",
+    "Show in Downloads": "다운로드에서 보기",
+    "Still installing — check the Install page for progress.": "아직 설치 중입니다 — 진행 상황은 설치 페이지에서 확인하세요.",
+    "Installing — tap to cancel": "설치 중 — 탭하여 취소",
 ]

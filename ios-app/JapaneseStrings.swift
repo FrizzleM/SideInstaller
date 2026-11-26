@@ -1685,4 +1685,13 @@ let japaneseStrings: [String: String] = [
     "Checked %d hours ago": "%d 時間前に確認",
     "Checked %d days ago": "%d 日前に確認",
     "Pairing file installed into %@, but couldn't be written into %@.": "ペアリングファイルを %@ にインストールしましたが、%@ には書き込めませんでした。",
+
+    // 0.9.164
+    "Loop route": "ルートを繰り返し再生",
+    "Newer than installed %@": "インストール済み %@ より新しい",
+    "Older than installed %@": "インストール済み %@ より古い",
+    "Same as installed %@": "インストール済み %@ と同じ",
+    "Show in Downloads": "ダウンロードで表示",
+    "Still installing — check the Install page for progress.": "インストールは続行中です — 進捗はインストール画面で確認してください。",
+    "Installing — tap to cancel": "インストール中 — タップでキャンセル",
 ]

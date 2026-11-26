@@ -111,6 +111,10 @@ struct FilesTabView: View {
     /// 文件页安装的传输不再走它的 install()，只用 appendStepLog
     /// 记配对安装开始/完成/失败，证书页的诊断日志里能看到。
     @ObservedObject private var localInstall = LocalHTTPInstallServer.shared
+    /// F-2 (0.9.164): the installed apps, for the IPA row's newer/older tag —
+    /// the shared instance RootView already observes, so the tag follows
+    /// the device list without another load.
+    @ObservedObject private var appsManager = SideloadedAppsManager.shared
     /// IPA 文件行图标已试集合（键 = 路径#大小#修改时间，文件换了就重取，
     /// 不死循环重试）。图标本体在共享 ThumbnailCache 里（A-37-3），
     /// 本页只留一个 iconEpoch：批量写回/清旧图时 +1 触发重绘。
@@ -416,6 +420,18 @@ struct FilesTabView: View {
             parts.append(info.bundleID)
         }
         return parts.joined(separator: " | ")
+    }
+
+    /// F-2 (0.9.164): the installed-version comparison tag for an IPA row
+    /// (Downloads page 同款): the parsed info the row already loaded
+    /// decides the file's version; no info yet means no tag, not a guess.
+    private func installedVersionTag(for item: LocalFileItem) -> (text: String, color: Color)? {
+        guard item.isIPA,
+              let info = fileIPAInfo[item.url.path],
+              let fileVersion = info.version, !fileVersion.isEmpty,
+              !info.bundleID.isEmpty,
+              let installed = appsManager.installedVersion(forBundleID: info.bundleID) else { return nil }
+        return czfVersionComparisonTag(fileVersion: fileVersion, installedVersion: installed)
     }
 
     /// A-38-A1：IPA 行信息 + 图标一次解析（只取可见行，行 .task 触发）：
@@ -1731,6 +1747,14 @@ struct FilesTabView: View {
                             .font(.caption)
                             .foregroundStyle(Theme.muted)
                             .lineLimit(1)
+                        // F-2 (0.9.164): how this file's version compares
+                        // with the installed one.
+                        if let tag = installedVersionTag(for: item) {
+                            Text(tag.text)
+                                .font(.caption)
+                                .foregroundStyle(tag.color)
+                                .lineLimit(1)
+                        }
                         Text(item.name)
                             .font(.caption)
                             .foregroundStyle(Theme.muted)

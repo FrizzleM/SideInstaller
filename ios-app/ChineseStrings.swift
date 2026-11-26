@@ -1697,4 +1697,13 @@ let chineseStrings: [String: String] = [
     "Checked %d hours ago": "%d 小时前检查过",
     "Checked %d days ago": "%d 天前检查过",
     "Pairing file installed into %@, but couldn't be written into %@.": "配对文件已写入 %@，但没能写入 %@。",
+
+    // 0.9.164
+    "Loop route": "循环播放路线",
+    "Newer than installed %@": "比已装的 %@ 更新",
+    "Older than installed %@": "比已装的 %@ 更旧",
+    "Same as installed %@": "与已装的 %@ 相同",
+    "Show in Downloads": "在下载里查看",
+    "Still installing — check the Install page for progress.": "仍在安装——去安装页查看进度。",
+    "Installing — tap to cancel": "正在安装——点按可取消",
 ]

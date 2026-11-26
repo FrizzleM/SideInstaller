@@ -708,7 +708,13 @@ struct SourceAppsView: View {
             VStack(alignment: .trailing, spacing: 4) {
                 // 失败重试走原路：企业失败重试企业路（清 flag 后
                 // startCertInstall 里失败会重写），ID 失败维持原样。
+                // B-1 (0.9.164): the entry guards in `startInstall` /
+                // `startCertInstall` only let a row through when its state
+                // is nil, and nothing ever cleared `.failed` back to nil —
+                // the retry silently died in the guard. Clear it first,
+                // so the tap actually retries.
                 Button(L("Try again")) {
+                    states[app.id] = nil
                     if certFailedIDs.contains(app.id) {
                         startCertInstall(app)
                     } else {

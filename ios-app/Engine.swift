@@ -172,6 +172,11 @@ final class Engine {
     /// next time they're opened.
     static let downloadsChanged = Notification.Name("CZFDownloadsChanged")
 
+    /// F-3 (0.9.164): a history row asked to reveal its IPA in Downloads
+    /// (`userInfo["url"]` is the file path); RootView switches to the
+    /// Downloads tab and DownloadsListView scrolls to it.
+    static let revealDownload = Notification.Name("CZFRevealDownload")
+
     /// Answer the pairing-file mismatch popup: true replaces the pairing file.
     @MainActor
     func answerPairingImportMismatch(_ proceed: Bool) {
@@ -3159,6 +3164,11 @@ final class Engine {
     }
 
     /// 证书页入口：对指定 IPA 用企业证书签名（可带修改项）并安装。
+    /// B-3 (0.9.164): @MainActor — the `isGenerating` guard below reads
+    /// PairingManager's main-actor state, as runOneClick does. The only
+    /// caller is the @MainActor no-arg entry above (which the cert page
+    /// calls), so no call site changes.
+    @MainActor
     func runEnterpriseCertInstall(ipaURL: URL, mods: CertSignMods) {
         guard !isRunning else {
             lastError = L("An install is already running. Wait for it to finish, then refresh.")
@@ -3168,6 +3178,14 @@ final class Engine {
         // 的 lastError/guide，否则被拦住的这次会报上一次的错。
         lastError = nil
         guide = nil
+        // B-3 (0.9.164): runOneClick refuses while a pairing file is being
+        // generated, but this entry didn't — starting now would lose the
+        // device link when generation disconnects at the end.
+        guard !PairingManager.shared.isGenerating else {
+            lastError = L("Pairing file is being generated. Wait for it to finish, then try again.")
+            log("⛔️ Pairing file is being generated — enterprise-cert install refused until it finishes, so the link isn't dropped mid-install.")
+            return
+        }
         guard osSupported else {
             lastError = L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
                           osVersionText, Engine.minimumTunnelOSText)
@@ -3215,9 +3233,9 @@ final class Engine {
         log("=== Starting enterprise-cert install ===")
 
         pipelineTask = Task { @MainActor in
-            // 修法：runStarted() 是 @MainActor（InstallActivity 类级隔离），
-            // 而本入口是非隔离同步函数——runOneClick 能直接调是因为它自己
-            // 带 @MainActor。放进 Task 头一句，仍在任何管线工作之前。
+            // runStarted() 是 @MainActor（InstallActivity 类级隔离），
+            // 本入口现也带 @MainActor（B-3，0.9.164）；Task 头一句仍在
+            // 任何管线工作之前，写法不动。
             InstallActivity.shared.runStarted()
             var outcome: InstallActivity.Outcome = .stopped
             var tunnelAcquired = false
@@ -3339,6 +3357,10 @@ final class Engine {
     }
 
     /// 已签名页入口：解包一个已签好的 IPA 直接安装（不再签一次）。
+    /// B-3 (0.9.164): @MainActor — the `isGenerating` guard below reads
+    /// PairingManager's main-actor state, as runOneClick does. All callers
+    /// are main-actor (Files tab, signed-IPAs page), so no call site changes.
+    @MainActor
     func runInstallSignedIPA(ipaURL: URL) {
         guard !isRunning else {
             lastError = L("An install is already running. Wait for it to finish, then refresh.")
@@ -3348,6 +3370,14 @@ final class Engine {
         // 的 lastError/guide，否则被拦住的这次会报上一次的错。
         lastError = nil
         guide = nil
+        // B-3 (0.9.164): runOneClick refuses while a pairing file is being
+        // generated, but this entry didn't — starting now would lose the
+        // device link when generation disconnects at the end.
+        guard !PairingManager.shared.isGenerating else {
+            lastError = L("Pairing file is being generated. Wait for it to finish, then try again.")
+            log("⛔️ Pairing file is being generated — signed-IPA install refused until it finishes, so the link isn't dropped mid-install.")
+            return
+        }
         guard osSupported else {
             lastError = L("iOS %@ isn't supported — SideInstaller needs iOS %@ or later.",
                           osVersionText, Engine.minimumTunnelOSText)
@@ -3392,8 +3422,9 @@ final class Engine {
         log("=== Installing already-signed IPA ===")
 
         pipelineTask = Task { @MainActor in
-            // 修法：同企业路——runStarted() 是 @MainActor，本入口非隔离，
-            // 放进 Task 头一句，仍在任何管线工作之前。
+            // 修法：同企业路——runStarted() 是 @MainActor，本入口现也带
+            // @MainActor（B-3，0.9.164）；放进 Task 头一句，仍在任何管线
+            // 工作之前，写法不动。
             InstallActivity.shared.runStarted()
             var outcome: InstallActivity.Outcome = .stopped
             var tunnelAcquired = false

@@ -1719,4 +1719,13 @@ let vietnameseStrings: [String: String] = [
     "Checked %d hours ago": "Đã kiểm tra %d giờ trước",
     "Checked %d days ago": "Đã kiểm tra %d ngày trước",
     "Pairing file installed into %@, but couldn't be written into %@.": "Đã cài tệp ghép nối vào %@, nhưng không thể ghi vào %@.",
+
+    // 0.9.164
+    "Loop route": "Lặp lại tuyến đường",
+    "Newer than installed %@": "Mới hơn bản đã cài %@",
+    "Older than installed %@": "Cũ hơn bản đã cài %@",
+    "Same as installed %@": "Giống bản đã cài %@",
+    "Show in Downloads": "Hiển thị trong Tải xuống",
+    "Still installing — check the Install page for progress.": "Vẫn đang cài đặt — kiểm tra tiến trình trên trang Cài đặt.",
+    "Installing — tap to cancel": "Đang cài đặt — chạm để hủy",
 ]

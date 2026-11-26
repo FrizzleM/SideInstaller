@@ -363,6 +363,32 @@ enum ProfileMatcher {
     }
 }
 
+extension SideloadedAppsManager {
+    /// F-2 (0.9.164): the installed version of the app an IPA's bundle ID
+    /// belongs to — SourcesView's `installedVersion(for:)` matcher, shared
+    /// so the Downloads and Files rows tag the same way: the team suffix a
+    /// signature appends still counts as the same app.
+    func installedVersion(forBundleID bundleID: String) -> String? {
+        entries.first {
+            ProfileMatcher.installed($0.app.bundleID, isBuiltFrom: bundleID, teamID: nil)
+        }?.app.version
+    }
+}
+
+/// F-2 (0.9.164): the Downloads / Files row tag comparing a file's version
+/// with the installed one — newer / older / same, with the installed version
+/// named. The file version and the installed version are both required, so
+/// no tag is ever invented from a missing half.
+func czfVersionComparisonTag(fileVersion: String, installedVersion: String) -> (text: String, color: Color) {
+    if UpdateChecker.isNewer(fileVersion, than: installedVersion) {
+        return (L("Newer than installed %@", installedVersion), Theme.positive)
+    }
+    if UpdateChecker.isNewer(installedVersion, than: fileVersion) {
+        return (L("Older than installed %@", installedVersion), Theme.warning)
+    }
+    return (L("Same as installed %@", installedVersion), Theme.muted)
+}
+
 /// One app a refresh will act on: what is installed, and the IPA on disk it
 /// will be signed again from.
 struct RefreshJob: Identifiable, Equatable {
