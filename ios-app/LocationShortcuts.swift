@@ -344,7 +344,7 @@ struct PlayGPXRouteIntent: AppIntent, ForegroundContinuableIntent {
     @Parameter(title: "Loop",
                description: "When on, the route starts again from the beginning when it finishes, instead of stopping at the last point.",
                default: false)
-    var loop: Bool = false
+    var loop: Bool
 
     static var parameterSummary: some ParameterSummary {
         Summary("Play \(\.$file)") {
