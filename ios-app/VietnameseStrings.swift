@@ -1782,4 +1782,8 @@ let vietnameseStrings: [String: String] = [
     "全部更新进行中，等它跑完再安装。": "Đang cập nhật tất cả ứng dụng. Vui lòng đợi xong rồi mới cài đặt.",
     "其中 %d 个已跳过。": "Trong đó đã bỏ qua %d mục.",
 
+    // 0.9.178
+    "从未巡检": "Chưa từng chạy",
+    "上次自动续签：%@": "Lần tự động gia hạn gần nhất: %@",
+
 ]

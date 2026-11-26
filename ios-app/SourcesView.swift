@@ -977,11 +977,26 @@ struct SourceAppsView: View {
                 // two batch items and steal the slot, so wait the batch
                 // out too. The row's Cancel still stops the wait
                 // (`Task.isCancelled`).
-                while engine.isRunning || engine.batchUpdateRunning, !Task.isCancelled {
+                // B-3 (0.9.178): bounded at `Engine.installSlotWaitTimeout`
+                // (10 minutes, DownloadsManager's landed-retry wait 同款) —
+                // the old loop had no bound, so a slot that never frees
+                // left the row on `.queued` forever; a cancelled or
+                // timed-out wait drops the staged file through
+                // `discardInboxCopy` instead of orphaning it in tmp, and
+                // a timeout leaves its reason on the row.
+                var waited = 0.0
+                while (engine.isRunning || engine.batchUpdateRunning), !Task.isCancelled, waited < Engine.installSlotWaitTimeout {
                     try? await Task.sleep(for: .milliseconds(500))
+                    waited += 0.5
                 }
                 guard !Task.isCancelled else {
+                    Engine.discardInboxCopy(file)
                     states[app.id] = nil
+                    return
+                }
+                if waited >= Engine.installSlotWaitTimeout, engine.isRunning || engine.batchUpdateRunning {
+                    Engine.discardInboxCopy(file)
+                    states[app.id] = .failed(L("Timed out waiting for the install slot — the download was discarded. Try again."))
                     return
                 }
                 // The staged file already carries `expectedName`: the import
@@ -1378,11 +1393,23 @@ struct SourceAppsView: View {
                 // 在间隙里导入，批跑下一项导入时 `replaceCustomImport`
                 // 把刚交过去的文件逐出，企业页填表时文件已不在。等批
                 // 跑完再交；行内取消仍可停（`Task.isCancelled`）。
-                while engine.isRunning || engine.batchUpdateRunning, !Task.isCancelled {
+                // B-3 (0.9.178): startInstall 同款——600 秒上限 + 取消/
+                // 超时删暂存文件（`Engine.installSlotWaitTimeout`），
+                // 超时记失败行并进重试分流。
+                var waited = 0.0
+                while (engine.isRunning || engine.batchUpdateRunning), !Task.isCancelled, waited < Engine.installSlotWaitTimeout {
                     try? await Task.sleep(for: .milliseconds(500))
+                    waited += 0.5
                 }
                 guard !Task.isCancelled else {
+                    Engine.discardInboxCopy(file)
                     states[app.id] = nil
+                    return
+                }
+                if waited >= Engine.installSlotWaitTimeout, engine.isRunning || engine.batchUpdateRunning {
+                    Engine.discardInboxCopy(file)
+                    states[app.id] = .failed(L("Timed out waiting for the install slot — the download was discarded. Try again."))
+                    certFailedIDs.insert(app.id)
                     return
                 }
                 _ = await engine.importCustomIPA(from: file)

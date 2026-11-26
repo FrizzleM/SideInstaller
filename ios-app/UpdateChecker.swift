@@ -199,7 +199,9 @@ final class UpdateChecker: ObservableObject {
     private var selfUpdateTask: Task<Void, Never>?
     /// B-2 (0.9.164): how long the self-update wait runs before giving up
     /// on watching it — the install itself keeps going on the Install page.
-    private static let selfUpdateWaitTimeout: TimeInterval = 600
+    /// B-3 (0.9.178): now the shared `Engine.installSlotWaitTimeout`
+    /// (10 minutes), so every slot wait bounds the same way.
+    private static let selfUpdateWaitTimeout = Engine.installSlotWaitTimeout
 
     /// True when a newer version is confirmed AND its release asset is
     /// verified: the only state in which the version row (or the banner)
@@ -262,6 +264,17 @@ final class UpdateChecker: ObservableObject {
             }
             guard ok else {
                 selfUpdateError = engine.lastError
+                isSelfUpdating = false
+                selfUpdateTask = nil
+                return
+            }
+            // B-2 (0.9.178): re-check the batch guard AFTER the import —
+            // the tap-time guard above passed, but an update-all batch
+            // may have started during the download; starting the run now
+            // would steal its slot. Say so (the tap-time reason) instead
+            // of running into it.
+            if engine.batchUpdateRunning {
+                selfUpdateError = L("全部更新进行中，等它跑完再更新。")
                 isSelfUpdating = false
                 selfUpdateTask = nil
                 return

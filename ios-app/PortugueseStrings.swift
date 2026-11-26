@@ -1777,4 +1777,8 @@ let portugueseStrings: [String: String] = [
     "全部更新进行中，等它跑完再安装。": "Uma atualização de todos os apps está em andamento. Aguarde terminar antes de instalar.",
     "其中 %d 个已跳过。": "Dos quais %d foram ignorados.",
 
+    // 0.9.178
+    "从未巡检": "Nunca realizada",
+    "上次自动续签：%@": "Última renovação automática: %@",
+
 ]

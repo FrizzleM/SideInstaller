@@ -77,7 +77,9 @@ struct InstallHistoryView: View {
     @State private var reinstallTask: Task<Void, Never>?
     /// B-2 (0.9.164): how long a reinstall wait runs before giving up on
     /// watching it — the install itself keeps going on the Install page.
-    private static let reinstallWaitTimeout: TimeInterval = 600
+    /// B-3 (0.9.178): now the shared `Engine.installSlotWaitTimeout`
+    /// (10 minutes), so every slot wait bounds the same way.
+    private static let reinstallWaitTimeout = Engine.installSlotWaitTimeout
     /// Failure notice (no matching IPA, or a refused import).
     @State private var notice: String?
     /// Clear-history confirmation: true while the alert stands.

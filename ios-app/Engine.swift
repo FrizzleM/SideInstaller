@@ -496,6 +496,16 @@ final class Engine {
     /// cross-source) set it, and it also bars the other batch starting.
     var batchUpdateRunning: Bool = false
 
+    /// B-3 (0.9.178): how long a landed download waits for the install
+    /// slot before giving up — 10 minutes. The single home for the
+    /// bound every slot wait shares (`DownloadsManager.retryWaitTimeout`,
+    /// `UpdateChecker.selfUpdateWaitTimeout`,
+    /// `InstallHistoryView.reinstallWaitTimeout`, and the source page's
+    /// two slot waits): the install itself keeps going, only the wait
+    /// gives up, and a cancelled or timed-out wait drops the staged file
+    /// through `discardInboxCopy` instead of orphaning it in tmp.
+    static let installSlotWaitTimeout: TimeInterval = 600
+
     /// 本次安装会话的归属凭证：三条管线起跑时（resetRun 之后、
     /// isRunning = true 之前）各 mint 一个新 UUID，resetRun 先把
     /// 旧值清掉，旧凭证从此再匹配不上。Engine 是单管线，isRunning

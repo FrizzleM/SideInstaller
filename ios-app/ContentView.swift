@@ -34,6 +34,14 @@ struct ContentView: View {
     /// Shows the "LocalDevVPN's tunnel can only be closed from LocalDevVPN"
     /// note when the pill is tapped with a LOC tunnel up.
     @State private var showLOCStopNote = false
+    /// F-1 (0.9.178): true while a manual update check from the banner is
+    /// in flight — the banner's "Try again" can't double-tap (AboutView's
+    /// `isCheckingUpdate` 同款；`UpdateChecker` has no in-flight flag).
+    @State private var isCheckingUpdate = false
+    /// The in-flight banner check, so a second tap can cancel it.
+    @State private var checkTask: Task<Void, Never>?
+    /// F-2 (0.9.178): true while the full release-notes sheet is up.
+    @State private var showingReleaseNotes = false
     /// The tunnel was closed by hand from the pill: the holder-only
     /// auto-reconnect must not pull it back up until it comes up again.
     @State private var tunnelManualOff = false
@@ -372,6 +380,22 @@ struct ContentView: View {
                         .foregroundStyle(Theme.accent)
                     }
                     .buttonStyle(.plain)
+                    // F-1 (0.9.178): the release is still being published —
+                    // re-run the check from here instead of sending the
+                    // user to About → Check for updates. A second tap
+                    // while one is in flight cancels it; the banner itself
+                    // reports the outcome, so nothing is stored here.
+                    if updateChecker.pendingRelease {
+                        Button {
+                            retryUpdateCheck()
+                        } label: {
+                            Text(isCheckingUpdate ? L("Checking for updates…") : L("Try again"))
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(Theme.accent)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isCheckingUpdate)
+                    }
                     // F-1 (0.9.176): 一键自更新——About 页 `startSelfUpdate`
                     // 同一条管线（0.9.143 搁置的一键选项至今没补），状态
                     // 已抽到 `UpdateChecker` 共享处，横幅上直接跑。只在
@@ -402,14 +426,31 @@ struct ContentView: View {
                 // F-1 (0.9.177): the verified newer release's notes —
                 // the same section as About; only when an install is
                 // actually offered.
+                // F-2 (0.9.178): tap it for the full notes — the preview
+                // is only the first 5 lines / ~500 chars, the complete
+                // `releaseNotes` had no consumer until this sheet.
                 if updateChecker.selfUpdateAvailable, let notes = updateChecker.releaseNotesPreview {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L("What's new"))
-                            .font(.footnote.weight(.semibold))
-                        Text(notes)
-                            .font(.footnote)
-                            .foregroundStyle(Theme.muted)
-                            .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        showingReleaseNotes = true
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(L("What's new"))
+                                    .font(.footnote.weight(.semibold))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.muted)
+                            }
+                            Text(notes)
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .sheet(isPresented: $showingReleaseNotes) {
+                        ReleaseNotesSheet(updateChecker: updateChecker)
                     }
                 }
                 if let error = updateChecker.selfUpdateError {
@@ -419,6 +460,24 @@ struct ContentView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+        }
+    }
+
+    /// F-1 (0.9.178): re-run the version check from the banner while the
+    /// release is pending — AboutView's `runUpdateCheck` 同款, minus the
+    /// status line: the banner itself reports the outcome, so there is
+    /// nothing to store here. A second tap while one is in flight cancels
+    /// it, and a cancelled check writes no outcome.
+    private func retryUpdateCheck() {
+        if isCheckingUpdate {
+            checkTask?.cancel()
+            return
+        }
+        isCheckingUpdate = true
+        checkTask = Task {
+            _ = await updateChecker.check(force: true)
+            isCheckingUpdate = false
+            checkTask = nil
         }
     }
 
@@ -2450,5 +2509,34 @@ enum AppIconMenuImage {
         let image = (renderer.uiImage ?? UIImage()).withRenderingMode(.alwaysOriginal)
         drawn[source] = image
         return image
+    }
+}
+
+/// F-2 (0.9.178): the full release notes behind the "What's new" preview —
+/// shared by the Install banner and About, so the two sections can't drift
+/// apart. The notes only ever describe a verified newer release
+/// (`UpdateChecker.releaseNotes`).
+struct ReleaseNotesSheet: View {
+    @ObservedObject var updateChecker: UpdateChecker
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                if let notes = updateChecker.releaseNotes {
+                    Text(notes)
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(20)
+                }
+            }
+            .navigationTitle(L("What's new"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L("Done")) { dismiss() }
+                }
+            }
+        }
     }
 }

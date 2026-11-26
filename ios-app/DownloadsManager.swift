@@ -396,10 +396,10 @@ struct DownloadsListView: View {
     /// F-3 (0.9.171): the failed-download retry in flight, if any.
     @State private var retryTask: Task<Void, Never>?
     /// B-2 (0.9.177): how long a landed retry waits for the install slot
-    /// before giving up — 10 minutes, the same bound as
-    /// `UpdateChecker.selfUpdateWaitTimeout` and
-    /// `InstallHistoryView.reinstallWaitTimeout`.
-    private static let retryWaitTimeout: TimeInterval = 600
+    /// before giving up — 10 minutes, the shared
+    /// `Engine.installSlotWaitTimeout` (B-3, 0.9.178), so every slot wait
+    /// bounds the same way.
+    private static let retryWaitTimeout = Engine.installSlotWaitTimeout
     /// B-1 (0.9.176): the failed row whose retry has downloaded and is
     /// waiting for the install slot (an install or a batch in its gap) —
     /// its row reads “等待中” meanwhile (single-source `.queued` 同款）.

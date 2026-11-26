@@ -18,6 +18,11 @@ final class AutoRefreshService {
     private static let lastRoundKey = "SIDAutoRefreshLastRound"
     private static let lastAlertKey = "SIDAutoRefreshLastAlert"
     private static let lastTickKey = "SIDAutoRefreshLastTick"
+    /// B-1 (0.9.178): when the last patrol round reached a decision
+    /// (nothing due / a refresh started). `lastTickKey` stays the 10-minute
+    /// dedup stamp — a skipped round must not move it (C26) — so the
+    /// Settings footer reads this one, not the dedup stamp.
+    private static let lastPatrolDecisionKey = "SIDAutoRefreshLastPatrolDecision"
 
     /// 巡检间隔：30 分钟。
     private static let checkInterval: UInt64 = 30 * 60 * 1_000_000_000
@@ -45,8 +50,13 @@ final class AutoRefreshService {
     /// stamping `lastTickKey`) and when the last automatic renewal
     /// round started (`lastRoundKey`) — read-only, for the Settings
     /// page's footer. Nil when that round never ran.
+    /// B-1 (0.9.178): the patrol date now reads the decision stamp
+    /// (`lastPatrolDecisionKey`), not the 10-minute dedup stamp — the
+    /// A-3 early return (nothing due from the in-memory list) is a
+    /// decision too, so it stamps as well; a nil stamp now truly means
+    /// no patrol round ever decided.
     var lastPatrolDate: Date? {
-        let t = UserDefaults.standard.double(forKey: Self.lastTickKey)
+        let t = UserDefaults.standard.double(forKey: Self.lastPatrolDecisionKey)
         return t > 0 ? Date(timeIntervalSince1970: t) : nil
     }
     var lastRoundDate: Date? {
@@ -146,11 +156,15 @@ final class AutoRefreshService {
         // 都是“无到期”。四条全满足才跳过；任一条不满足走下面的全量 load。
         // 跳过时直接 return true（与“无到期”同一返回值），不盖去重戳、
         // 不重排到期通知——下次真 load 时再排。
+        // B-1 (0.9.178): the decision stamp IS stamped here — "nothing
+        // due" is a decision, so the footer moves even when every round
+        // early-returns; only the 10-minute dedup stamp stays unstamped.
         if manager.hasLoaded,
            let lastRefreshed = manager.lastRefreshed,
            Date().timeIntervalSince(lastRefreshed) < 24 * 3600,
            manager.lastLoadFailed.map({ $0 < lastRefreshed }) ?? true,
            dueBundleIDs().isEmpty {
+            UserDefaults.standard.set(tickNow, forKey: Self.lastPatrolDecisionKey)
             return true
         }
 
@@ -215,7 +229,10 @@ final class AutoRefreshService {
         // C26：去重戳只在检查真正跑起来后才盖——盖在入口处会让隧道不通/
         // 清单失败的一轮也吃掉 10 分钟窗口（对照：lastRoundKey 在 :163
         // 确认真开跑才记）。hasLoaded 通过之后才算“这一轮真的查了”。
+        // B-1 (0.9.178): the decision stamp lands here too — the same
+        // round, the same decision point as the A-3 early return above.
         UserDefaults.standard.set(tickNow, forKey: Self.lastTickKey)
+        UserDefaults.standard.set(tickNow, forKey: Self.lastPatrolDecisionKey)
 
         // 到期通知排期：每轮巡检拿到新清单就重排一次（本地通知，
         // 不用服务器）；旧的先清掉，新的按到期日排。

@@ -79,6 +79,11 @@ struct SettingsView: View {
     /// F-2 (0.9.171): bumped when an ignored version is removed here,
     /// so the list below (read straight from UserDefaults) redraws.
     @State private var ignoredVersionsNonce = 0
+    /// B-1 (0.9.178): bumped when the page appears and every 60 seconds
+    /// after, so the auto-refresh footer below (read straight from
+    /// UserDefaults through `AutoRefreshService`, which is not an
+    /// ObservableObject) redraws — `ignoredVersionsNonce` 同款.
+    @State private var patrolFooterNonce = 0
     /// F-2 (0.9.171): true while the clear-all-ignored confirm stands.
     @State private var showingClearIgnoredConfirm = false
 
@@ -670,6 +675,15 @@ struct SettingsView: View {
         } footer: {
             autoRefreshFooter
         }
+        // B-1 (0.9.178): the footer reads UserDefaults straight through
+        // `AutoRefreshService` (not an ObservableObject), so nothing
+        // redraws it on its own — bump the nonce when the section
+        // appears and every 60 seconds after, so "x 分钟前" keeps up
+        // with a patrol that landed while the page stood open.
+        .onAppear { patrolFooterNonce += 1 }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            patrolFooterNonce += 1
+        }
     }
 
     /// 定位降级明示（Seal 同款）：定位没给“始终”时，巡检只有音频
@@ -684,19 +698,35 @@ struct SettingsView: View {
             }
             // F-3 (0.9.177): when the last patrol ran — only while the
             // switch is on; off means no patrol runs at all.
+            // F-3 (0.9.178): and when the last automatic renewal round
+            // started — same shape, same "—" when it never ran.
             if autoRefreshEnabled {
                 Text(lastPatrolText)
+                Text(lastRoundText)
             }
         }
     }
 
     /// F-3 (0.9.177): "上次巡检：x 分钟前" — the relative time is
-    /// `SourcesView.checkedText` 同款; no patrol yet reads "—".
+    /// `SourcesView.checkedText` 同款; no patrol yet reads "从未巡检".
+    /// B-1 (0.9.178): the nil copy is "从未巡检" now, not "—" — the
+    /// decision stamp is covered on every decision round, so a nil stamp
+    /// truly means no patrol ever ran.
     private var lastPatrolText: String {
         guard let last = AutoRefreshService.shared.lastPatrolDate else {
-            return L("上次巡检：%@", "—")
+            return L("上次巡检：%@", L("从未巡检"))
         }
         return L("上次巡检：%@", SourcesView.checkedText(for: last))
+    }
+
+    /// F-3 (0.9.178): "上次自动续签：x 分钟前" — `lastRoundDate` only
+    /// stamps when a renewal round really starts (6-hour cooldown), so
+    /// "—" here truly means it never automatically renewed.
+    private var lastRoundText: String {
+        guard let last = AutoRefreshService.shared.lastRoundDate else {
+            return L("上次自动续签：%@", "—")
+        }
+        return L("上次自动续签：%@", SourcesView.checkedText(for: last))
     }
 
     // MARK: Downloaded IPAs

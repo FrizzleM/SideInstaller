@@ -24,6 +24,8 @@ struct AboutView: View {
     @State private var checkTask: Task<Void, Never>?
     /// What the last manual update check found; nil until one runs.
     @State private var updateCheckStatus: UpdateChecker.CheckResult?
+    /// F-2 (0.9.178): true while the full release-notes sheet is up.
+    @State private var showingReleaseNotes = false
 
     var body: some View {
         NavigationStack {
@@ -132,14 +134,30 @@ struct AboutView: View {
                 // F-1 (0.9.177): the verified newer release's notes —
                 // the same section as the Install banner; only when an
                 // install is actually offered.
+                // F-2 (0.9.178): tap it for the full notes (the Install
+                // banner's `ReleaseNotesSheet` 同款).
                 if updateChecker.selfUpdateAvailable, let notes = updateChecker.releaseNotesPreview {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L("What's new"))
-                            .font(.subheadline.weight(.medium))
-                        Text(notes)
-                            .font(.footnote)
-                            .foregroundStyle(Theme.muted)
-                            .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        showingReleaseNotes = true
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(L("What's new"))
+                                    .font(.subheadline.weight(.medium))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.muted)
+                            }
+                            Text(notes)
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .sheet(isPresented: $showingReleaseNotes) {
+                        ReleaseNotesSheet(updateChecker: updateChecker)
                     }
                 }
             }

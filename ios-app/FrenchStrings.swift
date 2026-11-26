@@ -1792,4 +1792,8 @@ let frenchStrings: [String: String] = [
     "全部更新进行中，等它跑完再安装。": "Une mise à jour de toutes les apps est en cours. Attendez qu'elle se termine avant d'installer.",
     "其中 %d 个已跳过。": "Dont %d ignorées.",
 
+    // 0.9.178
+    "从未巡检": "Jamais vérifiée",
+    "上次自动续签：%@": "Dernier renouvellement automatique : %@",
+
 ]

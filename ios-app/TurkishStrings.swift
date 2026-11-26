@@ -1703,4 +1703,8 @@ let turkishStrings: [String: String] = [
     "全部更新进行中，等它跑完再安装。": "Tüm uygulamalar güncelleniyor. Kurmadan önce bitmesini bekleyin.",
     "其中 %d 个已跳过。": "Bunların %d tanesi atlandı.",
 
+    // 0.9.178
+    "从未巡检": "Hiç yapılmadı",
+    "上次自动续签：%@": "Son otomatik yenileme: %@",
+
 ]
