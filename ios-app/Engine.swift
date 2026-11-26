@@ -491,6 +491,12 @@ final class Engine {
     /// Set when the pipeline stops on an error; cleared on a new run.
     var lastError: String?
 
+    /// F-2 (0.9.160): the entitlements precheck's warning for this run
+    /// (a free Apple ID certificate can't provide some capabilities the
+    /// IPA asks for). A warning, not an error: the run goes on, and the
+    /// Install tab shows it in an alert; cleared by `resetRun`.
+    var installWarning: String?
+
     /// Set when a download falls back to a copy already in Documents; shown
     /// as a caption under the progress card, never a blocking error.
     var downloadFallbackNotice: String?
@@ -774,6 +780,7 @@ final class Engine {
             // Apple ID path reads nil, the other two set it after this.
             self.historyIdentityOverride = nil
             self.lastError = nil
+            self.installWarning = nil
             self.pendingInvalidLinkMessage = nil
             self.finished = false
             self.successClosed = false
@@ -813,6 +820,41 @@ final class Engine {
         return L("%@ needs iOS %@ or later. This iPhone runs iOS %@.", info.name, minOS, osText)
     }
 
+    /// F-2 (0.9.160): entitlement keys a free Apple ID certificate can't
+    /// provide, mapped to the name the warning shows. Grounded in the
+    /// repo, not from memory: `Entitlement.all`'s catalogue comment
+    /// names Push, iCloud and Associated Domains as the paid-only ones
+    /// left out of what a free account can be granted, and `SideloadedApp`
+    /// notes `beta-reports-active` is granted only by App Store
+    /// distribution profiles. Every other key is deliberately NOT here:
+    /// the free catalogue (App Groups, Game Center, HealthKit, …) is
+    /// grantable, and an unknown key may be harmless — warn only on
+    /// what the code proves a free certificate can't give.
+    private static let paidOnlyEntitlementNames: [String: String] = [
+        "aps-environment": "Push Notifications",
+        "com.apple.developer.icloud-container-identifiers": "iCloud",
+        "com.apple.developer.ubiquity-container-identifiers": "iCloud",
+        "com.apple.developer.icloud-services": "iCloud",
+        "com.apple.developer.associated-domains": "Associated Domains",
+        "beta-reports-active": "TestFlight beta reports",
+    ]
+
+    /// F-2 (0.9.160): the paid-only capabilities the IPA at `url` asks
+    /// for, from the Entitlements in its `embedded.mobileprovision`
+    /// (`IPALibrary.embeddedProvisionData` + `ProvisioningProfile`,
+    /// the same single-entry read `provisionTeamID` uses — no full
+    /// unpack). An unsigned IPA's profile is its original signing's,
+    /// the only capability signal the file carries; no profile, or an
+    /// unreadable one, means nothing is known, so no warning — never a
+    /// guess. Boilerplate keys never reach here: `capabilityKeys`
+    /// already filters `application-identifier`, the team id, the
+    /// keychain groups and `get-task-allow`.
+    static func unsupportedEntitlements(inIPA url: URL) -> [String] {
+        guard let data = IPALibrary.embeddedProvisionData(inIPA: url),
+              let profile = ProvisioningProfile(data: data) else { return [] }
+        return Array(Set(profile.capabilityKeys.compactMap { paidOnlyEntitlementNames[$0] })).sorted()
+    }
+
     /// B4 (0.9.158): the signer the history records for the two installs
     /// that never sign in with an Apple ID (enterprise-cert and
     /// already-signed): the active enterprise profile's name. No profile:
@@ -830,6 +872,10 @@ final class Engine {
     @MainActor
     func runOneClick(afterProbe: Bool = false) {
         guard !isRunning else { return }
+        // F-2 (0.9.160): the last run's precheck warning goes with it —
+        // the early guards below return before resetRun runs, so a stale
+        // warning would otherwise pop on a run that never started.
+        installWarning = nil
         // Nothing downstream works on an older iOS.
         guard osSupported else {
             log("⛔️ iOS \(osVersionText) isn't supported — SideInstaller needs iOS \(Engine.minimumTunnelOSText) or later.")
@@ -873,6 +919,20 @@ final class Engine {
             lastError = reason
             log("⛔️ \(reason)")
             return
+        }
+        // F-2 (0.9.160): entitlements precheck — warn, don't block. A
+        // free certificate signs the app either way, but capabilities it
+        // can't provide fail silently after install (push never arrives,
+        // iCloud never syncs), so say so up front while the run is
+        // starting instead of letting the user find out later. Only the
+        // custom path has an IPA to read; the built-in sources are
+        // SideInstaller's own builds.
+        if installSource == .custom, let entry = IPALibrary.customImport() {
+            let missing = Self.unsupportedEntitlements(inIPA: entry.url)
+            if !missing.isEmpty {
+                installWarning = L("This IPA asks for %@, which a free Apple ID certificate can't provide. Those features will silently stop working after install.", missing.joined(separator: ", "))
+                log("⚠️ Entitlements precheck: \(missing.joined(separator: ", ")) not available on a free certificate.")
+            }
         }
         // The install runs over the loopback tunnel, so require it up front,
         // unless the run can start LocalDevVPN itself (see `ensureNetwork`).
@@ -2321,22 +2381,17 @@ final class Engine {
         }
     }
 
-    /// F1 (0.9.148): reinstall a history entry — find the newest IPA in the
-    /// Downloads library whose filename names the same app, import it as the
-    /// custom IPA and run the one-click pipeline. Returns false with
-    /// `lastError` set when no IPA matches (the user has to download it
-    /// again first) or the import refuses; a started run returns true.
-    /// The history entry keeps no IPA path, so matching is by name only:
-    /// the filename stem (or the build's display name) against the recorded
-    /// app name, best rank first, newest within a rank. `installSource` is
-    /// set to `.custom` only after the import succeeds (B-39-B2 同款）。
+    /// F-3 (0.9.160): the newest IPA in Downloads matching a history
+    /// entry, or nil when there is none to reinstall from. The
+    /// candidate search `reinstallFromHistory` used to inline; the
+    /// reinstall-all loop needs the same answer up front to tell "skip,
+    /// no IPA" apart from "tried and failed", so both call this one
+    /// matcher — a file the single path finds is one the loop counts
+    /// as present, and vice versa.
     @MainActor
-    func reinstallFromHistory(_ entry: InstallHistoryEntry) async -> Bool {
+    func historyIPAURL(for entry: InstallHistoryEntry) -> URL? {
         let needle = entry.appName.lowercased()
-        guard !needle.isEmpty else {
-            lastError = L("Couldn't find %@ in Downloads. Download it again first.", entry.appName)
-            return false
-        }
+        guard !needle.isEmpty else { return nil }
         // Candidates: the library scan (known builds + the custom import)
         // plus any unrecognized IPA in Documents, whose filename is the
         // only name a hand-saved custom IPA has.
@@ -2355,15 +2410,29 @@ final class Engine {
                 candidates.append((url, modified, rank))
             }
         }
-        guard let match = candidates.sorted(by: { a, b in
+        return candidates.sorted(by: { a, b in
             if a.rank != b.rank { return a.rank < b.rank }
             return a.modified > b.modified
-        }).first else {
+        }).first?.url
+    }
+
+    /// F1 (0.9.148): reinstall a history entry — find the newest IPA in the
+    /// Downloads library whose filename names the same app, import it as the
+    /// custom IPA and run the one-click pipeline. Returns false with
+    /// `lastError` set when no IPA matches (the user has to download it
+    /// again first) or the import refuses; a started run returns true.
+    /// The history entry keeps no IPA path, so matching is by name only:
+    /// the filename stem (or the build's display name) against the recorded
+    /// app name, best rank first, newest within a rank. `installSource` is
+    /// set to `.custom` only after the import succeeds (B-39-B2 同款）。
+    @MainActor
+    func reinstallFromHistory(_ entry: InstallHistoryEntry) async -> Bool {
+        guard let matchURL = historyIPAURL(for: entry) else {
             lastError = L("Couldn't find %@ in Downloads. Download it again first.", entry.appName)
             log("⛔️ History reinstall: no IPA for \(entry.appName) in Downloads.")
             return false
         }
-        guard await importCustomIPA(from: match.url) else { return false }
+        guard await importCustomIPA(from: matchURL) else { return false }
         // B-39-B2 同款：源赋值移到导入成功之后——导入被拒时在途管线
         // 读到的仍是旧源，不会被改装 custom 槽里的旧 IPA。
         installSource = .custom

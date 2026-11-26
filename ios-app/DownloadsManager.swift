@@ -267,6 +267,11 @@ struct DownloadsListView: View {
     @Environment(Engine.self) private var engine
     @StateObject private var manager = DownloadsManager()
     @State private var pendingDelete: DownloadedIPA?
+    /// B-1 (0.9.160): the renewal-source app name for `pendingDelete`,
+    /// read when the Delete button is tapped (clear-all's
+    /// `clearAllRenewalNames` 同款：点按钮时读，不在每次 body 求值时
+    /// 读盘）— nil means this file isn't any app's renewal source.
+    @State private var pendingDeleteRenewalName: String?
     /// The download being renamed (F3, 0.9.152), with its name in the field.
     @State private var renameItem: DownloadedIPA?
     @State private var renameText = ""
@@ -438,6 +443,14 @@ struct DownloadsListView: View {
                             }
                             .tint(Theme.accent)
                             Button(role: .destructive) {
+                                // B-1 (0.9.160): read the renewal source now,
+                                // while the row is tapped — the confirm box
+                                // below warns from this, Files page
+                                // `renewalDeleteWarning` 同款（路径对上，或
+                                // 包名对上），不只按路径认。
+                                pendingDeleteRenewalName = RenewalSourceStore.source(
+                                    forFileURL: item.url,
+                                    bundleID: IPALibrary.appInfo(at: item.url)?.bundleID)?.appName
                                 pendingDelete = item
                             } label: {
                                 Label(L("Delete"), systemImage: "trash")
@@ -464,10 +477,24 @@ struct DownloadsListView: View {
             Button(L("Delete"), role: .destructive) {
                 if let item = pendingDelete { manager.delete(item) }
                 pendingDelete = nil
+                pendingDeleteRenewalName = nil
             }
-            Button(L("Cancel"), role: .cancel) { pendingDelete = nil }
+            Button(L("Cancel"), role: .cancel) {
+                pendingDelete = nil
+                pendingDeleteRenewalName = nil
+            }
         } message: {
-            Text(L("只删文件，不影响已装的 App。"))
+            // B-1 (0.9.160): a renewal source says so first — the old
+            // "只删文件，不影响已装的 App。" is wrong for exactly this
+            // file: deleting it leaves the next renewal with "no matching
+            // IPA". A file no app renews from keeps the old line, which
+            // is true for it. Wording is the Files page's single-delete
+            // warning, one source of truth for both pages.
+            if let name = pendingDeleteRenewalName {
+                Text(L("这是 %@ 续签用的文件，删了它下次就续不了，要重新导入 IPA 才能续。删除后无法恢复", name))
+            } else {
+                Text(L("只删文件，不影响已装的 App。"))
+            }
         }
         // F3 (0.9.152): rename alert, Files page 同款（标题/字段/保存/
         // 扩展名提示全复用那边的文案）。

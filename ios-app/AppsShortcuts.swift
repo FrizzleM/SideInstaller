@@ -298,10 +298,15 @@ struct InstallIPAIntent: AppIntent {
             try Shortcuts.requireNoInstall()
             let copy = try Shortcuts.temporaryCopy(of: file, defaultName: "App.ipa")
             defer { Shortcuts.discard(copy) }
-            engine.installSource = .custom
             engine.lastError = nil
-            await engine.importCustomIPA(from: copy)
-            if let error = engine.lastError { throw ShortcutError(error) }
+            // B-2 (0.9.160): the app's own three paths set the source only
+            // after the import succeeds (B-39-B2) — a failed import used
+            // to leave the Install tab on Custom with nothing imported.
+            // Import first; only a success earns the source switch.
+            guard await engine.importCustomIPA(from: copy) else {
+                throw ShortcutError(engine.lastError ?? L("The install didn't start. Open SideInstaller to see why."))
+            }
+            engine.installSource = .custom
             return try await Shortcuts.install(named: engine.customIPAName ?? copy.lastPathComponent)
         }
         return .result(dialog: Shortcuts.dialog(message))
@@ -329,11 +334,14 @@ struct InstallIPAFromURLIntent: AppIntent {
         let message = try await Shortcuts.run("Install IPA from URL") { () -> String in
             let engine = Engine.shared
             try Shortcuts.requireNoInstall()
-            engine.installSource = .custom
             engine.lastError = nil
+            // B-2 (0.9.160): same as InstallIPAIntent above — the source
+            // switches to Custom only after the import succeeds, so a
+            // failed download leaves the Install tab on its old source.
             guard await engine.importCustomIPA(fromLink: link.absoluteString) else {
                 throw ShortcutError(engine.lastError ?? L("The install didn't start. Open SideInstaller to see why."))
             }
+            engine.installSource = .custom
             return try await Shortcuts.install(named: engine.customIPAName ?? link.lastPathComponent)
         }
         return .result(dialog: Shortcuts.dialog(message))

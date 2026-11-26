@@ -12,6 +12,9 @@ struct InstallHistoryView: View {
     @State private var entries: [InstallHistoryEntry] = []
     /// `id` of the entry whose reinstall is running, if any.
     @State private var reinstallingID: UUID?
+    /// F-3 (0.9.160): true while the reinstall-all loop runs; the
+    /// button and the rows stay disabled until it lands.
+    @State private var reinstallingAll = false
     /// Failure notice (no matching IPA, or a refused import).
     @State private var notice: String?
     /// Clear-history confirmation: true while the alert stands.
@@ -86,6 +89,14 @@ struct InstallHistoryView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    reinstallAllFailed()
+                } label: {
+                    Label(L("Reinstall all"), systemImage: "arrow.clockwise")
+                }
+                .disabled(!entries.contains(where: { !$0.success }) || reinstallingID != nil || reinstallingAll)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
                     confirmingClear = true
                 } label: {
                     Label(L("Clear"), systemImage: "trash")
@@ -128,6 +139,69 @@ struct InstallHistoryView: View {
             // the top — re-read, so it shows without leaving the page.
             if ok { entries = InstallHistoryStore.load() }
             reinstallingID = nil
+        }
+    }
+
+    /// F-3 (0.9.160): reinstall every failed entry, one at a time, in
+    /// list order. No IPA in Downloads means skip, not fail — the same
+    /// `historyIPAURL` matcher the single path uses decides, so the
+    /// loop's skip and the row's "download it again" never disagree.
+    /// `reinstallFromHistory` returns when its run *starts*, not when it
+    /// lands, so each started run is waited out (`Shortcuts.install`
+    /// 同款：`isRunning` 落袋再看 `finished`) before the next item
+    /// starts — otherwise the next import is refused for a run already
+    /// in flight. A run cancelled mid-loop stops the loop; the summary
+    /// counts only what actually ran.
+    private func reinstallAllFailed() {
+        guard reinstallingID == nil, !reinstallingAll else { return }
+        let failed = entries.filter { !$0.success }
+        guard !failed.isEmpty else { return }
+        reinstallingAll = true
+        Task { @MainActor in
+            var succeeded = 0
+            var failedCount = 0
+            var skipped = 0
+            var failedNames: [String] = []
+            for entry in failed {
+                if Task.isCancelled { break }
+                guard engine.historyIPAURL(for: entry) != nil else {
+                    skipped += 1
+                    continue
+                }
+                reinstallingID = entry.id
+                let started = await engine.reinstallFromHistory(entry)
+                if started {
+                    while engine.isRunning, !Task.isCancelled {
+                        try? await Task.sleep(for: .milliseconds(500))
+                    }
+                    if Task.isCancelled {
+                        reinstallingID = nil
+                        break
+                    }
+                    // installOneCustomIPA 同口径：降级拒绝是单项跳过
+                    // （批继续），跑完看 finished，失败只计数、不停批。
+                    if engine.downgradeDeclined {
+                        failedCount += 1
+                        failedNames.append(entry.appName)
+                    } else if engine.finished {
+                        succeeded += 1
+                    } else {
+                        failedCount += 1
+                        failedNames.append(entry.appName)
+                    }
+                } else {
+                    failedCount += 1
+                    failedNames.append(entry.appName)
+                }
+                reinstallingID = nil
+            }
+            reinstallingAll = false
+            entries = InstallHistoryStore.load()
+            var summary = L("Reinstall all finished: %d succeeded, %d failed, %d skipped.", succeeded, failedCount, skipped)
+            if !failedNames.isEmpty {
+                summary += " " + L("Failed: %@", failedNames.prefix(5).joined(separator: "、"))
+            }
+            notice = summary
         }
     }
 }

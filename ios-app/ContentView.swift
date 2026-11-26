@@ -654,6 +654,17 @@ struct ContentView: View {
         } message: {
             Text(L("安装要走 LocalDevVPN 的本地隧道。先装好 LocalDevVPN，之后点安装会自动打开它连接，不用手动开。"))
         }
+        // F-2 (0.9.160): the entitlements precheck's warning — a free
+        // certificate can't provide some capabilities this IPA asks for.
+        // Informational only: the run is already going, OK just clears it.
+        .alert(L("Before you install"), isPresented: Binding(
+            get: { engine.installWarning != nil },
+            set: { if !$0 { engine.installWarning = nil } }
+        )) {
+            Button(L("OK"), role: .cancel) { engine.installWarning = nil }
+        } message: {
+            Text(engine.installWarning ?? "")
+        }
         .onChange(of: engine.isRunning) { _, running in
             // A run that ended by itself leaves nothing to cancel.
             if !running { confirmingCancel = false }

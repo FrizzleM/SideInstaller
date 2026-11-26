@@ -1686,4 +1686,11 @@ let vietnameseStrings: [String: String] = [
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "Không đọc được phiên bản iOS của iPhone bên kia. Hãy kết nối lại rồi thử lại — cài đặt mà không biết phiên bản có thể cài ứng dụng mà iPhone của họ không chạy được.",
     "Development certificate expiring": "Chứng chỉ phát triển sắp hết hạn",
     "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "Chứng chỉ phát triển \"%@\" hết hạn vào %@. Hãy gia hạn kịp thời, nếu không quá trình cài đặt sẽ thất bại.",
+    "This IPA asks for %@, which a free Apple ID certificate can't provide. Those features will silently stop working after install.": "IPA này yêu cầu %@, mà chứng chỉ Apple ID miễn phí không thể cung cấp. Các tính năng đó sẽ âm thầm ngừng hoạt động sau khi cài đặt.",
+    "Before you install": "Trước khi cài đặt",
+    "Reinstall all": "Cài đặt lại tất cả",
+    "Reinstall all finished: %d succeeded, %d failed, %d skipped.": "Cài đặt lại tất cả xong: thành công %d, thất bại %d, đã bỏ qua %d.",
+    "Failed: %@": "Thất bại: %@",
+    "Still getting ready. Try again in a moment.": "Vẫn đang chuẩn bị. Hãy thử lại sau giây lát.",
+
 ]

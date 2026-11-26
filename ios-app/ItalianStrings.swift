@@ -1688,4 +1688,11 @@ let italianStrings: [String: String] = [
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "Non è stato possibile leggere la versione di iOS del loro iPhone. Riconnettiti e riprova: installare senza conoscerla potrebbe installare un’app che il loro iPhone non può eseguire.",
     "Development certificate expiring": "Certificato di sviluppo in scadenza",
     "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "Il certificato di sviluppo “%@” scade il %@. Rinnovalo in tempo, altrimenti le installazioni non riusciranno.",
+    "This IPA asks for %@, which a free Apple ID certificate can't provide. Those features will silently stop working after install.": "Questo IPA richiede %@, che un certificato Apple ID gratuito non può fornire. Queste funzioni smetteranno silenziosamente di funzionare dopo l'installazione.",
+    "Before you install": "Prima dell'installazione",
+    "Reinstall all": "Reinstalla tutto",
+    "Reinstall all finished: %d succeeded, %d failed, %d skipped.": "Reinstallazione completata: %d riuscite, %d non riuscite, %d ignorate.",
+    "Failed: %@": "Non riuscite: %@",
+    "Still getting ready. Try again in a moment.": "Preparazione in corso. Riprova tra un momento.",
+
 ]

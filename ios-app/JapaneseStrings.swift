@@ -1652,4 +1652,11 @@ let japaneseStrings: [String: String] = [
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "相手の iPhone の iOS バージョンを読み取れませんでした。再接続してもう一度お試しください。バージョンが分からないままインストールすると、相手の iPhone で動かないアプリが入るおそれがあります。",
     "Development certificate expiring": "開発用証明書の有効期限が近づいています",
     "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "開発用証明書「%@」は %@ に期限切れとなります。早めに更新してください。更新しないとインストールが失敗します。",
+    "This IPA asks for %@, which a free Apple ID certificate can't provide. Those features will silently stop working after install.": "この IPA は %@ を要求していますが、無料の Apple ID 証明書では提供できません。これらの機能はインストール後に通知なく動作しなくなります。",
+    "Before you install": "インストールの前に",
+    "Reinstall all": "すべて再インストール",
+    "Reinstall all finished: %d succeeded, %d failed, %d skipped.": "すべて再インストール完了：成功 %d 件、失敗 %d 件、スキップ %d 件。",
+    "Failed: %@": "失敗：%@",
+    "Still getting ready. Try again in a moment.": "準備中です。しばらくしてからもう一度お試しください。",
+
 ]

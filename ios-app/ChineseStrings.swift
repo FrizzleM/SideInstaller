@@ -1664,4 +1664,11 @@ let chineseStrings: [String: String] = [
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "读取不到对方 iPhone 的 iOS 版本。请重新连接再试——不知道版本就安装，可能会装上对方 iPhone 跑不了的应用。",
     "Development certificate expiring": "开发证书即将到期",
     "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "开发证书“%@”将于 %@ 到期。请及时更新，否则安装会失败。",
+    "This IPA asks for %@, which a free Apple ID certificate can't provide. Those features will silently stop working after install.": "这个 IPA 要求 %@，免费 Apple ID 证书提供不了这些能力，装完这些功能会静默失效。",
+    "Before you install": "安装前提醒",
+    "Reinstall all": "全部重装",
+    "Reinstall all finished: %d succeeded, %d failed, %d skipped.": "全部重装完成：成功 %d 个，失败 %d 个，跳过 %d 个。",
+    "Failed: %@": "失败：%@",
+    "Still getting ready. Try again in a moment.": "正在准备，稍后再试。",
+
 ]

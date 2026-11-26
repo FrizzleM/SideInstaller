@@ -1606,4 +1606,11 @@ let turkishStrings: [String: String] = [
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "Karşı tarafın iPhone'unun iOS sürümü okunamadı. Yeniden bağlanıp tekrar deneyin — sürümü bilmeden yüklemek, iPhone'larının çalıştıramayacağı bir uygulamayı yükleyebilir.",
     "Development certificate expiring": "Geliştirici sertifikasının süresi dolmak üzere",
     "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "“%@” geliştirici sertifikası %@ tarihinde sona eriyor. Zamanında yenileyin, yoksa kurulumlar başarısız olur.",
+    "This IPA asks for %@, which a free Apple ID certificate can't provide. Those features will silently stop working after install.": "Bu IPA %@ istiyor, ancak ücretsiz Apple ID sertifikası bunları sağlayamaz. Bu özellikler yüklemeden sonra sessizce çalışmayı durdurur.",
+    "Before you install": "Yüklemeden önce",
+    "Reinstall all": "Tümünü yeniden yükle",
+    "Reinstall all finished: %d succeeded, %d failed, %d skipped.": "Toplu yeniden yükleme bitti: %d başarılı, %d başarısız, %d atlandı.",
+    "Failed: %@": "Başarısız: %@",
+    "Still getting ready. Try again in a moment.": "Hâlâ hazırlanıyor. Birazdan yeniden deneyin.",
+
 ]

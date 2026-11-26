@@ -691,7 +691,13 @@ final class LocationManager: ObservableObject {
     /// Runs setup first if it hasn't finished (often the tunnel wasn't up when
     /// the page opened). Setup errors are shown to the user here.
     func simulate(_ coordinate: CLLocationCoordinate2D, name: String? = nil) {
-        guard !isBusy else { return }
+        // B5 (0.9.160): a tap while setup is still running used to die
+        // silently in the guard — say so in the popup instead of
+        // leaving the user to tap again, blind.
+        guard !isBusy else {
+            lastError = L("Still getting ready. Try again in a moment.")
+            return
+        }
         guard Self.isValid(coordinate) else {
             lastError = ErrorHelp.explained(L("That isn't a valid coordinate."))
             return
@@ -739,7 +745,12 @@ final class LocationManager: ObservableObject {
 
     /// Hand the device its real location back.
     func stop() {
-        guard !isBusy else { return }
+        // B5 (0.9.160): same as simulate above — a Reset tap mid-run
+        // says it's still getting ready instead of doing nothing.
+        guard !isBusy else {
+            lastError = L("Still getting ready. Try again in a moment.")
+            return
+        }
         isBusy = true
         lastError = nil
         lastSuccess = nil

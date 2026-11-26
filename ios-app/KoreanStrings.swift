@@ -1653,4 +1653,11 @@ let koreanStrings: [String: String] = [
     "Couldn't read their iPhone's iOS version. Reconnect and try again — installing without it could put an app their iPhone can't run on it.": "상대방 iPhone의 iOS 버전을 읽을 수 없습니다. 다시 연결한 후 시도하세요. 버전을 모른 채 설치하면 상대방 iPhone에서 실행할 수 없는 앱이 설치될 수 있습니다.",
     "Development certificate expiring": "개발 인증서 만료 임박",
     "The development certificate \"%@\" expires on %@. Renew it in time, or installs will fail.": "개발 인증서 \"%@\"이(가) %@에 만료됩니다. 제때 갱신하세요. 그렇지 않으면 설치가 실패합니다.",
+    "This IPA asks for %@, which a free Apple ID certificate can't provide. Those features will silently stop working after install.": "이 IPA는 %@를 요구하지만 무료 Apple ID 인증서로는 제공할 수 없습니다. 해당 기능은 설치 후 조용히 작동하지 않게 됩니다.",
+    "Before you install": "설치하기 전에",
+    "Reinstall all": "모두 다시 설치",
+    "Reinstall all finished: %d succeeded, %d failed, %d skipped.": "모두 다시 설치 완료: 성공 %d개, 실패 %d개, 건너뜀 %d개.",
+    "Failed: %@": "실패: %@",
+    "Still getting ready. Try again in a moment.": "아직 준비 중입니다. 잠시 후 다시 시도하세요.",
+
 ]

@@ -148,6 +148,10 @@ struct FilesTabView: View {
     @State private var batchInstallIndex = 0
     @State private var batchInstallTotal = 0
     @State private var batchInstallCurrent: String?
+    /// F-1 (0.9.160): the unsigned IPA being imported for Apple ID
+    /// install (`installUnsignedFile`); `id` is the file path, same as
+    /// the Downloads page's `installingID`.
+    @State private var installingFileID: String?
     // Mach-O 查看 / 局域网传输
     @State private var machoItem: LocalFileItem?
     /// ⓘ 详情 sheet 正在看的行。
@@ -515,6 +519,16 @@ struct FilesTabView: View {
                     if useIcons { Label(L("Install"), systemImage: "square.and.arrow.down") } else { Text(L("Install")) }
                 }
             }
+            if !item.isInSignedDir {
+                Button {
+                    CZFHaptics.impact(.light)
+                    installUnsignedFile(item)
+                    actionItem = nil
+                } label: {
+                    if useIcons { Label(L("Install"), systemImage: "square.and.arrow.down") } else { Text(L("Install")) }
+                }
+                .disabled(installingFileID != nil)
+            }
             Button {
                 CZFHaptics.impact(.light)
                 machoItem = item
@@ -633,6 +647,31 @@ struct FilesTabView: View {
             return
         }
         startEnterpriseInstall(ipaURL: item.url, record: nil)
+    }
+
+    /// F-1 (0.9.160): unsigned IPA → Apple ID install, the Downloads
+    /// page's `install(_:)` 同款：`importCustomIPA` 进安装页的 custom
+    /// 槽，成功就立 `sharedIPAReady`，RootView 打开安装 sheet——不
+    /// 用回安装页再选一次文件。导入被拒时原因写到页尾 opMessage，
+    /// 不开 sheet（`importCustomIPA` 自己的进行中守卫也拦第二路，
+    /// 这里的 `installingFileID` 只拦本页重复点）。
+    private func installUnsignedFile(_ item: LocalFileItem) {
+        guard installingFileID == nil else {
+            opMessage = L("An import is already running. Wait for it to finish, then try again.")
+            opFailed = true
+            return
+        }
+        installingFileID = item.id
+        Task { @MainActor in
+            let ok = await engine.importCustomIPA(from: item.url)
+            if ok {
+                engine.sharedIPAReady = true
+            } else if let error = engine.lastError {
+                opMessage = error
+                opFailed = true
+            }
+            installingFileID = nil
+        }
     }
 
     /// 文件页安装日志用的 App 名：记录名优先，现解析次之，文件名兜底；
