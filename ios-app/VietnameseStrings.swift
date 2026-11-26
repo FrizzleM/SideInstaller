@@ -1454,4 +1454,73 @@ let vietnameseStrings: [String: String] = [
     "The debugger lost %@ (%@). Open it with JIT again.":
         "Trình gỡ lỗi đã mất kết nối với %@ (%@). Hãy mở lại nó bằng JIT.",
     "Universal": "Phổ quát",
+
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "Tiếp theo, SideInstaller đăng nhập Apple, tải ứng dụng về và nhờ Apple ký nó, việc này cần internet.",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "Tiếp theo, SideInstaller đăng nhập Apple, việc này cần internet.",
+    "Next, Apple signs the app, which needs the internet.":
+        "Tiếp theo, Apple ký ứng dụng, việc này cần internet.",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "Tiếp theo, SideInstaller tải ảnh đĩa nhà phát triển về, việc này cần internet.",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "Tiếp theo, Apple ký ảnh đĩa nhà phát triển cho iPhone này, việc này cần internet.",
+    "Connect to a Wi-Fi network, then try again.":
+        "Hãy kết nối vào một mạng Wi-Fi rồi thử lại.",
+    "Try Mobile Data Mode?":
+        "Thử Chế độ dữ liệu di động?",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "iPhone này đang dùng dữ liệu di động, không phải Wi-Fi, và khi đó iOS không nhận kết nối mới từ LocalDevVPN.",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "Chế độ dữ liệu di động vượt qua điều đó bằng Chế độ máy bay: bạn bật nó khi SideInstaller kết nối và tắt lại khi SideInstaller cần internet. SideInstaller sẽ báo cho bạn khi nào.",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "Wi-Fi là cách ổn định, và an toàn hơn. Để dùng nó, hãy bật Wi-Fi rồi thử lại.",
+    "Try Mobile Data Mode":
+        "Thử Chế độ dữ liệu di động",
+    "Use Wi-Fi Instead":
+        "Dùng Wi-Fi",
+    "Turn on Airplane Mode":
+        "Bật Chế độ máy bay",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "Kết nối SideInstaller giữ lại đã đóng, nên cần một kết nối mới.",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "Mở Trung tâm điều khiển: vuốt xuống từ góc trên cùng bên phải màn hình.",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "Chạm vào Chế độ máy bay để bật. Để Wi-Fi tắt và LocalDevVPN vẫn kết nối.",
+    "Come back to SideInstaller. It carries on by itself.":
+        "Quay lại SideInstaller. Nó sẽ tự tiếp tục.",
+    "Then pair this iPhone with SideInstaller in Settings, as usual. If SideInstaller doesn't show up there, pairing doesn't work in Airplane Mode: cancel, and pair on Wi-Fi.":
+        "Sau đó ghép nối iPhone này với SideInstaller trong Cài đặt như thường lệ. Nếu SideInstaller không hiện ở đó, việc ghép nối không hoạt động ở Chế độ máy bay: hãy hủy và ghép nối qua Wi-Fi.",
+    "Connecting in Airplane Mode":
+        "Đang kết nối ở Chế độ máy bay",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "Giữ Chế độ máy bay bật cho đến khi SideInstaller bảo bạn tắt.",
+    "Turn off Airplane Mode":
+        "Tắt Chế độ máy bay",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "SideInstaller đã kết nối, và vẫn giữ kết nối khi dữ liệu di động trở lại.",
+    "Open Control Center again.":
+        "Mở lại Trung tâm điều khiển.",
+    "Tap Airplane Mode to turn it off.":
+        "Chạm vào Chế độ máy bay để tắt.",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "Quay lại SideInstaller. Nó sẽ tiếp tục khi dữ liệu di động trở lại.",
+    "You can turn off Airplane Mode":
+        "Bạn có thể tắt Chế độ máy bay",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "Hiện SideInstaller không cần Chế độ máy bay nữa, và vẫn giữ kết nối cho việc bạn làm tiếp theo. Tắt Chế độ máy bay bất cứ lúc nào bạn muốn.",
+    "Waiting for Airplane Mode…":
+        "Đang chờ Chế độ máy bay…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "Chế độ máy bay đã bật, nhưng LocalDevVPN chưa kết nối. Hãy mở nó và kết nối lại.",
+    "Waiting for mobile data…":
+        "Đang chờ dữ liệu di động…",
+    "This iPhone is on mobile data, not Wi-Fi. Continue in SideInstaller to try Mobile Data Mode, or connect to Wi-Fi and run this again.":
+        "iPhone này đang dùng dữ liệu di động, không phải Wi-Fi. Hãy tiếp tục trong SideInstaller để thử Chế độ dữ liệu di động, hoặc kết nối Wi-Fi rồi chạy lại.",
+    "Mobile data":
+        "Dữ liệu di động",
+    "Mobile Data Mode":
+        "Chế độ dữ liệu di động",
 ]

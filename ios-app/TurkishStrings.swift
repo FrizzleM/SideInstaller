@@ -1318,4 +1318,73 @@ let turkishStrings: [String: String] = [
     "The debugger lost %@ (%@). Open it with JIT again.":
         "Hata ayıklayıcı %@ ile bağlantıyı kaybetti (%@). Onu yeniden JIT ile aç.",
     "Universal": "Evrensel",
+
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "Sırada SideInstaller'ın Apple'da oturum açması, uygulamayı indirmesi ve Apple'a imzalatması var; bunun için internet gerekir.",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "Sırada SideInstaller'ın Apple'da oturum açması var; bunun için internet gerekir.",
+    "Next, Apple signs the app, which needs the internet.":
+        "Sırada Apple'ın uygulamayı imzalaması var; bunun için internet gerekir.",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "Sırada SideInstaller'ın geliştirici disk görüntüsünü indirmesi var; bunun için internet gerekir.",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "Sırada Apple'ın geliştirici disk görüntüsünü bu iPhone için imzalaması var; bunun için internet gerekir.",
+    "Connect to a Wi-Fi network, then try again.":
+        "Bir Wi-Fi ağına bağlan, sonra yeniden dene.",
+    "Try Mobile Data Mode?":
+        "Mobil Veri Modu denensin mi?",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "Bu iPhone Wi-Fi yerine mobil veri kullanıyor ve iOS bu durumda LocalDevVPN'den gelen yeni bağlantıları kabul etmiyor.",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "Mobil Veri Modu bunu Uçak Modu ile aşar: SideInstaller bağlanırken Uçak Modu'nu açarsın, SideInstaller'ın internete ihtiyacı olunca yeniden kapatırsın. Ne zaman olduğunu SideInstaller söyler.",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "Wi-Fi kararlı yoldur ve daha güvenlidir. Onu kullanmak için Wi-Fi'ı aç ve yeniden dene.",
+    "Try Mobile Data Mode":
+        "Mobil Veri Modu'nu dene",
+    "Use Wi-Fi Instead":
+        "Wi-Fi kullan",
+    "Turn on Airplane Mode":
+        "Uçak Modu'nu aç",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "SideInstaller'ın açık tuttuğu bağlantı kapandı, bu yüzden yeni bir bağlantı gerekiyor.",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "Denetim Merkezi'ni aç: ekranın sağ üst köşesinden aşağı kaydır.",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "Açmak için Uçak Modu'na dokun. Wi-Fi'ı kapalı, LocalDevVPN'i bağlı bırak.",
+    "Come back to SideInstaller. It carries on by itself.":
+        "SideInstaller'a geri dön. Kendiliğinden devam eder.",
+    "Then pair this iPhone with SideInstaller in Settings, as usual. If SideInstaller doesn't show up there, pairing doesn't work in Airplane Mode: cancel, and pair on Wi-Fi.":
+        "Ardından bu iPhone'u her zamanki gibi Ayarlar'da SideInstaller ile eşle. SideInstaller orada görünmezse Uçak Modu'nda eşleme çalışmaz: iptal et ve Wi-Fi'da eşle.",
+    "Connecting in Airplane Mode":
+        "Uçak Modu'nda bağlanıyor",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "SideInstaller kapatmanı isteyene kadar Uçak Modu'nu açık tut.",
+    "Turn off Airplane Mode":
+        "Uçak Modu'nu kapat",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "SideInstaller bağlandı ve mobil veri geri geldiğinde de bağlantısını korur.",
+    "Open Control Center again.":
+        "Denetim Merkezi'ni yeniden aç.",
+    "Tap Airplane Mode to turn it off.":
+        "Kapatmak için Uçak Modu'na dokun.",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "SideInstaller'a geri dön. Mobil veri gelince devam eder.",
+    "You can turn off Airplane Mode":
+        "Uçak Modu'nu kapatabilirsin",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "SideInstaller'ın şimdilik Uçak Modu'na ihtiyacı kalmadı ve sonraki işlerin için bağlantısını koruyor. Uçak Modu'nu istediğin zaman kapat.",
+    "Waiting for Airplane Mode…":
+        "Uçak Modu bekleniyor…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "Uçak Modu açık ama LocalDevVPN bağlı değil. Onu aç ve yeniden bağla.",
+    "Waiting for mobile data…":
+        "Mobil veri bekleniyor…",
+    "This iPhone is on mobile data, not Wi-Fi. Continue in SideInstaller to try Mobile Data Mode, or connect to Wi-Fi and run this again.":
+        "Bu iPhone Wi-Fi yerine mobil veri kullanıyor. Mobil Veri Modu'nu denemek için SideInstaller'da devam et ya da Wi-Fi'a bağlanıp bunu yeniden çalıştır.",
+    "Mobile data":
+        "Mobil veri",
+    "Mobile Data Mode":
+        "Mobil Veri Modu",
 ]

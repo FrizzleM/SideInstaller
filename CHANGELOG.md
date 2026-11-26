@@ -2,6 +2,17 @@
 
 All notable changes to SideInstaller are documented here.
 
+## Unreleased
+
+### Added
+- **Mobile Data Mode (beta).** On mobile data without Wi-Fi, iOS refuses new connections from
+  LocalDevVPN. When something you start needs one, SideInstaller now asks whether to try Mobile
+  Data Mode, or to use Wi-Fi, the stable and safer way. In Mobile Data Mode it has you turn on
+  Airplane Mode while it connects, and off again before anything that needs the internet, and
+  keeps the connection it opened instead of opening a new one each time. It covers installs,
+  refreshes, pairing, Location spoofing, JIT, Sideloaded apps, crash logs, Developer Mode and
+  the Shortcuts actions, so testing can show where it works.
+
 ## 2.3.0
 
 ### Added

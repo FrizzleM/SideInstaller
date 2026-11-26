@@ -73,7 +73,7 @@ final class PairingManager: ObservableObject {
         isGenerating = true
         Task {
             do {
-                try await pairThisDevice()
+                try await MobileDataMode.shared.run(.pairing) { try await pairThisDevice() }
                 lastSuccess = L("Pairing file ready. You can export it or install it into an app below.")
             } catch is CancellationError {
                 // User backed out — no error banner.
@@ -105,6 +105,12 @@ final class PairingManager: ObservableObject {
     /// Pairs this iPhone with itself while `isGenerating` holds up the code and
     /// the steps for Settings.
     private func pairThisDevice() async throws {
+        // On mobile data alone, Mobile Data Mode can try pairing in Airplane
+        // Mode, as the connections after it need.
+        if NetworkStatus.links().mobileDataOnly {
+            try await MobileDataMode.shared.prepareNewTunnel(forPairing: true)
+            MobileDataMode.shared.dialEnded(opened: false)
+        }
         _ = try await PairingController.shared.startAndWait()
         engine.connection.disconnect()
         targets = []
@@ -168,6 +174,9 @@ final class PairingManager: ObservableObject {
         engine.refreshNetworkStatus()
         guard !didAutoScan, !hasScanned, !isBusy, !engine.isRunning,
               engine.vpnConnected, pairingFileExists else { return }
+        // On mobile data alone a scan needs Mobile Data Mode, which only asks
+        // when the user taps Scan, unless its tunnel is still open.
+        guard !NetworkStatus.links().mobileDataOnly || MobileDataMode.shared.mayHaveOpenTunnel else { return }
         didAutoScan = true
         scan()
     }
@@ -179,8 +188,12 @@ final class PairingManager: ObservableObject {
         isScanning = true
         Task {
             do {
-                targets = try await engine.installedPairingTargets()
+                targets = try await MobileDataMode.shared.run(.pairing) {
+                    try await engine.installedPairingTargets()
+                }
                 hasScanned = true
+            } catch is CancellationError {
+                // Mobile Data Mode's popup was closed: nothing to report.
             } catch {
                 lastError = message(error)
             }
@@ -196,8 +209,12 @@ final class PairingManager: ObservableObject {
         installingTargetID = target.id
         Task {
             do {
-                try await engine.installPairing(into: target)
+                try await MobileDataMode.shared.run(.pairing) {
+                    try await engine.installPairing(into: target)
+                }
                 lastSuccess = L("Pairing file installed into %@.", target.name)
+            } catch is CancellationError {
+                // Mobile Data Mode's popup was closed: nothing to report.
             } catch {
                 lastError = message(error)
             }
@@ -215,10 +232,14 @@ final class PairingManager: ObservableObject {
         let all = targets
         Task {
             do {
-                try await engine.installPairing(intoAll: all)
+                try await MobileDataMode.shared.run(.pairing) {
+                    try await engine.installPairing(intoAll: all)
+                }
                 lastSuccess = all.count == 1
                     ? L("Pairing file installed into %@.", all[0].name)
                     : L("Pairing file installed into all %d apps.", all.count)
+            } catch is CancellationError {
+                // Mobile Data Mode's popup was closed: nothing to report.
             } catch {
                 lastError = message(error)
             }

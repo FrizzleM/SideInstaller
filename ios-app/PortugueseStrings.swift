@@ -1448,4 +1448,73 @@ let portugueseStrings: [String: String] = [
     "The debugger lost %@ (%@). Open it with JIT again.":
         "O depurador perdeu %@ (%@). Abra-o com JIT de novo.",
     "Universal": "Universal",
+
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "Agora o SideInstaller entra na Apple, baixa o app e faz a Apple assiná-lo, o que precisa da internet.",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "Agora o SideInstaller entra na Apple, o que precisa da internet.",
+    "Next, Apple signs the app, which needs the internet.":
+        "Agora a Apple assina o app, o que precisa da internet.",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "Agora o SideInstaller baixa a imagem de disco de desenvolvedor, o que precisa da internet.",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "Agora a Apple assina a imagem de disco de desenvolvedor para este iPhone, o que precisa da internet.",
+    "Connect to a Wi-Fi network, then try again.":
+        "Conecte-se a uma rede Wi-Fi e tente de novo.",
+    "Try Mobile Data Mode?":
+        "Experimentar o Modo Dados Celulares?",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "Este iPhone está usando dados celulares, não Wi-Fi, e nesse caso o iOS não aceita novas conexões do LocalDevVPN.",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "O Modo Dados Celulares contorna isso com o Modo Avião: você o ativa enquanto o SideInstaller se conecta e o desativa quando o SideInstaller precisa da internet. O SideInstaller avisa quando.",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "O Wi-Fi é o jeito estável, e o mais seguro. Para usá-lo, ative o Wi-Fi e tente de novo.",
+    "Try Mobile Data Mode":
+        "Experimentar o Modo Dados Celulares",
+    "Use Wi-Fi Instead":
+        "Usar Wi-Fi",
+    "Turn on Airplane Mode":
+        "Ative o Modo Avião",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "A conexão que o SideInstaller mantinha foi fechada, então ele precisa de uma nova.",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "Abra a Central de Controle: deslize para baixo a partir do canto superior direito da tela.",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "Toque em Modo Avião para ativá-lo. Deixe o Wi-Fi desligado e o LocalDevVPN conectado.",
+    "Come back to SideInstaller. It carries on by itself.":
+        "Volte ao SideInstaller. Ele continua sozinho.",
+    "Then pair this iPhone with SideInstaller in Settings, as usual. If SideInstaller doesn't show up there, pairing doesn't work in Airplane Mode: cancel, and pair on Wi-Fi.":
+        "Depois, pareie este iPhone com o SideInstaller em Ajustes, como de costume. Se o SideInstaller não aparecer lá, o pareamento não funciona no Modo Avião: cancele e pareie pelo Wi-Fi.",
+    "Connecting in Airplane Mode":
+        "Conectando no Modo Avião",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "Mantenha o Modo Avião ativado até o SideInstaller pedir para desativá-lo.",
+    "Turn off Airplane Mode":
+        "Desative o Modo Avião",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "O SideInstaller está conectado e mantém a conexão quando os dados celulares voltarem.",
+    "Open Control Center again.":
+        "Abra a Central de Controle de novo.",
+    "Tap Airplane Mode to turn it off.":
+        "Toque em Modo Avião para desativá-lo.",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "Volte ao SideInstaller. Ele continua assim que os dados celulares voltarem.",
+    "You can turn off Airplane Mode":
+        "Você pode desativar o Modo Avião",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "Por enquanto o SideInstaller não precisa mais do Modo Avião e mantém a conexão para o que você fizer depois. Desative o Modo Avião quando quiser.",
+    "Waiting for Airplane Mode…":
+        "Aguardando o Modo Avião…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "O Modo Avião está ativado, mas o LocalDevVPN não está conectado. Abra-o e conecte-o de novo.",
+    "Waiting for mobile data…":
+        "Aguardando os dados celulares…",
+    "This iPhone is on mobile data, not Wi-Fi. Continue in SideInstaller to try Mobile Data Mode, or connect to Wi-Fi and run this again.":
+        "Este iPhone está usando dados celulares, não Wi-Fi. Continue no SideInstaller para experimentar o Modo Dados Celulares, ou conecte-se ao Wi-Fi e execute esta ação de novo.",
+    "Mobile data":
+        "Dados celulares",
+    "Mobile Data Mode":
+        "Modo Dados Celulares",
 ]

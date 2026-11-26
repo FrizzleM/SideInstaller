@@ -1420,4 +1420,73 @@ let japaneseStrings: [String: String] = [
         "デバッガは %@ にアタッチできませんでした（%@）。デバッガがアタッチできるように署名する SideStore か SideInstaller で再インストールしてください。",
     "The debugger lost %@ (%@). Open it with JIT again.": "デバッガが %@ を見失いました（%@）。もう一度 JIT で開いてください。",
     "Universal": "ユニバーサル",
+
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "次に SideInstaller は Apple にサインインし、App をダウンロードして Apple に署名してもらいます。これにはインターネットが必要です。",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "次に SideInstaller は Apple にサインインします。これにはインターネットが必要です。",
+    "Next, Apple signs the app, which needs the internet.":
+        "次に Apple が App に署名します。これにはインターネットが必要です。",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "次に SideInstaller は Developer Disk Image をダウンロードします。これにはインターネットが必要です。",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "次に Apple がこの iPhone 用の Developer Disk Image に署名します。これにはインターネットが必要です。",
+    "Connect to a Wi-Fi network, then try again.":
+        "Wi-Fi ネットワークに接続してから、もう一度お試しください。",
+    "Try Mobile Data Mode?":
+        "モバイルデータモードを試しますか？",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "この iPhone は Wi-Fi ではなくモバイルデータ通信を使っています。その間 iOS は LocalDevVPN からの新しい接続を受け付けません。",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "モバイルデータモードは機内モードを使ってこれを回避します。SideInstaller が接続する間は機内モードをオンにし、SideInstaller がインターネットを必要とするときにオフに戻します。タイミングは SideInstaller が知らせます。",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "Wi-Fi が安定した方法で、より安全です。そちらを使うには、Wi-Fi をオンにしてもう一度お試しください。",
+    "Try Mobile Data Mode":
+        "モバイルデータモードを試す",
+    "Use Wi-Fi Instead":
+        "Wi-Fi を使う",
+    "Turn on Airplane Mode":
+        "機内モードをオンにする",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "SideInstaller が保っていた接続が閉じたため、新しい接続が必要です。",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "コントロールセンターを開きます：画面の右上隅から下にスワイプします。",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "機内モードをタップしてオンにします。Wi-Fi はオフのまま、LocalDevVPN は接続したままにしてください。",
+    "Come back to SideInstaller. It carries on by itself.":
+        "SideInstaller に戻ります。あとは自動で続きます。",
+    "Then pair this iPhone with SideInstaller in Settings, as usual. If SideInstaller doesn't show up there, pairing doesn't work in Airplane Mode: cancel, and pair on Wi-Fi.":
+        "そのあと、いつもどおり設定でこの iPhone を SideInstaller とペアリングします。そこに SideInstaller が表示されない場合、機内モードではペアリングできません。キャンセルして、Wi-Fi でペアリングしてください。",
+    "Connecting in Airplane Mode":
+        "機内モードで接続中",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "SideInstaller がオフにするよう知らせるまで、機内モードはオンのままにしてください。",
+    "Turn off Airplane Mode":
+        "機内モードをオフにする",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "SideInstaller は接続済みで、モバイルデータ通信が戻っても接続を保ちます。",
+    "Open Control Center again.":
+        "もう一度コントロールセンターを開きます。",
+    "Tap Airplane Mode to turn it off.":
+        "機内モードをタップしてオフにします。",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "SideInstaller に戻ります。モバイルデータ通信が戻ると続きます。",
+    "You can turn off Airplane Mode":
+        "機内モードをオフにできます",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "SideInstaller は今のところ機内モードを必要とせず、次の操作のために接続を保ちます。機内モードはいつでもオフにしてかまいません。",
+    "Waiting for Airplane Mode…":
+        "機内モードを待っています…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "機内モードはオンですが、LocalDevVPN が接続されていません。LocalDevVPN を開いて、もう一度接続してください。",
+    "Waiting for mobile data…":
+        "モバイルデータ通信を待っています…",
+    "This iPhone is on mobile data, not Wi-Fi. Continue in SideInstaller to try Mobile Data Mode, or connect to Wi-Fi and run this again.":
+        "この iPhone は Wi-Fi ではなくモバイルデータ通信を使っています。SideInstaller で続けてモバイルデータモードを試すか、Wi-Fi に接続してからもう一度実行してください。",
+    "Mobile data":
+        "モバイルデータ通信",
+    "Mobile Data Mode":
+        "モバイルデータモード",
 ]

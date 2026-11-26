@@ -37,6 +37,49 @@ final class DeviceConnection {
 
     var isConnected: Bool { adapter != nil && handshake != nil }
 
+    /// Set while Mobile Data Mode is on (`MobileDataMode`): `connect` then
+    /// keeps the tunnel open now, while it still answers, instead of opening a
+    /// new one, since on mobile data alone iOS refuses new ones.
+    static var keepsOpenTunnel: Bool {
+        get {
+            keepsOpenTunnelLock.lock()
+            defer { keepsOpenTunnelLock.unlock() }
+            return keepsOpenTunnelValue
+        }
+        set {
+            keepsOpenTunnelLock.lock()
+            keepsOpenTunnelValue = newValue
+            keepsOpenTunnelLock.unlock()
+        }
+    }
+    private static let keepsOpenTunnelLock = NSLock()
+    private static var keepsOpenTunnelValue = false
+
+    /// True when the tunnel open now still carries a new service connection:
+    /// lockdownd answers through it. iOS can close a tunnel without the
+    /// adapter noticing, so `isConnected` alone can't tell.
+    func tunnelAnswers() -> Bool {
+        guard let adapter, let handshake else { return false }
+        var client: OpaquePointer?
+        if let error = ffiError(lockdownd_connect_rsd(adapter, handshake, &client),
+                                "lockdownd_connect_rsd failed") {
+            Engine.shared.log("Mobile Data Mode: the open tunnel didn't take a new connection (\(error)).")
+            return false
+        }
+        guard let client else { return false }
+        defer { lockdownd_client_free(client) }
+        var value: plist_t?
+        let error = "ProductVersion".withCString { key in
+            ffiError(lockdownd_get_value(client, key, nil, &value), "lockdownd_get_value failed")
+        }
+        if let error {
+            Engine.shared.log("Mobile Data Mode: lockdownd didn't answer through the open tunnel (\(error)).")
+            return false
+        }
+        if let value { plist_free(value) }
+        return true
+    }
+
     struct FFIError: Error, CustomStringConvertible {
         let code: Int32
         let subCode: Int32
@@ -59,6 +102,10 @@ final class DeviceConnection {
         /// lockdown record opens a tunnel through the loopback there, only an
         /// RPPairing one.
         var lockdownRouteClosed = false
+        /// True when this iPhone's listener refused the connection because the
+        /// iPhone is on mobile data only (`NetworkStatus.Links.mobileDataOnly`),
+        /// which Mobile Data Mode gets round with Airplane Mode.
+        var refusedOnMobileData = false
         var description: String { advice }
         var errorDescription: String? { advice }
 
@@ -281,6 +328,16 @@ final class DeviceConnection {
     /// (`Engine.canMintLockdownRecord`).
     func connect(deviceIP: String, pairingFilePath: String, hostname: String = "SideInstaller",
                  allowLockdownMinting: Bool = true) throws {
+        // Mobile Data Mode keeps the tunnel open while it answers: a new one
+        // would be refused on mobile data alone. Only this iPhone's own, never
+        // another iPhone's (Side by Side, the one caller that can't mint).
+        if allowLockdownMinting, Self.keepsOpenTunnel, isConnected {
+            if tunnelAnswers() {
+                Engine.shared.log("Mobile Data Mode: reusing the tunnel that's open instead of opening a new one.")
+                return
+            }
+            Engine.shared.log("Mobile Data Mode: the tunnel that was kept doesn't answer any more, so a new one is needed.")
+        }
         let kind = PairingFileKind.of(path: pairingFilePath)
         guard kind.isUsable else {
             throw fail("\((pairingFilePath as NSString).lastPathComponent) isn't a pairing file: it carries neither a remote-pairing key pair nor a lockdown pair record.")
@@ -427,7 +484,8 @@ final class DeviceConnection {
                     kind: failure.kind,
                     advice: L("This iPhone is on mobile data, not Wi-Fi, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Connect to a Wi-Fi network, then try again.",
                               deviceIP, Int(port)),
-                    underlying: failure.raw)
+                    underlying: failure.raw,
+                    refusedOnMobileData: true)
             }
         }
         if findsMovedPort, let notThere = miss.notThere {

@@ -1422,4 +1422,73 @@ let koreanStrings: [String: String] = [
         "디버거가 %@ 앱에 연결하지 못했습니다(%@). 디버거가 연결할 수 있게 서명하는 SideStore나 SideInstaller로 다시 설치하세요.",
     "The debugger lost %@ (%@). Open it with JIT again.": "디버거가 %@ 앱과의 연결을 잃었습니다(%@). JIT로 다시 여세요.",
     "Universal": "유니버설",
+
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "다음으로 SideInstaller가 Apple에 로그인하고, 앱을 다운로드하고, Apple에서 서명을 받습니다. 여기에는 인터넷이 필요합니다.",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "다음으로 SideInstaller가 Apple에 로그인합니다. 여기에는 인터넷이 필요합니다.",
+    "Next, Apple signs the app, which needs the internet.":
+        "다음으로 Apple이 앱에 서명합니다. 여기에는 인터넷이 필요합니다.",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "다음으로 SideInstaller가 개발자 디스크 이미지를 다운로드합니다. 여기에는 인터넷이 필요합니다.",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "다음으로 Apple이 이 iPhone용 개발자 디스크 이미지에 서명합니다. 여기에는 인터넷이 필요합니다.",
+    "Connect to a Wi-Fi network, then try again.":
+        "Wi-Fi 네트워크에 연결한 뒤 다시 시도하세요.",
+    "Try Mobile Data Mode?":
+        "모바일 데이터 모드를 사용해 볼까요?",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "이 iPhone은 Wi-Fi가 아닌 모바일 데이터를 사용 중이며, 이때 iOS는 LocalDevVPN에서 오는 새 연결을 받지 않습니다.",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "모바일 데이터 모드는 에어플레인 모드로 이를 우회합니다. SideInstaller가 연결하는 동안 에어플레인 모드를 켜고, SideInstaller에 인터넷이 필요할 때 다시 끕니다. 언제 해야 하는지는 SideInstaller가 알려 줍니다.",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "Wi-Fi가 안정적인 방법이며 더 안전합니다. Wi-Fi를 사용하려면 Wi-Fi를 켜고 다시 시도하세요.",
+    "Try Mobile Data Mode":
+        "모바일 데이터 모드 사용해 보기",
+    "Use Wi-Fi Instead":
+        "Wi-Fi 사용",
+    "Turn on Airplane Mode":
+        "에어플레인 모드 켜기",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "SideInstaller가 유지하던 연결이 닫혀서 새 연결이 필요합니다.",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "제어 센터를 엽니다: 화면 오른쪽 상단 모서리에서 아래로 쓸어내립니다.",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "에어플레인 모드를 탭하여 켭니다. Wi-Fi는 끈 채로, LocalDevVPN은 연결된 채로 둡니다.",
+    "Come back to SideInstaller. It carries on by itself.":
+        "SideInstaller로 돌아옵니다. 나머지는 알아서 진행됩니다.",
+    "Then pair this iPhone with SideInstaller in Settings, as usual. If SideInstaller doesn't show up there, pairing doesn't work in Airplane Mode: cancel, and pair on Wi-Fi.":
+        "그런 다음 평소처럼 설정에서 이 iPhone을 SideInstaller와 페어링합니다. 설정에 SideInstaller가 보이지 않으면 에어플레인 모드에서는 페어링할 수 없으니, 취소하고 Wi-Fi에서 페어링하세요.",
+    "Connecting in Airplane Mode":
+        "에어플레인 모드에서 연결 중",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "SideInstaller가 끄라고 할 때까지 에어플레인 모드를 켠 채로 두세요.",
+    "Turn off Airplane Mode":
+        "에어플레인 모드 끄기",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "SideInstaller가 연결되었으며, 모바일 데이터가 돌아와도 연결을 유지합니다.",
+    "Open Control Center again.":
+        "제어 센터를 다시 엽니다.",
+    "Tap Airplane Mode to turn it off.":
+        "에어플레인 모드를 탭하여 끕니다.",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "SideInstaller로 돌아옵니다. 모바일 데이터가 돌아오면 계속 진행됩니다.",
+    "You can turn off Airplane Mode":
+        "에어플레인 모드를 꺼도 됩니다",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "SideInstaller는 지금은 에어플레인 모드가 더 필요하지 않으며, 다음 작업을 위해 연결을 유지합니다. 원할 때 에어플레인 모드를 끄세요.",
+    "Waiting for Airplane Mode…":
+        "에어플레인 모드를 기다리는 중…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "에어플레인 모드는 켜졌지만 LocalDevVPN이 연결되어 있지 않습니다. LocalDevVPN을 열고 다시 연결하세요.",
+    "Waiting for mobile data…":
+        "모바일 데이터를 기다리는 중…",
+    "This iPhone is on mobile data, not Wi-Fi. Continue in SideInstaller to try Mobile Data Mode, or connect to Wi-Fi and run this again.":
+        "이 iPhone은 Wi-Fi가 아닌 모바일 데이터를 사용 중입니다. SideInstaller에서 계속하여 모바일 데이터 모드를 사용해 보거나, Wi-Fi에 연결한 뒤 다시 실행하세요.",
+    "Mobile data":
+        "모바일 데이터",
+    "Mobile Data Mode":
+        "모바일 데이터 모드",
 ]
