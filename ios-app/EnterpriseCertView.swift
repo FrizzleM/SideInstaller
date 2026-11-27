@@ -1346,7 +1346,7 @@ struct EnterpriseCertView: View {
         .alert(L("签名提醒"), isPresented: $showingWarningAlert) {
             Button(L("继续签名")) {
                 if let kind = pendingSignKind, let url = pendingSignURL {
-                    executeSign(kind: kind, url: url, workspace.mods: pendingSignMods)
+                    executeSign(kind: kind, url: url, mods: pendingSignMods)
                 }
                 clearPendingSign()
             }
@@ -2007,7 +2007,7 @@ struct EnterpriseCertView: View {
                     warnings.append(expiry)
                 }
                 if warnings.isEmpty {
-                    self.executeSign(kind: kind, url: url, workspace.mods: currentMods)
+                    self.executeSign(kind: kind, url: url, mods: currentMods)
                 } else {
                     self.pendingWarnings = warnings
                     self.pendingSignKind = kind
