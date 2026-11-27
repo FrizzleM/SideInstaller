@@ -1755,4 +1755,9 @@ let japaneseStrings: [String: String] = [
     "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "Apple ID での署名は Bundle ID を「元の ID.チーム ID」に変更するため、2 つ目のアイコンとしてインストールされます。",
     "Update to %@ · %@": "%@ · %@ にアップデート",
 
+    // 0.9.182
+    "从未自动续签": "自動更新したことがない",
+    "粘贴": "貼り付け",
+    "Recent links": "最近のリンク",
+
 ]

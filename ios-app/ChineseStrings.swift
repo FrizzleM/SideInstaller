@@ -1767,4 +1767,9 @@ let chineseStrings: [String: String] = [
     "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "Apple ID 签名会把 Bundle ID 改成“原 ID.团队号”，装出第二个图标。",
     "Update to %@ · %@": "更新到 %@ · %@",
 
+    // 0.9.182
+    "从未自动续签": "从未自动续签",
+    "粘贴": "粘贴",
+    "Recent links": "最近链接",
+
 ]

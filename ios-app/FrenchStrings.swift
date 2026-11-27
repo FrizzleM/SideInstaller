@@ -1802,4 +1802,9 @@ let frenchStrings: [String: String] = [
     "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "La signature avec l'identifiant Apple modifie le Bundle ID en « ID d'origine.ID d'équipe » et installe une deuxième icône.",
     "Update to %@ · %@": "Mettre à jour vers %@ · %@",
 
+    // 0.9.182
+    "从未自动续签": "Jamais renouvelé automatiquement",
+    "粘贴": "Coller",
+    "Recent links": "Liens récents",
+
 ]

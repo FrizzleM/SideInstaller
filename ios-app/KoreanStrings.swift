@@ -1756,4 +1756,9 @@ let koreanStrings: [String: String] = [
     "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "Apple ID 서명은 Bundle ID를 “원본 ID.팀 ID”로 변경하므로 두 번째 아이콘으로 설치됩니다.",
     "Update to %@ · %@": "%@ · %@(으)로 업데이트",
 
+    // 0.9.182
+    "从未自动续签": "자동 갱신한 적 없음",
+    "粘贴": "붙여넣기",
+    "Recent links": "최근 링크",
+
 ]

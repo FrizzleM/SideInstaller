@@ -1713,4 +1713,9 @@ let turkishStrings: [String: String] = [
     "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "Apple ID ile imzalama, Bundle ID'yi “orijinal ID.ekip ID” olarak değiştirir ve ikinci bir simge olarak yüklenir.",
     "Update to %@ · %@": "%@ · %@ sürümüne güncelle",
 
+    // 0.9.182
+    "从未自动续签": "Hiç otomatik yenilenmedi",
+    "粘贴": "Yapıştır",
+    "Recent links": "Son bağlantılar",
+
 ]

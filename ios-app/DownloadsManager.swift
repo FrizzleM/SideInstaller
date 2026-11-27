@@ -709,8 +709,10 @@ struct DownloadsListView: View {
                             // or clear them all — the rows alone only
                             // offer one-at-a-time Try again / Remove, and
                             // a batch failure leaves several rows to work
-                            // through. Retry all needs at least two rows
-                            // (one row's Try again already does the job);
+                            // through. Retry all works from a single row
+                            // (B-3, 0.9.182: one failed row used to grey
+                            // it out, for no reason — the row's own Try
+                            // again is the same tap, just harder to find);
                             // while it runs the button is Cancel instead,
                             // so a tap stops after the current item. Clear
                             // all asks first (below), and never touches
@@ -729,7 +731,7 @@ struct DownloadsListView: View {
                                 // F-1 (0.9.175): 同 Try again——`isDownloading`
                                 // 不再锁 Retry all：重试进 FIFO 队列排队，
                                 // 行状态由队列里的 Queued 承接。
-                                .disabled(retryAllTask == nil && (downloader.failedDownloads.count < 2 || retryTask != nil || engine.isRunning || engine.batchUpdateRunning))
+                                .disabled(retryAllTask == nil && (downloader.failedDownloads.isEmpty || retryTask != nil || engine.isRunning || engine.batchUpdateRunning))
                                 Button(L("Clear all")) { confirmingClearFailed = true }
                                     .font(.caption)
                                     .disabled(retryTask != nil || retryAllTask != nil)

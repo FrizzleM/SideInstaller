@@ -1792,4 +1792,9 @@ let vietnameseStrings: [String: String] = [
     "Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon.": "Ký bằng ID Apple sẽ đổi Bundle ID thành “ID gốc.ID nhóm” nên ứng dụng được cài dưới dạng biểu tượng thứ hai.",
     "Update to %@ · %@": "Cập nhật lên %@ · %@",
 
+    // 0.9.182
+    "从未自动续签": "Chưa từng tự động gia hạn",
+    "粘贴": "Dán",
+    "Recent links": "Liên kết gần đây",
+
 ]

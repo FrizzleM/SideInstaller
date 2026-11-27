@@ -125,6 +125,13 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(AppBackground())
             .sheet(item: $editorTarget) { AccountEditor(target: $0) }
+            // B-1 (0.9.182): the About sheet lives here, at the body root
+            // next to the editor sheet — it used to hang off `aboutSection`
+            // deep inside the Form, and the live-refreshing activity-log
+            // area could drop it (S-3/S-9 同类：宿主太深，刷新顶掉 sheet)。
+            .sheet(isPresented: $showingAbout) {
+                AboutView()
+            }
             // Attached to the Form, apart from the download alert below, so the
             // two alerts don't conflict.
             .alert(L("Remove this Apple ID?"),
@@ -348,9 +355,6 @@ struct SettingsView: View {
                 .foregroundStyle(Theme.accent2)
         } header: {
             Text(L("About"))
-        }
-        .sheet(isPresented: $showingAbout) {
-            AboutView()
         }
     }
 
@@ -726,7 +730,8 @@ struct SettingsView: View {
             // F-3 (0.9.177): when the last patrol ran — only while the
             // switch is on; off means no patrol runs at all.
             // F-3 (0.9.178): and when the last automatic renewal round
-            // started — same shape, same "—" when it never ran.
+            // started — same shape, "从未自动续签" when it never ran
+            // (B-2, 0.9.182: a bare "—" says nothing).
             if autoRefreshEnabled {
                 Text(lastPatrolText)
                 Text(lastRoundText)
@@ -748,10 +753,13 @@ struct SettingsView: View {
 
     /// F-3 (0.9.178): "上次自动续签：x 分钟前" — `lastRoundDate` only
     /// stamps when a renewal round really starts (6-hour cooldown), so
-    /// "—" here truly means it never automatically renewed.
+    /// nil truly means it never automatically renewed.
+    /// B-2 (0.9.182): the nil copy is "从未自动续签" now, not "—" —
+    /// the last bare "—" placeholder in the app (lastPatrolText got the
+    /// same treatment in 0.9.178).
     private var lastRoundText: String {
         guard let last = AutoRefreshService.shared.lastRoundDate else {
-            return L("上次自动续签：%@", "—")
+            return L("上次自动续签：%@", L("从未自动续签"))
         }
         return L("上次自动续签：%@", SourcesView.checkedText(for: last))
     }

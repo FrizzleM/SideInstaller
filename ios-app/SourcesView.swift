@@ -32,6 +32,19 @@ struct SourcesView: View {
     /// U-UI：源列表搜索（名字含查询串，不区分大小写）。
     @State private var sourceSearchText = ""
 
+    /// F-2 (0.9.182): the clipboard's link, when it holds an http(s)
+    /// URL — ContentView's `clipboardLink` (0.9.181) 同款 gating, so
+    /// the alert's Paste button never offers plain text.
+    private var clipboardSourceLink: String? {
+        guard let text = UIPasteboard.general.string?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty else { return nil }
+        let lowered = text.lowercased()
+        guard lowered.hasPrefix("http://") || lowered.hasPrefix("https://"),
+              Engine.downloadLink(text) != nil else { return nil }
+        return text
+    }
+
     var body: some View {
         VStack(spacing: 12) {
             searchBar
@@ -159,6 +172,12 @@ struct SourcesView: View {
                 .textContentType(.URL)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+            // F-2 (0.9.182): one-tap paste of a copied source link —
+            // only when the clipboard holds an http(s) link; a bad link
+            // still goes through `addFailed` below, like a typed one.
+            if let link = clipboardSourceLink {
+                Button(L("粘贴")) { newSourceURL = link }
+            }
             Button(L("Add")) {
                 if store.addSource(newSourceURL) {
                     newSourceURL = ""

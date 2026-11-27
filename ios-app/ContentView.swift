@@ -399,17 +399,27 @@ struct ContentView: View {
                     .buttonStyle(.plain, sound: .dismiss)
                 }
                 HStack(spacing: 12) {
-                    Button {
-                        if let url = URL(string: UpdateChecker.installPageURL) { openURL(url) }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(L("Get the latest version"))
-                            Image(systemName: "arrow.up.right")
+                    // F-1 (0.9.182): no more jumping to Safari — when a
+                    // verified update is waiting (or one is running), the
+                    // Install pill below IS the in-app update, so this
+                    // link is hidden instead of offering a second path
+                    // out of the app. It only stays while the release
+                    // isn't verified yet (pendingRelease), when there is
+                    // no in-app install to run and the repo page is the
+                    // only manual way to fetch it.
+                    if !updateChecker.selfUpdateAvailable && !updateChecker.isSelfUpdating {
+                        Button {
+                            if let url = URL(string: UpdateChecker.installPageURL) { openURL(url) }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(L("Get the latest version"))
+                                Image(systemName: "arrow.up.right")
+                            }
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(Theme.accent)
                         }
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(Theme.accent)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                     // F-1 (0.9.178): the release is still being published —
                     // re-run the check from here instead of sending the
                     // user to About → Check for updates. A second tap
@@ -707,6 +717,24 @@ struct ContentView: View {
                     .buttonStyle(.plain, sound: .tick)
                     .accessibilityLabel(L("Paste a download link"))
                 }
+                // F-3 (0.9.182): recent links — a clock button (only
+                // when history is non-empty) opening a menu of the last
+                // 5 used links; tapping one fills the field. Recorded
+                // on a real `startLinkImport` start, deduped, newest
+                // first, capped at 5, in UserDefaults.
+                if !recentLinks.isEmpty {
+                    Menu {
+                        ForEach(recentLinks, id: \.self) { link in
+                            Button(link) { ipaLink = link }
+                        }
+                    } label: {
+                        Image(systemName: "clock")
+                            .foregroundStyle(Theme.muted)
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .buttonStyle(.plain, sound: .tick)
+                    .accessibilityLabel(L("Recent links"))
+                }
                 Button(action: downloadFromLink) {
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.title3)
@@ -759,13 +787,37 @@ struct ContentView: View {
         return text
     }
 
+    /// F-3 (0.9.182): the last 5 links that really started a link
+    /// import, newest first — UserDefaults, so they survive a relaunch.
+    /// No shared store existed before this (full-repo grep: zero hits).
+    private var recentLinks: [String] {
+        get { UserDefaults.standard.stringArray(forKey: "CZFRecentLinks") ?? [] }
+        // nonmutating: the setter only touches UserDefaults, never self —
+        // a plain setter would demand a mutating caller and fail to compile.
+        nonmutating set {
+            UserDefaults.standard.set(Array(newValue.prefix(5)), forKey: "CZFRecentLinks")
+        }
+    }
+
+    /// F-3 (0.9.182): record a link that started importing — dedupe,
+    /// newest first, capped at 5.
+    private func recordRecentLink(_ link: String) {
+        var links = recentLinks
+        links.removeAll { $0 == link }
+        links.insert(link, at: 0)
+        recentLinks = links
+    }
+
     private func downloadFromLink() {
         guard linkIsUsable else { return }
         linkFieldFocused = false
         let link = ipaLink
         // B1 (0.9.147): the task lives in the engine, so the link row can
         // cancel it — the old fire-and-forget Task had no handle.
-        engine.startLinkImport(link)
+        // F-3 (0.9.182): only a real start joins the recent links.
+        if engine.startLinkImport(link) {
+            recordRecentLink(link)
+        }
     }
 
     // MARK: Primary action
