@@ -29,8 +29,9 @@ struct CertificateChoiceSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(L("Choose how to sign"))
-                .font(.headline)
+            // U-2 (0.9.190): new shell — the section title, not a
+            // hand-written headline.
+            SectionTitle(title: L("Choose how to sign"), systemImage: "signature")
             if !accounts.accounts.isEmpty {
                 HStack(spacing: 10) {
                     Text(L("签名账号"))
@@ -77,9 +78,13 @@ struct CertificateChoiceSheet: View {
                 systemImage: "person.crop.circle",
                 title: L("Apple ID"),
                 detail: L("Apple ID signing changes the Bundle ID to “original ID.team ID”, so it installs as a second icon."))
-            Button(L("Cancel"), role: .cancel) { onCancel() }
-                .font(.subheadline)
-                .frame(maxWidth: .infinity, alignment: .center)
+            // U-2 (0.9.190): new shell — the quiet secondary button,
+            // full width (AccountViews 同款 label 内 maxWidth).
+            Button(role: .cancel) { onCancel() } label: {
+                Text(L("Cancel"))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SecondaryButtonStyle())
         }
         .padding(20)
     }
@@ -97,25 +102,35 @@ struct CertificateChoiceSheet: View {
 
     private func choiceRow(identity: CZFSignIdentity, systemImage: String, title: String, detail: String) -> some View {
         Button { onChoose(identity) } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.title3)
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 28)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                    Text(detail)
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
+            // U-2 (0.9.190): new shell — the row is a PanelCard; the
+            // Theme.control background and the 12pt corner are the
+            // card's now, the icon/title/detail layout is untouched.
+            PanelCard(padding: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: systemImage)
+                        .font(.title3)
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                        Text(detail)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    // F-1 (0.9.190): mark the last-used signing method —
+                    // the choice is already persisted in
+                    // CZFSignIdentity.stored; the sheet re-reads it every
+                    // time it opens, so the mark is always current.
+                    if identity == CZFSignIdentity.stored {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Theme.accent)
+                    }
                 }
-                Spacer()
             }
-            .padding(12)
-            .background(Theme.control)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
     }

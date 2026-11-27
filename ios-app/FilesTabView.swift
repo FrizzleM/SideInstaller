@@ -2353,28 +2353,41 @@ struct FilesTabView: View {
     /// “移动到” sheet 内容：从 body 抽出来——body 的修饰链太大，
     /// 编译器在 ForEach 那行报 type-check timeout；内容一字未动，
     /// 只是换了个地方放。
+    /// B-3 (0.9.190): new shell — ScrollView + AppBackground, rows in
+    /// PanelCards, the bare-text empty state is an EmptyState with the
+    /// same copy and the folder icon; title, Cancel and tap-to-move
+    /// are untouched.
     @ViewBuilder
     private func moveSheetContent(item: LocalFileItem) -> some View {
         NavigationStack {
-            List {
-                if moveDestinations(for: item).isEmpty {
-                    Text(L("没有可移动到的文件夹，先新建一个。"))
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                }
-                ForEach(moveDestinations(for: item), id: \.dir) { dest in
-                    Button {
-                        moveItem = nil
-                        moveItemToFolder(item, dest.dir)
-                    } label: {
-                        HStack {
-                            Image(systemName: dest.dir.isEmpty ? "house" : "folder")
-                            Text(dest.name)
-                            Spacer()
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.spacingSmall) {
+                    if moveDestinations(for: item).isEmpty {
+                        EmptyState(title: L("没有可移动到的文件夹，先新建一个。"),
+                                   message: "",
+                                   systemImage: "folder")
+                            .padding(.vertical, Theme.spacingLarge)
+                    } else {
+                        ForEach(moveDestinations(for: item), id: \.dir) { dest in
+                            PanelCard(padding: 16) {
+                                Button {
+                                    moveItem = nil
+                                    moveItemToFolder(item, dest.dir)
+                                } label: {
+                                    HStack {
+                                        Image(systemName: dest.dir.isEmpty ? "house" : "folder")
+                                        Text(dest.name)
+                                        Spacer()
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
+                .padding(Theme.spacingLarge)
             }
+            .background(AppBackground())
             .navigationTitle(L("移动到"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -2389,28 +2402,39 @@ struct FilesTabView: View {
     /// destinations, narrowed to the ones every selected item can go to
     /// (see moveSelectionDestinations), so a tap can't pick a folder one
     /// of the items can't go into.
+    /// B-3 (0.9.190): new shell — same swap as the single-move sheet
+    /// (ScrollView + AppBackground, PanelCard rows, EmptyState).
     @ViewBuilder
     private func moveSelectionSheetContent() -> some View {
         NavigationStack {
-            List {
-                if moveSelectionDestinations.isEmpty {
-                    Text(L("没有可移动到的文件夹，先新建一个。"))
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                }
-                ForEach(moveSelectionDestinations, id: \.dir) { dest in
-                    Button {
-                        showMoveSelectionSheet = false
-                        moveSelectionToFolder(dest.dir)
-                    } label: {
-                        HStack {
-                            Image(systemName: dest.dir.isEmpty ? "house" : "folder")
-                            Text(dest.name)
-                            Spacer()
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.spacingSmall) {
+                    if moveSelectionDestinations.isEmpty {
+                        EmptyState(title: L("没有可移动到的文件夹，先新建一个。"),
+                                   message: "",
+                                   systemImage: "folder")
+                            .padding(.vertical, Theme.spacingLarge)
+                    } else {
+                        ForEach(moveSelectionDestinations, id: \.dir) { dest in
+                            PanelCard(padding: 16) {
+                                Button {
+                                    showMoveSelectionSheet = false
+                                    moveSelectionToFolder(dest.dir)
+                                } label: {
+                                    HStack {
+                                        Image(systemName: dest.dir.isEmpty ? "house" : "folder")
+                                        Text(dest.name)
+                                        Spacer()
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
+                .padding(Theme.spacingLarge)
             }
+            .background(AppBackground())
             .navigationTitle(L("移动到"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

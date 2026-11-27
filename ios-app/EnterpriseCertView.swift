@@ -190,6 +190,11 @@ struct EnterpriseCertView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             refreshCertState()
+            // B-1 (0.9.190): read the cached revocation state on entry —
+            // revocationStatus is @State and resets to .unknown every
+            // time the page opens, so without this the row reads
+            // "未检查" until someone taps the manual button.
+            checkRevocationCached()
             // F-3 (0.9.157): 打开证书页就按当前到期日重排到期通知 —
             // 刚导完证书还没等巡检跑过来时，通知也已经排上了。
             EnterpriseCertExpiryNotifier.reschedule()
@@ -912,6 +917,30 @@ struct EnterpriseCertView: View {
         }
     }
 
+    /// B-1 (0.9.190): the on-appear revocation read — checkRevocation()
+    /// 的同款写法（后台线程 + 指纹守卫），但非 force：24 小时内只读
+    /// A-6 的缓存、不重复做信任评估、不联网 OCSP。手动按钮仍是
+    /// force，每次都真查；签前现查（startSign）也不动。
+    private func checkRevocationCached() {
+        guard !revocationChecking, hasP12 else { return }
+        revocationChecking = true
+        // 照抄 checkRevocation 的三重守卫模式：调用前抓指纹，
+        // 写回前核对未变才写状态；revocationChecking 复位放守卫外，
+        // 任何出口都复位。
+        let profiles = EnterpriseCertStore.profiles()
+        let fingerprint = EnterpriseCertStore.certStateFingerprint(profiles: profiles)
+        Task.detached(priority: .userInitiated) {
+            let status = CertRevocationChecker.check()
+            await MainActor.run {
+                if fingerprint == EnterpriseCertStore.certStateFingerprint(profiles: profiles) {
+                    self.revocationStatus = status
+                    self.revocationCheckedAt = Date()
+                }
+                self.revocationChecking = false
+            }
+        }
+    }
+
     /// 吊销检查放后台线程跑（信任评估可能联网 OCSP）。
     /// 手动按钮：每次都真查（force），不读 A-6 的 24 小时缓存。
     private func checkRevocation() {
@@ -1094,6 +1123,16 @@ struct EnterpriseCertView: View {
                             .textFieldStyle(.plain).fieldBackground()
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
+                            // B-2 (0.9.190)：手填一旦敲出与预填不同的中间值
+                            // 即清掉预填标记——最终值即便又回到预填值也已
+                            // 是 deliberate，不再被批量入口误判清掉；select()
+                            // 是同步先设 mods.minOS 再设 prefilledMinOS，
+                            // onChange 触发时新值等于标记，不会误清。
+                            .onChange(of: workspace.mods.minOS) { _, new in
+                                if new != workspace.prefilledMinOS {
+                                    workspace.prefilledMinOS = ""
+                                }
+                            }
                     }
                     signGroup(title: L("新图标")) {
                         iconRow

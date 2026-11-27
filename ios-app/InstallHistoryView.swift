@@ -86,121 +86,35 @@ struct InstallHistoryView: View {
     @State private var confirmingClear = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            SearchBar(text: $historySearchText, placeholder: L("搜索"))
-                .padding(.horizontal)
-                .padding(.top, 8)
-            // F-1 (0.9.166)：结果分段——文件页顶部分段同款（`.segmented`），
-            // 与上面的搜索叠加过滤。
-            Picker("", selection: $historyResultFilter) {
-                Text(L("All")).tag(HistoryResultFilter.all)
-                Text(L("Succeeded")).tag(HistoryResultFilter.succeeded)
-                Text(L("Failed")).tag(HistoryResultFilter.failed)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            List {
-            if entries.isEmpty {
-                // U2 (0.9.151): the empty state used to be one bare line;
-                // Downloads page empty state 同款：图标 + 主文案 + 一行
-                // 引导，告诉用户装好的会记在这里。
-                VStack(alignment: .leading, spacing: 8) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.title2)
-                        .foregroundStyle(Theme.muted)
-                    Text(L("No installs yet."))
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.muted)
-                    Text(L("Installed apps will be listed here."))
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.muted)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.spacing) {
+                SearchBar(text: $historySearchText, placeholder: L("搜索"))
+                // F-1 (0.9.166)：结果分段——文件页顶部分段同款（`.segmented`），
+                // 与上面的搜索叠加过滤。
+                Picker("", selection: $historyResultFilter) {
+                    Text(L("All")).tag(HistoryResultFilter.all)
+                    Text(L("Succeeded")).tag(HistoryResultFilter.succeeded)
+                    Text(L("Failed")).tag(HistoryResultFilter.failed)
                 }
-                .padding(.vertical, 8)
-            }
-            ForEach(filteredEntries) { entry in
-                Button { reinstall(entry) } label: {
-                    HStack(spacing: 10) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(verbatim: entry.title)
-                                .font(.headline)
-                                .lineLimit(1)
-                            Text(entry.date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened)
-                                .locale(Localizer.locale)))
-                                .font(.footnote)
-                                .foregroundStyle(Theme.muted)
-                            Text(verbatim: entry.identity)
-                                .font(.footnote)
-                                .foregroundStyle(Theme.muted)
-                                .lineLimit(1)
-                            // F-1 (0.9.168)：有 Bundle ID 就显示一行——
-                            // 两个同名分身的行只有这里能分清，搜到的是哪
-                            // 个也一眼可见；老条目没存就不显示。
-                            if let bundleID = entry.bundleID, !bundleID.isEmpty {
-                                Text(verbatim: bundleID)
-                                    .font(.footnote)
-                                    .foregroundStyle(Theme.muted)
-                                    .lineLimit(1)
-                            }
-                            // F-A (0.9.155): a failed run says so in red,
-                            // with the reason it stopped — the row still
-                            // reinstalls on tap, same as a success.
-                            if !entry.success {
-                                Text(L("Failed"))
-                                    .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(Theme.negative)
-                                if let reason = entry.failureReason, !reason.isEmpty {
-                                    Text(verbatim: reason)
-                                        .font(.footnote)
-                                        .foregroundStyle(Theme.negative)
-                                        .lineLimit(2)
-                                }
-                            }
-                        }
-                        Spacer()
-                        if reinstallingID == entry.id {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "arrow.clockwise.circle")
-                                .foregroundStyle(Theme.muted)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-                .buttonStyle(.plain)
-                .disabled(reinstallingID != nil)
-                // F-3 (0.9.164): reveal this entry's IPA in Downloads —
-                // swipe for it, or long-press the row. The row tap itself
-                // still reinstalls.
-                .swipeActions(edge: .trailing) {
-                    Button {
-                        locate(entry)
-                    } label: {
-                        Label(L("Show in Downloads"), systemImage: "magnifyingglass")
-                    }
-                    .tint(Theme.accent)
-                    // F-3 (0.9.176): delete just this record — no
-                    // confirmation, it deletes the history line, not
-                    // the app. The in-memory list drops with the store
-                    // so the row vanishes at once.
-                    Button(role: .destructive) {
-                        InstallHistoryStore.remove(id: entry.id)
-                        entries.removeAll { $0.id == entry.id }
-                    } label: {
-                        Label(L("Delete"), systemImage: "trash")
-                    }
-                }
-                .contextMenu {
-                    Button {
-                        locate(entry)
-                    } label: {
-                        Label(L("Show in Downloads"), systemImage: "magnifyingglass")
+                .pickerStyle(.segmented)
+                if filteredEntries.isEmpty {
+                    // U-1 (0.9.190): new shell — the empty state reads the
+                    // filtered list, so a search/filter that matches
+                    // nothing no longer leaves a blank page; the icon and
+                    // copy are the old empty state's (U2, 0.9.151).
+                    EmptyState(title: L("No installs yet."),
+                               message: L("Installed apps will be listed here."),
+                               systemImage: "clock.arrow.circlepath")
+                        .padding(.vertical, Theme.spacingLarge)
+                } else {
+                    ForEach(filteredEntries) { entry in
+                        historyRow(entry)
                     }
                 }
             }
+            .padding(Theme.spacingLarge)
         }
-        .listStyle(.plain)
-        }
+        .background(AppBackground())
         .navigationTitle(L("Install history"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -258,6 +172,99 @@ struct InstallHistoryView: View {
             Button(L("OK"), role: .cancel) { notice = nil }
         } message: {
             Text(notice ?? "")
+        }
+    }
+
+    /// U-1 (0.9.190): one history row in the new shell — a PanelCard
+    /// whose main area reinstalls on tap. The List is gone, so its
+    /// swipe actions move onto the trailing Menu (LocationView 同款
+    /// ellipsis): "Show in Downloads" and Delete, same actions, and
+    /// the long-press menu stays — the row tap itself still reinstalls.
+    private func historyRow(_ entry: InstallHistoryEntry) -> some View {
+        PanelCard(padding: 16) {
+            HStack(alignment: .top, spacing: 10) {
+                Button { reinstall(entry) } label: {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: entry.title)
+                                .font(.headline)
+                                .lineLimit(1)
+                            Text(entry.date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened)
+                                .locale(Localizer.locale)))
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                            Text(verbatim: entry.identity)
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                                .lineLimit(1)
+                            // F-1 (0.9.168)：有 Bundle ID 就显示一行——
+                            // 两个同名分身的行只有这里能分清，搜到的是哪
+                            // 个也一眼可见；老条目没存就不显示。
+                            if let bundleID = entry.bundleID, !bundleID.isEmpty {
+                                Text(verbatim: bundleID)
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.muted)
+                                    .lineLimit(1)
+                            }
+                            // F-A (0.9.155): a failed run says so in red,
+                            // with the reason it stopped — the row still
+                            // reinstalls on tap, same as a success.
+                            if !entry.success {
+                                Text(L("Failed"))
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(Theme.negative)
+                                if let reason = entry.failureReason, !reason.isEmpty {
+                                    Text(verbatim: reason)
+                                        .font(.footnote)
+                                        .foregroundStyle(Theme.negative)
+                                        .lineLimit(2)
+                                }
+                            }
+                        }
+                        Spacer()
+                        if reinstallingID == entry.id {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "arrow.clockwise.circle")
+                                .foregroundStyle(Theme.muted)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .buttonStyle(.plain)
+                .disabled(reinstallingID != nil)
+                Menu {
+                    // F-3 (0.9.164): reveal this entry's IPA in Downloads.
+                    Button {
+                        locate(entry)
+                    } label: {
+                        Label(L("Show in Downloads"), systemImage: "magnifyingglass")
+                    }
+                    // F-3 (0.9.176): delete just this record — no
+                    // confirmation, it deletes the history line, not
+                    // the app. The in-memory list drops with the store
+                    // so the row vanishes at once.
+                    Button(role: .destructive) {
+                        InstallHistoryStore.remove(id: entry.id)
+                        entries.removeAll { $0.id == entry.id }
+                    } label: {
+                        Label(L("Delete"), systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundStyle(Theme.muted)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+            }
+        }
+        .contextMenu {
+            Button {
+                locate(entry)
+            } label: {
+                Label(L("Show in Downloads"), systemImage: "magnifyingglass")
+            }
         }
     }
 
