@@ -7,6 +7,10 @@ struct CertsView: View {
     @EnvironmentObject private var loc: Localizer
     @ObservedObject var manager: CertManager
 
+    /// P1-3 (0.9.186): the saved Apple IDs, for the per-account
+    /// certificate groups below (Settings › Account 同款来源）.
+    @EnvironmentObject private var accounts: AccountStore
+
     @State private var showSettings = false
     /// The certificate the user tapped "Revoke" on, pending confirmation.
     @State private var pendingRevoke: DevCert?
@@ -37,6 +41,7 @@ struct CertsView: View {
                 if manager.canUseSideStoreCertificate {
                     sideStoreCard.cascadeItem(3)
                 }
+                accountGroups
                 // Errors show as a popup, which `RootView` lays over the app.
                 certList
             }
@@ -204,13 +209,16 @@ struct CertsView: View {
                                         .foregroundStyle(Theme.muted)
                                 }
                             }
-                            // F-2 (0.9.165)：这张证书到期会断掉的已装 App。
-                            if let affectedText = affectedAppsText {
-                                Text(affectedText)
-                                    .font(.footnote)
-                                    .foregroundStyle(Theme.muted)
-                            }
                         }
+                    }
+                    // B-3 (0.9.186): the affected-apps list is team-wide,
+                    // not per certificate — it used to render under every
+                    // expiring certificate, repeating the same names.
+                    // Once, after the list, is enough.
+                    if let affectedText = affectedAppsText {
+                        Text(affectedText)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
                     }
                     Text(L("证书到期后请重新登录 Apple ID 获取新证书，再用全部续签重签 App。"))
                         .font(.footnote)
@@ -397,6 +405,111 @@ struct CertsView: View {
     }
 
     // MARK: Certificate list
+
+    /// P1-3 (0.9.186): the certificates, grouped by Apple ID — one
+    /// group per saved account, so both accounts' certificates are
+    /// visible on one page. Only the active account's certificates
+    /// are loaded (loading every account would sign in as each one,
+    /// 2FA prompts included); the other groups show the recorded
+    /// team and switch on tap — activating also signs the
+    /// CertManager out and reloads as the new account, so the tap
+    /// is the signing-account switch. Renewal is untouched: this
+    /// only picks which account signs, never which team a renewal
+    /// touches.
+    @ViewBuilder
+    private var accountGroups: some View {
+        if !accounts.accounts.isEmpty {
+            VStack(spacing: 12) {
+                ForEach(accounts.accounts) { account in
+                    accountGroupCard(account)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func accountGroupCard(_ account: SavedAccount) -> some View {
+        let isActive = accounts.isActive(account)
+        let teamText: String? = {
+            if let teamID = account.teamID { return teamID }
+            return accounts.team(for: account.normalized)?.label
+        }()
+        if isActive {
+            PanelCard {
+                accountGroupContent(account, teamText: teamText, isActive: true)
+            }
+        } else {
+            Button { switchSigningAccount(account) } label: {
+                PanelCard {
+                    accountGroupContent(account, teamText: teamText, isActive: false)
+                }
+            }
+            .buttonStyle(.plain, sound: .tick)
+        }
+    }
+
+    private func accountGroupContent(_ account: SavedAccount, teamText: String?, isActive: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "person.crop.circle")
+                    .foregroundStyle(Theme.muted)
+                Text(account.appleID)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 8)
+                if isActive {
+                    Text(L("当前签名账号"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.positive)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            HStack(spacing: 8) {
+                if let teamText {
+                    Text(teamText)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                }
+                if isActive, manager.hasLoaded {
+                    Text(L("%d certificate(s)", manager.certs.count))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                    if let soonest = manager.certs.compactMap(\.expiresAt).min() {
+                        Text(expiryLabel(soonest))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                    }
+                } else if !isActive {
+                    Text(L("点一下切换签名账号"))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+        }
+    }
+
+    /// Switches the signing account to `account` and reloads the
+    /// certificates as it. The revision listener signs the manager
+    /// out (clearing the old account's list) right after the
+    /// activate; loadCerts' Task body reads the generation after
+    /// that signOut, so it signs in as the new account. The delayed
+    /// re-check covers a load the listener's signOut cancelled
+    /// mid-flight — then the list just loads again, and the manual
+    /// Refresh button is still there as the last resort.
+    private func switchSigningAccount(_ account: SavedAccount) {
+        guard !accounts.isActive(account) else { return }
+        accounts.activate(account)
+        manager.loadCerts()
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            if !manager.hasLoaded, !manager.isWorking { manager.loadCerts() }
+        }
+    }
 
     @ViewBuilder
     private var certList: some View {

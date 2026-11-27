@@ -142,6 +142,14 @@ struct RootView: View {
     /// activity log; SettingsView's log section scrolls to it, then
     /// clears the flag itself (settingsEnterpriseRequest 同款）.
     @State private var settingsLogRequest = false
+    /// P1-1/P1-4 (0.9.186): a "Go to Settings" action asks for the
+    /// Account section; SettingsView scrolls to it, then clears the
+    /// flag itself (settingsLogRequest 同款）.
+    @State private var settingsAccountRequest = false
+    /// P1-4 (0.9.186): a failed refresh whose next step is the
+    /// Certificates page; SettingsView's tools NavigationLink opens
+    /// it, then clears the flag itself (enterpriseRequest 同款）.
+    @State private var settingsCertRequest = false
     @StateObject private var sourcesManager = SourcesManager()
     @StateObject private var jitManager = JITManager()
     /// What the sign-in sheet showed last, so it keeps its content while it
@@ -173,7 +181,7 @@ struct RootView: View {
                 .blueTopBar()
                 .tabItem { Label(L("Download"), systemImage: "arrow.down.circle") }
                 .tag(Page.downloads)
-            SettingsView(isTab: true, enterpriseRequest: $settingsEnterpriseRequest, logRequest: $settingsLogRequest)
+            SettingsView(isTab: true, enterpriseRequest: $settingsEnterpriseRequest, logRequest: $settingsLogRequest, accountRequest: $settingsAccountRequest, certRequest: $settingsCertRequest)
                 .tabItem { Label(L("Settings"), systemImage: "gearshape") }
                 .tag(Page.settings)
         }
@@ -194,6 +202,23 @@ struct RootView: View {
             showInstallSheetPending = false
             page = .settings
             settingsLogRequest = true
+        }
+        // P1-1/P1-4 (0.9.186): the install checklist's and the failed
+        // refresh row's "Go to Settings" — same shape as revealLog,
+        // landing on the Account section instead of the log.
+        .onReceive(NotificationCenter.default.publisher(for: Engine.revealAccount)) { _ in
+            showInstallSheet = false
+            showInstallSheetPending = false
+            page = .settings
+            settingsAccountRequest = true
+        }
+        // P1-4 (0.9.186): the failed refresh row's "Go to the
+        // Certificates page" — same shape, opening that page.
+        .onReceive(NotificationCenter.default.publisher(for: Engine.revealCertificates)) { _ in
+            showInstallSheet = false
+            showInstallSheetPending = false
+            page = .settings
+            settingsCertRequest = true
         }
         // U-UI：文件页/源页把 IPA 交给企业证书页时（CertWorkspace.openEnterpriseSign），
         // 切到设置 tab 并让企业区自动打开；标志由这里清掉，只触发一次。

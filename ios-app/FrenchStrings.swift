@@ -812,6 +812,19 @@ let frenchStrings: [String: String] = [
     "免费证书都支持": "Tout est pris en charge par le certificat gratuit",
     "错误 (%d)": "Erreurs (%d)",
     "Retry failed items": "Réessayer les éléments échoués",
+    // 0.9.186: P1-1 preflight checklist + P1-2 account/team picker, P1-3 cert groups, P1-4 refresh next step, P1-5 background 2FA notice.
+    "安装前检查": "Vérifications avant l'installation",
+    "去设置": "Ouvrir Réglages",
+    "去连 LocalDevVPN": "Connecter LocalDevVPN",
+    "签名账号": "Compte de signature",
+    "换团队": "Changer d'équipe",
+    "首次登录时选择": "À choisir à la première connexion",
+    "当前签名账号": "Compte de signature actuel",
+    "点一下切换签名账号": "Touchez pour changer de compte de signature",
+    "续签需要验证码": "Code de vérification requis pour le renouvellement",
+    "自动续签需要输入 Apple ID 验证码。打开 SideInstaller 输入验证码，续签会继续。": "Le renouvellement automatique a besoin du code de vérification de l'identifiant Apple. Ouvrez SideInstaller, saisissez le code et le renouvellement continuera.",
+    "重新登录": "Se reconnecter",
+    "去证书页看": "Voir la page des certificats",
 
     "couldn't find the IPA in the %@ %@ release":
         "impossible de trouver l'IPA dans la version %@ de %@",

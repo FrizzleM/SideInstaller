@@ -3,6 +3,7 @@ import Foundation
 import Network
 import Observation
 import UIKit
+import UserNotifications
 import SideInstallerFFI
 
 /// One ordered step of the one-click install.
@@ -201,6 +202,14 @@ final class Engine {
     /// the install sheet, switches to the Settings tab and scrolls to
     /// the activity log (revealDownload 同款通道）.
     static let revealLog = Notification.Name("CZFRevealLog")
+    /// P1-1/P1-4 (0.9.186): a "Go to Settings" action — RootView closes
+    /// the install sheet, switches to the Settings tab and scrolls to
+    /// the Account section (revealLog 同款通道）.
+    static let revealAccount = Notification.Name("CZFRevealAccount")
+    /// P1-4 (0.9.186): a failed refresh whose next step is the
+    /// Certificates page — RootView switches to the Settings tab and
+    /// opens it (enterpriseRequest 同款 one-shot).
+    static let revealCertificates = Notification.Name("CZFRevealCertificates")
 
     /// Answer the pairing-file mismatch popup: true replaces the pairing file.
     @MainActor
@@ -5966,6 +5975,19 @@ final class Engine {
             self.twoFactor = TwoFactorPhase(request: request.id, signIn: ticket.id,
                                             appleID: ticket.appleID, prompt: prompt)
             self.log(prompt.logLine)
+            // P1-5 (0.9.186): a background refresh that hits 2FA used to
+            // wait forever on a sheet nobody can see — the 2FA sheet is
+            // a SwiftUI sheet in RootView, so while the app is backgrounded
+            // the sign-in blocks on `twoFactorRequests.wait` (no timeout)
+            // and the due apps silently don't renew until the user happens
+            // to open the app. Nudge them now; tapping the notification
+            // opens the app, where the pending sheet is already waiting.
+            // Foreground sign-ins show the sheet themselves, so they get
+            // no notification.
+            if ticket.purpose == .refresh,
+               UIApplication.shared.applicationState != .active {
+                Self.notifyBackgroundTwoFactor(requestID: request.id)
+            }
         }
         guard let answer = twoFactorRequests.wait(request),
               let bytes = answer.json.map({ Array($0.utf8) }), bytes.count < len else { return 0 }
@@ -5983,6 +6005,30 @@ final class Engine {
         guard twoFactorRequests.answer(phase.request, with: answer) else { return }
         if twoFactor?.request == phase.request { twoFactor?.answer = answer }
         log(answer.logLine)
+    }
+
+    /// P1-5 (0.9.186): tells the user a background refresh is waiting on
+    /// a 2FA code. One notification per 2FA request (the id keeps a
+    /// re-asked code from stacking); a failure only reaches the log —
+    /// the sheet itself is still there when the app comes forward, so
+    /// this is a nudge, not the only path. Called from the 2FA
+    /// callback's main-queue block, so `applicationState` is read on
+    /// the main thread.
+    private static func notifyBackgroundTwoFactor(requestID: Int) {
+        let content = UNMutableNotificationContent()
+        content.title = L("续签需要验证码")
+        content.body = L("自动续签需要输入 Apple ID 验证码。打开 SideInstaller 输入验证码，续签会继续。")
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "resign-2fa-\(requestID)", content: content, trigger: nil)
+        Task {
+            do {
+                try await UNUserNotificationCenter.current().add(request)
+            } catch {
+                Engine.shared.log("Auto refresh: 2FA notification failed to send (\(error.localizedDescription)).")
+            }
+        }
+        Engine.shared.log("Auto refresh: 2FA needed while backgrounded — notified the user.")
     }
 
     /// Close the sheet showing `phase`. While Apple waits on the user this

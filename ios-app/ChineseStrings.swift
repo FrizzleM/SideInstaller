@@ -792,6 +792,19 @@ let chineseStrings: [String: String] = [
     "免费证书都支持": "免费证书都支持",
     "错误 (%d)": "错误 (%d)",
     "Retry failed items": "重试失败项",
+    // 0.9.186: P1-1 preflight checklist + P1-2 account/team picker, P1-3 cert groups, P1-4 refresh next step, P1-5 background 2FA notice.
+    "安装前检查": "安装前检查",
+    "去设置": "去设置",
+    "去连 LocalDevVPN": "去连 LocalDevVPN",
+    "签名账号": "签名账号",
+    "换团队": "换团队",
+    "首次登录时选择": "首次登录时选择",
+    "当前签名账号": "当前签名账号",
+    "点一下切换签名账号": "点一下切换签名账号",
+    "续签需要验证码": "续签需要验证码",
+    "自动续签需要输入 Apple ID 验证码。打开 SideInstaller 输入验证码，续签会继续。": "自动续签需要输入 Apple ID 验证码。打开 SideInstaller 输入验证码，续签会继续。",
+    "重新登录": "重新登录",
+    "去证书页看": "去证书页看",
 
     "couldn't find the IPA in the %@ %@ release":
         "在 %@ 渠道的 %@ 发行版中找不到 IPA 文件",

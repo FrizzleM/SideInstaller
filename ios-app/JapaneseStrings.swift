@@ -724,6 +724,19 @@ let japaneseStrings: [String: String] = [
     "免费证书都支持": "無料証明書ですべて対応",
     "错误 (%d)": "エラー (%d)",
     "Retry failed items": "失敗した項目を再試行",
+    // 0.9.186: P1-1 preflight checklist + P1-2 account/team picker, P1-3 cert groups, P1-4 refresh next step, P1-5 background 2FA notice.
+    "安装前检查": "インストール前の確認",
+    "去设置": "設定を開く",
+    "去连 LocalDevVPN": "LocalDevVPN に接続",
+    "签名账号": "署名アカウント",
+    "换团队": "チームを変更",
+    "首次登录时选择": "初回サインイン時に選択",
+    "当前签名账号": "現在の署名アカウント",
+    "点一下切换签名账号": "タップして署名アカウントを切り替え",
+    "续签需要验证码": "更新には確認コードが必要です",
+    "自动续签需要输入 Apple ID 验证码。打开 SideInstaller 输入验证码，续签会继续。": "自動更新には Apple ID の確認コードが必要です。SideInstaller を開いてコードを入力すると、更新が続行されます。",
+    "重新登录": "再サインイン",
+    "去证书页看": "証明書ページを見る",
 
     "couldn't find the IPA in the %@ %@ release":
         "%@ チャンネルの %@ リリースに IPA が見つかりませんでした",

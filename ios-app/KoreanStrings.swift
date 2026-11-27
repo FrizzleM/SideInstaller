@@ -725,6 +725,19 @@ let koreanStrings: [String: String] = [
     "免费证书都支持": "무료 인증서로 모두 지원",
     "错误 (%d)": "오류 (%d)",
     "Retry failed items": "실패한 항목 다시 시도",
+    // 0.9.186: P1-1 preflight checklist + P1-2 account/team picker, P1-3 cert groups, P1-4 refresh next step, P1-5 background 2FA notice.
+    "安装前检查": "설치 전 확인",
+    "去设置": "설정으로 이동",
+    "去连 LocalDevVPN": "LocalDevVPN에 연결",
+    "签名账号": "서명 계정",
+    "换团队": "팀 변경",
+    "首次登录时选择": "첫 로그인 시 선택",
+    "当前签名账号": "현재 서명 계정",
+    "点一下切换签名账号": "탭하여 서명 계정 전환",
+    "续签需要验证码": "갱신에 확인 코드가 필요합니다",
+    "自动续签需要输入 Apple ID 验证码。打开 SideInstaller 输入验证码，续签会继续。": "자동 갱신에는 Apple ID 확인 코드가 필요합니다. SideInstaller를 열고 코드를 입력하면 갱신이 계속됩니다.",
+    "重新登录": "다시 로그인",
+    "去证书页看": "인증서 페이지 보기",
 
     "couldn't find the IPA in the %@ %@ release":
         "%@ %@ 릴리즈에서 IPA를 찾을 수 없습니다",

@@ -806,6 +806,19 @@ let vietnameseStrings: [String: String] = [
     "免费证书都支持": "Chứng chỉ miễn phí hỗ trợ tất cả",
     "错误 (%d)": "Lỗi (%d)",
     "Retry failed items": "Thử lại các mục thất bại",
+    // 0.9.186: P1-1 preflight checklist + P1-2 account/team picker, P1-3 cert groups, P1-4 refresh next step, P1-5 background 2FA notice.
+    "安装前检查": "Kiểm tra trước khi cài đặt",
+    "去设置": "Mở Cài đặt",
+    "去连 LocalDevVPN": "Kết nối LocalDevVPN",
+    "签名账号": "Tài khoản ký",
+    "换团队": "Đổi nhóm",
+    "首次登录时选择": "Chọn ở lần đăng nhập đầu tiên",
+    "当前签名账号": "Tài khoản ký hiện tại",
+    "点一下切换签名账号": "Chạm để đổi tài khoản ký",
+    "续签需要验证码": "Cần mã xác minh để gia hạn",
+    "自动续签需要输入 Apple ID 验证码。打开 SideInstaller 输入验证码，续签会继续。": "Gia hạn tự động cần mã xác minh của ID Apple. Mở SideInstaller, nhập mã và quá trình gia hạn sẽ tiếp tục.",
+    "重新登录": "Đăng nhập lại",
+    "去证书页看": "Xem trang chứng chỉ",
 
     "couldn't find the IPA in the %@ %@ release":
         "không tìm thấy tệp IPA trong bản phát hành %@ của %@",

@@ -21,10 +21,52 @@ struct CertificateChoiceSheet: View {
     var onChoose: (CZFSignIdentity) -> Void
     var onCancel: () -> Void
 
+    @Environment(Engine.self) private var engine
+    /// P1-2 (0.9.186): the signing account picker, same store as the
+    /// install page — the Apple ID choice below signs as the account
+    /// picked here, not whatever Settings last had active.
+    @EnvironmentObject private var accounts: AccountStore
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(L("Choose how to sign"))
                 .font(.headline)
+            if !accounts.accounts.isEmpty {
+                HStack(spacing: 10) {
+                    Text(L("签名账号"))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 8)
+                    Menu {
+                        ForEach(accounts.accounts) { account in
+                            Button { Task { await pickSigningAccount(account) } } label: {
+                                Label {
+                                    Text(account.appleID)
+                                } icon: {
+                                    if accounts.isActive(account) { Image(systemName: "checkmark") }
+                                }
+                            }
+                        }
+                    } label: {
+                        Text(accounts.active?.appleID ?? L("Add Apple ID"))
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(Theme.accent)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if let team = accounts.team(for: engine.normalizedAppleID) {
+                    HStack(spacing: 10) {
+                        Text(L("Team"))
+                            .font(.subheadline.weight(.semibold))
+                        Spacer(minLength: 8)
+                        Text(team.label)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                            .lineLimit(1)
+                    }
+                }
+            }
             choiceRow(
                 identity: .enterprise,
                 systemImage: "checkmark.seal",
@@ -40,6 +82,17 @@ struct CertificateChoiceSheet: View {
                 .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(20)
+    }
+
+    /// ContentView.pickInstallAccount 同款：切账号并等旧会话释放完，
+    /// 再让下面的 Apple ID 选择去跑管线，否则管线可能沿用旧会话、
+    /// 用错账号签名。企业证书路不用 Apple ID，不受影响。
+    @MainActor
+    private func pickSigningAccount(_ account: SavedAccount) async {
+        guard !accounts.isActive(account) else { return }
+        accounts.activate(account)
+        await engine.dropSignSession()
+        engine.log("Signing choice: signing account switched to \(account.normalized).")
     }
 
     private func choiceRow(identity: CZFSignIdentity, systemImage: String, title: String, detail: String) -> some View {

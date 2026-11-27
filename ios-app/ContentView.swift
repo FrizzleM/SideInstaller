@@ -19,6 +19,10 @@ struct ContentView: View {
     /// the team-filtered count (CertsView.affectedApps 同款）.
     @EnvironmentObject private var appsManager: SideloadedAppsManager
     @EnvironmentObject private var certManager: CertManager
+    /// P1-2 (0.9.186): the install page's account/team picker reads
+    /// the saved Apple IDs straight from the store (Settings ›
+    /// Account 同款来源）.
+    @EnvironmentObject private var accounts: AccountStore
     /// P0-4 (0.9.185): the last signing method, reactive so the quota
     /// row hides when the user picks enterprise signing (which doesn't
     /// consume App IDs). Default mirrors CZFSignIdentity.stored.
@@ -567,6 +571,14 @@ struct ContentView: View {
                 sectionTitle(L("Install"), systemImage: "square.and.arrow.down")
                 quotaRow
                 capabilitiesInlineRow
+                // P1-1 (0.9.186): the preflight checklist, on the page
+                // itself instead of only behind the Install tap's sheet —
+                // the same guard conditions runOneClick enforces, shown
+                // up front. P1-2: the signing account/team picker.
+                if isAppleIDSigning {
+                    preflightChecklist
+                    accountTeamPicker
+                }
                 // Each app with its own icon, in the menu and in the field.
                 Menu {
                     Picker(L("Install"), selection: Bindable(engine).installSource) {
@@ -693,6 +705,185 @@ struct ContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// P1-1 (0.9.186): the preflight checklist on the install page —
+    /// pairing file / tunnel / Apple ID / team, one row each. The
+    /// first three reuse the PrecheckSheet's own state functions
+    /// (the same conditions runOneClick's guards enforce), so the
+    /// page and the tap-time sheet can never disagree; the team row
+    /// reads the remembered team for the active account. Display
+    /// only — the guards themselves are untouched. Each failing row
+    /// carries its fix: import the pairing file here, start the
+    /// tunnel, or jump to Settings › Account.
+    private var isAppleIDSigning: Bool {
+        (CZFSignIdentity(rawValue: signIdentityRaw) ?? .enterprise) == .appleID
+    }
+
+    @ViewBuilder
+    private var preflightChecklist: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(L("安装前检查"))
+                    .font(.subheadline.weight(.semibold))
+                if pairingPrecheckState(engine) == .blocked {
+                    preflightRow(title: L("Pairing file"), state: .blocked, detail: L("未导入"),
+                                 fixTitle: L("Import pairing file")) { showPairingImporter = true }
+                } else if engine.canSelfPair {
+                    preflightRow(title: L("Pairing file"), state: .ok, detail: L("本机可自配对，不需要文件"))
+                } else if let name = engine.importedPairingName {
+                    preflightRow(title: L("Pairing file"), state: .ok, detail: L("已导入：%@", name))
+                } else {
+                    preflightRow(title: L("Pairing file"), state: .ok, detail: L("imported pairing file"))
+                }
+                if tunnelPrecheckState(engine) == .ok {
+                    preflightRow(title: L("Tunnel"), state: .ok, detail: L("connected"))
+                } else if tunnelPrecheckState(engine) == .warn {
+                    preflightRow(title: L("Tunnel"), state: .warn, detail: L("未连接，安装时自动启动"),
+                                 fixTitle: L("去连 LocalDevVPN")) { startTunnelFromChecklist() }
+                } else if engine.localDevVPNInstalled {
+                    preflightRow(title: L("Tunnel"), state: .blocked, detail: L("未连接，且不会自动启动"),
+                                 fixTitle: L("去连 LocalDevVPN")) { _ = engine.startLocalDevVPN() }
+                } else {
+                    preflightRow(title: L("Tunnel"), state: .blocked, detail: L("未连接，且不会自动启动——点继续安装时会提示安装 LocalDevVPN"),
+                                 fixTitle: L("Get LocalDevVPN")) { if let url = Guides.vpn.actionURL { openURL(url) } }
+                }
+                if accountPrecheckState(engine) == .ok {
+                    preflightRow(title: L("Apple ID（签名身份）"), state: .ok, detail: engine.normalizedAppleID)
+                } else {
+                    preflightRow(title: L("Apple ID（签名身份）"), state: .blocked, detail: L("去设置页登录 Apple ID 并填好密码"),
+                                 fixTitle: L("去设置")) { NotificationCenter.default.post(name: Engine.revealAccount, object: nil) }
+                }
+                if accountPrecheckState(engine) != .ok {
+                    preflightRow(title: L("Team"), state: .blocked, detail: L("去设置页登录 Apple ID 并填好密码"),
+                                 fixTitle: L("去设置")) { NotificationCenter.default.post(name: Engine.revealAccount, object: nil) }
+                } else if let team = accounts.team(for: engine.normalizedAppleID) {
+                    preflightRow(title: L("Team"), state: .ok, detail: team.label)
+                } else {
+                    preflightRow(title: L("Team"), state: .warn, detail: L("首次登录时选择"),
+                                 fixTitle: L("去设置")) { NotificationCenter.default.post(name: Engine.revealAccount, object: nil) }
+                }
+            }
+        }
+        // The tunnel/Wi-Fi states are read live; refresh once on appear
+        // so a tunnel connected elsewhere shows green without a tap.
+        .task { engine.refreshNetworkStatus() }
+    }
+
+    /// One checklist row: status colour + title + detail, with an
+    /// optional fix button on the right (precheckRow 同款形状，行更紧凑，
+    /// so four of them fit in one card on the install page).
+    private func preflightRow(title: String, state: PrecheckState, detail: String,
+                              fixTitle: String? = nil, fix: (() -> Void)? = nil) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: state.systemImage)
+                .foregroundStyle(state.color)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(detail)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            if let fixTitle, let fix {
+                Button(fixTitle) { CZFHaptics.impact(); fix() }
+                    .font(.footnote.weight(.semibold))
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    .controlSize(.small)
+            }
+        }
+    }
+
+    /// The checklist's tunnel fix: PrecheckSheet.startTunnel 同款
+    /// （内置直拉，否则交接 LocalDevVPN）; with neither available
+    /// the App Store page is the only way forward.
+    private func startTunnelFromChecklist() {
+        if BuiltinTunnel.useBuiltinDirectly {
+            Task { _ = await engine.tunnelUp() }
+        } else if engine.localDevVPNInstalled {
+            engine.startLocalDevVPN()
+        } else if let url = Guides.vpn.actionURL {
+            openURL(url)
+        }
+    }
+
+    /// P1-2 (0.9.186): pick the signing account and team on the
+    /// install page, instead of going to Settings › Account and back.
+    /// The account list is AccountStore's own; the team shown is the
+    /// one remembered for that account (picked at sign-in through
+    /// TeamSheet). Switching the account also drops the in-memory
+    /// sign session, so the run's sign-in can't skip on the old
+    /// session and sign with the wrong account.
+    @ViewBuilder
+    private var accountTeamPicker: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Text(L("签名账号"))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 8)
+                    if accounts.accounts.isEmpty {
+                        Button(L("去设置")) { NotificationCenter.default.post(name: Engine.revealAccount, object: nil) }
+                            .font(.footnote.weight(.semibold))
+                            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                            .controlSize(.small)
+                    } else {
+                        Menu {
+                            ForEach(accounts.accounts) { account in
+                                Button { Task { await pickInstallAccount(account) } } label: {
+                                    Label {
+                                        Text(account.appleID)
+                                    } icon: {
+                                        if accounts.isActive(account) { Image(systemName: "checkmark") }
+                                    }
+                                }
+                            }
+                        } label: {
+                            Text(accounts.active?.appleID ?? L("Add Apple ID"))
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(Theme.accent)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                HStack(spacing: 10) {
+                    Text(L("Team"))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 8)
+                    if let team = accounts.team(for: engine.normalizedAppleID) {
+                        Text(team.label)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                            .lineLimit(1)
+                        Button(L("换团队")) { accounts.forgetTeam(for: engine.normalizedAppleID) }
+                            .font(.footnote.weight(.semibold))
+                            .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                            .controlSize(.small)
+                    } else {
+                        Text(L("首次登录时选择"))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Activates `account` for the next sign-in and drops the cached
+    /// session, so the run signs as the account just picked. The
+    /// revision listener drops it fire-and-forget too; awaiting the
+    /// drop here closes the race where a run started right after the
+    /// tap would still see the old session and skip sign-in.
+    @MainActor
+    private func pickInstallAccount(_ account: SavedAccount) async {
+        guard !accounts.isActive(account) else { return }
+        accounts.activate(account)
+        await engine.dropSignSession()
+        engine.log("Install: signing account switched to \(account.normalized).")
     }
 
     /// The two ways in for a custom build: pick a file, or paste a link.

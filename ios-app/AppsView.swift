@@ -393,6 +393,14 @@ func czfVersionComparisonTag(fileVersion: String, installedVersion: String) -> (
 /// will be signed again from.
 struct RefreshJob: Identifiable, Equatable {
 
+    /// P1-4 (0.9.186): why this job failed, in machine terms — the
+    /// row's next-step button is picked from it, never from the
+    /// localized message text (which reads differently in 9
+    /// languages). Nil for skips and cancels, which get no button.
+    enum FailureKind: Equatable {
+        case tunnel, signIn, revoked, other
+    }
+
     enum State: Equatable {
         case pending, working, done
         case failed(String)
@@ -412,6 +420,7 @@ struct RefreshJob: Identifiable, Equatable {
     /// Team ID the app is currently signed under (from its current profile).
     let teamID: String?
     var state: State = .pending
+    var failureKind: FailureKind?
 
     var id: String { bundleID }
 }
@@ -639,9 +648,12 @@ final class SideloadedAppsManager: ObservableObject {
     /// 照旧全续。`fromUI` 给单 App 续签入口（行滑动 / 详情页按钮）用：它也
     /// 只续指定 bundleID，但它是界面入口，守卫拦下时要像全量续签一样
     /// 置 lastError 弹原因，而不是像自动巡检那样只写日志。
+    /// `fromBackground` 给快捷指令 / 待续签入口（loadThenRefreshAll）用：
+    /// 它们调的也是无参 refreshAll()，与界面按钮撞衫，光看参数分不出
+    /// 前台后 — 完成通知只发给后台入口，界面入口不发（B-1，0.9.186）。
     /// F1 (0.9.153): single-app refresh — same guards, same team filter,
     /// only the entry point is new.
-    func refreshAll(onlyBundleIDs: Set<String>? = nil, fromUI: Bool = false) {
+    func refreshAll(onlyBundleIDs: Set<String>? = nil, fromUI: Bool = false, fromBackground: Bool = false) {
         let candidates = onlyBundleIDs.map { ids in
             refreshable.filter { ids.contains($0.bundleID) }
         } ?? refreshable
@@ -713,17 +725,32 @@ final class SideloadedAppsManager: ObservableObject {
         // 的连接错误。
         engine.refreshNetworkStatus()
         if !engine.vpnConnected && !engine.localDevVPNInstalled && !BuiltinTunnel.useBuiltinDirectly {
-            lastError = L("未安装 LocalDevVPN，请先安装 LocalDevVPN 再续签。")
+            // B-2 (0.9.186): C3/C27 同款分流 — the auto patrol must
+            // not leave a lastError behind (it has no UI to show it
+            // on, and the next open would pop a stale failure); only
+            // the UI entry sets it. The other guards in this function
+            // already split this way; this one didn't.
+            if showsFailure {
+                lastError = L("未安装 LocalDevVPN，请先安装 LocalDevVPN 再续签。")
+            }
             engine.log("⛔️ Refresh all: LocalDevVPN isn't installed.")
             return
         }
-        refreshTask = startRefresh(candidates, showsFailure: showsFailure, onlyBundleIDs: onlyBundleIDs)
+        refreshTask = startRefresh(candidates, showsFailure: showsFailure, onlyBundleIDs: onlyBundleIDs,
+                                   notifyCompletion: fromBackground || (onlyBundleIDs != nil && !fromUI))
     }
 
     /// Refreshes `selected` in the background, as the page lists them. A run
     /// that can't start says why in a popup when `showsFailure` is set.
+    /// `notifyCompletion` is the background-only completion notification
+    /// (B-1): patrol, Shortcuts and pending-refresh runs report by
+    /// notification because nobody is watching; UI runs report on the
+    /// page itself. It is NOT `!showsFailure` — the Shortcuts entry
+    /// shares refreshAll()'s no-arg call with the UI button, so the
+    /// distinction has to arrive as its own flag.
     @discardableResult
-    private func startRefresh(_ selected: [RefreshJob], showsFailure: Bool, onlyBundleIDs: Set<String>? = nil) -> Task<RefreshOutcome, Never> {
+    private func startRefresh(_ selected: [RefreshJob], showsFailure: Bool, onlyBundleIDs: Set<String>? = nil,
+                              notifyCompletion: Bool) -> Task<RefreshOutcome, Never> {
         jobs = selected
         isRefreshing = true
         lastError = nil
@@ -755,7 +782,13 @@ final class SideloadedAppsManager: ObservableObject {
                     : L("LocalDevVPN isn't connected. Connect it, then try again.")
                 if showsFailure { lastError = message }
                 engine.log("⛔️ Refresh all: \(message)")
-                jobs = []
+                // P1-4 (0.9.186): the jobs stay on the card as failed,
+                // with the tunnel next step, instead of vanishing —
+                // an empty card said nothing about what to do next.
+                for index in jobs.indices {
+                    jobs[index].state = .failed(message)
+                    jobs[index].failureKind = .tunnel
+                }
                 return RefreshOutcome(failure: message)
             }
             tunnelAcquired = true
@@ -770,7 +803,14 @@ final class SideloadedAppsManager: ObservableObject {
                 let raw = String(describing: error)
                 if showsFailure { lastError = message }
                 engine.log("⛔️ Refresh all: \(raw)")
-                jobs = []
+                // P1-4 (0.9.186): tunnel-acquire 同款 — the jobs stay
+                // as failed with the sign-in next step, instead of an
+                // empty card and a popup alone.
+                let kind = Self.failureKind(for: error)
+                for index in jobs.indices {
+                    jobs[index].state = .failed(message)
+                    jobs[index].failureKind = kind
+                }
                 return RefreshOutcome(failure: message)
             }
 
@@ -858,6 +898,8 @@ final class SideloadedAppsManager: ObservableObject {
                         for index in jobs.indices where jobs[index].teamID == team {
                             jobs[index].state = .failed(
                                 L("Couldn't sign in as %@ (%@). Switch to that account and refresh again.", groupAccount.normalized, message))
+                            // P1-4 (0.9.186): the row's next step.
+                            jobs[index].failureKind = Self.failureKind(for: error)
                         }
                         engine.log("⛔️ Refresh group \(team) as \(groupAccount.normalized): sign-in failed: \(message)")
                         continue
@@ -912,6 +954,8 @@ final class SideloadedAppsManager: ObservableObject {
                         let message = userFacingErrorMessage(error)
                         let raw = String(describing: error)
                         jobs[index].state = .failed(message)
+                        // P1-4 (0.9.186): the row's next step.
+                        jobs[index].failureKind = Self.failureKind(for: error)
                         // B5：续签失败，注销源路径（与 .working 登记配对）。
                         engine.renewingSourcePaths.remove(job.ipa.path)
                         engine.log("⛔️ Refresh \(job.name): \(raw)")
@@ -950,20 +994,29 @@ final class SideloadedAppsManager: ObservableObject {
             if refreshed == jobs.count {
                 setBackgroundRefreshResult(nil)
             }
-            // Post local notification for background resign
-            let content = UNMutableNotificationContent()
-            content.title = refreshed > 0 ? L("续签成功") : L("续签完成")
-            content.body = refreshSummary ?? L("Refreshed %d of %d apps.", refreshed, jobs.count)
-            content.sound = .default
-            let request = UNNotificationRequest(identifier: "resign-done", content: content, trigger: nil)
-            do {
-                try await UNUserNotificationCenter.current().add(request)
-            } catch {
-                engine.log("Refresh all: completion notification failed to send (\(error.localizedDescription)).")
-                // C11：通知是后台续签唯一的出口——发不出去又有失败，
-                // 把结果存下来，下次打开应用页时在列表上方显示。
-                if refreshed < jobs.count {
-                    setBackgroundRefreshResult(refreshSummary ?? L("Refreshed %d of %d apps.", refreshed, jobs.count))
+            // B-1 (0.9.186): the completion notification is the
+            // background run's only report — a manual foreground run
+            // is watched on this page already, so it gets no banner
+            // on top of its own card (the comment always said
+            // "background resign"; the code posted for every run).
+            // The C11 fallback below belongs to the same gate: a
+            // foreground run's failures are already on screen.
+            if notifyCompletion {
+                // Post local notification for background resign
+                let content = UNMutableNotificationContent()
+                content.title = refreshed > 0 ? L("续签成功") : L("续签完成")
+                content.body = refreshSummary ?? L("Refreshed %d of %d apps.", refreshed, jobs.count)
+                content.sound = .default
+                let request = UNNotificationRequest(identifier: "resign-done", content: content, trigger: nil)
+                do {
+                    try await UNUserNotificationCenter.current().add(request)
+                } catch {
+                    engine.log("Refresh all: completion notification failed to send (\(error.localizedDescription)).")
+                    // C11：通知是后台续签唯一的出口——发不出去又有失败，
+                    // 把结果存下来，下次打开应用页时在列表上方显示。
+                    if refreshed < jobs.count {
+                        setBackgroundRefreshResult(refreshSummary ?? L("Refreshed %d of %d apps.", refreshed, jobs.count))
+                    }
                 }
             }
             let outcome = RefreshOutcome(jobs: jobs)
@@ -1022,7 +1075,7 @@ final class SideloadedAppsManager: ObservableObject {
         // gives an action in the background.
         keepAlive.startAudio()
         defer { keepAlive.stopAudio() }
-        let run = startRefresh(selected, showsFailure: false, onlyBundleIDs: bundleIDs)
+        let run = startRefresh(selected, showsFailure: false, onlyBundleIDs: bundleIDs, notifyCompletion: true)
         // Stopping the shortcut stops the run after the app being refreshed,
         // as the page's Stop does.
         let outcome = await withTaskCancellationHandler {
@@ -1202,7 +1255,10 @@ final class SideloadedAppsManager: ObservableObject {
         // B-4（SIDE-33）：load 的数秒内另起了一轮续签时静默返回——
         // 再调 refreshAll() 会撞 isRefreshing 守卫、弹一条假错误。
         guard !isRefreshing else { return }
-        refreshAll()
+        // B-1 (0.9.186): this is the Shortcuts / pending-refresh entry —
+        // background, so the run reports by notification (the UI button
+        // calls the same no-arg refreshAll(), hence the flag).
+        refreshAll(fromBackground: true)
     }
 
     private func postResignNotification(title: String, body: String) async {
@@ -1225,6 +1281,30 @@ final class SideloadedAppsManager: ObservableObject {
     /// A thrown error as the page should print it.
     private static func text(for error: Error) -> String {
         (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+    }
+
+    /// P1-4 (0.9.186): classifies a refresh error for the failed row's
+    /// next-step button. Reads the raw error, never the localized
+    /// message — the same failure reads differently in 9 languages.
+    /// Order matters: a revoked-certificate message also mentions
+    /// signing in, and a tunnel message also mentions the connection.
+    static func failureKind(for error: Error) -> RefreshJob.FailureKind {
+        let raw = ((error as? LocalizedError)?.errorDescription ?? String(describing: error)).lowercased()
+        if raw.contains("localdevvpn") || raw.contains("tunnel")
+            || raw.contains("device link dropped") || raw.contains("couldn't reach") {
+            return .tunnel
+        }
+        if raw.contains("revok") || raw.contains("7460")
+            || raw.contains("no certificate on team") {
+            return .revoked
+        }
+        if Engine.isCredentialError(raw) || Engine.isAccountLocked(raw)
+            || raw.contains("no apple id") || raw.contains("not signed in")
+            || raw.contains("sign in") || raw.contains("two-factor")
+            || raw.contains("verification") || raw.contains("password") {
+            return .signIn
+        }
+        return .other
     }
 
     /// Finds which listed apps have a matching IPA in Documents. The IPAs are
@@ -1636,7 +1716,81 @@ struct AppsView: View {
                 }
                 .foregroundStyle(Theme.accent)
                 .disabled(manager.isRefreshing)
+                // P1-4 (0.9.186): the failure is not a dead end — the
+                // Guide card's steps for this kind of failure, plus
+                // the one tap that starts fixing it. The kind was
+                // recorded where the failure happened, never read off
+                // the localized text. Skips and cancels carry no kind
+                // and keep only "Try again".
+                if let kind = job.failureKind, kind != .other {
+                    ForEach(nextSteps(for: kind), id: \.self) { step in
+                        HStack(alignment: .top, spacing: 6) {
+                            Text("•")
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                            Text(step)
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    nextStepButton(for: kind)
+                }
             }
+        }
+    }
+
+    /// P1-4 (0.9.186): the Guide card's steps for this failure kind,
+    /// reused on the failed row. Revoked has none here — its Guide's
+    /// steps name the install page's "Revoke and retry" button, which
+    /// doesn't exist on this page; the Certificates page is the fix.
+    private func nextSteps(for kind: RefreshJob.FailureKind) -> [String] {
+        switch kind {
+        case .tunnel: return Guides.vpn.steps
+        case .signIn: return Guides.account.steps
+        case .revoked, .other: return []
+        }
+    }
+
+    /// P1-4 (0.9.186): the one tap that starts fixing this failure.
+    /// Tunnel opens LocalDevVPN (App Store when it isn't installed);
+    /// sign-in jumps to Settings › Account; revoked opens the
+    /// Certificates page. Nothing here re-signs with another team —
+    /// the fix is always on the current login's own road (iron rule).
+    @ViewBuilder
+    private func nextStepButton(for kind: RefreshJob.FailureKind) -> some View {
+        switch kind {
+        case .tunnel:
+            Button {
+                if !engine.startLocalDevVPN(), let url = Guides.vpn.actionURL {
+                    openURL(url)
+                }
+            } label: {
+                Label(L("去连 LocalDevVPN"), systemImage: "network")
+                    .font(.footnote.weight(.semibold))
+            }
+            .foregroundStyle(Theme.accent)
+            .disabled(manager.isRefreshing)
+        case .signIn:
+            Button {
+                NotificationCenter.default.post(name: Engine.revealAccount, object: nil)
+            } label: {
+                Label(L("重新登录"), systemImage: "person.crop.circle.badge.plus")
+                    .font(.footnote.weight(.semibold))
+            }
+            .foregroundStyle(Theme.accent)
+            .disabled(manager.isRefreshing)
+        case .revoked:
+            Button {
+                NotificationCenter.default.post(name: Engine.revealCertificates, object: nil)
+            } label: {
+                Label(L("去证书页看"), systemImage: "checkmark.seal")
+                    .font(.footnote.weight(.semibold))
+            }
+            .foregroundStyle(Theme.accent)
+            .disabled(manager.isRefreshing)
+        case .other:
+            EmptyView()
         }
     }
 

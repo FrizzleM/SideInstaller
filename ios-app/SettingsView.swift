@@ -16,6 +16,14 @@ struct SettingsView: View {
     /// activity log; the body scrolls to it, then clears the flag
     /// (enterpriseRequest 同款 one-shot).
     var logRequest: Binding<Bool> = .constant(false)
+    /// P1-1/P1-4 (0.9.186): a "Go to Settings" action asks for the
+    /// Account section; the body scrolls to it, then clears the flag
+    /// (logRequest 同款 one-shot).
+    var accountRequest: Binding<Bool> = .constant(false)
+    /// P1-4 (0.9.186): a failed refresh asks for the Certificates
+    /// page; the tools NavigationLink opens it, then clears the flag
+    /// (enterpriseRequest 同款 one-shot).
+    var certRequest: Binding<Bool> = .constant(false)
     @Environment(Engine.self) private var engine
     /// Observed for the language picker, and to redraw on language change.
     @EnvironmentObject private var loc: Localizer
@@ -110,7 +118,7 @@ struct SettingsView: View {
         NavigationStack {
             ScrollViewReader { proxy in
             Form {
-                accountSection
+                accountSection.id("account")
                 enterpriseSection
                 toolsSection
                 languageSection
@@ -172,6 +180,14 @@ struct SettingsView: View {
                 guard requested else { return }
                 logRequest.wrappedValue = false
                 proxy.scrollTo("activityLog", anchor: .top)
+            }
+            // P1-1/P1-4 (0.9.186): a "Go to Settings" action — scroll
+            // the Account section into view, then clear the flag
+            // (logRequest 同款 one-shot).
+            .onChange(of: accountRequest.wrappedValue) { _, requested in
+                guard requested else { return }
+                accountRequest.wrappedValue = false
+                proxy.scrollTo("account", anchor: .top)
             }
             }
         }
@@ -335,7 +351,7 @@ struct SettingsView: View {
                 NavigationLink { JITView(manager: jitManager) } label: {
                     ToolRow(icon: "bolt.fill", color: Theme.badgeWarning, title: L("JIT"))
                 }
-                NavigationLink { CertsView(manager: certManager) } label: {
+                NavigationLink(destination: CertsView(manager: certManager), isActive: certRequest) {
                     ToolRow(icon: "checkmark.seal", color: Theme.blue, title: L("Apple ID 证书"))
                 }
                 NavigationLink { EntitlementsView(manager: entitlementsManager) } label: {
