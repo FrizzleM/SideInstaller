@@ -32,18 +32,18 @@
       "iconURL": "https://raw.githubusercontent.com/FrizzleM/Nightflix/main/NightFlix/Assets.xcassets/AppIcon.appiconset/AppIcon-Light.png",
       "subtitle": "An iOS movie and series streaming app",
       "localizedDescription": "New here? Read the wiki",
-      "version": "3.0.0",
-      "versionDate": "2026-11-19T12:39:30Z",
-      "versionDescription": "Nightflix 3.0 is a complete redesign.\n\n- New Netflix-style interface: Home with Series / Films / Categories filters, a featured title, Top 10 rows, Continue Watching and \"Because You Watched\" rows\n- New & Hot tab: Coming Soon with release reminders, Everyone's Watching, and today's Top 10 series and films\n- My Nightflix tab: Continue Watching, My List, titles you've rated, reminders and recently watched\n- Tap a title for a quick preview, or open its full page with episodes, More Like This and trailers\n- Search also finds titles by actor\n- New built-in player (VidFast) with resume and episode autoplay\n- The player opens in landscape and plays sound even with the silent switch on",
-      "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v3.0.0/Nightflix.ipa",
-      "size": 6293121,
+      "version": "3.0.1",
+      "versionDate": "2026-11-27T10:15:25Z",
+      "versionDescription": "- Fixes player buttons (fullscreen, settings, skip) that often did not respond to taps. Ad scripts on the player page were swallowing every tap; they can no longer block the player's controls.\n- Note: when the player's controls have hidden themselves, the first tap only brings them back, as in Safari.",
+      "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v3.0.1/Nightflix.ipa",
+      "size": 6318722,
       "versions": [
         {
-          "version": "3.0.0",
-          "date": "2026-11-19T12:39:30Z",
-          "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v3.0.0/Nightflix.ipa",
-          "localizedDescription": "Nightflix 3.0 is a complete redesign.\n\n- New Netflix-style interface: Home with Series / Films / Categories filters, a featured title, Top 10 rows, Continue Watching and \"Because You Watched\" rows\n- New & Hot tab: Coming Soon with release reminders, Everyone's Watching, and today's Top 10 series and films\n- My Nightflix tab: Continue Watching, My List, titles you've rated, reminders and recently watched\n- Tap a title for a quick preview, or open its full page with episodes, More Like This and trailers\n- Search also finds titles by actor\n- New built-in player (VidFast) with resume and episode autoplay\n- The player opens in landscape and plays sound even with the silent switch on",
-          "size": 6293121
+          "version": "3.0.1",
+          "date": "2026-11-27T10:15:25Z",
+          "downloadURL": "https://github.com/FrizzleM/Nightflix/releases/download/v3.0.1/Nightflix.ipa",
+          "localizedDescription": "- Fixes player buttons (fullscreen, settings, skip) that often did not respond to taps. Ad scripts on the player page were swallowing every tap; they can no longer block the player's controls.\n- Note: when the player's controls have hidden themselves, the first tap only brings them back, as in Safari.",
+          "size": 6318722
         }
       ],
       "screenshotURLs": [
