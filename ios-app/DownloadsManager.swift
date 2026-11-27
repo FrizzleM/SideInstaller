@@ -489,14 +489,29 @@ struct DownloadsListView: View {
     }
 
     /// F-2 (0.9.162): the in-flight row's speed line — SourcesView's
-    /// `downloadDetailLine` 同款 minus the ETA (this row shows the
-    /// percent already; the estimate lives on the source row).
+    /// `downloadDetailLine` 同款。
+    /// F-1 (0.9.183): the ETA joins it — the estimate was only on the
+    /// source row, so switching to this page hid how long was left.
+    /// Same shape and key (`%@ left`) as SourcesView, same helper below.
     private var downloadDetailLine: String {
         let speed = L("%@/s", ByteCountFormatter.string(fromByteCount: Int64(downloader.downloadSpeed), countStyle: .file))
         if downloader.totalBytesExpected > 0 {
-            return "\(speed) • \(L("%@ of %@", ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file), ByteCountFormatter.string(fromByteCount: downloader.totalBytesExpected, countStyle: .file)))"
+            let of = L("%@ of %@", ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file), ByteCountFormatter.string(fromByteCount: downloader.totalBytesExpected, countStyle: .file))
+            if let eta = downloader.estimatedTimeRemaining {
+                return "\(speed) • \(of) • \(L("%@ left", Self.etaText(eta)))"
+            }
+            return "\(speed) • \(of)"
         }
         return "\(speed) • \(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: downloader.bytesWritten, countStyle: .file)))"
+    }
+
+    /// "3:42", or "1:12:33" past the hour, for a remaining-time estimate —
+    /// SourcesView.etaText 同款（F-1, 0.9.183）。
+    private static func etaText(_ eta: TimeInterval) -> String {
+        let total = Int(eta.rounded())
+        let h = total / 3600, m = (total % 3600) / 60, s = total % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
+        return String(format: "%d:%02d", m, s)
     }
 
     /// A-39-2：下载行日期文案静态缓存——照抄 SIDE-38 A4 的
@@ -1034,7 +1049,11 @@ struct DownloadsListView: View {
             return
         }
         let targets = downloader.failedDownloads
-        guard targets.count >= 2 else { return }
+        // B-2 (0.9.183): the button's gate was opened for a single row
+        // in 0.9.182 (B-3) but this `count >= 2` stayed — one failed
+        // row made Retry all tappable and then silently do nothing.
+        // The row's own Try again is the same tap; one row is enough.
+        guard !targets.isEmpty else { return }
         retryAllTask = Task {
             for failed in targets {
                 if Task.isCancelled { break }

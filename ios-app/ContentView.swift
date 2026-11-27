@@ -56,6 +56,13 @@ struct ContentView: View {
     @State private var lastTunnelReconnect = Date.distantPast
     /// Text in the IPA download-link field.
     @State private var ipaLink = ""
+    /// B-1 (0.9.183): the clipboard's link, as state — the old computed
+    /// property only re-read the pasteboard when the body happened to
+    /// re-run, and nothing re-ran it when the app came back to the
+    /// foreground, so a link copied in Safari never raised the paste
+    /// button until some other state changed. Refreshed on appear and
+    /// on every foreground return (below).
+    @State private var clipboardLinkState: String?
     @FocusState private var linkFieldFocused: Bool
 
     var body: some View {
@@ -178,6 +185,14 @@ struct ContentView: View {
                 Text(L("LocalDevVPN 的隧道只能在 LocalDevVPN 里关。过去关掉后，回到这里 pill 会自动变回关闭态。"))
             }
             .scrollDismissesKeyboard(.interactively)
+            // B-1 (0.9.183): re-read the clipboard when this page appears
+            // and whenever the app returns to the foreground — a link
+            // copied in another app must raise the paste button at once,
+            // not on the next unrelated body refresh.
+            .onAppear { refreshClipboardLink() }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                refreshClipboardLink()
+            }
             // SIDE-2：安装页不再预连隧道（2026-11-21 用户亲令按需开）：
             // 以前打开安装页即拉、WiFi 后连上再补一次，什么都没点隧道
             // 已经起了。隧道只在需要它的操作开始时起（见 Engine 租约）。
@@ -708,7 +723,7 @@ struct ContentView: View {
                 // only when the clipboard holds an http(s) link that
                 // `Engine.downloadLink` accepts; otherwise the button
                 // stays hidden instead of pasting plain text.
-                if let clipboardLink {
+                if let clipboardLink = clipboardLinkState {
                     Button { ipaLink = clipboardLink } label: {
                         Image(systemName: "doc.on.clipboard")
                             .foregroundStyle(Theme.muted)
@@ -777,7 +792,9 @@ struct ContentView: View {
     /// F-1 (0.9.181): the clipboard's link, when it holds an http(s)
     /// URL that `Engine.downloadLink` accepts — nil for plain text or
     /// any other scheme, so the paste button never offers junk.
-    private var clipboardLink: String? {
+    /// B-1 (0.9.183): read on demand into `clipboardLinkState`, not as
+    /// a computed property — see the state's comment.
+    private static func readClipboardLink() -> String? {
         guard let text = UIPasteboard.general.string?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
               !text.isEmpty else { return nil }
@@ -785,6 +802,11 @@ struct ContentView: View {
         guard lowered.hasPrefix("http://") || lowered.hasPrefix("https://"),
               Engine.downloadLink(text) != nil else { return nil }
         return text
+    }
+
+    /// B-1 (0.9.183): re-read the clipboard into state.
+    private func refreshClipboardLink() {
+        clipboardLinkState = Self.readClipboardLink()
     }
 
     /// F-3 (0.9.182): the last 5 links that really started a link
@@ -815,8 +837,13 @@ struct ContentView: View {
         // B1 (0.9.147): the task lives in the engine, so the link row can
         // cancel it — the old fire-and-forget Task had no handle.
         // F-3 (0.9.182): only a real start joins the recent links.
+        // F-2 (0.9.183): the field clears on a real start — the link
+        // already sits in Recent links, so clearing loses nothing, and
+        // a stale link left in the field invites a second tap that
+        // re-imports the same IPA.
         if engine.startLinkImport(link) {
             recordRecentLink(link)
+            ipaLink = ""
         }
     }
 

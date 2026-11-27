@@ -198,7 +198,15 @@ struct SourcesView: View {
         let q = sourceSearchText.trimmingCharacters(in: .whitespaces).lowercased()
         var list = store.sources
         if !q.isEmpty {
-            list = list.filter { $0.displayName.lowercased().contains(q) }
+            // B-3 (0.9.183): name or link — the other list pages match
+            // two fields (Apps: name or bundle ID, JIT: name or bundle
+            // ID, Downloads: name or filename), but this one only
+            // matched the display name, so searching by a pasted source
+            // URL found nothing.
+            list = list.filter {
+                $0.displayName.lowercased().contains(q)
+                    || $0.url.absoluteString.lowercased().contains(q)
+            }
         }
         switch sourceSort {
         case .default:
@@ -430,6 +438,17 @@ struct SourceAppsView: View {
         VStack(spacing: 12) {
             if source != nil {
                 searchBar
+                    .padding(.horizontal, 20)
+            }
+            // F-3 (0.9.183): when this source was last checked — the
+            // list page shows it on every row, but once inside a source
+            // there was no sign of the fetch's age. Same relative text
+            // as the row (`SourcesView.checkedText`).
+            if let source, let checked = source.lastCheckedAt {
+                Text(L("最后更新：%@", SourcesView.checkedText(for: checked)))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
             }
             List {
