@@ -1443,6 +1443,7 @@ let japaneseStrings: [String: String] = [
     "This only clears the list. Installed apps are not affected.": "一覧だけが消去されます。インストール済みの App には影響しません。",
     "empty account config": "アカウント設定が空です",
     "%d files, first %@: %@": "%d 個のファイル、最初は %@：%@",
+    "%d 个文件": "%d 個のファイル",
     "%@ isn't listed": "%@ は一覧にありません",
     "the data couldn't be read": "データを読み取れませんでした",
     "Couldn't reach this iPhone. Check the connection and try again.": "この iPhone に接続できません。接続を確認してから、もう一度お試しください。",

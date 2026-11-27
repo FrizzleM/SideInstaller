@@ -1392,6 +1392,7 @@ let turkishStrings: [String: String] = [
     "This only clears the list. Installed apps are not affected.": "Bu yalnızca listeyi temizler. Kurulu uygulamalar etkilenmez.",
     "empty account config": "Hesap yapılandırması boş",
     "%d files, first %@: %@": "%d dosya, ilki %@ : %@",
+    "%d 个文件": "%d dosya",
     "%@ isn't listed": "%@ listede yok",
     "the data couldn't be read": "Veriler okunamadı",
     "Couldn't reach this iPhone. Check the connection and try again.": "Bu iPhone'a ulaşılamıyor. Bağlantıyı kontrol edip yeniden deneyin.",

@@ -299,6 +299,9 @@ struct FilesTabView: View {
     @State private var systemFilesExpanded = false
     // F-2 (0.9.189)：文件夹组默认折叠（见 foldersGroup）。
     @State private var foldersExpanded = false
+    /// F-2 (0.9.190)：文件夹内视图的文件夹组展开态——与根目录的
+    /// foldersExpanded 分开，免得两处互相串。
+    @State private var foldersInDirExpanded = false
     /// U-UI：文件页顶部分段——文件列表 / 应用文件夹库。
     private enum FileViewTab { case files, library }
     @State private var fileView = FileViewTab.files
@@ -346,6 +349,18 @@ struct FilesTabView: View {
     }
     private var unsignedCount: Int { ipaCounts.unsigned }
     private var signedCount: Int { ipaCounts.signed }
+
+    /// B-4 (0.9.190)：顶栏与页尾的文件总数文案——合计 >0 时
+    /// “n 个文件 · 大小”，全是文件夹时总数为 0（文件夹 size 恒
+    /// 为 0），ByteCountFormatter 会把 0 字节渲染成 “Zero KB”。
+    /// 为 0 时只显示数量，不拼大小。只改展示，不动 totalSize 计算。
+    private func fileCountText(count: Int, totalSize: Int) -> String {
+        if totalSize > 0 {
+            return L("%d 个文件 · %@", count,
+                     ByteCountFormatter.string(fromByteCount: Int64(totalSize), countStyle: .file))
+        }
+        return L("%d 个文件", count)
+    }
 
     /// 文件列表排序：默认扫描顺序 / 名称 / 大小（大在前）/ 最新
     /// （修改时间晚在前）。只改显示顺序，不动磁盘顺序。
@@ -454,15 +469,17 @@ struct FilesTabView: View {
 
     /// F-2 (0.9.189)：文件夹组——默认折叠，只留一行组头 + 计数；组内行复用
     /// fileRow（点行进文件夹、长按菜单、圈选都不变）。搜索命中组内行时
-    /// 自动展开（items 已按搜索过滤，非空即有命中）。只在根目录出现；
-    /// 文件夹内视图仍走 folderSection 平铺，不另分组。
+    /// 自动展开（items 已按搜索过滤，非空即有命中）。
+    /// F-2 (0.9.190)：展开态由调用方传绑定——根目录用 foldersExpanded，
+    /// 文件夹内视图用 foldersInDirExpanded，两处互不串。
     private func foldersGroup(items: [LocalFileItem],
+                              expanded: Binding<Bool>,
                               renewalByPath: [String: RenewalSourceEntry],
                               renewalByBundleID: [String: RenewalSourceEntry]) -> some View {
-        let expanded = foldersExpanded || !fileSearchText.isEmpty
+        let isExpanded = expanded.wrappedValue || !fileSearchText.isEmpty
         return VStack(alignment: .leading, spacing: 12) {
             Button {
-                foldersExpanded.toggle()
+                expanded.wrappedValue.toggle()
             } label: {
                 HStack(spacing: 12) {
                     SectionTitle(title: L("Folder"), systemImage: "folder")
@@ -470,14 +487,14 @@ struct FilesTabView: View {
                     Text("\(items.count)")
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
-                    Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(Theme.muted)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            if expanded {
+            if isExpanded {
                 ForEach(items) { item in
                     fileRow(item, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID)
                     if item.id != items.last?.id {
@@ -1094,8 +1111,7 @@ struct FilesTabView: View {
                 VStack(spacing: 16) {
                     // 0.9.187：五 tab 全部用 BrandHeader（应用/源页已有）。
                     BrandHeader(icon: "folder.fill", title: L("文件列表")) {
-                        StatusDot(text: L("%d 个文件 · %@", files.count,
-                                          ByteCountFormatter.string(fromByteCount: Int64(partition.totalSize), countStyle: .file)),
+                        StatusDot(text: fileCountText(count: files.count, totalSize: partition.totalSize),
                                   color: files.isEmpty ? Theme.muted : Theme.positive)
                     }
                     .cascadeItem(0)
@@ -1448,7 +1464,22 @@ struct FilesTabView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
             } else {
-                folderSection(items: dirVisible, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID).cascadeItem(2)
+                // F-2 (0.9.190)：文件夹内视图也把文件夹拆出来单独成组
+                // （根目录同款默认折叠组头 + 计数，见 foldersGroup）——
+                // 0.9.189 的组只在根目录出现，进文件夹里还是平铺。
+                // 非文件夹行仍走 folderSection 平铺，行为一字不动。
+                let dirFolders = dirVisible.filter { $0.isDirectory }
+                let dirNonFolders = dirVisible.filter { !$0.isDirectory }
+                if !dirNonFolders.isEmpty {
+                    folderSection(items: dirNonFolders, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID).cascadeItem(2)
+                }
+                if !dirFolders.isEmpty {
+                    foldersGroup(items: dirFolders,
+                                 expanded: $foldersInDirExpanded,
+                                 renewalByPath: renewalByPath,
+                                 renewalByBundleID: renewalByBundleID)
+                        .cascadeItem(2)
+                }
             }
         } else if files.isEmpty {
             emptyCard.cascadeItem(2)
@@ -1488,6 +1519,7 @@ struct FilesTabView: View {
                 }
                 if !otherFolders.isEmpty {
                     foldersGroup(items: otherFolders,
+                                 expanded: $foldersExpanded,
                                  renewalByPath: renewalByPath,
                                  renewalByBundleID: renewalByBundleID)
                         .cascadeItem(4)
@@ -1528,8 +1560,7 @@ struct FilesTabView: View {
         fileInstallStatus
         importCard.cascadeItem(5)
         lanCard.cascadeItem(6)
-        Text(L("%d 个文件 · %@", files.count,
-               ByteCountFormatter.string(fromByteCount: Int64(partition.totalSize), countStyle: .file)))
+        Text(fileCountText(count: files.count, totalSize: partition.totalSize))
             .font(.footnote)
             .foregroundStyle(Theme.muted)
             .frame(maxWidth: .infinity, alignment: .center)
@@ -1800,12 +1831,17 @@ struct FilesTabView: View {
     }
 
     /// B-4 (0.9.189)：当前可见的可选项 id——与 filesBranchContent
-    /// 渲染的完全一致：文件夹内视图走 dirVisible；根目录走 IPA 列表
+    /// 渲染的完全一致：文件夹内视图走 dirVisible（文件夹组折起时
+    /// 组内行不可见，不进）；根目录走 IPA 列表
     /// + 其他文件（文件夹组/系统文件组折起时组内行不可见，不进）；
     /// 已签名栏只显示 IPA。搜索/切栏/类型筛全部复用同一批过滤函数。
     private func visibleSelectableIDs(partition: FilePartition) -> Set<String> {
         if !currentDir.isEmpty {
-            return Set(visibleDirItems(in: currentDirItems).map { $0.id })
+            // F-2 (0.9.190)：文件夹内文件夹组折起时组内行不可见，不进
+            // 全选——与根目录分支的 foldersExpandedNow 同款口径。
+            let visible = visibleDirItems(in: currentDirItems)
+            let foldersExpandedNow = foldersInDirExpanded || !fileSearchText.isEmpty
+            return Set(visible.filter { !$0.isDirectory || foldersExpandedNow }.map { $0.id })
         }
         var ids = Set(filteredIPAs(partition: partition).map { $0.id })
         guard fileTab == .unsigned else { return ids }

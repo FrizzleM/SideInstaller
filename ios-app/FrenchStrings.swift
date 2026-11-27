@@ -1480,6 +1480,7 @@ let frenchStrings: [String: String] = [
     "This only clears the list. Installed apps are not affected.": "Cela efface seulement la liste. Les apps installées ne sont pas affectées.",
     "empty account config": "Configuration du compte vide",
     "%d files, first %@: %@": "%d fichiers, le premier %@ : %@",
+    "%d 个文件": "%d fichiers",
     "%@ isn't listed": "%@ n'est pas répertorié",
     "the data couldn't be read": "Les données n'ont pas pu être lues",
     "Couldn't reach this iPhone. Check the connection and try again.": "Impossible de joindre cet iPhone. Vérifiez la connexion puis réessayez.",
