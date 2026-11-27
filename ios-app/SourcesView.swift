@@ -35,7 +35,22 @@ struct SourcesView: View {
     /// F-2 (0.9.182): the clipboard's link, when it holds an http(s)
     /// URL — ContentView's `clipboardLink` (0.9.181) 同款 gating, so
     /// the alert's Paste button never offers plain text.
-    private var clipboardSourceLink: String? {
+    /// B-2 (0.9.184): read into state on appear + foreground return,
+    /// not a computed property — the install page's paste button had
+    /// the same staleness (0.9.183 B-1): an alert opened before copying
+    /// never gained its Paste button, because nothing re-read the
+    /// clipboard while it stood.
+    @State private var clipboardSourceLink: String?
+
+    /// B-2 (0.9.184): re-read the clipboard into state.
+    private func refreshClipboardSourceLink() {
+        clipboardSourceLink = Self.readClipboardSourceLink()
+    }
+
+    /// The clipboard's link, when it holds an http(s) URL that
+    /// `Engine.downloadLink` accepts — nil for plain text or any other
+    /// scheme, so the Paste button never offers junk.
+    private static func readClipboardSourceLink() -> String? {
         guard let text = UIPasteboard.general.string?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
               !text.isEmpty else { return nil }
@@ -116,7 +131,10 @@ struct SourcesView: View {
             }
             .listStyle(.plain)
             .refreshable { await store.fetchAll(force: true) }
-            .task { store.syncURLs(); await store.fetchAll() }
+            .task { refreshClipboardSourceLink(); store.syncURLs(); await store.fetchAll() }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                refreshClipboardSourceLink()
+            }
             .onReceive(NotificationCenter.default.publisher(for: UnifiedSourceList.didChange)) { _ in
                 Task { @MainActor in store.syncURLs() }
             }
@@ -691,6 +709,17 @@ struct SourceAppsView: View {
                 } label: {
                     Label(L("Ignore this version"), systemImage: "eye.slash")
                 }
+            }
+            // F-1 (0.9.184): copy this app's IPA link — the source
+            // row's Copy link 同款（源 URL 换成应用直链）；没有直链
+            // 的行不显示。
+            if let link = app.downloadLink {
+                Button {
+                    UIPasteboard.general.string = link.absoluteString
+                } label: {
+                    Label(L("Copy link"), systemImage: "doc.on.doc")
+                }
+                .tint(Theme.muted)
             }
             // F-1 (0.9.161): uninstall the installed copy — only when this
             // source's app is on the device, never SideInstaller itself.

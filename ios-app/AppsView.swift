@@ -1839,6 +1839,16 @@ struct AppsView: View {
                                 }
                                 .tint(Theme.accent)
                             }
+                            // F-3 (0.9.184): one-tap copy of the bundle ID —
+                            // the detail page's field only copies by
+                            // long-press select; the row needs it for
+                            // searching Downloads / Files by bundle ID.
+                            Button {
+                                UIPasteboard.general.string = status.app.bundleID
+                            } label: {
+                                Label(L("Copy Bundle ID"), systemImage: "doc.on.doc")
+                            }
+                            .tint(Theme.muted)
                             // F-1 (0.9.161): uninstall the installed copy —
                             // never SideInstaller itself (it lists here too:
                             // it is installed with a provisioning profile).

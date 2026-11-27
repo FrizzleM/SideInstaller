@@ -1236,6 +1236,22 @@ struct FilesTabView: View {
         }
         .pickerStyle(.segmented)
         fileSearchBar
+            // B-1 (0.9.184): a Bundle ID search only matched rows the
+            // list had already parsed — `matching` reads the ID from
+            // `fileIPAInfo`, which visible-row `.task`s fill lazily, and
+            // `refreshFiles` only scans. So an IPA never scrolled into
+            // view was unfindable by its Bundle ID. When a query is up,
+            // parse the current tab's unparsed IPAs now (the loader
+            // dedupes by its tried-sets and writes back through its
+            // batcher, so the filter re-evaluates as infos land).
+            .task(id: fileSearchText) {
+                guard !fileSearchText.isEmpty else { return }
+                // Same filter set as `filteredIPAs` below — only the
+                // rows this search can show.
+                for item in partition.ipas where item.isIPA && fileTabMatches(item) && fileTypeMatches(item) && fileIPAInfo[item.url.path] == nil {
+                    loadFileIPAInfoAndIcon(for: item)
+                }
+            }
         // 排序：只改显示顺序（IPA 列表、文件夹内列表、其他文件
         // 组都按同一规则排）；默认保持扫描顺序，不动老习惯。
         HStack {

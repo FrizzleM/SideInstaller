@@ -1717,5 +1717,7 @@ let turkishStrings: [String: String] = [
     "从未自动续签": "Hiç otomatik yenilenmedi",
     "粘贴": "Yapıştır",
     "Recent links": "Son bağlantılar",
+    "Clear recent links": "Son bağlantıları temizle",
+    "Copy Bundle ID": "Bundle ID'yi kopyala",
 
 ]

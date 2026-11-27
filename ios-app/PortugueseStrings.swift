@@ -1791,5 +1791,7 @@ let portugueseStrings: [String: String] = [
     "从未自动续签": "Nunca renovado automaticamente",
     "粘贴": "Colar",
     "Recent links": "Links recentes",
+    "Clear recent links": "Limpar links recentes",
+    "Copy Bundle ID": "Copiar Bundle ID",
 
 ]

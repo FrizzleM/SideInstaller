@@ -1796,5 +1796,7 @@ let vietnameseStrings: [String: String] = [
     "从未自动续签": "Chưa từng tự động gia hạn",
     "粘贴": "Dán",
     "Recent links": "Liên kết gần đây",
+    "Clear recent links": "Xóa các liên kết gần đây",
+    "Copy Bundle ID": "Sao chép Bundle ID",
 
 ]

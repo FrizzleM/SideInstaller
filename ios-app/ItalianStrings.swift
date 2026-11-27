@@ -1800,5 +1800,7 @@ let italianStrings: [String: String] = [
     "从未自动续签": "Mai rinnovato automaticamente",
     "粘贴": "Incolla",
     "Recent links": "Link recenti",
+    "Clear recent links": "Cancella link recenti",
+    "Copy Bundle ID": "Copia Bundle ID",
 
 ]

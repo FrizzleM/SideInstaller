@@ -1759,5 +1759,7 @@ let japaneseStrings: [String: String] = [
     "从未自动续签": "自動更新したことがない",
     "粘贴": "貼り付け",
     "Recent links": "最近のリンク",
+    "Clear recent links": "最近のリンクを消去",
+    "Copy Bundle ID": "Bundle ID をコピー",
 
 ]

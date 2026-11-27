@@ -1771,5 +1771,7 @@ let chineseStrings: [String: String] = [
     "从未自动续签": "从未自动续签",
     "粘贴": "粘贴",
     "Recent links": "最近链接",
+    "Clear recent links": "清除最近链接",
+    "Copy Bundle ID": "复制 Bundle ID",
 
 ]

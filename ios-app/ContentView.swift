@@ -742,6 +742,13 @@ struct ContentView: View {
                         ForEach(recentLinks, id: \.self) { link in
                             Button(link) { ipaLink = link }
                         }
+                        Divider()
+                        // F-2 (0.9.184): clear the list — stale links
+                        // otherwise sit here until five newer ones push
+                        // them out, one by one.
+                        Button(L("Clear recent links"), role: .destructive) {
+                            recentLinks = []
+                        }
                     } label: {
                         Image(systemName: "clock")
                             .foregroundStyle(Theme.muted)

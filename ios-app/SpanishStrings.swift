@@ -1803,5 +1803,7 @@ let spanishStrings: [String: String] = [
     "从未自动续签": "Nunca renovado automáticamente",
     "粘贴": "Pegar",
     "Recent links": "Enlaces recientes",
+    "Clear recent links": "Borrar enlaces recientes",
+    "Copy Bundle ID": "Copiar Bundle ID",
 
 ]

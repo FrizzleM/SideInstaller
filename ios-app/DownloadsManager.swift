@@ -475,9 +475,15 @@ struct DownloadsListView: View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         var items = manager.downloads
         if !query.isEmpty {
+            // B-3 (0.9.184): Bundle ID too — Files and History search
+            // match it, but this one only matched the shown name and
+            // the filename, so a bundle ID copied from the Apps page
+            // found nothing. `appInfo` is cache-backed (fingerprint
+            // key), so this stays a lookup, not a re-parse per keystroke.
             items = items.filter {
                 $0.displayName.lowercased().contains(query)
                     || $0.fileName.lowercased().contains(query)
+                    || (IPALibrary.appInfo(at: $0.url)?.bundleID.lowercased().contains(query) == true)
             }
         }
         switch downloadSort {

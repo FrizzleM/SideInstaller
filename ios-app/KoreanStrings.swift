@@ -1760,5 +1760,7 @@ let koreanStrings: [String: String] = [
     "从未自动续签": "자동 갱신한 적 없음",
     "粘贴": "붙여넣기",
     "Recent links": "최근 링크",
+    "Clear recent links": "최근 링크 지우기",
+    "Copy Bundle ID": "Bundle ID 복사",
 
 ]

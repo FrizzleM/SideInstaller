@@ -1806,5 +1806,7 @@ let frenchStrings: [String: String] = [
     "从未自动续签": "Jamais renouvelé automatiquement",
     "粘贴": "Coller",
     "Recent links": "Liens récents",
+    "Clear recent links": "Effacer les liens récents",
+    "Copy Bundle ID": "Copier l’identifiant du bundle",
 
 ]
