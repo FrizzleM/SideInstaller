@@ -1659,6 +1659,82 @@ verified, since it needs an iPhone: a pairing that completes and goes on to
 load the apps, everything that talks to debugserver or DVT, the TXM answers,
 and the shared lockdown heartbeat.
 
+## Mobile Data Mode (beta)
+
+Built on branch `mobile-data-mode` (2026-11-27) to test which features it
+works for, and merged into main the same day once it worked on the user's
+iPhone (no per-feature results recorded). Before it, main only said to join
+Wi-Fi when this happens (4f22ebb).
+
+**Why.** While the iPhone is on mobile data and not on Wi-Fi, iOS keeps its
+remote pairing listener closed, so every new connection LocalDevVPN carries
+to 10.7.0.1:49152 is refused, on every port. In Airplane Mode (Wi-Fi off,
+LocalDevVPN still connected) the listener is open, and a tunnel opened then
+keeps working once mobile data is back. Both measured on an iPhone 16, iOS
+27.2.1, on 2026-11-26: Location started in Airplane Mode, then moved and
+reset with mobile data back. StikDebug's connection diagnosis gives the same
+advice (`ConnectionDiagnostics.swift`, "Enable Airplane Mode").
+
+**How.** `MobileDataMode.swift`:
+
+- *Asking.* Whatever the user starts runs as an action
+  (`MobileDataMode.run(feature)`, a task-local context that child tasks
+  inherit). On mobile data only, the first new tunnel an action needs puts up
+  the offer: Try Mobile Data Mode, or Use Wi-Fi Instead, which ends the action
+  like Cancel. It also says Wi-Fi is the stable, safer way. Nothing else on
+  this branch says Wi-Fi is needed: no "Wi-Fi required" card, no Wi-Fi wait or
+  gate before Install, and a refused port on mobile data says to turn on
+  Airplane Mode (Side by Side keeps its own, since it needs a shared network).
+  A page's own quiet attempts (auto-scan, auto-load, the Location page's
+  setup on open) aren't actions and never ask; on mobile data only they skip
+  unless a kept tunnel may be open.
+- *Airplane Mode on.* Before each new tunnel (`prepareNewTunnel`), the popup
+  walks through Control Center. It carries on by itself once mobile data is
+  gone and LocalDevVPN's route is still up, polling `NetworkStatus.links()`
+  every 0.4 s, and says so if LocalDevVPN dropped. Wi-Fi coming on instead
+  just carries on.
+- *Airplane Mode off.* Before a step that needs the internet
+  (`requireInternet`): the install's sign-in, download and signing, a refresh's
+  sign-in and each app's signing, the disk image's download and its Apple
+  personalization (TSS). It waits for mobile data and an internet path.
+- *Kept tunnel.* From the first yes until Wi-Fi is back, `connect` reuses the
+  open tunnel while lockdownd still answers through it
+  (`DeviceConnection.keepsOpenTunnel`, `tunnelAnswers`) instead of dialling
+  every time as on Wi-Fi. When the kept tunnel turns out closed (the dial is
+  refused with `TunnelError.refusedOnMobileData`), the Engine asks for
+  Airplane Mode again and dials once more (`Engine.openDeviceLink`).
+- *Done.* When an action ends with Airplane Mode still on, a note says it can
+  go off; it closes itself once the iPhone is online.
+
+The popups sit in a window of their own above the app (`MobileDataOverlay`),
+so they also show over the Settings and Report a problem sheets.
+
+**Per feature.**
+
+| Feature | New tunnels | Internet after |
+|---|---|---|
+| Install (incl. Sources, links, Shortcuts) | 1, plus 1 if the kept one closed before installing | sign-in, download, signing |
+| Pairing this iPhone | the pairing host, then 1 | none; Bonjour in Airplane Mode is the unknown |
+| Pairing › scan / write into apps | 1 | none |
+| Location | 1 | the disk image's download and TSS, when it isn't on yet |
+| JIT | 1 for the app list, 1 for the session's own tunnel | as Location |
+| Sideloaded apps, Refresh | 1 | sign-in, signing |
+| Crash logs, Developer Mode | 1 | none |
+| Shortcuts | come forward first, then as the feature | as the feature |
+| Side by Side | not offered: it talks to another iPhone over Wi-Fi | |
+
+Every step logs under "Mobile Data Mode:", and each action ends with a line
+counting its tunnels and Airplane Mode requests. Problem reports list mobile
+data and Mobile Data Mode.
+
+**Unknown until tested on the iPhone:** whether a kept tunnel survives the
+minutes of a sign-in with 2FA; whether new service connections inside a kept
+tunnel work once mobile data is back, not just the session already open, as
+Location showed; whether pairing can find SideInstaller with no Wi-Fi at all;
+whether the JIT session's tunnel stays up when Airplane Mode goes off; and
+whether `pdp_ip`'s IPv6 addresses linger in Airplane Mode, which would read as
+mobile data still being on.
+
 ## Running on a device (what you do)
 
 1. Install LocalDevVPN (App Store id 6755608044), connect it, keep Wi-Fi on.

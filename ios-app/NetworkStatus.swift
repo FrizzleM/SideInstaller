@@ -296,6 +296,56 @@ enum NetworkStatus {
         interfaces().contains { $0.ipv4 == deviceIP }
     }
 
+    /// Whether this iPhone is on Wi-Fi and on mobile data right now.
+    struct Links: Equatable {
+        /// `en0` has an IPv4 address, as `Scan.wifi` reads it.
+        let wifi: Bool
+        /// A `pdp_ip` interface is up with an IPv4 address, or an IPv6 one
+        /// that isn't link-local: an IPv6-only carrier gives it no IPv4.
+        let mobileData: Bool
+
+        /// On mobile data and not on Wi-Fi. iOS keeps this iPhone's remote
+        /// pairing listener closed then, so every new connection LocalDevVPN
+        /// carries to it is refused, on every port; a tunnel opened before
+        /// mobile data came back keeps working (iPhone 16, iOS 27.2.1,
+        /// 2026-11-26).
+        var mobileDataOnly: Bool { mobileData && !wifi }
+
+        /// For the log.
+        var summary: String {
+            "Wi-Fi \(wifi ? "on" : "off"), mobile data \(mobileData ? "on" : "off")"
+        }
+    }
+
+    static func links() -> Links {
+        var wifi = false
+        var mobileData = false
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddr) == 0, let first = ifaddr else {
+            return Links(wifi: false, mobileData: false)
+        }
+        defer { freeifaddrs(ifaddr) }
+        var ptr: UnsafeMutablePointer<ifaddrs>? = first
+        while let cur = ptr {
+            defer { ptr = cur.pointee.ifa_next }
+            let flags = Int32(cur.pointee.ifa_flags)
+            guard flags & IFF_UP != 0, flags & IFF_RUNNING != 0,
+                  let addr = cur.pointee.ifa_addr else { continue }
+            let name = String(cString: cur.pointee.ifa_name)
+            let family = Int32(addr.pointee.sa_family)
+            if name == "en0", family == AF_INET { wifi = true }
+            guard name.hasPrefix("pdp_ip") else { continue }
+            if family == AF_INET {
+                mobileData = true
+            } else if family == AF_INET6,
+                      let host = numericHost(addr, length: socklen_t(addr.pointee.sa_len)),
+                      !host.lowercased().hasPrefix("fe80") {
+                mobileData = true
+            }
+        }
+        return Links(wifi: wifi, mobileData: mobileData)
+    }
+
     /// Extra local addresses to try when the device's tunnel listener gives a
     /// port but no host. Wi-Fi (`en0`) first, since remote pairing runs over it.
     /// Loopback and tunnel interfaces are excluded; they're already tried.

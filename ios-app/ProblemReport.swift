@@ -54,6 +54,9 @@ struct ProblemReport {
         details += [
             connection("LocalDevVPN", engine.vpnConnected),
             connection("Wi-Fi", engine.wifiConnected),
+            connection("Mobile data", NetworkStatus.links().mobileData),
+            Detail(label: "Mobile Data Mode", value: MobileDataMode.shared.isOn ? "on" : "off",
+                   shown: MobileDataMode.shared.isOn ? L("on") : L("off")),
             Detail(label: "Device IP", value: engine.deviceHost),
             pairingFile(engine),
             developerMode,

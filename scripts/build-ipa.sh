@@ -59,11 +59,6 @@ if [ -n "$BUILD_NUMBER" ]; then
   [[ "$BUILD_NUMBER" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || die "BUILD_NUMBER must be up to three numbers (got: $BUILD_NUMBER)"
 fi
 
-# build-rust.sh defaults to Xcode-beta; use the selected Xcode instead.
-if [ -z "${DEVELOPER_DIR:-}" ]; then
-  DEVELOPER_DIR="$(xcode-select -p)"
-fi
-export DEVELOPER_DIR
 # shellcheck disable=SC1091
 # Only when cargo isn't on PATH already: GitHub's macOS runner has it there,
 # and sourcing that runner's env file ended the script without a word

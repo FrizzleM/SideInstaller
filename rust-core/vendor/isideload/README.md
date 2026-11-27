@@ -839,7 +839,11 @@ closed because Dadoum fixed it in the Tangled repository instead; crates.io
 still has only 0.1.0 (checked 2026-11-09).
 
 A re-vendor has to keep change 15 too, unless upstream gates those uses itself,
-or `rust-core/Cargo.toml` has to turn `install` back on.
+or `rust-core/Cargo.toml` has to turn `install` back on. Upstream pull request
+nab138/isideload#33 (opened 2026-11-09 from FrizzleM's fork) does that on top of
+`326e562`, where `sideloader.rs` also imports `DevicesApi` only for
+`install_app`, so that is gated too. On that base the check without `install`
+needs `--features tokio-mt,fs-storage`.
 
 Change 2 is upstream on the `apple-codesign-quick` branch at `f6a4d5d` (what
 iLoader 2.3.3 pins) but was not on `main` (`b6d1113`) as of 2026-09-13. A

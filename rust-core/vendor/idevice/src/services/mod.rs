@@ -12,6 +12,8 @@ pub mod core_device;
 pub mod core_device_proxy;
 #[cfg(feature = "crashreportcopymobile")]
 pub mod crashreportcopymobile;
+#[cfg(feature = "cryptexd")]
+pub mod cryptexd;
 #[cfg(feature = "debug_proxy")]
 pub mod debug_proxy;
 #[cfg(feature = "diagnostics_relay")]

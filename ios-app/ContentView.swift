@@ -99,14 +99,11 @@ struct ContentView: View {
                     }
                     // 企业证书签名在设置页的企业证书区（功能更全），安装页不再放卡片。
                     // Most-blocking requirement first: an unsupported iOS, then
-                    // Wi-Fi if this run must pair, then the missing tunnel.
+                    // the missing tunnel. No Wi-Fi card: without Wi-Fi, Mobile
+                    // Data Mode (beta) offers Airplane Mode instead.
                     if !engine.isRunning {
                         if !engine.osSupported {
                             osRequirement.cascadeItem(cascade(2))
-                        // Only a run that pairs itself needs Wi-Fi; an imported
-                        // pairing file never touches the local network.
-                        } else if !engine.wifiConnected, engine.needsFreshPairing, engine.canSelfPair {
-                            wifiRequirement.cascadeItem(cascade(2))
                         // Not when Install starts LocalDevVPN itself.
                         } else if !engine.tunnelAvailable, !BuiltinTunnel.useBuiltinDirectly {
                             vpnRequirement.cascadeItem(cascade(2))
@@ -1581,15 +1578,6 @@ struct ContentView: View {
             pairingImportButton
             pairingDocsLink
         }
-    }
-
-    // MARK: Wi-Fi requirement
-
-    /// Shown while Wi-Fi is off, which pairing needs.
-    private var wifiRequirement: some View {
-        requirementCard(systemImage: "wifi.slash", tint: Theme.negative,
-                        title: L("Wi-Fi required"),
-                        message: L("Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network."))
     }
 
     // MARK: Loopback-VPN requirement

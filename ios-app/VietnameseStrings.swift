@@ -189,7 +189,6 @@ let vietnameseStrings: [String: String] = [
     "iOS %@ required": "Yêu cầu iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "iPhone này đang chạy iOS %@, SideInstaller không thể cài đặt trên phiên bản đó. Cập nhật lên iOS %@ trở lên trong Cài đặt › Cài đặt chung › Cập nhật phần mềm.",
-    "Wi-Fi required": "Yêu cầu Wi-Fi",
     "Pairing code": "Mã ghép nối",
     "Type this into the prompt in Settings.":
         "Nhập mã này vào hộp thoại trong Cài đặt.",
@@ -291,16 +290,7 @@ let vietnameseStrings: [String: String] = [
 
     // MARK: - Pairing service status
 
-    "not paired": "chưa ghép nối",
     "connected": "đã kết nối",
-    "requesting Local Network…": "đang xin quyền Mạng cục bộ…",
-    "Local Network denied": "quyền Mạng cục bộ bị từ chối",
-    "waiting for device…": "đang chờ thiết bị…",
-    "advertising — open Settings › Privacy & Security › Developer Mode":
-        "đang phát tín hiệu — mở Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển",
-    "enter PIN %@ in Settings": "nhập mã PIN %@ trong Cài đặt",
-    "paired: %@ (%dB)": "đã ghép nối: %@ (%d B)",
-    "failed: empty pairing file": "lỗi: tệp ghép nối rỗng",
     "failed: %@": "lỗi: %@",
     "Pairing is already in progress.": "Quá trình ghép nối đang diễn ra.",
     "Local Network permission is off. Enable it in Settings › SideInstaller › Local Network, then try again.":
@@ -382,7 +372,6 @@ let vietnameseStrings: [String: String] = [
     "That isn't a valid coordinate.": "Tọa độ đó không hợp lệ.",
     "Location session closed — set it up again.": "Phiên vị trí đã đóng — hãy thiết lập lại.",
     "Downloading %@ failed (HTTP %d).": "Tải %@ thất bại (HTTP %d).",
-    "The download of %@ came back empty. Try again.": "Tải xuống %@ về trống. Hãy thử lại.",
     "Couldn't build the download URL for %@.": "Không thể tạo URL tải cho %@.",
     "Couldn't build the certificate link.": "Không thể tạo liên kết chứng chỉ.",
 
@@ -394,10 +383,10 @@ let vietnameseStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "Chạm Lưu bên dưới bản đồ để giữ lại điểm dưới ghim. Chạm vào một địa điểm đã lưu để đặt ngay.",
     "Play a GPX route": "Phát lộ trình GPX",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        "Nhập tệp .gpx và thiết bị sẽ di chuyển theo nó với tốc độ bạn chọn, rồi dừng ở điểm cuối.",
     "Import GPX file": "Nhập tệp GPX",
     "Couldn't read %@ as a GPX file.": "Không thể đọc %@ dưới dạng tệp GPX.",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "Không thể đọc %@ dưới dạng tuyến đường. Hãy nhập tệp GPX, KML hoặc GeoJSON, hoặc tệp có vĩ độ và kinh độ trên mỗi dòng.",
     "%@ has no track, route or waypoints in it.": "%@ không có track, route hay waypoint nào.",
     "As recorded": "Như đã ghi",
     "Walk": "Đi bộ",
@@ -719,6 +708,8 @@ let vietnameseStrings: [String: String] = [
         "Có thứ gì đó ở %@:%d đã từ chối kết nối, nghĩa là đường hầm vẫn thông, nhưng iPhone này không lắng nghe trên cổng ghép nối dù Chế độ nhà phát triển đang bật. Hãy ghép nối lại iPhone này trong “Tệp ghép nối” rồi thử lại. Nếu vẫn lỗi, hãy khởi động lại iPhone.",
     "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
         "Có thứ gì đó ở %@:%d đã nhận kết nối nhưng không trả lời như cổng ghép nối của iPhone này, và cũng không có cổng nào khác trả lời như vậy. Hãy kiểm tra rằng VPN đang bật là LocalDevVPN và Chế độ nhà phát triển đang bật (Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển) rồi thử lại. Nếu vẫn lỗi, hãy khởi động lại iPhone.",
+    "This iPhone is on mobile data, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Turn on Airplane Mode, keep LocalDevVPN connected, then try again.":
+        "iPhone này đang dùng dữ liệu di động, và khi đó iOS đóng cổng ghép nối của nó, nên %@:%d đã từ chối kết nối. Hãy bật Chế độ máy bay, giữ LocalDevVPN kết nối rồi thử lại.",
     "Start LocalDevVPN when needed": "Khởi động LocalDevVPN khi cần",
     "Start LocalDevVPN now": "Khởi động LocalDevVPN ngay",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -925,8 +916,6 @@ let vietnameseStrings: [String: String] = [
     "Then come back here — this continues automatically.":
         "Sau đó quay lại đây: quá trình sẽ tự tiếp tục.",
     "Tap Connect so the toggle turns on.": "Chạm vào Connect để công tắc bật lên.",
-    "Keep Wi-Fi on, then come back here — this continues automatically.":
-        "Giữ Wi-Fi bật rồi quay lại đây: quá trình sẽ tự tiếp tục.",
     "Get LocalDevVPN": "Tải LocalDevVPN",
     "Import an .ipa first": "Hãy nhập một .ipa trước",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
@@ -1066,6 +1055,16 @@ let vietnameseStrings: [String: String] = [
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
+    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
+        "Bấm “Save to file…” rồi gửi tệp sang iPhone này bằng AirDrop, iCloud Drive hoặc cáp. Tệp ghép nối xuất từ iLoader cũng dùng được.",
+    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
+        "Quay lại đây, chạm “Thay” trên thẻ “Tệp ghép nối” và chọn tệp đó.",
+    "Get idevice_pair": "Tải idevice_pair",
+    "Make a remote pairing file": "Tạo một tệp “Remote pairing”",
+    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
+        "Trên Mac, PC Windows hoặc Linux, mở idevice_pair, cắm iPhone này vào và chạm Tin cậy nếu được hỏi. Chọn iPhone này, chọn “Remote pairing”, bấm “Create” và giữ iPhone này ở trạng thái mở khóa cho đến khi xong.",
+    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
+        "Tệp ghép nối bạn đã nhập là loại lockdown. Từ iOS 26.4, iPhone này ngắt kết nối với các tệp đó khi chúng đi qua LocalDevVPN, nên tệp này không kết nối được, và một tệp mới cùng loại cũng vậy.",
     "A certificate already exists": "Đã có một chứng chỉ",
     "Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone.":
         "Apple sẽ không cấp chứng chỉ ký thứ hai cho Apple ID này. Thu hồi chứng chỉ sẵn có sẽ giúp quá trình cài đặt tiếp tục — nhưng không thể hoàn tác.",
@@ -1117,13 +1116,13 @@ let vietnameseStrings: [String: String] = [
         "iPhone này đã ngắt kết nối ngay khi nó vừa mở. Từ iOS 26.4, nó làm vậy với các tệp ghép nối lockdown, như tệp này, khi chúng đi qua LocalDevVPN. Thay vào đó, hãy ghép nối iPhone này với chính nó: chạm “Tạo lại” trong Công cụ › Ghép nối, hoặc chạm Cài ứng dụng, thao tác này sẽ ghép nối trước.",
     "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
         "iPhone này đã ngắt kết nối ngay khi nó vừa mở. Từ iOS 26.4, nó làm vậy với các tệp ghép nối lockdown, như tệp này, khi chúng đi qua LocalDevVPN, nên tạo một tệp mới cùng loại cũng không giúp được gì. Tệp ghép nối “Remote pairing” vẫn dùng được: trên máy tính, mở idevice_pair, chọn “Remote pairing”, bấm “Create”, rồi “Save to file…”, và nhập tệp đó trong “Tệp ghép nối”.",
-    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
-        "Việc ghép nối iPhone này cần đến nó: SideInstaller quảng bá chính mình trên mạng nội bộ để Cài đặt tìm thấy.",
-    "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
-        "Hãy kết nối vào một mạng Wi-Fi. Việc ghép nối iPhone này cần đến nó — SideInstaller phải tìm thấy được trên mạng nội bộ.",
+    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
+        "iPhone này đã ngắt kết nối: từ iOS 26.4, nó làm vậy với các tệp ghép nối lockdown như tệp này khi chúng đi qua LocalDevVPN. Xem các bước ở trên.",
 
     // MARK: - About
 
+    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
+        "Việc ghép nối iPhone này cần đến nó: SideInstaller quảng bá chính mình trên mạng nội bộ để Cài đặt tìm thấy.",
     "About": "Giới thiệu",
     "Version %@ (%@)": "Phiên bản %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
@@ -1790,7 +1789,6 @@ let vietnameseStrings: [String: String] = [
     "All": "Tất cả",
     "Succeeded": "Thành công",
     "Restore real location when done": "Khôi phục vị trí thực khi xong",
-    "Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.": "Nhập tệp .gpx và thiết bị sẽ di chuyển theo nó với tốc độ bạn chọn. Khi xong, thiết bị dừng ở điểm cuối, trừ khi khôi phục vị trí thực khi xong đang bật.",
     "移动“%@”？": "Di chuyển \"%@\"?",
     "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "Đây là IPA trên tab Cài đặt. Di chuyển nó sẽ làm trống ô đó — hãy cài đặt từ thư mục mới của nó.",
     "Move": "Di chuyển",
@@ -1831,4 +1829,73 @@ let vietnameseStrings: [String: String] = [
     "系统文件": "Tệp hệ thống",
     "其他文件": "Tệp khác",
 
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "Tiếp theo, SideInstaller đăng nhập Apple, tải ứng dụng về và nhờ Apple ký nó, việc này cần internet.",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "Tiếp theo, SideInstaller đăng nhập Apple, việc này cần internet.",
+    "Next, Apple signs the app, which needs the internet.":
+        "Tiếp theo, Apple ký ứng dụng, việc này cần internet.",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "Tiếp theo, SideInstaller tải ảnh đĩa nhà phát triển về, việc này cần internet.",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "Tiếp theo, Apple ký ảnh đĩa nhà phát triển cho iPhone này, việc này cần internet.",
+    "Try Mobile Data Mode?":
+        "Thử Chế độ dữ liệu di động?",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "iPhone này đang dùng dữ liệu di động, không phải Wi-Fi, và khi đó iOS không nhận kết nối mới từ LocalDevVPN.",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "Chế độ dữ liệu di động vượt qua điều đó bằng Chế độ máy bay: bạn bật nó khi SideInstaller kết nối và tắt lại khi SideInstaller cần internet. SideInstaller sẽ báo cho bạn khi nào.",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "Wi-Fi là cách ổn định, và an toàn hơn. Để dùng nó, hãy bật Wi-Fi rồi thử lại.",
+    "Try Mobile Data Mode":
+        "Thử Chế độ dữ liệu di động",
+    "Use Wi-Fi Instead":
+        "Dùng Wi-Fi",
+    "Turn on Airplane Mode":
+        "Bật Chế độ máy bay",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "Kết nối SideInstaller giữ lại đã đóng, nên cần một kết nối mới.",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "Mở Trung tâm điều khiển: vuốt xuống từ góc trên cùng bên phải màn hình.",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "Chạm vào Chế độ máy bay để bật. Để Wi-Fi tắt và LocalDevVPN vẫn kết nối.",
+    "Come back to SideInstaller. It carries on by itself.":
+        "Quay lại SideInstaller. Nó sẽ tự tiếp tục.",
+    "Then pair this iPhone with SideInstaller in Settings, as usual.":
+        "Sau đó ghép nối iPhone này với SideInstaller trong Cài đặt như thường lệ.",
+    "Connecting in Airplane Mode":
+        "Đang kết nối ở Chế độ máy bay",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "Giữ Chế độ máy bay bật cho đến khi SideInstaller bảo bạn tắt.",
+    "Turn off Airplane Mode":
+        "Tắt Chế độ máy bay",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "SideInstaller đã kết nối, và vẫn giữ kết nối khi dữ liệu di động trở lại.",
+    "Open Control Center again.":
+        "Mở lại Trung tâm điều khiển.",
+    "Tap Airplane Mode to turn it off.":
+        "Chạm vào Chế độ máy bay để tắt.",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "Quay lại SideInstaller. Nó sẽ tiếp tục khi dữ liệu di động trở lại.",
+    "You can turn off Airplane Mode":
+        "Bạn có thể tắt Chế độ máy bay",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "Hiện SideInstaller không cần Chế độ máy bay nữa, và vẫn giữ kết nối cho việc bạn làm tiếp theo. Tắt Chế độ máy bay bất cứ lúc nào bạn muốn.",
+    "Waiting for Airplane Mode…":
+        "Đang chờ Chế độ máy bay…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "Chế độ máy bay đã bật, nhưng LocalDevVPN chưa kết nối. Hãy mở nó và kết nối lại.",
+    "Waiting for mobile data…":
+        "Đang chờ dữ liệu di động…",
+    "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
+        "iPhone này đang dùng dữ liệu di động. Hãy tiếp tục trong SideInstaller để dùng Chế độ dữ liệu di động.",
+    "Mobile data":
+        "Dữ liệu di động",
+    "Mobile Data Mode":
+        "Chế độ dữ liệu di động",
 ]
+
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
+        "Nhập tệp GPX, KML hoặc GeoJSON, hoặc một danh sách tọa độ, thiết bị sẽ di chuyển theo đó với tốc độ bạn chọn. Khi kết thúc, thiết bị ở lại điểm cuối cùng, trừ khi bạn đã bật khôi phục vị trí thực khi xong.",

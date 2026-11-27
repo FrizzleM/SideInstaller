@@ -5,185 +5,144 @@ import UniformTypeIdentifiers
 
 // MARK: - Developer disk image
 
-/// The three files of Apple's personalized developer disk image and where they
-/// are stored. Mounting the image enables DVT services such as location
-/// simulation. Downloaded on first use rather than bundled.
+/// Apple's developer disk image in the two forms iOS takes it in, and where
+/// each is stored. Having it on the device enables DVT services such as
+/// location simulation, and debugserver for JIT. Downloaded on first use
+/// rather than bundled.
 ///
 /// Source: doronz88/DeveloperDiskImage (the same mirror StikDebug uses). These
-/// are Apple's unmodified files; the device personalizes the image against its
-/// chip ID at mount time.
+/// are Apple's unmodified files, which the device has Apple personalize for it.
 enum DeveloperDiskImage {
 
-    private static let baseURL =
-        "https://github.com/doronz88/DeveloperDiskImage/raw/refs/heads/main/PersonalizedImages/Xcode_iOS_DDI_Personalized"
+    enum Variant: CaseIterable {
+        /// Mounted by the image mounter. Each of its build identities names a
+        /// chip and board, so it only covers the devices Xcode knew when it was
+        /// built: 27.1's stops at iPhone18,5.
+        case personalized
+        /// Installed by cryptexd as a Cryptex1. Its build identity names no
+        /// device (`Cryptex1,UseProductClass`), so newer iPhones take it too,
+        /// as the mirror's README says.
+        case cryptex
 
-    /// Files to download (same name remotely and locally).
-    private static let files = [
-        "BuildManifest.plist",
-        "Image.dmg",
-        "Image.dmg.trustcache",
-    ]
+        /// The mirror's folder for it.
+        fileprivate var folder: String {
+            switch self {
+            case .personalized: "Xcode_iOS_DDI_Personalized"
+            case .cryptex: "Xcode_iOS_DDI_Cryptex"
+            }
+        }
 
-    static var directory: URL {
-        URL.documentsDirectory.appendingPathComponent("DDI", isDirectory: true)
+        /// Files to download (same name remotely and locally). The mirror
+        /// rewrites the cryptex's BuildManifest.plist to name these, so its
+        /// folder loads as a Restore directory as it is.
+        fileprivate var files: [String] {
+            switch self {
+            case .personalized:
+                ["BuildManifest.plist", "Image.dmg", "Image.dmg.trustcache"]
+            case .cryptex:
+                ["BuildManifest.plist", "Image.dmg", "Image.dmg.trustcache",
+                 "Image.dmg.cryptex_info", "Image.dmg.root_hash"]
+            }
+        }
+
+        /// Where its files are kept. The personalized image keeps the folder
+        /// it always had.
+        var directory: URL {
+            switch self {
+            case .personalized:
+                URL.documentsDirectory.appendingPathComponent("DDI", isDirectory: true)
+            case .cryptex:
+                URL.documentsDirectory.appendingPathComponent("DDI-Cryptex", isDirectory: true)
+            }
+        }
+
+        /// What the log calls it.
+        var logName: String {
+            switch self {
+            case .personalized: "personalized image"
+            case .cryptex: "cryptex"
+            }
+        }
     }
 
-    static var imagePath: String { directory.appendingPathComponent("Image.dmg").path }
-    static var trustcachePath: String { directory.appendingPathComponent("Image.dmg.trustcache").path }
-    static var manifestPath: String { directory.appendingPathComponent("BuildManifest.plist").path }
+    /// From iOS 26.4 the image goes on as a cryptex, as StikDebug installs it
+    /// there (and pymobiledevice3 over a tunnel).
+    static var installsAsCryptex: Bool {
+        ProcessInfo.processInfo.isOperatingSystemAtLeast(
+            OperatingSystemVersion(majorVersion: 26, minorVersion: 4, patchVersion: 0))
+    }
 
-    /// True when all three files are on disk and non-empty.
-    static var isDownloaded: Bool {
-        files.allSatisfy { name in
-            let path = directory.appendingPathComponent(name).path
+    /// The forms to try on this iOS, best first. From 26.4 the personalized
+    /// image is the fallback, for an iPhone its identities cover.
+    static var variants: [Variant] {
+        installsAsCryptex ? [.cryptex, .personalized] : [.personalized]
+    }
+
+    /// The form tried first.
+    static var preferred: Variant { variants[0] }
+
+    static var imagePath: String { Variant.personalized.directory.appendingPathComponent("Image.dmg").path }
+    static var trustcachePath: String { Variant.personalized.directory.appendingPathComponent("Image.dmg.trustcache").path }
+    static var manifestPath: String { Variant.personalized.directory.appendingPathComponent("BuildManifest.plist").path }
+    /// The cryptex's Restore directory, which cryptex1_assets_load reads.
+    static var cryptexDirectory: String { Variant.cryptex.directory.path }
+
+    /// True when the form tried first is on disk.
+    static var isDownloaded: Bool { isDownloaded(preferred) }
+
+    /// True when all of `variant`'s files are on disk and non-empty.
+    static func isDownloaded(_ variant: Variant) -> Bool {
+        variant.files.allSatisfy { name in
+            let path = variant.directory.appendingPathComponent(name).path
             let attributes = try? FileManager.default.attributesOfItem(atPath: path)
             return (attributes?[.size] as? Int ?? 0) > 0
         }
     }
 
-    /// Fetch whichever of the three files are missing, reporting 0…1 across the
-    /// whole set rather than per file. The fraction is nil while the file in
-    /// flight states no total (a chunked transfer); `bytes` is the bytes
-    /// arrived so far on that file, so the page can show a byte count
-    /// instead of a stuck 0% (B1, 0.9.155).
-    static func downloadMissing(progress: @escaping (Double?, Int64) -> Void) async throws {
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        // B3 (0.9.147): a 0-byte file counts as missing — a truncated
-        // download used to satisfy `fileExists` while `isDownloaded`
-        // demanded a size above zero, so every setup failed with no way
-        // back except deleting the app's data.
-        let missing = files.filter { name in
-            let path = directory.appendingPathComponent(name).path
-            let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int ?? 0
-            return size <= 0
-        }
-        guard !missing.isEmpty else { progress(1, 0); return }
+    /// Fetches whichever of the preferred form's files are missing.
+    static func downloadMissing(progress: @escaping (Double) -> Void) async throws {
+        try await downloadMissing(preferred, progress: progress)
+    }
 
+    /// Fetch whichever of `variant`'s files are missing, reporting 0…1 across
+    /// the whole set rather than per file.
+    static func downloadMissing(_ variant: Variant, progress: @escaping (Double) -> Void) async throws {
+        let directory = variant.directory
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let missing = variant.files.filter { name in
+            let path = directory.appendingPathComponent(name).path
+            let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+            return (attributes?[.size] as? Int ?? 0) == 0
+        }
+        guard !missing.isEmpty else { progress(1); return }
+
+        let baseURL = "https://github.com/doronz88/DeveloperDiskImage/raw/refs/heads/main/PersonalizedImages/\(variant.folder)"
         for (index, name) in missing.enumerated() {
-            try Task.checkCancellation()
-            progress(Double(index) / Double(missing.count), 0)
+            progress(Double(index) / Double(missing.count))
             guard let url = URL(string: "\(baseURL)/\(name)") else {
                 throw EngineError.message(L("Couldn't build the download URL for %@.", name))
             }
-            let destination = directory.appendingPathComponent(name)
-            try await downloadOne(from: url, to: destination) { fileFraction, bytes in
-                progress(fileFraction.map { (Double(index) + $0) / Double(missing.count) }, bytes)
+            let (tmp, response) = try await URLSession.shared.download(from: url)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                throw EngineError.message(L("Downloading %@ failed (HTTP %d).", name, code))
             }
-            Engine.shared.log("DDI: downloaded \(name).")
+            let destination = directory.appendingPathComponent(name)
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: tmp, to: destination)
+            Engine.shared.log("DDI: downloaded \(name) (\(variant.logName)).")
         }
-        progress(1, 0)
+        progress(1)
     }
 
     /// Deletes the downloaded files, so a corrupt or truncated copy can be
     /// fetched again (B3, 0.9.147).
     static func clearDownloaded() {
-        try? FileManager.default.removeItem(at: directory)
+        for variant in Variant.allCases {
+            try? FileManager.default.removeItem(at: variant.directory)
+        }
     }
 
-    /// Downloads one file with progress, a 15-second idle timeout (the
-    /// manual update check's), and cancellation — `URLSession.download(from:)`
-    /// reports no progress, so this uses a download task with KVO like
-    /// `SideStoreDownloader.fetchDirect`. `progress` is called on an
-    /// arbitrary queue, throttled to whole-percent steps; its fraction is
-    /// nil while the transfer states no total, with `bytes` carrying the
-    /// bytes arrived so far instead (B1, 0.9.155).
-    private static func downloadOne(from url: URL, to destination: URL,
-                                    progress: @escaping (Double?, Int64) -> Void) async throws {
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData,
-                                 timeoutInterval: 15)
-        request.setValue("SideInstaller", forHTTPHeaderField: "User-Agent")
-        // Same shape as `fetchDirect`: the continuation is resumed only
-        // through `settle`, which takes it once, so a cancel landing as
-        // the download finishes can't resume it twice.
-        let settleLock = NSLock()
-        var pending: CheckedContinuation<URL, Error>?
-        func settle(_ result: Result<URL, Error>) {
-            settleLock.lock()
-            let continuation = pending
-            pending = nil
-            settleLock.unlock()
-            switch result {
-            case .success(let url): continuation?.resume(returning: url)
-            case .failure(let error): continuation?.resume(throwing: error)
-            }
-        }
-        var observation: NSKeyValueObservation?
-        var lastPublished = -1
-        /// B1 (0.9.155): last byte count reported while the total was
-        /// unknown, so those reports stay throttled to 256KB steps.
-        var lastPublishedBytes: Int64 = 0
-        let task = URLSession.shared.downloadTask(with: request) { file, response, error in
-            observation?.invalidate()
-            if let error {
-                settle(.failure((error as? URLError)?.code == .cancelled
-                                ? CancellationError() : error))
-                return
-            }
-            guard let file, let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode) else {
-                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                settle(.failure(EngineError.message(
-                    L("Downloading %@ failed (HTTP %d).", destination.lastPathComponent, code))))
-                return
-            }
-            do {
-                try? FileManager.default.removeItem(at: destination)
-                try FileManager.default.moveItem(at: file, to: destination)
-                settle(.success(destination))
-            } catch {
-                settle(.failure(error))
-            }
-        }
-        observation = task.progress.observe(\.fractionCompleted) { done, _ in
-            // B1 (0.9.155): a chunked transfer never states a total, so
-            // `fractionCompleted` sits at 0 the whole way — report the
-            // bytes instead (256KB steps), with a nil fraction so the page
-            // goes indeterminate instead of showing a stuck 0%.
-            if done.totalUnitCount > 0 {
-                settleLock.lock()
-                let percent = Int(done.fractionCompleted * 100)
-                let fresh = percent > lastPublished
-                if fresh { lastPublished = percent }
-                settleLock.unlock()
-                guard fresh else { return }
-                progress(done.fractionCompleted, done.completedUnitCount)
-            } else {
-                let bytes = done.completedUnitCount
-                settleLock.lock()
-                let fresh = bytes > 0 && (bytes - lastPublishedBytes >= 256 * 1024 || lastPublishedBytes == 0)
-                if fresh { lastPublishedBytes = bytes }
-                settleLock.unlock()
-                guard fresh else { return }
-                progress(nil, bytes)
-            }
-        }
-        let tmp = try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { cont in
-                pending = cont
-                if Task.isCancelled {
-                    // Cancelled before the download started: stop the task
-                    // and resume here — the cancel may or may not deliver
-                    // the completion handler, and `settle` lets only the
-                    // first resume through.
-                    task.cancel()
-                    settle(.failure(CancellationError()))
-                } else {
-                    task.resume()
-                }
-            }
-        } onCancel: {
-            task.cancel()
-        }
-        // B3 (0.9.147): a 200 with an empty body used to land on disk, and
-        // from then on `isDownloaded` stayed false while this function kept
-        // skipping the file. Refuse the empty file instead.
-        let size = (try? FileManager.default.attributesOfItem(atPath: tmp.path))?[.size] as? Int ?? 0
-        guard size > 0 else {
-            try? FileManager.default.removeItem(at: tmp)
-            throw EngineError.message(
-                L("The download of %@ came back empty. Try again.", destination.lastPathComponent))
-        }
-    }
 }
 
 // MARK: - Saved places
@@ -201,26 +160,40 @@ struct SavedPlace: Identifiable, Codable, Equatable {
     }
 }
 
-// MARK: - GPX routes
+// MARK: - Imported routes
 
 extension UTType {
     /// GPX, declared in Info.plist under the identifier other apps use for it.
     /// Without the declaration the picker shows .gpx files but won't let them
     /// be selected.
     static let gpx = UTType(importedAs: "com.topografix.gpx", conformingTo: .xml)
+    /// KML, the format of Google Earth and My Maps exports, declared in
+    /// Info.plist for the same reason.
+    static let kml = UTType(importedAs: "com.google.earth.kml", conformingTo: .xml)
+
+    /// What a route can be imported from: the formats StikDebug reads.
+    static var routeFiles: [UTType] {
+        var types: [UTType] = [.gpx, .kml, .json, .xml, .commaSeparatedText, .plainText]
+        if #available(iOS 18.0, *) { types.insert(.geoJSON, at: 2) }
+        return types
+    }
 }
 
-/// A route read from a GPX file.
+/// A route read from a file: GPX, KML, GeoJSON, other JSON with latitudes and
+/// longitudes, or CSV or plain text with a coordinate on each line, the
+/// formats StikDebug imports (`RouteFile`).
 ///
-/// StikDebug takes every `trkpt`, `rtept` and `wpt` in file order. Here a
-/// file's track wins, then its route, then its waypoints, so the points of
-/// interest a track file often carries don't end up in the path.
+/// StikDebug takes every point a file has, in file order. Here a file's path
+/// wins (a GPX track, then its route; a KML or GeoJSON line), then its single
+/// places, so the points of interest a track file often carries don't end up
+/// in the path.
 struct GPXRoute {
     let name: String
     /// The points in file order, invalid ones dropped.
     let points: [CLLocationCoordinate2D]
-    /// When each point was recorded, if every one has a `<time>` and they never
-    /// go backwards. Playing "as recorded" follows these.
+    /// When each point was recorded, if every one has a time and they never go
+    /// backwards: a GPX `<time>`, or a KML track's `<when>`. Playing "as
+    /// recorded" follows these.
     let times: [Date]?
     /// Length along the points, in meters.
     let distance: CLLocationDistance
@@ -249,14 +222,7 @@ struct GPXRoute {
     init(contentsOf url: URL) throws {
         let fileName = url.lastPathComponent
         let data = try Data(contentsOf: url)
-        let reader = GPXReader()
-        let parser = XMLParser(data: data)
-        parser.delegate = reader
-        guard parser.parse() else {
-            throw EngineError.message(L("Couldn't read %@ as a GPX file.", fileName))
-        }
-        let found = [reader.trackPoints, reader.routePoints, reader.waypoints]
-            .first { !$0.isEmpty } ?? []
+        let found = try RouteFile.points(in: data, fileName: fileName)
         guard !found.isEmpty else {
             throw EngineError.message(L("%@ has no track, route or waypoints in it.", fileName))
         }
@@ -282,61 +248,167 @@ struct GPXRoute {
     }
 }
 
-/// Collects a GPX file's points, each with its `<time>` if it has one.
-private final class GPXReader: NSObject, XMLParserDelegate {
-    struct Point {
-        var coordinate: CLLocationCoordinate2D
-        var time: Date?
+/// One point of an imported route, with when it was recorded if the file says.
+struct RoutePoint {
+    var coordinate: CLLocationCoordinate2D
+    var time: Date?
+
+    /// Nil unless `latitude` and `longitude` are a place on Earth.
+    init?(latitude: Double, longitude: Double, time: Date? = nil) {
+        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
+        self.coordinate = coordinate
+        self.time = time
     }
 
-    private(set) var trackPoints: [Point] = []
-    private(set) var routePoints: [Point] = []
-    private(set) var waypoints: [Point] = []
+    /// A pair of numbers in the order a format puts them in, or the other way
+    /// round when that order isn't a place and the other is, as StikDebug
+    /// reads them.
+    init?(_ first: Double, _ second: Double, longitudeFirst: Bool) {
+        let (latitude, longitude) = longitudeFirst ? (second, first) : (first, second)
+        guard let point = RoutePoint(latitude: latitude, longitude: longitude)
+                ?? RoutePoint(latitude: longitude, longitude: latitude) else { return nil }
+        self = point
+    }
+}
 
-    /// The point being read and the element it came from.
-    private var current: (element: String, point: Point)?
-    private var timeText: String?
+/// Reads an imported route's points out of a file. What's in it decides how
+/// it's read, not its name: a file saved from the web, or handed over by
+/// Shortcuts, often has no extension or the wrong one.
+enum RouteFile {
+    static func points(in data: Data, fileName: String) throws -> [RoutePoint] {
+        switch kind(of: data) {
+        case .xml:
+            let reader = RouteXMLReader()
+            let parser = XMLParser(data: data)
+            parser.delegate = reader
+            guard parser.parse() else {
+                throw EngineError.message(reader.isKML
+                    ? unreadable(fileName) : L("Couldn't read %@ as a GPX file.", fileName))
+            }
+            return reader.best
+        case .json:
+            guard let object = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
+                throw EngineError.message(unreadable(fileName))
+            }
+            return JSONCoordinates.points(in: object)
+        case .text:
+            guard let text = String(data: data, encoding: .utf8)
+                    ?? String(data: data, encoding: .utf16)
+                    ?? String(data: data, encoding: .windowsCP1252) else {
+                throw EngineError.message(unreadable(fileName))
+            }
+            return TextCoordinates.points(in: text)
+        }
+    }
+
+    private enum Kind { case xml, json, text }
+
+    /// XML starts with `<`, JSON with `{` or `[`; anything else is read as
+    /// lines of coordinates.
+    private static func kind(of data: Data) -> Kind {
+        let start = String(decoding: data.prefix(256), as: UTF8.self)
+            .drop(while: { $0.isWhitespace || $0 == "\u{FEFF}" })
+        switch start.first {
+        case "<"?: return .xml
+        case "{"?, "["?: return .json
+        default: return .text
+        }
+    }
+
+    private static func unreadable(_ fileName: String) -> String {
+        L("Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.", fileName)
+    }
+}
+
+/// Collects a GPX or KML file's points, each with its time if it has one.
+///
+/// GPX: `trkpt`, `rtept` and `wpt`, each with its `<time>`. KML: the
+/// `coordinates` of a `LineString` or `LinearRing` (the path) and of a `Point`
+/// (a place), and a `gx:Track`'s `gx:coord`s, timed by its `when`s.
+private final class RouteXMLReader: NSObject, XMLParserDelegate {
+    private(set) var trackPoints: [RoutePoint] = []
+    private(set) var routePoints: [RoutePoint] = []
+    private(set) var waypoints: [RoutePoint] = []
+    /// True when the root element is `kml`.
+    private(set) var isKML = false
+
+    /// The path when there is one: a track, then a route; else the places.
+    var best: [RoutePoint] {
+        [trackPoints, routePoints, waypoints].first { !$0.isEmpty } ?? []
+    }
+
+    /// The GPX point being read and the element it came from.
+    private var current: (element: String, point: RoutePoint)?
+    /// The text of the element being read, when it's one that's kept: a GPX
+    /// `time`, or a KML `coordinates`, `when` or `gx:coord`.
+    private var text: String?
+    private var sawRoot = false
+    /// The KML geometry whose `coordinates` come next: point, linestring or
+    /// linearring.
+    private var geometry: String?
+    /// Inside a KML `gx:Track`, its `when`s and `gx:coord`s so far, which it
+    /// lists separately in the same order.
+    private var inTrack = false
+    private var trackTimes: [Date?] = []
+    private var trackCoordinates: [RoutePoint] = []
 
     // Not `ISO8601DateFormatter`, which took 4 of the 5 seconds a
     // 50,000-point track needed to load.
     private let timeStyle = Date.ISO8601FormatStyle()
     private let fractionalTimeStyle = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
 
-    /// Element names without a namespace prefix (`gpx:trkpt` → `trkpt`).
+    /// Element names without a namespace prefix (`gpx:trkpt` → `trkpt`,
+    /// `gx:coord` → `coord`).
     private func localName(_ name: String) -> String {
         String(name.split(separator: ":").last ?? Substring(name)).lowercased()
+    }
+
+    private func time(_ text: String?) -> Date? {
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        return (try? timeStyle.parse(text)) ?? (try? fractionalTimeStyle.parse(text))
     }
 
     func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?,
                 qualifiedName qName: String?, attributes: [String: String] = [:]) {
         let name = localName(elementName)
+        if !sawRoot {
+            sawRoot = true
+            isKML = name == "kml"
+        }
         switch name {
         case "trkpt", "rtept", "wpt":
             guard let latitude = Double(attributes["lat"] ?? ""),
-                  let longitude = Double(attributes["lon"] ?? "") else { return }
-            let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-            guard CLLocationCoordinate2DIsValid(coordinate) else { return }
-            current = (name, Point(coordinate: coordinate))
+                  let longitude = Double(attributes["lon"] ?? ""),
+                  let point = RoutePoint(latitude: latitude, longitude: longitude) else { return }
+            current = (name, point)
         case "time" where current != nil:
-            timeText = ""
+            text = ""
+        case "point", "linestring", "linearring":
+            geometry = name
+        case "coordinates" where geometry != nil:
+            text = ""
+        case "track":
+            inTrack = true
+            trackTimes = []
+            trackCoordinates = []
+        case "when" where inTrack, "coord" where inTrack:
+            text = ""
         default:
             break
         }
     }
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
-        timeText? += string
+        text? += string
     }
 
     func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?,
                 qualifiedName qName: String?) {
         switch localName(elementName) {
         case "time":
-            if let text = timeText?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                current?.point.time = (try? timeStyle.parse(text))
-                    ?? (try? fractionalTimeStyle.parse(text))
-            }
-            timeText = nil
+            if text != nil { current?.point.time = time(text) }
+            text = nil
         case "trkpt":
             if let current { trackPoints.append(current.point) }
             current = nil
@@ -346,9 +418,184 @@ private final class GPXReader: NSObject, XMLParserDelegate {
         case "wpt":
             if let current { waypoints.append(current.point) }
             current = nil
+        case "coordinates":
+            if let text, let geometry {
+                // `longitude,latitude[,altitude]`, one tuple per space.
+                let points = text.split(whereSeparator: \.isWhitespace).compactMap { tuple -> RoutePoint? in
+                    let values = tuple.split(separator: ",").compactMap { Double($0) }
+                    guard values.count >= 2 else { return nil }
+                    return RoutePoint(latitude: values[1], longitude: values[0])
+                }
+                if geometry == "point" { waypoints += points } else { trackPoints += points }
+            }
+            text = nil
+        case "point", "linestring", "linearring":
+            geometry = nil
+        case "when" where inTrack:
+            trackTimes.append(time(text))
+            text = nil
+        case "coord" where inTrack:
+            // `longitude latitude altitude`.
+            let values = (text ?? "").split(whereSeparator: \.isWhitespace).compactMap { Double($0) }
+            if values.count >= 2, let point = RoutePoint(latitude: values[1], longitude: values[0]) {
+                trackCoordinates.append(point)
+            }
+            text = nil
+        case "track":
+            // The times only fit when there's one per point.
+            let timed = trackTimes.count == trackCoordinates.count
+            for (index, point) in trackCoordinates.enumerated() {
+                var point = point
+                point.time = timed ? trackTimes[index] : nil
+                trackPoints.append(point)
+            }
+            inTrack = false
+            trackTimes = []
+            trackCoordinates = []
         default:
             break
         }
+    }
+}
+
+/// Coordinates out of JSON: GeoJSON, whose positions are `[longitude,
+/// latitude]`, or any other JSON whose objects carry latitude and longitude
+/// keys, or whose pairs are `[latitude, longitude]`, as StikDebug reads it.
+/// GeoJSON's lines and polygon rings are the path, its points the places;
+/// anything else is the path, in the order it's listed.
+enum JSONCoordinates {
+    static func points(in object: Any) -> [RoutePoint] {
+        var path: [RoutePoint] = []
+        var places: [RoutePoint] = []
+        collect(object, path: &path, places: &places)
+        return path.isEmpty ? places : path
+    }
+
+    private static func collect(_ object: Any, path: inout [RoutePoint], places: inout [RoutePoint]) {
+        if let dictionary = object as? [String: Any] {
+            let coordinates = dictionary["coordinates"]
+            switch (dictionary["type"] as? String)?.lowercased() {
+            case "featurecollection":
+                for feature in dictionary["features"] as? [Any] ?? [] {
+                    collect(feature, path: &path, places: &places)
+                }
+                return
+            case "feature":
+                if let geometry = dictionary["geometry"] { collect(geometry, path: &path, places: &places) }
+                return
+            case "geometrycollection":
+                for geometry in dictionary["geometries"] as? [Any] ?? [] {
+                    collect(geometry, path: &path, places: &places)
+                }
+                return
+            case "point":
+                if let point = position(coordinates) { places.append(point) }
+                return
+            case "multipoint":
+                places += positions(coordinates)
+                return
+            case "linestring":
+                path += positions(coordinates)
+                return
+            case "multilinestring":
+                for line in coordinates as? [Any] ?? [] { path += positions(line) }
+                return
+            case "polygon":
+                // The outer ring.
+                path += positions((coordinates as? [Any])?.first)
+                return
+            case "multipolygon":
+                for polygon in coordinates as? [Any] ?? [] { path += positions((polygon as? [Any])?.first) }
+                return
+            default:
+                break
+            }
+            if let point = keyedPoint(dictionary) {
+                path.append(point)
+                return
+            }
+            // A wrapper: its keys come in no particular order.
+            for value in dictionary.values { collect(value, path: &path, places: &places) }
+            return
+        }
+        guard let array = object as? [Any] else { return }
+        if array.count >= 2, let first = number(array[0]), let second = number(array[1]) {
+            if let point = RoutePoint(first, second, longitudeFirst: false) { path.append(point) }
+            return
+        }
+        for element in array { collect(element, path: &path, places: &places) }
+    }
+
+    /// A GeoJSON position.
+    private static func position(_ value: Any?) -> RoutePoint? {
+        guard let pair = value as? [Any], pair.count >= 2,
+              let longitude = number(pair[0]), let latitude = number(pair[1]) else { return nil }
+        return RoutePoint(latitude: latitude, longitude: longitude)
+    }
+
+    private static func positions(_ value: Any?) -> [RoutePoint] {
+        (value as? [Any] ?? []).compactMap(position)
+    }
+
+    /// An object with latitude and longitude keys, in any case.
+    private static func keyedPoint(_ dictionary: [String: Any]) -> RoutePoint? {
+        let keyed = Dictionary(dictionary.map { ($0.key.lowercased(), $0.value) }) { first, _ in first }
+        guard let latitude = ["latitude", "lat"].lazy.compactMap({ keyed[$0].flatMap(number) }).first,
+              let longitude = ["longitude", "lon", "lng", "long"].lazy.compactMap({ keyed[$0].flatMap(number) }).first
+        else { return nil }
+        return RoutePoint(latitude: latitude, longitude: longitude)
+    }
+
+    private static func number(_ value: Any) -> Double? {
+        // A JSON `true` is an NSNumber too.
+        if let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() {
+            return number.doubleValue
+        }
+        return (value as? String).flatMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+    }
+}
+
+/// Coordinates out of CSV or plain text, one point a line: from the columns
+/// a header line names (`lat` or `latitude`, `lon`, `lng`, `long` or
+/// `longitude`), or else the first two numbers on the line, latitude first,
+/// as maps copy them. StikDebug reads text the same way.
+enum TextCoordinates {
+    static func points(in text: String) -> [RoutePoint] {
+        var columns: (latitude: Int, longitude: Int)?
+        var points: [RoutePoint] = []
+        for line in text.split(whereSeparator: \.isNewline) {
+            let fields = line.split { $0 == "," || $0 == ";" || $0 == "\t" }
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+            if columns == nil, let header = headerColumns(fields) {
+                columns = header
+                continue
+            }
+            if let columns, fields.indices.contains(max(columns.latitude, columns.longitude)),
+               let latitude = numbers(in: fields[columns.latitude]).first,
+               let longitude = numbers(in: fields[columns.longitude]).first {
+                if let point = RoutePoint(latitude: latitude, longitude: longitude) { points.append(point) }
+                continue
+            }
+            let values = numbers(in: String(line))
+            if values.count >= 2, let point = RoutePoint(values[0], values[1], longitudeFirst: false) {
+                points.append(point)
+            }
+        }
+        return points
+    }
+
+    private static func headerColumns(_ fields: [String]) -> (latitude: Int, longitude: Int)? {
+        let names = fields.map { $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "\"'")) }
+        guard let latitude = names.firstIndex(where: { $0 == "lat" || $0 == "latitude" }),
+              let longitude = names.firstIndex(where: { ["lon", "lng", "long", "longitude"].contains($0) })
+        else { return nil }
+        return (latitude, longitude)
+    }
+
+    private static let number = #/[-+]?(?:\d+(?:\.\d*)?|\.\d+)/#
+
+    private static func numbers(in text: String) -> [Double] {
+        text.matches(of: number).compactMap { Double($0.output) }
     }
 }
 
@@ -503,13 +750,8 @@ final class LocationManager: ObservableObject {
 
     @Published private(set) var stage: Stage = .notReady
     /// DDI download progress (0…1) while `stage` is `.downloading`; nil
-    /// otherwise (B2, 0.9.147) — and nil mid-download while the file in
-    /// flight states no total, when `downloadBytes` carries the count
-    /// instead (B1, 0.9.155).
+    /// otherwise (B2, 0.9.147).
     @Published private(set) var downloadProgress: Double?
-    /// B1 (0.9.155): bytes arrived so far while the total is unknown;
-    /// nil whenever the total is known (or nothing is downloading).
-    @Published private(set) var downloadBytes: Int64?
     /// The task running setup (`prepareQuietly`, `simulate`, `playRoute`),
     /// so a download in progress can be cancelled (B2, 0.9.147).
     private var readyTask: Task<Void, Never>?
@@ -652,20 +894,27 @@ final class LocationManager: ObservableObject {
     /// tunnel is already up.
     private func ensureReady(quietly: Bool = false) async throws {
         guard stage != .ready else { return }
+        // Only what the user asked for offers Mobile Data Mode.
+        guard quietly else {
+            return try await MobileDataMode.shared.run(.location) {
+                try await prepareSession(quietly: false)
+            }
+        }
+        try await prepareSession(quietly: true)
+    }
+
+    /// `ensureReady`'s steps.
+    private func prepareSession(quietly: Bool) async throws {
         if !DeveloperDiskImage.isDownloaded {
+            try await MobileDataMode.shared.requireInternet(.diskImageDownload)
             stage = .downloading
             downloadProgress = 0
-            downloadBytes = nil
             do {
-                try await DeveloperDiskImage.downloadMissing { fraction, bytes in
-                    Task { @MainActor in
-                        self.downloadProgress = fraction
-                        self.downloadBytes = fraction == nil ? bytes : nil
-                    }
+                try await DeveloperDiskImage.downloadMissing { fraction in
+                    Task { @MainActor in self.downloadProgress = fraction }
                 }
             } catch {
                 downloadProgress = nil
-                downloadBytes = nil
                 // Back to not ready, or the page would sit on "downloading"
                 // with nothing running — a cancelled quiet download ends
                 // here, with no other code resetting the stage.
@@ -673,7 +922,6 @@ final class LocationManager: ObservableObject {
                 throw error
             }
             downloadProgress = nil
-            downloadBytes = nil
         }
         if quietly {
             engine.refreshNetworkStatus()
@@ -685,15 +933,12 @@ final class LocationManager: ObservableObject {
         stage = .mounting
         // Mount progress goes to the activity log only.
         var lastLogged = -1
-        _ = try await engine.prepareLocationSimulation(
-            imagePath: DeveloperDiskImage.imagePath,
-            trustcachePath: DeveloperDiskImage.trustcachePath,
-            manifestPath: DeveloperDiskImage.manifestPath) { fraction in
-                let step = Int(fraction * 4) * 25
-                guard step > lastLogged else { return }
-                lastLogged = step
-                Engine.shared.log("DDI mount: \(step)%")
-            }
+        _ = try await engine.prepareLocationSimulation { fraction in
+            let step = Int(fraction * 4) * 25
+            guard step > lastLogged else { return }
+            lastLogged = step
+            Engine.shared.log("DDI mount: \(step)%")
+        }
         stage = .ready
     }
 
@@ -725,8 +970,9 @@ final class LocationManager: ObservableObject {
                 try await performSimulate(coordinate)
                 lastSuccess = L("Location set to %@.", name ?? Self.format(coordinate))
             } catch is CancellationError {
-                // Cancelled mid-download: setup just stays not ready, with
-                // no error popup (B2, 0.9.147).
+                // Cancelled mid-download, or Mobile Data Mode's popup was
+                // closed: setup just stays not ready, with no error popup
+                // (B2, 0.9.147).
             } catch {
                 lastError = message(error)
             }
@@ -870,7 +1116,8 @@ final class LocationManager: ObservableObject {
 
     // MARK: Routes
 
-    /// Reads a GPX file off the main thread. A path is kept as `route`; a
+    /// Reads a route file (GPX, KML, GeoJSON, JSON, CSV or text) off the main
+    /// thread. A path is kept as `route`; a
     /// single place is only returned, for the page to move the map to.
     func importRoute(from url: URL) async -> GPXRoute? {
         guard !isImportingRoute, !isPlayingRoute else { return nil }
@@ -928,7 +1175,8 @@ final class LocationManager: ObservableObject {
             do {
                 try await beginPlayback(timeline, name: name)
             } catch is CancellationError {
-                // Cancelled mid-download: no error popup (B2, 0.9.147).
+                // Cancelled mid-download, or Mobile Data Mode's popup was
+                // closed: no error popup (B2, 0.9.147).
             } catch {
                 lastError = message(error)
             }
@@ -1375,7 +1623,7 @@ struct LocationView: View {
         .toolbar { settingsToolbarItem(isPresented: $showSettings) }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showRouteImporter) {
-            FileImporterRepresentableView(allowedContentTypes: [.gpx, .xml]) { urls in
+            FileImporterRepresentableView(allowedContentTypes: UTType.routeFiles) { urls in
                 guard let url = urls.first else { return }   // empty means cancelled
                 importRoute(from: url)
             }
@@ -1540,11 +1788,6 @@ struct LocationView: View {
                         } else {
                             ProgressView()
                                 .tint(Theme.accent)
-                            if let bytes = manager.downloadBytes {
-                                Text(L("%@ downloaded", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)))
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(Theme.muted)
-                            }
                         }
                         Spacer(minLength: 8)
                         Button(L("Cancel")) { manager.cancelDownload() }
@@ -2032,7 +2275,7 @@ struct LocationView: View {
                 if let route = manager.route {
                     loadedRoute(route)
                 } else {
-                    Text(L("Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on."))
+                    Text(L("Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on."))
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)

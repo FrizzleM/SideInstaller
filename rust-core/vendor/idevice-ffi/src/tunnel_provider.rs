@@ -271,7 +271,9 @@ async fn adapter_over_tunnel<S: ReadWrite + 'static>(
 
     let raw = tunnel.into_inner();
     let mut adapter = idevice::tcp::adapter::Adapter::new(Box::new(raw), client_ip, server_ip);
-    adapter.set_mss(mtu.saturating_sub(60));
+    // Capped at 8192 as upstream does (edf2587): the tunnel's MTU can be far
+    // larger than the segments the device's end takes.
+    adapter.set_mss(mtu.min(8192).saturating_sub(60));
     let mut adapter = adapter.to_async_handle();
 
     info!("tunnel dial: tunnel up (client {client_ip}, server {server_ip}, mtu {mtu}); connecting to RSD on port {rsd_port} inside it");

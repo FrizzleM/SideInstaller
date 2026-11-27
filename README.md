@@ -7,7 +7,7 @@
 **Install SideStore and LiveContainer directly on your iPhone. No PC required.**
 
 [![Install](https://img.shields.io/badge/Install-SideInstaller-2ea44f?style=for-the-badge)](https://sideinstaller.net/)
-[![Version](https://img.shields.io/badge/version-0.9.142-2669ed?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.9.190-2669ed?style=for-the-badge)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-iOS-lightgrey?style=for-the-badge&logo=apple)](#requirements)
 [![License](https://img.shields.io/badge/license-Custom-orange?style=for-the-badge)](LICENSE.md)
 
@@ -65,8 +65,38 @@ anyone to read, audit, or contribute to, so you can see exactly what's running o
 ## How to use it
 
 [siboot](https://github.com/FrizzleM/siboot) installs SideInstaller from the iPhone itself, signed
-with your own Apple account: no computer and no certificate. You need iOS 27 or later, Wi-Fi and
-Developer Mode on. [sideinstaller.net](https://sideinstaller.net/) shows steps 1 to 3.
+with your own Apple account: no computer and no certificate. It's one command in Open Minis, with
+LocalDevVPN connected; no other app is needed. You need iOS 27 or later, Wi-Fi, Developer Mode on
+and Open Minis 1.16 or later. [sideinstaller.net](https://sideinstaller.net/install.html) shows the
+same steps.
+
+1. **Get the apps.** Install [Open Minis](https://apps.apple.com/app/id6759188481) and
+   [LocalDevVPN](https://apps.apple.com/app/id6755608044), both free on the App Store.
+2. **Run siboot in Open Minis.** Connect LocalDevVPN. In Open Minis, tap the console icon at the
+   top right, then **Shell Terminal**, and run:
+
+   ```sh
+   wget -qO- https://raw.githubusercontent.com/FrizzleM/siboot/main/minis/install.sh | sh
+   ```
+
+   siboot opens a page over the terminal and says what to do. The first time, it pairs the iPhone
+   with itself: tap **Start pairing**, open **Settings › Privacy & Security › Developer Mode**,
+   scroll to the bottom, tap **Pair with siboot**, and enter your passcode and the 6-digit code
+   siboot shows. Leave the player that opens over Minis alone, and go back to Minis once Settings
+   says it's paired (later runs use the saved pairing). Then enter your Apple account email,
+   password and verification code. Keep Minis open until it says it's done. The first time, trust
+   your Apple account in **Settings › General › VPN & Device Management**.
+3. **Open SideInstaller.** With LocalDevVPN connected, log in with your Apple account and tap
+   **Install SideStore** or **Install SideStore + LiveContainer**.
+
+Once paired, `siboot developer-mode` in Open Minis asks the iPhone to show the Developer Mode switch
+in Settings, or with `--turn-on` to turn it on ([details](https://github.com/FrizzleM/siboot/blob/main/minis/README.md#developer-mode)).
+
+### Legacy: enterprise certificates
+
+Before iOS 27, or if siboot doesn't work for you, install SideInstaller with one of the enterprise
+certificates at [sideinstaller.net/#legacy](https://sideinstaller.net/#legacy) instead, then go on
+from step 3.
 
 ### Links
 

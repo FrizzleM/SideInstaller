@@ -37,6 +37,49 @@ final class DeviceConnection {
 
     var isConnected: Bool { adapter != nil && handshake != nil }
 
+    /// Set while Mobile Data Mode is on (`MobileDataMode`): `connect` then
+    /// keeps the tunnel open now, while it still answers, instead of opening a
+    /// new one, since on mobile data alone iOS refuses new ones.
+    static var keepsOpenTunnel: Bool {
+        get {
+            keepsOpenTunnelLock.lock()
+            defer { keepsOpenTunnelLock.unlock() }
+            return keepsOpenTunnelValue
+        }
+        set {
+            keepsOpenTunnelLock.lock()
+            keepsOpenTunnelValue = newValue
+            keepsOpenTunnelLock.unlock()
+        }
+    }
+    private static let keepsOpenTunnelLock = NSLock()
+    private static var keepsOpenTunnelValue = false
+
+    /// True when the tunnel open now still carries a new service connection:
+    /// lockdownd answers through it. iOS can close a tunnel without the
+    /// adapter noticing, so `isConnected` alone can't tell.
+    func tunnelAnswers() -> Bool {
+        guard let adapter, let handshake else { return false }
+        var client: OpaquePointer?
+        if let error = ffiError(lockdownd_connect_rsd(adapter, handshake, &client),
+                                "lockdownd_connect_rsd failed") {
+            Engine.shared.log("Mobile Data Mode: the open tunnel didn't take a new connection (\(error)).")
+            return false
+        }
+        guard let client else { return false }
+        defer { lockdownd_client_free(client) }
+        var value: plist_t?
+        let error = "ProductVersion".withCString { key in
+            ffiError(lockdownd_get_value(client, key, nil, &value), "lockdownd_get_value failed")
+        }
+        if let error {
+            Engine.shared.log("Mobile Data Mode: lockdownd didn't answer through the open tunnel (\(error)).")
+            return false
+        }
+        if let value { plist_free(value) }
+        return true
+    }
+
     struct FFIError: Error, CustomStringConvertible {
         let code: Int32
         let subCode: Int32
@@ -59,6 +102,10 @@ final class DeviceConnection {
         /// lockdown record opens a tunnel through the loopback there, only an
         /// RPPairing one.
         var lockdownRouteClosed = false
+        /// True when this iPhone's listener refused the connection because the
+        /// iPhone is on mobile data only (`NetworkStatus.Links.mobileDataOnly`),
+        /// which Mobile Data Mode gets round with Airplane Mode.
+        var refusedOnMobileData = false
         var description: String { advice }
         var errorDescription: String? { advice }
 
@@ -252,6 +299,16 @@ final class DeviceConnection {
     /// (`Engine.canMintLockdownRecord`).
     func connect(deviceIP: String, pairingFilePath: String, hostname: String = "SideInstaller",
                  allowLockdownMinting: Bool = true) throws {
+        // Mobile Data Mode keeps the tunnel open while it answers: a new one
+        // would be refused on mobile data alone. Only this iPhone's own, never
+        // another iPhone's (Side by Side, the one caller that can't mint).
+        if allowLockdownMinting, Self.keepsOpenTunnel, isConnected {
+            if tunnelAnswers() {
+                Engine.shared.log("Mobile Data Mode: reusing the tunnel that's open instead of opening a new one.")
+                return
+            }
+            Engine.shared.log("Mobile Data Mode: the tunnel that was kept doesn't answer any more, so a new one is needed.")
+        }
         let kind = PairingFileKind.of(path: pairingFilePath)
         guard kind.isUsable else {
             throw fail("\((pairingFilePath as NSString).lastPathComponent) isn't a pairing file: it carries neither a remote-pairing key pair nor a lockdown pair record.")
@@ -392,6 +449,20 @@ final class DeviceConnection {
             port = Self.rsdPort
             guard let retried = try reach(port) else { return }
             miss = retried
+        }
+        // On mobile data alone, iOS keeps this iPhone's listener closed on
+        // every port, so there's no other port to look for it on.
+        if findsMovedPort, case .refused(let failure) = miss {
+            let links = NetworkStatus.links()
+            if links.mobileDataOnly {
+                Engine.shared.log("Port \(port) refused, and this iPhone is on mobile data only (\(links.summary)): iOS keeps its remote pairing listener closed then, so its other ports aren't searched.")
+                throw TunnelError(
+                    kind: failure.kind,
+                    advice: L("This iPhone is on mobile data, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Turn on Airplane Mode, keep LocalDevVPN connected, then try again.",
+                              deviceIP, Int(port)),
+                    underlying: failure.raw,
+                    refusedOnMobileData: true)
+            }
         }
         if findsMovedPort, let notThere = miss.notThere {
             passed.append(port)
@@ -1885,8 +1956,9 @@ final class DeviceConnection {
 
     // MARK: Developer disk image (image_mounter over RSD)
 
-    /// How many developer images the device has mounted. Zero means the DVT
-    /// services — location simulation among them — aren't reachable yet.
+    /// How many developer images the image mounter has mounted. Zero means the
+    /// DVT services — location simulation among them — aren't reachable yet,
+    /// unless the image went on as a cryptex (`installedCryptexDeveloperImage`).
     func mountedDeveloperImageCount() throws -> Int {
         guard let adapter, let handshake else { throw fail("not connected") }
         var client: OpaquePointer?
@@ -1970,6 +2042,71 @@ final class DeviceConnection {
         plist_get_uint_val(value, &chipID)
         guard chipID != 0 else { throw fail("device reported an empty UniqueChipID") }
         return chipID
+    }
+
+    /// What developer disk image the device has, for the log, or nil when it
+    /// has none. With `checkingCryptex` (iOS 26.4 and newer, where it goes on
+    /// as a cryptex) cryptexd is asked first, as StikDebug asks it; the image
+    /// mounter decides otherwise. When the image mounter can't be asked but
+    /// cryptexd answered that there's none, there's none.
+    func developerImagePresence(checkingCryptex: Bool) throws -> String? {
+        var cryptexAnswered = false
+        var cryptexFailure: Error?
+        if checkingCryptex {
+            do {
+                if let version = try installedCryptexDeveloperImage() {
+                    return version.isEmpty ? "a cryptex" : "cryptex \(version)"
+                }
+                cryptexAnswered = true
+            } catch {
+                cryptexFailure = error
+                Engine.shared.log("cryptexd didn't say whether the developer disk image is installed (\(error)). Asking the image mounter …")
+            }
+        }
+        do {
+            let count = try mountedDeveloperImageCount()
+            return count > 0 ? "\(count) image(s) mounted" : nil
+        } catch {
+            if cryptexAnswered { return nil }
+            throw cryptexFailure ?? error
+        }
+    }
+
+    // MARK: Developer disk image as a cryptex (cryptexd over RSD)
+
+    /// The version of the DeveloperDiskImage cryptex installed on the device,
+    /// nil when there's none. Read from cryptexd: an image installed through
+    /// it, as from iOS 26.4 on, isn't one the image mounter lists.
+    func installedCryptexDeveloperImage() throws -> String? {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var installed: UnsafeMutablePointer<InstalledCryptexC>?
+        try check(cryptexd_installed_ddi(adapter, handshake, &installed),
+                  "cryptexd_installed_ddi failed")
+        guard let installed else { return nil }
+        defer { cryptexd_free_installed_cryptex(installed) }
+        return installed.pointee.version.map { String(cString: $0) } ?? ""
+    }
+
+    /// Installs the DeveloperDiskImage cryptex from `directory`, its Restore
+    /// directory, as StikDebug does from iOS 26.4 on (`cryptexd_install_ddi`):
+    /// cryptexd gives this iPhone's identifiers and nonce, Apple signs a
+    /// Cryptex1 ticket for them, and cryptexd installs the image with it.
+    /// Returns the installed cryptex's version.
+    @discardableResult
+    func installCryptexDeveloperImage(directory: String) throws -> String {
+        guard let adapter, let handshake else { throw fail("not connected") }
+        var assets: OpaquePointer?
+        try check(directory.withCString { cryptex1_assets_load($0, &assets) },
+                  "loading the developer disk image cryptex from \(directory) failed")
+        guard let assets else { throw fail("cryptex assets handle was null") }
+        defer { cryptex1_assets_free(assets) }
+
+        var installed: UnsafeMutablePointer<InstalledCryptexC>?
+        try check(cryptexd_install_ddi(adapter, handshake, assets, &installed),
+                  "installing the developer disk image cryptex failed")
+        guard let installed else { return "" }
+        defer { cryptexd_free_installed_cryptex(installed) }
+        return installed.pointee.version.map { String(cString: $0) } ?? ""
     }
 
     // MARK: Developer Mode (AMFI)

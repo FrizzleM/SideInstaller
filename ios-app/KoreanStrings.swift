@@ -188,7 +188,6 @@ let koreanStrings: [String: String] = [
     "iOS %@ required": "iOS %@ 필요",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "이 iPhone의 iOS 버전은 %@이므로 SideInstaller로 설치할 수 없습니다. 설정 › 일반 › 소프트웨어 업데이트에서 iOS %@ 이상으로 업데이트하세요.",
-    "Wi-Fi required": "Wi-Fi 필요",
     "Pairing code": "페어링 코드",
     "Type this into the prompt in Settings.":
         "설정의 입력창에 이 코드를 입력하세요.",
@@ -287,16 +286,7 @@ let koreanStrings: [String: String] = [
 
     // MARK: - Pairing service status
 
-    "not paired": "페어링 안 됨",
     "connected": "연결됨",
-    "requesting Local Network…": "로컬 네트워크 권한 요청 중…",
-    "Local Network denied": "로컬 네트워크 권한 거부됨",
-    "waiting for device…": "기기를 기다리는 중…",
-    "advertising — open Settings › Privacy & Security › Developer Mode":
-        "로컬 네트워크에 알리는 중 — 설정 › 개인정보 보호 및 보안 › 개발자 모드를 여세요",
-    "enter PIN %@ in Settings": "설정에서 PIN %@ 입력",
-    "paired: %@ (%dB)": "페어링됨: %@ (%dB)",
-    "failed: empty pairing file": "실패: 페어링 파일이 비어 있음",
     "failed: %@": "실패: %@",
     "Pairing is already in progress.": "이미 페어링이 진행 중입니다.",
     "Local Network permission is off. Enable it in Settings › SideInstaller › Local Network, then try again.":
@@ -377,7 +367,6 @@ let koreanStrings: [String: String] = [
     "That isn't a valid coordinate.": "올바른 좌표가 아닙니다.",
     "Location session closed — set it up again.": "위치 세션이 종료되었습니다. 다시 설정하세요.",
     "Downloading %@ failed (HTTP %d).": "%@ 다운로드에 실패했습니다(HTTP %d).",
-    "The download of %@ came back empty. Try again.": "%@ 다운로드 결과가 비어 있습니다. 다시 시도하세요.",
     "Couldn't build the download URL for %@.": "%@의 다운로드 URL을 만들지 못했습니다.",
     "Couldn't build the certificate link.": "인증서 링크를 만들지 못했습니다.",
 
@@ -389,10 +378,10 @@ let koreanStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "지도 아래의 저장을 탭하면 핀이 가리키는 위치를 저장합니다. 저장된 장소를 탭하면 바로 그 위치로 설정됩니다.",
     "Play a GPX route": "GPX 경로 재생",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        ".gpx 파일을 가져오면 기기가 선택한 속도로 그 경로를 따라 이동하고, 마지막 지점에 머뭅니다.",
     "Import GPX file": "GPX 파일 가져오기",
     "Couldn't read %@ as a GPX file.": "%@ 파일을 GPX 파일로 읽지 못했습니다.",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "%@ 파일을 경로로 읽지 못했습니다. GPX, KML, GeoJSON 파일이나 줄마다 위도와 경도가 있는 파일을 가져오세요.",
     "%@ has no track, route or waypoints in it.": "%@ 파일에 트랙, 경로, 웨이포인트가 없습니다.",
     "As recorded": "기록된 대로",
     "Walk": "도보",
@@ -638,6 +627,8 @@ let koreanStrings: [String: String] = [
         "%@:%d에서 연결을 거부했습니다. 터널은 트래픽을 전달하고 있지만, 개발자 모드가 켜져 있는데도 이 iPhone이 페어링 포트를 열고 있지 않습니다. “페어링 파일”에서 이 iPhone을 다시 페어링한 뒤 다시 시도하세요. 그래도 실패하면 iPhone을 재시동하세요.",
     "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
         "%@:%d에서 연결을 받았지만 이 iPhone의 페어링 포트로 응답하지 않았고, 다른 포트도 그렇게 응답하지 않았습니다. 켜져 있는 VPN이 LocalDevVPN인지, 개발자 모드가 켜져 있는지(설정 › 개인정보 보호 및 보안 › 개발자 모드) 확인한 뒤 다시 시도하세요. 그래도 실패하면 iPhone을 재시동하세요.",
+    "This iPhone is on mobile data, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Turn on Airplane Mode, keep LocalDevVPN connected, then try again.":
+        "이 iPhone은 모바일 데이터를 사용 중이며, 이때 iOS는 페어링 포트를 닫아 두기 때문에 %@:%d이(가) 연결을 거부했습니다. 에어플레인 모드를 켜고 LocalDevVPN 연결을 유지한 뒤 다시 시도하세요.",
     "Start LocalDevVPN when needed": "필요할 때 LocalDevVPN 시작",
     "Start LocalDevVPN now": "지금 LocalDevVPN 시작",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -843,8 +834,6 @@ let koreanStrings: [String: String] = [
     "Open Settings › Wi-Fi and join a network.": "설정 › Wi-Fi를 열어 네트워크에 연결하세요.",
     "Then come back here — this continues automatically.": "그런 다음 여기로 돌아오세요. 자동으로 이어집니다.",
     "Tap Connect so the toggle turns on.": "“Connect”를 탭해서 스위치를 켜세요.",
-    "Keep Wi-Fi on, then come back here — this continues automatically.":
-        "Wi-Fi를 켜 둔 채 여기로 돌아오세요. 자동으로 이어집니다.",
     "Get LocalDevVPN": "LocalDevVPN 받기",
     "Import an .ipa first": "먼저 .ipa 가져오기",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
@@ -983,6 +972,16 @@ let koreanStrings: [String: String] = [
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
+    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
+        "“Save to file…”을 클릭하고, 파일을 AirDrop, iCloud Drive 또는 케이블로 이 iPhone에 보내세요. iLoader에서 내보낸 페어링 파일도 사용할 수 있습니다.",
+    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
+        "여기로 돌아와 페어링 파일 카드에서 “교체”를 탭하고 해당 파일을 선택하세요.",
+    "Get idevice_pair": "idevice_pair 받기",
+    "Make a remote pairing file": "원격 페어링 파일 만들기",
+    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
+        "Mac, Windows PC 또는 Linux 컴퓨터에서 idevice_pair를 열고 이 iPhone을 연결한 뒤, 요청이 표시되면 신뢰를 탭하세요. 목록에서 이 iPhone을 선택하고 “Remote pairing”을 고른 다음 “Create”를 클릭하세요. 완료될 때까지 iPhone의 잠금을 해제한 상태로 두세요.",
+    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
+        "가져온 페어링 파일은 lockdown 방식입니다. iOS 26.4부터 이 iPhone은 이런 파일이 LocalDevVPN을 통해 들어오면 연결을 끊으므로 연결할 수 없으며, 같은 방식으로 새로 만들어도 마찬가지입니다.",
     "A certificate already exists": "인증서가 이미 있습니다",
     "Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone.":
         "Apple은 이 Apple ID에 서명 인증서를 2개 발급하지 않습니다. 이미 있는 인증서를 폐기하면 설치를 계속할 수 있지만, 이 작업은 되돌릴 수 없습니다.",
@@ -1034,14 +1033,14 @@ let koreanStrings: [String: String] = [
         "이 iPhone이 연결이 열리자마자 끊었습니다. iOS 26.4부터는 이 파일 같은 lockdown 방식 페어링 파일이 LocalDevVPN을 통해 들어오면 이렇게 동작합니다. 대신 이 iPhone을 자기 자신과 페어링하세요. 도구 › 페어링에서 “다시 생성”을 탭하거나, 먼저 페어링을 진행하는 설치를 탭하세요.",
     "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
         "이 iPhone이 연결이 열리자마자 끊었습니다. iOS 26.4부터는 이 파일 같은 lockdown 방식 페어링 파일이 LocalDevVPN을 통해 들어오면 이렇게 동작하므로, 같은 방식으로 새로 만들어도 소용없습니다. 원격 페어링 파일은 계속 사용할 수 있습니다. 컴퓨터에서 idevice_pair를 열고 “Remote pairing”을 선택한 뒤 “Create”를 클릭하고 “Save to file…”을 클릭하세요. 그런 다음 “페어링 파일”에서 그 파일을 가져오세요.",
-    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
-        "이 iPhone을 페어링하려면 필요합니다. 설정이 찾을 수 있도록 SideInstaller가 로컬 네트워크에 자신을 알립니다.",
-    "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
-        "Wi-Fi 네트워크에 연결하세요. 이 iPhone을 페어링하려면 필요합니다. SideInstaller가 로컬 네트워크에서 발견될 수 있어야 합니다.",
+    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
+        "이 iPhone이 연결을 끊었습니다. iOS 26.4부터는 이 파일 같은 lockdown 방식 페어링 파일이 LocalDevVPN을 통해 들어오면 이렇게 동작합니다. 위의 단계를 참고하세요.",
 
     // MARK: - Side by Side tool
 
     // The tool's name is left in English everywhere, as SideStore's is.
+    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
+        "이 iPhone을 페어링하려면 필요합니다. 설정이 찾을 수 있도록 SideInstaller가 로컬 네트워크에 자신을 알립니다.",
     "Side by Side": "Side by Side",
     "Set up someone else's iPhone": "다른 사람의 iPhone 설정해 주기",
     "Same Wi-Fi network": "같은 Wi-Fi 네트워크",
@@ -1754,7 +1753,6 @@ let koreanStrings: [String: String] = [
     "All": "전체",
     "Succeeded": "성공",
     "Restore real location when done": "종료 시 실제 위치로 복원",
-    "Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.": ".gpx 파일을 가져오면 기기가 선택한 속도로 그 경로를 따라 이동합니다. 종료 시 마지막 지점에 머무르지만, 종료 시 실제 위치 복원이 켜져 있으면 실제 위치로 돌아갑니다.",
     "移动“%@”？": "\"%@\"을(를) 이동할까요?",
     "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "설치 탭에 있는 IPA입니다. 이동하면 해당 슬롯이 비게 됩니다. 새 폴더에서 설치하세요.",
     "Move": "이동",
@@ -1795,4 +1793,73 @@ let koreanStrings: [String: String] = [
     "系统文件": "시스템 파일",
     "其他文件": "기타 파일",
 
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "다음으로 SideInstaller가 Apple에 로그인하고, 앱을 다운로드하고, Apple에서 서명을 받습니다. 여기에는 인터넷이 필요합니다.",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "다음으로 SideInstaller가 Apple에 로그인합니다. 여기에는 인터넷이 필요합니다.",
+    "Next, Apple signs the app, which needs the internet.":
+        "다음으로 Apple이 앱에 서명합니다. 여기에는 인터넷이 필요합니다.",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "다음으로 SideInstaller가 개발자 디스크 이미지를 다운로드합니다. 여기에는 인터넷이 필요합니다.",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "다음으로 Apple이 이 iPhone용 개발자 디스크 이미지에 서명합니다. 여기에는 인터넷이 필요합니다.",
+    "Try Mobile Data Mode?":
+        "모바일 데이터 모드를 사용해 볼까요?",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "이 iPhone은 Wi-Fi가 아닌 모바일 데이터를 사용 중이며, 이때 iOS는 LocalDevVPN에서 오는 새 연결을 받지 않습니다.",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "모바일 데이터 모드는 에어플레인 모드로 이를 우회합니다. SideInstaller가 연결하는 동안 에어플레인 모드를 켜고, SideInstaller에 인터넷이 필요할 때 다시 끕니다. 언제 해야 하는지는 SideInstaller가 알려 줍니다.",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "Wi-Fi가 안정적인 방법이며 더 안전합니다. Wi-Fi를 사용하려면 Wi-Fi를 켜고 다시 시도하세요.",
+    "Try Mobile Data Mode":
+        "모바일 데이터 모드 사용해 보기",
+    "Use Wi-Fi Instead":
+        "Wi-Fi 사용",
+    "Turn on Airplane Mode":
+        "에어플레인 모드 켜기",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "SideInstaller가 유지하던 연결이 닫혀서 새 연결이 필요합니다.",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "제어 센터를 엽니다: 화면 오른쪽 상단 모서리에서 아래로 쓸어내립니다.",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "에어플레인 모드를 탭하여 켭니다. Wi-Fi는 끈 채로, LocalDevVPN은 연결된 채로 둡니다.",
+    "Come back to SideInstaller. It carries on by itself.":
+        "SideInstaller로 돌아옵니다. 나머지는 알아서 진행됩니다.",
+    "Then pair this iPhone with SideInstaller in Settings, as usual.":
+        "그런 다음 평소처럼 설정에서 이 iPhone을 SideInstaller와 페어링합니다.",
+    "Connecting in Airplane Mode":
+        "에어플레인 모드에서 연결 중",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "SideInstaller가 끄라고 할 때까지 에어플레인 모드를 켠 채로 두세요.",
+    "Turn off Airplane Mode":
+        "에어플레인 모드 끄기",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "SideInstaller가 연결되었으며, 모바일 데이터가 돌아와도 연결을 유지합니다.",
+    "Open Control Center again.":
+        "제어 센터를 다시 엽니다.",
+    "Tap Airplane Mode to turn it off.":
+        "에어플레인 모드를 탭하여 끕니다.",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "SideInstaller로 돌아옵니다. 모바일 데이터가 돌아오면 계속 진행됩니다.",
+    "You can turn off Airplane Mode":
+        "에어플레인 모드를 꺼도 됩니다",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "SideInstaller는 지금은 에어플레인 모드가 더 필요하지 않으며, 다음 작업을 위해 연결을 유지합니다. 원할 때 에어플레인 모드를 끄세요.",
+    "Waiting for Airplane Mode…":
+        "에어플레인 모드를 기다리는 중…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "에어플레인 모드는 켜졌지만 LocalDevVPN이 연결되어 있지 않습니다. LocalDevVPN을 열고 다시 연결하세요.",
+    "Waiting for mobile data…":
+        "모바일 데이터를 기다리는 중…",
+    "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
+        "이 iPhone은 모바일 데이터를 사용 중입니다. 모바일 데이터 모드를 사용하려면 SideInstaller에서 계속하세요.",
+    "Mobile data":
+        "모바일 데이터",
+    "Mobile Data Mode":
+        "모바일 데이터 모드",
 ]
+
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
+        "GPX, KML 또는 GeoJSON 파일이나 좌표 목록을 가져오면 기기가 선택한 속도로 경로를 따라 이동합니다. 끝나면 마지막 지점에 머무릅니다. 단, 완료 시 실제 위치로 복원이 켜져 있는 경우는 제외합니다.",

@@ -188,7 +188,6 @@ let chineseStrings: [String: String] = [
     "iOS %@ required": "需要 iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "此 iPhone 运行的是 iOS %@，SideInstaller 无法在该版本上安装。请在 设置 › 通用 › 软件更新 中更新到 iOS %@ 或更高版本。",
-    "Wi-Fi required": "需要 Wi-Fi",
     "Pairing code": "配对码",
     "Type this into the prompt in Settings.":
         "将它输入到 设置 中的提示框内。",
@@ -287,16 +286,7 @@ let chineseStrings: [String: String] = [
 
     // MARK: - Pairing service status
 
-    "not paired": "未配对",
     "connected": "已连接",
-    "requesting Local Network…": "正在请求本地网络权限…",
-    "Local Network denied": "本地网络权限被拒绝",
-    "waiting for device…": "正在等待设备…",
-    "advertising — open Settings › Privacy & Security › Developer Mode":
-        "正在广播 —— 打开 设置 › 隐私与安全性 › 开发者模式",
-    "enter PIN %@ in Settings": "在 设置 中输入 PIN 码 %@",
-    "paired: %@ (%dB)": "已配对：%@（%d B）",
-    "failed: empty pairing file": "失败：配对文件为空",
     "failed: %@": "失败：%@",
     "Pairing is already in progress.": "配对已在进行中。",
     "Local Network permission is off. Enable it in Settings › SideInstaller › Local Network, then try again.":
@@ -377,7 +367,6 @@ let chineseStrings: [String: String] = [
     "That isn't a valid coordinate.": "该坐标无效。",
     "Location session closed — set it up again.": "位置会话已关闭 — 请重新设置。",
     "Downloading %@ failed (HTTP %d).": "下载 %@ 失败（HTTP %d）。",
-    "The download of %@ came back empty. Try again.": "“%@”下载回来是空文件，请重试。",
     "Couldn't build the download URL for %@.": "无法为 %@ 构建下载链接。",
     "Couldn't build the certificate link.": "无法构建证书链接。",
 
@@ -389,10 +378,10 @@ let chineseStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "轻点地图下方的“存储”即可保留图钉下的位置。轻点已存储的地点会立即设置该位置。",
     "Play a GPX route": "播放 GPX 路线",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        "导入 .gpx 文件后，设备会按你选择的速度沿路线移动，结束后停在最后一个点。",
     "Import GPX file": "导入 GPX 文件",
     "Couldn't read %@ as a GPX file.": "无法将 %@ 读取为 GPX 文件。",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "无法将 %@ 读取为路线。请导入 GPX、KML 或 GeoJSON 文件，或每行包含一个纬度和经度的文件。",
     "%@ has no track, route or waypoints in it.": "%@ 中没有轨迹、路线或航点。",
     "As recorded": "按记录时间",
     "Walk": "步行",
@@ -722,6 +711,8 @@ let chineseStrings: [String: String] = [
         "%@:%d 上有东西拒绝了连接，说明隧道是通的，但尽管开发者模式已打开，这台 iPhone 仍没有在配对端口上监听。请在“配对文件”中重新配对这台 iPhone，然后重试。如果仍然失败，请重启 iPhone。",
     "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
         "%@:%d 上有东西接受了连接，但没有像这台 iPhone 的配对端口那样应答，其他端口也没有。请确认当前打开的 VPN 是 LocalDevVPN，并且开发者模式已打开（设置 › 隐私与安全性 › 开发者模式），然后重试。如果仍然失败，请重启 iPhone。",
+    "This iPhone is on mobile data, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Turn on Airplane Mode, keep LocalDevVPN connected, then try again.":
+        "这台 iPhone 正在使用蜂窝数据，此时 iOS 会关闭它的配对端口，所以 %@:%d 拒绝了连接。请打开飞行模式，保持 LocalDevVPN 连接，然后重试。",
     "Start LocalDevVPN when needed": "需要时打开 LocalDevVPN",
     "Start LocalDevVPN now": "立即启动 LocalDevVPN",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -910,8 +901,6 @@ let chineseStrings: [String: String] = [
     "Open Settings › Wi-Fi and join a network.": "打开 设置 › Wi-Fi 并加入一个网络。",
     "Then come back here — this continues automatically.": "然后回到这里 —— 接下来会自动继续。",
     "Tap Connect so the toggle turns on.": "轻点 Connect，让开关打开。",
-    "Keep Wi-Fi on, then come back here — this continues automatically.":
-        "保持 Wi-Fi 开启，然后回到这里 —— 接下来会自动继续。",
     "Get LocalDevVPN": "获取 LocalDevVPN",
     "Import an .ipa first": "请先导入一个 .ipa",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
@@ -1049,6 +1038,16 @@ let chineseStrings: [String: String] = [
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
+    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
+        "点击“Save to file…”，再通过隔空投送、iCloud 云盘或数据线把文件传到本机。从 iLoader 导出的配对文件也可以用。",
+    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
+        "回到这里，在“配对文件”卡片上轻点“更换”，然后选中它。",
+    "Get idevice_pair": "获取 idevice_pair",
+    "Make a remote pairing file": "生成“Remote pairing”配对文件",
+    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
+        "在 Mac、Windows 电脑或 Linux 上打开 idevice_pair，插上本机，如有提示就轻点“信任”。选中本机，选择“Remote pairing”，点击“Create”，在完成前保持本机解锁。",
+    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
+        "你导入的配对文件是 lockdown 类型。从 iOS 26.4 起，这类文件通过 LocalDevVPN 连接时，这台 iPhone 会断开连接，所以它无法连接，重新生成一个同类文件也一样。",
     "A certificate already exists": "已存在证书",
     "Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone.":
         "Apple 不会为此 Apple ID 签发第二个签名证书。吊销已有的那个可以让安装继续——但此操作无法撤回。",
@@ -1102,13 +1101,13 @@ let chineseStrings: [String: String] = [
         "这台 iPhone 在连接刚建立时就把它断开了。从 iOS 26.4 起，通过 LocalDevVPN 连接的 lockdown 配对文件（比如这个）都会被这样断开。请改为让这台 iPhone 与自身配对：在 工具 › 配对 中轻点“重新生成”，或者轻点“安装”，它会先完成配对。",
     "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
         "这台 iPhone 在连接刚建立时就把它断开了。从 iOS 26.4 起，通过 LocalDevVPN 连接的 lockdown 配对文件（比如这个）都会被这样断开，所以重新生成一个同类文件也没用。“Remote pairing”配对文件仍然可用：在电脑上打开 idevice_pair，选择“Remote pairing”，点击“Create”，再点击“Save to file…”，然后在“配对文件”中导入这个文件。",
-    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
-        "配对这台 iPhone 需要它：SideInstaller 会在本地网络上广播自己，供“设置”发现。",
-    "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
-        "请连接到 Wi-Fi 网络。配对这台 iPhone 需要它——SideInstaller 必须能在本地网络上被找到。",
+    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
+        "这台 iPhone 断开了连接：从 iOS 26.4 起，通过 LocalDevVPN 连接的 lockdown 配对文件（比如这个）都会被这样断开。请参见上面的步骤。",
 
     // MARK: - About
 
+    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
+        "配对这台 iPhone 需要它：SideInstaller 会在本地网络上广播自己，供“设置”发现。",
     "About": "关于",
     "Version %@ (%@)": "版本 %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
@@ -1765,7 +1764,6 @@ let chineseStrings: [String: String] = [
     "All": "全部",
     "Succeeded": "成功",
     "Restore real location when done": "结束时恢复真实位置",
-    "Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.": "导入 .gpx 文件后，设备会按你选择的速度沿路线移动，结束后停在最后一个点，除非开了“结束时恢复真实位置”。",
     "移动“%@”？": "移动“%@”？",
     "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "这是安装页上的 IPA。移走后那个槽位就空了——请从它所在的新文件夹安装。",
     "Move": "移动",
@@ -1806,4 +1804,73 @@ let chineseStrings: [String: String] = [
     "系统文件": "系统文件",
     "其他文件": "其他文件",
 
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "接下来，SideInstaller 要登录 Apple、下载 App 并让 Apple 签名，这些都需要联网。",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "接下来，SideInstaller 要登录 Apple，这需要联网。",
+    "Next, Apple signs the app, which needs the internet.":
+        "接下来要由 Apple 为 App 签名，这需要联网。",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "接下来，SideInstaller 要下载开发者磁盘映像，这需要联网。",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "接下来要由 Apple 为这台 iPhone 签名开发者磁盘映像，这需要联网。",
+    "Try Mobile Data Mode?":
+        "试试蜂窝数据模式？",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "这台 iPhone 正在使用蜂窝数据而不是 Wi-Fi，此时 iOS 不接受来自 LocalDevVPN 的新连接。",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "蜂窝数据模式借助飞行模式绕过这个限制：SideInstaller 连接时打开飞行模式，需要联网时再关闭。SideInstaller 会告诉你什么时候操作。",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "Wi-Fi 是稳定的方式，也更安全。要使用它，请打开 Wi-Fi 后重试。",
+    "Try Mobile Data Mode":
+        "试用蜂窝数据模式",
+    "Use Wi-Fi Instead":
+        "改用 Wi-Fi",
+    "Turn on Airplane Mode":
+        "打开飞行模式",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "SideInstaller 保留的连接已关闭，需要建立新的连接。",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "打开控制中心：从屏幕右上角向下轻扫。",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "轻点飞行模式将它打开。保持 Wi-Fi 关闭，LocalDevVPN 保持连接。",
+    "Come back to SideInstaller. It carries on by itself.":
+        "回到 SideInstaller，它会自行继续。",
+    "Then pair this iPhone with SideInstaller in Settings, as usual.":
+        "然后像平常一样，在设置中将这台 iPhone 与 SideInstaller 配对。",
+    "Connecting in Airplane Mode":
+        "正在飞行模式下连接",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "保持飞行模式打开，直到 SideInstaller 提示你关闭。",
+    "Turn off Airplane Mode":
+        "关闭飞行模式",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "SideInstaller 已连接，蜂窝数据恢复后也会保持连接。",
+    "Open Control Center again.":
+        "再次打开控制中心。",
+    "Tap Airplane Mode to turn it off.":
+        "轻点飞行模式将它关闭。",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "回到 SideInstaller，蜂窝数据恢复后它会继续。",
+    "You can turn off Airplane Mode":
+        "可以关闭飞行模式了",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "SideInstaller 目前不再需要飞行模式，并会为你接下来的操作保持连接。你可以随时关闭飞行模式。",
+    "Waiting for Airplane Mode…":
+        "正在等待飞行模式…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "飞行模式已打开，但 LocalDevVPN 没有连接。请打开它并重新连接。",
+    "Waiting for mobile data…":
+        "正在等待蜂窝数据…",
+    "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
+        "这台 iPhone 正在使用蜂窝数据。在 SideInstaller 中继续以使用蜂窝数据模式。",
+    "Mobile data":
+        "蜂窝数据",
+    "Mobile Data Mode":
+        "蜂窝数据模式",
 ]
+
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
+        "导入 GPX、KML 或 GeoJSON 文件，或一份坐标列表，设备就会按你选的速度沿路线移动。走完后停在最后一个点，除非你开了完成后恢复真实位置。",

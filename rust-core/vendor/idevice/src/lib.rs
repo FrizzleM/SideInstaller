@@ -6,6 +6,7 @@
 #[cfg(feature = "pair")]
 mod ca;
 pub mod cursor;
+pub mod darwin_errno;
 mod obfuscation;
 pub mod pairing_file;
 pub mod provider;
@@ -863,6 +864,9 @@ pub enum IdeviceError {
     #[cfg(feature = "core_device")]
     #[error(transparent)]
     CoreDevice(#[from] services::core_device::CoreDeviceError),
+    #[cfg(feature = "cryptexd")]
+    #[error(transparent)]
+    Cryptexd(#[from] services::cryptexd::CryptexdError),
 
     // Feature-gated service errors (single-variant, not worth a sub-enum)
     #[cfg(feature = "misagent")]
@@ -1031,6 +1035,9 @@ impl IdeviceError {
             IdeviceError::InstallationProxy(_) => 107,
             #[cfg(feature = "core_device")]
             IdeviceError::CoreDevice(_) => 108,
+            // 109 is upstream's Restore, which this copy doesn't have.
+            #[cfg(feature = "cryptexd")]
+            IdeviceError::Cryptexd(_) => 110,
 
             // 200+: Feature-gated single-variant service errors
             #[cfg(feature = "misagent")]
@@ -1071,6 +1078,8 @@ impl IdeviceError {
             IdeviceError::InstallationProxy(e) => e.sub_code(),
             #[cfg(feature = "core_device")]
             IdeviceError::CoreDevice(e) => e.sub_code(),
+            #[cfg(feature = "cryptexd")]
+            IdeviceError::Cryptexd(e) => e.sub_code(),
             _ => 0,
         }
     }

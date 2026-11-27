@@ -68,4 +68,34 @@ struct PairingTargetsTests {
         #expect(byName["SideStore"]?.takesRemoteRecordOnly == false)
         #expect(byName["StikDebug"]?.takesRemoteRecordOnly == false)
     }
+
+    @Test("Sideloaded StikDebug is handed the file it reads, Documents/pairingFile.plist")
+    func sideloadedStikDebugPath() throws {
+        let targets = PairingTargets.match(installed: [
+            .init(bundleID: "com.stik.stikdebug.X53M69UJ7U", displayName: "StikDebug"),
+        ])
+        let target = try #require(targets.first)
+        #expect(targets.count == 1)
+        #expect(target.name == "StikDebug (Sideloaded)")
+        // rp_pairing_file.plist is a leftover StikDebug deletes unread once it
+        // has a pairing.
+        #expect(target.remoteRelativePath == "pairingFile.plist")
+    }
+
+    @Test("The apps StikDebug places a pairing file in are listed, at their own paths")
+    func stikDebugDestinations() {
+        let targets = PairingTargets.match(installed: [
+            .init(bundleID: "com.example.stosdebug", displayName: "StosDebug"),
+            .init(bundleID: "com.example.ksign", displayName: "Ksign"),
+            .init(bundleID: "com.example.autocapture", displayName: "Auto Capture"),
+            .init(bundleID: "com.example.notes", displayName: "Notes"),
+        ])
+        let paths = Dictionary(uniqueKeysWithValues: targets.map { ($0.name, $0.remoteRelativePath) })
+        #expect(paths == [
+            "StosDebug": "pairingFile.plist",
+            "Ksign": "pairingFile.plist",
+            "Auto Capture": "rpPairingFile.plist",
+        ])
+        #expect(targets.allSatisfy { !$0.app.takesRemoteRecordOnly })
+    }
 }

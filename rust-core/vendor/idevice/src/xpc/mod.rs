@@ -17,9 +17,64 @@ pub use format::{Dictionary, XPCMessage, XPCObject};
 
 const ROOT_CHANNEL: u32 = 1;
 const REPLY_CHANNEL: u32 = 3;
+/// First stream ID available for an outbound file transfer. Client-initiated
+/// streams must be odd, and 1/3 are taken by the root and reply channels.
+const FIRST_OUTBOUND_FILE_STREAM: u32 = 5;
 
 /// Fixed XPC message-wrapper header: magic + flags + body length + message id.
 const XPC_WRAPPER_LEN: usize = 24;
+
+static HANDSHAKE_UUID: std::sync::OnceLock<uuid::Uuid> = std::sync::OnceLock::new();
+
+/// The UUID this host presents in every RSD handshake, unless one is passed to
+/// [`RemoteXpcClient::send_device_handshake_with_uuid`].
+///
+/// Since iOS 27.2 the device remembers the handshake UUID of the last RSD peer
+/// on a tunnel (even after it disconnects). When a later connection presents a
+/// different UUID it re-attaches the peer and closes every service listener it
+/// advertised, to the newcomer and to earlier connections alike. So every
+/// connection to a tunnel, across processes, has to present the same UUID.
+///
+/// The default is `uuid3(NAMESPACE_DNS, hostname)`, the same host id
+/// pymobiledevice3 uses, so the two can share a tunnel. If the hostname can't
+/// be read, a random UUID is generated once per process.
+pub fn default_handshake_uuid() -> uuid::Uuid {
+    *HANDSHAKE_UUID.get_or_init(|| match host_name() {
+        Some(name) => uuid::Uuid::new_v3(&uuid::Uuid::NAMESPACE_DNS, name.as_bytes()),
+        None => uuid::Uuid::new_v4(),
+    })
+}
+
+/// Overrides [`default_handshake_uuid`] for this process, e.g. to present the
+/// UUID of macOS's `remoted` on a link it also uses. Must be called before the
+/// first handshake; returns the UUID back if the default was already fixed.
+pub fn set_default_handshake_uuid(uuid: uuid::Uuid) -> Result<(), uuid::Uuid> {
+    HANDSHAKE_UUID.set(uuid)
+}
+
+#[cfg(unix)]
+fn host_name() -> Option<String> {
+    let mut buf = [0u8; 256];
+    // SAFETY: buf is valid for buf.len() bytes; gethostname NUL-terminates on
+    // success when the name fits, and we cap the length at buf.len() anyway.
+    let ret = unsafe { libc::gethostname(buf.as_mut_ptr().cast(), buf.len()) };
+    if ret != 0 {
+        return None;
+    }
+    let len = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+    let name = std::str::from_utf8(&buf[..len]).ok()?;
+    (!name.is_empty()).then(|| name.to_string())
+}
+
+#[cfg(windows)]
+fn host_name() -> Option<String> {
+    std::env::var("COMPUTERNAME").ok().filter(|n| !n.is_empty())
+}
+
+#[cfg(not(any(unix, windows)))]
+fn host_name() -> Option<String> {
+    None
+}
 
 #[derive(Debug)]
 pub struct RemoteXpcClient<R: ReadWrite> {
@@ -30,6 +85,8 @@ pub struct RemoteXpcClient<R: ReadWrite> {
     /// across `recv_from_channel` calls so a partially-received message survives a
     /// cancelled read — required for `recv_push` to be safe in a `select!`.
     partial: std::collections::HashMap<u32, Vec<u8>>,
+    /// Stream ID for the next outbound file transfer.
+    next_outbound_file_stream: u32,
 }
 
 impl<R: ReadWrite> RemoteXpcClient<R> {
@@ -38,6 +95,7 @@ impl<R: ReadWrite> RemoteXpcClient<R> {
             h2_client: http2::Http2Client::new(socket).await?,
             root_id: 1,
             partial: std::collections::HashMap::new(),
+            next_outbound_file_stream: FIRST_OUTBOUND_FILE_STREAM,
         })
     }
 
@@ -81,14 +139,27 @@ impl<R: ReadWrite> RemoteXpcClient<R> {
     /// Announce ourselves to the device's `remoted` as a modern (non-legacy)
     /// RemoteXPC peer.
     ///
-    /// Send this only on the RSD/remoted control connection
+    /// Send this only on the RSD/remoted control connection. Identifies this
+    /// host with [`default_handshake_uuid`].
     pub async fn send_device_handshake(&mut self) -> Result<(), IdeviceError> {
+        self.send_device_handshake_with_uuid(default_handshake_uuid())
+            .await
+    }
+
+    /// Like [`Self::send_device_handshake`], identifying this host with `uuid`.
+    ///
+    /// On iOS 27.2+ every connection sharing a tunnel must present the same
+    /// UUID; see [`default_handshake_uuid`].
+    pub async fn send_device_handshake_with_uuid(
+        &mut self,
+        uuid: uuid::Uuid,
+    ) -> Result<(), IdeviceError> {
         const REMOTE_XPC_VERSION_FLAGS: u64 = 0x0100_0000_0000_0006;
 
         let msg = xpc!({
             "MessageType": "Handshake",
             "MessagingProtocolVersion": 7u64,
-            "UUID": uuid::Uuid::new_v4(),
+            "UUID": uuid,
             "Properties": {
                 "RemoteXPCVersionFlags": REMOTE_XPC_VERSION_FLAGS,
                 "SensitivePropertiesVisible": true,
@@ -236,6 +307,35 @@ impl<R: ReadWrite> RemoteXpcClient<R> {
                 yield data;
             }
         }
+    }
+
+    /// Pushes the payload of a file transfer we announced in an earlier request.
+    pub async fn send_file_transfer(
+        &mut self,
+        transfer_id: u64,
+        data: &[u8],
+    ) -> Result<(), IdeviceError> {
+        let stream_id = self.next_outbound_file_stream;
+        self.next_outbound_file_stream += 2;
+
+        self.h2_client.open_stream(stream_id).await?;
+
+        // The preamble is a DATA frame like any other, so it has to go through
+        // the flow-controlled send path: sending it unaccounted overruns the
+        // connection window once an earlier transfer has drained it, and the
+        // device answers with GOAWAY (FLOW_CONTROL_ERROR).
+        let preamble = XPCMessage::new(
+            Some(XPCFlag::FileTxStreamRequest | XPCFlag::AlwaysSet),
+            None,
+            Some(transfer_id),
+        )
+        .encode(transfer_id)?;
+        self.h2_client.send(preamble, stream_id).await?;
+        self.h2_client.send(data.to_vec(), stream_id).await?;
+        self.h2_client
+            .send_end_stream(Vec::new(), stream_id)
+            .await?;
+        Ok(())
     }
 
     pub async fn open_file_stream_for_response(

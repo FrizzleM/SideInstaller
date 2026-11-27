@@ -188,7 +188,6 @@ let italianStrings: [String: String] = [
     "iOS %@ required": "Serve iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Questo iPhone ha iOS %@, su cui SideInstaller non può installare nulla. Aggiorna a iOS %@ in Impostazioni › Generali › Aggiornamento software.",
-    "Wi-Fi required": "Serve il Wi-Fi",
     "Pairing code": "Codice di abbinamento",
     "Type this into the prompt in Settings.":
         "Scrivi questo codice nella richiesta che compare in Impostazioni.",
@@ -290,16 +289,7 @@ let italianStrings: [String: String] = [
 
     // MARK: - Pairing service status
 
-    "not paired": "non abbinato",
     "connected": "connesso",
-    "requesting Local Network…": "richiesta di accesso alla rete locale…",
-    "Local Network denied": "accesso alla rete locale negato",
-    "waiting for device…": "in attesa del dispositivo…",
-    "advertising — open Settings › Privacy & Security › Developer Mode":
-        "in ascolto — apri Impostazioni › Privacy e sicurezza › Modalità sviluppatore",
-    "enter PIN %@ in Settings": "inserisci il PIN %@ in Impostazioni",
-    "paired: %@ (%dB)": "abbinato: %@ (%d B)",
-    "failed: empty pairing file": "errore: file di abbinamento vuoto",
     "failed: %@": "errore: %@",
     "Pairing is already in progress.": "C'è già un abbinamento in corso.",
     "Local Network permission is off. Enable it in Settings › SideInstaller › Local Network, then try again.":
@@ -382,7 +372,6 @@ let italianStrings: [String: String] = [
     "Location session closed — set it up again.":
         "La sessione di posizione è chiusa: preparala di nuovo.",
     "Downloading %@ failed (HTTP %d).": "Il download di %@ non è riuscito (HTTP %d).",
-    "The download of %@ came back empty. Try again.": "Il download di %@ è arrivato vuoto. Riprova.",
     "Couldn't build the download URL for %@.": "Impossibile costruire l'URL di download per %@.",
     "Couldn't build the certificate link.": "Impossibile creare il link del certificato.",
 
@@ -394,10 +383,10 @@ let italianStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "Tocca Salva sotto la mappa per tenere il punto sotto la puntina. Toccando un luogo salvato lo imposti subito.",
     "Play a GPX route": "Riproduci un percorso GPX",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        "Importa un file .gpx: il dispositivo lo percorre alla velocità che scegli, poi resta sull'ultimo punto.",
     "Import GPX file": "Importa file GPX",
     "Couldn't read %@ as a GPX file.": "Impossibile leggere %@ come file GPX.",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "Impossibile leggere %@ come percorso. Importa un file GPX, KML o GeoJSON, o un file con una latitudine e una longitudine per riga.",
     "%@ has no track, route or waypoints in it.": "%@ non contiene tracce, percorsi o waypoint.",
     "As recorded": "Come registrato",
     "Walk": "A piedi",
@@ -718,6 +707,8 @@ let italianStrings: [String: String] = [
         "Qualcosa su %@:%d ha rifiutato la connessione, quindi il tunnel funziona, ma questo iPhone non è in ascolto sulla sua porta di abbinamento, anche se la Modalità sviluppatore è attiva. Abbina di nuovo questo iPhone da “File di abbinamento”, poi riprova. Se non funziona ancora, riavvia l'iPhone.",
     "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
         "Qualcosa su %@:%d ha accettato la connessione ma non ha risposto come la porta di abbinamento di questo iPhone, e nessun'altra porta ha risposto come tale. Controlla che la VPN attiva sia LocalDevVPN e che la Modalità sviluppatore sia attiva (Impostazioni › Privacy e sicurezza › Modalità sviluppatore), poi riprova. Se non funziona ancora, riavvia l'iPhone.",
+    "This iPhone is on mobile data, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Turn on Airplane Mode, keep LocalDevVPN connected, then try again.":
+        "Questo iPhone usa i dati cellulare, e in quel caso iOS tiene chiusa la sua porta di abbinamento, quindi %@:%d ha rifiutato la connessione. Attiva la modalità aereo, lascia LocalDevVPN connesso, poi riprova.",
     "Start LocalDevVPN when needed": "Avvia LocalDevVPN quando serve",
     "Start LocalDevVPN now": "Avvia LocalDevVPN adesso",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -925,8 +916,6 @@ let italianStrings: [String: String] = [
     "Then come back here — this continues automatically.":
         "Poi torna qui: il processo va avanti da solo.",
     "Tap Connect so the toggle turns on.": "Tocca Connect per far scattare l'interruttore.",
-    "Keep Wi-Fi on, then come back here — this continues automatically.":
-        "Lascia il Wi-Fi attivo e torna qui: il processo va avanti da solo.",
     "Get LocalDevVPN": "Scarica LocalDevVPN",
     "Import an .ipa first": "Importa prima un .ipa",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
@@ -1067,6 +1056,16 @@ let italianStrings: [String: String] = [
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
+    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
+        "Fai clic su “Save to file…” e invia il file a questo iPhone, con AirDrop, iCloud Drive o un cavo. Va bene anche un file di abbinamento esportato da iLoader.",
+    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
+        "Torna qui, tocca “Sostituisci” nella scheda “File di abbinamento” e scegli il file.",
+    "Get idevice_pair": "Scarica idevice_pair",
+    "Make a remote pairing file": "Crea un file “Remote pairing”",
+    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
+        "Su un Mac, un PC Windows o Linux, apri idevice_pair, collega questo iPhone e tocca Autorizza se te lo chiede. Selezionalo, scegli “Remote pairing”, fai clic su “Create” e tieni questo iPhone sbloccato finché non ha finito.",
+    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
+        "Il file di abbinamento che hai importato è di tipo lockdown. Da iOS 26.4 questo iPhone chiude la connessione con questi file quando passano da LocalDevVPN, quindi non può connettersi, e nemmeno un file nuovo dello stesso tipo.",
     "A certificate already exists": "Esiste già un certificato",
     "Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone.":
         "Apple non rilascia un secondo certificato di firma per questo Apple ID. Revocare quello che c'è già fa proseguire l'installazione, ma è un'operazione irreversibile.",
@@ -1119,13 +1118,13 @@ let italianStrings: [String: String] = [
         "Questo iPhone ha chiuso la connessione appena aperta. Da iOS 26.4 lo fa con i file di abbinamento lockdown, come questo, quando passano da LocalDevVPN. Abbina invece questo iPhone con sé stesso: tocca “Rigenera” in Strumenti › Abbinamento, oppure tocca Installa, che prima lo abbina.",
     "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
         "Questo iPhone ha chiuso la connessione appena aperta. Da iOS 26.4 lo fa con i file di abbinamento lockdown, come questo, quando passano da LocalDevVPN, quindi crearne uno nuovo dello stesso tipo non serve. Un file di abbinamento “Remote pairing” funziona ancora: su un computer apri idevice_pair, scegli “Remote pairing”, fai clic su “Create”, poi su “Save to file…”, e importa il file in “File di abbinamento”.",
-    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
-        "L’associazione di questo iPhone lo richiede: SideInstaller si annuncia sulla rete locale perché Impostazioni lo trovi.",
-    "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
-        "Connettiti a una rete Wi-Fi. L’associazione di questo iPhone lo richiede: SideInstaller deve essere individuabile sulla rete locale.",
+    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
+        "Questo iPhone ha chiuso la connessione: da iOS 26.4 lo fa con i file di abbinamento lockdown come questo quando passano da LocalDevVPN. Vedi i passaggi qui sopra.",
 
     // MARK: - About
 
+    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
+        "L’associazione di questo iPhone lo richiede: SideInstaller si annuncia sulla rete locale perché Impostazioni lo trovi.",
     "About": "Info",
     "Version %@ (%@)": "Versione %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
@@ -1794,7 +1793,6 @@ let italianStrings: [String: String] = [
     "All": "Tutto",
     "Succeeded": "Riusciti",
     "Restore real location when done": "Ripristina la posizione reale al termine",
-    "Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.": "Importa un file .gpx: il dispositivo lo percorre alla velocità che scegli. Alla fine resta sull'ultimo punto, a meno che il ripristino della posizione reale non sia attivo.",
     "移动“%@”？": "Spostare \"%@\"?",
     "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "Questo è l'IPA nella scheda Installa. Spostarlo svuota quello slot — installalo invece dalla sua nuova cartella.",
     "Move": "Sposta",
@@ -1835,4 +1833,73 @@ let italianStrings: [String: String] = [
     "系统文件": "File di sistema",
     "其他文件": "Altri file",
 
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "Ora SideInstaller accede ad Apple, scarica l'app e la fa firmare da Apple: serve internet.",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "Ora SideInstaller accede ad Apple: serve internet.",
+    "Next, Apple signs the app, which needs the internet.":
+        "Ora Apple firma l'app: serve internet.",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "Ora SideInstaller scarica la developer disk image: serve internet.",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "Ora Apple firma la developer disk image per questo iPhone: serve internet.",
+    "Try Mobile Data Mode?":
+        "Provare la Modalità dati cellulare?",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "Questo iPhone usa i dati cellulare, non il Wi-Fi, e in quel caso iOS non accetta nuove connessioni da LocalDevVPN.",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "La Modalità dati cellulare lo aggira con la modalità aereo: la attivi mentre SideInstaller si connette e la disattivi quando SideInstaller ha bisogno di internet. Te lo dice SideInstaller.",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "Il Wi-Fi è il modo stabile, e il più sicuro. Per usarlo, attiva il Wi-Fi e riprova.",
+    "Try Mobile Data Mode":
+        "Prova la Modalità dati cellulare",
+    "Use Wi-Fi Instead":
+        "Usa il Wi-Fi",
+    "Turn on Airplane Mode":
+        "Attiva la modalità aereo",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "La connessione che SideInstaller teneva aperta si è chiusa, quindi ne serve una nuova.",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "Apri Centro di Controllo: scorri verso il basso dall'angolo in alto a destra dello schermo.",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "Tocca Modalità aereo per attivarla. Lascia il Wi-Fi spento e LocalDevVPN connessa.",
+    "Come back to SideInstaller. It carries on by itself.":
+        "Torna su SideInstaller. Prosegue da solo.",
+    "Then pair this iPhone with SideInstaller in Settings, as usual.":
+        "Poi abbina questo iPhone a SideInstaller in Impostazioni, come al solito.",
+    "Connecting in Airplane Mode":
+        "Connessione in modalità aereo",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "Tieni attiva la modalità aereo finché SideInstaller non ti chiede di disattivarla.",
+    "Turn off Airplane Mode":
+        "Disattiva la modalità aereo",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "SideInstaller è connesso e mantiene la connessione quando tornano i dati cellulare.",
+    "Open Control Center again.":
+        "Apri di nuovo Centro di Controllo.",
+    "Tap Airplane Mode to turn it off.":
+        "Tocca Modalità aereo per disattivarla.",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "Torna su SideInstaller. Prosegue appena tornano i dati cellulare.",
+    "You can turn off Airplane Mode":
+        "Puoi disattivare la modalità aereo",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "Per ora SideInstaller non ha più bisogno della modalità aereo e mantiene la connessione per quello che farai dopo. Disattiva la modalità aereo quando vuoi.",
+    "Waiting for Airplane Mode…":
+        "In attesa della modalità aereo…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "La modalità aereo è attiva, ma LocalDevVPN non è connessa. Aprila e connettila di nuovo.",
+    "Waiting for mobile data…":
+        "In attesa dei dati cellulare…",
+    "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
+        "Questo iPhone usa i dati cellulare. Continua in SideInstaller per usare la Modalità dati cellulare.",
+    "Mobile data":
+        "Dati cellulare",
+    "Mobile Data Mode":
+        "Modalità dati cellulare",
 ]
+
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
+        "Importa un file GPX, KML o GeoJSON, oppure un elenco di coordinate, e il dispositivo lo percorre alla velocità scelta. Alla fine resta all’ultimo punto, a meno che non sia attivo il ripristino della posizione reale.",

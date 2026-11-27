@@ -2,6 +2,55 @@
 
 All notable changes to SideInstaller are documented here.
 
+## Unreleased
+
+### Added
+- **Mobile Data Mode (beta).** On mobile data without Wi-Fi, iOS refuses new connections from
+  LocalDevVPN. When something you start needs one, SideInstaller now asks whether to try Mobile
+  Data Mode, or to use Wi-Fi, the stable and safer way. In Mobile Data Mode it has you turn on
+  Airplane Mode while it connects, and off again before anything that needs the internet, and
+  keeps the connection it opened instead of opening a new one each time. It covers installs,
+  refreshes, pairing, Location spoofing, JIT, Sideloaded apps, crash logs, Developer Mode and
+  the Shortcuts actions, so testing can show where it works. An install that has to pair no longer
+  waits for Wi-Fi either: the "Wi-Fi required" card is gone.
+
+## 2.3.0
+
+### Added
+- **Routes from more kinds of file.** Play a GPX route, and the Play GPX Route shortcut, also take
+  KML (Google Earth and My Maps exports), GeoJSON, and JSON, CSV or plain text with a latitude and
+  longitude on each line, the files StikDebug imports. A KML track's times play “As recorded”, as
+  a GPX file's do.
+- **The pairing file goes into Ksign, StosDebug and Auto Capture**, which StikDebug and
+  idevice_pair place it in.
+
+### Changed
+- **The developer disk image goes on as a cryptex from iOS 26.4.** Location spoofing and JIT now
+  have cryptexd install Apple's developer disk image, as StikDebug does there, and mount the
+  personalized image only when that fails. The personalized image only lists the iPhones Xcode
+  knew when it was made, so on a newer one neither could start. The cryptex is downloaded the
+  first time, about 18 MB, from the same mirror.
+
+### Fixed
+- **Sideloaded StikDebug gets the pairing file where it reads it.** SideInstaller wrote it as
+  `rp_pairing_file.plist`, a name StikDebug only takes in when it has no pairing yet and otherwise
+  deletes unread. It now writes `pairingFile.plist`, as iLoader and idevice_pair do.
+- **Connections on iOS 27.2 no longer cut each other off.** iOS 27.2 remembers who last connected
+  to an iPhone's services, and when a connection introduces itself as someone else, it closes the
+  services every connection was using. Each of SideInstaller's connections introduced itself under
+  a new name, so opening one (JIT's own, or a reconnect before an install) could end the one before.
+  They now all use one name, as StikDebug's do.
+- **A steadier tunnel.** The software TCP stack the tunnel runs on is now jktcp 0.1.8, which
+  StikDebug ships: a segment that arrives out of order is no longer dropped until it's sent again,
+  a write cut short can no longer leave half a packet in the tunnel, and an open tunnel no longer
+  wakes the app a thousand times a second. Segments are capped at 8 KB, as idevice caps them now.
+- **On mobile data, the error says to join Wi-Fi.** While this iPhone is on mobile data and not on
+  Wi-Fi, iOS refuses every new connection LocalDevVPN carries to it. SideInstaller said to pair
+  again or restart the iPhone, which can't help, after spending seconds searching the iPhone's
+  other ports for its pairing port. It now says to connect to Wi-Fi, without the search.
+- Reading back a file just written into another app's container can't loop for ever when the file
+  changes size meanwhile, and an app whose container iOS won't open is reported as such.
+
 ## 2.2.0
 
 ### Added

@@ -206,9 +206,11 @@ struct ReportProblemView: View {
         crashLookError = nil
         defer { lookingForCrashes = false }
         do {
-            deviceCrashes = try await engine.deviceCrashLogs()
+            deviceCrashes = try await MobileDataMode.shared.run(.crashLogs) {
+                try await engine.deviceCrashLogs()
+            }
         } catch is CancellationError {
-            return
+            // Mobile Data Mode's popup was closed: nothing to report.
         } catch {
             crashLookError = userFacingErrorMessage(error)
         }

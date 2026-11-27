@@ -32,10 +32,25 @@ pub struct RsdHandshake {
 }
 
 impl RsdHandshake {
+    /// Performs the RSD handshake, identifying this host with
+    /// [`crate::xpc::default_handshake_uuid`].
     pub async fn new(socket: impl ReadWrite) -> Result<Self, IdeviceError> {
+        Self::new_with_uuid(socket, crate::xpc::default_handshake_uuid()).await
+    }
+
+    /// Performs the RSD handshake, identifying this host with `host_uuid`.
+    ///
+    /// On iOS 27.2+ every connection to a tunnel must present the same UUID,
+    /// or the device tears down the services it advertised to all of them.
+    pub async fn new_with_uuid(
+        socket: impl ReadWrite,
+        host_uuid: uuid::Uuid,
+    ) -> Result<Self, IdeviceError> {
         let mut xpc_client = RemoteXpcClient::new(socket).await?;
         xpc_client.do_handshake().await?;
-        xpc_client.send_device_handshake().await?;
+        xpc_client
+            .send_device_handshake_with_uuid(host_uuid)
+            .await?;
         let data = xpc_client.recv_root().await?;
 
         let services_dict = match data

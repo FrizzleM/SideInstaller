@@ -164,7 +164,6 @@ let turkishStrings: [String: String] = [
     "iOS %@ required": "iOS %@ gerekli",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Bu iPhone iOS %@ çalıştırıyor; SideInstaller buna yükleme yapamaz. Ayarlar › Genel › Yazılım Güncelleme'den iOS %@ veya sonrasına güncelle.",
-    "Wi-Fi required": "Wi-Fi gerekli",
     "Pairing code": "Eşleme kodu",
     "Type this into the prompt in Settings.": "Bunu Ayarlar'daki istem alanına yaz.",
     "Install stopped": "Yükleme durdu",
@@ -259,16 +258,7 @@ let turkishStrings: [String: String] = [
 
     // MARK: - Pairing service status
 
-    "not paired": "eşlenmedi",
     "connected": "bağlı",
-    "requesting Local Network…": "Yerel Ağ izni isteniyor…",
-    "Local Network denied": "Yerel Ağ reddedildi",
-    "waiting for device…": "cihaz bekleniyor…",
-    "advertising — open Settings › Privacy & Security › Developer Mode":
-        "duyuruluyor — Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu'nu aç",
-    "enter PIN %@ in Settings": "Ayarlar'da PIN %@ gir",
-    "paired: %@ (%dB)": "eşlendi: %@ (%dB)",
-    "failed: empty pairing file": "başarısız: boş eşleme dosyası",
     "failed: %@": "başarısız: %@",
     "Pairing is already in progress.": "Eşleme zaten sürüyor.",
     "Local Network permission is off. Enable it in Settings › SideInstaller › Local Network, then try again.":
@@ -349,7 +339,6 @@ let turkishStrings: [String: String] = [
     "That isn't a valid coordinate.": "Bu geçerli bir koordinat değil.",
     "Location session closed — set it up again.": "Konum oturumu kapandı — yeniden ayarla.",
     "Downloading %@ failed (HTTP %d).": "%@ indirme başarısız (HTTP %d).",
-    "The download of %@ came back empty. Try again.": "%@ indirmesi boş geldi. Yeniden deneyin.",
     "Couldn't build the download URL for %@.": "%@ için indirme adresi oluşturulamadı.",
     "Couldn't build the certificate link.": "Sertifika bağlantısı oluşturulamadı.",
     // Location › saved places and GPX routes.
@@ -361,10 +350,10 @@ let turkishStrings: [String: String] = [
     "Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away.":
         "İğnenin altındaki yeri saklamak için haritanın altındaki Kaydet'e dokun. Kayıtlı bir yere dokunmak hemen uygular.",
     "Play a GPX route": "GPX rotası oynat",
-    "Import a .gpx file and the device moves along it at the speed you pick, then stays at its last point.":
-        ".gpx dosyası içe aktar; cihaz seçtiğin hızda rota boyunca hareket eder, sonra son noktada kalır.",
     "Import GPX file": "GPX dosyasını içe aktar",
     "Couldn't read %@ as a GPX file.": "%@ bir GPX dosyası olarak okunamadı.",
+    "Couldn't read %@ as a route. Import a GPX, KML or GeoJSON file, or one with a latitude and longitude on each line.":
+        "%@ bir rota olarak okunamadı. GPX, KML veya GeoJSON dosyası ya da her satırında bir enlem ve boylam olan bir dosya içe aktar.",
     "%@ has no track, route or waypoints in it.": "%@ içinde iz, rota veya yol noktası yok.",
     "As recorded": "Kayıtlı hızda",
     "Walk": "Yürüme",
@@ -686,6 +675,8 @@ let turkishStrings: [String: String] = [
         "%@:%d adresindeki bir şey bağlantıyı reddetti; yani tünel trafik taşıyor, ama Geliştirici Modu açık olduğu hâlde bu iPhone eşleme bağlantı noktasını dinlemiyor. “Eşleme dosyası” altında bu iPhone'u yeniden eşle, sonra yeniden dene. Yine olmazsa iPhone'u yeniden başlat.",
     "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
         "%@:%d adresindeki bir şey bağlantıyı kabul etti ama bu iPhone'un eşleme bağlantı noktası gibi yanıt vermedi, başka hiçbir bağlantı noktası da öyle yanıt vermedi. Açık olan VPN'in LocalDevVPN olduğunu ve Geliştirici Modu'nun açık olduğunu (Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu) denetle, sonra yeniden dene. Yine olmazsa iPhone'u yeniden başlat.",
+    "This iPhone is on mobile data, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Turn on Airplane Mode, keep LocalDevVPN connected, then try again.":
+        "Bu iPhone mobil veri kullanıyor ve iOS bu durumda eşleme bağlantı noktasını kapalı tutuyor, bu yüzden %@:%d bağlantıyı reddetti. Uçak Modu'nu aç, LocalDevVPN'i bağlı tut, sonra yeniden dene.",
     "Start LocalDevVPN when needed": "Gerektiğinde LocalDevVPN'i başlat",
     "Start LocalDevVPN now": "LocalDevVPN'i şimdi başlat",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -880,8 +871,6 @@ let turkishStrings: [String: String] = [
     "Open Settings › Wi-Fi and join a network.": "Ayarlar › Wi-Fi'yi aç ve bir ağa katıl.",
     "Then come back here — this continues automatically.": "Sonra buraya dön — bu otomatik devam eder.",
     "Tap Connect so the toggle turns on.": "Anahtarın açılması için Connect'e dokun.",
-    "Keep Wi-Fi on, then come back here — this continues automatically.":
-        "Wi-Fi'yi açık tut, sonra buraya dön — bu otomatik devam eder.",
     "Get LocalDevVPN": "LocalDevVPN al",
     "Import an .ipa first": "Önce bir .ipa içe aktar",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
@@ -1012,6 +1001,16 @@ let turkishStrings: [String: String] = [
 
     // MARK: - Revoke-and-retry (Apple error 7460)
 
+    "Click “Save to file…” and send the file to this iPhone, by AirDrop, iCloud Drive or a cable. A pairing file exported from iLoader works too.":
+        "“Save to file…”e tıkla ve dosyayı AirDrop, iCloud Drive veya kabloyla bu iPhone'a gönder. iLoader'dan dışa aktarılmış eşleme dosyası da çalışır.",
+    "Come back here, tap “Replace” on the Pairing file card, and pick it.":
+        "Buraya dön, Eşleme dosyası kartında “Değiştir”e dokun ve dosyayı seç.",
+    "Get idevice_pair": "idevice_pair al",
+    "Make a remote pairing file": "Uzaktan eşleme dosyası oluştur",
+    "On a Mac, Windows PC or Linux box, open idevice_pair, plug this iPhone in, and tap Trust if it asks. Pick it, choose “Remote pairing”, click “Create”, and keep this iPhone unlocked until it's done.":
+        "Mac, Windows PC veya Linux bilgisayarda idevice_pair'i aç, bu iPhone'u bağla ve isterse Güven'e dokun. Seç, “Remote pairing”i seç, “Create”e tıkla ve bitene kadar bu iPhone'un kilidini açık tut.",
+    "The pairing file you imported is a lockdown one. Since iOS 26.4, this iPhone hangs up on those when they come through LocalDevVPN, so it can't connect, and a new one of the same kind won't either.":
+        "İçe aktardığın eşleme dosyası bir lockdown dosyası. iOS 26.4'ten beri bu iPhone, LocalDevVPN üzerinden gelen bu tür dosyalarda bağlantıyı keser; bağlanamaz ve aynı türden yenisi de işe yaramaz.",
     "A certificate already exists": "Bir sertifika zaten var",
     "Apple won't issue a second signing certificate for this Apple ID. Revoking the one it already has lets the install continue — but it can't be undone.":
         "Apple bu Apple kimliği için ikinci bir imzalama sertifikası vermez. Zaten olanı iptal etmek yüklemenin sürmesini sağlar — ama geri alınamaz.",
@@ -1056,13 +1055,13 @@ let turkishStrings: [String: String] = [
         "Bu iPhone bağlantıyı açılır açılmaz kesti. iOS 26.4'ten itibaren, bunun gibi lockdown eşleme dosyaları LocalDevVPN üzerinden geldiğinde bunu yapar. Bunun yerine bu iPhone'u kendisiyle eşle: Araçlar › Eşleme altında “Yeniden oluştur”a dokun ya da önce eşlemeyi yapan Yükle'ye dokun.",
     "This iPhone hung up on the connection as soon as it opened. Since iOS 26.4 it does that to lockdown pairing files, like this one, when they come through LocalDevVPN, so a new one of the same kind won't help. A remote pairing file still works: on a computer, open idevice_pair, choose “Remote pairing”, click “Create”, then “Save to file…”, and import the file under “Pairing file”.":
         "Bu iPhone bağlantı açılır açılmaz kesti. iOS 26.4'ten beri LocalDevVPN üzerinden gelen lockdown eşleme dosyalarında (bunun gibi) bunu yapar; aynı türden yenisi yardımcı olmaz. Uzaktan eşleme dosyası hâlâ çalışır: bilgisayarda idevice_pair'i aç, “Remote pairing” seç, “Create” sonra “Save to file…”e tıkla ve dosyayı “Eşleme dosyası” altında içe aktar.",
-    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
-        "Bu iPhone'u eşlemek için gerekir: SideInstaller, Ayarlar'ın bulması için kendini yerel ağda duyurur.",
-    "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
-        "Bir Wi-Fi ağına bağlan. Bu iPhone'u eşlemek için gerekir — SideInstaller yerel ağda bulunabilir olmalı.",
+    "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
+        "Bu iPhone bağlantıyı kesti: iOS 26.4'ten itibaren, bunun gibi lockdown eşleme dosyaları LocalDevVPN üzerinden geldiğinde bunu yapar. Yukarıdaki adımlara bak.",
 
     // MARK: - About
 
+    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
+        "Bu iPhone'u eşlemek için gerekir: SideInstaller, Ayarlar'ın bulması için kendini yerel ağda duyurur.",
     "About": "Hakkında",
     "Version %@ (%@)": "Sürüm %@ (%@)",
     "SideInstaller installs SideStore and LiveContainer straight onto your iPhone, with no PC involved.":
@@ -1711,7 +1710,6 @@ let turkishStrings: [String: String] = [
     "All": "Tümü",
     "Succeeded": "Başarılı",
     "Restore real location when done": "Bitince gerçek konumu geri yükle",
-    "Import a .gpx file and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.": ".gpx dosyası içe aktar; cihaz seçtiğin hızda rota boyunca hareket eder. Bitince son noktada kalır, ancak bitince gerçek konumu geri yükleme açıksa gerçek konumuna döner.",
     "移动“%@”？": "\"%@\" taşınsın mı?",
     "This is the IPA on the Install tab. Moving it empties that slot — install it from its new folder instead.": "Bu, Yükle sekmesindeki IPA'dır. Taşımak o yuvayı boşaltır — bunun yerine yeni klasöründen yükleyin.",
     "Move": "Taşı",
@@ -1752,4 +1750,73 @@ let turkishStrings: [String: String] = [
     "系统文件": "Sistem dosyaları",
     "其他文件": "Diğer dosyalar",
 
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "Sırada SideInstaller'ın Apple'da oturum açması, uygulamayı indirmesi ve Apple'a imzalatması var; bunun için internet gerekir.",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "Sırada SideInstaller'ın Apple'da oturum açması var; bunun için internet gerekir.",
+    "Next, Apple signs the app, which needs the internet.":
+        "Sırada Apple'ın uygulamayı imzalaması var; bunun için internet gerekir.",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "Sırada SideInstaller'ın geliştirici disk görüntüsünü indirmesi var; bunun için internet gerekir.",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "Sırada Apple'ın geliştirici disk görüntüsünü bu iPhone için imzalaması var; bunun için internet gerekir.",
+    "Try Mobile Data Mode?":
+        "Mobil Veri Modu denensin mi?",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "Bu iPhone Wi-Fi yerine mobil veri kullanıyor ve iOS bu durumda LocalDevVPN'den gelen yeni bağlantıları kabul etmiyor.",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "Mobil Veri Modu bunu Uçak Modu ile aşar: SideInstaller bağlanırken Uçak Modu'nu açarsın, SideInstaller'ın internete ihtiyacı olunca yeniden kapatırsın. Ne zaman olduğunu SideInstaller söyler.",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "Wi-Fi kararlı yoldur ve daha güvenlidir. Onu kullanmak için Wi-Fi'ı aç ve yeniden dene.",
+    "Try Mobile Data Mode":
+        "Mobil Veri Modu'nu dene",
+    "Use Wi-Fi Instead":
+        "Wi-Fi kullan",
+    "Turn on Airplane Mode":
+        "Uçak Modu'nu aç",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "SideInstaller'ın açık tuttuğu bağlantı kapandı, bu yüzden yeni bir bağlantı gerekiyor.",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "Denetim Merkezi'ni aç: ekranın sağ üst köşesinden aşağı kaydır.",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "Açmak için Uçak Modu'na dokun. Wi-Fi'ı kapalı, LocalDevVPN'i bağlı bırak.",
+    "Come back to SideInstaller. It carries on by itself.":
+        "SideInstaller'a geri dön. Kendiliğinden devam eder.",
+    "Then pair this iPhone with SideInstaller in Settings, as usual.":
+        "Ardından bu iPhone'u her zamanki gibi Ayarlar'da SideInstaller ile eşle.",
+    "Connecting in Airplane Mode":
+        "Uçak Modu'nda bağlanıyor",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "SideInstaller kapatmanı isteyene kadar Uçak Modu'nu açık tut.",
+    "Turn off Airplane Mode":
+        "Uçak Modu'nu kapat",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "SideInstaller bağlandı ve mobil veri geri geldiğinde de bağlantısını korur.",
+    "Open Control Center again.":
+        "Denetim Merkezi'ni yeniden aç.",
+    "Tap Airplane Mode to turn it off.":
+        "Kapatmak için Uçak Modu'na dokun.",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "SideInstaller'a geri dön. Mobil veri gelince devam eder.",
+    "You can turn off Airplane Mode":
+        "Uçak Modu'nu kapatabilirsin",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "SideInstaller'ın şimdilik Uçak Modu'na ihtiyacı kalmadı ve sonraki işlerin için bağlantısını koruyor. Uçak Modu'nu istediğin zaman kapat.",
+    "Waiting for Airplane Mode…":
+        "Uçak Modu bekleniyor…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "Uçak Modu açık ama LocalDevVPN bağlı değil. Onu aç ve yeniden bağla.",
+    "Waiting for mobile data…":
+        "Mobil veri bekleniyor…",
+    "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
+        "Bu iPhone mobil veri kullanıyor. Mobil Veri Modu'nu kullanmak için SideInstaller'da devam et.",
+    "Mobile data":
+        "Mobil veri",
+    "Mobile Data Mode":
+        "Mobil Veri Modu",
 ]
+
+    "Import a GPX, KML or GeoJSON file, or a list of coordinates, and the device moves along it at the speed you pick. When it ends, the device stays at its last point, unless restoring the real location when done is on.":
+        "Bir GPX, KML veya GeoJSON dosyası ya da bir koordinat listesi içe aktarın; cihaz seçtiğiniz hızla rota boyunca hareket eder. Bittiğinde son noktada kalır; tamamlandığında gerçek konuma dönme açık değilse.",

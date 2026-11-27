@@ -1,14 +1,17 @@
 import Foundation
 
 /// One app that can receive the pairing file, as in iLoader's PAIRING_APPS
-/// table. The file is written into its container over house_arrest/AFC.
+/// table, StikDebug's `pairingDestinationApps` and idevice_pair's
+/// `known_apps.rs`. The file is written into its container over
+/// house_arrest/AFC.
 struct PairingTargetApp: Identifiable, Equatable {
     /// The display name the installed app reports, matched on and shown.
     let name: String
     /// Where the pairing file must land, relative to the app's Documents dir.
     let remoteRelativePath: String
     /// Restricts the entry to bundle ids containing this, which splits
-    /// StikDebug's App Store and sideloaded builds — they read different paths.
+    /// StikDebug's App Store and sideloaded builds, as iLoader's table does.
+    /// Both read the same path now.
     let bundleIDContains: String?
 
     var id: String { name }
@@ -40,12 +43,25 @@ struct PairingTargetApp: Identifiable, Equatable {
         .init(name: "Feather",
               remoteRelativePath: "pairingFile.plist",
               bundleIDContains: nil),
+        // A signer like Feather; StikDebug and idevice_pair place it here.
+        .init(name: "Ksign",
+              remoteRelativePath: "pairingFile.plist",
+              bundleIDContains: nil),
         .init(name: "StikDebug",
               remoteRelativePath: "pairingFile.plist",
               bundleIDContains: nil),
+        // StikDebug reads Documents/pairingFile.plist in every build. It takes
+        // rp_pairing_file.plist only as a leftover of older builds: moved in
+        // when it has no pairing yet, deleted unread otherwise
+        // (`PairingFileStore.prepareURL`). iLoader moved back on 2026-10-15.
         .init(name: "StikDebug (Sideloaded)",
-              remoteRelativePath: "rp_pairing_file.plist",
+              remoteRelativePath: "pairingFile.plist",
               bundleIDContains: "com.stik.stikdebug"),
+        // stossy11's debugger, which reads Documents/pairingFile.plist with
+        // rp_pairing_file_read as StikDebug does (its `DeviceManager.swift`).
+        .init(name: "StosDebug",
+              remoteRelativePath: "pairingFile.plist",
+              bundleIDContains: nil),
         .init(name: "StikTest",
               remoteRelativePath: "stiktest_pairing.plist",
               bundleIDContains: nil),
@@ -66,6 +82,10 @@ struct PairingTargetApp: Identifiable, Equatable {
               bundleIDContains: nil),
         .init(name: "Reynard",
               remoteRelativePath: "pairingFile.plist",
+              bundleIDContains: nil),
+        // Its own file name, as StikDebug and idevice_pair write it.
+        .init(name: "Auto Capture",
+              remoteRelativePath: "rpPairingFile.plist",
               bundleIDContains: nil),
         .init(name: "PanicAnalyzer",
               remoteRelativePath: "pairingFile.plist",

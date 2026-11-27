@@ -33,6 +33,10 @@ pub struct Http2Client<R: ReadWrite> {
     /// across reads keeps [`Self::pump`] (and therefore `recv_push`)
     /// cancellation-safe: a partially-received frame survives a dropped read.
     recv_buf: Vec<u8>,
+    /// Streams we finished pushing an outbound file transfer on. The device
+    /// resets them once it has the payload, so a RST_STREAM for one of these is
+    /// normal completion rather than an error.
+    finished_file_transfer_streams: std::collections::HashSet<u32>,
 }
 
 impl<R: ReadWrite> Http2Client<R> {
@@ -47,6 +51,7 @@ impl<R: ReadWrite> Http2Client<R> {
             stream_send_windows: HashMap::new(),
             peer_initial_window: DEFAULT_WINDOW,
             recv_buf: Vec::new(),
+            finished_file_transfer_streams: std::collections::HashSet::new(),
         })
     }
 
@@ -112,6 +117,29 @@ impl<R: ReadWrite> Http2Client<R> {
     }
 
     pub async fn send(&mut self, payload: Vec<u8>, stream_id: u32) -> Result<(), IdeviceError> {
+        self.send_inner(payload, stream_id, false).await
+    }
+
+    /// Sends `payload` and closes our half of the stream with END_STREAM.
+    ///
+    /// Used to finish an outbound file transfer: the device resets the stream
+    /// once it has the payload, and [`Self::pump`] treats that reset as normal
+    /// completion rather than an error.
+    pub async fn send_end_stream(
+        &mut self,
+        payload: Vec<u8>,
+        stream_id: u32,
+    ) -> Result<(), IdeviceError> {
+        self.finished_file_transfer_streams.insert(stream_id);
+        self.send_inner(payload, stream_id, true).await
+    }
+
+    async fn send_inner(
+        &mut self,
+        payload: Vec<u8>,
+        stream_id: u32,
+        end_stream: bool,
+    ) -> Result<(), IdeviceError> {
         const MAX_FRAME_SIZE: usize = 16384;
         let mut chunks = payload.chunks(MAX_FRAME_SIZE).peekable();
         // Always send at least one frame, even for an empty payload. An empty
@@ -120,13 +148,14 @@ impl<R: ReadWrite> Http2Client<R> {
             let frame = frame::DataFrame {
                 stream_id,
                 payload: Vec::new(),
+                end_stream,
             }
             .serialize();
             self.inner.write_all(&frame).await?;
             self.inner.flush().await?;
             return Ok(());
         }
-        for chunk in chunks {
+        while let Some(chunk) = chunks.next() {
             let need = chunk.len() as i64;
             // Respect the peer's flow-control window: a DATA frame must not exceed
             // either the connection-level or the stream-level send window, or the
@@ -140,6 +169,8 @@ impl<R: ReadWrite> Http2Client<R> {
             let frame = frame::DataFrame {
                 stream_id,
                 payload: chunk.to_vec(),
+                // Only the last chunk carries END_STREAM.
+                end_stream: end_stream && chunks.peek().is_none(),
             }
             .serialize();
             self.inner.write_all(&frame).await?;
@@ -210,6 +241,16 @@ impl<R: ReadWrite> Http2Client<R> {
                         .stream_send_windows
                         .entry(w.stream_id)
                         .or_insert(initial) += w.increment_size as i64;
+                }
+            }
+            frame::Frame::RstStream(rst) => {
+                if self.finished_file_transfer_streams.remove(&rst.stream_id) {
+                    debug!(
+                        "Device reset finished file transfer stream {}",
+                        rst.stream_id
+                    );
+                } else {
+                    return Err(crate::xpc::errors::XpcError::HttpStreamReset.into());
                 }
             }
             frame::Frame::Data(data_frame) => {

@@ -558,6 +558,9 @@ final class SideloadedAppsManager: ObservableObject {
         guard !didAutoLoad, !hasLoaded, !isWorking else { return }
         engine.refreshNetworkStatus()
         guard engine.vpnConnected else { return }
+        // On mobile data alone reading the device needs Mobile Data Mode,
+        // which only asks when the user taps Load, unless its tunnel is open.
+        guard !NetworkStatus.links().mobileDataOnly || MobileDataMode.shared.mayHaveOpenTunnel else { return }
         didAutoLoad = true
         load(quiet: true)
     }
@@ -583,27 +586,15 @@ final class SideloadedAppsManager: ObservableObject {
         // 全局执行器，随后的 @Published 写会落在主线程外——显式进主 actor。
         let task = Task { @MainActor in
             do {
-                let inventory = try await engine.sideloadedAppInventory()
-                // A-3（SIDE-33）：三步解析（两个 compactMap + match）是
-                // 非隔离纯函数，放 detached 里算完，只把赋值留在主线程。
-                // SideloadedApp / ProvisioningProfile / ProfileMatcher 皆为
-                // 非隔离 struct/enum，无 @MainActor，移过去无隔离问题。
-                let parsed = await Task.detached {
-                    let apps = inventory.apps.compactMap(SideloadedApp.init(plist:))
-                    // TestFlight apps' profiles would otherwise show as unused.
-                    let profiles = inventory.profiles.compactMap(ProvisioningProfile.init(data:))
-                        .filter { !$0.isAppStoreDistribution }
-                    let matched = ProfileMatcher.match(apps: apps, profiles: profiles)
-                    return (apps: apps, profiles: profiles, matched: matched)
-                }.value
-                entries = parsed.matched.entries
-                unmatched = parsed.matched.unmatched
-                await rebuildRefreshable()
-                hasLoaded = true
-                lastRefreshed = Date()
-                lastLoadFailed = nil
-                lastLoadError = nil
-                engine.log("Sideloaded apps: \(parsed.apps.count) sideloaded, \(parsed.profiles.count) profile(s) decoded.")
+                // Only what the user asked for offers Mobile Data Mode.
+                if quiet {
+                    // Even after a refresh, which is an action of its own.
+                    try await MobileDataMode.quietly { try await performLoad() }
+                } else {
+                    try await MobileDataMode.shared.run(.apps) { try await performLoad() }
+                }
+            } catch is CancellationError {
+                // Mobile Data Mode's popup was closed: nothing to report.
             } catch {
                 let message = userFacingErrorMessage(error)
                 let raw = String(describing: error)
@@ -627,17 +618,26 @@ final class SideloadedAppsManager: ObservableObject {
     /// `isWorking`.
     private func performLoad() async throws {
         let inventory = try await engine.sideloadedAppInventory()
-        let apps = inventory.apps.compactMap(SideloadedApp.init(plist:))
-        // TestFlight apps' profiles would otherwise show as unused.
-        let profiles = inventory.profiles.compactMap(ProvisioningProfile.init(data:))
-            .filter { !$0.isAppStoreDistribution }
-        let matched = ProfileMatcher.match(apps: apps, profiles: profiles)
-        entries = matched.entries
-        unmatched = matched.unmatched
+        // A-3（SIDE-33）：三步解析（两个 compactMap + match）是
+        // 非隔离纯函数，放 detached 里算完，只把赋值留在主线程。
+        // SideloadedApp / ProvisioningProfile / ProfileMatcher 皆为
+        // 非隔离 struct/enum，无 @MainActor，移过去无隔离问题。
+        let parsed = await Task.detached {
+            let apps = inventory.apps.compactMap(SideloadedApp.init(plist:))
+            // TestFlight apps' profiles would otherwise show as unused.
+            let profiles = inventory.profiles.compactMap(ProvisioningProfile.init(data:))
+                .filter { !$0.isAppStoreDistribution }
+            let matched = ProfileMatcher.match(apps: apps, profiles: profiles)
+            return (apps: apps, profiles: profiles, matched: matched)
+        }.value
+        entries = parsed.matched.entries
+        unmatched = parsed.matched.unmatched
         await rebuildRefreshable()
         hasLoaded = true
         lastRefreshed = Date()
-        engine.log("Sideloaded apps: \(apps.count) sideloaded, \(profiles.count) profile(s) decoded.")
+        lastLoadFailed = nil
+        lastLoadError = nil
+        engine.log("Sideloaded apps: \(parsed.apps.count) sideloaded, \(parsed.profiles.count) profile(s) decoded.")
     }
 
     // MARK: - Refresh all
@@ -761,277 +761,279 @@ final class SideloadedAppsManager: ObservableObject {
         keepAlive.startAudio()
 
         let task = Task { @MainActor () -> RefreshOutcome in
-            // 原账号：全程结束（正常、失败、取消）都要切回来。activate
-            // 是同步的，放 defer 里保证任何出口都执行；defer 不能
-            // await，所以内存 session 的重登放在正文末尾尽力做。
-            let originalAccount = AccountStore.shared.active
-            var tunnelAcquired = false
-            defer {
-                isRefreshing = false
-                refreshStatus = nil
-                refreshTask = nil
-                self.keepAlive.stopAudio()
-                if let originalAccount { AccountStore.shared.activate(originalAccount) }
-                if tunnelAcquired { engine.releaseTunnel() }
-            }
-            // SIDE-2：隧道按需开——续签全程拿租约；拿不到就地报错、不跑，
-            // defer 照常复位 isRefreshing（不走这句会卡死在“续签中”）。
-            guard await engine.acquireTunnel() else {
-                let message = BuiltinTunnel.useBuiltinDirectly
-                    ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
-                    : L("LocalDevVPN isn't connected. Connect it, then try again.")
-                if showsFailure { lastError = message }
-                engine.log("⛔️ Refresh all: \(message)")
-                // P1-4 (0.9.186): the jobs stay on the card as failed,
-                // with the tunnel next step, instead of vanishing —
-                // an empty card said nothing about what to do next.
-                for index in jobs.indices {
-                    jobs[index].state = .failed(message)
-                    jobs[index].failureKind = .tunnel
+            return await MobileDataMode.shared.run(.refresh) { () -> RefreshOutcome in
+                // 原账号：全程结束（正常、失败、取消）都要切回来。activate
+                // 是同步的，放 defer 里保证任何出口都执行；defer 不能
+                // await，所以内存 session 的重登放在正文末尾尽力做。
+                let originalAccount = AccountStore.shared.active
+                var tunnelAcquired = false
+                defer {
+                    isRefreshing = false
+                    refreshStatus = nil
+                    refreshTask = nil
+                    self.keepAlive.stopAudio()
+                    if let originalAccount { AccountStore.shared.activate(originalAccount) }
+                    if tunnelAcquired { engine.releaseTunnel() }
                 }
-                return RefreshOutcome(failure: message)
-            }
-            tunnelAcquired = true
-            do {
-                try await engine.prepareRefresh()
-            } catch is CancellationError {
-                engine.log("Refresh all: cancelled during sign-in.")
-                jobs = []
-                return RefreshOutcome(jobs: jobs)
-            } catch {
-                let message = userFacingErrorMessage(error)
-                let raw = String(describing: error)
-                if showsFailure { lastError = message }
-                engine.log("⛔️ Refresh all: \(raw)")
-                // P1-4 (0.9.186): tunnel-acquire 同款 — the jobs stay
-                // as failed with the sign-in next step, instead of an
-                // empty card and a popup alone.
-                let kind = Self.failureKind(for: error)
-                for index in jobs.indices {
-                    jobs[index].state = .failed(message)
-                    jobs[index].failureKind = kind
-                }
-                return RefreshOutcome(failure: message)
-            }
-
-            // prepareRefresh 刚登完当前账号、记下了它的团队映射；但
-            // jobs 是登之前建的（那时这队可能还没映射），重建一次让
-            // 刚记下的映射当场生效：切到 icloud 点一次全部续签，
-            // icloud 的 App 这一轮就能进列表，不用再重读、再点一次。
-            // 只续到期的那几只（快捷指令/后台）仍按原 ID 过滤。
-            await rebuildRefreshable()
-            let rebuiltCandidates = onlyBundleIDs.map { ids in
-                refreshable.filter { ids.contains($0.bundleID) }
-            } ?? refreshable
-            if rebuiltCandidates.count != jobs.count {
-                engine.log("Refresh all: list rebuilt after sign-in (\(jobs.count) → \(rebuiltCandidates.count)).")
-                // C4：重建把有的 App 悄悄丢了时，别直接换掉 jobs——
-                // 被丢的以 .failed 留在原位（分母不变、有一行交代），
-                // 新进来的（刚记下团队映射的）接在末尾。
-                var byID: [String: RefreshJob] = [:]
-                for job in rebuiltCandidates { byID[job.bundleID] = job }
-                let oldIDs = Set(jobs.map { $0.bundleID })
-                var merged: [RefreshJob] = []
-                merged.reserveCapacity(max(jobs.count, rebuiltCandidates.count))
-                for var job in jobs {
-                    if let rebuilt = byID[job.bundleID] {
-                        merged.append(rebuilt)
-                    } else {
-                        job.state = .failed(L("Skipped: this app stopped being refreshable after the run started. Its IPA may have been deleted."))
-                        merged.append(job)
+                // SIDE-2：隧道按需开——续签全程拿租约；拿不到就地报错、不跑，
+                // defer 照常复位 isRefreshing（不走这句会卡死在“续签中”）。
+                guard await engine.acquireTunnel() else {
+                    let message = BuiltinTunnel.useBuiltinDirectly
+                        ? L("The built-in tunnel couldn't start. See the log for the reason, then try again.")
+                        : L("LocalDevVPN isn't connected. Connect it, then try again.")
+                    if showsFailure { lastError = message }
+                    engine.log("⛔️ Refresh all: \(message)")
+                    // P1-4 (0.9.186): the jobs stay on the card as failed,
+                    // with the tunnel next step, instead of vanishing —
+                    // an empty card said nothing about what to do next.
+                    for index in jobs.indices {
+                        jobs[index].state = .failed(message)
+                        jobs[index].failureKind = .tunnel
                     }
+                    return RefreshOutcome(failure: message)
                 }
-                merged.append(contentsOf: rebuiltCandidates.filter { !oldIDs.contains($0.bundleID) })
-                jobs = merged
-            }
+                tunnelAcquired = true
+                do {
+                    try await engine.prepareRefresh()
+                } catch is CancellationError {
+                    engine.log("Refresh all: cancelled during sign-in.")
+                    jobs = []
+                    return RefreshOutcome(jobs: jobs)
+                } catch {
+                    let message = userFacingErrorMessage(error)
+                    let raw = String(describing: error)
+                    if showsFailure { lastError = message }
+                    engine.log("⛔️ Refresh all: \(raw)")
+                    // P1-4 (0.9.186): tunnel-acquire 同款 — the jobs stay
+                    // as failed with the sign-in next step, instead of an
+                    // empty card and a popup alone.
+                    let kind = Self.failureKind(for: error)
+                    for index in jobs.indices {
+                        jobs[index].state = .failed(message)
+                        jobs[index].failureKind = kind
+                    }
+                    return RefreshOutcome(failure: message)
+                }
 
-            // C4：没团队号的 job 不进任何组——以前 groupedByTeam 里
-            // 静默跳过，现在先标 .failed，免得它从总数里无声消失。
-            // 正常不会走到这里（rebuildRefreshable 已滤掉没团队号的），
-            // 只是防线。
-            for index in jobs.indices where jobs[index].teamID == nil {
-                jobs[index].state = .failed(L("Skipped: this app has no team on its signing profile, so it can't be refreshed."))
-            }
-            // 按团队分组跑：每组先切到该团队的账号、登完核对团队号再
-            // 签。组内保持页面顺序，组按首次出现顺序。取消只在组间
-            // 和 App 间检查，正在签装的单个 App 不中断。
-            // B-38-B1：整轮登记——待续签的后项在整轮里都有守卫，
-            // 不只当前项。注册点必须在 C4 合并之后（合并会换掉 jobs）。
-            engine.renewingSourcePaths.formUnion(jobs.map { $0.ipa.path })
-            let groups = Self.groupedByTeam(jobs)
-            let multiAccount = groups.count > 1
-            var refreshed = 0
-            var didSwitchAccount = false
-            for group in groups {
-                if Task.isCancelled { break }
-                let team = group.team
-                // 当前 session 已是该组团队时不用切（prepareRefresh 刚
-                // 登的原账号组就是这种情况）。
-                if engine.signingTeamID != team {
-                    guard let groupAccount = AccountStore.shared.account(forTeam: team) else {
-                        // rebuildRefreshable 已拦过，走到这里说明列表过期：
-                        // 整组跳过，绝不拿当前账号给它签名。
-                        for index in jobs.indices where jobs[index].teamID == team {
-                            jobs[index].state = .failed(
-                                L("Skipped: no saved Apple ID matches this app's team (%@). Switch to that account and refresh again.", team))
+                // prepareRefresh 刚登完当前账号、记下了它的团队映射；但
+                // jobs 是登之前建的（那时这队可能还没映射），重建一次让
+                // 刚记下的映射当场生效：切到 icloud 点一次全部续签，
+                // icloud 的 App 这一轮就能进列表，不用再重读、再点一次。
+                // 只续到期的那几只（快捷指令/后台）仍按原 ID 过滤。
+                await rebuildRefreshable()
+                let rebuiltCandidates = onlyBundleIDs.map { ids in
+                    refreshable.filter { ids.contains($0.bundleID) }
+                } ?? refreshable
+                if rebuiltCandidates.count != jobs.count {
+                    engine.log("Refresh all: list rebuilt after sign-in (\(jobs.count) → \(rebuiltCandidates.count)).")
+                    // C4：重建把有的 App 悄悄丢了时，别直接换掉 jobs——
+                    // 被丢的以 .failed 留在原位（分母不变、有一行交代），
+                    // 新进来的（刚记下团队映射的）接在末尾。
+                    var byID: [String: RefreshJob] = [:]
+                    for job in rebuiltCandidates { byID[job.bundleID] = job }
+                    let oldIDs = Set(jobs.map { $0.bundleID })
+                    var merged: [RefreshJob] = []
+                    merged.reserveCapacity(max(jobs.count, rebuiltCandidates.count))
+                    for var job in jobs {
+                        if let rebuilt = byID[job.bundleID] {
+                            merged.append(rebuilt)
+                        } else {
+                            job.state = .failed(L("Skipped: this app stopped being refreshable after the run started. Its IPA may have been deleted."))
+                            merged.append(job)
                         }
-                        engine.log("⛔️ Refresh group \(team): no saved account maps to this team — skipped.")
-                        continue
                     }
-                    // 切账号：Settings 切账号时 RootView 的 revision 监听
-                    // 会异步丢弃旧 session，但那是 fire-and-forget，不能
-                    // 等；这里显式等旧 session 释放完再登，否则 signIn
-                    // 会因 signSession != nil 直接跳过、还用旧账号。
-                    AccountStore.shared.activate(groupAccount)
-                    didSwitchAccount = true
-                    await engine.dropSignSession()
-                    do {
-                        try await engine.signInForRefresh()
-                    } catch is CancellationError {
-                        for index in jobs.indices where jobs[index].teamID == team {
+                    merged.append(contentsOf: rebuiltCandidates.filter { !oldIDs.contains($0.bundleID) })
+                    jobs = merged
+                }
+
+                // C4：没团队号的 job 不进任何组——以前 groupedByTeam 里
+                // 静默跳过，现在先标 .failed，免得它从总数里无声消失。
+                // 正常不会走到这里（rebuildRefreshable 已滤掉没团队号的），
+                // 只是防线。
+                for index in jobs.indices where jobs[index].teamID == nil {
+                    jobs[index].state = .failed(L("Skipped: this app has no team on its signing profile, so it can't be refreshed."))
+                }
+                // 按团队分组跑：每组先切到该团队的账号、登完核对团队号再
+                // 签。组内保持页面顺序，组按首次出现顺序。取消只在组间
+                // 和 App 间检查，正在签装的单个 App 不中断。
+                // B-38-B1：整轮登记——待续签的后项在整轮里都有守卫，
+                // 不只当前项。注册点必须在 C4 合并之后（合并会换掉 jobs）。
+                engine.renewingSourcePaths.formUnion(jobs.map { $0.ipa.path })
+                let groups = Self.groupedByTeam(jobs)
+                let multiAccount = groups.count > 1
+                var refreshed = 0
+                var didSwitchAccount = false
+                for group in groups {
+                    if Task.isCancelled { break }
+                    let team = group.team
+                    // 当前 session 已是该组团队时不用切（prepareRefresh 刚
+                    // 登的原账号组就是这种情况）。
+                    if engine.signingTeamID != team {
+                        guard let groupAccount = AccountStore.shared.account(forTeam: team) else {
+                            // rebuildRefreshable 已拦过，走到这里说明列表过期：
+                            // 整组跳过，绝不拿当前账号给它签名。
+                            for index in jobs.indices where jobs[index].teamID == team {
+                                jobs[index].state = .failed(
+                                    L("Skipped: no saved Apple ID matches this app's team (%@). Switch to that account and refresh again.", team))
+                            }
+                            engine.log("⛔️ Refresh group \(team): no saved account maps to this team — skipped.")
+                            continue
+                        }
+                        // 切账号：Settings 切账号时 RootView 的 revision 监听
+                        // 会异步丢弃旧 session，但那是 fire-and-forget，不能
+                        // 等；这里显式等旧 session 释放完再登，否则 signIn
+                        // 会因 signSession != nil 直接跳过、还用旧账号。
+                        AccountStore.shared.activate(groupAccount)
+                        didSwitchAccount = true
+                        await engine.dropSignSession()
+                        do {
+                            try await engine.signInForRefresh()
+                        } catch is CancellationError {
+                            for index in jobs.indices where jobs[index].teamID == team {
+                                jobs[index].state = .failed(L("Skipped: refresh stopped."))
+                            }
+                            engine.log("Refresh group \(team): sign-in cancelled — skipped.")
+                            continue
+                        } catch {
+                            let message = Self.text(for: error)
+                            for index in jobs.indices where jobs[index].teamID == team {
+                                jobs[index].state = .failed(
+                                    L("Couldn't sign in as %@ (%@). Switch to that account and refresh again.", groupAccount.normalized, message))
+                                // P1-4 (0.9.186): the row's next step.
+                                jobs[index].failureKind = Self.failureKind(for: error)
+                            }
+                            engine.log("⛔️ Refresh group \(team) as \(groupAccount.normalized): sign-in failed: \(message)")
+                            continue
+                        }
+                        // 底线核对：登完的团队必须等于该组团队，否则整组跳
+                        // 过。2FA 取消/锁定/凭据错误/限流都走到这里的上一
+                        // 步：只跳过该组，继续跑别的组。
+                        guard engine.signingTeamID == team else {
+                            for index in jobs.indices where jobs[index].teamID == team {
+                                jobs[index].state = .failed(
+                                    L("Skipped: signed in as %@, but this app's team is %@. Switch to that account and refresh again.", groupAccount.normalized, team))
+                            }
+                            engine.log("⛔️ Refresh group \(team): signed in as \(groupAccount.normalized) but team is \(engine.signingTeamID ?? "unknown") — skipped.")
+                            continue
+                        }
+                        engine.log("Refresh group \(team): signed in as \(groupAccount.normalized).")
+                    }
+                    let groupEmail = AccountStore.shared.account(forTeam: team)?.normalized
+                        ?? AccountStore.shared.activeAppleID
+                    for job in group.jobs {
+                        if Task.isCancelled { break }
+                        guard let index = jobs.firstIndex(where: { $0.bundleID == job.bundleID }) else { continue }
+                        // 第二道闸（保留）：逐个再核一次团队，防列表与
+                        // session 漂移。团队号未知、App 团队号未知、团队号
+                        // 不一致，三种一律跳过不续，绝不把证书签的 App
+                        // 重新签成个人 ID。
+                        guard let teamNow = engine.signingTeamID, let installed = job.teamID, installed == teamNow else {
+                            jobs[index].state = .failed(
+                                L("Skipped: not signed by the team you're signed in as, so a certificate-signed app is never re-signed here."))
+                            continue
+                        }
+                        jobs[index].state = .working
+                        // B5：这项续签在跑时把源路径登记进 Engine，文件页/LAN/WebDAV
+                        // 的删/移/改名入口会拒掉这个源；.done/.failed 处注销。
+                        engine.renewingSourcePaths.insert(job.ipa.path)
+                        refreshStatus = multiAccount
+                            ? L("Refreshing %@ as %@", job.name, groupEmail)
+                            : L("Refreshing %@", job.name)
+                        do {
+                            try await engine.refreshInstalledApp(named: job.name, ipaPath: job.ipa.path)
+                            jobs[index].state = .done
+                            engine.renewingSourcePaths.remove(job.ipa.path)
+                            refreshed += 1
+                            // 记一笔续签源：删文件时凭它提示“这是某 App 续签用的文件”。
+                            RenewalSourceStore.record(bundleID: job.bundleID, appName: job.name, ipaURL: job.ipa)
+                        } catch is CancellationError {
                             jobs[index].state = .failed(L("Skipped: refresh stopped."))
-                        }
-                        engine.log("Refresh group \(team): sign-in cancelled — skipped.")
-                        continue
-                    } catch {
-                        let message = Self.text(for: error)
-                        for index in jobs.indices where jobs[index].teamID == team {
-                            jobs[index].state = .failed(
-                                L("Couldn't sign in as %@ (%@). Switch to that account and refresh again.", groupAccount.normalized, message))
+                            engine.renewingSourcePaths.remove(job.ipa.path)
+                            engine.log("Refresh \(job.name): cancelled.")
+                            continue
+                        } catch {
+                            let message = userFacingErrorMessage(error)
+                            let raw = String(describing: error)
+                            jobs[index].state = .failed(message)
                             // P1-4 (0.9.186): the row's next step.
                             jobs[index].failureKind = Self.failureKind(for: error)
+                            // B5：续签失败，注销源路径（与 .working 登记配对）。
+                            engine.renewingSourcePaths.remove(job.ipa.path)
+                            engine.log("⛔️ Refresh \(job.name): \(raw)")
                         }
-                        engine.log("⛔️ Refresh group \(team) as \(groupAccount.normalized): sign-in failed: \(message)")
-                        continue
                     }
-                    // 底线核对：登完的团队必须等于该组团队，否则整组跳
-                    // 过。2FA 取消/锁定/凭据错误/限流都走到这里的上一
-                    // 步：只跳过该组，继续跑别的组。
-                    guard engine.signingTeamID == team else {
-                        for index in jobs.indices where jobs[index].teamID == team {
-                            jobs[index].state = .failed(
-                                L("Skipped: signed in as %@, but this app's team is %@. Switch to that account and refresh again.", groupAccount.normalized, team))
-                        }
-                        engine.log("⛔️ Refresh group \(team): signed in as \(groupAccount.normalized) but team is \(engine.signingTeamID ?? "unknown") — skipped.")
-                        continue
-                    }
-                    engine.log("Refresh group \(team): signed in as \(groupAccount.normalized).")
                 }
-                let groupEmail = AccountStore.shared.account(forTeam: team)?.normalized
-                    ?? AccountStore.shared.activeAppleID
-                for job in group.jobs {
-                    if Task.isCancelled { break }
-                    guard let index = jobs.firstIndex(where: { $0.bundleID == job.bundleID }) else { continue }
-                    // 第二道闸（保留）：逐个再核一次团队，防列表与
-                    // session 漂移。团队号未知、App 团队号未知、团队号
-                    // 不一致，三种一律跳过不续，绝不把证书签的 App
-                    // 重新签成个人 ID。
-                    guard let teamNow = engine.signingTeamID, let installed = job.teamID, installed == teamNow else {
-                        jobs[index].state = .failed(
-                            L("Skipped: not signed by the team you're signed in as, so a certificate-signed app is never re-signed here."))
-                        continue
+
+                // 切回原账号的内存 session（activeID 已由 defer 恢复）。
+                // 只有本轮切过账号时才需要；重登失败则 team 已清，下次
+                // 登录重取，绝不顶着别的账号的团队号。
+                if didSwitchAccount {
+                    await self.restoreOriginalSession(original: originalAccount)
+                }
+
+                // C22：取消只停 Task、不扫尾 jobs——没轮到的 job 仍是 .pending，
+                // 卡片常驻显示 "Waiting"，与“本轮已结束”不符；收尾扫一遍改
+                // .failed。正常跑完时没有 .pending 残留，扫尾是空操作。
+                // B5：取消时正在 .working 的那项也要扫尾——否则它的源路径
+                // 会一直留在续签集里，之后删它永远被拒。
+                for index in jobs.indices where jobs[index].state == .pending || jobs[index].state == .working {
+                    if jobs[index].state == .working {
+                        engine.renewingSourcePaths.remove(jobs[index].ipa.path)
                     }
-                    jobs[index].state = .working
-                    // B5：这项续签在跑时把源路径登记进 Engine，文件页/LAN/WebDAV
-                    // 的删/移/改名入口会拒掉这个源；.done/.failed 处注销。
-                    engine.renewingSourcePaths.insert(job.ipa.path)
-                    refreshStatus = multiAccount
-                        ? L("Refreshing %@ as %@", job.name, groupEmail)
-                        : L("Refreshing %@", job.name)
+                    jobs[index].state = .failed(L("Skipped: refresh stopped."))
+                }
+                // B-38-B1：整轮注销——提前 .failed / 取消后 .pending 的项，
+                // 逐项 remove 盖不住，只有整批 subtract 能清掉。
+                engine.renewingSourcePaths.subtract(jobs.map { $0.ipa.path })
+                refreshSummary = jobs.count == 1
+                    ? (refreshed == 1 ? L("Refreshed. Its seven days start again now.")
+                                      : L("Nothing was refreshed."))
+                    : L("Refreshed %d of %d apps.", refreshed, jobs.count)
+                engine.log("Refresh all finished: \(refreshed)/\(jobs.count) refreshed.")
+                // C11：全续完就清掉上次后台失败的留底；没全续完时，
+                // 通知发不出去才留底（发出去就不用留，用户已收到）。
+                if refreshed == jobs.count {
+                    setBackgroundRefreshResult(nil)
+                }
+                // B-1 (0.9.186): the completion notification is the
+                // background run's only report — a manual foreground run
+                // is watched on this page already, so it gets no banner
+                // on top of its own card (the comment always said
+                // "background resign"; the code posted for every run).
+                // The C11 fallback below belongs to the same gate: a
+                // foreground run's failures are already on screen.
+                if notifyCompletion {
+                    // Post local notification for background resign
+                    let content = UNMutableNotificationContent()
+                    content.title = refreshed > 0 ? L("续签成功") : L("续签完成")
+                    content.body = refreshSummary ?? L("Refreshed %d of %d apps.", refreshed, jobs.count)
+                    content.sound = .default
+                    let request = UNNotificationRequest(identifier: "resign-done", content: content, trigger: nil)
                     do {
-                        try await engine.refreshInstalledApp(named: job.name, ipaPath: job.ipa.path)
-                        jobs[index].state = .done
-                        engine.renewingSourcePaths.remove(job.ipa.path)
-                        refreshed += 1
-                        // 记一笔续签源：删文件时凭它提示“这是某 App 续签用的文件”。
-                        RenewalSourceStore.record(bundleID: job.bundleID, appName: job.name, ipaURL: job.ipa)
-                    } catch is CancellationError {
-                        jobs[index].state = .failed(L("Skipped: refresh stopped."))
-                        engine.renewingSourcePaths.remove(job.ipa.path)
-                        engine.log("Refresh \(job.name): cancelled.")
-                        continue
+                        try await UNUserNotificationCenter.current().add(request)
                     } catch {
-                        let message = userFacingErrorMessage(error)
-                        let raw = String(describing: error)
-                        jobs[index].state = .failed(message)
-                        // P1-4 (0.9.186): the row's next step.
-                        jobs[index].failureKind = Self.failureKind(for: error)
-                        // B5：续签失败，注销源路径（与 .working 登记配对）。
-                        engine.renewingSourcePaths.remove(job.ipa.path)
-                        engine.log("⛔️ Refresh \(job.name): \(raw)")
+                        engine.log("Refresh all: completion notification failed to send (\(error.localizedDescription)).")
+                        // C11：通知是后台续签唯一的出口——发不出去又有失败，
+                        // 把结果存下来，下次打开应用页时在列表上方显示。
+                        if refreshed < jobs.count {
+                            setBackgroundRefreshResult(refreshSummary ?? L("Refreshed %d of %d apps.", refreshed, jobs.count))
+                        }
                     }
                 }
-            }
-
-            // 切回原账号的内存 session（activeID 已由 defer 恢复）。
-            // 只有本轮切过账号时才需要；重登失败则 team 已清，下次
-            // 登录重取，绝不顶着别的账号的团队号。
-            if didSwitchAccount {
-                await self.restoreOriginalSession(original: originalAccount)
-            }
-
-            // C22：取消只停 Task、不扫尾 jobs——没轮到的 job 仍是 .pending，
-            // 卡片常驻显示 "Waiting"，与“本轮已结束”不符；收尾扫一遍改
-            // .failed。正常跑完时没有 .pending 残留，扫尾是空操作。
-            // B5：取消时正在 .working 的那项也要扫尾——否则它的源路径
-            // 会一直留在续签集里，之后删它永远被拒。
-            for index in jobs.indices where jobs[index].state == .pending || jobs[index].state == .working {
-                if jobs[index].state == .working {
-                    engine.renewingSourcePaths.remove(jobs[index].ipa.path)
+                let outcome = RefreshOutcome(jobs: jobs)
+                // Read the device again, so the days on screen are the new ones.
+                if refreshed > 0 {
+                    isRefreshing = false        // `load` won't run while a refresh holds the link
+                    load(quiet: true)
                 }
-                jobs[index].state = .failed(L("Skipped: refresh stopped."))
-            }
-            // B-38-B1：整轮注销——提前 .failed / 取消后 .pending 的项，
-            // 逐项 remove 盖不住，只有整批 subtract 能清掉。
-            engine.renewingSourcePaths.subtract(jobs.map { $0.ipa.path })
-            refreshSummary = jobs.count == 1
-                ? (refreshed == 1 ? L("Refreshed. Its seven days start again now.")
-                                  : L("Nothing was refreshed."))
-                : L("Refreshed %d of %d apps.", refreshed, jobs.count)
-            engine.log("Refresh all finished: \(refreshed)/\(jobs.count) refreshed.")
-            // C11：全续完就清掉上次后台失败的留底；没全续完时，
-            // 通知发不出去才留底（发出去就不用留，用户已收到）。
-            if refreshed == jobs.count {
-                setBackgroundRefreshResult(nil)
-            }
-            // B-1 (0.9.186): the completion notification is the
-            // background run's only report — a manual foreground run
-            // is watched on this page already, so it gets no banner
-            // on top of its own card (the comment always said
-            // "background resign"; the code posted for every run).
-            // The C11 fallback below belongs to the same gate: a
-            // foreground run's failures are already on screen.
-            if notifyCompletion {
-                // Post local notification for background resign
-                let content = UNMutableNotificationContent()
-                content.title = refreshed > 0 ? L("续签成功") : L("续签完成")
-                content.body = refreshSummary ?? L("Refreshed %d of %d apps.", refreshed, jobs.count)
-                content.sound = .default
-                let request = UNNotificationRequest(identifier: "resign-done", content: content, trigger: nil)
-                do {
-                    try await UNUserNotificationCenter.current().add(request)
-                } catch {
-                    engine.log("Refresh all: completion notification failed to send (\(error.localizedDescription)).")
-                    // C11：通知是后台续签唯一的出口——发不出去又有失败，
-                    // 把结果存下来，下次打开应用页时在列表上方显示。
-                    if refreshed < jobs.count {
-                        setBackgroundRefreshResult(refreshSummary ?? L("Refreshed %d of %d apps.", refreshed, jobs.count))
-                    }
+                // C13：手动续签正常跑完，快捷指令留下的待续签意图已满足——
+                // 清掉标记，免得下次回前台又自动跑一轮。
+                if onlyBundleIDs == nil {
+                    UserDefaults.standard.removeObject(forKey: Self.pendingRefreshKey)
+                    UserDefaults.standard.removeObject(forKey: Self.pendingRefreshAtKey)
                 }
+                return outcome
             }
-            let outcome = RefreshOutcome(jobs: jobs)
-            // Read the device again, so the days on screen are the new ones.
-            if refreshed > 0 {
-                isRefreshing = false        // `load` won't run while a refresh holds the link
-                load(quiet: true)
-            }
-            // C13：手动续签正常跑完，快捷指令留下的待续签意图已满足——
-            // 清掉标记，免得下次回前台又自动跑一轮。
-            if onlyBundleIDs == nil {
-                UserDefaults.standard.removeObject(forKey: Self.pendingRefreshKey)
-                UserDefaults.standard.removeObject(forKey: Self.pendingRefreshAtKey)
-            }
-            return outcome
         }
         refreshTask = task
         return task
@@ -1046,7 +1048,7 @@ final class SideloadedAppsManager: ObservableObject {
         isWorking = true
         defer { isWorking = false }
         lastError = nil
-        try await performLoad()
+        try await MobileDataMode.shared.run(.apps) { try await performLoad() }
     }
 
     /// Reads the device afresh, then refreshes the refreshable apps whose

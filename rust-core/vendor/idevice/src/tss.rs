@@ -87,13 +87,20 @@ impl TSSRequest {
             .await?;
 
         debug!("Apple responded with {res}");
-        let res = res.trim_start_matches("STATUS=0&");
-        let res = res.trim_start_matches("MESSAGE=");
-        if !res.starts_with("SUCCESS") {
-            warn!("TSS responded with non-success value");
-            return Err(IdeviceError::UnexpectedResponse(
-                "TSS server responded with non-success status".into(),
-            ));
+        let trimmed = res.trim_start_matches("STATUS=0&");
+        let trimmed = trimmed.trim_start_matches("MESSAGE=");
+        if !trimmed.starts_with("SUCCESS") {
+            // On failure Apple returns `STATUS=<n>&MESSAGE=<text>` (no
+            // REQUEST_STRING); surface it so the caller sees why it was rejected.
+            let detail = res
+                .split("&REQUEST_STRING=")
+                .next()
+                .unwrap_or(res.as_str())
+                .trim();
+            warn!("TSS responded with non-success value: {detail}");
+            return Err(IdeviceError::UnexpectedResponse(format!(
+                "TSS server responded with non-success status ({detail})"
+            )));
         }
         let res = res.split("REQUEST_STRING=").collect::<Vec<&str>>();
         if res.len() < 2 {
@@ -103,6 +110,133 @@ impl TSSRequest {
             ));
         }
         Ok(plist::from_bytes(res[1].as_bytes())?)
+    }
+
+    /// Builds a Cryptex1 personalization request (`@Cryptex1,Ticket`).
+    ///
+    /// Cryptex1 tickets have a different shape from the AP tickets
+    /// [`add_ap_tags`](Self::add_ap_tags) produces, which is why that method
+    /// skips every `Cryptex1,*` key. The device is identified by `Cryptex1,UDID`
+    /// alone - none of the `Ap*` tags an AP request carries appear here - and
+    /// each personalized component contributes nothing but its `Digest`. The
+    /// generic DMG is declared `Personalize: false` in the build manifest and is
+    /// left out entirely.
+    ///
+    /// # Arguments
+    /// * `build_identity` - the build identity whose `Info.Variant` names a
+    ///   cryptex, i.e. the one carrying the `Cryptex1,*` manifest entries.
+    /// * `chip_instance` - the device's AppleImage4 chip instance, as returned by
+    ///   cryptexd's `read-personalization-id` routine.
+    /// * `nonce` - the cryptex nonce for the identity's `Cryptex1,NonceDomain`.
+    pub fn add_cryptex1_tags(
+        &mut self,
+        build_identity: &plist::Dictionary,
+        chip_instance: &plist::Dictionary,
+        nonce: &[u8],
+    ) -> Result<(), IdeviceError> {
+        fn required<'a>(
+            dict: &'a plist::Dictionary,
+            key: &'static str,
+        ) -> Result<&'a Value, IdeviceError> {
+            dict.get(key).ok_or_else(|| {
+                IdeviceError::UnexpectedResponse(format!("cryptex identity is missing {key}"))
+            })
+        }
+
+        /// Manifest values come as either an integer or a `0x`-prefixed string.
+        fn as_number(value: &Value, key: &'static str) -> Result<u64, IdeviceError> {
+            match value {
+                Value::Integer(i) => i.as_unsigned().ok_or_else(|| {
+                    IdeviceError::UnexpectedResponse(format!("{key} is not an unsigned integer"))
+                }),
+                Value::String(s) => {
+                    let trimmed = s.trim_start_matches("0x");
+                    let radix = if trimmed.len() == s.len() { 10 } else { 16 };
+                    u64::from_str_radix(trimmed, radix).map_err(|_| {
+                        IdeviceError::UnexpectedResponse(format!("{key} is not a number: {s}"))
+                    })
+                }
+                _ => Err(IdeviceError::UnexpectedResponse(format!(
+                    "{key} is neither an integer nor a string"
+                ))),
+            }
+        }
+
+        self.insert("@Cryptex1,Ticket", true);
+        self.insert(
+            "Cryptex1,ChipID",
+            as_number(
+                required(build_identity, "Cryptex1,ChipID")?,
+                "Cryptex1,ChipID",
+            )?,
+        );
+        self.insert(
+            "Cryptex1,ProductClass",
+            as_number(
+                required(build_identity, "Cryptex1,ProductClass")?,
+                "Cryptex1,ProductClass",
+            )?,
+        );
+        for key in [
+            "Cryptex1,Type",
+            "Cryptex1,SubType",
+            "Cryptex1,UseProductClass",
+            "Cryptex1,NonceDomain",
+            "Cryptex1,Version",
+            "Cryptex1,PreauthorizationVersion",
+        ] {
+            self.insert(key, required(build_identity, key)?.clone());
+        }
+        self.insert("Cryptex1,Nonce", Value::Data(nonce.to_vec()));
+        self.insert(
+            "Cryptex1,ProductionMode",
+            required(chip_instance, "img4_chip_cpro")?
+                .as_boolean()
+                .or_else(|| {
+                    // The daemon reports the flag as an integer on some releases.
+                    chip_instance
+                        .get("img4_chip_cpro")
+                        .and_then(|v| v.as_unsigned_integer())
+                        .map(|v| v != 0)
+                })
+                .ok_or_else(|| {
+                    IdeviceError::UnexpectedResponse("img4_chip_cpro is not a boolean".into())
+                })?,
+        );
+        self.insert("Cryptex1,UDID", Value::Data(cryptex1_udid(chip_instance)?));
+        self.insert("Cryptex1,UniqueTagList", Value::Data(Vec::new()));
+
+        let manifest = build_identity
+            .get("Manifest")
+            .and_then(|m| m.as_dictionary())
+            .ok_or_else(|| {
+                IdeviceError::UnexpectedResponse("cryptex identity is missing Manifest".into())
+            })?;
+        for (key, entry) in manifest {
+            if !key.starts_with("Cryptex1,") {
+                continue;
+            }
+            let entry = match entry.as_dictionary() {
+                Some(e) => e,
+                None => continue,
+            };
+            let personalize = entry
+                .get("Info")
+                .and_then(|i| i.as_dictionary())
+                .and_then(|i| i.get("Personalize"))
+                .and_then(|p| p.as_boolean())
+                .unwrap_or(false);
+            if !personalize {
+                debug!("skipping {key} as it is not personalized");
+                continue;
+            }
+            let digest = entry
+                .get("Digest")
+                .ok_or_else(|| IdeviceError::UnexpectedResponse(format!("{key} has no Digest")))?;
+            self.insert(key.clone(), crate::plist!({ "Digest": digest.clone() }));
+        }
+
+        Ok(())
     }
 }
 
@@ -193,4 +327,54 @@ pub fn apply_restore_request_rules(
             warn!("Rule wasn't a dictionary");
         }
     }
+}
+
+/// Builds the `Cryptex1,UDID` identifying a device in a Cryptex1 TSS request.
+///
+/// It is the 16-byte concatenation of the chip ID and the ECID, both big-endian,
+/// and lands in the signed ticket verbatim as the `UDID` property.
+pub fn cryptex1_udid(chip_instance: &plist::Dictionary) -> Result<Vec<u8>, IdeviceError> {
+    fn field(chip_instance: &plist::Dictionary, key: &'static str) -> Result<u64, IdeviceError> {
+        chip_instance
+            .get(key)
+            .and_then(|v| v.as_unsigned_integer())
+            .ok_or_else(|| {
+                IdeviceError::UnexpectedResponse(format!(
+                    "chip instance is missing an unsigned {key}"
+                ))
+            })
+    }
+
+    let mut udid = field(chip_instance, "img4_chip_chip")?
+        .to_be_bytes()
+        .to_vec();
+    udid.extend_from_slice(&field(chip_instance, "img4_chip_ecid")?.to_be_bytes());
+    Ok(udid)
+}
+
+/// Selects the one build identity in a DDI build manifest that describes a
+/// cryptex, i.e. the one whose `Info.Variant` ends in
+/// `Developer Disk Image Cryptex`.
+pub fn select_cryptex_build_identity(
+    build_manifest: &plist::Dictionary,
+) -> Result<&plist::Dictionary, IdeviceError> {
+    const CRYPTEX_VARIANT_SUFFIX: &str = "Developer Disk Image Cryptex";
+
+    build_manifest
+        .get("BuildIdentities")
+        .and_then(|i| i.as_array())
+        .and_then(|identities| {
+            identities.iter().find_map(|identity| {
+                let identity = identity.as_dictionary()?;
+                let variant = identity
+                    .get("Info")
+                    .and_then(|i| i.as_dictionary())
+                    .and_then(|i| i.get("Variant"))
+                    .and_then(|v| v.as_string())?;
+                variant
+                    .ends_with(CRYPTEX_VARIANT_SUFFIX)
+                    .then_some(identity)
+            })
+        })
+        .ok_or(IdeviceError::BadBuildManifest)
 }

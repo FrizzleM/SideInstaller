@@ -12,10 +12,10 @@ keeps cargo unifying a single `idevice` instance.
 
 ## Local changes
 
-Four files differ from upstream: `src/remote_pairing/opack.rs`,
-`src/services/afc/packet.rs`, `src/remote_pairing/mod.rs` and
-`src/remote_pairing/tls_psk.rs`, plus this README. To list them again, diff
-against cargo's checkout of the pinned revision:
+Changes 1–5 are this repo's own. Changes 6–11 are upstream fixes from after
+the pinned revision, taken from `master` @ `c8fff6d` (2026-11-22) because
+StikDebug ships them: they're in the idevice its 2026-11 builds link. To list
+the files again, diff against cargo's checkout of the pinned revision:
 `diff -rq ~/.cargo/git/checkouts/idevice-*/7bd551c/idevice rust-core/vendor/idevice`.
 
 **1. `src/remote_pairing/opack.rs` — OPACK back-reference decoding.**
@@ -100,6 +100,82 @@ rust-core locks (2026-11-09: `AsyncFd::register` not found), which failed the
 pull-request checks for no change of ours. The app never builds dev-dependencies,
 so nothing else is affected.
 
+**6. `src/xpc/mod.rs`, `src/services/rsd.rs` — one RSD handshake UUID per
+host (upstream `df53825`, `e564574`, 2026-11-16).**
+
+Every RSD handshake sent a new random `UUID`. Since iOS 27.2 the device
+remembers the UUID of the last RSD peer on a tunnel, even after it
+disconnects, and when a later connection presents a different one it
+re-attaches the peer and closes every service listener it advertised, to the
+newcomer and to the connections before it. SideInstaller opens several
+(the JIT session's own tunnel, a reconnect before each install), and siboot
+opens one to check the iPhone and another to install. Now every handshake
+presents `default_handshake_uuid()`: `uuid3(NAMESPACE_DNS, hostname)`, as
+pymobiledevice3's host id is made, so apps on the same iPhone built on this
+idevice (StikDebug's builds are) present the same one and don't close each
+other's services. `RsdHandshake::new_with_uuid` and
+`send_device_handshake_with_uuid` take another.
+
+**7. `Cargo.toml` — jktcp 0.1.8 (upstream `63a341d`, `9c1ad29`).**
+
+The software TCP stack every tunnel byte goes through. 0.1.7 stops waking every
+open tunnel each millisecond (it polls its retransmission timer only while a
+segment is unacknowledged); 0.1.8 queues IP packet writes so a write cancelled
+in a `select!` can no longer leave half a packet on the tunnel and desync it,
+answers an out-of-order segment with a duplicate ACK (fast retransmit) instead
+of dropping it silently, takes overlapping segments, honours a FIN only in
+order, and tells every reader when its connection closes. No API change.
+
+**8. `src/services/core_device_proxy.rs` — segments capped at 8192 bytes
+(upstream `edf2587`).**
+
+The adapter's MSS was the tunnel's MTU less 60, however large the MTU the
+device reported. It's now `min(mtu, 8192) - 60`, as upstream sets it.
+`vendor/idevice-ffi`'s RPPairing tunnel and siboot's take the same cap.
+
+**9. `src/services/cryptexd.rs`, `src/services/cryptexd/`, `src/darwin_errno.rs`,
+`src/tss.rs`, `src/xpc/` — the DeveloperDiskImage as a cryptex (upstream
+`7305894`, with `ded303b`'s fix).**
+
+The `cryptexd` service over RemoteXPC, and `install_ddi`/`installed_ddi`, which
+personalize and install the DeveloperDiskImage as a Cryptex1 and report it.
+Each personalized-image build identity names a chip and board, so that image
+only mounts on the devices Xcode knew when it was built (27.1's stops at
+iPhone18,5); the Cryptex1 identity names none. StikDebug installs it this way
+from iOS 26.4 on, and so does SideInstaller (`DeveloperDiskImage` in
+`LocationView.swift`). Copied from upstream, except:
+
+- `tss.rs` keeps the vendored reqwest client (upstream since hand-rolls its
+  HTTP) and gains only `add_cryptex1_tags`, `cryptex1_udid`,
+  `select_cryptex_build_identity`, and upstream's error that says what Apple
+  answered when it refuses.
+- `xpc/mod.rs` and `xpc/http2/` gain only what cryptexd's install needs: the
+  outbound file transfer (`send_file_transfer`), DATA frames that can carry
+  END_STREAM, and RST_STREAM as a frame, taken as completion on a finished
+  transfer's stream and as the error it always was on any other.
+- `lib.rs` numbers `IdeviceError::Cryptexd` 110, as upstream does.
+
+Behind the new `cryptexd` feature (`xpc`, `rsd`, `tss`), which `full` includes.
+
+**10. `src/services/afc/inner_file.rs` — reading a file to its end (upstream
+`df4cf18`).**
+
+`read` asked for a whole transfer however little was left, subtracted what came
+back from what was left, and looped until that hit zero: a file that shrank
+since its size was read looped for ever on empty reads, and one that grew
+underflowed the count. It now asks for what's left and stops at an empty read,
+as does `read_n`. SideInstaller reads back every file it writes into another
+app's container with it.
+
+**11. `src/services/house_arrest.rs` — a refused vend is an error (upstream
+`0940073`).**
+
+house_arrest answers a `VendContainer`/`VendDocuments` it won't do (no such
+app, or a container it doesn't vend) with an `Error` key, which was read and
+dropped, so the caller got an AFC client on a connection with nothing behind
+it and a confusing failure on its first request. It's now
+`UnexpectedResponse("house_arrest VendContainer failed: …")`.
+
 ## Re-vendoring
 
 Upstream merged change 1 as `6fb49ae` (2026-09-12, "fix(rppairing): decode
@@ -107,7 +183,9 @@ OPACK back-references"), copied from this file, so a re-vendor from a revision
 at or after it can take upstream's `opack.rs` — diff it against this one and
 keep the tests. Changes 2–4 are not upstream as of `master` @ `8970209`
 (2026-10-27) and have to be carried over, as does change 5 while upstream's
-`tun-rs` requirement lets cargo pick a release that doesn't build. Change 2 matters most:
+`tun-rs` requirement lets cargo pick a release that doesn't build. Changes 6–11
+come with any revision at or after `c8fff6d` (2026-11-22); there, `tss.rs`
+can be taken whole. Change 2 matters most:
 `rust-core/src/logging.rs` holds idevice's DEBUG output back unless Verbose
 logging is on, but the switch exists for exactly the runs where it is.
 
