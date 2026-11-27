@@ -41,12 +41,6 @@ DERIVED="$CACHE_DIR/DerivedData"
 FFI_CACHE="$CACHE_DIR/ffi"
 LOG="$CACHE_DIR/last-build.log"
 
-# build-rust.sh defaults to Xcode-beta; use the selected Xcode when it's missing.
-if [ -z "${DEVELOPER_DIR:-}" ] && [ ! -d /Applications/Xcode-beta.app ]; then
-  DEVELOPER_DIR="$(xcode-select -p)"
-  export DEVELOPER_DIR
-fi
-
 die() { echo "error: $*" >&2; exit 1; }
 build_failed() {
   echo "error: $1. Last errors:" >&2
@@ -55,6 +49,19 @@ build_failed() {
   exit 1
 }
 plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$2" 2>/dev/null; }
+
+# One Xcode for the SDK check below and the Rust and app builds: DEVELOPER_DIR
+# when it names an installed one, else Xcode-beta when it's installed and
+# DEVELOPER_DIR wasn't set, else the Xcode xcode-select points at.
+if [ -z "${DEVELOPER_DIR:-}" ] || [ ! -d "$DEVELOPER_DIR" ]; then
+  if [ -d /Applications/Xcode-beta.app/Contents/Developer ] && [ -z "${DEVELOPER_DIR:-}" ]; then
+    DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+  else
+    DEVELOPER_DIR="$(env -u DEVELOPER_DIR xcode-select -p 2>/dev/null)" || die "no Xcode found (xcode-select -p failed)"
+  fi
+fi
+[ -d "$DEVELOPER_DIR" ] || die "DEVELOPER_DIR doesn't exist: $DEVELOPER_DIR"
+export DEVELOPER_DIR
 
 # The iPhone Duo runs an app built with an older iOS SDK in a window beside its
 # status bar instead of across the whole screen, so an older Xcode is refused.
