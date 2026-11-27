@@ -798,6 +798,12 @@ let portugueseStrings: [String: String] = [
     "Latest (%@)": "Mais recente (%@)",
     "Couldn't load the other versions: %@": "Não foi possível carregar as outras versões: %@",
     "Try again": "Tentar de novo",
+    // 0.9.185: P0-2 error popup, P0-4 quota row, P0-5 capabilities ok, P0-6 log errors.
+    "查看日志": "Ver registro",
+    "免费名额：已装 %d/3": "Vagas grátis: %d/3 instalados",
+    "App ID：已用 %d/%d": "IDs de app: %d/%d usados",
+    "免费证书都支持": "O certificado grátis cobre tudo",
+    "错误 (%d)": "Erros (%d)",
     "Retry failed items": "Tentar novamente os itens com falha",
 
     "couldn't find the IPA in the %@ %@ release":

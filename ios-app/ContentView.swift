@@ -14,6 +14,20 @@ struct ContentView: View {
     @Environment(\.dismiss) private var dismiss
     /// Observed so labels redraw when the language changes.
     @EnvironmentObject private var loc: Localizer
+    /// P0-4 (0.9.185): the free-quota row reads the same device list
+    /// as the Apps tab; CertManager gives the current team's id for
+    /// the team-filtered count (CertsView.affectedApps 同款）.
+    @EnvironmentObject private var appsManager: SideloadedAppsManager
+    @EnvironmentObject private var certManager: CertManager
+    /// P0-4 (0.9.185): the last signing method, reactive so the quota
+    /// row hides when the user picks enterprise signing (which doesn't
+    /// consume App IDs). Default mirrors CZFSignIdentity.stored.
+    @AppStorage(CZFSignIdentity.defaultsKey) private var signIdentityRaw: String = CZFSignIdentity.enterprise.rawValue
+    /// P0-5 (0.9.185): the custom IPA's paid-only capabilities, if any
+    /// (nil = no custom IPA / not computed yet). Read by the install
+    /// card's inline row and the precheck sheet; computed once per
+    /// imported IPA in the task on appCard.
+    @State private var missingCapabilities: [String]? = nil
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
     @State private var showImporter = false
@@ -170,7 +184,7 @@ struct ContentView: View {
                 .ignoresSafeArea()
             }
             .sheet(isPresented: $showPrecheck) {
-                PrecheckSheet(onContinue: continueAfterPrecheck)
+                PrecheckSheet(onContinue: continueAfterPrecheck, missingCapabilities: missingCapabilities)
             }
             .sheet(isPresented: $showingSigningChoice) {
                 CertificateChoiceSheet(
@@ -189,7 +203,13 @@ struct ContentView: View {
             // and whenever the app returns to the foreground — a link
             // copied in another app must raise the paste button at once,
             // not on the next unrelated body refresh.
-            .onAppear { refreshClipboardLink() }
+            .onAppear {
+                refreshClipboardLink()
+                // P0-4 (0.9.185): the quota row needs the device list;
+                // the Apps tab's auto-load, shared manager — guarded
+                // inside (once, tunnel up, never starts LocalDevVPN).
+                appsManager.autoLoad()
+            }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                 refreshClipboardLink()
             }
@@ -545,6 +565,8 @@ struct ContentView: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
                 sectionTitle(L("Install"), systemImage: "square.and.arrow.down")
+                quotaRow
+                capabilitiesInlineRow
                 // Each app with its own icon, in the menu and in the field.
                 Menu {
                     Picker(L("Install"), selection: Bindable(engine).installSource) {
@@ -606,6 +628,71 @@ struct ContentView: View {
         .disabled(engine.isRunning || engine.batchUpdateRunning)
         // Madeira offers Stable only once its first stable release is out.
         .task(id: engine.installSource) { await engine.checkStableRelease(for: engine.installSource) }
+        // P0-5 (0.9.185): the custom IPA's paid-only capabilities,
+        // computed once per imported IPA (local zip read, no login
+        // or network). The inline row and the precheck sheet share it.
+        .task(id: engine.customIPAName) {
+            if engine.installSource == .custom, let entry = IPALibrary.customImport() {
+                missingCapabilities = Engine.unsupportedEntitlements(inIPA: entry.url)
+            } else {
+                missingCapabilities = nil
+            }
+        }
+    }
+
+    /// P0-4 (0.9.185): free slots before signing — AltStore's
+    /// "View App IDs" as a one-liner. Only for Apple ID signing
+    /// (enterprise doesn't consume App IDs), only once the device
+    /// list has loaded (never a wrong 0/3), and only when the
+    /// current team is known (else the count can't be attributed).
+    /// The App ID half shows the last quota a run actually saw
+    /// (`lastAppIDCost`); unknown until a run has checked, so the
+    /// segment is omitted rather than guessed.
+    @ViewBuilder
+    private var quotaRow: some View {
+        if (CZFSignIdentity(rawValue: signIdentityRaw) ?? .enterprise) == .appleID,
+           appsManager.hasLoaded, let teamID = certManager.teamID {
+            HStack(spacing: 6) {
+                Image(systemName: "person.crop.circle.badge.checkmark")
+                    .foregroundStyle(Theme.muted)
+                Text(L("免费名额：已装 %d/3", installedCount(teamID: teamID)))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                if let cost = engine.lastAppIDCost,
+                   let limit = cost.limit, let available = cost.available {
+                    Text("·")
+                        .foregroundStyle(Theme.muted)
+                    Text(L("App ID：已用 %d/%d", limit - available, limit))
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                }
+                Spacer()
+            }
+        }
+    }
+
+    /// The installed apps signed under the current team — the
+    /// free 3-slot count (CertsView.affectedApps 同款口径）.
+    private func installedCount(teamID: String) -> Int {
+        appsManager.entries.filter { $0.current?.teamIdentifier == teamID }.count
+    }
+
+    /// P0-5 (0.9.185): the missing capabilities up front, on the
+    /// install page itself — the precheck sheet only opens on a
+    /// blocked row, so a warn-only row there would otherwise never
+    /// be seen. Same sentence as the run's warning (installWarning).
+    @ViewBuilder
+    private var capabilitiesInlineRow: some View {
+        if engine.installSource == .custom, let missing = missingCapabilities, !missing.isEmpty {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(Theme.warning)
+                Text(L("This IPA asks for %@, which a free Apple ID certificate can't provide. Those features will silently stop working after install.", missing.joined(separator: ", ")))
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     /// The two ways in for a custom build: pick a file, or paste a link.
@@ -1594,6 +1681,10 @@ private struct PrecheckSheet: View {
     @Environment(Engine.self) private var engine: Engine
     @Environment(\.dismiss) private var dismiss
     let onContinue: () -> Void
+    /// P0-5 (0.9.185): the custom IPA's paid-only capabilities, if any
+    /// (nil = no custom IPA / not computed yet). Computed once per
+    /// imported IPA by ContentView's task on appCard.
+    let missingCapabilities: [String]?
 
     @State private var showPairingPicker = false
     @State private var showIPAPicker = false
@@ -1612,6 +1703,9 @@ private struct PrecheckSheet: View {
                     accountRow
                     if engine.installSource == .custom {
                         packageRow
+                    }
+                    if engine.installSource == .custom, let missing = missingCapabilities {
+                        capabilitiesRow(missing: missing)
                     }
                     VStack(spacing: 10) {
                         Button(action: onContinue) {
@@ -1715,6 +1809,19 @@ private struct PrecheckSheet: View {
         } else {
             precheckRow(title: L("安装包"), state: .blocked, detail: L("还没导入 .ipa"),
                         fixTitle: L("导入安装包"), fix: { showIPAPicker = true })
+        }
+    }
+
+    /// P0-5 (0.9.185): the custom IPA's paid-only capabilities as a
+    /// checklist row — warn, never blocked (0.9.160's "warn, don't
+    /// block" kept). The ok state says the free certificate covers
+    /// everything, so the sheet doesn't leave the question open.
+    private func capabilitiesRow(missing: [String]) -> some View {
+        if missing.isEmpty {
+            precheckRow(title: L("Capabilities"), state: .ok, detail: L("免费证书都支持"))
+        } else {
+            precheckRow(title: L("Capabilities"), state: .warn,
+                        detail: L("This IPA asks for %@, which a free Apple ID certificate can't provide. Those features will silently stop working after install.", missing.joined(separator: ", ")))
         }
     }
 
@@ -1943,6 +2050,28 @@ struct InstallPopup: View {
                 .font(.subheadline.weight(.medium))
         }
         .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+        // P0-2 (0.9.185): the failure is no longer a dead end. "View
+        // log" closes this popup and jumps to the activity log
+        // (RootView closes the install sheet, switches to Settings
+        // and scrolls to the log); "Try again" re-runs the same
+        // install — runOneClick clears lastError itself, so the
+        // popup goes away on success and re-renders on a new failure.
+        Button {
+            close()
+            NotificationCenter.default.post(name: Engine.revealLog, object: nil)
+        } label: {
+            Label(L("查看日志"), systemImage: "doc.text.magnifyingglass")
+                .font(.subheadline.weight(.medium))
+        }
+        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+        Button {
+            engine.runOneClick()
+        } label: {
+            Label(L("Try again"), systemImage: "arrow.clockwise")
+                .font(.subheadline.weight(.medium))
+        }
+        .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+        .disabled(engine.isRunning)
         if engine.guide == nil, !engine.certConflict, !ErrorHelp.isExplained(message) {
             CopyLogsButton()
         }

@@ -129,6 +129,11 @@ final class Engine {
     static let anisetteAutoKey = "anisetteServerAuto"
 
     private(set) var appIDCost: AppIDCost?
+    /// P0-4 (0.9.185): the last App ID quota `confirmAppIDCost` saw,
+    /// for the install page's quota row. Display-only — unlike
+    /// `appIDCost` it never raises the (2026-11-08 removed)
+    /// confirmation popup.
+    var lastAppIDCost: AppIDCost?
     /// Resumed with the answer to `appIDCost`: true to sign and install.
     private var appIDCostReply: CheckedContinuation<Bool, Never>?
     /// A pairing file whose UDID differs from the connected iPhone, waiting for
@@ -192,6 +197,10 @@ final class Engine {
     /// (`userInfo["url"]` is the file path); RootView switches to the
     /// Downloads tab and DownloadsListView scrolls to it.
     static let revealDownload = Notification.Name("CZFRevealDownload")
+    /// P0-2 (0.9.185): the error popup's "View log" — RootView closes
+    /// the install sheet, switches to the Settings tab and scrolls to
+    /// the activity log (revealDownload 同款通道）.
+    static let revealLog = Notification.Name("CZFRevealLog")
 
     /// Answer the pairing-file mismatch popup: true replaces the pairing file.
     @MainActor
@@ -3035,6 +3044,9 @@ final class Engine {
             return
         }
         try Task.checkCancellation()
+        // P0-4 (0.9.185): keep the quota for the install page's row —
+        // display-only, no popup (see `lastAppIDCost`).
+        lastAppIDCost = cost
         let left = cost.available.map(String.init) ?? "unknown"
         log("App IDs: this app needs \(cost.cost) new (\(cost.newIDs.joined(separator: ", "))); \(left) left. Installing directly, no confirmation popup.")
         // 2026-11-08：用户亲定去掉 App ID 确认弹窗，直接安装。

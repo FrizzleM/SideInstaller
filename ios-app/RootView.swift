@@ -138,6 +138,10 @@ struct RootView: View {
     /// U-UI：文件页/源页“签名”动作要求打开设置里的企业证书页时置位；
     /// SettingsView 的企业区 NavigationLink 认它，打开后自己清掉。
     @State private var settingsEnterpriseRequest = false
+    /// P0-2 (0.9.185): the error popup's "View log" asks for the
+    /// activity log; SettingsView's log section scrolls to it, then
+    /// clears the flag itself (settingsEnterpriseRequest 同款）.
+    @State private var settingsLogRequest = false
     @StateObject private var sourcesManager = SourcesManager()
     @StateObject private var jitManager = JITManager()
     /// What the sign-in sheet showed last, so it keeps its content while it
@@ -169,7 +173,7 @@ struct RootView: View {
                 .blueTopBar()
                 .tabItem { Label(L("Download"), systemImage: "arrow.down.circle") }
                 .tag(Page.downloads)
-            SettingsView(isTab: true, enterpriseRequest: $settingsEnterpriseRequest)
+            SettingsView(isTab: true, enterpriseRequest: $settingsEnterpriseRequest, logRequest: $settingsLogRequest)
                 .tabItem { Label(L("Settings"), systemImage: "gearshape") }
                 .tag(Page.settings)
         }
@@ -180,6 +184,16 @@ struct RootView: View {
         // Downloads tab; DownloadsListView scrolls to the file itself.
         .onReceive(NotificationCenter.default.publisher(for: Engine.revealDownload)) { _ in
             page = .downloads
+        }
+        // P0-2 (0.9.185): the error popup's "View log" — the install
+        // sheet would cover the tab, so close it first (the 2FA
+        // handling below does the same), then switch to Settings
+        // and let the log section scroll itself into view.
+        .onReceive(NotificationCenter.default.publisher(for: Engine.revealLog)) { _ in
+            showInstallSheet = false
+            showInstallSheetPending = false
+            page = .settings
+            settingsLogRequest = true
         }
         // U-UI：文件页/源页把 IPA 交给企业证书页时（CertWorkspace.openEnterpriseSign），
         // 切到设置 tab 并让企业区自动打开；标志由这里清掉，只触发一次。

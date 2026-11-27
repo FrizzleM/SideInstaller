@@ -12,6 +12,10 @@ struct SettingsView: View {
     /// U-UI：文件页/源页要求打开企业证书区时置位；企业区 NavigationLink
     /// 认它，打开后自己清掉。
     var enterpriseRequest: Binding<Bool> = .constant(false)
+    /// P0-2 (0.9.185): the error popup's "View log" asks for the
+    /// activity log; the body scrolls to it, then clears the flag
+    /// (enterpriseRequest 同款 one-shot).
+    var logRequest: Binding<Bool> = .constant(false)
     @Environment(Engine.self) private var engine
     /// Observed for the language picker, and to redraw on language change.
     @EnvironmentObject private var loc: Localizer
@@ -104,6 +108,7 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             Form {
                 accountSection
                 enterpriseSection
@@ -118,7 +123,7 @@ struct SettingsView: View {
                 ignoredUpdatesSection
                 anisetteSection
                 advancedSection
-                logSection
+                logSection.id("activityLog")
                 aboutSection
             }
             .listStyle(.insetGrouped)
@@ -156,6 +161,17 @@ struct SettingsView: View {
                     if !isTab {
                         Button(L("Done")) { dismiss() }
                     }
+            }
+            }
+            // P0-2 (0.9.185): the error popup's "View log" — scroll
+            // the activity log into view, then clear the flag (the
+            // enterpriseRequest 同款 one-shot). If the id isn't
+            // found the scroll is a no-op and the user still lands
+            // on the Settings tab.
+            .onChange(of: logRequest.wrappedValue) { _, requested in
+                guard requested else { return }
+                logRequest.wrappedValue = false
+                proxy.scrollTo("activityLog", anchor: .top)
             }
             }
         }
@@ -1000,8 +1016,49 @@ private struct LogConsole: View {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && lines.isEmpty
     }
 
+    /// P0-6 (0.9.185): the error rows among the shown lines — the
+    /// ⛔️-marked failures plus the failure sentences that never got
+    /// the marker (LogStore.Entry has no level field, so the screen
+    /// reads the text; the ⛔️ convention covers most of it).
+    private var errorLines: [LogStore.Entry] {
+        lines.filter(Self.isErrorLine)
+    }
+
+    private static func isErrorLine(_ line: LogStore.Entry) -> Bool {
+        let text = line.text.lowercased()
+        return text.contains("⛔️")
+            || text.contains("failed")
+            || text.contains("couldn't")
+            || text.contains("didn't")
+            || text.contains("error")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // P0-6 (0.9.185): errors pinned on top, red, in their own
+            // short scroll — Feather's critical-errors section. The
+            // full console below (and its scroll-to-bottom anchor)
+            // is untouched; the section follows the same search.
+            if !errorLines.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L("错误 (%d)", errorLines.count))
+                        .font(.system(.caption, design: .monospaced).weight(.semibold))
+                        .foregroundStyle(Theme.negative)
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 2) {
+                            ForEach(errorLines) { line in
+                                Text(line.stamp + "  " + line.text)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundStyle(Theme.negative)
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .frame(maxHeight: 120)
+                }
+            }
             SearchBar(text: $searchText, placeholder: L("搜索"))
             if hasNoMatch {
                 Text(L("没有匹配的日志。"))

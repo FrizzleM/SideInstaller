@@ -805,6 +805,12 @@ let frenchStrings: [String: String] = [
     "Latest (%@)": "Dernière (%@)",
     "Couldn't load the other versions: %@": "Impossible de charger les autres versions : %@",
     "Try again": "Réessayer",
+    // 0.9.185: P0-2 error popup, P0-4 quota row, P0-5 capabilities ok, P0-6 log errors.
+    "查看日志": "Voir le journal",
+    "免费名额：已装 %d/3": "Places gratuites : %d/3 installées",
+    "App ID：已用 %d/%d": "ID d'app : %d/%d utilisés",
+    "免费证书都支持": "Tout est pris en charge par le certificat gratuit",
+    "错误 (%d)": "Erreurs (%d)",
     "Retry failed items": "Réessayer les éléments échoués",
 
     "couldn't find the IPA in the %@ %@ release":

@@ -802,6 +802,12 @@ let spanishStrings: [String: String] = [
     "Latest (%@)": "Última (%@)",
     "Couldn't load the other versions: %@": "No se han podido cargar las demás versiones: %@",
     "Try again": "Reintentar",
+    // 0.9.185: P0-2 error popup, P0-4 quota row, P0-5 capabilities ok, P0-6 log errors.
+    "查看日志": "Ver registro",
+    "免费名额：已装 %d/3": "Plazas gratuitas: %d/3 instaladas",
+    "App ID：已用 %d/%d": "ID de app: %d/%d usados",
+    "免费证书都支持": "El certificado gratuito lo cubre todo",
+    "错误 (%d)": "Errores (%d)",
     "Retry failed items": "Reintentar los elementos fallidos",
 
     "couldn't find the IPA in the %@ %@ release":

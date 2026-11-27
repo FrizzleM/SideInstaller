@@ -799,6 +799,12 @@ let vietnameseStrings: [String: String] = [
     "Latest (%@)": "Mới nhất (%@)",
     "Couldn't load the other versions: %@": "Không thể tải các phiên bản khác: %@",
     "Try again": "Thử lại",
+    // 0.9.185: P0-2 error popup, P0-4 quota row, P0-5 capabilities ok, P0-6 log errors.
+    "查看日志": "Xem nhật ký",
+    "免费名额：已装 %d/3": "Suất miễn phí: đã cài %d/3",
+    "App ID：已用 %d/%d": "App ID: đã dùng %d/%d",
+    "免费证书都支持": "Chứng chỉ miễn phí hỗ trợ tất cả",
+    "错误 (%d)": "Lỗi (%d)",
     "Retry failed items": "Thử lại các mục thất bại",
 
     "couldn't find the IPA in the %@ %@ release":

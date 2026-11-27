@@ -718,6 +718,12 @@ let koreanStrings: [String: String] = [
     "Latest (%@)": "최신 (%@)",
     "Couldn't load the other versions: %@": "다른 버전을 불러오지 못했습니다: %@",
     "Try again": "다시 시도",
+    // 0.9.185: P0-2 error popup, P0-4 quota row, P0-5 capabilities ok, P0-6 log errors.
+    "查看日志": "로그 보기",
+    "免费名额：已装 %d/3": "무료 슬롯: %d/3 설치됨",
+    "App ID：已用 %d/%d": "App ID: %d/%d 사용 중",
+    "免费证书都支持": "무료 인증서로 모두 지원",
+    "错误 (%d)": "오류 (%d)",
     "Retry failed items": "실패한 항목 다시 시도",
 
     "couldn't find the IPA in the %@ %@ release":

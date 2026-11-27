@@ -763,6 +763,12 @@ let turkishStrings: [String: String] = [
     "Latest (%@)": "En son (%@)",
     "Couldn't load the other versions: %@": "Diğer sürümler yüklenemedi: %@",
     "Try again": "Yeniden dene",
+    // 0.9.185: P0-2 error popup, P0-4 quota row, P0-5 capabilities ok, P0-6 log errors.
+    "查看日志": "Günlüğü görüntüle",
+    "免费名额：已装 %d/3": "Ücretsiz slot: %d/3 yüklü",
+    "App ID：已用 %d/%d": "App ID: %d/%d kullanıldı",
+    "免费证书都支持": "Ücretsiz sertifika hepsini destekliyor",
+    "错误 (%d)": "Hatalar (%d)",
     "Retry failed items": "Başarısız öğeleri yeniden dene",
     "couldn't find the IPA in the %@ %@ release": "%@ %@ sürümünde IPA bulunamadı",
     "%@ has no %@ release right now": "%@ için şu anda %@ sürüm yok",

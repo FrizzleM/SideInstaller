@@ -785,6 +785,12 @@ let chineseStrings: [String: String] = [
     "Latest (%@)": "最新（%@）",
     "Couldn't load the other versions: %@": "无法加载其他版本：%@",
     "Try again": "重试",
+    // 0.9.185: P0-2 error popup, P0-4 quota row, P0-5 capabilities ok, P0-6 log errors.
+    "查看日志": "查看日志",
+    "免费名额：已装 %d/3": "免费名额：已装 %d/3",
+    "App ID：已用 %d/%d": "App ID：已用 %d/%d",
+    "免费证书都支持": "免费证书都支持",
+    "错误 (%d)": "错误 (%d)",
     "Retry failed items": "重试失败项",
 
     "couldn't find the IPA in the %@ %@ release":

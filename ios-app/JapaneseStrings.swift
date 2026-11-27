@@ -717,6 +717,12 @@ let japaneseStrings: [String: String] = [
     "Latest (%@)": "最新（%@）",
     "Couldn't load the other versions: %@": "他のバージョンを読み込めませんでした：%@",
     "Try again": "再試行",
+    // 0.9.185: P0-2 error popup, P0-4 quota row, P0-5 capabilities ok, P0-6 log errors.
+    "查看日志": "ログを表示",
+    "免费名额：已装 %d/3": "無料枠：%d/3 インストール済み",
+    "App ID：已用 %d/%d": "App ID：%d/%d 使用中",
+    "免费证书都支持": "無料証明書ですべて対応",
+    "错误 (%d)": "エラー (%d)",
     "Retry failed items": "失敗した項目を再試行",
 
     "couldn't find the IPA in the %@ %@ release":

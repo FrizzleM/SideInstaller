@@ -1623,6 +1623,19 @@ struct AppsView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.negative)
                     .fixedSize(horizontal: false, vertical: true)
+                // P0-3 (0.9.185): the failed row names the app and its
+                // reason already; the missing piece was a retry on the
+                // row itself (same single-app call as the swipe action
+                // and the detail page). Disabled while a run is going —
+                // refreshAll's own guard would refuse it anyway.
+                Button {
+                    manager.refreshAll(onlyBundleIDs: [job.bundleID], fromUI: true)
+                } label: {
+                    Label(L("Try again"), systemImage: "arrow.clockwise")
+                        .font(.footnote.weight(.semibold))
+                }
+                .foregroundStyle(Theme.accent)
+                .disabled(manager.isRefreshing)
             }
         }
     }
@@ -1983,7 +1996,23 @@ struct AppsView: View {
                         .foregroundStyle(Theme.muted)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    expiryLabel(profile, urgency: urgency)
+                    // P0-1 (0.9.185): the countdown is the renew button —
+                    // SideStore's "7 DAYS" is tappable; here the expiry
+                    // line renews this app. Only rows with a paired IPA
+                    // offer it (same gate as the swipe action); the inner
+                    // button is borderless so its tap doesn't open the
+                    // detail page the NavigationLink wraps.
+                    if jobsByID[status.app.bundleID] != nil {
+                        Button {
+                            manager.refreshAll(onlyBundleIDs: [status.app.bundleID], fromUI: true)
+                        } label: {
+                            expiryLabel(profile, urgency: urgency)
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(manager.isRefreshing)
+                    } else {
+                        expiryLabel(profile, urgency: urgency)
+                    }
                     // 0.9.150: per-row missing-IPA marker — the top note
                     // only gives a count, and a row with no IPA looked
                     // exactly like a refreshable one. Team-excluded apps
