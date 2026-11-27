@@ -154,7 +154,6 @@ let spanishStrings: [String: String] = [
     "iOS %@ required": "Se requiere iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Este iPhone tiene iOS %@, y con esa versión SideInstaller no puede instalar nada. Actualiza a iOS %@ o posterior en Ajustes › General › Actualización de software.",
-    "Wi-Fi required": "Se requiere Wi-Fi",
     "Pairing code": "Código de emparejamiento",
     "Type this into the prompt in Settings.":
         "Escribe este código en el mensaje que aparece en Ajustes.",
@@ -660,8 +659,8 @@ let spanishStrings: [String: String] = [
         "Algo en %@:%d rechazó la conexión, así que el túnel funciona, pero este iPhone no está escuchando en su puerto de emparejamiento, aunque el Modo de desarrollador está activado. Vuelve a emparejar este iPhone desde “Archivo de emparejamiento” y vuelve a intentarlo. Si sigue fallando, reinicia el iPhone.",
     "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
         "Algo en %@:%d aceptó la conexión pero no respondió como el puerto de emparejamiento de este iPhone, y ningún otro puerto respondió como tal. Comprueba que la VPN activa sea LocalDevVPN y que el Modo de desarrollador esté activado (Ajustes › Privacidad y seguridad › Modo de desarrollador) y vuelve a intentarlo. Si sigue fallando, reinicia el iPhone.",
-    "This iPhone is on mobile data, not Wi-Fi, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Connect to a Wi-Fi network, then try again.":
-        "Este iPhone está usando datos móviles, no Wi-Fi, y en ese caso iOS mantiene cerrado su puerto de emparejamiento, así que %@:%d rechazó la conexión. Conéctate a una red Wi-Fi y vuelve a intentarlo.",
+    "This iPhone is on mobile data, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Turn on Airplane Mode, keep LocalDevVPN connected, then try again.":
+        "Este iPhone está usando datos móviles, y en ese caso iOS mantiene cerrado su puerto de emparejamiento, así que %@:%d rechazó la conexión. Activa el Modo Avión, deja LocalDevVPN conectado y vuelve a intentarlo.",
     "Start LocalDevVPN when needed": "Iniciar LocalDevVPN cuando haga falta",
     "Start LocalDevVPN now": "Iniciar LocalDevVPN ahora",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -833,13 +832,9 @@ let spanishStrings: [String: String] = [
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "No se ha podido registrar este iPhone%@ en el equipo de desarrollo de tu Apple ID, así que Apple no emitirá un perfil de aprovisionamiento. %@ — consulta los pasos de arriba.",
-    "Connect to Wi-Fi": "Conéctate al Wi-Fi",
-    "Open Settings › Wi-Fi and join a network.": "Abre Ajustes › Wi-Fi y únete a una red.",
     "Then come back here — this continues automatically.":
         "Después vuelve aquí: el proceso continúa solo.",
     "Tap Connect so the toggle turns on.": "Toca Connect para que el interruptor se active.",
-    "Keep Wi-Fi on, then come back here — this continues automatically.":
-        "Deja el Wi-Fi activado y vuelve aquí: el proceso continúa solo.",
     "Get LocalDevVPN": "Obtener LocalDevVPN",
     "Import an .ipa first": "Importa un .ipa primero",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
@@ -1041,10 +1036,6 @@ let spanishStrings: [String: String] = [
         "Este iPhone ha cortado la conexión nada más abrirse. Desde iOS 26.4 lo hace con los archivos de emparejamiento lockdown, como este, cuando llegan a través de LocalDevVPN, así que crear otro del mismo tipo no servirá. Un archivo de emparejamiento “Remote pairing” sigue funcionando: en un ordenador, abre idevice_pair, elige “Remote pairing”, haz clic en “Create” y luego en “Save to file…”, e importa el archivo en “Archivo de emparejamiento”.",
     "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
         "Este iPhone ha cortado la conexión: desde iOS 26.4 lo hace con los archivos de emparejamiento lockdown como este cuando llegan a través de LocalDevVPN. Consulta los pasos de arriba.",
-    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
-        "Emparejar este iPhone lo necesita: SideInstaller se anuncia en la red local para que Ajustes lo encuentre.",
-    "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
-        "Conéctate a una red Wi-Fi. Emparejar este iPhone lo necesita: SideInstaller tiene que ser localizable en la red local.",
 
     // MARK: - About
 
@@ -1459,4 +1450,71 @@ let spanishStrings: [String: String] = [
     "The debugger lost %@ (%@). Open it with JIT again.":
         "El depurador perdió %@ (%@). Vuelve a abrirla con JIT.",
     "Universal": "Universal",
+
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "Ahora SideInstaller inicia sesión en Apple, descarga la app y hace que Apple la firme, y para eso necesita internet.",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "Ahora SideInstaller inicia sesión en Apple, y para eso necesita internet.",
+    "Next, Apple signs the app, which needs the internet.":
+        "Ahora Apple firma la app, y para eso hace falta internet.",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "Ahora SideInstaller descarga la imagen de disco de desarrollador, y para eso necesita internet.",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "Ahora Apple firma la imagen de disco de desarrollador para este iPhone, y para eso hace falta internet.",
+    "Try Mobile Data Mode?":
+        "¿Probar el Modo datos móviles?",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "Este iPhone está usando datos móviles, no Wi-Fi, y en ese caso iOS no acepta conexiones nuevas desde LocalDevVPN.",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "El Modo datos móviles lo evita con el Modo Avión: lo activas mientras SideInstaller se conecta y lo desactivas cuando SideInstaller necesita internet. SideInstaller te avisa de cuándo.",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "El Wi-Fi es la forma estable, y la más segura. Para usarlo, activa el Wi-Fi y vuelve a intentarlo.",
+    "Try Mobile Data Mode":
+        "Probar el Modo datos móviles",
+    "Use Wi-Fi Instead":
+        "Usar Wi-Fi",
+    "Turn on Airplane Mode":
+        "Activa el Modo Avión",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "La conexión que SideInstaller mantenía se ha cerrado, así que necesita una nueva.",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "Abre el Centro de control: desliza hacia abajo desde la esquina superior derecha de la pantalla.",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "Toca Modo Avión para activarlo. Deja el Wi-Fi apagado y LocalDevVPN conectada.",
+    "Come back to SideInstaller. It carries on by itself.":
+        "Vuelve a SideInstaller. Seguirá solo.",
+    "Then pair this iPhone with SideInstaller in Settings, as usual.":
+        "Después empareja este iPhone con SideInstaller en Ajustes, como siempre.",
+    "Connecting in Airplane Mode":
+        "Conectando en Modo Avión",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "Mantén el Modo Avión activado hasta que SideInstaller te pida desactivarlo.",
+    "Turn off Airplane Mode":
+        "Desactiva el Modo Avión",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "SideInstaller está conectado y mantiene la conexión cuando vuelvan los datos móviles.",
+    "Open Control Center again.":
+        "Abre de nuevo el Centro de control.",
+    "Tap Airplane Mode to turn it off.":
+        "Toca Modo Avión para desactivarlo.",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "Vuelve a SideInstaller. Seguirá en cuanto vuelvan los datos móviles.",
+    "You can turn off Airplane Mode":
+        "Ya puedes desactivar el Modo Avión",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "Por ahora SideInstaller ya no necesita el Modo Avión y mantiene la conexión para lo que hagas después. Desactiva el Modo Avión cuando quieras.",
+    "Waiting for Airplane Mode…":
+        "Esperando el Modo Avión…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "El Modo Avión está activado, pero LocalDevVPN no está conectada. Ábrela y vuelve a conectarla.",
+    "Waiting for mobile data…":
+        "Esperando los datos móviles…",
+    "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
+        "Este iPhone está usando datos móviles. Continúa en SideInstaller para usar el Modo datos móviles.",
+    "Mobile data":
+        "Datos móviles",
+    "Mobile Data Mode":
+        "Modo datos móviles",
 ]

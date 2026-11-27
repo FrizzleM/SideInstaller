@@ -78,13 +78,27 @@ enum Shortcuts {
     static func ensureTunnel<Intent: ForegroundContinuableIntent>(for intent: Intent) async throws {
         let engine = Engine.shared
         await engine.settleNetworkStatus()
-        guard !engine.vpnConnected else { return }
+        guard !engine.vpnConnected else {
+            try await offerMobileDataMode(for: intent)
+            return
+        }
         guard engine.startsVPNWhenNeeded else {
             throw ShortcutError(ErrorHelp.explained(L("LocalDevVPN isn't connected. Connect it before this action runs: Shortcuts' Set VPN action can, or turn on “Start LocalDevVPN when needed” in SideInstaller's Settings.")))
         }
         guard !isInForeground else { return }
         try await intent.requestToContinueInForeground(
             Shortcuts.dialog(L("LocalDevVPN isn't connected. Continue in SideInstaller to connect it.")))
+    }
+
+    /// On mobile data alone a new tunnel needs Mobile Data Mode, which asks
+    /// and has Airplane Mode turned on in SideInstaller: from the background,
+    /// the action asks to come forward first. A tunnel Mobile Data Mode kept
+    /// open needs none of that.
+    private static func offerMobileDataMode<Intent: ForegroundContinuableIntent>(for intent: Intent) async throws {
+        guard NetworkStatus.links().mobileDataOnly, !MobileDataMode.shared.mayHaveOpenTunnel,
+              !isInForeground else { return }
+        try await intent.requestToContinueInForeground(
+            Shortcuts.dialog(L("This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.")))
     }
 
     // MARK: Apple sign-in

@@ -42,14 +42,11 @@ struct ContentView: View {
                         pairingFileCard.cascadeItem(2)
                     }
                     // Most-blocking requirement first: an unsupported iOS, then
-                    // Wi-Fi if this run must pair, then the missing tunnel.
+                    // the missing tunnel. No Wi-Fi card: without Wi-Fi, Mobile
+                    // Data Mode (beta) offers Airplane Mode instead.
                     if !engine.isRunning {
                         if !engine.osSupported {
                             osRequirement.cascadeItem(cascade(2))
-                        // Only a run that pairs itself needs Wi-Fi; an imported
-                        // pairing file never touches the local network.
-                        } else if !engine.wifiConnected, engine.needsFreshPairing, engine.canSelfPair {
-                            wifiRequirement.cascadeItem(cascade(2))
                         // Not when Install starts LocalDevVPN itself.
                         } else if !engine.tunnelAvailable {
                             vpnRequirement.cascadeItem(cascade(2))
@@ -811,28 +808,6 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
             pairingImportButton
             pairingDocsLink
-        }
-    }
-
-    // MARK: Wi-Fi requirement
-
-    /// Shown while Wi-Fi is off, which pairing needs.
-    private var wifiRequirement: some View {
-        PanelCard {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "wifi.slash")
-                    .font(.title3)
-                    .foregroundStyle(Theme.negative)
-                    .frame(width: 28)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L("Wi-Fi required"))
-                        .font(.subheadline.weight(.medium))
-                    Text(L("Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network."))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
         }
     }
 

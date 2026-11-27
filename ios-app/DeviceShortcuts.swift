@@ -132,11 +132,14 @@ struct InstallPairingIntoAppsIntent: AppIntent, ForegroundContinuableIntent {
             try Shortcuts.requireNoInstall()
             try await Shortcuts.ensureTunnel(for: self)
             let engine = Engine.shared
-            let targets = try await engine.installedPairingTargets()
-            guard !targets.isEmpty else {
-                throw ShortcutError(L("Install an app like SideStore, StikDebug, or Feather first, then rescan."))
+            let targets = try await MobileDataMode.shared.run(.pairing) { () -> [InstalledPairingTarget] in
+                let targets = try await engine.installedPairingTargets()
+                guard !targets.isEmpty else {
+                    throw ShortcutError(L("Install an app like SideStore, StikDebug, or Feather first, then rescan."))
+                }
+                try await engine.installPairing(intoAll: targets)
+                return targets
             }
-            try await engine.installPairing(intoAll: targets)
             let message = targets.count == 1
                 ? L("Pairing file installed into %@.", targets[0].name)
                 : L("Pairing file installed into all %d apps.", targets.count)
@@ -159,7 +162,10 @@ struct ShowDeveloperModeIntent: AppIntent, ForegroundContinuableIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let message = try await Shortcuts.run("Show Developer Mode in Settings") { () -> String in
             try await Shortcuts.ensureTunnel(for: self)
-            switch try await Engine.shared.requestDeveloperMode(.reveal) {
+            let outcome = try await MobileDataMode.shared.run(.developerMode) {
+                try await Engine.shared.requestDeveloperMode(.reveal)
+            }
+            switch outcome {
             case .alreadyOn:
                 return L("Developer Mode is already on.")
             case .revealed, .enabling:

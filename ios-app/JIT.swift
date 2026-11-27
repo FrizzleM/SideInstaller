@@ -899,6 +899,8 @@ final class JITManager: ObservableObject {
     /// Which session's events count: one that ended may still have some on
     /// their way.
     private var sessionID: UUID?
+    /// Waiting for the session's tunnel (`waitUntilConnected`).
+    private var connectWaiters: [CheckedContinuation<Void, Never>] = []
     /// Silent audio, so SideInstaller isn't suspended while the app it opened
     /// is in front: a debugger that stops answering leaves the app frozen at
     /// its next request.
@@ -950,9 +952,14 @@ final class JITManager: ObservableObject {
         }
         Task {
             do {
-                if !quiet { try await ensurePairingFile() }
+                let read = { () async throws -> [[String: Any]] in
+                    if !quiet { try await self.ensurePairingFile() }
+                    return try await self.engine.installedAppPlists()
+                }
+                // Only what the user asked for offers Mobile Data Mode.
+                let plists = quiet ? try await read() : try await MobileDataMode.shared.run(.jit, read)
                 let own = Bundle.main.bundleIdentifier
-                apps = try await engine.installedAppPlists()
+                apps = plists
                     .compactMap(JITApp.init(plist:))
                     // Debugging SideInstaller would stop SideInstaller.
                     .filter { $0.bundleID != own }
@@ -1005,20 +1012,34 @@ final class JITManager: ObservableObject {
         let jitProtocol = jitProtocol(for: app)
         engine.log("=== JIT: \(app.name) (\(app.bundleID), \(jitProtocol.logName)) ===")
         Task {
-            do {
-                try await getReady()
-                let deviceIP = engine.deviceHost
-                let pairingFilePath = engine.pairingFilePath ?? PairingController.pairingFilePath()
-                start(app, jitProtocol, deviceIP: deviceIP, pairingFilePath: pairingFilePath)
-            } catch is CancellationError {
-                engine.log("JIT: pairing stopped.")
-            } catch {
-                let message = Self.text(error)
-                lastError = message
-                engine.log("⛔️ JIT: \(message)")
+            await MobileDataMode.shared.run(.jit) {
+                do {
+                    try await getReady()
+                    // The session opens a tunnel of its own, which on mobile
+                    // data alone needs Airplane Mode.
+                    try await MobileDataMode.shared.prepareNewTunnel()
+                    let deviceIP = engine.deviceHost
+                    let pairingFilePath = engine.pairingFilePath ?? PairingController.pairingFilePath()
+                    start(app, jitProtocol, deviceIP: deviceIP, pairingFilePath: pairingFilePath)
+                    startingBundleID = nil
+                    // Airplane Mode stays on until the session's tunnel is up.
+                    await waitUntilConnected()
+                } catch is CancellationError {
+                    engine.log("JIT: stopped before the session started.")
+                } catch {
+                    let message = Self.text(error)
+                    lastError = message
+                    engine.log("⛔️ JIT: \(message)")
+                }
+                startingBundleID = nil
             }
-            startingBundleID = nil
         }
+    }
+
+    /// Returns once the session has its tunnel, or has ended.
+    private func waitUntilConnected() async {
+        guard let status, status.phase == .connecting else { return }
+        await withCheckedContinuation { connectWaiters.append($0) }
     }
 
     /// Quits the app the session is attached to, which ends the session.
@@ -1032,6 +1053,7 @@ final class JITManager: ObservableObject {
         try requireDeveloperMode()
         try await ensurePairingFile()
         if !DeveloperDiskImage.isDownloaded {
+            try await MobileDataMode.shared.requireInternet(.diskImageDownload)
             try await DeveloperDiskImage.downloadMissing { _ in }
         }
         // Mount progress goes to the activity log only.
@@ -1089,6 +1111,13 @@ final class JITManager: ObservableObject {
     private func handle(_ event: JITSession.Event) {
         switch event {
         case .phase(let phase):
+            if phase != .connecting {
+                // Past the tunnel, one way or the other: Mobile Data Mode's
+                // popups needn't wait for it any more.
+                MobileDataMode.shared.dialEnded(opened: !phase.isEnded)
+                connectWaiters.forEach { $0.resume() }
+                connectWaiters.removeAll()
+            }
             if case .ended(let outcome) = phase {
                 end(outcome)
             } else {

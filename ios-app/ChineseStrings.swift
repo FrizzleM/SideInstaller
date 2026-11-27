@@ -151,7 +151,6 @@ let chineseStrings: [String: String] = [
     "iOS %@ required": "需要 iOS %@",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "此 iPhone 运行的是 iOS %@，SideInstaller 无法在该版本上安装。请在 设置 › 通用 › 软件更新 中更新到 iOS %@ 或更高版本。",
-    "Wi-Fi required": "需要 Wi-Fi",
     "Pairing code": "配对码",
     "Type this into the prompt in Settings.":
         "将它输入到 设置 中的提示框内。",
@@ -634,8 +633,8 @@ let chineseStrings: [String: String] = [
         "%@:%d 上有东西拒绝了连接，说明隧道是通的，但尽管开发者模式已打开，这台 iPhone 仍没有在配对端口上监听。请在“配对文件”中重新配对这台 iPhone，然后重试。如果仍然失败，请重启 iPhone。",
     "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
         "%@:%d 上有东西接受了连接，但没有像这台 iPhone 的配对端口那样应答，其他端口也没有。请确认当前打开的 VPN 是 LocalDevVPN，并且开发者模式已打开（设置 › 隐私与安全性 › 开发者模式），然后重试。如果仍然失败，请重启 iPhone。",
-    "This iPhone is on mobile data, not Wi-Fi, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Connect to a Wi-Fi network, then try again.":
-        "这台 iPhone 正在使用蜂窝数据而不是 Wi-Fi，此时 iOS 会关闭它的配对端口，所以 %@:%d 拒绝了连接。请连接到 Wi-Fi 网络，然后重试。",
+    "This iPhone is on mobile data, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Turn on Airplane Mode, keep LocalDevVPN connected, then try again.":
+        "这台 iPhone 正在使用蜂窝数据，此时 iOS 会关闭它的配对端口，所以 %@:%d 拒绝了连接。请打开飞行模式，保持 LocalDevVPN 连接，然后重试。",
     "Start LocalDevVPN when needed": "需要时打开 LocalDevVPN",
     "Start LocalDevVPN now": "立即启动 LocalDevVPN",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -805,12 +804,8 @@ let chineseStrings: [String: String] = [
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "无法将此 iPhone%@ 注册到你 Apple ID 的开发者团队，因此 Apple 不会签发描述文件。%@ —— 请参见上面的步骤。",
-    "Connect to Wi-Fi": "连接 Wi-Fi",
-    "Open Settings › Wi-Fi and join a network.": "打开 设置 › Wi-Fi 并加入一个网络。",
     "Then come back here — this continues automatically.": "然后回到这里 —— 接下来会自动继续。",
     "Tap Connect so the toggle turns on.": "轻点 Connect，让开关打开。",
-    "Keep Wi-Fi on, then come back here — this continues automatically.":
-        "保持 Wi-Fi 开启，然后回到这里 —— 接下来会自动继续。",
     "Get LocalDevVPN": "获取 LocalDevVPN",
     "Import an .ipa first": "请先导入一个 .ipa",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
@@ -1008,10 +1003,6 @@ let chineseStrings: [String: String] = [
         "这台 iPhone 在连接刚建立时就把它断开了。从 iOS 26.4 起，通过 LocalDevVPN 连接的 lockdown 配对文件（比如这个）都会被这样断开，所以重新生成一个同类文件也没用。“Remote pairing”配对文件仍然可用：在电脑上打开 idevice_pair，选择“Remote pairing”，点击“Create”，再点击“Save to file…”，然后在“配对文件”中导入这个文件。",
     "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
         "这台 iPhone 断开了连接：从 iOS 26.4 起，通过 LocalDevVPN 连接的 lockdown 配对文件（比如这个）都会被这样断开。请参见上面的步骤。",
-    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
-        "配对这台 iPhone 需要它：SideInstaller 会在本地网络上广播自己，供“设置”发现。",
-    "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
-        "请连接到 Wi-Fi 网络。配对这台 iPhone 需要它——SideInstaller 必须能在本地网络上被找到。",
 
     // MARK: - About
 
@@ -1409,4 +1400,71 @@ let chineseStrings: [String: String] = [
         "调试器无法附加到 %@（%@）。请用 SideStore 或 SideInstaller 重新安装它，它们签名的应用可以被调试器附加。",
     "The debugger lost %@ (%@). Open it with JIT again.": "调试器与 %@ 断开了（%@）。请再次用 JIT 打开它。",
     "Universal": "通用",
+
+    // MARK: - Mobile Data Mode (beta)
+
+    "Next, SideInstaller signs in to Apple, downloads the app and has Apple sign it, which needs the internet.":
+        "接下来，SideInstaller 要登录 Apple、下载 App 并让 Apple 签名，这些都需要联网。",
+    "Next, SideInstaller signs in to Apple, which needs the internet.":
+        "接下来，SideInstaller 要登录 Apple，这需要联网。",
+    "Next, Apple signs the app, which needs the internet.":
+        "接下来要由 Apple 为 App 签名，这需要联网。",
+    "Next, SideInstaller downloads the developer disk image, which needs the internet.":
+        "接下来，SideInstaller 要下载开发者磁盘映像，这需要联网。",
+    "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
+        "接下来要由 Apple 为这台 iPhone 签名开发者磁盘映像，这需要联网。",
+    "Try Mobile Data Mode?":
+        "试试蜂窝数据模式？",
+    "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
+        "这台 iPhone 正在使用蜂窝数据而不是 Wi-Fi，此时 iOS 不接受来自 LocalDevVPN 的新连接。",
+    "Mobile Data Mode works around that with Airplane Mode: you turn it on while SideInstaller connects, and off again when SideInstaller needs the internet. SideInstaller tells you when.":
+        "蜂窝数据模式借助飞行模式绕过这个限制：SideInstaller 连接时打开飞行模式，需要联网时再关闭。SideInstaller 会告诉你什么时候操作。",
+    "Wi-Fi is the stable way, and the safer one. To use it, turn on Wi-Fi and try again.":
+        "Wi-Fi 是稳定的方式，也更安全。要使用它，请打开 Wi-Fi 后重试。",
+    "Try Mobile Data Mode":
+        "试用蜂窝数据模式",
+    "Use Wi-Fi Instead":
+        "改用 Wi-Fi",
+    "Turn on Airplane Mode":
+        "打开飞行模式",
+    "The connection SideInstaller kept has closed, so it needs a new one.":
+        "SideInstaller 保留的连接已关闭，需要建立新的连接。",
+    "Open Control Center: swipe down from the top-right corner of the screen.":
+        "打开控制中心：从屏幕右上角向下轻扫。",
+    "Tap Airplane Mode to turn it on. Leave Wi-Fi off and LocalDevVPN connected.":
+        "轻点飞行模式将它打开。保持 Wi-Fi 关闭，LocalDevVPN 保持连接。",
+    "Come back to SideInstaller. It carries on by itself.":
+        "回到 SideInstaller，它会自行继续。",
+    "Then pair this iPhone with SideInstaller in Settings, as usual.":
+        "然后像平常一样，在设置中将这台 iPhone 与 SideInstaller 配对。",
+    "Connecting in Airplane Mode":
+        "正在飞行模式下连接",
+    "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
+        "保持飞行模式打开，直到 SideInstaller 提示你关闭。",
+    "Turn off Airplane Mode":
+        "关闭飞行模式",
+    "SideInstaller is connected, and keeps its connection once mobile data is back.":
+        "SideInstaller 已连接，蜂窝数据恢复后也会保持连接。",
+    "Open Control Center again.":
+        "再次打开控制中心。",
+    "Tap Airplane Mode to turn it off.":
+        "轻点飞行模式将它关闭。",
+    "Come back to SideInstaller. It carries on once mobile data is back.":
+        "回到 SideInstaller，蜂窝数据恢复后它会继续。",
+    "You can turn off Airplane Mode":
+        "可以关闭飞行模式了",
+    "SideInstaller is done with Airplane Mode for now, and keeps its connection for what you do next. Turn Airplane Mode off whenever you like.":
+        "SideInstaller 目前不再需要飞行模式，并会为你接下来的操作保持连接。你可以随时关闭飞行模式。",
+    "Waiting for Airplane Mode…":
+        "正在等待飞行模式…",
+    "Airplane Mode is on, but LocalDevVPN isn't connected. Open it and connect it again.":
+        "飞行模式已打开，但 LocalDevVPN 没有连接。请打开它并重新连接。",
+    "Waiting for mobile data…":
+        "正在等待蜂窝数据…",
+    "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
+        "这台 iPhone 正在使用蜂窝数据。在 SideInstaller 中继续以使用蜂窝数据模式。",
+    "Mobile data":
+        "蜂窝数据",
+    "Mobile Data Mode":
+        "蜂窝数据模式",
 ]

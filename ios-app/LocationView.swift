@@ -840,7 +840,19 @@ final class LocationManager: ObservableObject {
     /// tunnel is already up.
     private func ensureReady(quietly: Bool = false) async throws {
         guard stage != .ready else { return }
+        // Only what the user asked for offers Mobile Data Mode.
+        guard quietly else {
+            return try await MobileDataMode.shared.run(.location) {
+                try await prepareSession(quietly: false)
+            }
+        }
+        try await prepareSession(quietly: true)
+    }
+
+    /// `ensureReady`'s steps.
+    private func prepareSession(quietly: Bool) async throws {
         if !DeveloperDiskImage.isDownloaded {
+            try await MobileDataMode.shared.requireInternet(.diskImageDownload)
             stage = .downloading
             try await DeveloperDiskImage.downloadMissing { _ in }
         }
@@ -884,6 +896,8 @@ final class LocationManager: ObservableObject {
             do {
                 try await performSimulate(coordinate)
                 lastSuccess = L("Location set to %@.", name ?? Self.format(coordinate))
+            } catch is CancellationError {
+                // Mobile Data Mode's popup was closed: nothing to report.
             } catch {
                 lastError = message(error)
             }
@@ -1074,6 +1088,8 @@ final class LocationManager: ObservableObject {
         Task {
             do {
                 try await beginPlayback(timeline, name: name)
+            } catch is CancellationError {
+                // Mobile Data Mode's popup was closed: nothing to report.
             } catch {
                 lastError = message(error)
             }
