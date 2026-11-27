@@ -9,6 +9,9 @@ struct JITView: View {
     @ObservedObject var manager: JITManager
 
     @State private var showSettings = false
+    /// F-3 (0.9.181): the app list's search text — the other list
+    /// pages all filter by name; the JIT list never did.
+    @State private var appSearchText = ""
 
     var body: some View {
         ScrollView {
@@ -17,6 +20,7 @@ struct JITView: View {
                 ddiProgressCard
                 sessionCard
                 lastJITCard
+                jitSearchBar
                 loadButton.cascadeItem(1)
                 // Errors show as a popup, which `RootView` lays over the app.
                 appList
@@ -42,7 +46,9 @@ struct JITView: View {
                 StatusDot(text: L("JIT on for %@", status.app.name), color: Theme.positive)
                     .transition(.opacity)
             } else if manager.hasLoaded {
-                let count = manager.apps.count
+                // F-3 (0.9.181) 打磨：搜索时计数跟列表走（过滤后的
+                // 数量），不搜索时仍是总数；文案键复用现成的两条。
+                let count = appSearchText.isEmpty ? manager.apps.count : filteredApps.count
                 StatusDot(text: count == 1 ? L("%d app can use JIT", count) : L("%d apps can use JIT", count),
                           color: Theme.positive, idle: count == 0)
                     .transition(.opacity)
@@ -176,14 +182,36 @@ struct JITView: View {
 
     // MARK: App list
 
+    /// F-3 (0.9.181): filter the JIT app list by name or bundle ID —
+    /// the file, download, source and history pages all have one.
+    /// Only while apps are loaded: an empty list has nothing to filter.
+    private var jitSearchBar: some View {
+        Group {
+            if !manager.apps.isEmpty {
+                SearchBar(text: $appSearchText, placeholder: L("搜索"))
+            }
+        }
+    }
+
+    /// The loaded apps, filtered by the search text — name or bundle
+    /// ID, case-insensitive; empty text shows everything.
+    private var filteredApps: [JITApp] {
+        guard !appSearchText.isEmpty else { return manager.apps }
+        let query = appSearchText
+        return manager.apps.filter { app in
+            app.name.localizedCaseInsensitiveContains(query)
+                || app.bundleID.localizedCaseInsensitiveContains(query)
+        }
+    }
+
     @ViewBuilder
     private var appList: some View {
         if manager.hasLoaded && manager.apps.isEmpty && !manager.isLoading {
             emptyState.transition(.cardAppear)
-        } else if !manager.apps.isEmpty {
+        } else if !filteredApps.isEmpty {
             VStack(spacing: 12) {
                 // Enumerated so rows redraw on a language change.
-                ForEach(Array(manager.apps.enumerated()), id: \.element.id) { index, app in
+                ForEach(Array(filteredApps.enumerated()), id: \.element.id) { index, app in
                     appRow(app).cascadeItem(2 + index)
                 }
             }

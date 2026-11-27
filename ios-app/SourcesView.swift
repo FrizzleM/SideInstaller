@@ -72,6 +72,16 @@ struct SourcesView: View {
                         }
                         .tint(Theme.accent)
                         .disabled(source.isLoading)
+                        // F-2 (0.9.181): copy this source's link from
+                        // the row — the aggregated page's menu had it
+                        // (`AppSourcesView`), but that page is two taps
+                        // away through Settings; same key, same action.
+                        Button {
+                            UIPasteboard.general.string = source.url.absoluteString
+                        } label: {
+                            Label(L("Copy link"), systemImage: "doc.on.doc")
+                        }
+                        .tint(Theme.muted)
                         Button(role: .destructive) {
                             if let idx = store.sources.firstIndex(where: { $0.url == source.url }) {
                                 store.removeSource(at: IndexSet(integer: idx))
@@ -1873,14 +1883,52 @@ final class SourcesManager: ObservableObject {
     /// both offer is listed under each. F1 (0.9.152): disabled sources
     /// contribute nothing here, so their apps never count toward updates.
     func listings(installed apps: [SideloadedAppStatus]) -> [SourceListing] {
-        urls.filter { !isDisabled($0) }.flatMap { url -> [SourceListing] in
+        let all = urls.filter { !isDisabled($0) }.flatMap { url -> [SourceListing] in
             guard case .loaded(let source)? = states[url] else { return [] }
             return source.apps.map { app in
                 SourceListing(app: app, sourceURL: url, sourceName: Self.name(of: source, at: url),
                               installedVersion: Self.installedVersion(of: app, in: apps))
             }
         }
-        .sorted { $0.app.name.localizedCaseInsensitiveCompare($1.app.name) == .orderedAscending }
+        // B-1 (0.9.181): one row per bundle ID — the same app in two
+        // sources used to list twice (its `id` carries the source URL),
+        // so Updates showed it twice, "全部更新" installed it twice,
+        // and a lagging source could downgrade a just-updated app.
+        return Self.deduplicated(all)
+            .sorted { $0.app.name.localizedCaseInsensitiveCompare($1.app.name) == .orderedAscending }
+    }
+
+    /// B-1 (0.9.181): collapse listings by bundle ID, keeping the
+    /// newest latest version on a conflict — the Updates section,
+    /// `updateCount` and the cross-source batch all read `listings`,
+    /// so one choke point fixes all three. An empty bundle ID never
+    /// collapses: it can't identify an app.
+    static func deduplicated(_ listings: [SourceListing]) -> [SourceListing] {
+        var best: [String: SourceListing] = [:]
+        var order: [String] = []
+        var unkeyed: [SourceListing] = []
+        for listing in listings {
+            let key = listing.app.bundleIdentifier
+            guard !key.isEmpty else { unkeyed.append(listing); continue }
+            guard let prev = best[key] else {
+                best[key] = listing
+                order.append(key)
+                continue
+            }
+            if Self.isNewer(listing, than: prev) { best[key] = listing }
+        }
+        return order.compactMap { best[$0] } + unkeyed
+    }
+
+    /// True when `listing`'s newest version beats `prev`'s — a missing
+    /// version never wins over a present one; equal versions keep the
+    /// first source's row.
+    private static func isNewer(_ listing: SourceListing, than prev: SourceListing) -> Bool {
+        let next = listing.app.latest?.version
+        let current = prev.app.latest?.version
+        if let next, let current { return UpdateChecker.isNewer(next, than: current) }
+        if next != nil, current == nil { return true }
+        return false
     }
 
     /// The version of `app` on this iPhone, from what the Sideloaded apps page

@@ -1,3 +1,4 @@
+import Combine
 import CoreTransferable
 import SwiftUI
 import UIKit
@@ -84,6 +85,12 @@ struct SettingsView: View {
     /// UserDefaults through `AutoRefreshService`, which is not an
     /// ObservableObject) redraws — `ignoredVersionsNonce` 同款.
     @State private var patrolFooterNonce = 0
+    /// B-3 (0.9.181): the 60-second footer timer's subscription —
+    /// built on appear, cancelled on disappear. The TabView keeps
+    /// every tab alive, so an `autoconnect` publisher on the section
+    /// would tick forever after switching away (and a second
+    /// SettingsView in a JIT/Certs sheet would add a second one).
+    @State private var patrolFooterTimer: AnyCancellable?
     /// F-2 (0.9.171): true while the clear-all-ignored confirm stands.
     @State private var showingClearIgnoredConfirm = false
 
@@ -680,10 +687,30 @@ struct SettingsView: View {
         // redraws it on its own — bump the nonce when the section
         // appears and every 60 seconds after, so "x 分钟前" keeps up
         // with a patrol that landed while the page stood open.
-        .onAppear { patrolFooterNonce += 1 }
-        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+        // B-3 (0.9.181): the timer lives only while the page is
+        // visible — see `startPatrolFooterTimer`.
+        .onAppear {
             patrolFooterNonce += 1
+            startPatrolFooterTimer()
         }
+        .onDisappear { stopPatrolFooterTimer() }
+    }
+
+    /// B-3 (0.9.181): (re)build the footer timer — one tick a minute
+    /// while the page is visible, so "x 分钟前" keeps up with a patrol
+    /// that landed while the page stood open.
+    private func startPatrolFooterTimer() {
+        stopPatrolFooterTimer()
+        patrolFooterTimer = Timer.publish(every: 60, on: .main, in: .common)
+            .autoconnect()
+            .sink { _ in patrolFooterNonce += 1 }
+    }
+
+    /// B-3 (0.9.181): cancel the footer timer — the page is hidden,
+    /// so no tick may bump the nonce (and the body) until it returns.
+    private func stopPatrolFooterTimer() {
+        patrolFooterTimer?.cancel()
+        patrolFooterTimer = nil
     }
 
     /// 定位降级明示（Seal 同款）：定位没给“始终”时，巡检只有音频

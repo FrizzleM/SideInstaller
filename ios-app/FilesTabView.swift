@@ -1044,6 +1044,11 @@ struct FilesTabView: View {
         .onAppear {
             refreshFiles()
             renewalSources = RenewalSourceStore.load()
+            // B-2 (0.9.181): downloads page 同款 — read the device when
+            // the page opens, so the version tags have installed
+            // versions to compare against. Guarded and cheap: a no-op
+            // once loaded, while loading, or while the tunnel is down.
+            appsManager.autoLoad()
         }
         // F-1 (0.9.159): an install that deleted its source IPA rescans
         // this list now, instead of waiting for the next time it's opened.

@@ -694,6 +694,19 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain, sound: .tick)
                 }
+                // F-1 (0.9.181): one-tap paste of a copied IPA link —
+                // only when the clipboard holds an http(s) link that
+                // `Engine.downloadLink` accepts; otherwise the button
+                // stays hidden instead of pasting plain text.
+                if let clipboardLink {
+                    Button { ipaLink = clipboardLink } label: {
+                        Image(systemName: "doc.on.clipboard")
+                            .foregroundStyle(Theme.muted)
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .buttonStyle(.plain, sound: .tick)
+                    .accessibilityLabel(L("Paste a download link"))
+                }
                 Button(action: downloadFromLink) {
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.title3)
@@ -731,6 +744,19 @@ struct ContentView: View {
     /// True once the field holds something worth trying to download.
     private var linkIsUsable: Bool {
         !engine.isImportingIPA && Engine.downloadLink(ipaLink) != nil
+    }
+
+    /// F-1 (0.9.181): the clipboard's link, when it holds an http(s)
+    /// URL that `Engine.downloadLink` accepts — nil for plain text or
+    /// any other scheme, so the paste button never offers junk.
+    private var clipboardLink: String? {
+        guard let text = UIPasteboard.general.string?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty else { return nil }
+        let lowered = text.lowercased()
+        guard lowered.hasPrefix("http://") || lowered.hasPrefix("https://"),
+              Engine.downloadLink(text) != nil else { return nil }
+        return text
     }
 
     private func downloadFromLink() {

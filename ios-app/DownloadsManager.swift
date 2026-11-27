@@ -870,7 +870,12 @@ struct DownloadsListView: View {
         }
         .navigationTitle(L("Download"))
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { manager.refresh() }
+        // B-2 (0.9.181): read the device when the page opens, so the
+        // version tags have installed versions to compare against —
+        // the launch-time `autoLoad` silently declines while the tunnel
+        // is down, and nothing re-ran it afterwards. Guarded and cheap
+        // (single-source page 同款）: a no-op once loaded or offline.
+        .onAppear { manager.refresh(); appsManager.autoLoad() }
         // F-1 (0.9.159): an install that deleted its source IPA rescans
         // this list now, instead of waiting for the next time it's opened.
         .onReceive(NotificationCenter.default.publisher(for: Engine.downloadsChanged)) { _ in
