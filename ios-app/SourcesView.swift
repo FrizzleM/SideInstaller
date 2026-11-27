@@ -3569,6 +3569,17 @@ struct SourceAppView: View {
                     Text(versionMeta(latest))
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
+                    // F-1 (0.9.189)：复制最新版直链——历史旧版本行同款，
+                    // 拷完提示已复制，不静默。
+                    Button {
+                        UIPasteboard.general.string = latest.downloadURL.absoluteString
+                        notice = L("Copied")
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    .controlSize(.small)
+                    .accessibilityLabel(L("Copy link"))
                 }
                 if let notes = latest.notes, !notes.isEmpty {
                     ReleaseNotesText(text: notes)

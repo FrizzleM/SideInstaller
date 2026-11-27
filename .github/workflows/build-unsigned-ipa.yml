@@ -112,3 +112,37 @@ jobs:
           fi
           gh release view "$tag" --json tagName,isDraft,isPrerelease,assets \
             --jq '{tag: .tagName, draft: .isDraft, prerelease: .isPrerelease, assets: [.assets[].name]}'
+          # B-1 (0.9.189): keep latest_version.txt in sync — the app's
+          # UpdateChecker reads this file first; 0.9.181-0.9.187 never
+          # updated it, so 0.9.186 always read "up to date". Only reached
+          # when this version is >= the latest release (the guard above
+          # exits early otherwise), so writing it here can never
+          # downgrade anyone. Idempotent: no commit when already equal.
+          # Push-back mirrors update-altsource.yml (checkout token +
+          # github-actions[bot] + pull --rebase + 3 retries); a failed
+          # push fails the step loudly instead of silently going stale.
+          git fetch origin main
+          git checkout main
+          git pull --rebase origin main || true
+          if [[ "$(cat latest_version.txt 2>/dev/null || true)" != "$version" ]]; then
+            printf '%s\n' "$version" > latest_version.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add latest_version.txt
+            git commit -m "chore: bump latest_version.txt to $version"
+            for attempt in 1 2 3; do
+              git pull --rebase origin main || true
+              if git push origin "HEAD:main"; then
+                echo "latest_version.txt is now $version."
+                break
+              fi
+              if [[ "$attempt" == "3" ]]; then
+                echo "::error::failed to push latest_version.txt after 3 attempts" >&2
+                exit 1
+              fi
+              echo "Push failed; retrying (attempt $attempt)" >&2
+              sleep 5
+            done
+          else
+            echo "latest_version.txt is already $version; nothing to commit."
+          fi

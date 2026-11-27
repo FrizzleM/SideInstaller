@@ -63,7 +63,7 @@ struct EnterpriseCertView: View {
     @ObservedObject private var otaServer = OTAInstallServer.shared
     @State private var showingLoopbackFallbackAlert = false
     @State private var loopbackFailureText: String?
-    // 吊销状态（手动刷新，警告不拦截）
+    // 吊销状态（手动按钮强制刷新；签前现查自动写回，警告不拦截）
     @State private var revocationStatus: CertRevocationStatus = .unknown
     @State private var revocationChecking = false
     @State private var revocationCheckedAt: Date?
@@ -1518,6 +1518,9 @@ struct EnterpriseCertView: View {
         }
         workspace.mods.plugins = staged
         workspace.mods.minOS = preset.minOS
+        // B-2 (0.9.189)：预设值是 deliberate 设置，不是预填——清掉
+        // 预填标记，批量入口不再把它当预填清掉。
+        workspace.prefilledMinOS = ""
         workspace.mods.icon = preset.icon
         // F-2 (0.9.188)：瘦身/兼容三开关与打包文件名同样恢复（旧预设
         // 没有这几项时按默认值解，见 CertSignPreset）。
@@ -1811,6 +1814,8 @@ struct EnterpriseCertView: View {
             CertPluginStore.remove(url)
         }
         workspace.mods = CertSignMods()
+        // B-2 (0.9.189)：预填来源随表单一起清——换 IPA 后旧预填失效。
+        workspace.prefilledMinOS = ""
         pluginError = nil
         multiCountText = "1"
         multiStartText = "1"
@@ -1847,6 +1852,9 @@ struct EnterpriseCertView: View {
             workspace.mods.bundleID = info.bundleID
             workspace.mods.version = info.version ?? ""
             workspace.mods.minOS = info.minOS ?? ""
+            // B-2 (0.9.189)：记下这份 minOS 是预填来的——批量入口只清
+            // 预填，手填/预设的 deliberate 值不受影响。
+            workspace.prefilledMinOS = info.minOS ?? ""
         }
         // 脱壳预检（轻松签式）：选好就在后台算，加密的直接
         // 在表单上提示；选中的还是这个 IPA 才写，免得切走后
@@ -1964,7 +1972,8 @@ struct EnterpriseCertView: View {
 
     /// 签名入口：先在后台做签前警告检查（脱壳要解压，耗时），
     /// 有警告先弹提醒（警告不拦截，点继续才执行），没警告直接执行。
-    /// 吊销状态读上次手动检查的结果——没查过就不警告，不猜。
+    /// B-3 (0.9.189)：吊销状态签前现查（非 force，走 24 小时缓存）——
+    /// 只读上次手动检查的结果时，警告永不自动触发。
     private func startSign(kind: CertSignKind) {
         guard let url = selectedIPA, !workspace.signBusy, !workspace.batchBusy, certReady else { return }
         signBlockedMessage = nil
@@ -1972,6 +1981,10 @@ struct EnterpriseCertView: View {
         signOnlyMessage = nil
         lastSignedRecord = nil
         let currentMods = effectiveMods
+        // B-3 (0.9.189)：签前现查吊销的指纹守卫——照抄 checkRevocation：
+        // 调用前抓指纹，写回前核对未变才写状态。
+        let profiles = EnterpriseCertStore.profiles()
+        let fingerprint = EnterpriseCertStore.certStateFingerprint(profiles: profiles)
         Task.detached(priority: .userInitiated) {
             // A7：签名前重解析挪进 detached 任务——主线程不再同步解 IPA。
             // 防 stale 语义保留：写回时加 selectedIPA == url 守卫（:1660 同款），
@@ -1990,12 +2003,22 @@ struct EnterpriseCertView: View {
                 return self.selectedUndumpedApps
             }
             let undumped = reusedUndumped ?? IPADecryptionCheck.undumpedAppsFast(of: url) ?? IPADecryptionCheck.undumpedApps(of: url)
+            // B-3 (0.9.189)：签前现查吊销状态（非 force，走 A-6 的
+            // 24 小时缓存，24 小时内不重复联网）——读陈旧
+            // revocationStatus 时警告永不自动触发。
+            let freshRevocation = CertRevocationChecker.check()
             await MainActor.run {
                 if self.selectedIPA == url, let fresh {
                     self.selectedInfo = fresh
                 }
+                // B-3 (0.9.189)：查到的状态写回（指纹守卫同款），行内
+                // 红字与“上次检查”随之更新；手动按钮仍是强制刷新入口。
+                if fingerprint == EnterpriseCertStore.certStateFingerprint(profiles: profiles) {
+                    self.revocationStatus = freshRevocation
+                    self.revocationCheckedAt = Date()
+                }
                 var warnings: [String] = []
-                if self.revocationStatus == .revoked {
+                if freshRevocation == .revoked {
                     warnings.append(L("证书已经掉签，签名后可能无法安装。"))
                 }
                 if let undumped, !undumped.isEmpty {

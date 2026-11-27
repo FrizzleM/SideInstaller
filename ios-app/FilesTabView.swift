@@ -297,6 +297,8 @@ struct FilesTabView: View {
     @State private var revocationCheckedAt: Date?
     /// 0.9.187：系统文件组默认折叠（不展开、不占行，只留一行组头）。
     @State private var systemFilesExpanded = false
+    // F-2 (0.9.189)：文件夹组默认折叠（见 foldersGroup）。
+    @State private var foldersExpanded = false
     /// U-UI：文件页顶部分段——文件列表 / 应用文件夹库。
     private enum FileViewTab { case files, library }
     @State private var fileView = FileViewTab.files
@@ -447,6 +449,42 @@ struct FilesTabView: View {
                   item.childCount == 0 else { return true }
             return !fileSearchText.isEmpty
                 && item.name.lowercased().contains(fileSearchText.lowercased())
+        }
+    }
+
+    /// F-2 (0.9.189)：文件夹组——默认折叠，只留一行组头 + 计数；组内行复用
+    /// fileRow（点行进文件夹、长按菜单、圈选都不变）。搜索命中组内行时
+    /// 自动展开（items 已按搜索过滤，非空即有命中）。只在根目录出现；
+    /// 文件夹内视图仍走 folderSection 平铺，不另分组。
+    private func foldersGroup(items: [LocalFileItem],
+                              renewalByPath: [String: RenewalSourceEntry],
+                              renewalByBundleID: [String: RenewalSourceEntry]) -> some View {
+        let expanded = foldersExpanded || !fileSearchText.isEmpty
+        return VStack(alignment: .leading, spacing: 12) {
+            Button {
+                foldersExpanded.toggle()
+            } label: {
+                HStack(spacing: 12) {
+                    SectionTitle(title: L("Folder"), systemImage: "folder")
+                    Spacer()
+                    Text("\(items.count)")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.muted)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if expanded {
+                ForEach(items) { item in
+                    fileRow(item, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID)
+                    if item.id != items.last?.id {
+                        Divider()
+                    }
+                }
+            }
         }
     }
 
@@ -1295,7 +1333,7 @@ struct FilesTabView: View {
         // F-1 (0.9.188)：重复组一次算好，排序行按钮与确认 alert 共用。
         let duplicates = duplicateCleanup(in: partition)
         if selecting {
-            selectionBar.cascadeItem(2)
+            selectionBar(partition: partition).cascadeItem(2)
         }
         // 轻松签文件列表式切栏（只过滤 IPA 行）：放搜索框上面，
         // 跟证书页应用库切栏同例，segmented 样式。
@@ -1431,17 +1469,28 @@ struct FilesTabView: View {
                 // （搜到名字本身时仍可搜出，见 visibleRootFiles）。
                 let otherFiles = visibleRootFiles(sortedFiles(matching(partition.others).filter { fileTypeMatches($0) }))
                 let systemFilesShown = sortedFiles(matching(partition.systemFiles).filter { fileTypeMatches($0) })
-                if !otherFiles.isEmpty {
+                // F-2 (0.9.189)：文件夹从“其他文件”里拆出来单独成组（默认
+                // 折叠，见 foldersGroup）——60×60 蓝图标与 IPA 真图同尺寸
+                // 并排太抢；组内行仍复用 fileRow，行为一字不动。
+                let otherFolders = otherFiles.filter { $0.isDirectory }
+                let otherNonFolders = otherFiles.filter { !$0.isDirectory }
+                if !otherNonFolders.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         SectionTitle(title: L("其他文件"), systemImage: "doc")
-                        ForEach(otherFiles) { item in
+                        ForEach(otherNonFolders) { item in
                             fileRow(item, renewalByPath: renewalByPath, renewalByBundleID: renewalByBundleID)
-                            if item.id != otherFiles.last?.id {
+                            if item.id != otherNonFolders.last?.id {
                                 Divider()
                             }
                         }
                     }
                     .cascadeItem(3)
+                }
+                if !otherFolders.isEmpty {
+                    foldersGroup(items: otherFolders,
+                                 renewalByPath: renewalByPath,
+                                 renewalByBundleID: renewalByBundleID)
+                        .cascadeItem(4)
                 }
                 if !systemFilesShown.isEmpty {
                     systemFilesGroup(items: systemFilesShown,
@@ -1654,11 +1703,32 @@ struct FilesTabView: View {
     }
 
     /// 多选时的操作条：压缩成一个 zip / 批量安装 / 批量删除。
-    private var selectionBar: some View {
+    /// B-4 (0.9.189)：加“全选/取消全选”——未签名栏/已签名栏同款口径，
+    /// 全选只选当前可见的（搜了就只选搜到的，折起的组不算可见）。
+    private func selectionBar(partition: FilePartition) -> some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text(L("已选 %d 个", selection.count))
-                    .font(.subheadline.weight(.semibold))
+                HStack(spacing: Theme.spacingSmall) {
+                    Text(L("已选 %d 个", selection.count))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Button {
+                        CZFHaptics.impact()
+                        selection = visibleSelectableIDs(partition: partition)
+                    } label: {
+                        Text(L("Select all")).font(.footnote)
+                    }
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    .controlSize(.small)
+                    Button {
+                        CZFHaptics.impact()
+                        selection.removeAll()
+                    } label: {
+                        Text(L("取消全选")).font(.footnote)
+                    }
+                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                    .controlSize(.small)
+                }
                 // 0.9.188：按钮行间距走共享 token，与文件行/日志行的
                 // HStack 间距 12 对齐；按钮本身已是共享 SecondaryButtonStyle。
                 HStack(spacing: Theme.spacingSmall) {
@@ -1727,6 +1797,29 @@ struct FilesTabView: View {
                 }
             }
         }
+    }
+
+    /// B-4 (0.9.189)：当前可见的可选项 id——与 filesBranchContent
+    /// 渲染的完全一致：文件夹内视图走 dirVisible；根目录走 IPA 列表
+    /// + 其他文件（文件夹组/系统文件组折起时组内行不可见，不进）；
+    /// 已签名栏只显示 IPA。搜索/切栏/类型筛全部复用同一批过滤函数。
+    private func visibleSelectableIDs(partition: FilePartition) -> Set<String> {
+        if !currentDir.isEmpty {
+            return Set(visibleDirItems(in: currentDirItems).map { $0.id })
+        }
+        var ids = Set(filteredIPAs(partition: partition).map { $0.id })
+        guard fileTab == .unsigned else { return ids }
+        let otherFiles = visibleRootFiles(sortedFiles(matching(partition.others).filter { fileTypeMatches($0) }))
+        let foldersExpandedNow = foldersExpanded || !fileSearchText.isEmpty
+        for item in otherFiles where !item.isDirectory || foldersExpandedNow {
+            ids.insert(item.id)
+        }
+        if systemFilesExpanded || !fileSearchText.isEmpty {
+            for item in sortedFiles(matching(partition.systemFiles).filter { fileTypeMatches($0) }) {
+                ids.insert(item.id)
+            }
+        }
+        return ids
     }
 
     private var importCard: some View {
@@ -3462,13 +3555,19 @@ struct FilesTabView: View {
         // 造的是空 CertSignMods()，minOS/icon/plugins/strip* 全是默认
         // 值，注释却写着“批量同样带上”）。读同一份表单 mods 再清掉
         // 四项单 App 身份，瘦身/兼容开关与插件、图标、最低系统版本
-        // 真正带上。
+        // （手填/预设的 deliberate 值）真正带上；select() 预填的
+        // minOS 在下面闭包里清（B-2，0.9.189）。
         let mods: CertSignMods = {
             var m = workspace.mods
             m.name = ""
             m.bundleID = ""
             m.version = ""
             m.outputName = ""
+            // B-2 (0.9.189)：只清预填的 minOS——select() 把单个 IPA 的
+            // 原值预填进共享 mods，批量会把它带给其他目标（各目标的
+            // MinimumOSVersion 被改写成另一个 App 的原值）；手填/预设
+            // 的 minOS 是 deliberate 设置，照 0.9.188 意图继续带进批量。
+            if m.minOS == workspace.prefilledMinOS { m.minOS = "" }
             return m
         }()
         let urls = targets.map { $0.url }

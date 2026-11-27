@@ -1984,6 +1984,10 @@ final class CertWorkspace: ObservableObject {
     /// 名读同一份 mods；EnterpriseCertView 全 App 只有一个实例，
     /// 搬家不改变表单的生命周期。
     @Published var mods = CertSignMods()
+    /// B-2 (0.9.189)：select() 预填进 mods 的 minOS 来源——单签时
+    /// effectiveMods 会清掉与原值相等的项，批量入口靠它只清预填、
+    /// 保留手填/预设的 deliberate 值（见 FilesTabView.batchSign）。
+    @Published var prefilledMinOS = ""
 }
 
 
