@@ -31,6 +31,10 @@ struct SourcesView: View {
     @State private var sourceSort = SourceSort.default
     /// U-UI：源列表搜索（名字含查询串，不区分大小写）。
     @State private var sourceSearchText = ""
+    /// B-3 (0.9.188)：待确认删除的源——swipeActions 与 .onDelete 两条路
+    /// 都先立这个、弹确认再删，不再直调 removeSource（删源会连缓存
+    /// 与上次检查时间一起清，见 SourcesStore.removeSource）。
+    @State private var pendingDeleteSources: [LoadedSource] = []
 
     /// F-2 (0.9.182): the clipboard's link, when it holds an http(s)
     /// URL — ContentView's `clipboardLink` (0.9.181) 同款 gating, so
@@ -64,6 +68,90 @@ struct SourcesView: View {
         VStack(spacing: 12) {
             searchBar
                 .padding(.horizontal, 20)
+            sourceList
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(L("AppStore"))
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { showAddAlert = true } label: {
+                    Image(systemName: "plus").foregroundStyle(.white)
+                }
+                .accessibilityLabel(L("Add Source"))
+            }
+            // F-3 (0.9.180): explicit refresh — re-checking used to need
+            // pull-to-refresh; the list header already says while a
+            // fetch is running, and per-source fetch guards double taps.
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Task { await store.fetchAll(force: true) }
+                } label: {
+                    Image(systemName: "arrow.clockwise").foregroundStyle(.white)
+                }
+                .accessibilityLabel(L("Refresh"))
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    ForEach([SourceSort.default, .name, .newest], id: \.self) { option in
+                        Button {
+                            sourceSort = option
+                        } label: {
+                            if sourceSort == option {
+                                Label(option.label, systemImage: "checkmark")
+                            } else {
+                                Text(option.label)
+                            }
+                        }
+                    }
+                } label: {
+                    // B-3 (0.9.180): the label names the current sort, like
+                    // the file and apps pages — "筛选" never said which.
+                    Text(L("排序：%@", sourceSort.label)).foregroundStyle(.white)
+                }
+            }
+        }
+        .alert(L("Add Source"), isPresented: $showAddAlert) {
+            TextField(L("Source URL"), text: $newSourceURL)
+                .keyboardType(.URL)
+                .textContentType(.URL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            // F-2 (0.9.182): one-tap paste of a copied source link —
+            // only when the clipboard holds an http(s) link; a bad link
+            // still goes through `addFailed` below, like a typed one.
+            if let link = clipboardSourceLink {
+                Button(L("粘贴")) { newSourceURL = link }
+            }
+            Button(L("Add")) {
+                if store.addSource(newSourceURL) {
+                    newSourceURL = ""
+                } else {
+                    addFailed = true
+                }
+            }
+            Button(L("Cancel"), role: .cancel) { newSourceURL = "" }
+        }
+        .alert(L("That isn't a usable source link."), isPresented: $addFailed) {
+            Button(L("OK"), role: .cancel) { }
+        }
+        // B-3 (0.9.188)：删源确认——swipeActions 与 .onDelete 两条路共用。
+        // 内置源仍不可删（行上的 .disabled 与 store.removeSource 里的
+        // builtInURL 过滤都不动）。文案说明会连缓存与上次检查时间一起清。
+        .alert(deleteSourcesTitle, isPresented: deleteSourcesPresented) {
+            Button(L("Delete"), role: .destructive) { deletePendingSources() }
+            Button(L("Cancel"), role: .cancel) { pendingDeleteSources = [] }
+        } message: {
+            Text(L("The source will be removed, along with its cached data and last checked time."))
+        }
+    }
+
+    /// B-3 (0.9.188)：源列表单独抽出来——body 表达式过大时编译器报
+    /// type-check 超时（:110），拆成子 builder 再挂修饰符；内容不动。
+    private var sourceList: some View {
             List {
                 if store.sources.contains(where: \.isLoading) {
                     Text(L("正在刷新数据中…"))
@@ -135,75 +223,6 @@ struct SourcesView: View {
             .onReceive(NotificationCenter.default.publisher(for: UnifiedSourceList.didChange)) { _ in
                 Task { @MainActor in store.syncURLs() }
             }
-        }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(L("AppStore"))
-                    .font(.headline)
-                    .foregroundStyle(.white)
-            }
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button { showAddAlert = true } label: {
-                    Image(systemName: "plus").foregroundStyle(.white)
-                }
-                .accessibilityLabel(L("Add Source"))
-            }
-            // F-3 (0.9.180): explicit refresh — re-checking used to need
-            // pull-to-refresh; the list header already says while a
-            // fetch is running, and per-source fetch guards double taps.
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    Task { await store.fetchAll(force: true) }
-                } label: {
-                    Image(systemName: "arrow.clockwise").foregroundStyle(.white)
-                }
-                .accessibilityLabel(L("Refresh"))
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    ForEach([SourceSort.default, .name, .newest], id: \.self) { option in
-                        Button {
-                            sourceSort = option
-                        } label: {
-                            if sourceSort == option {
-                                Label(option.label, systemImage: "checkmark")
-                            } else {
-                                Text(option.label)
-                            }
-                        }
-                    }
-                } label: {
-                    // B-3 (0.9.180): the label names the current sort, like
-                    // the file and apps pages — "筛选" never said which.
-                    Text(L("排序：%@", sourceSort.label)).foregroundStyle(.white)
-                }
-            }
-        }
-        .alert(L("Add Source"), isPresented: $showAddAlert) {
-            TextField(L("Source URL"), text: $newSourceURL)
-                .keyboardType(.URL)
-                .textContentType(.URL)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            // F-2 (0.9.182): one-tap paste of a copied source link —
-            // only when the clipboard holds an http(s) link; a bad link
-            // still goes through `addFailed` below, like a typed one.
-            if let link = clipboardSourceLink {
-                Button(L("粘贴")) { newSourceURL = link }
-            }
-            Button(L("Add")) {
-                if store.addSource(newSourceURL) {
-                    newSourceURL = ""
-                } else {
-                    addFailed = true
-                }
-            }
-            Button(L("Cancel"), role: .cancel) { newSourceURL = "" }
-        }
-        .alert(L("That isn't a usable source link."), isPresented: $addFailed) {
-            Button(L("OK"), role: .cancel) { }
-        }
     }
 
     /// U-UI：搜索过滤 + 排序后的源（onDelete 按 url 回映射到 store.sources，
@@ -237,6 +256,31 @@ struct SourcesView: View {
     /// U-UI：搜索框。
     private var searchBar: some View {
         SearchBar(text: $sourceSearchText, placeholder: L("搜索"))
+    }
+
+    /// B-3 (0.9.188)：删源确认的标题 / 呈现绑定 / 执行——从 body 里抽
+    /// 出来，body 表达式过大时编译器报 type-check 超时（:110）。
+    /// 名字用 LoadedSource.displayName（sourceRow 同款），不用
+    /// SourceRowsCard 里的私有 sourceName（那个不在此 struct 作用域）。
+    private var deleteSourcesTitle: String {
+        pendingDeleteSources.count == 1
+            ? L("删除“%@”？", pendingDeleteSources.first?.displayName ?? "")
+            : L("删除所选 %d 个？", pendingDeleteSources.count)
+    }
+    private var deleteSourcesPresented: Binding<Bool> {
+        Binding(
+            get: { !pendingDeleteSources.isEmpty },
+            set: { if !$0 { pendingDeleteSources = [] } }
+        )
+    }
+    private func deletePendingSources() {
+        let urls = pendingDeleteSources.map { $0.url }
+        pendingDeleteSources = []
+        for url in urls {
+            if let idx = store.sources.firstIndex(where: { $0.url == url }) {
+                store.removeSource(at: IndexSet(integer: idx))
+            }
+        }
     }
 
     /// One source: its icon and name, with the app count, a spinner while it
@@ -408,10 +452,6 @@ struct SourceAppsView: View {
     @State private var pendingUninstall: (bundleID: String, name: String)?
     @State private var uninstallingID: String?
     @State private var uninstallError: String?
-    /// B-3 (0.9.188)：待确认删除的源——swipeActions 与 .onDelete 两条路
-    /// 都先立这个、弹确认再删，不再直调 removeSource（删源会连缓存
-    /// 与上次检查时间一起清，见 SourcesStore.removeSource）。
-    @State private var pendingDeleteSources: [LoadedSource] = []
     /// F-1 (0.9.170): bumped when an update version is ignored, so the
     /// list redraws — `hasUpdate(for:)` reads UserDefaults, which no
     /// observed object publishes, and the badge recount rides the
@@ -628,28 +668,6 @@ struct SourceAppsView: View {
             Button(L("OK"), role: .cancel) { uninstallError = nil }
         } message: {
             Text(uninstallError ?? "")
-        }
-        // B-3 (0.9.188)：删源确认——swipeActions 与 .onDelete 两条路共用。
-        // 内置源仍不可删（行上的 .disabled 与 store.removeSource 里的
-        // builtInURL 过滤都不动）。文案说明会连缓存与上次检查时间一起清。
-        .alert(pendingDeleteSources.count == 1
-               ? L("删除“%@”？", pendingDeleteSources.first.map { sourceName($0.url) } ?? "")
-               : L("删除所选 %d 个？", pendingDeleteSources.count), isPresented: Binding(
-            get: { !pendingDeleteSources.isEmpty },
-            set: { if !$0 { pendingDeleteSources = [] } }
-        )) {
-            Button(L("Delete"), role: .destructive) {
-                let urls = pendingDeleteSources.map { $0.url }
-                pendingDeleteSources = []
-                for url in urls {
-                    if let idx = store.sources.firstIndex(where: { $0.url == url }) {
-                        store.removeSource(at: IndexSet(integer: idx))
-                    }
-                }
-            }
-            Button(L("Cancel"), role: .cancel) { pendingDeleteSources = [] }
-        } message: {
-            Text(L("The source will be removed, along with its cached data and last checked time."))
         }
         // F2 (0.9.153): leaving the page no longer cancels the download —
         // the shared downloader keeps it running, and the completion
