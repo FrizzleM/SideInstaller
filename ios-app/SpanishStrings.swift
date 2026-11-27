@@ -135,6 +135,20 @@ let spanishStrings: [String: String] = [
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ ya está disponible — tienes instalada la %@.",
     "Get the latest version": "Obtener la última versión",
+
+    // Release notes (About, the update banner's "What's new")
+
+    "Release notes": "Notas de la versión",
+    "What changed in each version, from GitHub.": "Qué cambió en cada versión, desde GitHub.",
+    "New": "Nueva",
+    "No notes for this version.": "No hay notas para esta versión.",
+    "View on GitHub": "Ver en GitHub",
+    "Open on GitHub": "Abrir en GitHub",
+    "Couldn't load the release notes. Check your connection and try again.":
+        "No se pudieron cargar las notas de la versión. Comprueba tu conexión e inténtalo de nuevo.",
+    "GitHub is limiting requests from this network. Try again in a few minutes.":
+        "GitHub está limitando las solicitudes desde esta red. Inténtalo de nuevo en unos minutos.",
+
     "From the website": "Desde la web",
     "Sign it with your Apple ID": "Firmarla con tu Apple ID",
     "Install it in LiveContainer": "Instalarla en LiveContainer",

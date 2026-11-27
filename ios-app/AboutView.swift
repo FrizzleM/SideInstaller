@@ -11,6 +11,7 @@ struct AboutView: View {
     @State private var showSettings = false
     @State private var showCrypto = false
     @State private var showReport = false
+    @State private var showReleaseNotes = false
 
     var body: some View {
         NavigationStack {
@@ -30,6 +31,7 @@ struct AboutView: View {
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showCrypto) { CryptoDonationsView() }
             .sheet(isPresented: $showReport) { ReportProblemView() }
+            .sheet(isPresented: $showReleaseNotes) { ReleaseNotesView() }
         }
     }
 
@@ -70,6 +72,10 @@ struct AboutView: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 16) {
                 sectionTitle(L("Links"), systemImage: "link")
+                AboutRow(systemImage: "list.bullet.rectangle",
+                         title: L("Release notes"),
+                         detail: L("What changed in each version, from GitHub."),
+                         action: { showReleaseNotes = true })
                 AboutRow(systemImage: "chevron.left.forwardslash.chevron.right",
                          title: L("Source code"),
                          urlString: "https://github.com/FrizzleM/SideInstaller/tree/main")

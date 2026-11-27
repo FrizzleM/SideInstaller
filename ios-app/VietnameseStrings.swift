@@ -134,6 +134,20 @@ let vietnameseStrings: [String: String] = [
     "SideInstaller %@ is available — you're on %@.":
         "Đã có SideInstaller %@ — bạn đang dùng bản %@.",
     "Get the latest version": "Tải phiên bản mới nhất",
+
+    // Release notes (About, the update banner's "What's new")
+
+    "Release notes": "Ghi chú phát hành",
+    "What changed in each version, from GitHub.": "Những thay đổi trong từng phiên bản, lấy từ GitHub.",
+    "New": "Mới",
+    "No notes for this version.": "Không có ghi chú cho phiên bản này.",
+    "View on GitHub": "Xem trên GitHub",
+    "Open on GitHub": "Mở trên GitHub",
+    "Couldn't load the release notes. Check your connection and try again.":
+        "Không thể tải ghi chú phát hành. Hãy kiểm tra kết nối và thử lại.",
+    "GitHub is limiting requests from this network. Try again in a few minutes.":
+        "GitHub đang giới hạn yêu cầu từ mạng này. Hãy thử lại sau vài phút.",
+
     "From the website": "Từ trang web",
     "Sign it with your Apple ID": "Ký bằng Apple ID của bạn",
     "Install it in LiveContainer": "Cài vào LiveContainer",

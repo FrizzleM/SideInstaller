@@ -109,6 +109,20 @@ let turkishStrings: [String: String] = [
     "Update available": "Güncelleme mevcut",
     "SideInstaller %@ is available — you're on %@.": "SideInstaller %@ mevcut — sen %@ sürümündesin.",
     "Get the latest version": "En son sürümü al",
+
+    // Release notes (About, the update banner's "What's new")
+
+    "Release notes": "Sürüm notları",
+    "What changed in each version, from GitHub.": "GitHub'dan, her sürümde nelerin değiştiği.",
+    "New": "Yeni",
+    "No notes for this version.": "Bu sürüm için not yok.",
+    "View on GitHub": "GitHub'da görüntüle",
+    "Open on GitHub": "GitHub'da aç",
+    "Couldn't load the release notes. Check your connection and try again.":
+        "Sürüm notları yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.",
+    "GitHub is limiting requests from this network. Try again in a few minutes.":
+        "GitHub bu ağdan gelen istekleri sınırlıyor. Birkaç dakika sonra tekrar deneyin.",
+
     "From the website": "Web sitesinden",
     "Sign it with your Apple ID": "Apple kimliğinle imzala",
     "Install it in LiveContainer": "LiveContainer'a yükle",

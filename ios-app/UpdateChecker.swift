@@ -48,7 +48,7 @@ final class UpdateChecker: ObservableObject {
     }
 
     /// "v1.5.3" → "1.5.3". Nil for an empty tag.
-    static func version(fromTag tag: String) -> String? {
+    nonisolated static func version(fromTag tag: String) -> String? {
         var v = tag.trimmingCharacters(in: .whitespacesAndNewlines)
         if v.first == "v" || v.first == "V" { v.removeFirst() }
         return v.isEmpty ? nil : v

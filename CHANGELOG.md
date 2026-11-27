@@ -5,6 +5,9 @@ All notable changes to SideInstaller are documented here.
 ## Unreleased
 
 ### Added
+- **Release notes in the app** (#173). About › Release notes, and "What's new" on the update
+  banner, show what changed in each version, as written on its GitHub release, newest first. The
+  version you're on and any newer ones are marked, and each links to its release page.
 - **Mobile Data Mode (beta).** On mobile data without Wi-Fi, iOS refuses new connections from
   LocalDevVPN. When something you start needs one, SideInstaller now asks whether to try Mobile
   Data Mode, or to use Wi-Fi, the stable and safer way. In Mobile Data Mode it has you turn on

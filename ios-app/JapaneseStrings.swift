@@ -132,6 +132,20 @@ let japaneseStrings: [String: String] = [
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ が公開されています（現在お使いのバージョン：%@）。",
     "Get the latest version": "最新バージョンを取得",
+
+    // Release notes (About, the update banner's "What's new")
+
+    "Release notes": "リリースノート",
+    "What changed in each version, from GitHub.": "各バージョンの変更内容（GitHub から）。",
+    "New": "新着",
+    "No notes for this version.": "このバージョンのノートはありません。",
+    "View on GitHub": "GitHub で見る",
+    "Open on GitHub": "GitHub で開く",
+    "Couldn't load the release notes. Check your connection and try again.":
+        "リリースノートを読み込めませんでした。接続を確認してもう一度お試しください。",
+    "GitHub is limiting requests from this network. Try again in a few minutes.":
+        "GitHub がこのネットワークからのリクエストを制限しています。数分後にもう一度お試しください。",
+
     "From the website": "Web サイトから",
     "Sign it with your Apple ID": "Apple ID で署名",
     "Install it in LiveContainer": "LiveContainer にインストール",

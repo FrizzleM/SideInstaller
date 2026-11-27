@@ -132,6 +132,19 @@ let chineseStrings: [String: String] = [
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ 已发布 —— 你当前使用的是 %@。",
     "Get the latest version": "获取最新版本",
+
+    // Release notes (About, the update banner's "What's new")
+
+    "Release notes": "版本说明",
+    "What changed in each version, from GitHub.": "来自 GitHub 的各版本更新内容。",
+    "New": "新版本",
+    "No notes for this version.": "此版本没有说明。",
+    "View on GitHub": "在 GitHub 上查看",
+    "Open on GitHub": "在 GitHub 上打开",
+    "Couldn't load the release notes. Check your connection and try again.": "无法加载版本说明。请检查网络连接后重试。",
+    "GitHub is limiting requests from this network. Try again in a few minutes.":
+        "GitHub 正在限制来自此网络的请求。请几分钟后重试。",
+
     "From the website": "从网站安装",
     "Sign it with your Apple ID": "用你的 Apple ID 签名",
     "Install it in LiveContainer": "安装到 LiveContainer",

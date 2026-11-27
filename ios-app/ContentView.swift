@@ -10,6 +10,8 @@ struct ContentView: View {
     @EnvironmentObject private var loc: Localizer
     @Environment(\.openURL) private var openURL
     @State private var showSettings = false
+    /// The version log, opened from the update banner's "What's new".
+    @State private var showReleaseNotes = false
     @State private var showImporter = false
     /// True while the pairing-file picker is up.
     @State private var showPairingImporter = false
@@ -96,6 +98,7 @@ struct ContentView: View {
             .background(AppBackground())
             .toolbar { settingsToolbarItem(isPresented: $showSettings) }
             .sheet(isPresented: $showSettings) { SettingsView() }
+            .sheet(isPresented: $showReleaseNotes) { ReleaseNotesView() }
             .sheet(isPresented: $showImporter) {
                 FileImporterRepresentableView(allowedContentTypes: [.ipa]) { urls in
                     guard let url = urls.first else { return }   // empty means cancelled
@@ -226,16 +229,21 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain, sound: .dismiss)
                 }
-                Menu {
-                    updateOptions
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(L("Get the latest version"))
-                        Image(systemName: "chevron.down")
+                HStack(spacing: 20) {
+                    Menu {
+                        updateOptions
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(L("Get the latest version"))
+                            Image(systemName: "chevron.down")
+                        }
                     }
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Theme.accent)
+                    // The new version's notes, and the ones before it.
+                    Button(L("What's new")) { showReleaseNotes = true }
+                        .buttonStyle(.plain, sound: .tick)
                 }
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Theme.accent)
             }
         }
     }

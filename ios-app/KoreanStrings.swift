@@ -133,6 +133,20 @@ let koreanStrings: [String: String] = [
     "SideInstaller %@ is available — you're on %@.":
         "SideInstaller %@ 버전을 사용할 수 있습니다. 현재 버전은 %@입니다.",
     "Get the latest version": "최신 버전 받기",
+
+    // Release notes (About, the update banner's "What's new")
+
+    "Release notes": "릴리스 노트",
+    "What changed in each version, from GitHub.": "GitHub에서 가져온 버전별 변경 사항.",
+    "New": "새 버전",
+    "No notes for this version.": "이 버전에 대한 노트가 없습니다.",
+    "View on GitHub": "GitHub에서 보기",
+    "Open on GitHub": "GitHub에서 열기",
+    "Couldn't load the release notes. Check your connection and try again.":
+        "릴리스 노트를 불러올 수 없습니다. 연결을 확인하고 다시 시도하세요.",
+    "GitHub is limiting requests from this network. Try again in a few minutes.":
+        "GitHub가 이 네트워크의 요청을 제한하고 있습니다. 몇 분 후에 다시 시도하세요.",
+
     "From the website": "웹사이트에서 받기",
     "Sign it with your Apple ID": "내 Apple ID로 서명",
     "Install it in LiveContainer": "LiveContainer에 설치",
