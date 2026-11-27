@@ -1782,4 +1782,9 @@ let koreanStrings: [String: String] = [
     "Clear recent links": "최근 링크 지우기",
     "Copy Bundle ID": "Bundle ID 복사",
 
+    // 0.9.187: Files page search placeholder + others/system file groups.
+    "搜索文件名 / App 名 / Bundle ID": "파일 이름 / 앱 이름 / Bundle ID 검색",
+    "系统文件": "시스템 파일",
+    "其他文件": "기타 파일",
+
 ]

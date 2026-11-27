@@ -76,9 +76,9 @@ struct WelcomeView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
             .fill(Color.orange.opacity(0.12)))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
             .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1))
     }
 

@@ -1793,4 +1793,9 @@ let chineseStrings: [String: String] = [
     "Clear recent links": "清除最近链接",
     "Copy Bundle ID": "复制 Bundle ID",
 
+    // 0.9.187: Files page search placeholder + others/system file groups.
+    "搜索文件名 / App 名 / Bundle ID": "搜索文件名 / App 名 / Bundle ID",
+    "系统文件": "系统文件",
+    "其他文件": "其他文件",
+
 ]

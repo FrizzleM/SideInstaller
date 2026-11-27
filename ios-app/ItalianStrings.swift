@@ -1822,4 +1822,9 @@ let italianStrings: [String: String] = [
     "Clear recent links": "Cancella link recenti",
     "Copy Bundle ID": "Copia Bundle ID",
 
+    // 0.9.187: Files page search placeholder + others/system file groups.
+    "搜索文件名 / App 名 / Bundle ID": "Cerca per nome file, app o Bundle ID",
+    "系统文件": "File di sistema",
+    "其他文件": "Altri file",
+
 ]

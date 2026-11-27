@@ -117,8 +117,13 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
-            Form {
-                accountSection.id("account")
+            ScrollView {
+                VStack(spacing: 16) {
+                    // 0.9.187: five tabs all use BrandHeader (Apps/Sources/Files/Downloads 同构).
+                    BrandHeader(icon: "gearshape", title: L("Settings")) {
+                        EmptyView()
+                    }
+                    accountSection.id("account")
                 enterpriseSection
                 toolsSection
                 languageSection
@@ -131,11 +136,11 @@ struct SettingsView: View {
                 ignoredUpdatesSection
                 anisetteSection
                 advancedSection
-                logSection.id("activityLog")
-                aboutSection
+                    logSection.id("activityLog")
+                    aboutSection
+                }
+                .padding(20)
             }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
             .background(AppBackground())
             .sheet(item: $editorTarget) { AccountEditor(target: $0) }
             // B-1 (0.9.182): the About sheet lives here, at the body root
@@ -196,11 +201,36 @@ struct SettingsView: View {
         }
         // Device IP 非法重置的提示：挂在 Form 链上，与上面两个 alert
         // 分开，避免同时弹出冲突。
-        .blueTopBar()
         .alert(L("Invalid device IP"), isPresented: $showDeviceIPResetAlert) {
             Button(L("OK"), role: .cancel) { }
         } message: {
             Text(L("The address was invalid, reset to 10.7.0.1."))
+        }
+    }
+
+    /// 0.9.187: one settings group — a SectionTitle above a PanelCard,
+    /// with an optional muted footnote under the card. Every group on
+    /// this page goes through here; the Form's sections are gone.
+    /// Two overloads instead of a defaulted @ViewBuilder parameter
+    /// (a builder parameter with a default is a compile risk).
+    private func settingsGroup<Content: View>(
+        title: String, systemImage: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        settingsGroup(title: title, systemImage: systemImage, content: content) { EmptyView() }
+    }
+
+    private func settingsGroup<Content: View, Footer: View>(
+        title: String, systemImage: String,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder footer: () -> Footer
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle(title: title, systemImage: systemImage)
+            PanelCard { content() }
+            footer()
+                .font(.footnote)
+                .foregroundStyle(Theme.muted)
         }
     }
 
@@ -209,26 +239,23 @@ struct SettingsView: View {
     /// Saved Apple IDs: tap to make one active, swipe to edit or remove one or
     /// pick its team again, or add a new one.
     private var accountSection: some View {
-        Section {
+        settingsGroup(title: L("Account"), systemImage: "person.crop.circle") {
             ForEach(accounts.accounts) { account in
-                Button { accounts.activate(account) } label: { accountRow(account) }
-                    // `.plain` keeps the row text from using the accent color.
-                    .buttonStyle(.plain, sound: .tick)
-                    .swipeActions(edge: .trailing) {
+                HStack(spacing: 12) {
+                    Button { accounts.activate(account) } label: { accountRow(account) }
+                        // `.plain` keeps the row text from using the accent color.
+                        .buttonStyle(.plain, sound: .tick)
+                    Menu {
                         Button(role: .destructive) {
                             pendingRemove = account
                         } label: {
                             Label(L("Remove"), systemImage: "trash")
                         }
-                        // Set explicitly: the row's `.plain` style removes the
-                        // destructive red.
-                        .tint(Theme.negative)
                         Button {
                             editorTarget = .existing(account)
                         } label: {
                             Label(L("Edit"), systemImage: "pencil")
                         }
-                        .tint(Theme.accent)
                         // Only once a team was picked, which an Apple ID on
                         // more than one is asked for.
                         if accounts.team(for: account.normalized) != nil {
@@ -237,9 +264,14 @@ struct SettingsView: View {
                             } label: {
                                 Label(L("Team"), systemImage: "person.2")
                             }
-                            .tint(Theme.warning)
                         }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                            .foregroundStyle(Theme.muted)
+                            .frame(minWidth: 44, minHeight: 44)
                     }
+                }
             }
             if accounts.accounts.isEmpty {
                 Text(L("No Apple ID saved yet. Add one and SideInstaller will use it for every sign-in."))
@@ -267,8 +299,6 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
             }
-        } header: {
-            Text(L("Account"))
         }
         .disabled(engine.isRunning || appsManager.isRefreshing)
         // On the section, apart from the Form's alerts, so they don't conflict.
@@ -289,7 +319,7 @@ struct SettingsView: View {
     /// U-UI：企业证书区（签名段从原证书页搬到 EnterpriseCertView 后，
     /// 设置页只留这一行摘要 + 推入链接；证书本身的表单全在那一页）。
     private var enterpriseSection: some View {
-        Section {
+        settingsGroup(title: L("企业证书"), systemImage: "checkmark.seal") {
             NavigationLink(destination: EnterpriseCertView(), isActive: enterpriseRequest) {
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.seal")
@@ -339,7 +369,7 @@ struct SettingsView: View {
     /// 本页，3 行去掉）。
     private var toolsSection: some View {
         Group {
-            Section {
+            settingsGroup(title: L("Tools"), systemImage: "wrench.and.screwdriver") {
                 NavigationLink { SideBySideView(manager: sideBySideManager) } label: {
                     ToolRow(icon: "square.on.square", color: Theme.tilePurple, title: L("Side by Side"), beta: true)
                 }
@@ -367,8 +397,6 @@ struct SettingsView: View {
                 NavigationLink { InstallHistoryView() } label: {
                     ToolRow(icon: "clock.arrow.circlepath", color: Theme.tileTeal, title: L("Install history"))
                 }
-            } header: {
-                Text(L("Tools"))
             }
             webdavCard
         }
@@ -376,7 +404,7 @@ struct SettingsView: View {
 
     /// U-UI：关于区（AboutView 本体不动；点行弹 sheet）。
     private var aboutSection: some View {
-        Section {
+        settingsGroup(title: L("About"), systemImage: "info.circle") {
             HStack {
                 Text(L("Version"))
                 Spacer()
@@ -385,8 +413,6 @@ struct SettingsView: View {
             }
             Button(L("About")) { showingAbout = true }
                 .foregroundStyle(Theme.accent2)
-        } header: {
-            Text(L("About"))
         }
     }
 
@@ -511,14 +537,12 @@ struct SettingsView: View {
 
     /// App-wide language, applied immediately since every screen observes it.
     private var languageSection: some View {
-        Section {
+        settingsGroup(title: L("Language"), systemImage: "globe") {
             Picker(L("App language"), selection: $loc.language) {
                 ForEach(AppLanguage.allCases) { language in
                     Text(language.displayName).tag(language)
                 }
             }
-        } header: {
-            Text(L("Language"))
         }
     }
 
@@ -526,25 +550,21 @@ struct SettingsView: View {
 
     /// 外观三档：跟随系统 / 浅色 / 深色，由 App 入口统一应用到整个窗口。
     private var appearanceSection: some View {
-        Section {
+        settingsGroup(title: L("Appearance"), systemImage: "sun.max") {
             Picker(L("Appearance"), selection: $appearance) {
                 ForEach(AppAppearance.allCases, id: \.self) { option in
                     Text(option.label).tag(option)
                 }
             }
             .pickerStyle(.segmented)
-        } header: {
-            Text(L("Appearance"))
         }
     }
 
     // MARK: Sounds
 
     private var soundsSection: some View {
-        Section {
+        settingsGroup(title: L("Sounds"), systemImage: "speaker.wave.2") {
             Toggle(L("Sound effects"), isOn: $soundEffects)
-        } header: {
-            Text(L("Sounds"))
         }
     }
 
@@ -571,7 +591,7 @@ struct SettingsView: View {
     /// connects and then returns to this app.
     @ViewBuilder
     private var tunnelSection: some View {
-        Section {
+        settingsGroup(title: L("Tunnel"), systemImage: "bolt.horizontal.circle") {
             Toggle(L("Start LocalDevVPN when needed"), isOn: Bindable(engine).autoStartVPN)
             Button {
                 Task {
@@ -614,8 +634,6 @@ struct SettingsView: View {
                     .foregroundStyle(.primary)
                     .onSubmit { validateDeviceIP() }
             }
-        } header: {
-            Text(L("Tunnel"))
         } footer: {
             // 只留内置隧道：说明地址默认值与生效时机。
             if localDevVPNDidntOpen {
@@ -636,7 +654,7 @@ struct SettingsView: View {
     /// Both need a link that already works, so they can't help where the link
     /// itself needs Developer Mode (iOS 27).
     private var developerModeSection: some View {
-        Section {
+        settingsGroup(title: L("Developer Mode"), systemImage: "hammer") {
             Button {
                 runDeveloperMode(.reveal)
             } label: {
@@ -662,8 +680,6 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(note.failed ? AnyShapeStyle(Theme.negative) : AnyShapeStyle(Theme.muted))
             }
-        } header: {
-            Text(L("Developer Mode"))
         }
         // On the section, apart from the Form's alerts, so they don't conflict.
         .alert(L("Turn on Developer Mode?"), isPresented: $confirmEnableDeveloperMode) {
@@ -704,7 +720,7 @@ struct SettingsView: View {
 
 
     private var autoRefreshSection: some View {
-        Section {
+        settingsGroup(title: L("Auto Refresh"), systemImage: "arrow.triangle.2.circlepath") {
             Toggle(L("Refresh apps automatically in background"), isOn: $autoRefreshEnabled)
                 .onChange(of: autoRefreshEnabled) { _, _ in
                     AutoRefreshService.shared.applySetting()
@@ -713,8 +729,6 @@ struct SettingsView: View {
                         SIDAutoRefresh.scheduleBackgroundWake()
                     }
                 }
-        } header: {
-            Text(L("Auto Refresh"))
         } footer: {
             autoRefreshFooter
         }
@@ -803,11 +817,9 @@ struct SettingsView: View {
     /// import or build download over cellular data asks first, showing the
     /// file's size (or that it's unknown) before it uses mobile data.
     private var downloadsSection: some View {
-        Section {
+        settingsGroup(title: L("Downloads"), systemImage: "arrow.down.circle") {
             Toggle(L("Wi-Fi only downloads"), isOn: $wifiOnlyDownloads)
             Toggle(L("Delete the IPA after installing"), isOn: $deleteAfterInstall)
-        } header: {
-            Text(L("Downloads"))
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
                 Text(L("When on, a download over cellular data asks first, so a large IPA doesn't use your mobile data."))
@@ -823,7 +835,7 @@ struct SettingsView: View {
     /// un-ignore at all, so a mis-tapped ignore silenced that version
     /// until the source shipped a newer one.
     private var ignoredUpdatesSection: some View {
-        Section {
+        settingsGroup(title: L("已忽略的更新"), systemImage: "eye.slash") {
             let ignored = IgnoredUpdateVersions.all()
             if ignored.isEmpty {
                 Text(L("没有已忽略的更新。"))
@@ -831,6 +843,7 @@ struct SettingsView: View {
                     .foregroundStyle(Theme.muted)
             } else {
                 ForEach(ignored, id: \.bundleID) { entry in
+                    HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         // F-3 (0.9.172): the app's name, not just its
                         // bundle ID — a bare ID doesn't say which app
@@ -844,21 +857,22 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(Theme.muted)
                     }
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            IgnoredUpdateVersions.remove(bundleID: entry.bundleID)
-                            ignoredVersionsNonce += 1
-                        } label: {
-                            Label(L("Remove"), systemImage: "trash")
-                        }
+                    Spacer()
+                    Button(role: .destructive) {
+                        IgnoredUpdateVersions.remove(bundleID: entry.bundleID)
+                        ignoredVersionsNonce += 1
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundStyle(Theme.negative)
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .accessibilityLabel(L("Remove"))
                     }
                 }
                 Button(L("清空全部"), role: .destructive) {
                     showingClearIgnoredConfirm = true
                 }
             }
-        } header: {
-            Text(L("已忽略的更新"))
         }
         .alert(L("清空全部"), isPresented: $showingClearIgnoredConfirm) {
             Button(L("清空全部"), role: .destructive) {
@@ -874,7 +888,7 @@ struct SettingsView: View {
     // MARK: Anisette server
 
     private var anisetteSection: some View {
-        Section {
+        settingsGroup(title: L("Anisette Server"), systemImage: "server.rack") {
             Picker(L("Server"), selection: anisetteSelection) {
                 ForEach(engine.anisetteServers) { server in
                     Text(server.name).tag(Optional(server.address))
@@ -900,8 +914,6 @@ struct SettingsView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-        } header: {
-            Text(L("Anisette Server"))
         }
     }
 
@@ -928,7 +940,7 @@ struct SettingsView: View {
     // MARK: Advanced
 
     private var advancedSection: some View {
-        Section {
+        settingsGroup(title: L("Advanced"), systemImage: "slider.horizontal.3") {
             HStack {
                 Text(L("Device IP"))
                 Spacer()
@@ -940,8 +952,6 @@ struct SettingsView: View {
                     .foregroundStyle(.primary)
                     .onSubmit { validateDeviceIP() }
             }
-        } header: {
-            Text(L("Advanced"))
         }
     }
 
@@ -950,14 +960,10 @@ struct SettingsView: View {
     // The lines are read only in `LogConsole` and `LogHeader`, so a new one
     // redraws those two and not the rest of Settings.
     private var logSection: some View {
-        Section {
+        settingsGroup(title: L("Activity Log (%d)", LogStore.shared.lines.count), systemImage: "doc.text") {
             LogConsole()
             HStack {
-                Button {
-                    UIPasteboard.general.string = LogStore.shared.text
-                } label: {
-                    Label(L("Copy"), systemImage: "doc.on.doc")
-                }
+                CopyLogsButton()
                 // F5 (0.9.154): share the log as a .txt file (see
                 // LogExportFile — the file is written only when the share
                 // actually happens, so this never reads the log in body).
@@ -984,8 +990,6 @@ struct SettingsView: View {
             // footer 说明）；“Report a problem”按钮不搬回，仍留
             // AboutView（fork 2026-11-05 的位置），用户 2026-11-06 批准。
             Toggle(L("Verbose logging"), isOn: Bindable(engine).verboseLogging)
-        } header: {
-            LogHeader()
         } footer: {
             Text(L("Adds the messages exchanged with iOS to the log, for tracking down a connection problem. Leave it off otherwise, as they quickly fill the log."))
         }

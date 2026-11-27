@@ -742,7 +742,7 @@ private struct EntitlementPicker: View {
         // The button keeps the page's width; the bar under it spans the window.
         .pageColumn()
         .padding(.bottom, 12)
-        .background(Theme.card)
+        .cardSurface(in: Rectangle())
         .overlay(alignment: .top) { Divider() }
     }
 }

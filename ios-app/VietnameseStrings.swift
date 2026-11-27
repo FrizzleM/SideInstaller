@@ -1818,4 +1818,9 @@ let vietnameseStrings: [String: String] = [
     "Clear recent links": "Xóa các liên kết gần đây",
     "Copy Bundle ID": "Sao chép Bundle ID",
 
+    // 0.9.187: Files page search placeholder + others/system file groups.
+    "搜索文件名 / App 名 / Bundle ID": "Tìm theo tên tệp / tên App / Bundle ID",
+    "系统文件": "Tệp hệ thống",
+    "其他文件": "Tệp khác",
+
 ]

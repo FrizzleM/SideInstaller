@@ -67,7 +67,6 @@ struct AccountSetupView: View {
             Image(systemName: "person.crop.circle.fill.badge.checkmark")
                 .font(.largeTitle)
                 .foregroundStyle(Theme.brand)
-                .shadow(color: Theme.glow, radius: 20, x: 0, y: 12)
                 .padding(.bottom, 4)
             Text(L("Sign in with your Apple ID"))
                 .font(.title2.weight(.semibold))

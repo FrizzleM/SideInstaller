@@ -445,12 +445,18 @@ struct DownloadsListView: View {
     /// IPA's own version (the release version it was downloaded as when
     /// the IPA can't be read) against what this iPhone has installed.
     /// No readable version or no installed match means no tag, not a guess.
-    private func versionTag(for item: DownloadedIPA) -> (text: String, color: Color)? {
+    private func versionTag(for item: DownloadedIPA) -> (text: String, color: Color, systemImage: String)? {
         guard let info = IPALibrary.appInfo(at: item.url),
               let fileVersion = info.version ?? item.version, !fileVersion.isEmpty,
               !info.bundleID.isEmpty,
               let installed = appsManager.installedVersion(forBundleID: info.bundleID) else { return nil }
-        return czfVersionComparisonTag(fileVersion: fileVersion, installedVersion: installed)
+        if UpdateChecker.isNewer(fileVersion, than: installed) {
+            return (L("Newer than installed %@", installed), Theme.positive, "arrow.up.circle")
+        }
+        if UpdateChecker.isNewer(installed, than: fileVersion) {
+            return (L("Older than installed %@", installed), Theme.warning, "arrow.down.circle")
+        }
+        return (L("Same as installed %@", installed), Theme.muted, "checkmark.circle")
     }
 
     /// F-3 (0.9.164): scroll a revealed download into view and highlight it.
@@ -540,6 +546,11 @@ struct DownloadsListView: View {
 
     var body: some View {
         VStack(spacing: 12) {
+            // 0.9.187：五 tab 全部用 BrandHeader（应用/源/文件页已有）。
+            BrandHeader(icon: "arrow.down.circle", title: L("Download")) {
+                EmptyView()
+            }
+            .padding(.horizontal, 20)
             // U1 (0.9.148): search + sort above the list (SourcesView 同款：
             // SearchBar 在 List 外，键盘与行重绘互不干扰）。
             SearchBar(text: $searchText, placeholder: L("搜索"))
@@ -829,9 +840,7 @@ struct DownloadsListView: View {
                                         // F-2 (0.9.164): how this file's version
                                         // compares with the installed one.
                                         if let tag = versionTag(for: item) {
-                                            Text(tag.text)
-                                                .font(.caption)
-                                                .foregroundStyle(tag.color)
+                                            StatusPill(text: tag.text, systemImage: tag.systemImage, color: tag.color)
                                         }
                                     }
                                     Spacer()

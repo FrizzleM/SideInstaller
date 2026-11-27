@@ -1781,4 +1781,9 @@ let japaneseStrings: [String: String] = [
     "Clear recent links": "最近のリンクを消去",
     "Copy Bundle ID": "Bundle ID をコピー",
 
+    // 0.9.187: Files page search placeholder + others/system file groups.
+    "搜索文件名 / App 名 / Bundle ID": "ファイル名 / App 名 / Bundle ID で検索",
+    "系统文件": "システムファイル",
+    "其他文件": "その他のファイル",
+
 ]

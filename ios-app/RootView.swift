@@ -164,6 +164,7 @@ struct RootView: View {
         // gearshape 见旧 Tools 行，folder.fill 见旧文件 tab）。
         TabView(selection: tabSelection) {
             FilesTabView()
+                .blueTopBar()
                 .tabItem { Label(L("File"), systemImage: "folder") }
                 .tag(Page.files)
             NavigationStack { AppsView(manager: appsManager) }
@@ -172,6 +173,7 @@ struct RootView: View {
                 .tag(Page.apps)
                 .badge(appsManager.expiringSoon > 0 ? Text("\(appsManager.expiringSoon)") : nil)
             NavigationStack { SourcesView() }
+                .blueTopBar()
                 .tabItem { Label(L("Sources"), systemImage: "storefront") }
                 .tag(Page.sources)
                 // F-D (0.9.156): the Apps tab's expiring-soon badge, but for
@@ -280,7 +282,6 @@ struct RootView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(Capsule().fill(Theme.topBarFill))
-                    .shadow(radius: 4)
                 }
                 .buttonStyle(.plain)
                 .padding(.bottom, 8)

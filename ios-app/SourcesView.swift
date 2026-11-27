@@ -139,7 +139,6 @@ struct SourcesView: View {
                 Task { @MainActor in store.syncURLs() }
             }
         }
-        .blueTopBar()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {

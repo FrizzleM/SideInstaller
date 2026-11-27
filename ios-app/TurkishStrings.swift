@@ -1739,4 +1739,9 @@ let turkishStrings: [String: String] = [
     "Clear recent links": "Son bağlantıları temizle",
     "Copy Bundle ID": "Bundle ID'yi kopyala",
 
+    // 0.9.187: Files page search placeholder + others/system file groups.
+    "搜索文件名 / App 名 / Bundle ID": "Dosya adı / uygulama adı / Bundle ID ile ara",
+    "系统文件": "Sistem dosyaları",
+    "其他文件": "Diğer dosyalar",
+
 ]

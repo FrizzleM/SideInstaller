@@ -137,6 +137,26 @@ enum Theme {
     static let cardRadius: CGFloat = 20
     /// Corner radius of a popup.
     static let popupRadius: CGFloat = 20
+    /// Corner radius of a small chip or badge.
+    static let smallRadius: CGFloat = 8
+
+    // MARK: Spacing (0.9.187 UI redo: the one spacing scale)
+    /// Standard gap between sections and cards.
+    static let spacing: CGFloat = 16
+    /// Wide gap: page padding and card stacks.
+    static let spacingLarge: CGFloat = 20
+    /// Tight gap: inside a row or a card.
+    static let spacingSmall: CGFloat = 12
+
+    // MARK: Type scale (0.9.187 UI redo)
+    /// Card and page titles.
+    static let titleFont: Font = .headline
+    /// Emphasised body text, e.g. a row's name.
+    static let bodyFont: Font = .subheadline
+    /// Secondary text, e.g. a row's detail line.
+    static let detailFont: Font = .footnote
+    /// Smallest text, e.g. a caption or a tag.
+    static let captionFont: Font = .caption
 
     /// The widest a page's column grows, its padding included. A phone is
     /// narrower than this; a wider window, such as an open iPhone Duo (about
@@ -413,7 +433,6 @@ struct PopupCard<Content: View>: View {
         .frame(maxWidth: 460)
         .background(shape.fill(isTile ? Color.clear : Theme.raised))
         .overlay(shape.strokeBorder(Theme.hairline, lineWidth: 1))
-        .shadow(color: .black.opacity(isTile ? 0 : 0.5), radius: 24, x: 0, y: 12)
         .accessibilityElement(children: .contain)
         .accessibilityAction(.escape, requestClose)
         .alert(L("Closing this popup will end the process. Are you sure?"),
@@ -491,7 +510,6 @@ struct PopupGroupCard<Content: View>: View {
         .frame(maxWidth: 460)
         .background(shape.fill(Theme.raised).opacity(isGrouped ? 1 : 0))
         .overlay(shape.strokeBorder(Theme.hairline.opacity(isGrouped ? 1 : 0), lineWidth: 1))
-        .shadow(color: .black.opacity(isGrouped ? 0.5 : 0), radius: 24, x: 0, y: 12)
         .accessibilityElement(children: .contain)
         .accessibilityAction(.escape, requestClose)
         .alert(L("Closing this popup will end the process. Are you sure?"),
