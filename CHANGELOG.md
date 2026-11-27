@@ -11,7 +11,8 @@ All notable changes to SideInstaller are documented here.
   Airplane Mode while it connects, and off again before anything that needs the internet, and
   keeps the connection it opened instead of opening a new one each time. It covers installs,
   refreshes, pairing, Location spoofing, JIT, Sideloaded apps, crash logs, Developer Mode and
-  the Shortcuts actions, so testing can show where it works.
+  the Shortcuts actions, so testing can show where it works. An install that has to pair no longer
+  waits for Wi-Fi either: the "Wi-Fi required" card is gone.
 
 ## 2.3.0
 

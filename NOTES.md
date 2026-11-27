@@ -1661,8 +1661,10 @@ and the shared lockdown heartbeat.
 
 ## Mobile Data Mode (beta)
 
-Branch `mobile-data-mode` (2026-11-27), for testing which features it works
-for. Main only says to join Wi-Fi when this happens (4f22ebb).
+Built on branch `mobile-data-mode` (2026-11-27) to test which features it
+works for, and merged into main the same day once it worked on the user's
+iPhone (no per-feature results recorded). Before it, main only said to join
+Wi-Fi when this happens (4f22ebb).
 
 **Why.** While the iPhone is on mobile data and not on Wi-Fi, iOS keeps its
 remote pairing listener closed, so every new connection LocalDevVPN carries
@@ -1678,8 +1680,11 @@ advice (`ConnectionDiagnostics.swift`, "Enable Airplane Mode").
 - *Asking.* Whatever the user starts runs as an action
   (`MobileDataMode.run(feature)`, a task-local context that child tasks
   inherit). On mobile data only, the first new tunnel an action needs puts up
-  the offer: Try Mobile Data Mode, or Use Wi-Fi Instead, which stops with
-  "Connect to a Wi-Fi network". It also says Wi-Fi is the stable, safer way.
+  the offer: Try Mobile Data Mode, or Use Wi-Fi Instead, which ends the action
+  like Cancel. It also says Wi-Fi is the stable, safer way. Nothing else on
+  this branch says Wi-Fi is needed: no "Wi-Fi required" card, no Wi-Fi wait or
+  gate before Install, and a refused port on mobile data says to turn on
+  Airplane Mode (Side by Side keeps its own, since it needs a shared network).
   A page's own quiet attempts (auto-scan, auto-load, the Location page's
   setup on open) aren't actions and never ask; on mobile data only they skip
   unless a kept tunnel may be open.

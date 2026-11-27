@@ -482,7 +482,7 @@ final class DeviceConnection {
                 Engine.shared.log("Port \(port) refused, and this iPhone is on mobile data only (\(links.summary)): iOS keeps its remote pairing listener closed then, so its other ports aren't searched.")
                 throw TunnelError(
                     kind: failure.kind,
-                    advice: L("This iPhone is on mobile data, not Wi-Fi, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Connect to a Wi-Fi network, then try again.",
+                    advice: L("This iPhone is on mobile data, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Turn on Airplane Mode, keep LocalDevVPN connected, then try again.",
                               deviceIP, Int(port)),
                     underlying: failure.raw,
                     refusedOnMobileData: true)

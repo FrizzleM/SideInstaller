@@ -98,7 +98,7 @@ enum Shortcuts {
         guard NetworkStatus.links().mobileDataOnly, !MobileDataMode.shared.mayHaveOpenTunnel,
               !isInForeground else { return }
         try await intent.requestToContinueInForeground(
-            Shortcuts.dialog(L("This iPhone is on mobile data, not Wi-Fi. Continue in SideInstaller to try Mobile Data Mode, or connect to Wi-Fi and run this again.")))
+            Shortcuts.dialog(L("This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.")))
     }
 
     // MARK: Apple sign-in

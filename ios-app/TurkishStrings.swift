@@ -128,7 +128,6 @@ let turkishStrings: [String: String] = [
     "iOS %@ required": "iOS %@ gerekli",
     "This iPhone runs iOS %@, which SideInstaller can't install on. Update to iOS %@ or later in Settings › General › Software Update.":
         "Bu iPhone iOS %@ çalıştırıyor; SideInstaller buna yükleme yapamaz. Ayarlar › Genel › Yazılım Güncelleme'den iOS %@ veya sonrasına güncelle.",
-    "Wi-Fi required": "Wi-Fi gerekli",
     "Pairing code": "Eşleme kodu",
     "Type this into the prompt in Settings.": "Bunu Ayarlar'daki istem alanına yaz.",
     "Install stopped": "Yükleme durdu",
@@ -567,8 +566,8 @@ let turkishStrings: [String: String] = [
         "%@:%d adresindeki bir şey bağlantıyı reddetti; yani tünel trafik taşıyor, ama Geliştirici Modu açık olduğu hâlde bu iPhone eşleme bağlantı noktasını dinlemiyor. “Eşleme dosyası” altında bu iPhone'u yeniden eşle, sonra yeniden dene. Yine olmazsa iPhone'u yeniden başlat.",
     "Something at %@:%d took the connection but didn't answer as this iPhone's pairing port, and no other port answered as one either. Check that LocalDevVPN is the VPN that's on and that Developer Mode is on (Settings › Privacy & Security › Developer Mode), then try again. If it still fails, restart the iPhone.":
         "%@:%d adresindeki bir şey bağlantıyı kabul etti ama bu iPhone'un eşleme bağlantı noktası gibi yanıt vermedi, başka hiçbir bağlantı noktası da öyle yanıt vermedi. Açık olan VPN'in LocalDevVPN olduğunu ve Geliştirici Modu'nun açık olduğunu (Ayarlar › Gizlilik ve Güvenlik › Geliştirici Modu) denetle, sonra yeniden dene. Yine olmazsa iPhone'u yeniden başlat.",
-    "This iPhone is on mobile data, not Wi-Fi, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Connect to a Wi-Fi network, then try again.":
-        "Bu iPhone Wi-Fi yerine mobil veri kullanıyor ve iOS bu durumda eşleme bağlantı noktasını kapalı tutuyor, bu yüzden %@:%d bağlantıyı reddetti. Bir Wi-Fi ağına bağlan, sonra yeniden dene.",
+    "This iPhone is on mobile data, and iOS keeps its pairing port closed then, so %@:%d refused the connection. Turn on Airplane Mode, keep LocalDevVPN connected, then try again.":
+        "Bu iPhone mobil veri kullanıyor ve iOS bu durumda eşleme bağlantı noktasını kapalı tutuyor, bu yüzden %@:%d bağlantıyı reddetti. Uçak Modu'nu aç, LocalDevVPN'i bağlı tut, sonra yeniden dene.",
     "Start LocalDevVPN when needed": "Gerektiğinde LocalDevVPN'i başlat",
     "Start LocalDevVPN now": "LocalDevVPN'i şimdi başlat",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
@@ -729,12 +728,8 @@ let turkishStrings: [String: String] = [
     " (UDID %@)": " (UDID %@)",
     "Couldn't register this iPhone%@ with your Apple ID's developer team, so Apple won't issue a provisioning profile. %@ — see the steps above.":
         "Bu iPhone%@ Apple kimliğinin geliştirici ekibine kaydedilemedi; Apple sağlama profili vermiyor. %@ — yukarıdaki adımlara bak.",
-    "Connect to Wi-Fi": "Wi-Fi'ye bağlan",
-    "Open Settings › Wi-Fi and join a network.": "Ayarlar › Wi-Fi'yi aç ve bir ağa katıl.",
     "Then come back here — this continues automatically.": "Sonra buraya dön — bu otomatik devam eder.",
     "Tap Connect so the toggle turns on.": "Anahtarın açılması için Connect'e dokun.",
-    "Keep Wi-Fi on, then come back here — this continues automatically.":
-        "Wi-Fi'yi açık tut, sonra buraya dön — bu otomatik devam eder.",
     "Get LocalDevVPN": "LocalDevVPN al",
     "Import an .ipa first": "Önce bir .ipa içe aktar",
     "Tap “Import .ipa” above and pick the file — it can live anywhere the Files app can reach, including iCloud Drive or a USB drive.":
@@ -918,10 +913,6 @@ let turkishStrings: [String: String] = [
         "Bu iPhone bağlantı açılır açılmaz kesti. iOS 26.4'ten beri LocalDevVPN üzerinden gelen lockdown eşleme dosyalarında (bunun gibi) bunu yapar; aynı türden yenisi yardımcı olmaz. Uzaktan eşleme dosyası hâlâ çalışır: bilgisayarda idevice_pair'i aç, “Remote pairing” seç, “Create” sonra “Save to file…”e tıkla ve dosyayı “Eşleme dosyası” altında içe aktar.",
     "This iPhone hung up on the connection: from iOS 26.4 on, it does that to lockdown pairing files like this one when they come through LocalDevVPN. See the steps above.":
         "Bu iPhone bağlantıyı kesti: iOS 26.4'ten itibaren, bunun gibi lockdown eşleme dosyaları LocalDevVPN üzerinden geldiğinde bunu yapar. Yukarıdaki adımlara bak.",
-    "Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find.":
-        "Bu iPhone'u eşlemek için gerekir: SideInstaller, Ayarlar'ın bulması için kendini yerel ağda duyurur.",
-    "Connect to a Wi-Fi network. Pairing this iPhone needs it — SideInstaller has to be findable on the local network.":
-        "Bir Wi-Fi ağına bağlan. Bu iPhone'u eşlemek için gerekir — SideInstaller yerel ağda bulunabilir olmalı.",
 
     // MARK: - About
 
@@ -1331,8 +1322,6 @@ let turkishStrings: [String: String] = [
         "Sırada SideInstaller'ın geliştirici disk görüntüsünü indirmesi var; bunun için internet gerekir.",
     "Next, Apple signs the developer disk image for this iPhone, which needs the internet.":
         "Sırada Apple'ın geliştirici disk görüntüsünü bu iPhone için imzalaması var; bunun için internet gerekir.",
-    "Connect to a Wi-Fi network, then try again.":
-        "Bir Wi-Fi ağına bağlan, sonra yeniden dene.",
     "Try Mobile Data Mode?":
         "Mobil Veri Modu denensin mi?",
     "This iPhone is on mobile data, not Wi-Fi, and iOS doesn't accept new connections from LocalDevVPN then.":
@@ -1355,8 +1344,8 @@ let turkishStrings: [String: String] = [
         "Açmak için Uçak Modu'na dokun. Wi-Fi'ı kapalı, LocalDevVPN'i bağlı bırak.",
     "Come back to SideInstaller. It carries on by itself.":
         "SideInstaller'a geri dön. Kendiliğinden devam eder.",
-    "Then pair this iPhone with SideInstaller in Settings, as usual. If SideInstaller doesn't show up there, pairing doesn't work in Airplane Mode: cancel, and pair on Wi-Fi.":
-        "Ardından bu iPhone'u her zamanki gibi Ayarlar'da SideInstaller ile eşle. SideInstaller orada görünmezse Uçak Modu'nda eşleme çalışmaz: iptal et ve Wi-Fi'da eşle.",
+    "Then pair this iPhone with SideInstaller in Settings, as usual.":
+        "Ardından bu iPhone'u her zamanki gibi Ayarlar'da SideInstaller ile eşle.",
     "Connecting in Airplane Mode":
         "Uçak Modu'nda bağlanıyor",
     "Keep Airplane Mode on until SideInstaller asks you to turn it off.":
@@ -1381,8 +1370,8 @@ let turkishStrings: [String: String] = [
         "Uçak Modu açık ama LocalDevVPN bağlı değil. Onu aç ve yeniden bağla.",
     "Waiting for mobile data…":
         "Mobil veri bekleniyor…",
-    "This iPhone is on mobile data, not Wi-Fi. Continue in SideInstaller to try Mobile Data Mode, or connect to Wi-Fi and run this again.":
-        "Bu iPhone Wi-Fi yerine mobil veri kullanıyor. Mobil Veri Modu'nu denemek için SideInstaller'da devam et ya da Wi-Fi'a bağlanıp bunu yeniden çalıştır.",
+    "This iPhone is on mobile data. Continue in SideInstaller to use Mobile Data Mode.":
+        "Bu iPhone mobil veri kullanıyor. Mobil Veri Modu'nu kullanmak için SideInstaller'da devam et.",
     "Mobile data":
         "Mobil veri",
     "Mobile Data Mode":

@@ -335,10 +335,9 @@ final class MobileDataMode {
         }
     }
 
-    /// What stops an action whose user would rather use Wi-Fi.
-    private static var declined: Error {
-        EngineError.message(ErrorHelp.explained(L("Connect to a Wi-Fi network, then try again.")))
-    }
+    /// What stops an action whose user would rather use Wi-Fi: it ends like
+    /// Cancel, with no error, since the offer already said how.
+    private static var declined: Error { CancellationError() }
 
     /// Shows `shown` while `body` waits on it, one popup at a time.
     private func withPrompt<T>(_ shown: Prompt, _ body: () async throws -> T) async throws -> T {
@@ -516,7 +515,7 @@ struct MobileDataPopup: View {
                         L("Come back to SideInstaller. It carries on by itself."),
                     ])
                     if pairing {
-                        paragraph(L("Then pair this iPhone with SideInstaller in Settings, as usual. If SideInstaller doesn't show up there, pairing doesn't work in Airplane Mode: cancel, and pair on Wi-Fi."),
+                        paragraph(L("Then pair this iPhone with SideInstaller in Settings, as usual."),
                                   secondary: true)
                     }
                     waitingLine

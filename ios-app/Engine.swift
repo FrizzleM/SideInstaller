@@ -690,13 +690,8 @@ final class Engine {
         }
         // The install runs over the loopback tunnel, so require it up front,
         // unless the run can start LocalDevVPN itself (see `ensureNetwork`).
-        // On mobile data alone, pairing offers Mobile Data Mode instead.
+        // Wi-Fi isn't required: without it, pairing offers Mobile Data Mode.
         refreshNetworkStatus()
-        guard !needsFreshPairing || wifiConnected || NetworkStatus.links().mobileDataOnly else {
-            setGuide(Guides.wifi)
-            log("⛔️ Wi-Fi is off, and pairing this iPhone needs it. Connect to a Wi-Fi network, then tap Install again.")
-            return
-        }
         guard tunnelAvailable else {
             // A full-tunnel VPN counts as down until its probe answers, which
             // takes half a second at most: wait for it, then decide.
@@ -913,7 +908,7 @@ final class Engine {
 
     // MARK: Step 1 — network (waits for the loopback tunnel)
 
-    /// True when this run must pair from scratch, the one step needing Wi-Fi.
+    /// True when this run must pair from scratch.
     var needsFreshPairing: Bool {
         !fileExistsNonEmpty(pairingFilePath ?? PairingController.pairingFilePath())
     }
@@ -931,10 +926,9 @@ final class Engine {
             // Waits for a full-tunnel VPN's probe when there's no fresh answer.
             let (vpn, wifi, detail) = await readNetworkSettled()
             publishNetwork(vpn: vpn, wifi: wifi, vpnText: vpn ? "tunnel up" : "no tunnel")
-            // Only a run that pairs needs Wi-Fi; the tunnel is always required.
-            // On mobile data alone, pairing offers Mobile Data Mode instead.
-            let wifiSatisfied = wifi || !needsFreshPairing || NetworkStatus.links().mobileDataOnly
-            if wifiSatisfied && vpn {
+            // Only the tunnel is required. Without Wi-Fi, the steps that need
+            // a new connection offer Mobile Data Mode instead.
+            if vpn {
                 // Install checks this too, but only while a tunnel is up, and
                 // this run may have started it.
                 guard deviceIPIsUsable() else {
@@ -947,20 +941,11 @@ final class Engine {
                 return
             }
             setStep(.network, .waiting)
-            if !wifiSatisfied {
-                // Wi-Fi is the prerequisite for pairing, so surface it first.
-                if announced != "wifi" {
-                    log("Waiting for Wi-Fi… pairing this iPhone needs it. Connect to a Wi-Fi network.")
-                    announced = "wifi"
-                }
-                setGuide(Guides.wifi)
-            } else {
-                if announced != "vpn" {
-                    log("Waiting for the loopback tunnel… connect LocalDevVPN, ClashMi, or whichever VPN app you use.")
-                    announced = "vpn"
-                }
-                setGuide(Guides.vpn)
+            if announced != "vpn" {
+                log("Waiting for the loopback tunnel… connect LocalDevVPN, ClashMi, or whichever VPN app you use.")
+                announced = "vpn"
             }
+            setGuide(Guides.vpn)
             try await Task.sleep(nanoseconds: 1_500_000_000)
         }
     }
@@ -4237,19 +4222,6 @@ final class Engine {
 
 /// Computed so text is localized when read and follows language changes.
 enum Guides {
-    /// Shown only for a run that has to pair, the one step needing Wi-Fi.
-    static var wifi: Guide {
-        Guide(
-            title: L("Connect to Wi-Fi"),
-            systemImage: "wifi",
-            steps: [
-                L("Open Settings › Wi-Fi and join a network."),
-                L("Pairing this iPhone needs it: SideInstaller advertises itself on the local network for Settings to find."),
-                L("Then come back here — this continues automatically."),
-            ],
-            actionLabel: nil, actionURLString: nil)
-    }
-
     /// Shown when no tunnel is up. Recommends LocalDevVPN, but any VPN on the
     /// device subnet works.
     static var vpn: Guide {
@@ -4260,7 +4232,7 @@ enum Guides {
                 L("Install LocalDevVPN from the App Store and open it."),
                 L("If GitHub is blocked where you are, use a VPN that can proxy your traffic too: iOS runs one VPN at a time, so a local-only tunnel leaves nothing to download SideStore through."),
                 L("Tap Connect so the toggle turns on."),
-                L("Keep Wi-Fi on, then come back here — this continues automatically."),
+                L("Then come back here — this continues automatically."),
             ],
             actionLabel: L("Get LocalDevVPN"),
             actionURLString: "https://apps.apple.com/app/id6755608044")
