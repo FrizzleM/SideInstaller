@@ -1445,7 +1445,7 @@ struct LocationView: View {
     private var ddiCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle(L("Developer disk image"), systemImage: "internaldrive")
+                SectionTitle(title: L("Developer disk image"), systemImage: "internaldrive")
                 HStack(spacing: 8) {
                     Text(DeveloperDiskImage.isDownloaded ? L("Downloaded") : L("Not downloaded"))
                         .font(.footnote)
@@ -1467,7 +1467,7 @@ struct LocationView: View {
     private var mapCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 16) {
-                sectionTitle(L("Pick a place"), systemImage: "mappin.and.ellipse")
+                SectionTitle(title: L("Pick a place"), systemImage: "mappin.and.ellipse")
 
                 searchField
 
@@ -1503,7 +1503,8 @@ struct LocationView: View {
                         .allowsHitTesting(false)
                 }
                 .frame(height: 280)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                // 0.9.188：圆角走卡片 token（原来硬编码 16）。
+                .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
 
                 // Always the labelled row: the coordinate and both labels fit
                 // at this width, and the row no longer swaps layouts.
@@ -1614,20 +1615,21 @@ struct LocationView: View {
     }
 
     private var crosshair: some View {
+        // 0.9.188：阴影删掉（全仓仅剩的 3 处阴影之三）——白针蓝底圆标
+        // 本身对比够，在地图上仍可读，不用阴影托底。
         Image(systemName: "mappin.circle.fill")
             .font(.system(size: 30))
             .foregroundStyle(.white, Theme.blue)
-            .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
     }
 
     private var searchField: some View {
+        // 0.9.188：与共享 SearchBar 二选一统一——用 SearchBar 做字段
+        // （放大镜 + 清除同款），搜索按钮与进行中转圈保留在外面；
+        // 回车提交经 .onSubmit 接到 search()（SearchBar 内的字段
+        // 本身是过滤用的，没有提交回调）。
         HStack(spacing: 8) {
-            TextField(L("Search for a place"), text: $query)
-                .textFieldStyle(.plain)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
+            SearchBar(text: $query, placeholder: L("Search for a place"))
                 .onSubmit { search() }
-                .fieldBackground()
             Button { search() } label: {
                 if isSearching {
                     ProgressView().controlSize(.small)
@@ -1685,7 +1687,7 @@ struct LocationView: View {
     private var plannerCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 16) {
-                sectionTitle(L("Plan a route"), systemImage: "signpost.right.and.left")
+                SectionTitle(title: L("Plan a route"), systemImage: "signpost.right.and.left")
 
                 Picker(L("Travel by"), selection: $manager.travelMode) {
                     ForEach(TravelMode.allCases) { mode in
@@ -1931,10 +1933,9 @@ struct LocationView: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-            .fill(Theme.control))
-        .overlay(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
-            .strokeBorder(Theme.hairline, lineWidth: 1))
+        // 0.9.188：行面走 cardSurface（原来手写 Theme.control 底 +
+        // hairline 描边）；此行直接落在页上，不是卡中卡。
+        .cardSurface(in: RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
         .animation(.smooth(duration: 0.3), value: stretch)
     }
 
@@ -1943,7 +1944,7 @@ struct LocationView: View {
     private var savedPlacesCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle(L("Saved places"), systemImage: "bookmark")
+                SectionTitle(title: L("Saved places"), systemImage: "bookmark")
                 if manager.savedPlaces.isEmpty {
                     Text(L("Tap Save under the map to keep the spot under the pin. Tapping a saved place sets it straight away."))
                         .font(.caption)
@@ -1962,7 +1963,9 @@ struct LocationView: View {
 
     /// Tap to set the place; the menu shows it on the map or deletes it.
     private func savedPlaceRow(_ place: SavedPlace) -> some View {
-        HStack(spacing: 8) {
+        // 0.9.188：与 stopRow 同款行面（HStack 间距 12、标题不另写
+        // .primary、行高 minHeight 36 + 纵向内边距 4）。
+        HStack(spacing: 12) {
             Button {
                 moveMap(to: place.coordinate)
                 manager.simulate(place.coordinate, name: place.name)
@@ -1974,7 +1977,6 @@ struct LocationView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(place.name)
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.primary)
                             .lineLimit(1)
                         Text(LocationManager.format(place.coordinate))
                             .font(.caption.monospaced())
@@ -1983,7 +1985,7 @@ struct LocationView: View {
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 4)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain, sound: .tap)
@@ -2017,6 +2019,7 @@ struct LocationView: View {
                     .contentShape(Rectangle())
             }
         }
+        .frame(minHeight: 36)
     }
 
     // MARK: Route
@@ -2024,7 +2027,7 @@ struct LocationView: View {
     private var routeCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 16) {
-                sectionTitle(L("Play a GPX route"),
+                SectionTitle(title: L("Play a GPX route"),
                              systemImage: "point.topleft.down.to.point.bottomright.curvepath")
                 if let route = manager.route {
                     loadedRoute(route)
@@ -2286,9 +2289,8 @@ struct LocationView: View {
 
     // MARK: Helpers
 
-    private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        SectionTitle(title: title, systemImage: systemImage)
-    }
+    // 0.9.188：本地 sectionTitle 已并入 Theme SectionTitle（原来只是
+    // 一层透传），调用处直接用 SectionTitle。
 }
 
 // MARK: - Speed limit sign

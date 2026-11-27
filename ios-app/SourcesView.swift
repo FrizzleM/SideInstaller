@@ -111,9 +111,9 @@ struct SourcesView: View {
                         }
                         .tint(Theme.muted)
                         Button(role: .destructive) {
-                            if let idx = store.sources.firstIndex(where: { $0.url == source.url }) {
-                                store.removeSource(at: IndexSet(integer: idx))
-                            }
+                            // B-3 (0.9.188)：先弹确认再删（见下面的 alert），
+                            // 不再直调 removeSource。
+                            pendingDeleteSources = [source]
                         } label: {
                             Label(L("Delete"), systemImage: "trash")
                         }
@@ -121,12 +121,9 @@ struct SourcesView: View {
                     }
                 }
                 .onDelete { offsets in
-                    for offset in offsets {
-                        let item = displayedSources[offset]
-                        if let idx = store.sources.firstIndex(where: { $0.url == item.url }) {
-                            store.removeSource(at: IndexSet(integer: idx))
-                        }
-                    }
+                    // B-3 (0.9.188)：同上，先确认再删；内置源的
+                    // .deleteDisabled 已拦住这条路，进不来。
+                    pendingDeleteSources = offsets.map { displayedSources[$0] }
                 }
             }
             .listStyle(.plain)
@@ -309,6 +306,8 @@ struct SourcesView: View {
 
     /// A source or app icon: the remote image, or a box placeholder while it
     /// loads and when there is none.
+    /// 0.9.188：背景与圆角走 token，与 appIcon 同款（原来背景手写
+    /// Color(.secondarySystemBackground)、圆角手写 12）。
     private func sourceIcon(_ url: URL?) -> some View {
         AsyncImage(url: url) { image in
             image.resizable().scaledToFill()
@@ -317,8 +316,8 @@ struct SourcesView: View {
                 .foregroundStyle(Theme.muted)
         }
         .frame(width: 44, height: 44)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
     }
 }
 
@@ -409,6 +408,10 @@ struct SourceAppsView: View {
     @State private var pendingUninstall: (bundleID: String, name: String)?
     @State private var uninstallingID: String?
     @State private var uninstallError: String?
+    /// B-3 (0.9.188)：待确认删除的源——swipeActions 与 .onDelete 两条路
+    /// 都先立这个、弹确认再删，不再直调 removeSource（删源会连缓存
+    /// 与上次检查时间一起清，见 SourcesStore.removeSource）。
+    @State private var pendingDeleteSources: [LoadedSource] = []
     /// F-1 (0.9.170): bumped when an update version is ignored, so the
     /// list redraws — `hasUpdate(for:)` reads UserDefaults, which no
     /// observed object publishes, and the badge recount rides the
@@ -625,6 +628,28 @@ struct SourceAppsView: View {
             Button(L("OK"), role: .cancel) { uninstallError = nil }
         } message: {
             Text(uninstallError ?? "")
+        }
+        // B-3 (0.9.188)：删源确认——swipeActions 与 .onDelete 两条路共用。
+        // 内置源仍不可删（行上的 .disabled 与 store.removeSource 里的
+        // builtInURL 过滤都不动）。文案说明会连缓存与上次检查时间一起清。
+        .alert(pendingDeleteSources.count == 1
+               ? L("删除“%@”？", pendingDeleteSources.first.map { sourceName($0.url) } ?? "")
+               : L("删除所选 %d 个？", pendingDeleteSources.count), isPresented: Binding(
+            get: { !pendingDeleteSources.isEmpty },
+            set: { if !$0 { pendingDeleteSources = [] } }
+        )) {
+            Button(L("Delete"), role: .destructive) {
+                let urls = pendingDeleteSources.map { $0.url }
+                pendingDeleteSources = []
+                for url in urls {
+                    if let idx = store.sources.firstIndex(where: { $0.url == url }) {
+                        store.removeSource(at: IndexSet(integer: idx))
+                    }
+                }
+            }
+            Button(L("Cancel"), role: .cancel) { pendingDeleteSources = [] }
+        } message: {
+            Text(L("The source will be removed, along with its cached data and last checked time."))
         }
         // F2 (0.9.153): leaving the page no longer cancels the download —
         // the shared downloader keeps it running, and the completion
@@ -1018,8 +1043,11 @@ struct SourceAppsView: View {
                 .foregroundStyle(Theme.muted)
         }
         .frame(width: 60, height: 60)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        // 0.9.188：背景与圆角走 token，与 sourceIcon 同款（原来背景手写
+        // Color(.secondarySystemBackground)、圆角手写 14；文件页行图标
+        // 同款 60×60 + controlRadius）。
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
     }
 
     /// F2 (0.9.153): the download outlives the page, so a finished download
@@ -1572,7 +1600,10 @@ private struct DownloadPill: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 20)
             .padding(.vertical, 8)
-            .background(Capsule().fill(Theme.topBarFill))
+            // 0.9.188：填充与详情页 installButton 的 PrimaryButtonStyle
+            // 同色（原来 Theme.topBarFill）；胶囊形状与内边距保留——行尾
+            // 小按钮，不套全宽 52 高的大按钮样式。
+            .background(Capsule().fill(Theme.blue))
     }
 }
 
@@ -3100,7 +3131,9 @@ struct SourceRowsCard: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(manager.urls.enumerated()), id: \.element) { index, url in
-                    if index > 0 { Divider().overlay(Theme.hairline) }
+                    // 0.9.188：分隔线与文件页同款裸 Divider（原来
+                    // Divider().overlay(Theme.hairline)）。
+                    if index > 0 { Divider() }
                     sourceRow(url)
                 }
             }
@@ -3368,7 +3401,7 @@ struct SourceAppView: View {
                 if let description = app.localizedDescription, !description.isEmpty {
                     PanelCard {
                         VStack(alignment: .leading, spacing: 8) {
-                            cardTitle(L("About"))
+                            SectionTitle(title: L("About"), systemImage: "info.circle")
                             ReleaseNotesText(text: description)
                         }
                     }
@@ -3513,7 +3546,7 @@ struct SourceAppView: View {
         PanelCard {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
-                    cardTitle(L("What's new"))
+                    SectionTitle(title: L("What's new"), systemImage: "sparkles")
                     Spacer()
                     Text(versionMeta(latest))
                         .font(.caption)
@@ -3533,7 +3566,7 @@ struct SourceAppView: View {
     private var history: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                cardTitle(L("Version history"))
+                SectionTitle(title: L("Version history"), systemImage: "clock.arrow.circlepath")
                 ForEach(Array(app.versions.dropFirst().enumerated()), id: \.element.id) { index, version in
                     if index > 0 { Divider().overlay(Theme.hairline) }
                     VStack(alignment: .leading, spacing: 6) {
@@ -3571,11 +3604,8 @@ struct SourceAppView: View {
         }
     }
 
-    private func cardTitle(_ text: String) -> some View {
-        Text(text)
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(.secondary)
-    }
+    // 0.9.188：本地 cardTitle 已并入 Theme SectionTitle（上面三处
+    // 各按内容配图标），不再另起一套标题样式。
 
     /// "16 Nov 2026 · 10.4 MB · iOS 18+", with what the source gives.
     /// F-2 (0.9.168): the lowest iOS joins the line when the source

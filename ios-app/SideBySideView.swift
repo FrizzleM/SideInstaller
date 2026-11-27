@@ -2495,7 +2495,7 @@ struct SideBySideView: View {
     private var channelCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle(L("Release"), systemImage: "tag")
+                SectionTitle(title: L("Release"), systemImage: "tag")
                 Picker(L("Release"), selection: $manager.channel) {
                     ForEach(ReleaseChannel.allCases) { channel in
                         Text(channel.displayName).tag(channel)
@@ -3084,9 +3084,14 @@ struct SideBySideView: View {
 
     /// Why the run stopped, and the ways on: again as it was, or with
     /// something changed. Untitled: the header above says it stopped.
+    /// 0.9.188：与主安装页 InstallPopup.errorButtons 同款外皮——外层
+    /// VStack 间距 16 与 PopupCard 的错误内容一致，按钮组纵向间距 12
+    /// 与 errorButtons 的纵向排布一致；Report / Try again / CopyLogs
+    /// 的语义与按钮样式（Secondary + CopyLogs 条件）本来就同款，
+    /// 条目与跳转不动（见本文件不动清单）。
     private func failureCard(_ message: String) -> some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Theme.spacing) {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.title3)
@@ -3098,8 +3103,8 @@ struct SideBySideView: View {
                 }
                 // The button groups stay vertical: no swapping between a
                 // row and a column when the width changes.
-                VStack(spacing: 12) { retryButtons }
-                VStack(alignment: .leading, spacing: 12) { reportButtons(message) }
+                VStack(spacing: Theme.spacingSmall) { retryButtons }
+                VStack(alignment: .leading, spacing: Theme.spacingSmall) { reportButtons(message) }
             }
         }
     }
@@ -3153,7 +3158,7 @@ struct SideBySideView: View {
 
             PanelCard {
                 VStack(alignment: .leading, spacing: 16) {
-                    sectionTitle(L("Finish on their iPhone"), systemImage: "hand.tap")
+                    SectionTitle(title: L("Finish on their iPhone"), systemImage: "hand.tap")
                     NumberedSteps(steps: finishSteps)
                 }
             }
@@ -3256,9 +3261,8 @@ struct SideBySideView: View {
         }
     }
 
-    private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        SectionTitle(title: title, systemImage: systemImage)
-    }
+    // 0.9.188：本地 sectionTitle 已并入 Theme SectionTitle（原来只是
+    // 一层透传），调用处直接用 SectionTitle。
 }
 
 // MARK: - Pieces
@@ -3360,7 +3364,7 @@ private struct OptionRow: View {
                     .font(.system(size: 17))
                     .foregroundStyle(Theme.muted)
                     .frame(width: 36, height: 36)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.control))
+                    .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous).fill(Theme.control))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.subheadline.weight(.medium))

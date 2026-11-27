@@ -1128,7 +1128,7 @@ struct CertSignMods {
     var version = ""
     var minOS = ""
     /// 自定义输出主名（表单“打包文件名”可编辑项，空着回落源文件名；
-    /// 不进预设，换 IPA 时随 mods 一起清空）。
+    /// 进预设（F-2 0.9.188）；换 IPA 时随 mods 一起清空）。
     var outputName = ""
     /// 新图标的数据（选了才有）。挑图处存的是相册原图字节，不保证
     /// 是 PNG；签名写盘前由 `pngIconData()` 转真 PNG（C24）。
@@ -1147,7 +1147,8 @@ struct CertSignMods {
     /// 瘦身与兼容（签名段“更多设置”里的三个开关，默认全关）：
     /// stripWatch 删 Payload/*.app/Watch，stripExtensions 删
     /// PlugIns，stripDeviceLimits 删主 Info.plist 里的设备限制键。
-    /// 只在签名时先生效（见 CertSigner.preSignRepack），不进预设。
+    /// 只在签名时先生效（见 CertSigner.preSignRepack）；进预设
+    /// （F-2 0.9.188，批量/多开同样带上）。
     var stripWatch = false
     var stripExtensions = false
     var stripDeviceLimits = false
@@ -1693,6 +1694,13 @@ struct CertSignPreset: Codable, Identifiable {
     var multiStart: Int
     var icon: Data?
     var pluginFileNames: [String]
+    /// F-2 (0.9.188)：瘦身/兼容三开关 + 打包文件名也进预设——旧预设
+    /// 读不到时（0.9.188 之前存的）按默认值解（合成 Decodable 对带
+    /// 默认值的字段用 decodeIfPresent），不用迁移。
+    var stripWatch: Bool = false
+    var stripExtensions: Bool = false
+    var stripDeviceLimits: Bool = false
+    var outputName: String = ""
 }
 
 /// 签名预设：索引存 Application Support，插件文件存同目录下
@@ -1736,7 +1744,9 @@ enum CertSignPresetStore {
     /// 保存当前可复用项为预设；同名预设直接覆盖（旧目录一起删）。
     /// 插件拷失败的跳过，不记入；索引写失败也不抛，调用方照常报保存。
     static func save(name: String, minOS: String, multiCount: Int, multiStart: Int,
-                     icon: Data?, pluginURLs: [URL]) -> CertSignPreset {
+                     icon: Data?, pluginURLs: [URL],
+                     stripWatch: Bool = false, stripExtensions: Bool = false,
+                     stripDeviceLimits: Bool = false, outputName: String = "") -> CertSignPreset {
         var presets = load()
         if let old = presets.first(where: { $0.name == name }) {
             try? FileManager.default.removeItem(at: pluginDir(for: old.id))
@@ -1744,7 +1754,9 @@ enum CertSignPresetStore {
         }
         let preset = CertSignPreset(id: UUID(), name: name, minOS: minOS,
                                     multiCount: multiCount, multiStart: multiStart,
-                                    icon: icon, pluginFileNames: [])
+                                    icon: icon, pluginFileNames: [],
+                                    stripWatch: stripWatch, stripExtensions: stripExtensions,
+                                    stripDeviceLimits: stripDeviceLimits, outputName: outputName)
         let pdir = pluginDir(for: preset.id)
         var names: [String] = []
         for url in pluginURLs {
@@ -1965,6 +1977,13 @@ final class CertWorkspace: ObservableObject {
     @Published var signBusy = false
     /// U-UI：批量签名进行中（原证书页的 @State batchBusy；同上）。
     @Published var batchBusy = false
+    /// B-2 (0.9.188)：签名段表单的改动（插件、最低系统版本、图标、
+    /// 瘦身/兼容开关、打包文件名）——原来是 EnterpriseCertView 的局部
+    /// @State，文件页批量签名够不着，只能用空 CertSignMods()，注释
+    /// 还写着“批量同样带上”。表单状态搬到共享工作区，单签与批量签
+    /// 名读同一份 mods；EnterpriseCertView 全 App 只有一个实例，
+    /// 搬家不改变表单的生命周期。
+    @Published var mods = CertSignMods()
 }
 
 

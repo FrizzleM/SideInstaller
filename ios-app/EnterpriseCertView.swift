@@ -73,13 +73,14 @@ struct EnterpriseCertView: View {
     /// B-2 (0.9.179): 上次用的方式——进页即从 UserDefaults 恢复，
     /// 改了就写回（下面 onChange），跨页面跨启动都保留。
     @State private var signIdentity: CZFSignIdentity = CZFSignIdentity.stored
-    @State private var mods = CertSignMods()
+    // B-2 (0.9.188)：表单 mods 搬进共享 CertWorkspace（见 EnterpriseCert.swift），
+    // 单签与文件页批量签名读同一份；这里不再留局部 @State。
     @State private var showIPAPicker = false
     @State private var showLibraryPicker = false
     @State private var showPluginPicker = false
     @State private var pluginError: String?
     @State private var iconItem: PhotosPickerItem?
-    /// B12-6：新图标的解码缓存——`mods.icon` 是相册原图 Data（数 MB），
+    /// B12-6：新图标的解码缓存——`workspace.mods.icon` 是相册原图 Data（数 MB），
     /// `iconRow` 每遍 body 都 `UIImage(data:)` 重解；这里只解一次，
     /// body 只读缓存。`decodedIconData` 记缓存对应哪份 Data，视图
     /// 重建导致任务重跑时不再重复解码。
@@ -87,6 +88,10 @@ struct EnterpriseCertView: View {
     @State private var decodedIconData: Data?
     @State private var signOnlyMessage: String?
     @State private var signOnlyFailed = false
+    /// F-3 (0.9.188)：刚签好的包的记录——仅签名成功后状态行旁的
+    /// “去安装”按钮就装这一个；record 为空时按钮不出现；多开签出
+    /// N 个副本时装第一份，其余去「应用库 → 已签名」逐个点安装。
+    @State private var lastSignedRecord: SignedIPARecord?
     // 点红/仅签名按钮时被前置条件拦住的明说（代替静默禁用）：
     // 显示在按钮正下方，条件一满足就清掉，不残留旧话。
     @State private var signBlockedMessage: String?
@@ -276,7 +281,7 @@ struct EnterpriseCertView: View {
             guard let item else { return }
             Task {
                 if let data = try? await item.loadTransferable(type: Data.self) {
-                    mods.icon = data
+                    workspace.mods.icon = data
                 }
             }
         }
@@ -289,7 +294,9 @@ struct EnterpriseCertView: View {
     @ViewBuilder
     private var profileGroup: some View {
         signGroup(title: L("证书库")) {
-            VStack(alignment: .leading, spacing: 10) {
+            // 0.9.188：行内间距与 certCard 的 infoRow 组对齐（8）；到期日
+            // 字号与 infoRow 的值同款 footnote（原来 caption）。
+            VStack(alignment: .leading, spacing: 8) {
                 ForEach(profiles) { profile in
                     HStack(spacing: 8) {
                         if editingProfileID == profile.id {
@@ -318,7 +325,7 @@ struct EnterpriseCertView: View {
                                     }
                                     if let expiration = profileExpirations[profile.id] {
                                         Text(expiration.formatted(date: .abbreviated, time: .omitted) + remainingText(expiration))
-                                            .font(.caption)
+                                            .font(.footnote)
                                             .foregroundStyle(expirySoon(expiration) ? Theme.negative : Theme.muted)
                                     }
                                     Spacer()
@@ -396,14 +403,8 @@ struct EnterpriseCertView: View {
                             infoRow(L("Team"), info.teamName)
                         }
                         if let expiration = info.expiration {
-                            HStack {
-                                Text(L("到期"))
-                                    .foregroundStyle(Theme.muted)
-                                Spacer()
-                                Text(expiration.formatted(date: .abbreviated, time: .omitted) + remainingText(expiration))
-                                    .foregroundStyle(expirySoon(expiration) ? Theme.negative : .primary)
-                            }
-                            .font(.footnote)
+                            infoRow(L("到期"), expiration.formatted(date: .abbreviated, time: .omitted) + remainingText(expiration),
+                                    valueColor: expirySoon(expiration) ? Theme.negative : .primary)
                         }
                         // 轻松签式设备提示：描述文件限定了设备时，拿本机 UDID
                         //（MGCopyAnswer，轻松签同款办法）跟列表比对，能断言
@@ -731,12 +732,16 @@ struct EnterpriseCertView: View {
         refreshCertState()
     }
 
-    private func infoRow(_ title: String, _ value: String) -> some View {
-        HStack {
+    /// 0.9.188：与 profileGroup 的行同款（footnote 行、间距 8、标题
+    /// muted、值右对齐）；valueColor 让证书卡里的“到期”行也能走它，
+    /// 不再手写一个同形 HStack。
+    private func infoRow(_ title: String, _ value: String, valueColor: Color = .primary) -> some View {
+        HStack(spacing: 8) {
             Text(title)
                 .foregroundStyle(Theme.muted)
             Spacer()
             Text(value)
+                .foregroundStyle(valueColor)
                 .multilineTextAlignment(.trailing)
         }
         .font(.footnote)
@@ -974,7 +979,7 @@ struct EnterpriseCertView: View {
     /// 容易被当成“已经填好了”，这行才是准话；重名仍在签名
     /// 那一刻自动加序号（见 uniqueOutputURL）。
     private var effectiveOutputName: String {
-        let custom = mods.outputName.trimmingCharacters(in: .whitespaces)
+        let custom = workspace.mods.outputName.trimmingCharacters(in: .whitespaces)
         if !custom.isEmpty {
             return custom.lowercased().hasSuffix(".ipa") ? custom : "\(custom).ipa"
         }
@@ -1067,25 +1072,25 @@ struct EnterpriseCertView: View {
                 }
                 if signIdentity == .enterprise {
                     signGroup(title: L("App 名字")) {
-                        TextField(selectedInfo?.name ?? "", text: $mods.name)
+                        TextField(selectedInfo?.name ?? "", text: $workspace.mods.name)
                             .textFieldStyle(.plain).fieldBackground()
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
                     }
                     signGroup(title: L("Bundle Identifier")) {
-                        TextField(selectedInfo?.bundleID ?? "", text: $mods.bundleID)
+                        TextField(selectedInfo?.bundleID ?? "", text: $workspace.mods.bundleID)
                             .textFieldStyle(.plain).fieldBackground()
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
                     }
                     signGroup(title: L("版本号")) {
-                        TextField(selectedInfo?.version ?? "", text: $mods.version)
+                        TextField(selectedInfo?.version ?? "", text: $workspace.mods.version)
                             .textFieldStyle(.plain).fieldBackground()
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
                     }
                     signGroup(title: L("最低系统版本")) {
-                        TextField(L("如 15.0"), text: $mods.minOS)
+                        TextField(L("如 15.0"), text: $workspace.mods.minOS)
                             .textFieldStyle(.plain).fieldBackground()
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
@@ -1121,7 +1126,7 @@ struct EnterpriseCertView: View {
                     }
                     signGroup(title: L("打包文件名")) {
                         VStack(alignment: .leading, spacing: 4) {
-                            TextField(predictedOutputName, text: $mods.outputName)
+                            TextField(predictedOutputName, text: $workspace.mods.outputName)
                                 .textFieldStyle(.plain).fieldBackground()
                                 .autocorrectionDisabled()
                                 .textInputAutocapitalization(.never)
@@ -1158,16 +1163,11 @@ struct EnterpriseCertView: View {
                         HStack {
                             if engine.isRunning { ProgressView().tint(.white) }
                             Text(L("用 Apple ID 安装"))
-                                .font(.headline)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(Theme.accent)
-                        .foregroundStyle(.white)
-                        .cornerRadius(Theme.controlRadius)
-                        .shadow(color: Theme.accent.opacity(0.25), radius: 8, y: 4)
                     }
-                    .buttonStyle(CZFPressButtonStyle())
+                    // 0.9.188：走共享大按钮（52 高与文案保留，手写
+                    // background + 阴影去掉——全仓仅剩的 3 处阴影之二）。
+                    .buttonStyle(PrimaryButtonStyle())
                     .opacity(engine.isRunning ? 0.5 : 1)
                 } else {
                     Button {
@@ -1177,16 +1177,9 @@ struct EnterpriseCertView: View {
                         HStack {
                             if workspace.signBusy { ProgressView().tint(.white) }
                             Text(L("立即签名"))
-                                .font(.headline)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(Theme.negative)
-                        .foregroundStyle(.white)
-                        .cornerRadius(Theme.controlRadius)
-                        .shadow(color: Theme.negative.opacity(0.25), radius: 8, y: 4)
                     }
-                    .buttonStyle(CZFPressButtonStyle())
+                    .buttonStyle(PrimaryButtonStyle(tint: Theme.negative))
                     .opacity(workspace.signBusy || engine.isRunning || !certReady ? 0.5 : 1)
                 }
                 // 按钮正下方的实时状态行（轻松签式一眼看全，优先级
@@ -1229,6 +1222,32 @@ struct EnterpriseCertView: View {
                 // 只藏在默认收起的更多设置里，红按钮处直接说明，
                 // 免得在按钮上踩坑。只加提示，不改签名行为。
                 if signIdentity == .enterprise {
+                    // F-3 (0.9.188)：仅签名成功后，一键去安装刚签好的包——
+                    // 不用切 tab 到文件页翻找。record 为空（签名失败/
+                    // 多开全失败）时按钮不出现；多开签出 N 个副本时装
+                    // 第一份，其余去「应用库 → 已签名」逐个点安装。
+                    // 复用已签名行同款安装入口 installSigned。
+                    if let record = lastSignedRecord,
+                       signOnlyMessage != nil, !signOnlyFailed,
+                       !workspace.signBusy, !enterpriseInstallInFlight {
+                        Button {
+                            CZFHaptics.impact(.medium)
+                            installSigned(record)
+                        } label: {
+                            HStack {
+                                Text(L("Install"))
+                                    .font(.headline)
+                                Image(systemName: "square.and.arrow.down")
+                                    .font(.subheadline)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(Theme.accent.opacity(0.12))
+                            .foregroundStyle(Theme.accent)
+                            .cornerRadius(Theme.controlRadius)
+                        }
+                        .buttonStyle(CZFPressButtonStyle())
+                    }
                     if installWhenSign && multiCount > 1 {
                         Text(L("已开“签名后立即安装”，这次只签装 1 个，多开数量不生效；要签多个请关掉安装开关或用“仅签名”。"))
                             .font(.footnote)
@@ -1240,17 +1259,15 @@ struct EnterpriseCertView: View {
                     } label: {
                         HStack {
                             Text(L("更多设置"))
-                                .font(.headline)
                             Image(systemName: showMoreSettings ? "chevron.up" : "chevron.down")
                                 .font(.footnote)
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(Theme.accent.opacity(0.12))
-                        .foregroundStyle(Theme.accent)
-                        .cornerRadius(Theme.controlRadius)
                     }
-                    .buttonStyle(CZFPressButtonStyle())
+                    // 0.9.188：走共享幽灵按钮（SecondaryButtonStyle +
+                    // accent tint），不再手写 background + 圆角；44 高保留
+                    // （SecondaryButtonStyle 默认高就是 44）。
+                    .buttonStyle(SecondaryButtonStyle(tint: Theme.accent), sound: .tap)
                     if showMoreSettings {
                         PanelCard {
                             VStack(alignment: .leading, spacing: 12) {
@@ -1318,7 +1335,7 @@ struct EnterpriseCertView: View {
             ) { urls in
                 for url in urls {
                     if let staged = CertPluginStore.stage(url) {
-                        mods.plugins.append(staged)
+                        workspace.mods.plugins.append(staged)
                         pluginError = nil
                     } else {
                         pluginError = L("插件只支持 .dylib / .deb / .zip")
@@ -1329,7 +1346,7 @@ struct EnterpriseCertView: View {
         .alert(L("签名提醒"), isPresented: $showingWarningAlert) {
             Button(L("继续签名")) {
                 if let kind = pendingSignKind, let url = pendingSignURL {
-                    executeSign(kind: kind, url: url, mods: pendingSignMods)
+                    executeSign(kind: kind, url: url, workspace.mods: pendingSignMods)
                 }
                 clearPendingSign()
             }
@@ -1412,14 +1429,14 @@ struct EnterpriseCertView: View {
     /// 瘦身与兼容（签名时先改包再签，默认全关）：删 Watch 应用
     /// 与扩展插件能减小体积、去掉设备限制让 iPad 等设备也能装；
     /// 改包只删东西，不动签名流程本身，改坏直接报错不签。
-    /// 批量/多开同样带上（走同一份 mods）；不进预设，换 IPA 即清。
+    /// 批量/多开同样带上（走同一份 workspace.mods）；进预设（F-2 0.9.188），换 IPA 即清。
     private var slimSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle(L("去掉 Watch 应用（瘦身）"), isOn: $mods.stripWatch)
+            Toggle(L("去掉 Watch 应用（瘦身）"), isOn: $workspace.mods.stripWatch)
                 .font(.footnote)
-            Toggle(L("去掉扩展插件（瘦身）"), isOn: $mods.stripExtensions)
+            Toggle(L("去掉扩展插件（瘦身）"), isOn: $workspace.mods.stripExtensions)
                 .font(.footnote)
-            Toggle(L("去掉设备限制（兼容）"), isOn: $mods.stripDeviceLimits)
+            Toggle(L("去掉设备限制（兼容）"), isOn: $workspace.mods.stripDeviceLimits)
                 .font(.footnote)
             Text(L("签名时先改包再签：删 Watch / 扩展能减小体积，去设备限制让更多设备能装；顺手清掉包里 .DS_Store 等垃圾。"))
                 .font(.caption)
@@ -1480,9 +1497,11 @@ struct EnterpriseCertView: View {
     private func saveCurrentPreset() {
         let name = presetNameText.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
-        _ = CertSignPresetStore.save(name: name, minOS: mods.minOS,
+        _ = CertSignPresetStore.save(name: name, minOS: workspace.mods.minOS,
             multiCount: multiCount, multiStart: multiStart,
-            icon: mods.icon, pluginURLs: mods.plugins)
+            icon: workspace.mods.icon, pluginURLs: workspace.mods.plugins,
+            stripWatch: workspace.mods.stripWatch, stripExtensions: workspace.mods.stripExtensions,
+            stripDeviceLimits: workspace.mods.stripDeviceLimits, outputName: workspace.mods.outputName)
         presets = CertSignPresetStore.load()
         presetNameText = ""
         presetMessage = L("预设“%@”已保存。", name)
@@ -1491,15 +1510,21 @@ struct EnterpriseCertView: View {
     private func applyPreset(_ preset: CertSignPreset) {
         // 先清掉表单里已暂存的插件（跟换 IPA 时 resetMods 同例），
         // 再把预设的插件文件重新暂存一份进表单（预设原件不动）。
-        for url in mods.plugins { CertPluginStore.remove(url) }
-        mods.plugins = []
+        for url in workspace.mods.plugins { CertPluginStore.remove(url) }
+        workspace.mods.plugins = []
         var staged: [URL] = []
         for url in CertSignPresetStore.pluginURLs(for: preset) {
             if let stagedURL = CertPluginStore.stage(url) { staged.append(stagedURL) }
         }
-        mods.plugins = staged
-        mods.minOS = preset.minOS
-        mods.icon = preset.icon
+        workspace.mods.plugins = staged
+        workspace.mods.minOS = preset.minOS
+        workspace.mods.icon = preset.icon
+        // F-2 (0.9.188)：瘦身/兼容三开关与打包文件名同样恢复（旧预设
+        // 没有这几项时按默认值解，见 CertSignPreset）。
+        workspace.mods.stripWatch = preset.stripWatch
+        workspace.mods.stripExtensions = preset.stripExtensions
+        workspace.mods.stripDeviceLimits = preset.stripDeviceLimits
+        workspace.mods.outputName = preset.outputName
         iconItem = nil
         multiCountText = String(preset.multiCount)
         multiStartText = String(preset.multiStart)
@@ -1527,12 +1552,12 @@ struct EnterpriseCertView: View {
                 }
                 Spacer()
             }
-            if mods.plugins.isEmpty {
+            if workspace.mods.plugins.isEmpty {
                 Text(L("可选：.dylib / .deb / .zip，签名前注入"))
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
             } else {
-                ForEach(mods.plugins, id: \.path) { url in
+                ForEach(workspace.mods.plugins, id: \.path) { url in
                     HStack(spacing: 8) {
                         Image(systemName: "puzzlepiece.extension")
                             .font(.caption)
@@ -1542,7 +1567,7 @@ struct EnterpriseCertView: View {
                             .lineLimit(1)
                         Spacer()
                         Button {
-                            mods.plugins.removeAll { $0 == url }
+                            workspace.mods.plugins.removeAll { $0 == url }
                             CertPluginStore.remove(url)
                         } label: {
                             Image(systemName: "xmark.circle.fill")
@@ -1711,7 +1736,7 @@ struct EnterpriseCertView: View {
                     .frame(width: 40, height: 40)
                     .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous))
                 Button {
-                    mods.icon = nil
+                    workspace.mods.icon = nil
                     iconItem = nil
                     decodedIcon = nil
                     decodedIconData = nil
@@ -1725,7 +1750,7 @@ struct EnterpriseCertView: View {
                     Text(L("修复图标"))
                         .font(.footnote)
                 }
-            } else if mods.icon == nil {
+            } else if workspace.mods.icon == nil {
                 PhotosPicker(selection: $iconItem, matching: .images) {
                     Text(L("从相册选择"))
                         .font(.footnote)
@@ -1750,12 +1775,12 @@ struct EnterpriseCertView: View {
             }
             Spacer()
         }
-        .task(id: mods.icon) {
-            // B12-6：照抄同文件 S15（loadLibraryIcon :2609）：mods.icon
+        .task(id: workspace.mods.icon) {
+            // B12-6：照抄同文件 S15（loadLibraryIcon :2609）：workspace.mods.icon
             // 变时 detached 解一次、写回前核对仍是同一份 Data，旧解码
             // 不覆盖新图；.task 跑在主线程上（Swift 5 靶里 .task 继承
             // MainActor，见核验技能），读写 @State 不用再跳。
-            guard let data = mods.icon else {
+            guard let data = workspace.mods.icon else {
                 decodedIcon = nil
                 decodedIconData = nil
                 return
@@ -1766,26 +1791,26 @@ struct EnterpriseCertView: View {
                 // 用 80×80 缩略图；不是 IPA 内图标，是 Photos picker 选的图。
                 IPALibrary.thumbnail(from: data, maxPixelSize: 80)
             }.value
-            guard mods.icon == data else { return }
+            guard workspace.mods.icon == data else { return }
             decodedIcon = decoded
             decodedIconData = data
         }
     }
 
     /// 修复图标：把 App 内已有的 AppLogo 图设为新图标，走
-    /// mods.icon 既有签名路，不新造生成逻辑；资源取不到时不动。
+    /// workspace.mods.icon 既有签名路，不新造生成逻辑；资源取不到时不动。
     private func repairIcon() {
         guard let data = UIImage(named: "AppLogo")?.pngData() else { return }
-        mods.icon = data
+        workspace.mods.icon = data
         iconItem = nil
     }
 
     /// 换一个 IPA 时清掉修改项，并删掉已暂存的插件文件。
     private func resetMods() {
-        for url in mods.plugins {
+        for url in workspace.mods.plugins {
             CertPluginStore.remove(url)
         }
-        mods = CertSignMods()
+        workspace.mods = CertSignMods()
         pluginError = nil
         multiCountText = "1"
         multiStartText = "1"
@@ -1818,10 +1843,10 @@ struct EnterpriseCertView: View {
         // 后续表单重绘直接复用，不再每敲一键重新解压读盘。
         selectedInfo = IPALibrary.appInfo(at: url)
         if let info = selectedInfo {
-            mods.name = info.name
-            mods.bundleID = info.bundleID
-            mods.version = info.version ?? ""
-            mods.minOS = info.minOS ?? ""
+            workspace.mods.name = info.name
+            workspace.mods.bundleID = info.bundleID
+            workspace.mods.version = info.version ?? ""
+            workspace.mods.minOS = info.minOS ?? ""
         }
         // 脱壳预检（轻松签式）：选好就在后台算，加密的直接
         // 在表单上提示；选中的还是这个 IPA 才写，免得切走后
@@ -1846,8 +1871,8 @@ struct EnterpriseCertView: View {
     /// 签名时真正提交的改动：框里和原值一样（或被清空）的项不提交，
     /// 免得把原名、原 ID、原版本号原样再写一遍。
     private var effectiveMods: CertSignMods {
-        guard let info = selectedInfo else { return mods }
-        var result = mods
+        guard let info = selectedInfo else { return workspace.mods }
+        var result = workspace.mods
         let name = result.name.trimmingCharacters(in: .whitespaces)
         result.name = (name.isEmpty || name == info.name) ? "" : name
         let bundleID = result.bundleID.trimmingCharacters(in: .whitespaces)
@@ -1945,6 +1970,7 @@ struct EnterpriseCertView: View {
         signBlockedMessage = nil
         workspace.signBusy = true
         signOnlyMessage = nil
+        lastSignedRecord = nil
         let currentMods = effectiveMods
         Task.detached(priority: .userInitiated) {
             // A7：签名前重解析挪进 detached 任务——主线程不再同步解 IPA。
@@ -1981,7 +2007,7 @@ struct EnterpriseCertView: View {
                     warnings.append(expiry)
                 }
                 if warnings.isEmpty {
-                    self.executeSign(kind: kind, url: url, mods: currentMods)
+                    self.executeSign(kind: kind, url: url, workspace.mods: currentMods)
                 } else {
                     self.pendingWarnings = warnings
                     self.pendingSignKind = kind
@@ -2084,6 +2110,9 @@ struct EnterpriseCertView: View {
                         var ok = 0
                         var fail = 0
                         var firstError: String?
+                        // F-3 (0.9.188)：多开时记下第一份签好的记录，
+                        // 按钮就装这一份。
+                        var firstRecord: SignedIPARecord?
                         for j in 0..<multiCount {
                             let idx = startIdx + j
                             var copy = mods
@@ -2095,6 +2124,7 @@ struct EnterpriseCertView: View {
                             do {
                                 let record = try await CertSigner.signToFile(ipa: url, mods: copy)
                                 ok += 1
+                                if firstRecord == nil { firstRecord = record }
                                 CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
                                     appName: record.appName, kind: .signOnly, success: true,
                                     detail: L("已存到「已签名」")))
@@ -2114,12 +2144,14 @@ struct EnterpriseCertView: View {
                                 appName: baseName, kind: .signOnly, success: true,
                                 detail: L("已签出 %d 个副本，存到「已签名」。", multiCount)))
                             signOnlyMessage = L("已签出 %d 个副本，存到「应用库 → 已签名」，逐个点安装。", multiCount)
+                            lastSignedRecord = firstRecord
                             localInstall.appendStepLog(L("签名成功：%@（%d 个副本）", baseName, multiCount))
                             CZFHaptics.notification(.success)
                             signOnlyFailed = false
                         } else {
                             signOnlyMessage = L("批量签完：成功 %d 个，失败 %d 个。", ok, fail) + " " + (firstError ?? "")
                             signOnlyFailed = true
+                            lastSignedRecord = nil
                             localInstall.appendStepLog(L("批量签完：成功 %d 个，失败 %d 个。", ok, fail))
                             CZFHaptics.notification(.error)
                         }
@@ -2129,6 +2161,7 @@ struct EnterpriseCertView: View {
                             appName: record.appName, kind: .signOnly, success: true,
                             detail: L("已存到「已签名」")))
                         signOnlyMessage = L("签好了，已存到「应用库 → 已签名」。")
+                        lastSignedRecord = record
                         localInstall.appendStepLog(L("签名成功：%@", record.appName))
                         CZFHaptics.notification(.success)
                         signOnlyFailed = false
@@ -2139,6 +2172,7 @@ struct EnterpriseCertView: View {
                     let friendly = friendlySignError(message)
                     signOnlyMessage = friendly
                     signOnlyFailed = true
+                    lastSignedRecord = nil
                     localInstall.appendStepLog(L("Signing failed: %@", friendly))
                     CZFHaptics.notification(.error)
                     CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
@@ -2178,6 +2212,7 @@ struct EnterpriseCertView: View {
                     let friendly = friendlySignError(message)
                     signOnlyMessage = friendly
                     signOnlyFailed = true
+                    lastSignedRecord = nil
                     localInstall.appendStepLog(L("Signing failed: %@", friendly))
                     CZFHaptics.notification(.error)
                     CertSignLogStore.append(CertSignLogEntry(id: UUID(), date: Date(),
@@ -2321,30 +2356,36 @@ struct EnterpriseCertView: View {
     /// 的安装跑起来时这里不跟着亮，免得串台）。
     @ViewBuilder
     private var enterpriseInstallStatus: some View {
-        if enterpriseInstallInFlight {
-            HStack(spacing: 8) {
-                if engine.installProgress > 0 {
-                    Text(L("配对安装进行中（%d%%）", Int(engine.installProgress * 100)))
+        // 0.9.188：外皮与诊断日志区统一为 PanelCard（原来是裸行）；
+        // 无进行中也无失败时不渲染，不留空卡。分支内容不动。
+        if enterpriseInstallInFlight || enterpriseInstallErrorText != nil {
+            PanelCard {
+                if enterpriseInstallInFlight {
+                    HStack(spacing: 8) {
+                        if engine.installProgress > 0 {
+                            Text(L("配对安装进行中（%d%%）", Int(engine.installProgress * 100)))
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                        } else {
+                            Text(L("配对安装进行中"))
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                        }
+                        Spacer()
+                        Button(L("取消安装")) { CZFHaptics.impact(.light); engine.cancelOneClick() }
                         .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                } else {
-                    Text(L("配对安装进行中"))
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                }
-                Spacer()
-                Button(L("取消安装")) { CZFHaptics.impact(.light); engine.cancelOneClick() }
-                .font(.footnote)
-            }
-        } else if let error = enterpriseInstallErrorText {
-            HStack(spacing: 8) {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundStyle(Theme.negative)
-                Spacer()
-                if let record = enterpriseInstallRecord {
-                    Button(L("重试配对安装")) { CZFHaptics.impact(.light); startEngineInstall(record: record) }
-                        .font(.footnote)
+                    }
+                } else if let error = enterpriseInstallErrorText {
+                    HStack(spacing: 8) {
+                        Text(error)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.negative)
+                        Spacer()
+                        if let record = enterpriseInstallRecord {
+                            Button(L("重试配对安装")) { CZFHaptics.impact(.light); startEngineInstall(record: record) }
+                                .font(.footnote)
+                        }
+                    }
                 }
             }
         }
@@ -2362,7 +2403,10 @@ struct EnterpriseCertView: View {
     /// 共用同一个展开态与同一份数据；三段切栏一次只显示一段，
     /// 不会同时出现两个。
     private var installDiagnosticLogSection: some View {
-        DisclosureGroup(isExpanded: diagnosticLogExpanded) {
+        // 0.9.188：外皮与安装状态区统一为 PanelCard；日志井底色走
+        // Theme.control（原来是 Color.secondary.opacity(0.08) 手写）。
+        PanelCard {
+            DisclosureGroup(isExpanded: diagnosticLogExpanded) {
             VStack(alignment: .leading, spacing: 8) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 2) {
@@ -2392,8 +2436,7 @@ struct EnterpriseCertView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxHeight: 200)
-                .background(Color.secondary.opacity(0.08))
-                .cornerRadius(Theme.controlRadius)
+                .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous).fill(Theme.control))
                 Button(L("Copy logs")) {
                     var text = localInstall.diagnosticLog.joined(separator: "\n")
                     let recentEngine = LogStore.shared.lines.suffix(40)
@@ -2413,6 +2456,7 @@ struct EnterpriseCertView: View {
             Text(L("安装诊断日志"))
                 .font(.footnote)
                 .foregroundStyle(Theme.muted)
+        }
         }
     }
 
@@ -2648,24 +2692,25 @@ private struct LibraryIPAPicker: View {
         // A-37-3：读 iconEpoch 建立依赖——图标本体在共享缓存里，
         // 批量写回只 bump epoch、不写 @State；不读它，body 不会
         // 重算，图就永远不出现。别把这行当死代码清掉。
+        // 0.9.188：与文件页行同款（HStack 间距 12、图标 60×60、
+        // 三行文本同字号层级；名字不再另写 .primary）。
         let _ = iconEpoch
-        return HStack(spacing: 8) {
+        return HStack(spacing: 12) {
             if let uiImage = ThumbnailCache.image(for: item.url.path) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 52, height: 52)
+                    .frame(width: 60, height: 60)
                     .clipShape(RoundedRectangle(cornerRadius: Theme.controlRadius))
             } else {
                 Image(systemName: "doc")
                     .foregroundStyle(Theme.muted)
                     .font(.title3)
-                    .frame(width: 52, height: 52)
+                    .frame(width: 60, height: 60)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(displayName(item))
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
                     .lineLimit(1)
                 Text(secondLine(item))
                     .font(.caption)

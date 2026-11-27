@@ -365,6 +365,20 @@ struct CZFPressButtonStyle: ButtonStyle {
     }
 }
 
+/// 0.9.188：与 CZFPressButtonStyle 二选一统一后的留存者——一个按钮
+/// 本身不画任何东西、只把按压态报出来，给按钮外画的表面用（安装页
+/// 的 installSurface：蓝底与按压缩放都在按钮外面，按钮自己画反馈
+/// 够不着外皮）。CZFPressButtonStyle 留给自己画按压反馈的按钮；
+/// 两者不是一回事，不再各处私有一份。
+struct PressReportingButtonStyle: ButtonStyle {
+    @Binding var isPressed: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { _, pressed in isPressed = pressed }
+    }
+}
+
 /// What a card is made of: a pane of glass with nothing in it. The backdrop
 /// shows through untouched, under the faintest wash, and the pane is drawn by
 /// its rim: lit along the top, dim down the sides, catching a little light
@@ -1120,26 +1134,32 @@ extension View {
 
 // MARK: - Buttons
 
-/// The full-width call to action: filled `blue` under a white label, the one
+/// The full-width call to action: filled `tint` under a white label, the one
 /// solid colour on a page. Plays `sound` as it fires.
+/// 0.9.188：tint 通道（默认蓝）——签名页的企业红按钮走同一套大按钮，
+/// 不再手写 background + 阴影；现有调用方不传 tint，仍是蓝色。
 struct PrimaryButtonStyle: PrimitiveButtonStyle {
     var sound: UISound = .press
+    var tint: Color = Theme.blue
 
     func makeBody(configuration: Configuration) -> some View {
-        SoundingButtonStyle(base: PrimaryButtonLook(), sound: sound)
+        SoundingButtonStyle(base: PrimaryButtonLook(tint: tint), sound: sound)
             .makeBody(configuration: configuration)
     }
 }
 
 /// How `PrimaryButtonStyle` draws its button.
 private struct PrimaryButtonLook: ButtonStyle {
+    var tint: Color
+
     func makeBody(configuration: Configuration) -> some View {
-        PrimaryButtonBody(configuration: configuration)
+        PrimaryButtonBody(configuration: configuration, tint: tint)
     }
 }
 
 private struct PrimaryButtonBody: View {
     let configuration: ButtonStyleConfiguration
+    let tint: Color
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
@@ -1151,7 +1171,7 @@ private struct PrimaryButtonBody: View {
             .tint(.white)
             .frame(maxWidth: .infinity, minHeight: 52)
             .padding(.horizontal, 20)
-            .background(shape.fill(isEnabled ? Theme.blue : Theme.control))
+            .background(shape.fill(isEnabled ? tint : Theme.control))
             .contentShape(shape)
             .modifier(PressFeedback(isPressed: configuration.isPressed))
     }

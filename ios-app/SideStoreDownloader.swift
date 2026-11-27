@@ -2428,6 +2428,11 @@ extension IPALibrary {
         let bundleID: String
         let name: String
         let version: String?
+        /// CFBundleVersion (build number) from the same plist — the
+        /// duplicate cleanup groups on bundle ID + version + build, so a
+        /// re-signed or rebuilt copy with the same version still counts
+        /// as a different build, not a duplicate.
+        let build: String?
         /// MinimumOSVersion from the same plist; the cert page pre-fills its
         /// edit fields with the IPA's current values.
         let minOS: String?
@@ -2536,6 +2541,7 @@ extension IPALibrary {
             : (bundleName?.isEmpty == false ? bundleName! : bundleID)
         return AppInfo(bundleID: bundleID, name: name,
                        version: dict["CFBundleShortVersionString"] as? String,
+                       build: dict["CFBundleVersion"] as? String,
                        minOS: dict["MinimumOSVersion"] as? String)
     }
 

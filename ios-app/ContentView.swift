@@ -567,8 +567,10 @@ struct ContentView: View {
 
     private var appCard: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 12) {
-                sectionTitle(L("Install"), systemImage: "square.and.arrow.down")
+            // 0.9.188：卡内间距走共享 token，与 advancedSection /
+            // progressContent 对齐（原字面 12，值不动）。
+            VStack(alignment: .leading, spacing: Theme.spacingSmall) {
+                SectionTitle(title: L("Install"), systemImage: "square.and.arrow.down")
                 quotaRow
                 capabilitiesInlineRow
                 // P1-1 (0.9.186): the preflight checklist, on the page
@@ -723,7 +725,7 @@ struct ContentView: View {
     @ViewBuilder
     private var preflightChecklist: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: Theme.spacingSmall) {
                 Text(L("安装前检查"))
                     .font(.subheadline.weight(.semibold))
                 if pairingPrecheckState(engine) == .blocked {
@@ -773,9 +775,11 @@ struct ContentView: View {
     /// One checklist row: status colour + title + detail, with an
     /// optional fix button on the right (precheckRow 同款形状，行更紧凑，
     /// so four of them fit in one card on the install page).
+    /// 0.9.188：行内间距与 PrecheckSheet 的 precheckRow 对齐（12），
+    /// 图标字号与 precheckRow 相同（默认 body），行高一致。
     private func preflightRow(title: String, state: PrecheckState, detail: String,
                               fixTitle: String? = nil, fix: (() -> Void)? = nil) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.spacingSmall) {
             Image(systemName: state.systemImage)
                 .foregroundStyle(state.color)
             VStack(alignment: .leading, spacing: 2) {
@@ -819,8 +823,8 @@ struct ContentView: View {
     @ViewBuilder
     private var accountTeamPicker: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: Theme.spacingSmall) {
+                HStack(spacing: Theme.spacingSmall) {
                     Text(L("签名账号"))
                         .font(.subheadline.weight(.semibold))
                     Spacer(minLength: 8)
@@ -850,7 +854,7 @@ struct ContentView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                HStack(spacing: 10) {
+                HStack(spacing: Theme.spacingSmall) {
                     Text(L("Team"))
                         .font(.subheadline.weight(.semibold))
                     Spacer(minLength: 8)
@@ -888,7 +892,7 @@ struct ContentView: View {
 
     /// The two ways in for a custom build: pick a file, or paste a link.
     private var importControl: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Theme.spacingSmall) {
             filePickerButton
             if let build = engine.customIPABuild, !engine.isImportingIPA {
                 recognizedNote(build)
@@ -1139,9 +1143,9 @@ struct ContentView: View {
     /// Only the two sets of content cross-fade; the surface itself changes
     /// size, and the button's blue gives way to the card's fill.
     private var installSurface: some View {
-        // Fixed at 16 in both states (button and progress card share the
-        // shape), so the surface never jumps between radii.
-        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        // 0.9.188：圆角走卡片 token（原来硬编码 16；按钮与进度卡共用
+        // 同一形状，表面不在两态之间跳变——值改走 Theme.cardRadius）。
+        let shape = RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
         return ZStack(alignment: .top) {
             if showProgress {
                 progressContent
@@ -1359,9 +1363,9 @@ struct ContentView: View {
     /// (below iOS 27).
     private var pairingFileCard: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.spacingSmall) {
                 HStack(spacing: 8) {
-                    sectionTitle(L("Pairing file"), systemImage: "lock.doc")
+                    SectionTitle(title: L("Pairing file"), systemImage: "lock.doc")
                     Spacer(minLength: 4)
                     if engine.importedPairingName != nil {
                         Image(systemName: "checkmark.circle")
@@ -1465,10 +1469,10 @@ struct ContentView: View {
     /// pairing-file import.
     private var advancedSection: some View {
         PanelCard {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Theme.spacingSmall) {
                 Button { advancedExpanded.toggle() } label: {
                     HStack(spacing: 8) {
-                        sectionTitle(L("Advanced"), systemImage: "slider.horizontal.3")
+                        SectionTitle(title: L("Advanced"), systemImage: "slider.horizontal.3")
                         Spacer(minLength: 4)
                         // Collapsed, this is the only sign an imported file is in use.
                         if engine.canSelfPair, engine.importedPairingName != nil {
@@ -1483,7 +1487,7 @@ struct ContentView: View {
                 .buttonStyle(.plain, sound: .tick)
 
                 if advancedExpanded {
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: Theme.spacingSmall) {
                         if engine.installSource != .custom {
                             versionOption
                         }
@@ -1622,7 +1626,8 @@ struct ContentView: View {
     /// What the install surface holds as a card; `installSurface` draws the
     /// card itself.
     private var progressContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        // 0.9.188：卡内间距走共享 token，与 appCard / advancedSection 对齐。
+        VStack(alignment: .leading, spacing: Theme.spacingSmall) {
             HStack(spacing: 8) {
                 Text(progressTitle)
                     .font(.headline)
@@ -1811,10 +1816,8 @@ struct ContentView: View {
     }
 
     // MARK: Helpers
-
-    private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        SectionTitle(title: title, systemImage: systemImage)
-    }
+    // 0.9.188：本地 sectionTitle 已并入 Theme SectionTitle（原来只是
+    // 一层透传），调用处直接用 SectionTitle。
 }
 
 // MARK: - Pre-install checklist
@@ -2606,17 +2609,6 @@ extension View {
 }
 
 // MARK: - Install surface
-
-/// A button that draws nothing of its own and reports its press, for a surface
-/// drawn outside the button to show.
-private struct PressReportingButtonStyle: ButtonStyle {
-    @Binding var isPressed: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .onChange(of: configuration.isPressed) { _, pressed in isPressed = pressed }
-    }
-}
 
 private extension AnyTransition {
     /// Content changing places inside a surface that is changing shape: the old

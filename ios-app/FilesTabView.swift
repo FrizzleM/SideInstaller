@@ -202,6 +202,9 @@ struct FilesTabView: View {
     @State private var pendingMoveDestDir = ""
     /// 批量删除待确认（工具栏“删除所选”点后先弹确认，带数量）。
     @State private var pendingDeleteSelection = false
+    /// F-1 (0.9.188)：清理重复待确认——(组数, 待删项)，nil = 不弹；
+    /// 独立于 pendingDeleteSelection，不复用它的绑定。
+    @State private var pendingDuplicateCleanup: (groups: Int, toDelete: [LocalFileItem])?
     /// 通用失败提示（UI-5：由 B-3 的删除失败 alert 泛化而来——页尾 opMessage
     /// 在列表底下，顶部看不到，任何失败都可经这条 alert 可见；
     /// UI-2(b)：opMessage 的 .onChange 里 opFailed == true 时也会把
@@ -960,9 +963,12 @@ struct FilesTabView: View {
                     }
                 }
             }
+            // 0.9.188：外皮与移动 sheet 同款（inline 标题 + 右上取消），
+            // 内容与按钮不动。
             .navigationTitle(L("Cellular Install (OTA)"))
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button(L("Cancel")) { otaRecord = nil }
                 }
             }
@@ -1187,6 +1193,21 @@ struct FilesTabView: View {
                 Text(L("删除后无法恢复"))
             }
         }
+        // F-1 (0.9.188)：清理重复确认——独立 Bool state（不用
+        // pendingDeleteSelection / opErrorMessage 的绑定），Side 惯例
+        // .alert（不用 Live 的 confirmationDialog）。
+        .alert(L("Clean up duplicate IPAs"), isPresented: Binding(
+            get: { pendingDuplicateCleanup != nil },
+            set: { if !$0 { pendingDuplicateCleanup = nil } }
+        )) {
+            Button(L("Delete"), role: .destructive) {
+                pendingDuplicateCleanup = nil
+                cleanupDuplicates()
+            }
+            Button(L("Cancel"), role: .cancel) { pendingDuplicateCleanup = nil }
+        } message: {
+            Text(L("Found %d groups of duplicate IPAs. %d old copies will be deleted. The most recently modified copy in each group is kept. This can't be undone.", pendingDuplicateCleanup?.groups ?? 0, pendingDuplicateCleanup?.toDelete.count ?? 0))
+        }
         // UI-5：通用失败提示（B-3 的删除失败 alert 泛化而来——页尾 importCard 的
         // opMessage 在列表底下，顶部看不到；失败 alert 只在操作执行后
         // 才立起，此时确认 alert 已收起，不跟 B-1 的确认抢 present）。
@@ -1271,6 +1292,8 @@ struct FilesTabView: View {
     private func filesBranchContent(partition: FilePartition,
                                     renewalByPath: [String: RenewalSourceEntry],
                                     renewalByBundleID: [String: RenewalSourceEntry]) -> some View {
+        // F-1 (0.9.188)：重复组一次算好，排序行按钮与确认 alert 共用。
+        let duplicates = duplicateCleanup(in: partition)
         if selecting {
             selectionBar.cascadeItem(2)
         }
@@ -1336,6 +1359,30 @@ struct FilesTabView: View {
                     .font(.subheadline.weight(.semibold))
             }
             Spacer()
+            // F-1 (0.9.188)：清理重复——只在根目录视图出现，仅当有重复组时
+            // 才显示（计数 = 待删份数）。候选集是当前切栏的 IPA 全量
+            // （递归整棵树，不论搜索词与类型筛选）；Signed 目录、未解析
+            // 与版本/构建号缺失的行不进分组。计数首次需要时才触发解析
+            // （下面 .task，同搜索任务同款循环），不在 onAppear 全量解析。
+            if currentDir.isEmpty, !duplicates.toDelete.isEmpty {
+                Button {
+                    CZFHaptics.impact(.light)
+                    pendingDuplicateCleanup = duplicates
+                } label: {
+                    Text(L("Clean up duplicates (%d)", duplicates.toDelete.count))
+                }
+                .buttonStyle(SecondaryButtonStyle(), sound: .tap)
+                .controlSize(.small)
+            }
+        }
+        // F-1 (0.9.188)：计数首次需要时，对候选集里未解析的 IPA 调一次
+        // loadFileIPAInfoAndIcon（复用搜索任务同款循环）；解析结果经批量
+        // 写回落进 fileIPAInfo 后上面按钮的计数自行重算。tried 集在
+        // loadFileIPAInfoAndIcon 内去重，重复触发不重复读盘。
+        .task(id: "\(fileTab == .unsigned ? "unsigned" : "signed")-\(filesRefreshGeneration)") {
+            for item in partition.ipas where item.isIPA && !item.isInSignedDir && fileIPAInfo[item.url.path] == nil {
+                loadFileIPAInfoAndIcon(for: item)
+            }
         }
         if !currentDir.isEmpty {
             let dirItems = currentDirItems
@@ -1612,7 +1659,9 @@ struct FilesTabView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text(L("已选 %d 个", selection.count))
                     .font(.subheadline.weight(.semibold))
-                HStack(spacing: 10) {
+                // 0.9.188：按钮行间距走共享 token，与文件行/日志行的
+                // HStack 间距 12 对齐；按钮本身已是共享 SecondaryButtonStyle。
+                HStack(spacing: Theme.spacingSmall) {
                     Button {
                         zipSelection()
                     } label: {
@@ -2460,6 +2509,99 @@ struct FilesTabView: View {
 
     /// 批量删：先删完所有项，最后只扫一次（原来每项各扫一次，
     /// 删 N 个就是 N 次整树枚举，全在主线程）。
+    /// F-1 (0.9.188)：重复包分组——分组 key = Bundle ID + 版本 + 构建号；
+    /// 版本或构建号为 nil 或 "" 的不参与；Signed 目录（签好的包是刻意
+    /// 产物）与未解析的行不进分组；非 IPA 行不进分组。同组留修改时间
+    /// 最新的一份，其余进待删集（整组永不全删；mtime 打平用路径兜底
+    /// 保确定性）。与 Downloads 页的“清理旧版本”（每 Bundle ID 只留
+    /// 最新版本，跨版本删）不是一回事，不共用函数。
+    private func duplicateCleanup(in partition: FilePartition) -> (groups: Int, toDelete: [LocalFileItem]) {
+        var groups: [String: [LocalFileItem]] = [:]
+        for item in partition.ipas where item.isIPA && !item.isInSignedDir {
+            guard let info = fileIPAInfo[item.url.path],
+                  !info.bundleID.isEmpty,
+                  let version = info.version, !version.isEmpty,
+                  let build = info.build, !build.isEmpty else { continue }
+            groups["\(info.bundleID)\n\(version)\n\(build)", default: []].append(item)
+        }
+        var toDelete: [LocalFileItem] = []
+        var groupCount = 0
+        for members in groups.values where members.count > 1 {
+            groupCount += 1
+            let sorted = members.sorted {
+                let a = $0.modified ?? .distantPast, b = $1.modified ?? .distantPast
+                if a != b { return a > b }
+                return $0.url.path < $1.url.path
+            }
+            toDelete.append(contentsOf: sorted.dropFirst())
+        }
+        return (groupCount, toDelete)
+    }
+
+    /// F-1 (0.9.188)：执行清理重复——删前一刻按当时列表重算一次
+    /// （确认时的快照只用于 alert 文案）；循环骨架复用 deleteSelection：
+    /// 正在安装/签名/续签的跳过计数，续签源文件跳过计数（不弹逐项
+    /// 警告），removeFileFromDisk 失败计 failed 并记名；删后把已删
+    /// 路径从 fileIPAInfo/fileIPAInfoTried 清掉，再重扫 + 配对重算。
+    /// 不照搬 Live 的 try? 静默跳过。
+    private func cleanupDuplicates() {
+        let targets = duplicateCleanup(in: filePartition).toDelete
+        var deleted = 0
+        var failedNames: [String] = []
+        var skippedInstalling = 0
+        var skippedSigning = 0
+        var skippedRenewing = 0
+        var skippedRenewalSource = 0
+        var hadIPA = false
+        for item in targets {
+            guard files.contains(where: { $0.id == item.id }) else { continue }
+            if engine.isInstallingSource(path: item.url.path) { skippedInstalling += 1; continue }
+            if engine.isSigningSource(path: item.url.path) { skippedSigning += 1; continue }
+            if engine.isRenewingSource(path: item.url.path) { skippedRenewing += 1; continue }
+            if renewalSource(for: item) != nil { skippedRenewalSource += 1; continue }
+            hadIPA = true
+            if removeFileFromDisk(item) {
+                deleted += 1
+                fileIPAInfo.removeValue(forKey: item.url.path)
+                fileIPAInfoTried.remove(fileIconKey(item))
+            } else {
+                failedNames.append(item.name)
+            }
+        }
+        refreshFiles(resetDir: true)
+        if hadIPA {
+            Task { @MainActor in SideloadedAppsManager.shared.refreshRefreshableOnly() }
+        }
+        if !failedNames.isEmpty {
+            var list = failedNames.prefix(5).joined(separator: "、")
+            if failedNames.count > 5 {
+                list += "、" + L("等 %d 个", failedNames.count - 5)
+            }
+            opMessage = L("Failed to delete %d files: %@", failedNames.count, list)
+            opFailed = true
+            opErrorMessage = opMessage
+        } else if skippedInstalling > 0 {
+            opMessage = L("This file is being installed. Wait until it finishes.")
+            opFailed = true
+            opErrorMessage = opMessage
+        } else if skippedSigning > 0 {
+            opMessage = L("This file is being signed. Wait until it finishes.")
+            opFailed = true
+            opErrorMessage = opMessage
+        } else if skippedRenewing > 0 {
+            opMessage = L("This file is being renewed. Wait until it finishes.")
+            opFailed = true
+            opErrorMessage = opMessage
+        } else if skippedRenewalSource > 0 {
+            opMessage = L("%d renewal source files were skipped.", skippedRenewalSource)
+            opFailed = true
+            opErrorMessage = opMessage
+        } else {
+            opMessage = L("Cleaned up %d duplicate IPAs.", deleted)
+            opFailed = false
+        }
+    }
+
     private func deleteSelection() {
         var failed = 0
         var skippedFolders = 0
@@ -2698,6 +2840,61 @@ struct FilesTabView: View {
     /// installed. A stopped outcome (the run never started, or a cancel)
     /// ends the batch — the items after it are listed with the same reason,
     /// not silently dropped.
+    /// B-1 (0.9.188)：批量安装里单个已签名 IPA 的安装——installOneCustomIPA
+    /// 的已签名版：直接调 runInstallSignedIPA（企业本地安装，不经
+    /// startEnterpriseInstall——那路会立 fileInstallInFlight 并弹完成框，
+    /// 批量里每项都弹一次），再照 installOneCustomIPA 同款轮询等管线
+    /// 跑完。起跑守卫拦住（没起跑）是系统性原因，stopped: true，整批
+    /// 到此为止；跑起来后的成败只算这一项（stopped: false）。单点安装
+    /// 的现有分路（installSignedFile / installUnsignedFile）不动。
+    private func installOneSignedIPA(_ item: LocalFileItem) async -> Engine.BatchInstallOutcome {
+        let name = (item.name as NSString).deletingPathExtension
+        if Task.isCancelled {
+            return Engine.BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        engine.runInstallSignedIPA(ipaURL: item.url)
+        // installOneCustomIPA 同款：等管线起跑（全隧道探针最多拖半秒），
+        // 3 秒还不起跑就是起跑守卫拦住了，不是起跑慢。
+        var waited = 0.0
+        while !engine.isRunning, !Task.isCancelled, waited < 3.0 {
+            try? await Task.sleep(for: .milliseconds(100))
+            waited += 0.1
+        }
+        if Task.isCancelled {
+            return Engine.BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        guard engine.isRunning else {
+            // 没起跑：守卫原因（配对/隧道/向导）对剩下每项都一样，
+            // 逐个重跑只会重复同一失败，整批到此为止。runInstallSignedIPA
+            // 入口已清掉上一跑的 lastError/guide，所以这里剩下的就是
+            // 这次的原因（B-1 0.9.163 同款）。
+            let reason: String
+            if let guide = engine.guide {
+                reason = ([guide.title] + guide.steps).joined(separator: "\n")
+            } else if let lastError = engine.lastError {
+                reason = lastError
+            } else {
+                reason = L("The install didn't start. Open SideInstaller to see why.")
+            }
+            return Engine.BatchInstallOutcome(name: name, error: reason, stopped: true)
+        }
+        while engine.isRunning, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        if Task.isCancelled {
+            return Engine.BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+        }
+        if engine.finished {
+            return Engine.BatchInstallOutcome(name: name, error: nil, stopped: false)
+        }
+        if let error = engine.lastError {
+            return Engine.BatchInstallOutcome(name: name, error: error, stopped: false)
+        }
+        // 跑完了、没成功、没留错：只有取消走这条路——用户停了这跑，
+        // 剩下的别再起。
+        return Engine.BatchInstallOutcome(name: name, error: L("Install stopped"), stopped: true)
+    }
+
     private func installSelection() {
         guard batchInstallTask == nil else { return }
         let targets = selectionIPAs
@@ -2749,6 +2946,10 @@ struct FilesTabView: View {
             // never lands in the failure bucket.
             var userSkipped = 0
             var skippedOffsets: Set<Int> = []
+            // B-1 (0.9.188)：已签名项走企业安装路的计数（汇总里与 Apple ID
+            // 路分开报数）。
+            var signedTotal = 0
+            var signedOk = 0
             for (offset, item) in targets.enumerated() {
                 if Task.isCancelled || stopped { break }
                 // F-2 (0.9.175): Skip tapped between items — this item
@@ -2766,7 +2967,17 @@ struct FilesTabView: View {
                 }
                 batchInstallIndex = offset + 1
                 batchInstallCurrent = (item.name as NSString).deletingPathExtension
-                let outcome = await engine.installOneCustomIPA(item.url)
+                // B-1 (0.9.188)：已签名 IPA 改走已签名安装路（企业本地安装，
+                // installSignedFile 同款目标判定），不再全进 Apple ID 重签；
+                // 未签名的仍走现路。
+                let outcome: Engine.BatchInstallOutcome
+                if item.isInSignedDir {
+                    signedTotal += 1
+                    outcome = await installOneSignedIPA(item)
+                    if outcome.error == nil { signedOk += 1 }
+                } else {
+                    outcome = await engine.installOneCustomIPA(item.url)
+                }
                 // F-2 (0.9.175): Skip tapped mid-install — `cancelOneClick()`
                 // stopped this run, so its outcome (a stop, not a real
                 // failure) counts as user-skipped and must not set
@@ -2833,6 +3044,11 @@ struct FilesTabView: View {
             }
             if skipped > 0 {
                 message += " " + L("其中 %d 个不是 IPA，已跳过。", skipped)
+            }
+            // B-1 (0.9.188)：两种路的结果分开报——已签名项走企业安装路
+            // 的个数单独一句，不跟 Apple ID 路的成功数混在一起。
+            if signedTotal > 0 {
+                message += " " + L("Including %d signed IPAs installed via enterprise install.", signedOk)
             }
             opMessage = message
             opFailed = !failed.isEmpty
@@ -3137,22 +3353,29 @@ struct FilesTabView: View {
 
     /// 轻松签应用页未签名行：名字 / V版本 | 大小 | Bundle ID / 文件名，
     /// 整行可点进签名段表单（不要行内按钮）。
-    private func unsignedRowTexts(_ item: LocalFileItem) -> some View {
+    /// 0.9.188：三类行共用的三行文本（名 / 第二行 / 文件名）——文件行、
+    /// 未签名行、已签名行同一套字号层级（名 subheadline semibold，第二
+    /// 行与文件名 caption muted），一处定，不再各写一套。文件行在第
+    /// 二行与文件名之间还插一枚版本对比角标，那半行仍留在 fileRow 里。
+    private func rowTexts(name: String, second: String, fileName: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(unsignedDisplayName(item))
+            Text(name)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
                 .lineLimit(1)
-            Text(unsignedSecondLine(item))
+            Text(second)
                 .font(.caption)
                 .foregroundStyle(Theme.muted)
                 .lineLimit(1)
-            Text(item.name)
+            Text(fileName)
                 .font(.caption)
                 .foregroundStyle(Theme.muted)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func unsignedRowTexts(_ item: LocalFileItem) -> some View {
+        rowTexts(name: unsignedDisplayName(item), second: unsignedSecondLine(item), fileName: item.name)
     }
 
     /// if 两分支是两种不同 View，普通函数必须加 @ViewBuilder
@@ -3181,7 +3404,7 @@ struct FilesTabView: View {
                 workspace.selectedIPA = item.url
                 workspace.openEnterpriseSign = true
             } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     libraryIcon(for: item.url.path, signed: false)
                     unsignedRowTexts(item)
                 }
@@ -3235,8 +3458,13 @@ struct FilesTabView: View {
         // 这里清掉只留跨 App 通用项；打包名同理（不然全部产物共用
         // 同一主名、只靠 2、3… 序号区分，文件名跟 App 对不上）；
         // 包成 let，避免 var 被 Task.detached 捕获。
+        // B-2 (0.9.188)：表单 mods 已搬进共享 CertWorkspace（原来这里
+        // 造的是空 CertSignMods()，minOS/icon/plugins/strip* 全是默认
+        // 值，注释却写着“批量同样带上”）。读同一份表单 mods 再清掉
+        // 四项单 App 身份，瘦身/兼容开关与插件、图标、最低系统版本
+        // 真正带上。
         let mods: CertSignMods = {
-            var m = CertSignMods()
+            var m = workspace.mods
             m.name = ""
             m.bundleID = ""
             m.version = ""
@@ -3346,15 +3574,19 @@ struct FilesTabView: View {
         }
     }
 
+    /// 0.9.188：状态行与 fileInstallStatus 同款（VStack/HStack 间距 8，
+    /// footnote 文本 + 纯文本 footnote 按钮；fileInstallStatus 本身是
+    /// 0.9.187 已做完的外皮，不动）。logRow 本身已是文件行同款文本层，
+    /// 图标行间距 12 与 fileRow 对齐，不动。
     private var logList: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             if logEntries.isEmpty {
                 EmptyState(title: L("记录"),
                            message: L("还没有签名记录。签一次就会记一条，成功失败都有。"),
                            systemImage: "clock")
                     .padding(.vertical, 20)
             } else {
-                HStack(spacing: 12) {
+                HStack(spacing: 8) {
                     Text(L("共 %d 条", logEntries.count))
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
@@ -3362,8 +3594,7 @@ struct FilesTabView: View {
                     Button { showingLogClearConfirm = true } label: {
                         Text(L("清空"))
                     }
-                    .buttonStyle(SecondaryButtonStyle(), sound: .tap)
-                    .controlSize(.small)
+                    .font(.footnote)
                 }
                 ForEach(logEntries) { entry in
                     logRow(entry)
@@ -3699,7 +3930,7 @@ struct FilesTabView: View {
 
     private func signedRow(_ record: SignedIPARecord) -> some View {
         let iconPath = SignedIPAStore.url(for: record).path
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 4) {
             // 点行先选安装方式（配对安装 / 流量安装 OTA）；选择模式下点行改选。
             Button {
                 if selectingSigned {
@@ -3722,19 +3953,7 @@ struct FilesTabView: View {
                             .foregroundStyle(selectedSignedIDs.contains(record.id) ? Theme.accent : Theme.muted)
                     }
                     libraryIcon(for: iconPath, signed: true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(record.appName)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                        Text(signedSecondLine(record))
-                            .font(.caption)
-                            .foregroundStyle(Theme.muted)
-                            .lineLimit(1)
-                        Text(record.fileName)
-                            .font(.caption)
-                            .foregroundStyle(Theme.muted)
-                            .lineLimit(1)
-                    }
+                    rowTexts(name: record.appName, second: signedSecondLine(record), fileName: record.fileName)
                     Spacer()
                 }
             }
@@ -3969,90 +4188,133 @@ private struct FileDetailSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                detailRow(L("名字"), item.name)
-                detailRow(L("Size"), item.isDirectory
-                          ? L("%d 项", item.childCount)
-                          : ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file))
-                detailRow(L("修改时间"), item.modified?.formatted(date: .abbreviated, time: .standard) ?? L("unknown"))
-                detailRow(L("路径"), item.url.path, middleTruncation: true)
-                // F-2 (0.9.158): the IPA's own metadata — version, Bundle
-                // ID, minimum iOS — parsed already for the row's second
-                // line, so this is display only, no new parsing on the
-                // common path. Each value copies on long-press.
-                if item.isIPA, let info = shownIPAInfo {
-                    if let version = info.version, !version.isEmpty {
-                        detailRow(L("Version"), version)
-                    }
-                    if !info.bundleID.isEmpty {
-                        detailRow(L("Bundle ID"), info.bundleID)
-                    }
-                    if let minOS = info.minOS, !minOS.isEmpty {
-                        detailRow(L("Minimum iOS"), "iOS \(minOS)")
-                    }
-                }
-                if let renewalAppName {
-                    detailRow(L("续签用的应用"), renewalAppName)
-                }
-                // F-3 (0.9.169): the signing certificate's expiry — the
-                // list row only shows "剩 N 天", the exact date lives here.
-                // `expiresAt` is nil for unsigned IPAs, so this row never
-                // appears for them.
-                if let expiresAt {
-                    detailRow(L("证书到期日"), expiresAt.formatted(date: .abbreviated, time: .omitted) + remainingText(expiresAt))
-                }
-                // F-3 (0.9.163): the IPA's SHA-256, so a download can be
-                // checked for completeness or tampering before installing.
-                // The value copies on long-press like every other row
-                // (`detailRow`'s context menu); "Loading…" until the
-                // background hash lands.
-                if item.isIPA {
-                    detailRow(L("SHA-256"), sha256 ?? L("Loading…"))
-                }
-                // F-2 (0.9.167)：IPA 的 Entitlements——embedded.mobileprovision
-                // 里的权限键（推送/iCloud/App Groups 等免费证书给不了的先
-                // 在这里看见，装完才发现某功能悄悄失效之前）。只读列表，
-                // 每行长按复制；无 provision（或只有 4 个样板键）不显示该节。
-                if item.isIPA, let keys = capabilityKeys, !keys.isEmpty {
-                    Section(L("Entitlements")) {
-                        ForEach(keys, id: \.self) { key in
-                            Text(verbatim: key)
-                                .font(.subheadline)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                                .contextMenu {
-                                    Button(L("Copy")) { UIPasteboard.general.string = key }
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.spacing) {
+                    // 0.9.188：详情改走 PanelCard + SectionTitle（原来是
+                    // List + 手写 detailRow），与全 App 的卡片外皮一致；
+                    // 行内容、长按复制、操作按钮一字不动。
+                    PanelCard {
+                        VStack(alignment: .leading, spacing: Theme.spacingSmall) {
+                            SectionTitle(title: L("详情"), systemImage: "info.circle")
+                            detailRow(L("名字"), item.name)
+                            Divider()
+                            detailRow(L("Size"), item.isDirectory
+                                      ? L("%d 项", item.childCount)
+                                      : ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file))
+                            Divider()
+                            detailRow(L("修改时间"), item.modified?.formatted(date: .abbreviated, time: .standard) ?? L("unknown"))
+                            Divider()
+                            detailRow(L("路径"), item.url.path, middleTruncation: true)
+                            // F-2 (0.9.158): the IPA's own metadata — version, Bundle
+                            // ID, minimum iOS — parsed already for the row's second
+                            // line, so this is display only, no new parsing on the
+                            // common path. Each value copies on long-press.
+                            if item.isIPA, let info = shownIPAInfo {
+                                if let version = info.version, !version.isEmpty {
+                                    Divider()
+                                    detailRow(L("Version"), version)
                                 }
+                                if !info.bundleID.isEmpty {
+                                    Divider()
+                                    detailRow(L("Bundle ID"), info.bundleID)
+                                }
+                                if let minOS = info.minOS, !minOS.isEmpty {
+                                    Divider()
+                                    detailRow(L("Minimum iOS"), "iOS \(minOS)")
+                                }
+                            }
+                            if let renewalAppName {
+                                Divider()
+                                detailRow(L("续签用的应用"), renewalAppName)
+                            }
+                            // F-3 (0.9.169): the signing certificate's expiry — the
+                            // list row only shows "剩 N 天", the exact date lives here.
+                            // `expiresAt` is nil for unsigned IPAs, so this row never
+                            // appears for them.
+                            if let expiresAt {
+                                Divider()
+                                detailRow(L("证书到期日"), expiresAt.formatted(date: .abbreviated, time: .omitted) + remainingText(expiresAt))
+                            }
+                            // F-3 (0.9.163): the IPA's SHA-256, so a download can be
+                            // checked for completeness or tampering before installing.
+                            // The value copies on long-press like every other row
+                            // (`detailRow`'s context menu); "Loading…" until the
+                            // background hash lands.
+                            if item.isIPA {
+                                Divider()
+                                detailRow(L("SHA-256"), sha256 ?? L("Loading…"))
+                            }
+                        }
+                    }
+                    // F-2 (0.9.167)：IPA 的 Entitlements——embedded.mobileprovision
+                    // 里的权限键（推送/iCloud/App Groups 等免费证书给不了的先
+                    // 在这里看见，装完才发现某功能悄悄失效之前）。只读列表，
+                    // 每行长按复制；无 provision（或只有 4 个样板键）不显示该节。
+                    if item.isIPA, let keys = capabilityKeys, !keys.isEmpty {
+                        PanelCard {
+                            VStack(alignment: .leading, spacing: Theme.spacingSmall) {
+                                SectionTitle(title: L("Entitlements"), systemImage: "key")
+                                ForEach(keys, id: \.self) { key in
+                                    Text(verbatim: key)
+                                        .font(.subheadline)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                        .contextMenu {
+                                            Button(L("Copy")) { UIPasteboard.general.string = key }
+                                        }
+                                    if key != keys.last {
+                                        Divider()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    PanelCard {
+                        VStack(alignment: .leading, spacing: Theme.spacingSmall) {
+                            if !item.isDirectory {
+                                ShareLink(item: item.url) {
+                                    Label(L("分享"), systemImage: "square.and.arrow.up")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .buttonStyle(.plain)
+                                Divider()
+                            }
+                            Button {
+                                onRename()
+                            } label: {
+                                Label(L("重命名"), systemImage: "pencil")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                            Divider()
+                            Button {
+                                onMove()
+                            } label: {
+                                Label(L("移动"), systemImage: "folder")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                            Divider()
+                            Button {
+                                onDuplicate()
+                            } label: {
+                                Label(L("Copy"), systemImage: "doc.on.doc")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                            Divider()
+                            Button(role: .destructive) {
+                                onDelete()
+                            } label: {
+                                Label(L("Delete"), systemImage: "trash")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
-                Section {
-                    if !item.isDirectory {
-                        ShareLink(item: item.url) {
-                            Label(L("分享"), systemImage: "square.and.arrow.up")
-                        }
-                    }
-                    Button {
-                        onRename()
-                    } label: {
-                        Label(L("重命名"), systemImage: "pencil")
-                    }
-                    Button {
-                        onMove()
-                    } label: {
-                        Label(L("移动"), systemImage: "folder")
-                    }
-                    Button {
-                        onDuplicate()
-                    } label: {
-                        Label(L("Copy"), systemImage: "doc.on.doc")
-                    }
-                    Button(role: .destructive) {
-                        onDelete()
-                    } label: {
-                        Label(L("Delete"), systemImage: "trash")
-                    }
-                }
+                .padding(.horizontal, Theme.spacing)
+                .padding(.vertical, Theme.spacingSmall)
             }
             .navigationTitle(L("详情"))
             .navigationBarTitleDisplayMode(.inline)
