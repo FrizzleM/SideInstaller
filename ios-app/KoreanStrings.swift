@@ -1444,6 +1444,7 @@ let koreanStrings: [String: String] = [
     "This only clears the list. Installed apps are not affected.": "목록만 지워집니다. 설치된 앱에는 영향이 없습니다.",
     "empty account config": "계정 구성이 비어 있습니다",
     "%d files, first %@: %@": "%d개의 파일, 첫 번째 %@: %@",
+    "%d 个文件": "%d개의 파일",
     "%@ isn't listed": "%@가 목록에 없습니다",
     "the data couldn't be read": "데이터를 읽을 수 없습니다",
     "Couldn't reach this iPhone. Check the connection and try again.": "이 iPhone에 연결할 수 없습니다. 연결을 확인한 후 다시 시도하세요.",

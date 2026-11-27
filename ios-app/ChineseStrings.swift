@@ -1456,6 +1456,7 @@ let chineseStrings: [String: String] = [
     "This only clears the list. Installed apps are not affected.": "只清空列表，已安装的 App 不受影响。",
     "empty account config": "账号配置为空",
     "%d files, first %@: %@": "%d 个文件，首个 %@：%@",
+    "%d 个文件": "%d 个文件",
     "%@ isn't listed": "%@ 未列出",
     "the data couldn't be read": "数据无法读取",
     "Couldn't reach this iPhone. Check the connection and try again.": "连不上这台 iPhone，检查连接后重试。",

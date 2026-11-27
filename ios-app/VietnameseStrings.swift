@@ -1473,6 +1473,7 @@ let vietnameseStrings: [String: String] = [
     "This only clears the list. Installed apps are not affected.": "Chỉ xóa danh sách. Các ứng dụng đã cài đặt không bị ảnh hưởng.",
     "empty account config": "Cấu hình tài khoản trống",
     "%d files, first %@: %@": "%d tệp, tệp đầu tiên %@ : %@",
+    "%d 个文件": "%d tệp",
     "%@ isn't listed": "%@ không có trong danh sách",
     "the data couldn't be read": "Không thể đọc dữ liệu",
     "Couldn't reach this iPhone. Check the connection and try again.": "Không thể kết nối tới iPhone này. Kiểm tra kết nối rồi thử lại.",
