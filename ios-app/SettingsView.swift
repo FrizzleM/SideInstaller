@@ -215,14 +215,14 @@ struct SettingsView: View {
     /// (a builder parameter with a default is a compile risk).
     private func settingsGroup<Content: View>(
         title: String, systemImage: String,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         settingsGroup(title: title, systemImage: systemImage, content: content) { EmptyView() }
     }
 
     private func settingsGroup<Content: View, Footer: View>(
         title: String, systemImage: String,
-        @ViewBuilder content: () -> Content,
+        @ViewBuilder content: @escaping () -> Content,
         @ViewBuilder footer: () -> Footer
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
